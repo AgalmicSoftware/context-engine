@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Mechanical Phase 4 extension migration: keep legacy runtime behavior identical and tighten types separately.
 /**
  * @module contractScriptsImpl
@@ -177,6 +176,12 @@ import {
   uploadDataToArweaveWithRetry,
 } from './contractArweaveUploadRuntime.js';
 
+declare global {
+  interface Window {
+    [key: string]: any;
+  }
+}
+
 // === NEW: Porto / Passkey Sidecar ===
 import * as portoFunctions from './portoFunctions.js';
 
@@ -225,7 +230,7 @@ let GLOBAL_QUOTA_LOCK_UNTIL_MS = 0;
  * Record the last rate-limit/quota error so the UI layer (PileViewMode)
  * can decide to keep showing a spinner instead of "No questions available".
  */
-function recordRateLimitError(code, message) {
+function recordRateLimitError(code: any, message: any) {
   try {
     if (typeof window !== 'undefined') {
       window.__LAST_RPC_RATE_LIMIT_ERROR__ = {
@@ -234,14 +239,14 @@ function recordRateLimitError(code, message) {
         ts: Date.now(),
       };
     }
-  } catch (_) {
+  } catch (_: any) {
     // best effort only
   }
 }
 
 function applyWindowDebugDefaults() {
   if (typeof window === 'undefined') return;
-  const setIfUndef = (key, value) => {
+  const setIfUndef = (key: any, value: any) => {
     if (typeof window[key] === 'undefined') window[key] = value;
   };
   setIfUndef('ENABLE_RPC_DEBUG_LOGGING', ENABLE_RPC_DEBUG_LOGGING);
@@ -280,17 +285,17 @@ const _encryptedValueCache = new Map();
 /** @type {Set<string>} */
 const _decryptFailureLogCache = new Set();
 
-const toLower = (val) => toStr(val).trim().toLowerCase();
-const isObj = (val) => !!val && typeof val === 'object' && !Array.isArray(val);
+const toLower = (val: any) => toStr(val).trim().toLowerCase();
+const isObj = (val: any) => !!val && typeof val === 'object' && !Array.isArray(val);
 
-const getLitGetKey = (ctx = {}) => {
+const getLitGetKey = (ctx: any = {}) => {
   if (ctx?.litOpts && typeof ctx.litOpts.getKey === 'function') return ctx.litOpts.getKey;
   if (ctx?.litHooks && typeof ctx.litHooks.getKey === 'function') return ctx.litHooks.getKey;
   if (ctx?.lit && typeof ctx.lit.getKey === 'function') return ctx.lit.getKey;
   return null;
 };
 
-const buildDecryptContextTag = (ctx = {}) => {
+const buildDecryptContextTag = (ctx: any = {}) => {
   const account = normalizeAddress(ctx?.account || '');
   const providerLike = toLower(ctx?.providerLike || '');
   const chainId = Number(ctx?.chainId || 0) || 0;
@@ -304,7 +309,7 @@ const resolveDefaultProviderLike = () => {
     const state = store?.getState ? store.getState() : null;
     const fromStore = toStr(state?.profile?.provider || '').trim();
     if (fromStore) return fromStore;
-  } catch (err) {
+  } catch (err: any) {
     contractsLog.debug('resolveDefaultProviderLike error:', err);
   }
   if (typeof window !== 'undefined') {
@@ -316,7 +321,7 @@ const resolveDefaultProviderLike = () => {
   return 'porto_passkey';
 };
 
-const classifyDecryptFailure = (err, ctx = {}) => {
+const classifyDecryptFailure = (err: any, ctx: any = {}) => {
   const msg = toLower(err?.message || err?.reason || '');
   if (!ctx?.chainId) return 'missing-chain';
   if (!ctx?.providerLike) return 'missing-provider';
@@ -341,7 +346,7 @@ const classifyDecryptFailure = (err, ctx = {}) => {
   return 'decrypt-failed';
 };
 
-const getDecryptFailureMessage = (reason) => {
+const getDecryptFailureMessage = (reason: any) => {
   switch (reason) {
     case 'missing-chain':
       return 'Missing chainId for decrypt context.';
@@ -362,7 +367,7 @@ const getDecryptFailureMessage = (reason) => {
   }
 };
 
-const buildDecryptFailureResult = (reason, err = null) => {
+const buildDecryptFailureResult = (reason: any, err: any = null) => {
   let type = 'unknown';
   let retryable = false;
   switch (reason) {
@@ -397,7 +402,7 @@ const buildDecryptFailureResult = (reason, err = null) => {
   };
 };
 
-const isRetryableSurveyResponseReadError = (error) => {
+const isRetryableSurveyResponseReadError = (error: any) => {
   if (!error) return false;
 
   const arweaveFailure = normalizeArweaveFailureMeta(error);
@@ -470,12 +475,12 @@ const scheduleWeb3ContextCacheClear = () => {
   };
   try {
     Promise.resolve().then(clearCache);
-  } catch (_) {
+  } catch (_: any) {
     setTimeout(clearCache, 100);
   }
 };
 
-const normalizeWeb3ContextCacheValue = (value, seen = new WeakSet()) => {
+const normalizeWeb3ContextCacheValue = (value: any, seen: any = new WeakSet()): any => {
   if (value === undefined) return '__undefined__';
   if (value === null) return null;
   if (typeof value === 'symbol') return value.toString();
@@ -484,28 +489,28 @@ const normalizeWeb3ContextCacheValue = (value, seen = new WeakSet()) => {
   if (seen.has(value)) return '__circular__';
   seen.add(value);
   if (Array.isArray(value)) {
-    return value.map((item) => normalizeWeb3ContextCacheValue(item, seen));
+    return value.map((item: any) => normalizeWeb3ContextCacheValue(item, seen));
   }
-  const out = {};
-  Object.keys(value).sort().forEach((key) => {
+  const out: any = {};
+  Object.keys(value).sort().forEach((key: any) => {
     out[key] = normalizeWeb3ContextCacheValue(value[key], seen);
   });
   return out;
 };
 
-const serializeWeb3ContextCacheKey = (groupKeyOrCfg) => {
+const serializeWeb3ContextCacheKey = (groupKeyOrCfg: any) => {
   try {
     return JSON.stringify(normalizeWeb3ContextCacheValue(groupKeyOrCfg));
-  } catch (_) {
+  } catch (_: any) {
     try {
       return String(groupKeyOrCfg);
-    } catch (__){
+    } catch (__: any){
       return '__unserializable__';
     }
   }
 };
 
-export function getWeb3Context(groupKeyOrCfg) {
+export function getWeb3Context(groupKeyOrCfg: any) {
   if (groupKeyOrCfg && typeof groupKeyOrCfg === 'object' && groupKeyOrCfg._isWeb3Context === true) {
     return groupKeyOrCfg;
   }
@@ -519,7 +524,7 @@ export function getWeb3Context(groupKeyOrCfg) {
   const chainId = extractChainId(cfg);
   const readProvider = getLocalAwareReadProviderForGroup(groupKeyOrCfg);
   const addresses = getSessionAddresses(cfg);
-  const ctx = {
+  const ctx: any = {
     _isWeb3Context: true,
     cfg,
     chainId,
@@ -534,12 +539,12 @@ export function getWeb3Context(groupKeyOrCfg) {
 const SBT_READ_PROVIDER_OPTIONS = Object.freeze({ contractKey: 'sbtFactory' });
 const SURVEYS_READ_PROVIDER_OPTIONS = Object.freeze({ contractKey: 'surveys' });
 
-const getSurveysReadProviderForSession = (groupKeyOrCfg, cfg, chainId) => (
+const getSurveysReadProviderForSession = (groupKeyOrCfg: any, cfg: any, chainId: any) => (
   getReadProviderForGroup(cfg || groupKeyOrCfg, SURVEYS_READ_PROVIDER_OPTIONS) ||
   getReadProviderForChain(chainId)
 );
 
-const logDecryptFailure = (reason, err, meta = {}, ctx = {}) => {
+const logDecryptFailure = (reason: any, err: any, meta: any = {}, ctx: any = {}) => {
   const key = `${reason}|${meta?.field || ''}|${meta?.slug || ''}|${meta?.questionId || ''}|${buildDecryptContextTag(ctx)}`;
   if (_decryptFailureLogCache.has(key)) return;
   if (_decryptFailureLogCache.size >= MAX_CACHE_SIZE) {
@@ -560,7 +565,7 @@ const logDecryptFailure = (reason, err, meta = {}, ctx = {}) => {
   });
 };
 
-const getDecryptContext = (groupCfg = null, context = null) => {
+const getDecryptContext = (groupCfg: any = null, context: any = null) => {
   const ctxIn = isObj(context) ? context : {};
   let account = String(ctxIn.account || '').trim();
   let providerLike = toStr(ctxIn.providerLike || ctxIn.provider || '').trim();
@@ -570,7 +575,7 @@ const getDecryptContext = (groupCfg = null, context = null) => {
     if (!account) account = state?.profile?.account || '';
     if (!providerLike) providerLike = toStr(state?.profile?.provider || '').trim();
     if (!chainId) chainId = state?.profile?.network?.id || state?.profile?.network?.chainId || null;
-  } catch (err) {
+  } catch (err: any) {
     contractsLog.debug('getDecryptContext error:', err);
   }
   if (!providerLike) providerLike = resolveDefaultProviderLike();
@@ -594,7 +599,7 @@ const getDecryptContext = (groupCfg = null, context = null) => {
   return { account, providerLike, chainId, litOpts, litHooks };
 };
 
-const decryptEnvelopeCached = async (envelopeJson, ctx, meta = {}) => {
+const decryptEnvelopeCached = async (envelopeJson: any, ctx: any, meta: any = {}) => {
   if (!envelopeJson) return { value: null, error: null };
   const key = typeof envelopeJson === 'string'
     ? envelopeJson
@@ -637,10 +642,10 @@ const decryptEnvelopeCached = async (envelopeJson, ctx, meta = {}) => {
       const oldest = _encryptedValueCache.keys().next().value;
       _encryptedValueCache.delete(oldest);
     }
-    const result = { value, error: null };
+    const result: any = { value, error: null };
     _encryptedValueCache.set(cacheKey, result);
     return result;
-  } catch (err) {
+  } catch (err: any) {
     const reason = classifyDecryptFailure(err, ctx);
     logDecryptFailure(reason, err, meta, ctx);
     contractsLog.debug('decryptEnvelopeCached error:', err?.message || err);
@@ -648,7 +653,7 @@ const decryptEnvelopeCached = async (envelopeJson, ctx, meta = {}) => {
   }
 };
 
-const shouldPreferLitRecipientsForPayload = (payload, ctx) => {
+const shouldPreferLitRecipientsForPayload = (payload: any, ctx: any) => {
   const accountLower = toLower(ctx?.account || '');
   const creatorLower = normalizeAddress(payload?.creator || payload?.creatorAddress || '');
   return !!(
@@ -676,49 +681,49 @@ const _sbtGateAccessErrorCache = new Map();
 /** @type {Map<string, Promise<boolean|null>>} */
 const _sbtGateAccessInFlight = new Map();
 
-const normalizeGateMode = (gate = {}) => {
+const normalizeGateMode = (gate: any = {}) => {
   try {
     if (gate && gate.requireAll === true) return 'all';
     const raw = toLower(gate?.mode || gate?.operator || gate?.gateMode || gate?.require || '');
     if (raw === 'all' || raw === 'and' || raw === '1') return 'all';
-  } catch (err) {
+  } catch (err: any) {
     contractsLog.debug('normalizeGateMode error:', err);
   }
   return 'any';
 };
 
-const getGateSbtAddresses = (gate = {}) => {
-  const out = [];
+const getGateSbtAddresses = (gate: any = {}) => {
+  const out: any[] = [];
   const seen = new Set();
-  const push = (addr) => {
+  const push = (addr: any) => {
     try {
       if (!ethers.utils.isAddress(addr)) return;
       const lower = normalizeAddress(addr);
       if (seen.has(lower)) return;
       seen.add(lower);
       out.push(lower);
-    } catch (err) {
+    } catch (err: any) {
       contractsLog.debug('getGateSbtAddresses error:', err);
     }
   };
   try {
     if (Array.isArray(gate?.sbtAddresses)) gate.sbtAddresses.forEach(push);
     if (gate?.sbtAddress) push(gate.sbtAddress);
-  } catch (err) {
+  } catch (err: any) {
     contractsLog.debug('getGateSbtAddresses error:', err);
   }
   return out;
 };
 
-const extractSbtGateFromAccConditions = (accessControlConditions) => {
+const extractSbtGateFromAccConditions = (accessControlConditions: any) => {
   const conds = Array.isArray(accessControlConditions) ? accessControlConditions : [];
   if (!conds.length) return null;
 
-  const sbtAddresses = [];
+  const sbtAddresses: any[] = [];
   const seen = new Set();
   const operators = new Set();
 
-  conds.forEach((entry) => {
+  conds.forEach((entry: any) => {
     if (!entry) return;
 
     const op = entry?.operator;
@@ -737,7 +742,7 @@ const extractSbtGateFromAccConditions = (accessControlConditions) => {
 
     // Keep this conservative: only treat standard "balanceOf(:userAddress) > 0" as an SBT gate.
     const params = Array.isArray(entry.parameters) ? entry.parameters : [];
-    const hasUserParam = params.some((p) => String(p || '').trim() === ':userAddress');
+    const hasUserParam = params.some((p: any) => String(p || '').trim() === ':userAddress');
     if (!hasUserParam) return;
     const cmp = String(entry?.returnValueTest?.comparator || '').trim();
     const val = String(entry?.returnValueTest?.value || '').trim();
@@ -757,24 +762,24 @@ const extractSbtGateFromAccConditions = (accessControlConditions) => {
   return { sbtAddresses, mode };
 };
 
-const extractSbtGatesFromEnvelope = (envelopeJson) => {
+const extractSbtGatesFromEnvelope = (envelopeJson: any) => {
   if (!envelopeJson) return [];
   let env;
   try {
     env = typeof envelopeJson === 'string' ? JSON.parse(envelopeJson) : (envelopeJson || null);
-  } catch (err) {
+  } catch (err: any) {
     contractsLog.debug('extractSbtGatesFromEnvelope error:', err);
     return [];
   }
   const recipients = Array.isArray(env?.recipients) ? env.recipients : [];
-  const out = [];
+  const out: any[] = [];
   const dedupe = new Set();
 
-  recipients.forEach((r) => {
+  recipients.forEach((r: any) => {
     if (!r || r.type !== 'lit-sbt-v1' || !isObj(r.lit)) return;
     const gate = extractSbtGateFromAccConditions(r.lit.accessControlConditions);
     if (!gate) return;
-    const sig = `${gate.mode}:${gate.sbtAddresses.map((a) => a.toLowerCase()).sort().join('|')}`;
+    const sig = `${gate.mode}:${gate.sbtAddresses.map((a: any) => a.toLowerCase()).sort().join('|')}`;
     if (dedupe.has(sig)) return;
     dedupe.add(sig);
     out.push({ ...gate });
@@ -783,7 +788,7 @@ const extractSbtGatesFromEnvelope = (envelopeJson) => {
   return out;
 };
 
-const extractSbtGatesFromEncryptionMeta = (payload = {}) => {
+const extractSbtGatesFromEncryptionMeta = (payload: any = {}) => {
   const enc = isObj(payload?.encryption) ? payload.encryption : null;
   if (!enc || enc.enabled === false) return [];
 
@@ -792,14 +797,14 @@ const extractSbtGatesFromEncryptionMeta = (payload = {}) => {
     : (isObj(enc.gate) ? [enc.gate] : []);
   if (!gates.length) return [];
 
-  const out = [];
+  const out: any[] = [];
   const dedupe = new Set();
-  gates.forEach((gate) => {
+  gates.forEach((gate: any) => {
     if (!gate || typeof gate !== 'object') return;
     const sbtAddresses = getGateSbtAddresses(gate);
     if (!sbtAddresses.length) return;
     const mode = normalizeGateMode(gate);
-    const sig = `${mode}:${sbtAddresses.map((a) => a.toLowerCase()).sort().join('|')}`;
+    const sig = `${mode}:${sbtAddresses.map((a: any) => a.toLowerCase()).sort().join('|')}`;
     if (dedupe.has(sig)) return;
     dedupe.add(sig);
     out.push({ sbtAddresses, mode });
@@ -807,13 +812,13 @@ const extractSbtGatesFromEncryptionMeta = (payload = {}) => {
   return out;
 };
 
-const checkAccountSatisfiesSbtGate = async ({ account, chainId, gate, groupKeyOrCfg } = {}) => {
+const checkAccountSatisfiesSbtGate = async ({ account, chainId, gate, groupKeyOrCfg }: any = {}) => {
   const acct = normalizeAddress(account || '');
   if (!acct || !ethers.utils.isAddress(acct)) return false;
   const sbtAddresses = Array.isArray(gate?.sbtAddresses) ? gate.sbtAddresses : [];
   if (!sbtAddresses.length) return false;
   const mode = gate?.mode === 'all' ? 'all' : 'any';
-  const normalizedSbtAddresses = sbtAddresses.map((a) => normalizeAddress(a)).filter(Boolean);
+  const normalizedSbtAddresses = sbtAddresses.map((a: any) => normalizeAddress(a)).filter(Boolean);
   if (!normalizedSbtAddresses.length) return false;
   const addressesKey = normalizedSbtAddresses.slice().sort().join('|');
   const cacheKey = `${acct}:${String(chainId || '')}:${mode}:${addressesKey}`;
@@ -836,7 +841,7 @@ const checkAccountSatisfiesSbtGate = async ({ account, chainId, gate, groupKeyOr
   const run = (async () => {
     try {
       const checks = await Promise.all(
-        normalizedSbtAddresses.map((addr) =>
+        normalizedSbtAddresses.map((addr: any) =>
           // Reads only; uses group-aware chain provider resolution.
           contractScripts.userHasSBT('none', addr, acct, 0, 'latest', groupKeyOrCfg)
         )
@@ -845,7 +850,7 @@ const checkAccountSatisfiesSbtGate = async ({ account, chainId, gate, groupKeyOr
       _sbtGateAccessCache.set(cacheKey, { ts: Date.now(), value: has });
       _sbtGateAccessErrorCache.delete(cacheKey);
       return has;
-    } catch (_) {
+    } catch (_: any) {
       contractsLog.debug('checkAccountSatisfiesSbtGate error:', _);
       // Unknown (RPC/etc) - do not overwrite the last known value; just throttle retries briefly.
       _sbtGateAccessErrorCache.set(cacheKey, { ts: Date.now() });
@@ -863,7 +868,7 @@ const checkAccountSatisfiesSbtGate = async ({ account, chainId, gate, groupKeyOr
   }
 };
 
-const shouldAttemptGateDecrypt = async ({ payload, encryptedFields, ctx, groupKeyOrCfg } = {}) => {
+const shouldAttemptGateDecrypt = async ({ payload, encryptedFields, ctx, groupKeyOrCfg }: any = {}) => {
   // 1) Creator can always decrypt via self recipient; skip gate checks.
   const accountLower = toLower(ctx?.account || '');
   const creatorLower = normalizeAddress(payload?.creator || payload?.creatorAddress || '');
@@ -913,7 +918,7 @@ const shouldAttemptGateDecrypt = async ({ payload, encryptedFields, ctx, groupKe
   return hasUnknownGate;
 };
 
-const maybeDecryptSurveyPayload = async (surveyData, groupKeyOrCfg, opts = {}) => {
+const maybeDecryptSurveyPayload = async (surveyData: any, groupKeyOrCfg: any, opts: any = {}) => {
   if (!surveyData || typeof surveyData !== 'object') return surveyData;
   const encryptedTitle = surveyData.titleEncrypted || surveyData.encryptedTitle || null;
   const encryptedDocs = surveyData.documentURLsEncrypted || surveyData.docUrlsEncrypted || null;
@@ -970,7 +975,7 @@ const maybeDecryptSurveyPayload = async (surveyData, groupKeyOrCfg, opts = {}) =
   return surveyData;
 };
 
-const maybeDecryptQuestionPayload = async (questionData, groupKeyOrCfg, opts = {}) => {
+const maybeDecryptQuestionPayload = async (questionData: any, groupKeyOrCfg: any, opts: any = {}) => {
   if (!questionData || typeof questionData !== 'object') return questionData;
   const encryptedPrompt = questionData.promptEncrypted || questionData.encryptedPrompt || null;
   const encryptedOptions = questionData.optionsEncrypted || questionData.encryptedOptions || null;
@@ -1045,7 +1050,7 @@ const maybeDecryptQuestionPayload = async (questionData, groupKeyOrCfg, opts = {
   return questionData;
 };
 
-function recordRpcStat(fnName, meta) {
+function recordRpcStat(fnName: any, meta: any) {
   try {
     if (typeof window === 'undefined') return;
     const enabled =
@@ -1057,7 +1062,7 @@ function recordRpcStat(fnName, meta) {
     const stats = window.__RPC_STATS__ || { counts: {}, recent: [] };
     stats.counts[key] = (stats.counts[key] || 0) + 1;
 
-    const entry = { ts: Date.now(), fn: key };
+    const entry: any = { ts: Date.now(), fn: key };
     if (meta && typeof meta === 'object') entry.meta = meta;
     if (window.ENABLE_RPC_DEBUG_TRACE === true) {
       const stack = new Error().stack;
@@ -1067,17 +1072,17 @@ function recordRpcStat(fnName, meta) {
     stats.recent.push(entry);
     if (stats.recent.length > RPC_STATS_MAX) stats.recent.shift();
     window.__RPC_STATS__ = stats;
-  } catch (_) {
+  } catch (_: any) {
     // best effort only
   }
 }
 
 async function withRetry(
-  taskFn,
-  functionName          = 'anonymous-fn',
-  maxRetries            = MAX_RETRIES_DEFAULT,
-  initialDelayMs        = INITIAL_DELAY_MS_DEFAULT,
-  delayMultiplier       = DELAY_MULTIPLIER_DEFAULT
+  taskFn: any,
+  functionName: any          = 'anonymous-fn',
+  maxRetries: any            = MAX_RETRIES_DEFAULT,
+  initialDelayMs: any        = INITIAL_DELAY_MS_DEFAULT,
+  delayMultiplier: any       = DELAY_MULTIPLIER_DEFAULT
 ) {
   let attempt = 0, delayMs = initialDelayMs;
 
@@ -1087,13 +1092,13 @@ async function withRetry(
       // Surface a synthetic 402 so UI can treat this like a global rate-limit state
       recordRateLimitError(402, `[withRetry] RPC quota lock active; skipping ${functionName}`);
       const err = new Error(`[withRetry] RPC quota lock active; skipping ${functionName}`);
-      err.code = 402;
+      (err as any).code = 402;
       throw err;
     }
 
     try {
       return await taskFn();
-    } catch (err) {
+    } catch (err: any) {
       const rawCode = err?.code ?? err?.error?.code;
       let code = Number.isFinite(Number(rawCode)) ? Number(rawCode) : null;
       const message = (err?.message || err?.error?.message || '').toLowerCase();
@@ -1165,14 +1170,14 @@ async function withRetry(
         `[withRetry] 🔄  ${functionName}: rate-limited (code=${code}), ` +
         `retry ${attempt}/${maxRetries} in ${capped} ms.`
       );
-      await new Promise((r) => setTimeout(r, capped));
+      await new Promise((r: any) => setTimeout(r, capped));
       delayMs *= delayMultiplier;
     }
   }
 }
 
 
-const callWithRetry = (fn, fnName, meta, retryOpts = null) => {
+const callWithRetry = (fn: any, fnName: any, meta?: any, retryOpts: any = null) => {
   const maxRetries = Number(retryOpts?.maxRetries);
   const initialDelayMs = Number(retryOpts?.initialDelayMs);
   const delayMultiplier = Number(retryOpts?.delayMultiplier);
@@ -1206,15 +1211,15 @@ export { getReadProviderForGroup, getReadProviderForSession };
 /* ------------------------------------------------------------------ */
 /* 4.  DEBUG LOG HELPER                                               */
 /* ------------------------------------------------------------------ */
-const rpcLog = (...args) => {
+const rpcLog = (...args: any[]) => {
   rpcLogger.log(...args);
 };
 
-const cloneJsonSafe = (value) => {
+const cloneJsonSafe = (value: any) => {
   if (value == null) return value;
   try {
     return JSON.parse(JSON.stringify(value));
-  } catch (_) {
+  } catch (_: any) {
     return value;
   }
 };
@@ -1253,29 +1258,29 @@ const { recordTerminalArweaveInvalidFailure, downloadArweaveTextForGroup } = cre
   readArweaveTxCacheEntry,
   writeArweaveTxCacheEntry,
   readArweaveTxFailureCacheEntry,
-  writeArweaveTxFailureCacheEntry,
+  writeArweaveTxFailureCacheEntry: writeArweaveTxFailureCacheEntry as any,
   clearArweaveTxFailureCacheEntry,
   runArweaveTxFetchCoalesced,
-  buildArweaveDebugContext,
+  buildArweaveDebugContext: buildArweaveDebugContext as any,
 });
 
-const resolveStorageSessionSlug = (groupKeyOrCfg, cfg = null) => {
+const resolveStorageSessionSlug = (groupKeyOrCfg: any, cfg: any = null) => {
   const fromCfg = normalizeSessionSlug(cfg?.slug || cfg?.sessionSlug || '');
   if (fromCfg) return fromCfg;
   if (typeof groupKeyOrCfg === 'string') return normalizeSessionSlug(groupKeyOrCfg);
   return normalizeSessionSlug(groupKeyOrCfg?.slug || groupKeyOrCfg?.sessionSlug || '');
 };
 
-const resolveStorageBackendForResource = (cfg, resource, opts = {}) => resolveSessionStorageBackend(cfg, {
+const resolveStorageBackendForResource = (cfg: any, resource: any, opts: any = {}) => resolveSessionStorageBackend(cfg, {
   resource,
   encrypted: opts.encrypted === true,
 });
 
-const isCloudflareStorageResource = (cfg, resource, opts = {}) => (
+const isCloudflareStorageResource = (cfg: any, resource: any, opts: any = {}) => (
   resolveStorageBackendForResource(cfg, resource, opts) === STORAGE_BACKENDS.CLOUDFLARE
 );
 
-const payloadPointerIdToBytes32 = (id, label = 'storage pointer') => {
+const payloadPointerIdToBytes32 = (id: any, label: any = 'storage pointer') => {
   const pointerId = toStr(id).trim();
   if (!pointerId) throw new Error(`${label}: missing storage pointer id.`);
   const hex = arweaveScripts.base64urlToHex(pointerId);
@@ -1293,7 +1298,7 @@ const uploadJsonPayloadForContractPointer = async ({
   arweaveUploadOpts,
   uploadWithRetry = false,
   storageContext = {},
-}) => {
+}: any) => {
   const payloadString = JSON.stringify(payload);
   if (isCloudflareStorageResource(cfg, resource)) {
     const sessionSlug = resolveStorageSessionSlug(groupKeyOrCfg, cfg);
@@ -1338,7 +1343,7 @@ const readCloudflarePointerTextForGroup = async ({
   resource,
   groupKeyOrCfg,
   cfg,
-}) => {
+}: any) => {
   const storageRef = normalizeStorageRef({
     backend: STORAGE_BACKENDS.CLOUDFLARE,
     id: pointerId,
@@ -1364,11 +1369,11 @@ const readPayloadPointerTextForGroup = async ({
   groupKeyOrCfg,
   cfg,
   arweaveOpts,
-}) => {
+}: any) => {
   if (isCloudflareStorageResource(cfg, resource)) {
     try {
       return await readCloudflarePointerTextForGroup({ pointerId, resource, groupKeyOrCfg, cfg });
-    } catch (cloudflareError) {
+    } catch (cloudflareError: any) {
       contractsLog.warn(`Cloudflare ${resource} payload read failed; trying legacy Arweave fallback.`, cloudflareError);
       if (!ARWEAVE_ACTIVE) throw cloudflareError;
     }
@@ -1384,7 +1389,7 @@ const readPayloadPointerTextForGroup = async ({
   };
 };
 
-const attachPayloadPointerFields = (payload, pointerId, resource, storageRef = null) => (
+const attachPayloadPointerFields = (payload: any, pointerId: any, resource: any, storageRef: any = null) => (
   attachStorageRefCompatibilityFields({
     ...(payload || {}),
     ...(storageRef?.backend === STORAGE_BACKENDS.CLOUDFLARE
@@ -1394,7 +1399,7 @@ const attachPayloadPointerFields = (payload, pointerId, resource, storageRef = n
   }, { resource })
 );
 
-const recordInFlightStat = (kind = 'miss') => {
+const recordInFlightStat = (kind: any = 'miss') => {
   try {
     if (typeof window === 'undefined') return;
     const stats = window.__RPC_STATS__ || { counts: {}, recent: [] };
@@ -1402,12 +1407,12 @@ const recordInFlightStat = (kind = 'miss') => {
     inflight[kind] = Number(inflight[kind] || 0) + 1;
     stats.inflight = inflight;
     window.__RPC_STATS__ = stats;
-  } catch (_) {
+  } catch (_: any) {
     // best effort only
   }
 };
 
-const runInFlightCoalesced = async (map, key, task) => {
+const runInFlightCoalesced = async (map: any, key: any, task: any) => {
   if (map.has(key)) {
     recordInFlightStat('hit');
     return await map.get(key);
@@ -1422,7 +1427,7 @@ const runInFlightCoalesced = async (map, key, task) => {
   }
 };
 
-const buildDecryptModeTag = (opts = {}) => {
+const buildDecryptModeTag = (opts: any = {}) => {
   const skipDecrypt = !!(opts && (opts.skipDecrypt || opts.decrypt === false));
   if (skipDecrypt) return 'raw';
   const ctx = opts?.decryptContext || {};
@@ -1437,11 +1442,11 @@ const buildDecryptModeTag = (opts = {}) => {
   return `decrypt|${account}|${providerLike}|${chainId}|lit:${hasLit ? '1' : '0'}`;
 };
 
-const buildFailureModeTag = (opts = {}) => (
+const buildFailureModeTag = (opts: any = {}) => (
   opts && opts.throwOnFailure ? 'strict' : 'soft'
 );
 
-const buildArweaveReadModeTag = (opts = {}) => {
+const buildArweaveReadModeTag = (opts: any = {}) => {
   const retries = Number.isFinite(Number(opts?.arweaveRetries))
     ? Math.max(0, Number(opts.arweaveRetries))
     : 'default';
@@ -1451,7 +1456,7 @@ const buildArweaveReadModeTag = (opts = {}) => {
   return `arweave|retries:${retries}|timeout:${gatewayTimeoutMs}`;
 };
 
-const contractHelperDeps = {
+const contractHelperDeps: any = {
   resolveSession,
   latestBlockCache,
   gasPriceCache,
@@ -1477,7 +1482,7 @@ const contractHelperDeps = {
   fetchWorkerWithAuth,
 };
 
-const contractEventListenerDeps = {
+const contractEventListenerDeps: any = {
   resolveSession,
   getSessionAddresses,
   contractsLog,
@@ -1491,7 +1496,7 @@ const contractEventListenerDeps = {
   shouldLog,
 };
 
-const contractProfileDeps = {
+const contractProfileDeps: any = {
   resolveSession,
   getReadProviderForChain: getLocalAwareReadProviderForChain,
   getReadProviderForGroup: getLocalAwareReadProviderForGroup,
@@ -1519,7 +1524,7 @@ async function resolveGroupPasswordWalletScopeSbtAddress({
   sbtAddress,
   walletScopeSbtAddress,
   getGroupPasswordHashFn,
-}) {
+}: any) {
   if (typeof walletScopeSbtAddress !== 'undefined') {
     return walletScopeSbtAddress;
   }
@@ -1536,7 +1541,7 @@ async function resolveGroupPasswordWalletScopeSbtAddress({
         return resolved;
       }
     }
-  } catch (_) {
+  } catch (_: any) {
     // Fall back to SBT-scoped signing below when the hash cannot be read.
   }
 
@@ -1547,26 +1552,26 @@ async function resolveGroupPasswordWalletScopeSbtAddress({
 /* 5.  MAIN LIBRARY                                                   */
 /* ------------------------------------------------------------------ */
 
-const contractScripts = {
+const contractScripts: any = {
   _blockCache: {}, // For the memoized getBlockWithCaching
 
   // --- NEW: Expose Porto Auth for UI ---
   authenticatePorto: portoFunctions.authenticatePorto,
 
-  invalidateReadCachesForGroup: (groupKeyOrCfg = null) => {
+  invalidateReadCachesForGroup: (groupKeyOrCfg: any = null) => {
     clearReadCachesForGroup(groupKeyOrCfg);
   },
   ...createContractHelperMethods(contractHelperDeps),
   ...createContractEventListenerMethods(contractEventListenerDeps),
 
-  async fetchAllQuestionIDs(providerName, fromBlock = null, toBlock = null, groupKeyOrCfg = null) {
+  async fetchAllQuestionIDs(providerName: any, fromBlock: any = null, toBlock: any = null, groupKeyOrCfg: any = null) {
   const cfg    = resolveSession(groupKeyOrCfg || '');
   const gAddrs = getSessionAddresses(cfg);
   const addr   = (gAddrs.surveys?.address);
   const chId   = (gAddrs.surveys?.chainId) || (cfg?.networkChainId) || undefined;
 
   const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
-  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider);
+  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider as any);
   const questionsAddedEventFilter = SurveyContract.filters.QuestionsAdded(null, null, null);
 
   // Per-group base window + clamp caller overrides
@@ -1588,12 +1593,12 @@ const contractScripts = {
   });
 
   const rawLogs = await fetchLogsSmartWithProvider(provider, questionsAddedEventFilter, fromBlockNum, toBlockNum);
-  const events = rawLogs.map(log => SURVEYS_INTERFACE.parseLog(log));
+  const events = rawLogs.map((log: any) => SURVEYS_INTERFACE.parseLog(log));
 
   const questionIDSet = new Set();
-  events.forEach(event => {
+  events.forEach((event: any) => {
     const questionIds = event.args.questionIds;
-    questionIds.forEach(id => {
+    questionIds.forEach((id: any) => {
       if (id && id !== ethers.constants.HashZero) {
         questionIDSet.add(id.toLowerCase());
       }
@@ -1604,13 +1609,13 @@ const contractScripts = {
 
   // === CHANGED: +groupKeyOrCfg (optional). Uses group provider/addr and clamps
   async getAllQuestionIDsChunkedWithCallback(
-    providerName,
-    fromBlock = 0,
-    toBlock = 'latest',
-    onChunkProgress = null,
-    onPartialData = null,
-    groupKeyOrCfg,
-    scanOptions = null
+    providerName: any,
+    fromBlock: any = 0,
+    toBlock: any = 'latest',
+    onChunkProgress: any = null,
+    onPartialData: any = null,
+    groupKeyOrCfg: any,
+    scanOptions: any = null
   ) {
     const cfg    = resolveSession(groupKeyOrCfg || '');
     const gAddrs = getSessionAddresses(cfg);
@@ -1625,7 +1630,7 @@ const contractScripts = {
     }
 
     const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
-    const contract = new ethers.Contract(addr, SURVEYS, provider);
+    const contract = new ethers.Contract(addr, SURVEYS, provider as any);
     const questionsAddedEventFilter = contract.filters.QuestionsAdded();
     const rpcDebugContext = normalizeRpcDebugContext(scanOptions?.rpcDebugContext) || null;
 
@@ -1657,7 +1662,7 @@ const contractScripts = {
         toBlock: resolvedToBlockNum,
         totalBlocks: totalRangeBlocks,
         scannedBlocks: 0,
-        onProgress: (p) => {
+        onProgress: (p: any) => {
           const totalBlocks = Math.max(0, Number(p?.totalBlocks || totalRangeBlocks));
           const doneSoFarBlocks = Math.max(0, Math.min(totalBlocks, Number(p?.scannedBlocks || 0)));
           const remainingBlocks = Math.max(0, Number(p?.remainingBlocks ?? (totalBlocks - doneSoFarBlocks)));
@@ -1686,13 +1691,13 @@ const contractScripts = {
         progressState,
         rpcDebugContext
       );
-      const allEvents = rawLogs.map(log => SURVEYS_INTERFACE.parseLog(log));
+      const allEvents = rawLogs.map((log: any) => SURVEYS_INTERFACE.parseLog(log));
 
       const questionIDSet = new Set();
-      allEvents.forEach((ev) => {
+      allEvents.forEach((ev: any) => {
         const qArr = ev.args.questionIds;
         if (qArr && Array.isArray(qArr)) {
-          qArr.forEach((qId) => {
+          qArr.forEach((qId: any) => {
             if (qId && qId !== ethers.constants.HashZero) {
               questionIDSet.add(qId.toLowerCase());
             }
@@ -1722,28 +1727,28 @@ const contractScripts = {
       }
 
       return finalQIDs;
-    } catch(error) {
+    } catch(error: any) {
       contractsLog.error("getAllQuestionIDsChunkedWithCallback failed:", error);
       throw error;
     }
   },
 
-  async getResponsesByQuestionID(providerName, questionId, fromBlock = null, toBlock = null, groupKeyOrCfg = null) {
+  async getResponsesByQuestionID(providerName: any, questionId: any, fromBlock: any = null, toBlock: any = null, groupKeyOrCfg: any = null) {
   const cfg    = resolveSession(groupKeyOrCfg || '');
   const gAddrs = getSessionAddresses(cfg);
   const addr   = (gAddrs.surveys?.address);
   const chId   = (gAddrs.surveys?.chainId) || (cfg?.networkChainId) || undefined;
 
   const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
-  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider);
+  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider as any);
   const responseSubmittedEventFilter = SurveyContract.filters.ResponsesSubmitted();
 
   // 🔐 Normalize
-  const ensureHash = (v) => {
+  const ensureHash = (v: any) => {
     try {
       if (cryptoUtils && typeof cryptoUtils.hashIdentifier === 'function') return cryptoUtils.hashIdentifier(v);
-    } catch (_) {}
-    try { if (utils.isHexString(v, 32)) return String(v).toLowerCase(); } catch (_) {}
+    } catch (_: any) {}
+    try { if (utils.isHexString(v, 32)) return String(v).toLowerCase(); } catch (_: any) {}
     const s = (v === null || v === undefined) ? '' : String(v);
     return s.trim() === '' ? ethers.constants.HashZero : utils.id(s);
   };
@@ -1768,17 +1773,17 @@ const contractScripts = {
     address: SurveyContract.address, fromBlock: fromBlockNum, toBlock: toBlockNum
   });
   const rawLogs = await fetchLogsSmartWithProvider(provider, responseSubmittedEventFilter, fromBlockNum, toBlockNum);
-  const events = rawLogs.map(log => SURVEYS_INTERFACE.parseLog(log));
+  const events = rawLogs.map((log: any) => SURVEYS_INTERFACE.parseLog(log));
 
   const responses = await Promise.all(
     events
-      .filter(event => {
+      .filter((event: any) => {
         try {
-          const evIds = (event.args.questionIds || []).map((x) => String(x).toLowerCase());
+          const evIds = (event.args.questionIds || []).map((x: any) => String(x).toLowerCase());
           return evIds.includes(qIdB32.toLowerCase());
-        } catch (_) { return false; }
+        } catch (_: any) { return false; }
       })
-      .map(async event => {
+      .map(async (event: any) => {
         const responder = event.args.responder;
         const surveyId = event.args.surveyId;
         let blockTimestamp = 0;
@@ -1787,13 +1792,13 @@ const contractScripts = {
             if (blockData) {
                 blockTimestamp = blockData.timestamp;
             }
-        } catch (e) { /* ignore */ }
+        } catch (e: any) { /* ignore */ }
         let responseData = null;
         try {
           responseData = await this.getResponse(providerName, responder, qIdB32, groupKeyOrCfg, {
             _resolvedCfg: cfg,
           });
-        } catch (e) {
+        } catch (e: any) {
           contractsLog.warn('[getResponsesByQuestionID] individual response read failed; skipping', { responder, qId: qIdB32, error: e?.message });
         }
         return {
@@ -1808,10 +1813,10 @@ const contractScripts = {
   return responses;
 },
 
-  submitSurveyResponse: async function(providerName, surveyId, arweaveHash, groupKeyOrCfg = null) {
+  submitSurveyResponse: async function(providerName: any, surveyId: any, arweaveHash: any, groupKeyOrCfg: any = null) {
   if (providerName === 'none') throw new Error('submitSurveyResponse requires a signer-capable provider (not read-only).');
   const providerLocation = contractScripts.getProviderLocation(providerName);
-  const ethersProvider = new ethers.providers.Web3Provider(providerLocation, 'any');
+  const ethersProvider = new ethers.providers.Web3Provider(providerLocation as any, 'any');
   const signer = ethersProvider.getSigner();
 
   // === Address resolution (group-aware; no SURVEYS_ADDRESS fallback)
@@ -1822,14 +1827,14 @@ const contractScripts = {
     contractsLog.log('[submitSurveyResponse] Missing surveys address in group config; aborting tx.');
     return; // early return, no throw
   }
-  const SurveyContract = new ethers.Contract(addr, SURVEYS, signer);
+  const SurveyContract = new ethers.Contract(addr, SURVEYS, signer as any);
 
   // 🔐 Normalize & preflight
-  const ensureHash = (v) => {
+  const ensureHash = (v: any) => {
     try {
       if (cryptoUtils && typeof cryptoUtils.hashIdentifier === 'function') return cryptoUtils.hashIdentifier(v);
-    } catch (_) {}
-    try { if (utils.isHexString(v, 32)) return String(v).toLowerCase(); } catch (_) {}
+    } catch (_: any) {}
+    try { if (utils.isHexString(v, 32)) return String(v).toLowerCase(); } catch (_: any) {}
     const s = (v === null || v === undefined) ? '' : String(v);
     return s.trim() === '' ? ethers.constants.HashZero : utils.id(s);
   };
@@ -1865,20 +1870,20 @@ const contractScripts = {
 },
 
   predictSBTAddress: async function(
-    providerName,
-    name,
-    symbol,
-    limitedNumber,
-    adminAddress,
-    mintingEndTime,
-    hasPasswordMint,
-    burnAuth,
-    hashedPasswords,
-    tokenURI,
-    groupPasswordHash = ethers.constants.HashZero,
-    groupKeyOrCfg = null,
-    create2Salt = '',
-    predictOptions = {}
+    providerName: any,
+    name: any,
+    symbol: any,
+    limitedNumber: any,
+    adminAddress: any,
+    mintingEndTime: any,
+    hasPasswordMint: any,
+    burnAuth: any,
+    hashedPasswords: any,
+    tokenURI: any,
+    groupPasswordHash: any = ethers.constants.HashZero,
+    groupKeyOrCfg: any = null,
+    create2Salt: any = '',
+    predictOptions: any = {}
   ) {
     const create2SaltNormalized = normalizeCreate2Salt(create2Salt);
     if (!create2SaltNormalized) {
@@ -1910,16 +1915,16 @@ const contractScripts = {
     if (chainId) {
       try {
         provider = getReadProviderForChain(chainId);
-      } catch (_) {
+      } catch (_: any) {
         provider = null;
       }
     }
     if (!provider) {
       const providerLocation = contractScripts.getProviderLocation(providerName);
-      provider = new ethers.providers.Web3Provider(providerLocation);
+      provider = new ethers.providers.Web3Provider(providerLocation as any);
     }
 
-    const SBTFactory = new ethers.Contract(addr, SBT_FACTORY_ABI, provider);
+    const SBTFactory = new ethers.Contract(addr, SBT_FACTORY_ABI, provider as any);
     try {
       if (useConfiguredDeterministic) {
         return await SBTFactory.predictConfiguredSBTAddress(
@@ -1948,7 +1953,7 @@ const contractScripts = {
         tokenURI,
         groupPasswordHash
       );
-    } catch (err) {
+    } catch (err: any) {
       const normalizedError = useConfiguredDeterministic
         ? maybeWrapUnsupportedConfiguredDeterministicFactoryError(err, addr)
         : err;
@@ -1958,16 +1963,16 @@ const contractScripts = {
   },
 
 
-  async getSurveyResponsesByAddress(providerName, userAddress, fromBlock = null, toBlock = null, groupKeyOrCfg = null) {
+  async getSurveyResponsesByAddress(providerName: any, userAddress: any, fromBlock: any = null, toBlock: any = null, groupKeyOrCfg: any = null) {
   // Ensure user-profile scans do not inherit stale latest-block bounds.
-  latestBlockCache._map = {};
+  (latestBlockCache as any)._map = {};
   const cfg    = resolveSession(groupKeyOrCfg || '');
   const gAddrs = getSessionAddresses(cfg);
   const addr   = (gAddrs.surveys?.address);
   const chId   = (gAddrs.surveys?.chainId) || (cfg?.networkChainId) || undefined;
 
   const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
-  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider);
+  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider as any);
   const responseSubmittedEventTopic = SurveyContract.filters.ResponsesSubmitted(userAddress, null, null);
 
   // Per-group base window + clamp caller overrides
@@ -1988,20 +1993,20 @@ const contractScripts = {
     address: SurveyContract.address, fromBlock: fromBlockNum, toBlock: toBlockNum
   });
   const rawLogs = await fetchLogsSmartWithProvider(provider, responseSubmittedEventTopic, fromBlockNum, toBlockNum);
-  const surveyResponseEvents = rawLogs.map(log => SURVEYS_INTERFACE.parseLog(log));
+  const surveyResponseEvents = rawLogs.map((log: any) => SURVEYS_INTERFACE.parseLog(log));
 
-  var surveyIDs = surveyResponseEvents.map(event => event.args.surveyId);
+  var surveyIDs = surveyResponseEvents.map((event: any) => event.args.surveyId);
   return surveyIDs;
 },
 
-  async getSurveyResponses(providerName, fromCustomBlock = 0, toCustomBlock = 'latest', groupKeyOrCfg = null) {
+  async getSurveyResponses(providerName: any, fromCustomBlock: any = 0, toCustomBlock: any = 'latest', groupKeyOrCfg: any = null) {
   const cfg    = resolveSession(groupKeyOrCfg || '');
   const gAddrs = getSessionAddresses(cfg);
   const addr   = (gAddrs.surveys?.address);
   const chId   = (gAddrs.surveys?.chainId) || (cfg?.networkChainId) || undefined;
 
   const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
-  const contract = new ethers.Contract(addr, SURVEYS, provider);
+  const contract = new ethers.Contract(addr, SURVEYS, provider as any);
   const responsesSubmittedEventFilter = contract.filters.ResponsesSubmitted(null, null, null);
 
   // Per-group base window + clamp caller overrides
@@ -2022,9 +2027,9 @@ const contractScripts = {
     address: contract.address, fromBlock, toBlock
   });
   const rawLogs = await fetchLogsSmartWithProvider(provider, responsesSubmittedEventFilter, fromBlock, toBlock);
-  const events = rawLogs.map(log => SURVEYS_INTERFACE.parseLog(log));
+  const events = rawLogs.map((log: any) => SURVEYS_INTERFACE.parseLog(log));
 
-  const surveyResponses = {};
+  const surveyResponses: any = {};
   for (const event of events) {
     const responder = event.args.responder.toLowerCase();
     const surveyId = event.args.surveyId.toLowerCase();
@@ -2039,14 +2044,14 @@ const contractScripts = {
   return surveyResponses;
 },
 
-  async getSurveysCreatedByAddress(providerName, userAddress, fromBlock = null, toBlock = null, groupKeyOrCfg = null) {
+  async getSurveysCreatedByAddress(providerName: any, userAddress: any, fromBlock: any = null, toBlock: any = null, groupKeyOrCfg: any = null) {
   const cfg    = resolveSession(groupKeyOrCfg || '');
   const gAddrs = getSessionAddresses(cfg);
   const addr   = (gAddrs.surveys?.address);
   const chId   = (gAddrs.surveys?.chainId) || (cfg?.networkChainId) || undefined;
 
   const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
-  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider);
+  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider as any);
   const surveyCreatedEventTopic = SurveyContract.filters.SurveyAdded(userAddress, null);
 
   // Per-group base window + clamp caller overrides
@@ -2067,18 +2072,18 @@ const contractScripts = {
     address: SurveyContract.address, fromBlock: fromBlockNum, toBlock: toBlockNum
   });
   const rawLogs = await fetchLogsSmartWithProvider(provider, surveyCreatedEventTopic, fromBlockNum, toBlockNum);
-  const events = rawLogs.map(log => SURVEYS_INTERFACE.parseLog(log));
+  const events = rawLogs.map((log: any) => SURVEYS_INTERFACE.parseLog(log));
 
-  var surveyIDs = events.map(event => event.args.surveyId);
+  var surveyIDs = events.map((event: any) => event.args.surveyId);
   return surveyIDs;
 },
 
   async getQuestionResponses(
-  providerName,
-  fromCustomBlock = 0,
-  toCustomBlock = 'latest',
-  onChunkProgress = null,
-  groupKeyOrCfg = null
+  providerName: any,
+  fromCustomBlock: any = 0,
+  toCustomBlock: any = 'latest',
+  onChunkProgress: any = null,
+  groupKeyOrCfg: any = null
 ) {
   const cfg    = resolveSession(groupKeyOrCfg || '');
   const gAddrs = getSessionAddresses(cfg);
@@ -2086,7 +2091,7 @@ const contractScripts = {
   const chId   = (gAddrs.surveys?.chainId) || (cfg?.networkChainId) || undefined;
 
   const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
-  const contract = new ethers.Contract(addr, SURVEYS, provider);
+  const contract = new ethers.Contract(addr, SURVEYS, provider as any);
   const responsesSubmittedEventFilter = contract.filters.ResponsesSubmitted(null, null, null);
 
   // Per-group base window + clamp caller overrides
@@ -2109,24 +2114,24 @@ const contractScripts = {
     address: contract.address, fromBlock, toBlock
   });
   const rawLogs = await fetchLogsSmartWithProvider(provider, responsesSubmittedEventFilter, fromBlock, toBlock);
-  const allEventData = rawLogs.map(log => SURVEYS_INTERFACE.parseLog(log));
+  const allEventData = rawLogs.map((log: any) => SURVEYS_INTERFACE.parseLog(log));
 
-  const questionResponses = {};
+  const questionResponses: any = {};
   await Promise.all(
-    allEventData.map(async (event) => {
+    allEventData.map(async (event: any) => {
       const responder = event.args.responder.toLowerCase();
-      const questionIds = event.args.questionIds.map((q) => q.toLowerCase());
+      const questionIds = event.args.questionIds.map((q: any) => q.toLowerCase());
 
       const respArray = await Promise.all(
-        questionIds.map((qId) => this.getResponse(providerName, responder, qId, groupKeyOrCfg, {
+        questionIds.map((qId: any) => this.getResponse(providerName, responder, qId, groupKeyOrCfg, {
           _resolvedCfg: cfg,
-        }).catch((e) => {
+        }).catch((e: any) => {
           contractsLog.warn('[getQuestionResponses] individual response read failed; skipping', { qId, error: e?.message });
           return null;
         }))
       );
 
-      respArray.forEach((responseData, idx) => {
+      respArray.forEach((responseData: any, idx: any) => {
         if (responseData) {
           const qId = questionIds[idx];
           if (!questionResponses[qId]) questionResponses[qId] = {};
@@ -2151,12 +2156,12 @@ const contractScripts = {
 },
 
   async getQuestionResponsesChunkedWithCallback(
-  providerName,
-  fromCustomBlock = 0,
-  toCustomBlock = 'latest',
-  onChunkProgress = null,
-  onPartialData = null,
-  groupKeyOrCfg
+  providerName: any,
+  fromCustomBlock: any = 0,
+  toCustomBlock: any = 'latest',
+  onChunkProgress: any = null,
+  onPartialData: any = null,
+  groupKeyOrCfg: any
 ) {
   let resolvedFromBlockNum;
   let resolvedToBlockNum;
@@ -2176,7 +2181,7 @@ const contractScripts = {
 
     const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
 
-    const contract = new ethers.Contract(addr, SURVEYS, provider);
+    const contract = new ethers.Contract(addr, SURVEYS, provider as any);
     const responsesSubmittedEventFilter = contract.filters.ResponsesSubmitted(null, null, null);
 
     // Per-group base window + clamp caller overrides
@@ -2200,7 +2205,7 @@ const contractScripts = {
       contractAddress: contract.address, fromBlock: resolvedFromBlockNum, toBlock: resolvedToBlockNum
     });
     const rawLogs = await fetchLogsSmartWithProvider(provider, responsesSubmittedEventFilter, resolvedFromBlockNum, resolvedToBlockNum);
-    const parsedEvents = rawLogs.map((log) => ({
+    const parsedEvents = rawLogs.map((log: any) => ({
       event: SURVEYS_INTERFACE.parseLog(log),
       blockNumber: Number(log?.blockNumber || 0),
       transactionIndex: Number(log?.transactionIndex || 0),
@@ -2209,12 +2214,12 @@ const contractScripts = {
 
     // Deduplicate by (questionId,responder), keeping only the latest event for each pair.
     const latestByPair = new Map();
-    parsedEvents.forEach(({ event, blockNumber, transactionIndex, logIndex }) => {
+    parsedEvents.forEach(({ event, blockNumber, transactionIndex, logIndex }: any) => {
       const responder = String(event?.args?.responder || '').toLowerCase();
       const questionIds = Array.isArray(event?.args?.questionIds)
-        ? event.args.questionIds.map((id) => String(id || '').toLowerCase())
+        ? event.args.questionIds.map((id: any) => String(id || '').toLowerCase())
         : [];
-      questionIds.forEach((qId) => {
+      questionIds.forEach((qId: any) => {
         if (!qId) return;
         const pairKey = `${qId}|${responder}`;
         const prev = latestByPair.get(pairKey);
@@ -2238,14 +2243,14 @@ const contractScripts = {
     });
 
     const uniquePairs = Array.from(latestByPair.values());
-    const fullRangeAggregator = {};
+    const fullRangeAggregator: any = {};
     await Promise.all(
-      uniquePairs.map(async ({ responder, qId, blockNumber, transactionIndex, logIndex }) => {
+      uniquePairs.map(async ({ responder, qId, blockNumber, transactionIndex, logIndex }: any) => {
         let blockTimestamp = 0;
         try {
           const blockData = await this.getBlockWithCaching(provider, blockNumber, providerName, String(chId));
           blockTimestamp = blockData ? (blockData.timestamp || 0) : 0;
-        } catch (error) {
+        } catch (error: any) {
           blockTimestamp = Math.floor(Date.now() / 1000);
         }
 
@@ -2254,7 +2259,7 @@ const contractScripts = {
           respData = await this.getResponse(providerName, responder, qId, groupKeyOrCfg, {
             _resolvedCfg: cfg,
           });
-        } catch (e) {
+        } catch (e: any) {
           contractsLog.warn('[getQuestionResponsesFullRange] individual response read failed; skipping', { responder, qId, error: e?.message });
         }
         if (!respData) return;
@@ -2288,7 +2293,7 @@ const contractScripts = {
       onPartialData(fullRangeAggregator, resolvedToBlockNum);
     }
 
-  } catch (err) {
+  } catch (err: any) {
     contractsLog.error("Critical Error in getQuestionResponsesChunkedWithCallback:", err);
     if (onPartialData && resolvedFromBlockNum !== undefined) {
       onPartialData({}, resolvedFromBlockNum - 1);
@@ -2296,14 +2301,14 @@ const contractScripts = {
   }
 },
 
-  async getQuestionsCreatedByAddress(providerName, userAddress, fromBlock = null, toBlock = null, groupKeyOrCfg = null) {
+  async getQuestionsCreatedByAddress(providerName: any, userAddress: any, fromBlock: any = null, toBlock: any = null, groupKeyOrCfg: any = null) {
   const cfg    = resolveSession(groupKeyOrCfg || '');
   const gAddrs = getSessionAddresses(cfg);
   const addr   = (gAddrs.surveys?.address);
   const chId   = (gAddrs.surveys?.chainId) || (cfg?.networkChainId) || undefined;
 
   const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
-  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider);
+  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider as any);
   const questionsAddedEventFilter = SurveyContract.filters.QuestionsAdded(userAddress, null, null);
 
   // Per-group base window + clamp caller overrides
@@ -2324,12 +2329,12 @@ const contractScripts = {
     address: SurveyContract.address, fromBlock: fromBlockNum, toBlock: toBlockNum
   });
   const rawLogs = await fetchLogsSmartWithProvider(provider, questionsAddedEventFilter, fromBlockNum, toBlockNum);
-  const events = rawLogs.map(log => SURVEYS_INTERFACE.parseLog(log));
+  const events = rawLogs.map((log: any) => SURVEYS_INTERFACE.parseLog(log));
 
-  const questionIDs = [];
-  events.forEach(event => {
+  const questionIDs: any[] = [];
+  events.forEach((event: any) => {
     const questionIds = event.args.questionIds;
-    questionIds.forEach(id => {
+    questionIds.forEach((id: any) => {
       if (id && id !== ethers.constants.HashZero) {
         questionIDs.push(id.toLowerCase());
       }
@@ -2338,16 +2343,16 @@ const contractScripts = {
   return questionIDs;
 },
 
-  async getQuestionResponsesByAddress(providerName, userAddress, fromBlock = null, toBlock = null, groupKeyOrCfg = null, opts = {}) {
+  async getQuestionResponsesByAddress(providerName: any, userAddress: any, fromBlock: any = null, toBlock: any = null, groupKeyOrCfg: any = null, opts: any = {}) {
   // Ensure user-profile scans do not inherit stale latest-block bounds.
-  latestBlockCache._map = {};
+  (latestBlockCache as any)._map = {};
   const cfg    = resolveSession(groupKeyOrCfg || '');
   const gAddrs = getSessionAddresses(cfg);
   const addr   = (gAddrs.surveys?.address);
   const chId   = (gAddrs.surveys?.chainId) || (cfg?.networkChainId) || undefined;
 
   const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
-  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider);
+  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider as any);
   const responsesSubmittedEventFilter = SurveyContract.filters.ResponsesSubmitted(userAddress, null);
 
   // Per-group base window + clamp caller overrides
@@ -2370,11 +2375,11 @@ const contractScripts = {
   const withMeta = !!(opts && opts.withMeta === true);
   const rawLogs = await fetchLogsSmartWithProvider(provider, responsesSubmittedEventFilter, fromBlockNum, toBlockNum);
   const latestByQuestion = new Map();
-  rawLogs.forEach((log) => {
+  rawLogs.forEach((log: any) => {
     let event;
     try {
       event = SURVEYS_INTERFACE.parseLog(log);
-    } catch (_) {
+    } catch (_: any) {
       event = null;
     }
     if (!event) return;
@@ -2382,7 +2387,7 @@ const contractScripts = {
     const blockNumber = Number(log?.blockNumber || 0);
     const transactionIndex = Number(log?.transactionIndex || 0);
     const logIndex = Number(log?.logIndex || 0);
-    questionIds.forEach((id) => {
+    questionIds.forEach((id: any) => {
       if (!id || id === ethers.constants.HashZero) return;
       const qid = String(id || '').toLowerCase();
       if (!qid) return;
@@ -2410,12 +2415,12 @@ const contractScripts = {
     });
   });
   const entries = Array.from(latestByQuestion.values());
-  return withMeta ? entries : entries.map((entry) => entry.questionId);
+  return withMeta ? entries : entries.map((entry: any) => entry.questionId);
 },
 
-  async fetchUserSubmittedSurveyIDs(providerName, fromBlock = null, toBlock = null, groupKeyOrCfg) {
+  async fetchUserSubmittedSurveyIDs(providerName: any, fromBlock: any = null, toBlock: any = null, groupKeyOrCfg: any) {
     const cfg    = resolveSession(groupKeyOrCfg || '');
-    const blocklist = new Set(((cfg?.BLOCKED_SURVEY_IDS) || []).map(id => id.toLowerCase()));
+    const blocklist = new Set(((cfg?.BLOCKED_SURVEY_IDS) || []).map((id: any) => id.toLowerCase()));
 
     const gAddrs = getSessionAddresses(cfg);
     const addr   = (gAddrs.surveys?.address);
@@ -2430,7 +2435,7 @@ const contractScripts = {
     // Provider resolution: group → chain provider; otherwise defaultProvider/Infura (no signer)
     const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
 
-    const SurveyContract = new ethers.Contract(addr, SURVEYS, provider);
+    const SurveyContract = new ethers.Contract(addr, SURVEYS, provider as any);
     const surveyAddedEventFilter = SurveyContract.filters.SurveyAdded(null, null);
 
     // Per-group base window + clamp caller overrides
@@ -2451,11 +2456,11 @@ const contractScripts = {
       address: SurveyContract.address, fromBlock: fromBlockNum, toBlock: toBlockNum
     });
     const rawLogs = await fetchLogsSmartWithProvider(provider, surveyAddedEventFilter, fromBlockNum, toBlockNum);
-    const events = rawLogs.map(log => SURVEYS_INTERFACE.parseLog(log));
+    const events = rawLogs.map((log: any) => SURVEYS_INTERFACE.parseLog(log));
 
     // Refactored to return object with creationBlock
     const surveyMap = new Map();
-    events.forEach(event => {
+    events.forEach((event: any) => {
         const id = event.args.surveyId.toLowerCase();
         if (id && id !== ethers.constants.HashZero.toLowerCase() && !blocklist.has(id)) {
             // Keep the earliest block number if duplicates exist (though unlikely for creation)
@@ -2466,11 +2471,11 @@ const contractScripts = {
     });
 
     // Return array of objects: { surveyId, creationBlock }
-    return Array.from(surveyMap.entries()).map(([sid, bn]) => ({ surveyId: sid, creationBlock: bn }));
+    return Array.from(surveyMap.entries()).map(([sid, bn]: any) => ({ surveyId: sid, creationBlock: bn }));
   },
 
 
-  async fetchAllSurveyResponses(providerName, surveyId, fromBlockParam = null, toBlockParam = null, groupKeyOrCfg) {
+  async fetchAllSurveyResponses(providerName: any, surveyId: any, fromBlockParam: any = null, toBlockParam: any = null, groupKeyOrCfg: any) {
   const cfg    = resolveSession(groupKeyOrCfg || '');
   const gAddrs = getSessionAddresses(cfg);
   const addr   = (gAddrs.surveys?.address);
@@ -2478,14 +2483,14 @@ const contractScripts = {
 
   const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
 
-  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider);
+  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider as any);
 
   // 🔐 Normalize
-  const ensureHash = (v) => {
+  const ensureHash = (v: any) => {
     try {
       if (cryptoUtils && typeof cryptoUtils.hashIdentifier === 'function') return cryptoUtils.hashIdentifier(v);
-    } catch (_) {}
-    try { if (utils.isHexString(v, 32)) return String(v).toLowerCase(); } catch (_) {}
+    } catch (_: any) {}
+    try { if (utils.isHexString(v, 32)) return String(v).toLowerCase(); } catch (_: any) {}
     const s = (v === null || v === undefined) ? '' : String(v);
     return s.trim() === '' ? ethers.constants.HashZero : utils.id(s);
   };
@@ -2516,7 +2521,7 @@ const contractScripts = {
     address: SurveyContract.address, fromBlock: fromBlockNum, toBlock: toBlockNum, surveyId: sId
   });
   const rawLogs = await fetchLogsSmartWithProvider(provider, responseSubmittedEventTopic, fromBlockNum, toBlockNum);
-  const parsedEvents = rawLogs.map((log) => ({
+  const parsedEvents = rawLogs.map((log: any) => ({
     event: SURVEYS_INTERFACE.parseLog(log),
     blockNumber: Number(log?.blockNumber || 0),
     logIndex: Number(log?.logIndex || 0),
@@ -2524,7 +2529,7 @@ const contractScripts = {
 
   // Deduplicate by responder; keep only the newest event to avoid repeated response fetches.
   const latestByResponder = new Map();
-  parsedEvents.forEach(({ event, blockNumber, logIndex }) => {
+  parsedEvents.forEach(({ event, blockNumber, logIndex }: any) => {
     const responder = String(event?.args?.responder || '').toLowerCase();
     if (!responder) return;
     const prev = latestByResponder.get(responder);
@@ -2539,12 +2544,12 @@ const contractScripts = {
 
   const responderEntries = Array.from(latestByResponder.values());
   const responseReadResults = await Promise.all(
-    responderEntries.map(async ({ responder, blockNumber, logIndex }) => {
+    responderEntries.map(async ({ responder, blockNumber, logIndex }: any) => {
       let blockTimestamp = 0;
       try {
         const blockData = await this.getBlockWithCaching(provider, blockNumber, providerName, String(chId));
         if (blockData) blockTimestamp = blockData.timestamp;
-      } catch (_) {}
+      } catch (_: any) {}
       let surveyResponseData = null;
       try {
         surveyResponseData = await this.getSurveyResponse(
@@ -2554,7 +2559,7 @@ const contractScripts = {
           groupKeyOrCfg,
           { throwOnError: true }
         );
-      } catch (error) {
+      } catch (error: any) {
         const retryable = isRetryableSurveyResponseReadError(error);
         contractsLog.warn('[fetchAllSurveyResponses] individual response read failed; skipping', {
           error: error?.message,
@@ -2578,8 +2583,8 @@ const contractScripts = {
   );
 
   let hadPartialFailure = false;
-  let lowestFailedBlock = null;
-  const responses = responseReadResults.reduce((acc, result) => {
+  let lowestFailedBlock: number | null = null;
+  const responses = responseReadResults.reduce((acc: any, result: any) => {
     if (!result) return acc;
     if (result.failed) {
       if (!result.retryable) return acc;
@@ -2606,7 +2611,7 @@ const contractScripts = {
 },
 
     // === CHANGED: +groupKeyOrCfg (optional). Threads group to getSurveyHash.
-async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
+async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, opts: any = {}) {
   if (!surveyId || surveyId === ethers.constants.HashZero) {
     return null;
   }
@@ -2655,7 +2660,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
         let surveyData = null;
         try {
           surveyData = JSON.parse(arweaveSurveyData);
-        } catch (parseErr) {
+        } catch (parseErr: any) {
           throw await recordTerminalArweaveInvalidFailure({
             groupKeyOrCfg,
             txId: arweaveSurveyHash,
@@ -2672,7 +2677,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
       }
     );
     return cloneJsonSafe(result);
-  } catch (error) {
+  } catch (error: any) {
     logArweaveMetadataFetchFailure({ scope: 'survey', error });
     if (opts && opts.throwOnFailure) throw error;
     return null;
@@ -2681,7 +2686,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
 
 
     // === CHANGED: pass-through group to getResponse
-  async getSurveyResponse(providerName, userAddress, surveyId, groupKeyOrCfg, opts = {}) {
+  async getSurveyResponse(providerName: any, userAddress: any, surveyId: any, groupKeyOrCfg: any, opts: any = {}) {
     const response = await this.getResponse(providerName, userAddress, surveyId, groupKeyOrCfg, {
       ...(opts && typeof opts === 'object' ? opts : {}),
       responseCategory: 'survey_response_payload',
@@ -2690,19 +2695,19 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
   },
 
   addSurveyWithQuestions: async function (
-    providerName,
-    surveyId,
-    surveyData,
-    questionIds,
-    questionDataArray,
-    groupKeyOrCfg = null
+    providerName: any,
+    surveyId: any,
+    surveyData: any,
+    questionIds: any,
+    questionDataArray: any,
+    groupKeyOrCfg: any = null
   ) {
     if (providerName === 'none') {
       throw new Error('addSurveyWithQuestions requires a signer-capable provider (not read-only).');
     }
 
     const providerLocation = contractScripts.getProviderLocation(providerName);
-    const ethersProvider = new ethers.providers.Web3Provider(providerLocation, 'any');
+    const ethersProvider = new ethers.providers.Web3Provider(providerLocation as any, 'any');
     const signer = ethersProvider.getSigner();
 
     // Group-aware address resolution (no hard-coded fallback)
@@ -2713,19 +2718,19 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
       const slug = normalizeSessionSlug(typeof groupKeyOrCfg === 'string' ? groupKeyOrCfg : cfg?.slug || '');
       throw new Error(`[addSurveyWithQuestions] Missing surveys contract address for session slug "${slug || 'general'}".`);
     }
-    const SurveyContract = new ethers.Contract(addr, SURVEYS, signer);
+    const SurveyContract = new ethers.Contract(addr, SURVEYS, signer as any);
 
     let surveyPayloadUpload = null;
-    let questionPayloadUploads = [];
+    let questionPayloadUploads: any[] = [];
 
     // Normalize IDs to bytes32
-    const ensureHash = (v) => {
+    const ensureHash = (v: any) => {
       try {
         if (cryptoUtils && typeof cryptoUtils.hashIdentifier === 'function') return cryptoUtils.hashIdentifier(v);
-      } catch (_) {}
+      } catch (_: any) {}
       try {
         if (utils.isHexString(v, 32)) return String(v).toLowerCase();
-      } catch (_) {}
+      } catch (_: any) {}
       const s = v == null ? '' : String(v);
       return s.trim() === '' ? ethers.constants.HashZero : utils.id(s);
     };
@@ -2734,7 +2739,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
     const qIds32 = (Array.isArray(questionIds) ? questionIds : []).map(ensureHash);
 
     if (!utils.isHexString(sId, 32)) throw new Error('addSurveyWithQuestions: surveyId is not a bytes32.');
-    qIds32.forEach((id, i) => {
+    qIds32.forEach((id: any, i: any) => {
       if (!utils.isHexString(id, 32)) throw new Error(`addSurveyWithQuestions: questionIds[${i}] is not bytes32.`);
     });
 
@@ -2749,7 +2754,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
         ...(surveyData || {}),
       }, _sessionName, _sessionMetadataOptions);
 
-      const qArrayToUpload = (Array.isArray(questionDataArray) ? questionDataArray : []).map((q) => (
+      const qArrayToUpload = (Array.isArray(questionDataArray) ? questionDataArray : []).map((q: any) => (
         normalizeSessionNameFields({
           ...(q || {}),
         }, _sessionName, _sessionMetadataOptions)
@@ -2759,7 +2764,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
         family: 'survey_metadata',
         path: 'survey metadata',
       });
-      qArrayToUpload.forEach((questionData, index) => {
+      qArrayToUpload.forEach((questionData: any, index: any) => {
         validateNoLockedPlaintextInPayload(questionData, {
           family: 'question_metadata',
           path: `question metadata[${index}]`,
@@ -2801,7 +2806,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
     }
 
     const surveyArweaveHashBytes = surveyPayloadUpload.pointerBytes;
-    const questionArweaveHashesBytes = questionPayloadUploads.map((upload) => upload.pointerBytes);
+    const questionArweaveHashesBytes = questionPayloadUploads.map((upload: any) => upload.pointerBytes);
 
     rpcLog('RPC Call (Tx):', {
       function: 'addSurveyWithQuestions',
@@ -2837,7 +2842,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
       });
       clearReadCachesForGroup(groupKeyOrCfg);
       const surveyStorageRef = surveyPayloadUpload.storageRef;
-      const uploadedQuestions = qIds32.map((id, index) => (
+      const uploadedQuestions = qIds32.map((id: any, index: any) => (
         attachStorageRefCompatibilityFields({
           questionId: id,
           arweaveTxId: questionPayloadUploads[index]?.arweaveTxId || '',
@@ -2851,7 +2856,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
         ...(surveyStorageRef ? { surveyStorageRef } : {}),
         uploadedQuestions,
       };
-    } catch (error) {
+    } catch (error: any) {
       notifyUserFacingTransactionError(error);
       throw error;
     }
@@ -2859,18 +2864,18 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
 
 
   addQuestions: async function (
-    providerName,
-    questionIds,
-    questionDataArray,
-    surveyIds,
-    groupKeyOrCfg = null
+    providerName: any,
+    questionIds: any,
+    questionDataArray: any,
+    surveyIds: any,
+    groupKeyOrCfg: any = null
   ) {
     if (providerName === 'none') {
       throw new Error('addQuestions requires a signer-capable provider (not read-only).');
     }
 
     const providerLocation = contractScripts.getProviderLocation(providerName);
-    const ethersProvider = new ethers.providers.Web3Provider(providerLocation, 'any');
+    const ethersProvider = new ethers.providers.Web3Provider(providerLocation as any, 'any');
     const signer = ethersProvider.getSigner();
 
     // Group-aware address resolution (no hard-coded fallback)
@@ -2881,18 +2886,18 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
       const slug = normalizeSessionSlug(typeof groupKeyOrCfg === 'string' ? groupKeyOrCfg : cfg?.slug || '');
       throw new Error(`[addQuestions] Missing surveys contract address for session slug "${slug || 'general'}".`);
     }
-    const SurveyContract = new ethers.Contract(addr, SURVEYS, signer);
+    const SurveyContract = new ethers.Contract(addr, SURVEYS, signer as any);
 
-    let questionPayloadUploads = [];
+    let questionPayloadUploads: any[] = [];
 
     // Normalize IDs to bytes32
-    const ensureHash = (v) => {
+    const ensureHash = (v: any) => {
       try {
         if (cryptoUtils && typeof cryptoUtils.hashIdentifier === 'function') return cryptoUtils.hashIdentifier(v);
-      } catch (_) {}
+      } catch (_: any) {}
       try {
         if (utils.isHexString(v, 32)) return String(v).toLowerCase();
-      } catch (_) {}
+      } catch (_: any) {}
       const s = v == null ? '' : String(v);
       return s.trim() === '' ? ethers.constants.HashZero : utils.id(s);
     };
@@ -2900,10 +2905,10 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
     const qIds32 = (Array.isArray(questionIds) ? questionIds : []).map(ensureHash);
     const sIds32 = (Array.isArray(surveyIds) ? surveyIds : []).map(ensureHash);
 
-    qIds32.forEach((id, i) => {
+    qIds32.forEach((id: any, i: any) => {
       if (!utils.isHexString(id, 32)) throw new Error(`addQuestions: questionIds[${i}] is not a bytes32.`);
     });
-    sIds32.forEach((id, i) => {
+    sIds32.forEach((id: any, i: any) => {
       if (!utils.isHexString(id, 32)) throw new Error(`addQuestions: surveyIds[${i}] is not a bytes32.`);
     });
 
@@ -2913,13 +2918,13 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
       const _sessionName = String((cfg?.sessionName || cfg?.slug || '') || '');
       const _sessionSlug = resolveStorageSessionSlug(groupKeyOrCfg, cfg);
       const _sessionMetadataOptions = _sessionSlug ? { sessionSlug: _sessionSlug } : {};
-      const qArrayToUpload = (Array.isArray(questionDataArray) ? questionDataArray : []).map((q) => (
+      const qArrayToUpload = (Array.isArray(questionDataArray) ? questionDataArray : []).map((q: any) => (
         normalizeSessionNameFields({
           ...(q || {}),
         }, _sessionName, _sessionMetadataOptions)
       ));
 
-      qArrayToUpload.forEach((questionData, index) => {
+      qArrayToUpload.forEach((questionData: any, index: any) => {
         validateNoLockedPlaintextInPayload(questionData, {
           family: 'question_metadata',
           path: `question metadata[${index}]`,
@@ -2949,7 +2954,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
       throw new Error('Payload uploads are disabled; cannot add questions.');
     }
 
-    const questionArweaveHashBytesArray = questionPayloadUploads.map((upload) => upload.pointerBytes);
+    const questionArweaveHashBytesArray = questionPayloadUploads.map((upload: any) => upload.pointerBytes);
 
     rpcLog('RPC Call (Tx):', {
       function: 'addQuestions',
@@ -2982,7 +2987,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
       revertMessage: 'addQuestions transaction reverted on-chain.',
     });
 
-    const uploadedQuestions = qIds32.map((id, index) => {
+    const uploadedQuestions = qIds32.map((id: any, index: any) => {
       const upload = questionPayloadUploads[index] || {};
       return attachStorageRefCompatibilityFields({
         questionId: id,
@@ -2997,7 +3002,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
   },
 
 
-  submitResponses: async function (providerName, questionIds, questionResponses, surveyId, surveyResponse, groupKeyOrCfg = null) {
+  submitResponses: async function (providerName: any, questionIds: any, questionResponses: any, surveyId: any, surveyResponse: any, groupKeyOrCfg: any = null) {
   if (providerName === 'none') {
     throw new Error('submitResponses: read-only provider is not allowed here. Connect a wallet first.');
   }
@@ -3015,13 +3020,13 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
   }
 
   // 🔐 Normalize identifiers to bytes32 at the boundary
-  const ensureHash = (v) => {
+  const ensureHash = (v: any) => {
     try {
       if (cryptoUtils && typeof cryptoUtils.hashIdentifier === 'function') {
         return cryptoUtils.hashIdentifier(v);
       }
-    } catch (_) {}
-    try { if (utils.isHexString(v, 32)) return String(v).toLowerCase(); } catch (_) {}
+    } catch (_: any) {}
+    try { if (utils.isHexString(v, 32)) return String(v).toLowerCase(); } catch (_: any) {}
     const s = (v === null || v === undefined) ? '' : String(v);
     return s.trim() === '' ? ethers.constants.HashZero : utils.id(s);
   };
@@ -3030,7 +3035,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
   const hashedSurveyId = ensureHash(surveyId);
 
   // Optional preflight
-  hashedQuestionIds.forEach((id, i) => {
+  hashedQuestionIds.forEach((id: any, i: any) => {
     if (!utils.isHexString(id, 32)) throw new Error(`submitResponses: questionIds[${i}] is not a bytes32.`);
   });
   if (!utils.isHexString(hashedSurveyId, 32)) {
@@ -3038,12 +3043,12 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
   }
 
   // Build ethers provider/signer from the chosen interactive provider.
-  const ethersProvider = new ethers.providers.Web3Provider(signingProvider);
+  const ethersProvider = new ethers.providers.Web3Provider(signingProvider as any);
   const signer = ethersProvider.getSigner();
   const userAddress = await signer.getAddress(); // throws if no account
 
   // Prepare data to upload and on-chain params.
-  let questionResponseUploads = [];
+  let questionResponseUploads: any[] = [];
   let surveyResponseHashBytes = ethers.constants.HashZero;
 
   const cfg = resolveSession(groupKeyOrCfg || '');
@@ -3090,7 +3095,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
     return; // no-op when no configured payload storage path is available
   }
 
-  const questionResponseHashesBytes = questionResponseUploads.map((upload) => upload.pointerBytes);
+  const questionResponseHashesBytes = questionResponseUploads.map((upload: any) => upload.pointerBytes);
 
   // === Address resolution (group-aware; no SURVEYS_ADDRESS fallback)
   const gAddrs = getSessionAddresses(cfg);
@@ -3100,8 +3105,8 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
     return; // early return (no throw)
   }
 
-  const SurveyContract = new ethers.Contract(addr, SURVEYS, signer);
-  const txArgs = [
+  const SurveyContract = new ethers.Contract(addr, SURVEYS, signer as any);
+  const txArgs: any[] = [
     hashedQuestionIds,
     questionResponseHashesBytes,
     hashedSurveyId,
@@ -3141,14 +3146,14 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
     });
     clearReadCachesForGroup(groupKeyOrCfg);
     return receipt;
-  } catch (error) {
+  } catch (error: any) {
     notifyUserFacingTransactionError(error);
     contractsLog.error('Error sending transaction with provider.request:', error);
     throw error;
   }
   },
 
-  async getResponseHash(providerName, userAddress, id, groupKeyOrCfg, opts = {}) {
+  async getResponseHash(providerName: any, userAddress: any, id: any, groupKeyOrCfg: any, opts: any = {}) {
   const cfg    = (
     opts &&
     typeof opts === 'object' &&
@@ -3166,14 +3171,14 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
   }
 
   const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
-  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider);
+  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider as any);
 
   // 🔐 Normalize ID to bytes32
-  const ensureHash = (v) => {
+  const ensureHash = (v: any) => {
     try {
       if (cryptoUtils && typeof cryptoUtils.hashIdentifier === 'function') return cryptoUtils.hashIdentifier(v);
-    } catch (_) {}
-    try { if (utils.isHexString(v, 32)) return String(v).toLowerCase(); } catch (_) {}
+    } catch (_: any) {}
+    try { if (utils.isHexString(v, 32)) return String(v).toLowerCase(); } catch (_: any) {}
     const s = (v === null || v === undefined) ? '' : String(v);
     return s.trim() === '' ? ethers.constants.HashZero : utils.id(s);
   };
@@ -3203,14 +3208,14 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
       }
     );
     return (typeof result === 'string' && result) ? result : null;
-  } catch (error) {
+  } catch (error: any) {
     if (throwOnError) throw error;
     contractsLog.error('Error getting response hash:', error);
     return null;
   }
   },
 
-  async getResponse(providerName, userAddress, id, groupKeyOrCfg, opts = {}) {
+  async getResponse(providerName: any, userAddress: any, id: any, groupKeyOrCfg: any, opts: any = {}) {
   const cfg    = (
     opts &&
     typeof opts === 'object' &&
@@ -3231,14 +3236,14 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
 
   const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
 
-  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider);
+  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider as any);
 
   // 🔐 Normalize ID to bytes32
-  const ensureHash = (v) => {
+  const ensureHash = (v: any) => {
     try {
       if (cryptoUtils && typeof cryptoUtils.hashIdentifier === 'function') return cryptoUtils.hashIdentifier(v);
-    } catch (_) {}
-    try { if (utils.isHexString(v, 32)) return String(v).toLowerCase(); } catch (_) {}
+    } catch (_: any) {}
+    try { if (utils.isHexString(v, 32)) return String(v).toLowerCase(); } catch (_: any) {}
     const s = (v === null || v === undefined) ? '' : String(v);
     return s.trim() === '' ? ethers.constants.HashZero : utils.id(s);
   };
@@ -3264,7 +3269,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
       if (globalHit && typeof globalHit === 'object') {
         return cloneJsonSafe(globalHit);
       }
-    } catch (_) {}
+    } catch (_: any) {}
 
     try {
       const raw = window.sessionStorage?.getItem('ce:e2e:mockedViewedResponses:v1');
@@ -3274,7 +3279,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
       if (hit && typeof hit === 'object') {
         return cloneJsonSafe(hit);
       }
-    } catch (_) {}
+    } catch (_: any) {}
 
     return null;
   };
@@ -3335,8 +3340,8 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
         const arweaveData = storageRead?.text;
         let responseJson = null;
         try {
-          responseJson = JSON.parse(arweaveData);
-        } catch (parseErr) {
+          responseJson = JSON.parse(arweaveData as string);
+        } catch (parseErr: any) {
           throw await recordTerminalArweaveInvalidFailure({
             groupKeyOrCfg,
             txId: payloadPointerId,
@@ -3354,14 +3359,14 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
       }
     );
     return cloneJsonSafe(result);
-  } catch (error) {
+  } catch (error: any) {
     logArweaveMetadataFetchFailure({ scope: 'response', error });
     if (throwOnError) throw error;
     return null;
   }
   },
 
-  async getQuestionHash(providerName, questionId, groupKeyOrCfg, opts = {}) {
+  async getQuestionHash(providerName: any, questionId: any, groupKeyOrCfg: any, opts: any = {}) {
   const cfg    = resolveSession(groupKeyOrCfg || '');
   const gAddrs = getSessionAddresses(cfg);
   const addr   = (gAddrs.surveys?.address);
@@ -3379,15 +3384,15 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
     return null;
   }
 
-  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider);
+  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider as any);
 
 
   // 🔐 Normalize
-  const ensureHash = (v) => {
+  const ensureHash = (v: any) => {
     try {
       if (cryptoUtils && typeof cryptoUtils.hashIdentifier === 'function') return cryptoUtils.hashIdentifier(v);
-    } catch (_) {}
-    try { if (utils.isHexString(v, 32)) return String(v).toLowerCase(); } catch (_) {}
+    } catch (_: any) {}
+    try { if (utils.isHexString(v, 32)) return String(v).toLowerCase(); } catch (_: any) {}
     const s = (v === null || v === undefined) ? '' : String(v);
     return s.trim() === '' ? ethers.constants.HashZero : utils.id(s);
   };
@@ -3419,7 +3424,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
       HASH_READ_MAX_ENTRIES
     );
     return result;
-  } catch (error) {
+  } catch (error: any) {
     if (isCallExceptionError(error)) {
       READ_MEMO.questionHash.delete(memoKey);
       const didLog = markHashRevertLoggedOnce(questionHashRevertLogged, memoKey);
@@ -3440,7 +3445,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
   }
 },
 
-    async getSurveyHash(providerName, surveyId, groupKeyOrCfg, opts = {}) {
+    async getSurveyHash(providerName: any, surveyId: any, groupKeyOrCfg: any, opts: any = {}) {
   if (!surveyId || surveyId === ethers.constants.HashZero) {
     return null;
   }
@@ -3461,14 +3466,14 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
     return null;
   }
 
-  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider);
+  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider as any);
 
   // 🔐 Normalize
-  const ensureHash = (v) => {
+  const ensureHash = (v: any) => {
     try {
       if (cryptoUtils && typeof cryptoUtils.hashIdentifier === 'function') return cryptoUtils.hashIdentifier(v);
-    } catch (_) {}
-    try { if (utils.isHexString(v, 32)) return String(v).toLowerCase(); } catch (_) {}
+    } catch (_: any) {}
+    try { if (utils.isHexString(v, 32)) return String(v).toLowerCase(); } catch (_: any) {}
     const s = (v === null || v === undefined) ? '' : String(v);
     return s.trim() === '' ? ethers.constants.HashZero : utils.id(s);
   };
@@ -3500,7 +3505,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
       HASH_READ_MAX_ENTRIES
     );
     return result;
-  } catch (error) {
+  } catch (error: any) {
     if (isCallExceptionError(error)) {
       READ_MEMO.surveyHash.delete(memoKey);
       const didLog = markHashRevertLoggedOnce(surveyHashRevertLogged, memoKey);
@@ -3521,7 +3526,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
   }
 },
 
-    getQuestionSurvey: async function(providerName, questionId, groupKeyOrCfg = null) {
+    getQuestionSurvey: async function(providerName: any, questionId: any, groupKeyOrCfg: any = null) {
   const cfg    = resolveSession(groupKeyOrCfg || '');
   const gAddrs = getSessionAddresses(cfg);
   const addr   = (gAddrs.surveys?.address);
@@ -3535,14 +3540,14 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
   if (!provider) {
     return null;
   }
-  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider);
+  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider as any);
 
   // 🔐 Normalize
-  const ensureHash = (v) => {
+  const ensureHash = (v: any) => {
     try {
       if (cryptoUtils && typeof cryptoUtils.hashIdentifier === 'function') return cryptoUtils.hashIdentifier(v);
-    } catch (_) {}
-    try { if (utils.isHexString(v, 32)) return String(v).toLowerCase(); } catch (_) {}
+    } catch (_: any) {}
+    try { if (utils.isHexString(v, 32)) return String(v).toLowerCase(); } catch (_: any) {}
     const s = (v === null || v === undefined) ? '' : String(v);
     return s.trim() === '' ? ethers.constants.HashZero : utils.id(s);
   };
@@ -3552,14 +3557,14 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
     rpcLog('RPC Call:', { function: 'getQuestionSurvey', method: 'SurveyContract.getQuestionSurvey', params: { questionId: qId } });
     const surveyIdResult = await callWithRetry(() => SurveyContract.getQuestionSurvey(qId), 'SurveyContract.getQuestionSurvey');
     return surveyIdResult;
-  } catch (error) {
+  } catch (error: any) {
     contractsLog.error("Error getting question's associated survey:", error);
     return null;
   }
 },
 
     // === CHANGED: +groupKeyOrCfg (optional). Threads group to getQuestionHash.
-  async getQuestionData(providerName, questionId, groupKeyOrCfg, opts = {}) {
+  async getQuestionData(providerName: any, questionId: any, groupKeyOrCfg: any, opts: any = {}) {
     const qId = String(questionId || '').toLowerCase();
     const { baseKey } = resolveReadContext(groupKeyOrCfg);
     const modeTag = buildDecryptModeTag(opts);
@@ -3619,7 +3624,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
           let questionData = null;
           try {
             questionData = JSON.parse(questionDataString);
-          } catch (parseErr) {
+          } catch (parseErr: any) {
             throw await recordTerminalArweaveInvalidFailure({
               groupKeyOrCfg,
               txId: payloadPointerId,
@@ -3642,7 +3647,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
         }
       );
       return cloneJsonSafe(result);
-  } catch (error) {
+  } catch (error: any) {
     logArweaveMetadataFetchFailure({ scope: 'question', error });
     if (opts && opts.throwOnFailure) throw error;
     return null;
@@ -3652,17 +3657,17 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
   // Decrypt masked question metadata without re-downloading the payload from Arweave.
   // This is useful for "gate just changed" refreshes where we already have the encrypted
   // prompt/options/tags envelopes cached locally.
-  async decryptQuestionPayloadInPlace(questionData, groupKeyOrCfg = null, opts = {}) {
+  async decryptQuestionPayloadInPlace(questionData: any, groupKeyOrCfg: any = null, opts: any = {}) {
     return maybeDecryptQuestionPayload(questionData, groupKeyOrCfg, opts);
   },
 
   // Decrypt masked survey metadata without re-downloading the payload from Arweave.
-  async decryptSurveyPayloadInPlace(surveyData, groupKeyOrCfg = null, opts = {}) {
+  async decryptSurveyPayloadInPlace(surveyData: any, groupKeyOrCfg: any = null, opts: any = {}) {
     return maybeDecryptSurveyPayload(surveyData, groupKeyOrCfg, opts);
   },
 
 
-  getSurveyData: async function(providerName, surveyId, groupKeyOrCfg = null, opts = {}) {
+  getSurveyData: async function(providerName: any, surveyId: any, groupKeyOrCfg: any = null, opts: any = {}) {
     const sId = String(surveyId || '').toLowerCase();
     const { baseKey } = resolveReadContext(groupKeyOrCfg);
     const modeTag = buildDecryptModeTag(opts);
@@ -3710,8 +3715,8 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
           const surveyData = storageRead?.text;
           let parsed = null;
           try {
-            parsed = JSON.parse(surveyData);
-          } catch (parseErr) {
+            parsed = JSON.parse(surveyData as string);
+          } catch (parseErr: any) {
             throw await recordTerminalArweaveInvalidFailure({
               groupKeyOrCfg,
               txId: payloadPointerId,
@@ -3733,7 +3738,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
         }
       );
       return cloneJsonSafe(result);
-  } catch (error) {
+  } catch (error: any) {
       logArweaveMetadataFetchFailure({ scope: 'survey', error });
       if (opts && opts.throwOnFailure) throw error;
       return null;
@@ -3742,26 +3747,26 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
 
 
   createSBT: async function(
-  providerName,
-  name,
-  symbol,
-  limitedNumber,
-  adminAddress,
-  mintingEndTime,
-  hasPasswordMint,
-  burnAuth,
-  hashedPasswords,
-  tokenURI,
-  groupPasswordHash = ethers.constants.HashZero, // <-- ADDED (default = 0)
-  groupKeyOrCfg = null,
-  create2Salt = '',
-  createOptions = {}
+  providerName: any,
+  name: any,
+  symbol: any,
+  limitedNumber: any,
+  adminAddress: any,
+  mintingEndTime: any,
+  hasPasswordMint: any,
+  burnAuth: any,
+  hashedPasswords: any,
+  tokenURI: any,
+  groupPasswordHash: any = ethers.constants.HashZero, // <-- ADDED (default = 0)
+  groupKeyOrCfg: any = null,
+  create2Salt: any = '',
+  createOptions: any = {}
 ) {
   if (providerName === 'none') {
     throw new Error('createSBT: read-only provider is not allowed here. Connect a wallet first.');
   }
   const providerLocation = contractScripts.getProviderLocation(providerName);
-  const ethersProvider = new ethers.providers.Web3Provider(providerLocation, 'any');
+  const ethersProvider = new ethers.providers.Web3Provider(providerLocation as any, 'any');
   const signer = ethersProvider.getSigner();
 
   // === Address resolution (group-aware; no constant fallback)
@@ -3773,7 +3778,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
     contractsLog.log("No SBT factory address in group config:", slugOrEmpty);
     return; // early return, no tx
   }
-  const SBTFactory = new ethers.Contract(addr, SBT_FACTORY_ABI, signer);
+  const SBTFactory = new ethers.Contract(addr, SBT_FACTORY_ABI, signer as any);
 
   const create2SaltNormalized = normalizeCreate2Salt(create2Salt);
   const useCreate2 = !!create2SaltNormalized;
@@ -3869,7 +3874,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
       logLabel: 'CREATE_SBT',
       preferFallbackGasLimit: true,
     });
-  } catch (error) {
+  } catch (error: any) {
     throw useConfiguredDeterministic
       ? maybeWrapUnsupportedConfiguredDeterministicFactoryError(error, addr)
       : error;
@@ -3892,7 +3897,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
       revertMessage: 'createSBT transaction reverted on-chain.',
     });
     return receipt;
-  } catch (error) {
+  } catch (error: any) {
     const normalizedError = useConfiguredDeterministic
       ? maybeWrapUnsupportedConfiguredDeterministicFactoryError(error, addr)
       : error;
@@ -3905,7 +3910,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
   }
 },
 
-  countSBTCreated: async function(providerName, groupKeyOrCfg = null) {
+  countSBTCreated: async function(providerName: any, groupKeyOrCfg: any = null) {
     try {
       // Read-only: use group-aware read provider; no signer.
       const cfg = memoizedResolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
@@ -3919,16 +3924,16 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
       }
 
       const provider = getLocalAwareReadProviderForGroup(groupKeyOrCfg, SBT_READ_PROVIDER_OPTIONS);
-      const SBTFactory = new ethers.Contract(addr, SBT_FACTORY_ABI, provider);
+      const SBTFactory = new ethers.Contract(addr, SBT_FACTORY_ABI, provider as any);
       const sbtCount = await SBTFactory.sbtCount();
       return (ethers.BigNumber.isBigNumber(sbtCount) ? sbtCount.toNumber() : Number(sbtCount || 0)) || 0;
-    } catch (error) {
+    } catch (error: any) {
       contractsLog.error('Error in countSBTCreated function:', error);
       throw error;
     }
   },
 
-  async getSbtsCreated(providerName, fromCustomBlock = 0, toCustomBlock = 'latest', groupKeyOrCfg, options = null) {
+  async getSbtsCreated(providerName: any, fromCustomBlock: any = 0, toCustomBlock: any = 'latest', groupKeyOrCfg: any, options: any = null) {
   const cfg    = resolveSession(groupKeyOrCfg || '');
   const slugOrEmpty = (cfg && typeof cfg.slug !== 'undefined') ? cfg.slug : '';
   const gAddrs = getSessionAddresses(cfg);
@@ -3943,7 +3948,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
   }
 
   const provider = getLocalAwareReadProviderForGroup(groupKeyOrCfg, SBT_READ_PROVIDER_OPTIONS);
-  const SBTFactory = new ethers.Contract(addr, SBT_FACTORY_ABI, provider);
+  const SBTFactory = new ethers.Contract(addr, SBT_FACTORY_ABI, provider as any);
   const sbtCreatedEventFilter = SBTFactory.filters.SBTCreated();
 
   // Per-group base window + clamp caller overrides
@@ -3985,11 +3990,11 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
     } : null
   );
   const sbtCreatedEvents = rawLogs
-    .map((log) => {
+    .map((log: any) => {
       let parsed = null;
       try {
         parsed = SBT_FACTORY_INTERFACE.parseLog(log);
-      } catch (_) {
+      } catch (_: any) {
         return null;
       }
       const sbtAddress = (parsed?.args?.sbtAddress) || parsed?.args?.[0] || parsed?.args?.['0'];
@@ -3999,7 +4004,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
     .filter(Boolean);
 
   const creationByAddress = new Map();
-  for (const ev of sbtCreatedEvents) {
+  for (const ev of sbtCreatedEvents as any[]) {
     const key = String(ev.sbtAddress || '').toLowerCase();
     if (!key) continue;
     const bn = Number(ev.blockNumber);
@@ -4012,12 +4017,12 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
 
   const discovered = Array.from(creationByAddress.values());
 
-  const results = await Promise.all(discovered.map(async ({ sbtAddress, creationBlock }) => {
+  const results = await Promise.all(discovered.map(async ({ sbtAddress, creationBlock }: any) => {
     let meta = null;
     try {
       // IMPORTANT: pass through the SAME groupKeyOrCfg, not a transformed cfg
       meta = await this.getSbtMetadata(providerName, sbtAddress, groupKeyOrCfg);
-    } catch (_) {}
+    } catch (_: any) {}
     return {
       sbtAddress,
       tokenURI: meta?.tokenURI || null,
@@ -4033,7 +4038,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
 
   // Fetch a single SBT's creation block by scanning factory logs.
   // Attempts the full range first; falls back to split queries if the provider rejects wide ranges.
-  async getSbtCreationBlockByAddress(providerName, sbtAddress, groupKeyOrCfg = null, options = {}) {
+  async getSbtCreationBlockByAddress(providerName: any, sbtAddress: any, groupKeyOrCfg: any = null, options: any = {}) {
     try {
       if (!sbtAddress || !ethers.utils.isAddress(sbtAddress)) return null;
 
@@ -4064,7 +4069,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
       if (!addr) return null;
 
       const provider = getLocalAwareReadProviderForGroup(cfg || groupKeyOrCfg, SBT_READ_PROVIDER_OPTIONS);
-      const SBTFactory = new ethers.Contract(addr, SBT_FACTORY_ABI, provider);
+      const SBTFactory = new ethers.Contract(addr, SBT_FACTORY_ABI, provider as any);
       const sbtCreatedEventFilter = SBTFactory.filters.SBTCreated(sbtAddress);
 
       const { fromBlock: baseFrom, toBlock: baseTo } =
@@ -4084,14 +4089,14 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
         if (Number.isFinite(bn) && (best == null || bn < best)) best = bn;
       }
       return best;
-    } catch (e) {
+    } catch (e: any) {
       contractsLog.warn('[getSbtCreationBlockByAddress] failed:', e?.message || e);
       return null;
     }
   },
 
 
-  getSbtMintBurnCountsByAddress: async function(providerName, sbtAddress, fromBlock = 0, toBlock = 'latest', groupKeyOrCfg = null, options = null) {
+  getSbtMintBurnCountsByAddress: async function(providerName: any, sbtAddress: any, fromBlock: any = 0, toBlock: any = 'latest', groupKeyOrCfg: any = null, options: any = null) {
     try {
       let groupCfg = groupKeyOrCfg;
       let opts = options;
@@ -4135,11 +4140,11 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
         };
       }
 
-      const sbt = new ethers.Contract(sbtAddress, CUSTOM_SBT_ABI, provider);
+      const sbt = new ethers.Contract(sbtAddress, CUSTOM_SBT_ABI, provider as any);
       const totalBlocks = Math.max(0, Number(t) - Number(f) + 1);
-      const normalizeCountMap = (value) => {
+      const normalizeCountMap = (value: any) => {
         const out = Object.create(null);
-        Object.entries(value || {}).forEach(([addrRaw, countRaw]) => {
+        Object.entries(value || {}).forEach(([addrRaw, countRaw]: any) => {
           const addr = String(addrRaw || '').toLowerCase();
           if (!addr) return;
           const count = Math.max(0, Math.floor(Number(countRaw || 0)));
@@ -4148,12 +4153,12 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
         });
         return out;
       };
-      const sumCountMap = (value) => Object.values(value || {}).reduce((sum, count) => {
+      const sumCountMap = (value: any) => Object.values(value || {}).reduce((sum: any, count: any) => {
         const n = Math.max(0, Math.floor(Number(count || 0)));
         return sum + n;
       }, 0);
-      const phaseOrder = { activity: 0 };
-      const normalizeResumeState = (resumeIn) => {
+      const phaseOrder: any = { activity: 0 };
+      const normalizeResumeState = (resumeIn: any) => {
         if (!resumeIn || typeof resumeIn !== 'object') return null;
         const phase = String(resumeIn.phase || '').trim();
         if (!Object.prototype.hasOwnProperty.call(phaseOrder, phase)) return null;
@@ -4170,33 +4175,33 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
           blockNumber,
           mintedCountByAddress,
           burnedCountByAddress,
-          mintedEventCount: mintedEventCountRaw > 0 ? mintedEventCountRaw : sumCountMap(mintedCountByAddress),
-          burnedEventCount: burnedEventCountRaw > 0 ? burnedEventCountRaw : sumCountMap(burnedCountByAddress),
+          mintedEventCount: mintedEventCountRaw > 0 ? mintedEventCountRaw : (sumCountMap(mintedCountByAddress) as number),
+          burnedEventCount: burnedEventCountRaw > 0 ? burnedEventCountRaw : (sumCountMap(burnedCountByAddress) as number),
         };
       };
       const resumeState = normalizeResumeState(opts.resumeState);
 
       const mintedCountByAddress = normalizeCountMap(resumeState?.mintedCountByAddress);
       const burnedCountByAddress = normalizeCountMap(resumeState?.burnedCountByAddress);
-      let mintedEventCount = Number(resumeState?.mintedEventCount || 0) || sumCountMap(mintedCountByAddress);
-      let burnedEventCount = Number(resumeState?.burnedEventCount || 0) || sumCountMap(burnedCountByAddress);
-      const addCount = (bucket, addressRaw) => {
+      let mintedEventCount: number = Number(resumeState?.mintedEventCount || 0) || (sumCountMap(mintedCountByAddress) as number);
+      let burnedEventCount: number = Number(resumeState?.burnedEventCount || 0) || (sumCountMap(burnedCountByAddress) as number);
+      const addCount = (bucket: any, addressRaw: any) => {
         const address = String(addressRaw || '').toLowerCase();
         if (!address) return false;
         bucket[address] = (bucket[address] || 0) + 1;
         return true;
       };
-      const addMintedToken = (accountRaw) => {
+      const addMintedToken = (accountRaw: any) => {
         if (addCount(mintedCountByAddress, accountRaw)) {
           mintedEventCount += 1;
         }
       };
-      const addBurnedToken = (accountRaw) => {
+      const addBurnedToken = (accountRaw: any) => {
         if (addCount(burnedCountByAddress, accountRaw)) {
           burnedEventCount += 1;
         }
       };
-      const emitCheckpoint = (phase, blockNumber) => {
+      const emitCheckpoint = (phase: any, blockNumber: any) => {
         if (!onCheckpoint) return;
         try {
           onCheckpoint({
@@ -4209,11 +4214,11 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
             mintedEventCount,
             burnedEventCount,
           });
-        } catch (err) {
+        } catch (err: any) {
           contractsLog.warn('[getSbtMintBurnCountsByAddress] checkpoint callback failed:', err?.message || err);
         }
       };
-      const getPassResumeState = (passName = 'activity') => {
+      const getPassResumeState = (passName: any = 'activity') => {
         const passIndex = phaseOrder[passName];
         const resumePhase = resumeState?.phase || '';
         const resumeIndex = Object.prototype.hasOwnProperty.call(phaseOrder, resumePhase)
@@ -4248,8 +4253,8 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
           20,
           createSbtEventScanProgressState({
             onProgress,
-            onLogs: ({ logs = [], scanTo }) => {
-              logs.forEach((lg) => {
+            onLogs: ({ logs = [], scanTo }: any) => {
+              logs.forEach((lg: any) => {
                 let parsed;
                 try { parsed = CUSTOM_SBT_INTERFACE.parseLog(lg); } catch { return; }
                 const account = parsed?.args?.account ?? parsed?.args?.[0];
@@ -4282,7 +4287,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
         scannedToBlock: Number.isFinite(Number(t)) ? Number(t) : null,
         ok: true
       };
-    } catch (e) {
+    } catch (e: any) {
       contractsLog.error('[getSbtMintBurnCountsByAddress] failed:', e);
       return {
         mintedCountByAddress: {},
@@ -4295,7 +4300,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
     }
   },
 
-  getSBTsByUserAddress: async function(providerName, userAddress, fromBlock = null, groupKeyOrCfg = null) {
+  getSBTsByUserAddress: async function(providerName: any, userAddress: any, fromBlock: any = null, groupKeyOrCfg: any = null) {
     // Per-group base window + clamp caller override (fromBlock only)
     const { fromBlock: baseFrom } = await this.getRelevantBlockWindowForFilter(
       groupKeyOrCfg,
@@ -4306,13 +4311,13 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
       : baseFrom;
 
     const sbts = await this.getSbtsCreated('none', fromBlockNum, 'latest', groupKeyOrCfg);
-    let claimedSBTs = [];
+    let claimedSBTs: any[] = [];
     for (let sbt of sbts) {
       const userHasClaimed = await this.userHasSBT('none', sbt.sbtAddress, userAddress, fromBlockNum, 'latest', groupKeyOrCfg);
       if (userHasClaimed) {
         const addressesWhoMinted = await this.getAddressesWhoMintedSBT('none', sbt.sbtAddress, fromBlockNum, 'latest', groupKeyOrCfg);
         const addressesWhoBurned = await this.getAddressesWhoBurnedSBT('none', sbt.sbtAddress, fromBlockNum, 'latest', groupKeyOrCfg);
-        if (addressesWhoMinted.map(a=>a.toLowerCase()).includes(userAddress.toLowerCase()) && !addressesWhoBurned.map(a=>a.toLowerCase()).includes(userAddress.toLowerCase())) {
+        if (addressesWhoMinted.map((a: any) =>a.toLowerCase()).includes(userAddress.toLowerCase()) && !addressesWhoBurned.map((a: any) =>a.toLowerCase()).includes(userAddress.toLowerCase())) {
           claimedSBTs.push(sbt);
         }
       }
@@ -4321,7 +4326,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
   },
 
 
-  async getSbtMetadata(providerName, sbtAddress, groupKeyOrCfg = null) {
+  async getSbtMetadata(providerName: any, sbtAddress: any, groupKeyOrCfg: any = null) {
     try {
       if (!sbtAddress || !ethers.utils.isAddress(sbtAddress)) {
         contractsLog.warn('[getSbtMetadata] invalid SBT address:', sbtAddress);
@@ -4334,7 +4339,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
       const chId = extractChainId(cfg, SBT_READ_PROVIDER_OPTIONS);
 
       // Helpers (local scope)
-      const normalizeUri = (u) => {
+      const normalizeUri = (u: any) => {
         if (!u) return null;
         const s = String(u).trim();
         if (!s) return null;
@@ -4343,26 +4348,26 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
         if (/^ipfs:\/\//i.test(s)) return `https://ipfs.io/ipfs/${s.replace(/^ipfs:\/\//i, '')}`;
         return s;
       };
-      const toSeconds = (v) => {
+      const toSeconds = (v: any) => {
         if (v == null) return undefined;
         const n = Number(v);
         if (!Number.isFinite(n)) return undefined;
         if (n <= 0) return 0;
         return n > 1e12 ? Math.floor(n / 1000) : Math.floor(n);
       };
-      const toBlockNumber = (v) => {
+      const toBlockNumber = (v: any) => {
         if (v == null) return undefined;
         const n = Number(v);
         if (!Number.isFinite(n) || n < 0) return undefined;
         return Math.floor(n);
       };
-      const mapBurnAuth = (raw) => {
-        const MAP = { AdminOnly: 0, OwnerOnly: 1, Both: 2, Neither: 3 };
+      const mapBurnAuth = (raw: any) => {
+        const MAP: any = { AdminOnly: 0, OwnerOnly: 1, Both: 2, Neither: 3 };
         if (typeof raw === 'number') return raw;
         if (typeof raw === 'string' && Object.prototype.hasOwnProperty.call(MAP, raw)) return MAP[raw];
         return raw;
       };
-      const inferDirectImageUrl = (uriIn) => {
+      const inferDirectImageUrl = (uriIn: any) => {
         const normalized = normalizeUri(uriIn);
         if (!normalized) return null;
         if (/^data:image\//i.test(normalized)) return normalized;
@@ -4371,13 +4376,13 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
           if (/\.(png|jpe?g|gif|webp|svg|bmp|avif|ico)$/i.test(parsed.pathname || '')) {
             return normalized;
           }
-        } catch (_) {
+        } catch (_: any) {
           // ignore
         }
         return null;
       };
 
-      const sbt = new ethers.Contract(sbtAddress, CUSTOM_SBT_ABI, provider);
+      const sbt = new ethers.Contract(sbtAddress, CUSTOM_SBT_ABI, provider as any);
 
       // OPTIMIZATION: Removed redundant provider.getNetwork() call.
       // We already know 'chId' from the config used to create the provider.
@@ -4386,23 +4391,23 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
         callWithRetry(() => sbt.symbol(), 'SBT.symbol').catch(() => null),
         (async () => {
           try { return await callWithRetry(() => sbt.admin(), 'SBT.admin'); }
-          catch(_) {
+          catch(_: any) {
             try { return await callWithRetry(() => sbt.owner(), 'SBT.owner'); }
-            catch(__) { return ethers.constants.AddressZero; }
+            catch(__: any) { return ethers.constants.AddressZero; }
           }
         })(),
         (async () => {
           try { return await callWithRetry(() => sbt.tokenURI(), 'SBT.tokenURI()'); }
-          catch(_) {
+          catch(_: any) {
             try { return await callWithRetry(() => sbt.tokenURI(0), 'SBT.tokenURI(0)'); }
-            catch(__) { return null; }
+            catch(__: any) { return null; }
           }
         })()
       ]);
 
       const tokenURI = normalizeUri(tokenURI_raw);
 
-      const out = {
+      const out: any = {
         contractName: name || null,
         name: name || null,
         symbol: symbol || null,
@@ -4416,13 +4421,13 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
       // Merge tokenURI JSON (fail-soft)
       if (tokenURI) {
         try {
-          const tokenUriLogMeta = {
+          const tokenUriLogMeta: any = {
             sbtAddress: String(sbtAddress || '').toLowerCase(),
             tokenURI,
           };
           const tokenUriArweaveTxId = parseArweaveTxId(tokenURI);
           let tokenUriMetadataTimedOut = false;
-          const tokenUriOut = {};
+          const tokenUriOut: any = {};
           const tokenUriMetadataTask = (async () => {
             if (tokenUriArweaveTxId) {
               const tokenUriText = await downloadArweaveTextForGroup({
@@ -4453,14 +4458,14 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
               if (!text) return null;
               try {
                 return JSON.parse(text);
-              } catch (_) {
+              } catch (_: any) {
                 return null;
               }
             }
             return null;
           })();
           const json = await runWithSoftTimeout(
-            tokenUriMetadataTask.then((result) => {
+            tokenUriMetadataTask.then((result: any) => {
               if (!tokenUriMetadataTimedOut && Object.keys(tokenUriOut).length > 0) {
                 Object.assign(out, tokenUriOut);
               }
@@ -4482,21 +4487,21 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
 
           if (!tokenUriMetadataTimedOut && json && typeof json === 'object') {
             const MASKED_SBT_FIELD_VALUE = '[encrypted]';
-            const hasJsonField = (fieldKey) => Object.prototype.hasOwnProperty.call(json, fieldKey);
+            const hasJsonField = (fieldKey: any) => Object.prototype.hasOwnProperty.call(json, fieldKey);
             const encryptedFields = isObj(json.encryptedFields) ? json.encryptedFields : null;
             const targets = isObj(json?.encryption?.targets) ? json.encryption.targets : {};
-            const legacyEncryptedFieldKeys = {
+            const legacyEncryptedFieldKeys: any = {
               name: ['nameEncrypted', 'encryptedName'],
               description: ['descriptionEncrypted', 'encryptedDescription'],
               tags: ['tagsEncrypted', 'encryptedTags'],
               documentURLs: ['documentURLsEncrypted', 'docUrlsEncrypted'],
             };
-            const isLockedField = (fieldKey) => {
+            const isLockedField = (fieldKey: any) => {
               if (encryptedFields && Object.prototype.hasOwnProperty.call(encryptedFields, fieldKey) && encryptedFields[fieldKey]) {
                 return true;
               }
               if (targets?.[fieldKey] === true) return true;
-              return (legacyEncryptedFieldKeys[fieldKey] || []).some((legacyKey) => !!json?.[legacyKey]);
+              return (legacyEncryptedFieldKeys[fieldKey] || []).some((legacyKey: any) => !!json?.[legacyKey]);
             };
 
             if (hasJsonField('name')) {
@@ -4529,7 +4534,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
                         field: 'image',
                       }),
                     });
-                  } catch (_) {
+                  } catch (_: any) {
                     imageExists = null;
                   }
                   if (imageExists !== false) {
@@ -4600,7 +4605,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
               out.documentURLs = [documentUrlValue.trim()];
             } else if (Array.isArray(json.documents)) {
               out.documentURLs = json.documents
-                .map((entry) => {
+                .map((entry: any) => {
                   if (typeof entry === 'string') return entry.trim();
                   if (entry && typeof entry === 'object') {
                     const record = entry as Record<string, unknown>;
@@ -4637,19 +4642,19 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
             );
             if (creationBlock !== undefined) out.creationBlock = creationBlock;
           }
-        } catch (_) {}
+        } catch (_: any) {}
       }
 
       // Always prefer on-chain mint flags over tokenURI hints when the reads succeed.
       {
-        const FRAG = [
+        const FRAG: any[] = [
           "function maxTokens() view returns (uint256)",
           "function collectionBurnAuth() view returns (uint8)",
           "function mintingEndTime() view returns (uint256)",
           "function hasPasswordMint() view returns (bool)",
           "function mintMode() view returns (uint8)"
         ];
-        const c = new ethers.Contract(sbtAddress, FRAG, provider);
+        const c = new ethers.Contract(sbtAddress, FRAG, provider as any);
         const mintModeRead = typeof c.mintMode === 'function'
           ? c.mintMode().catch(() => null)
           : Promise.resolve(null);
@@ -4697,7 +4702,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
       normalizeSessionNameFields(out, fallbackSessionName);
 
       return out;
-    } catch (e) {
+    } catch (e: any) {
       contractsLog.error('[getSbtMetadata] failed:', e);
       return null;
     }
@@ -4705,12 +4710,12 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
 
 
 
-  startClaim: async function(providerName, SBTAddress, userCommit) {
+  startClaim: async function(providerName: any, SBTAddress: any, userCommit: any) {
     if (providerName === 'none') throw new Error('startClaim requires a signer-capable provider (not read-only).');
     const providerLocation = contractScripts.getProviderLocation(providerName);
-    const ethersProvider = new ethers.providers.Web3Provider(providerLocation, 'any');
+    const ethersProvider = new ethers.providers.Web3Provider(providerLocation as any, 'any');
     const signer = ethersProvider.getSigner();
-    const CustomSBT = new ethers.Contract(SBTAddress, CUSTOM_SBT_ABI, signer);
+    const CustomSBT = new ethers.Contract(SBTAddress, CUSTOM_SBT_ABI, signer as any);
     const txOverrides = await resolveTxGasOverrides({
       contract: CustomSBT,
       method: 'startClaim',
@@ -4735,12 +4740,12 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
     return receipt;
   },
 
-  claimWithPassword: async function(providerName, SBTAddress, password) {
+  claimWithPassword: async function(providerName: any, SBTAddress: any, password: any) {
     if (providerName === 'none') throw new Error('claimWithPassword requires a signer-capable provider (not read-only).');
     const providerLocation = contractScripts.getProviderLocation(providerName);
-    const ethersProvider = new ethers.providers.Web3Provider(providerLocation, 'any');
+    const ethersProvider = new ethers.providers.Web3Provider(providerLocation as any, 'any');
     const signer = ethersProvider.getSigner();
-    const CustomSBT = new ethers.Contract(SBTAddress, CUSTOM_SBT_ABI, signer);
+    const CustomSBT = new ethers.Contract(SBTAddress, CUSTOM_SBT_ABI, signer as any);
     const txOverrides = await resolveTxGasOverrides({
       contract: CustomSBT,
       method: 'claimWithPassword',
@@ -4765,7 +4770,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
     return receipt;
   },
 
-  claimWithInvite: async function(providerName, SBTAddress, nonce, signature) {
+  claimWithInvite: async function(providerName: any, SBTAddress: any, nonce: any, signature: any) {
     if (providerName === 'none') throw new Error('claimWithInvite requires a signer-capable provider (not read-only).');
     inviteLog.log('[INVITE_DEBUG v4] claimWithInvite (instrumented)');
     inviteLog.log('--- Debug ClaimWithInvite ---');
@@ -4776,16 +4781,16 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
       throw new Error('Invalid SBT address for claimWithInvite.');
     }
     const providerLocation = contractScripts.getProviderLocation(providerName);
-    const ethersProvider = new ethers.providers.Web3Provider(providerLocation, 'any');
+    const ethersProvider = new ethers.providers.Web3Provider(providerLocation as any, 'any');
     const signer = ethersProvider.getSigner();
     let signerAddress = null;
     try {
       signerAddress = await signer.getAddress();
       inviteLog.log('Signer Address:', signerAddress);
-    } catch (err) {
+    } catch (err: any) {
       inviteLog.warn('Failed to resolve signer address:', err?.message || err);
     }
-    const CustomSBT = new ethers.Contract(SBTAddress, CUSTOM_SBT_ABI, signer);
+    const CustomSBT = new ethers.Contract(SBTAddress, CUSTOM_SBT_ABI, signer as any);
     let callStaticFailure = null;
 
     // Preflight debug: recover signer + compare to on-chain hash + nonce expectations.
@@ -4808,7 +4813,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
         try {
           const expected = ethers.BigNumber.from(mintedTokens).add(1).toString();
           inviteLog.log('[INVITE_DEBUG v4] expected nonce:', expected);
-        } catch (_) {}
+        } catch (_: any) {}
       }
 
       try {
@@ -4817,14 +4822,14 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
           inviteLog.log('[INVITE_DEBUG v4] signer groupPasswordHash:', signerHash);
           inviteLog.log('[INVITE_DEBUG v4] signature matches signer:', String(signerHash).toLowerCase() === recoveredHash.toLowerCase());
         }
-      } catch (_) {}
+      } catch (_: any) {}
 
       try {
         const signerMinted = await CustomSBT.mintedTokens?.().catch(() => null);
         if (signerMinted != null) {
           inviteLog.log('[INVITE_DEBUG v4] signer mintedTokens:', ethers.BigNumber.from(signerMinted).toString());
         }
-      } catch (_) {}
+      } catch (_: any) {}
 
       try {
         let readProvider = null;
@@ -4833,18 +4838,18 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
           const net = await ethersProvider.getNetwork();
           readChainId = net?.chainId;
           inviteLog.log('[INVITE_DEBUG v4] signer chainId:', readChainId);
-        } catch (_) {}
+        } catch (_: any) {}
 
         if (readChainId) {
           try {
             readProvider = getReadProviderForChain(readChainId);
-          } catch (_) {
+          } catch (_: any) {
             readProvider = null;
           }
         }
 
         if (readProvider) {
-          const readContract = new ethers.Contract(SBTAddress, CUSTOM_SBT_ABI, readProvider);
+          const readContract = new ethers.Contract(SBTAddress, CUSTOM_SBT_ABI, readProvider as any);
           const [mintingEndTime, maxTokens, hasPasswordMint, userTokenId] = await Promise.all([
             readContract.mintingEndTime?.().catch(() => null),
             readContract.maxTokens?.().catch(() => null),
@@ -4855,10 +4860,10 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
           let balanceOf = null;
           try {
             code = signerAddress ? await readProvider.getCode(signerAddress) : null;
-          } catch (_) {}
+          } catch (_: any) {}
           try {
             balanceOf = signerAddress ? await readContract.balanceOf?.(signerAddress).catch(() => null) : null;
-          } catch (_) {}
+          } catch (_: any) {}
           const endSec = mintingEndTime != null ? Number(ethers.BigNumber.from(mintingEndTime).toString()) : null;
           const nowSec = Math.floor(Date.now() / 1000);
           inviteLog.log('[INVITE_DEBUG v4] mintingEndTime:', endSec, 'now:', nowSec);
@@ -4876,7 +4881,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
           try {
             await readContract.callStatic.claimWithInvite(nonce, signature, { from: signerAddress || undefined });
             inviteLog.log('[INVITE_DEBUG v4] read callStatic.claimWithInvite: ok');
-          } catch (callErr) {
+          } catch (callErr: any) {
             const errMsg =
               callErr?.reason ||
               callErr?.errorName ||
@@ -4893,7 +4898,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
         try {
           await CustomSBT.callStatic.claimWithInvite(nonce, signature, { from: signerAddress || undefined });
           inviteLog.log('[INVITE_DEBUG v4] signer callStatic.claimWithInvite: ok');
-        } catch (callErr) {
+        } catch (callErr: any) {
           const errMsg =
             callErr?.reason ||
             callErr?.errorName ||
@@ -4908,10 +4913,10 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
             callStaticFailure = new Error(String(errMsg || 'callStatic.claimWithInvite failed'));
           }
         }
-      } catch (metaErr) {
+      } catch (metaErr: any) {
         inviteLog.warn('[INVITE_DEBUG v4] metadata checks failed:', metaErr?.message || metaErr);
       }
-    } catch (preErr) {
+    } catch (preErr: any) {
       inviteLog.warn('[INVITE_DEBUG v4] preflight check failed:', preErr?.message || preErr);
     }
     if (callStaticFailure) {
@@ -4949,7 +4954,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
     return receipt;
   },
 
-  isPasswordValid: async function(providerLike, sbtAddress, hashedPasswordBytes32, groupKeyOrCfg = null) {
+  isPasswordValid: async function(providerLike: any, sbtAddress: any, hashedPasswordBytes32: any, groupKeyOrCfg: any = null) {
     try {
       const cfg  = memoizedResolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
       const chId = Number(
@@ -4963,15 +4968,15 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
 
       let ok = false;
       try {
-        const contract = new ethers.Contract(sbtAddress, CUSTOM_SBT_ABI, provider);
+        const contract = new ethers.Contract(sbtAddress, CUSTOM_SBT_ABI, provider as any);
         ok = await callWithRetry(() => contract.isPasswordValid(hashedPasswordBytes32), 'CustomSBT.isPasswordValid');
-      } catch (e) {
+      } catch (e: any) {
         inviteLog.error('[LIMITED][isPasswordValid] call failed:', e);
         ok = false;
       }
       inviteLog.log(`[LIMITED][isPasswordValid] sbt=${sbtAddress}, hash=${hashedPasswordBytes32}, ok=${ok}`);
       return ok;
-    } catch (e) {
+    } catch (e: any) {
       inviteLog.error('[LIMITED][isPasswordValid] provider resolution failed:', e);
       return false;
     }
@@ -4981,7 +4986,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
    * Deterministic group password hash scoped to an SBT address.
    * Predeploy callers fall back to AddressZero by passing an empty sbtAddress.
    */
-  computeGroupPasswordHash({ password, sbtAddress, adminAddress, chainId, name, symbol, tokenURI }) {
+  computeGroupPasswordHash({ password, sbtAddress, adminAddress, chainId, name, symbol, tokenURI }: any) {
     return cryptoUtils.computeGroupPasswordHash({
       password,
       sbtAddress,
@@ -4990,7 +4995,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
       name,
       symbol,
       tokenURI
-    });
+    } as any);
   },
 
 
@@ -4999,7 +5004,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
     sbtAddress,
     userAddress,
     walletScopeSbtAddress
-  }) {
+  }: any) {
     const resolvedWalletScopeSbtAddress = await resolveGroupPasswordWalletScopeSbtAddress({
       password,
       sbtAddress,
@@ -5023,7 +5028,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
     sbtAddress,
     nonces,
     walletScopeSbtAddress
-  }) {
+  }: any) {
     if (!Array.isArray(nonces) || nonces.length === 0) {
       throw new Error('generateInvitePayloads requires a non-empty nonces array.');
     }
@@ -5047,8 +5052,8 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
         sbtAddress: resolvedWalletScopeSbtAddress
       });
       inviteLog.log('[INVITE_DEBUG v4] derived groupPasswordHash:', localHash);
-    } catch (_) {}
-    const out = [];
+    } catch (_: any) {}
+    const out: any[] = [];
     for (const nonce of nonces) {
       const signature = await cryptoUtils.signInvite({
         password: normalizedPassword,
@@ -5056,7 +5061,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
         nonce,
         walletScopeSbtAddress: resolvedWalletScopeSbtAddress
       });
-      const payload = { n: String(nonce), s: signature };
+      const payload: any = { n: String(nonce), s: signature };
       const inviteCode = cryptoUtils.encodeInvite(payload);
       out.push({ nonce: String(nonce), signature, inviteCode });
     }
@@ -5065,16 +5070,16 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
 
   // "Group" here refers to SBT token group/collection, not session group
   /** Read helper for on-chain groupPasswordHash */
-  async getGroupPasswordHash(providerName, SBTAddress, groupKeyOrCfg = null, options = {}) {
+  async getGroupPasswordHash(providerName: any, SBTAddress: any, groupKeyOrCfg: any = null, options: any = {}) {
     try {
       const provider = getLocalAwareReadProviderForGroup(groupKeyOrCfg, SBT_READ_PROVIDER_OPTIONS);
-      const CustomSBT = new ethers.Contract(SBTAddress, CUSTOM_SBT_ABI, provider);
+      const CustomSBT = new ethers.Contract(SBTAddress, CUSTOM_SBT_ABI, provider as any);
       if (!CustomSBT.groupPasswordHash) return null;
       const v = await callWithRetry(() => CustomSBT.groupPasswordHash(), 'CustomSBT.groupPasswordHash');
       return v;
-    } catch (error) {
+    } catch (error: any) {
       try {
-        const win = typeof window !== 'undefined' ? window : {};
+        const win: any = typeof window !== 'undefined' ? window : {};
         const fallback = resolveReadProvider({
           groupKeyOrCfg,
           readOptions: SBT_READ_PROVIDER_OPTIONS,
@@ -5085,29 +5090,29 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
           },
         });
         if (fallback.ok && fallback.source === 'injected-wallet') {
-          const provider = new ethers.providers.Web3Provider(fallback.provider, 'any');
-          const CustomSBT = new ethers.Contract(SBTAddress, CUSTOM_SBT_ABI, provider);
+          const provider = new ethers.providers.Web3Provider(fallback.provider as any, 'any');
+          const CustomSBT = new ethers.Contract(SBTAddress, CUSTOM_SBT_ABI, provider as any);
           if (!CustomSBT.groupPasswordHash) return null;
           inviteLog.warn('[INVITE_DEBUG v2] getGroupPasswordHash falling back to injected provider by explicit opt-in');
           const v = await CustomSBT.groupPasswordHash();
           return v;
         }
-      } catch (_) {}
+      } catch (_: any) {}
       return null;
     }
   },
 
   /** Read helper for on-chain mintedTokens */
-  async getMintedTokens(providerName, SBTAddress, groupKeyOrCfg = null, options = {}) {
+  async getMintedTokens(providerName: any, SBTAddress: any, groupKeyOrCfg: any = null, options: any = {}) {
     try {
       if (!SBTAddress || !ethers.utils.isAddress(SBTAddress)) return null;
       const provider = getLocalAwareReadProviderForGroup(groupKeyOrCfg, SBT_READ_PROVIDER_OPTIONS);
-      const CustomSBT = new ethers.Contract(SBTAddress, ["function mintedTokens() view returns (uint256)"], provider);
+      const CustomSBT = new ethers.Contract(SBTAddress, ["function mintedTokens() view returns (uint256)"], provider as any);
       const v = await callWithRetry(() => CustomSBT.mintedTokens(), 'CustomSBT.mintedTokens');
       return v != null ? v.toString() : null;
-    } catch (error) {
+    } catch (error: any) {
       try {
-        const win = typeof window !== 'undefined' ? window : {};
+        const win: any = typeof window !== 'undefined' ? window : {};
         const fallback = resolveReadProvider({
           groupKeyOrCfg,
           readOptions: SBT_READ_PROVIDER_OPTIONS,
@@ -5118,18 +5123,18 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
           },
         });
         if (fallback.ok && fallback.source === 'injected-wallet') {
-          const provider = new ethers.providers.Web3Provider(fallback.provider, 'any');
-          const CustomSBT = new ethers.Contract(SBTAddress, ["function mintedTokens() view returns (uint256)"], provider);
+          const provider = new ethers.providers.Web3Provider(fallback.provider as any, 'any');
+          const CustomSBT = new ethers.Contract(SBTAddress, ["function mintedTokens() view returns (uint256)"], provider as any);
           inviteLog.warn('[INVITE_DEBUG v2] getMintedTokens falling back to injected provider by explicit opt-in');
           const v = await CustomSBT.mintedTokens();
           return v != null ? v.toString() : null;
         }
-      } catch (_) {}
+      } catch (_: any) {}
       return null;
     }
   },
 
-  async getSbtHistorySummary(providerName, SBTAddress, groupKeyOrCfg = null) {
+  async getSbtHistorySummary(providerName: any, SBTAddress: any, groupKeyOrCfg: any = null) {
     try {
       if (!SBTAddress || !ethers.utils.isAddress(SBTAddress)) return null;
       const provider = getLocalAwareReadProviderForGroup(groupKeyOrCfg, SBT_READ_PROVIDER_OPTIONS);
@@ -5138,42 +5143,42 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
         [
           "function getHistorySummary() view returns (uint256 totalMinted,uint256 totalBurned,uint256 activeSupply,uint256 currentHolderCount,uint256 historicalHolderCount)"
         ],
-        provider
+        provider as any
       );
       const summary = await callWithRetry(() => CustomSBT.getHistorySummary(), 'CustomSBT.getHistorySummary');
       return normalizeSbtHistorySummary(summary);
-    } catch (_) {
+    } catch (_: any) {
       try {
         if (typeof window !== 'undefined' && window.ethereum) {
-          const provider = new ethers.providers.Web3Provider(window.ethereum, 'any');
+          const provider = new ethers.providers.Web3Provider(window.ethereum as any, 'any');
           const CustomSBT = new ethers.Contract(
             SBTAddress,
             [
               "function getHistorySummary() view returns (uint256 totalMinted,uint256 totalBurned,uint256 activeSupply,uint256 currentHolderCount,uint256 historicalHolderCount)"
             ],
-            provider
+            provider as any
           );
           inviteLog.warn('[INVITE_DEBUG v2] getSbtHistorySummary falling back to injected provider');
           const summary = await CustomSBT.getHistorySummary();
           return normalizeSbtHistorySummary(summary);
         }
-      } catch (_) {}
+      } catch (_: any) {}
       return null;
     }
   },
 
 
 
-  computeGroupMintMessageHash: function (sbtAddress, userAddress) {
+  computeGroupMintMessageHash: function (sbtAddress: any, userAddress: any) {
     return cryptoUtils.computeGroupMintMessageHash(sbtAddress, userAddress);
   },
 
-  mintWithGroupSignature: async function(providerName, SBTAddress, signature) {
+  mintWithGroupSignature: async function(providerName: any, SBTAddress: any, signature: any) {
     if (providerName === 'none') throw new Error('mintWithGroupSignature requires a signer-capable provider (not read-only).');
     const providerLocation = contractScripts.getProviderLocation(providerName);
-    const ethersProvider = new ethers.providers.Web3Provider(providerLocation, 'any');
+    const ethersProvider = new ethers.providers.Web3Provider(providerLocation as any, 'any');
     const signer = ethersProvider.getSigner();
-    const CustomSBT = new ethers.Contract(SBTAddress, CUSTOM_SBT_ABI, signer);
+    const CustomSBT = new ethers.Contract(SBTAddress, CUSTOM_SBT_ABI, signer as any);
     const txOverrides = await resolveTxGasOverrides({
       contract: CustomSBT,
       method: 'mintWithGroupSignature',
@@ -5203,12 +5208,12 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
   },
 
 
-  claim: async function(providerName, SBTAddress) {
+  claim: async function(providerName: any, SBTAddress: any) {
     if (providerName === 'none') throw new Error('claim requires a signer-capable provider (not read-only).');
     const providerLocation = contractScripts.getProviderLocation(providerName);
-    const ethersProvider = new ethers.providers.Web3Provider(providerLocation, 'any');
+    const ethersProvider = new ethers.providers.Web3Provider(providerLocation as any, 'any');
     const signer = ethersProvider.getSigner();
-    const CustomSBT = new ethers.Contract(SBTAddress, CUSTOM_SBT_ABI, signer);
+    const CustomSBT = new ethers.Contract(SBTAddress, CUSTOM_SBT_ABI, signer as any);
     const txOverrides = await resolveTxGasOverrides({
       contract: CustomSBT,
       method: 'claim',
@@ -5233,12 +5238,12 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
     return receipt;
   },
 
-  addHashedPasswords: async function(providerName, SBTAddress, hashedPasswords) {
+  addHashedPasswords: async function(providerName: any, SBTAddress: any, hashedPasswords: any) {
     if (providerName === 'none') throw new Error('addHashedPasswords requires a signer-capable provider (not read-only).');
     const providerLocation = contractScripts.getProviderLocation(providerName);
-    const ethersProvider = new ethers.providers.Web3Provider(providerLocation, 'any');
+    const ethersProvider = new ethers.providers.Web3Provider(providerLocation as any, 'any');
     const signer = ethersProvider.getSigner();
-    const CustomSBT = new ethers.Contract(SBTAddress, CUSTOM_SBT_ABI, signer);
+    const CustomSBT = new ethers.Contract(SBTAddress, CUSTOM_SBT_ABI, signer as any);
     const txOverrides = await resolveTxGasOverrides({
       contract: CustomSBT,
       method: 'addHashedPasswords',
@@ -5263,12 +5268,12 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
     return receipt;
   },
 
-  burnToken: async function(providerName, SBTAddress, tokenId) {
+  burnToken: async function(providerName: any, SBTAddress: any, tokenId: any) {
     if (providerName === 'none') throw new Error('burnToken requires a signer-capable provider (not read-only).');
     const providerLocation = contractScripts.getProviderLocation(providerName);
-    const ethersProvider = new ethers.providers.Web3Provider(providerLocation, 'any');
+    const ethersProvider = new ethers.providers.Web3Provider(providerLocation as any, 'any');
     const signer = ethersProvider.getSigner();
-    const CustomSBT = new ethers.Contract(SBTAddress, CUSTOM_SBT_ABI, signer);
+    const CustomSBT = new ethers.Contract(SBTAddress, CUSTOM_SBT_ABI, signer as any);
     const tokenIdFormatted = this.getBigNumber(tokenId);
     const txOverrides = await resolveTxGasOverrides({
       contract: CustomSBT,
@@ -5294,10 +5299,10 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
     return receipt;
   },
 
-  async userHasSBT(providerName, SBTAddress, userAddress, fromBlock = 0, toBlock = "latest", groupKeyOrCfg = null) {
+  async userHasSBT(providerName: any, SBTAddress: any, userAddress: any, fromBlock: any = 0, toBlock: any = "latest", groupKeyOrCfg: any = null) {
     // Resolve group-aware read provider
     const provider  = getLocalAwareReadProviderForGroup(groupKeyOrCfg, SBT_READ_PROVIDER_OPTIONS);
-    const CustomSBT = new ethers.Contract(SBTAddress, CUSTOM_SBT_ABI, provider);
+    const CustomSBT = new ethers.Contract(SBTAddress, CUSTOM_SBT_ABI, provider as any);
 
     void fromBlock;
     void toBlock;
@@ -5311,7 +5316,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
         );
         if (tokenId && typeof tokenId.gt === 'function' && tokenId.gt(0)) return true;
       }
-    } catch (_) {
+    } catch (_: any) {
       // Fall back to balanceOf below if the helper is unavailable.
     }
 
@@ -5323,16 +5328,16 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
         );
         if (bal && typeof bal.gt === 'function' && bal.gt(0)) return true;
       }
-    } catch (_) {
+    } catch (_: any) {
       // Fall through to false when neither direct ownership helper succeeds.
     }
 
     return false;
   },
 
-  userCanBurnSBTs: async function(providerName, SBTAddress, userAddress, groupKeyOrCfg = null) {
+  userCanBurnSBTs: async function(providerName: any, SBTAddress: any, userAddress: any, groupKeyOrCfg: any = null) {
     const provider  = getLocalAwareReadProviderForGroup(groupKeyOrCfg, SBT_READ_PROVIDER_OPTIONS);
-    const CustomSBT = new ethers.Contract(SBTAddress, CUSTOM_SBT_ABI, provider);
+    const CustomSBT = new ethers.Contract(SBTAddress, CUSTOM_SBT_ABI, provider as any);
 
     const admin = await callWithRetry(() => CustomSBT.admin(), 'CustomSBT.admin (userCanBurnSBTs)');
     const burnAuth = await callWithRetry(
@@ -5349,7 +5354,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
     return false;
   },
 
-  async getAddressesWhoMintedSBT(providerName, SBTAddress, fromBlock = 0, toBlock = "latest", groupKeyOrCfg = null) {
+  async getAddressesWhoMintedSBT(providerName: any, SBTAddress: any, fromBlock: any = 0, toBlock: any = "latest", groupKeyOrCfg: any = null) {
     const counts = await this.getSbtMintBurnCountsByAddress(
       providerName,
       SBTAddress,
@@ -5360,7 +5365,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
     return Object.keys(counts?.mintedCountByAddress || {});
   },
 
-  async getAddressesWhoBurnedSBT(providerName, SBTAddress, fromBlock = 0, toBlock = "latest", groupKeyOrCfg = null) {
+  async getAddressesWhoBurnedSBT(providerName: any, SBTAddress: any, fromBlock: any = 0, toBlock: any = "latest", groupKeyOrCfg: any = null) {
     const counts = await this.getSbtMintBurnCountsByAddress(
       providerName,
       SBTAddress,
@@ -5376,8 +5381,8 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
 
   // SBT Functionality Ends -----------------------------
 
-  getProviderLocation: function(providerName) {
-    const win = typeof window !== 'undefined' ? window : {};
+  getProviderLocation: function(providerName: any) {
+    const win: any = typeof window !== 'undefined' ? window : {};
     const resolved = resolveSignerProvider({
       providerName,
       injectedProvider: win.ethereum,
@@ -5401,10 +5406,10 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
 };
 
 // Convenience: expose named read-provider resolver on default export
-contractScripts.getReadProviderForGroup = getReadProviderForGroup;
+(contractScripts as any).getReadProviderForGroup = getReadProviderForGroup;
 // Back-compat alias retained for older callers that still use the legacy name.
-contractScripts.getETHBalance = contractScripts.getNativeBalance;
-export const __test__contractScriptsArweaveCache = {
+(contractScripts as any).getETHBalance = (contractScripts as any).getNativeBalance;
+export const __test__contractScriptsArweaveCache: any = {
   resolveReadContext,
   downloadArweaveTextForGroup,
   readArweaveTxCacheEntry,
@@ -5414,26 +5419,26 @@ export const __test__contractScriptsArweaveCache = {
   clearArweaveTxFailureCacheEntry,
   recordTerminalArweaveInvalidFailure,
 };
-export const __test__contractScriptsArweaveUploads = {
+export const __test__contractScriptsArweaveUploads: any = {
   buildArweaveUploadTags,
   resolveArweaveUploadOpts,
 };
-export const __test__contractScriptsSessionNameFields = {
+export const __test__contractScriptsSessionNameFields: any = {
   normalizeSessionNameFields,
 };
-export const __test__contractScriptsSbtMemo = {
+export const __test__contractScriptsSbtMemo: any = {
   bumpSbtMemoRunVersion,
   isLatestSbtMemoRun,
 };
-export const __test__contractScriptsSbtProgress = {
+export const __test__contractScriptsSbtProgress: any = {
   createSbtEventScanProgressState,
 };
-export const __test__contractScriptsSbtHistory = {
+export const __test__contractScriptsSbtHistory: any = {
   normalizeHistorySummaryCount,
   normalizeSbtHistorySummary,
   deriveSbtHistorySummaryFromCounts,
 };
-export const __test__contractScriptsErrors = {
+export const __test__contractScriptsErrors: any = {
   isNonexistentTokenError,
   isRetryableSurveyResponseReadError,
 };
