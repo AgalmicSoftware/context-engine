@@ -94,6 +94,7 @@ import useSessionWizardWorkerDeploy, {
 } from './hooks/useSessionWizardWorkerDeploy';
 import useSessionSlugState from './hooks/useSessionSlugState.js';
 import useSessionHeaderPreview from './hooks/useSessionHeaderPreview';
+import useSessionWizardChromeState from './hooks/useSessionWizardChromeState';
 import SessionWizardInfoTooltip, {
   type SessionWizardTooltipRenderOptions,
 } from './SessionWizardInfoTooltip';
@@ -523,21 +524,6 @@ type SessionRegistryReadContract = {
   sessionIdExists?: (sessionIdHex: string) => Promise<boolean> | boolean;
 };
 
-type CollapsedSectionsState = Record<string, boolean> & {
-  worker: boolean;
-  encryption: boolean;
-  metadata: boolean;
-  publish: boolean;
-};
-
-type MetadataObjectCollapsedState = Record<string, boolean> & {
-  contracts: boolean;
-  faucet: boolean;
-  ai: boolean;
-  lit: boolean;
-  storageProfile: boolean;
-};
-
 type WorkerSecretsUpdateFn = (current: WorkerSecretsLike) => WorkerSecretsLike | UnknownRecord | null | undefined;
 
 type SponsoredBundleDeploymentStatePatch = {
@@ -798,7 +784,6 @@ const SessionWizard = ({
   const [publishBusy, setPublishBusy] = useState(false);
   const [publishStepElapsedMs, setPublishStepElapsedMs] = useState(0);
   const [wizardMode, setWizardMode] = useState('normal');
-  const [wizardDisplaySettingsOpen, setWizardDisplaySettingsOpen] = useState(false);
   const [registryChainId, setRegistryChainId] = useState<number>(() => {
     const fromDraft = Number(draft.networkChainId || 0);
     if (fromDraft && getSessionRegistryAddress(fromDraft)) return fromDraft;
@@ -875,8 +860,6 @@ const SessionWizard = ({
     if (cachedMap && typeof cachedMap === 'object') return cachedMap as ResourceGateMapState;
     return buildResourceGateMap(initialGates, initialDefaultGateId || initialGateRef.current.id) as ResourceGateMapState;
   });
-  const [moreOptionsOpen, setMoreOptionsOpen] = useState(false);
-  const [showJsonPreview, setShowJsonPreview] = useState(false);
   const [jsonCopied, setJsonCopied] = useState(false);
   const [latestChainBlock, setLatestChainBlock] = useState<number | null>(null);
   const [latestBlockStatus, setLatestBlockStatus] = useState('');
@@ -1217,20 +1200,23 @@ const SessionWizard = ({
     draftSessionHeader: draft?.sessionHeader,
     updateDraftSessionHeader: (value) => updateDraftValue(['sessionHeader'], value),
   });
-  const [showPromptPreview, setShowPromptPreview] = useState(false);
-  const [metadataObjectCollapsed, setMetadataObjectCollapsed] = useState<MetadataObjectCollapsedState>({
-    contracts: true,
-    faucet: true,
-    ai: true,
-    lit: true,
-    storageProfile: true,
+  const {
+    wizardDisplaySettingsOpen,
+    setWizardDisplaySettingsOpen,
+    moreOptionsOpen,
+    setMoreOptionsOpen,
+    showJsonPreview,
+    setShowJsonPreview,
+    showPromptPreview,
+    setShowPromptPreview,
+    metadataObjectCollapsed,
+    setMetadataObjectCollapsed,
+    collapsedSections,
+    setCollapsedSections,
+  } = useSessionWizardChromeState({
+    wizardMode,
+    hasSponsoredBundleLink,
   });
-  const [collapsedSections, setCollapsedSections] = useState<CollapsedSectionsState>(() => ({
-    worker: true,
-    encryption: wizardMode !== 'advanced',
-    metadata: false,
-    publish: true,
-  }));
   const workerResourceKeys = useMemo(
     () => getSessionWizardWorkerResourceKeys(),
     []
@@ -1244,25 +1230,6 @@ const SessionWizard = ({
     () => workerResourceKeys.filter((key) => !cloudflareWorkerSbtGateMode || key !== 'lit'),
     [cloudflareWorkerSbtGateMode, workerResourceKeys]
   );
-  useEffect(() => {
-    if (wizardMode === 'advanced') return;
-    setCollapsedSections((prev) => {
-      const firstOpenSection = ['metadata', 'encryption', 'worker', 'publish']
-        .find((key) => prev[key] === false) || 'metadata';
-      return {
-        metadata: firstOpenSection !== 'metadata',
-        encryption: firstOpenSection !== 'encryption',
-        worker: firstOpenSection !== 'worker',
-        publish: firstOpenSection !== 'publish',
-      };
-    });
-  }, [wizardMode]);
-  useEffect(() => {
-    if (!hasSponsoredBundleLink) {
-      setWizardDisplaySettingsOpen(false);
-    }
-  }, [hasSponsoredBundleLink]);
-
   const effectivePersistWorkerSecrets = DEV_PERSIST_WORKER_SECRETS && persistWorkerSecrets;
 
   const registryAddress = useMemo(() => {
