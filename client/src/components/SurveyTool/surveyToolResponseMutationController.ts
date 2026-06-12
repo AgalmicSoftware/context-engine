@@ -52,8 +52,16 @@ export const resolveFieldEncryptionDefaults = (
 } => {
   const questionLocked = deps.isQuestionLockedForResponse(questionId);
   const previousAudience = deps.resolveFieldEncryptionAudience(prevFieldState, questionId, fieldKey);
+  const isUntouchedPlainSelfDefault =
+    previousAudience === 'self' &&
+    prevFieldState.encrypted === false &&
+    (prevFieldState.value === undefined || prevFieldState.value === null || String(prevFieldState.value).length === 0) &&
+    !prevFieldState.encryptedPortion &&
+    !prevFieldState.hash &&
+    !prevFieldState.encryptionGateId;
+  const effectivePreviousAudience = isUntouchedPlainSelfDefault ? '' : previousAudience;
   const hasExistingEncryptionState =
-    typeof prevFieldState.encrypted === 'boolean' && !!previousAudience;
+    typeof prevFieldState.encrypted === 'boolean' && !!effectivePreviousAudience;
   const autoEncrypt = questionLocked || (
     hasExistingEncryptionState
       ? false
@@ -62,14 +70,14 @@ export const resolveFieldEncryptionDefaults = (
   const defaultAudience = autoEncrypt ? 'gate' : 'self';
   const resolvedAudience = questionLocked
     ? 'gate'
-    : (previousAudience || defaultAudience);
+    : (effectivePreviousAudience || defaultAudience);
   const resolvedGateId = (questionLocked || resolvedAudience === 'gate')
     ? deps.resolveFieldEncryptionGateId(prevFieldState, questionId, fieldKey)
     : null;
   const nextEncrypted = questionLocked
     ? true
-    : (typeof prevFieldState.encrypted === 'boolean'
-      ? prevFieldState.encrypted
+    : (hasExistingEncryptionState
+      ? !!prevFieldState.encrypted
       : autoEncrypt);
 
   return {

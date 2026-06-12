@@ -48,6 +48,7 @@ import {
   extractSingleQuestionOptionsFromCandidate,
   findSingleQuestionEntryAcrossGroups,
   getLatestAnsweredResponses,
+  responseHasLitSbtRecipient,
   isEnvelopeAesGcm256,
   resolveSingleQuestionMapFromCacheValue,
   resolvePromptGateTooltipProps,

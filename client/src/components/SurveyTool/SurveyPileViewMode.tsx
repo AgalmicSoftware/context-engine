@@ -1,7 +1,7 @@
 // @ts-nocheck
 /** @file SurveyPileViewMode.tsx */
 
-import React, { Component } from 'react';
+import React from 'react';
 import {
   Dropdown,
   DropdownToggle,
@@ -56,14 +56,14 @@ import {
 } from './surveyPileViewState.js';
 import {
   renderPileActiveQuestionCard,
-  renderPileCardShell,
-  renderPileGatedPromptCard,
+  renderPileCardShell as renderPileCardShellView,
+  renderPileGatedPromptCard as renderPileGatedPromptCardView,
 } from './surveyPileActiveQuestionCard';
 import {
-  renderPileAdditionalEditorRow,
-  renderPileCommentsSection,
-  renderPileQuestionIcons,
-  renderPileFooterSection,
+  renderPileAdditionalEditorRow as renderPileAdditionalEditorRowView,
+  renderPileCommentsSection as renderPileCommentsSectionView,
+  renderPileQuestionIcons as renderPileQuestionIconsView,
+  renderPileFooterSection as renderPileFooterSectionView,
 } from './surveyPileQuestionSections';
 import { renderPileInteractionSurface } from './surveyPileInteractionSurface';
 import {
@@ -462,6 +462,7 @@ import {
   buildClearedSurveyQuestionPoolState,
   buildInitialSurveyQuestionsState,
   buildSurveyQuestionPoolLoadState,
+  isSurveyQuestionsMaskedPromptText,
   type SurveyQuestionsProps,
   type SurveyQuestionsState,
 } from './surveyQuestionsTypes.js';
@@ -543,19 +544,20 @@ export const buildPileRuntimeInitialState = (engine) => {
 };
 
 export const createPileViewRuntimeStrategy = () => ({
-  buildInitialState: (engine) => buildPileRuntimeInitialState(engine),
+  buildInitialState: (engine) => buildPileRuntimeInitialState(attachPileViewRuntimeEngine(engine)),
 
-  componentDidMount: (engine) => engine.runPileComponentDidMount(),
+  componentDidMount: (engine) => attachPileViewRuntimeEngine(engine).runPileComponentDidMount(),
 
   componentDidUpdate: (engine, prevProps, prevState) => (
-    engine.runPileComponentDidUpdate(prevProps, prevState)
+    attachPileViewRuntimeEngine(engine).runPileComponentDidUpdate(prevProps, prevState)
   ),
 
-  componentWillUnmount: (engine) => engine.runPileComponentWillUnmount(),
+  componentWillUnmount: (engine) => attachPileViewRuntimeEngine(engine).runPileComponentWillUnmount(),
 
-  render: (engine) => engine.renderPileViewMode(),
+  render: (engine) => attachPileViewRuntimeEngine(engine).renderPileViewMode(),
 
   getCurrentRenderedQuestionIds: (engine) => {
+    engine = attachPileViewRuntimeEngine(engine);
     const pileQuestions = Array.isArray(engine.state?.pileQuestions) ? engine.state.pileQuestions : [];
     const activePileIndex = Number(engine.state?.activePileIndex || 0);
     const key = `${activePileIndex}|${pileQuestions.length}|${Number(engine._pileQuestionsGeneration || 0)}`;
@@ -575,7 +577,7 @@ export const createPileViewRuntimeStrategy = () => ({
   },
 
   toggleComments: (engine, questionId) => (
-    engine.setState((prev) => ({
+    attachPileViewRuntimeEngine(engine).setState((prev) => ({
       showComments: {
         ...prev.showComments,
         [questionId]: !prev.showComments[questionId],
@@ -583,11 +585,12 @@ export const createPileViewRuntimeStrategy = () => ({
     }))
   ),
 
-  getAnsweredQuestionsCount: (engine) => engine.getSubmitCount(),
+  getAnsweredQuestionsCount: (engine) => attachPileViewRuntimeEngine(engine).getSubmitCount(),
 
-  getPendingEditStats: (engine) => engine.computePendingEditStatsAtIndex(0),
+  getPendingEditStats: (engine) => attachPileViewRuntimeEngine(engine).computePendingEditStatsAtIndex(0),
 
   showTransientSubmitFeedback: (engine, message = '', durationMs = 2000) => {
+    engine = attachPileViewRuntimeEngine(engine);
     if (engine._emptySubmitTimer) {
       clearTimeout(engine._emptySubmitTimer);
       engine._emptySubmitTimer = null;
@@ -613,15 +616,101 @@ export const createPileViewRuntimeStrategy = () => ({
   },
 });
 
-export class PileViewMode extends SurveyQuestions {
-  constructor(props) {
-    super({
-      ...props,
-      runtimeStrategy: props?.runtimeStrategy || createPileViewRuntimeStrategy(),
-    });
-  }
+type PileViewModeEngine = any;
 
-  buildWarmPileSeedState(propsIn = this.props) {
+const createPileViewInstanceFields = () => ({
+  _pileQuestionsGeneration: 0,
+  _currentRenderedQuestionIdsCacheKey: '',
+  _questionObjectSignatureCache: new WeakMap(),
+  _questionListSignatureCache: new WeakMap(),
+  _currentPileQuestionsSignature: '0:0',
+  _currentPileQuestionsSignatureListRef: null,
+  _responseCountsCacheKey: '',
+  _responseCountsCacheValue: null,
+  _emptyReadyProbeStartedAtMs: 0,
+  _pileScanDisplayBaselineKey: '',
+  _pileScanDisplayBaselineRemaining: 0,
+  _lastGatedEmptyRecoveryKey: '',
+});
+
+const attachPileViewRuntimeEngine = (engine: PileViewModeEngine): PileViewModeEngine => {
+  if (!engine || typeof engine !== 'object') return engine;
+  if (!engine.__pileViewRuntimeFieldsInitialized) {
+    Object.assign(engine, createPileViewInstanceFields());
+    engine.__pileViewRuntimeFieldsInitialized = true;
+  }
+  Object.assign(engine, {
+        buildWarmPileSeedState: (...args: any[]) => buildWarmPileSeedState(engine, ...args),
+        buildQuestionOptionsDigest: (...args: any[]) => buildQuestionOptionsDigest(engine, ...args),
+        getPileLoadingScanDisplay: (...args: any[]) => getPileLoadingScanDisplay(engine, ...args),
+        getQuestionObjectSignature: (...args: any[]) => getQuestionObjectSignature(engine, ...args),
+        mixQuestionListHash: (...args: any[]) => mixQuestionListHash(engine, ...args),
+        buildQuestionListSignature: (...args: any[]) => buildQuestionListSignature(engine, ...args),
+        getPileVisibleQuestionIds: (...args: any[]) => getPileVisibleQuestionIds(engine, ...args),
+        buildPileVisibleResponseSignature: (...args: any[]) => buildPileVisibleResponseSignature(engine, ...args),
+        syncCurrentPileQuestionsSignature: (...args: any[]) => syncCurrentPileQuestionsSignature(engine, ...args),
+        areQuestionListsEquivalent: (...args: any[]) => areQuestionListsEquivalent(engine, ...args),
+        isRecentRateLimit: (...args: any[]) => isRecentRateLimit(engine, ...args),
+        getEffectivePileSessionConfig: (...args: any[]) => getEffectivePileSessionConfig(engine, ...args),
+        hasRestrictedSessionQuestionGate: (...args: any[]) => hasRestrictedSessionQuestionGate(engine, ...args),
+        maybeRecoverUnhydratedGatedPile: (...args: any[]) => maybeRecoverUnhydratedGatedPile(engine, ...args),
+        isPileLoadingVisible: (...args: any[]) => isPileLoadingVisible(engine, ...args),
+        shouldPreferGatedEmptyState: (...args: any[]) => shouldPreferGatedEmptyState(engine, ...args),
+        syncLoadingElapsedTimer: (...args: any[]) => syncLoadingElapsedTimer(engine, ...args),
+        scheduleLoadAndSortQuestions: (...args: any[]) => scheduleLoadAndSortQuestions(engine, ...args),
+        runPileComponentDidMount: (...args: any[]) => runPileComponentDidMount(engine, ...args),
+        runPileComponentDidUpdate: (...args: any[]) => runPileComponentDidUpdate(engine, ...args),
+        runPileComponentWillUnmount: (...args: any[]) => runPileComponentWillUnmount(engine, ...args),
+        handleViewAllFromPile: (...args: any[]) => handleViewAllFromPile(engine, ...args),
+        triggerNavFade: (...args: any[]) => triggerNavFade(engine, ...args),
+        handleNext: (...args: any[]) => handleNext(engine, ...args),
+        handlePrev: (...args: any[]) => handlePrev(engine, ...args),
+        toggleCreate: (...args: any[]) => toggleCreate(engine, ...args),
+        syncListeningModeQuery: (...args: any[]) => syncListeningModeQuery(engine, ...args),
+        shouldUseMobileListeningScroll: (...args: any[]) => shouldUseMobileListeningScroll(engine, ...args),
+        scrollListeningPanelIntoViewIfNeeded: (...args: any[]) => scrollListeningPanelIntoViewIfNeeded(engine, ...args),
+        toggleListeningPanel: (...args: any[]) => toggleListeningPanel(engine, ...args),
+        closeListeningPanel: (...args: any[]) => closeListeningPanel(engine, ...args),
+        toggleHologramAssistant: (...args: any[]) => toggleHologramAssistant(engine, ...args),
+        toggleConviction: (...args: any[]) => toggleConviction(engine, ...args),
+        openConvictionSlider: (...args: any[]) => openConvictionSlider(engine, ...args),
+        checkCacheAgainstBaseline: (...args: any[]) => checkCacheAgainstBaseline(engine, ...args),
+        prefillUserAnswersFromCache: (...args: any[]) => prefillUserAnswersFromCache(engine, ...args),
+        loadAndSortQuestions: (...args: any[]) => loadAndSortQuestions(engine, ...args),
+        shouldAbortPileHydrationRequest: (...args: any[]) => shouldAbortPileHydrationRequest(engine, ...args),
+        resetPileAutoDecryptLedger: (...args: any[]) => resetPileAutoDecryptLedger(engine, ...args),
+        rehydrateVisiblePileWindow: (...args: any[]) => rehydrateVisiblePileWindow(engine, ...args),
+        runPileQuestionSetHydration: (...args: any[]) => runPileQuestionSetHydration(engine, ...args),
+        initializeResponseState: (...args: any[]) => initializeResponseState(engine, ...args),
+        ensureVisiblePileResponseState: (...args: any[]) => ensureVisiblePileResponseState(engine, ...args),
+        handleAnswerPile: (...args: any[]) => handleAnswerPile(engine, ...args),
+        handleAdditionalPile: (...args: any[]) => handleAdditionalPile(engine, ...args),
+        getSubmitCount: (...args: any[]) => getSubmitCount(engine, ...args),
+        showNoPendingPileSubmitFeedback: (...args: any[]) => showNoPendingPileSubmitFeedback(engine, ...args),
+        handlePileSubmitClick: (...args: any[]) => handlePileSubmitClick(engine, ...args),
+        getPileFilterQuestionResponses: (...args: any[]) => getPileFilterQuestionResponses(engine, ...args),
+        toggleFilterModal: (...args: any[]) => toggleFilterModal(engine, ...args),
+        handlePileFilterActivityChange: (...args: any[]) => handlePileFilterActivityChange(engine, ...args),
+        handleFilter: (...args: any[]) => handleFilter(engine, ...args),
+        getIsPileSubmitRailVisible: (...args: any[]) => getIsPileSubmitRailVisible(engine, ...args),
+        notifyPileSubmitRailVisibility: (...args: any[]) => notifyPileSubmitRailVisibility(engine, ...args),
+        renderPileResponseInput: (...args: any[]) => renderPileResponseInput(engine, ...args),
+        renderPileSliderSection: (...args: any[]) => renderPileSliderSection(engine, ...args),
+        renderPileAdditionalInput: (...args: any[]) => renderPileAdditionalInput(engine, ...args),
+        renderPileAdditionalEditorRow: (...args: any[]) => renderPileAdditionalEditorRow(engine, ...args),
+        renderPileCommentsSection: (...args: any[]) => renderPileCommentsSection(engine, ...args),
+        renderPileQuestionIcons: (...args: any[]) => renderPileQuestionIcons(engine, ...args),
+        renderPileFooterSection: (...args: any[]) => renderPileFooterSection(engine, ...args),
+        renderPileCardShell: (...args: any[]) => renderPileCardShell(engine, ...args),
+        renderPileGatedPromptCard: (...args: any[]) => renderPileGatedPromptCard(engine, ...args),
+        renderActiveQuestion: (...args: any[]) => renderActiveQuestion(engine, ...args),
+        renderPileViewMode: (...args: any[]) => renderPileViewMode(engine, ...args),
+  });
+  engine.__pileViewRuntimeMethodsAttached = true;
+  return engine;
+};
+
+function buildWarmPileSeedState(engine: PileViewModeEngine, propsIn = engine.props) {
     try {
       if (!propsIn?.isQuestionCacheReady) return null;
       const slug = resolveEffectiveSlug(propsIn);
@@ -698,10 +787,10 @@ export class PileViewMode extends SurveyQuestions {
         ? [...highlighted, ...unanswered, ...answered]
         : [...highlighted, ...unanswered];
       const hiddenGated = sorted.filter(
-        (q) => q && this.isMaskedPromptText(q?.prompt) && !q?.promptDecrypted
+        (q) => q && isSurveyQuestionsMaskedPromptText(q?.prompt) && !q?.promptDecrypted
       );
       const sortedVisible = sorted.filter(
-        (q) => !(q && this.isMaskedPromptText(q?.prompt) && !q?.promptDecrypted)
+        (q) => !(q && isSurveyQuestionsMaskedPromptText(q?.prompt) && !q?.promptDecrypted)
       );
       return {
         pileQuestions: sortedVisible,
@@ -715,20 +804,7 @@ export class PileViewMode extends SurveyQuestions {
     }
   }
 
-  _pileQuestionsGeneration = 0;
-  _currentRenderedQuestionIdsCacheKey = '';
-  _questionObjectSignatureCache = new WeakMap();
-  _questionListSignatureCache = new WeakMap();
-  _currentPileQuestionsSignature = '0:0';
-  _currentPileQuestionsSignatureListRef = null;
-  _responseCountsCacheKey = '';
-  _responseCountsCacheValue = null;
-  _emptyReadyProbeStartedAtMs = 0;
-  _pileScanDisplayBaselineKey = '';
-  _pileScanDisplayBaselineRemaining = 0;
-  _lastGatedEmptyRecoveryKey = '';
-
-  buildQuestionOptionsDigest = (options) => {
+const buildQuestionOptionsDigest = (engine: PileViewModeEngine, options) => {
     if (!Array.isArray(options) || options.length === 0) return '0:0';
     let hash = 2166136261;
     options.forEach((option) => {
@@ -743,25 +819,25 @@ export class PileViewMode extends SurveyQuestions {
             )
             : String(option ?? '')
       );
-      hash = this.mixQuestionListHash(hash, normalized);
+      hash = engine.mixQuestionListHash(hash, normalized);
     });
     return `${options.length}:${hash >>> 0}`;
   };
 
-  getPileLoadingScanDisplay = (questionScanProgress, scanProgressDisplay) => {
+const getPileLoadingScanDisplay = (engine: PileViewModeEngine, questionScanProgress, scanProgressDisplay) => {
     const baseDisplay = scanProgressDisplay && typeof scanProgressDisplay === 'object'
       ? scanProgressDisplay
       : buildQuestionScanProgressDisplay(questionScanProgress);
     const phase = String(questionScanProgress?.phase || '').toLowerCase();
     if (phase !== 'scan') {
-      this._pileScanDisplayBaselineKey = '';
-      this._pileScanDisplayBaselineRemaining = 0;
+      engine._pileScanDisplayBaselineKey = '';
+      engine._pileScanDisplayBaselineRemaining = 0;
       return baseDisplay;
     }
 
     const remainingBlocks = Math.max(0, Number(baseDisplay?.remainingBlocks || 0));
     const baselineKey = [
-      normalizeQuestionProgressSlug(questionScanProgress?.slug || resolveEffectiveSlug(this.props)),
+      normalizeQuestionProgressSlug(questionScanProgress?.slug || resolveEffectiveSlug(engine.props)),
       String(questionScanProgress?.phase || ''),
       Number(questionScanProgress?.startedAtMs || 0),
       Number(questionScanProgress?.fromBlock || 0),
@@ -769,17 +845,17 @@ export class PileViewMode extends SurveyQuestions {
     ].join('|');
 
     if (
-      this._pileScanDisplayBaselineKey !== baselineKey ||
-      !Number.isFinite(Number(this._pileScanDisplayBaselineRemaining)) ||
-      Number(this._pileScanDisplayBaselineRemaining) <= 0
+      engine._pileScanDisplayBaselineKey !== baselineKey ||
+      !Number.isFinite(Number(engine._pileScanDisplayBaselineRemaining)) ||
+      Number(engine._pileScanDisplayBaselineRemaining) <= 0
     ) {
-      this._pileScanDisplayBaselineKey = baselineKey;
-      this._pileScanDisplayBaselineRemaining = remainingBlocks;
+      engine._pileScanDisplayBaselineKey = baselineKey;
+      engine._pileScanDisplayBaselineRemaining = remainingBlocks;
     }
 
     const baselineRemaining = Math.max(
       remainingBlocks,
-      Math.max(0, Number(this._pileScanDisplayBaselineRemaining || 0))
+      Math.max(0, Number(engine._pileScanDisplayBaselineRemaining || 0))
     );
     const scannedThisRefresh = Math.max(0, baselineRemaining - remainingBlocks);
     const percentComplete = baselineRemaining > 0
@@ -793,10 +869,10 @@ export class PileViewMode extends SurveyQuestions {
     };
   };
 
-  getQuestionObjectSignature = (question) => {
+const getQuestionObjectSignature = (engine: PileViewModeEngine, question) => {
     if (!question || typeof question !== 'object') return String(question ?? '');
     try {
-      const cached = this._questionObjectSignatureCache.get(question);
+      const cached = engine._questionObjectSignatureCache.get(question);
       if (cached) return cached;
     } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
     const sig = [
@@ -805,15 +881,15 @@ export class PileViewMode extends SurveyQuestions {
       String(question.prompt || ''),
       question.promptDecrypted ? '1' : '0',
       String(resolvePayloadStorageRef(question)?.id || question.arweaveTxId || ''),
-      this.buildQuestionOptionsDigest(Array.isArray(question.options) ? question.options : []),
+      engine.buildQuestionOptionsDigest(Array.isArray(question.options) ? question.options : []),
     ].join('|');
     try {
-      this._questionObjectSignatureCache.set(question, sig);
+      engine._questionObjectSignatureCache.set(question, sig);
     } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
     return sig;
   };
 
-  mixQuestionListHash = (seed, text) => {
+const mixQuestionListHash = (engine: PileViewModeEngine, seed, text) => {
     let h = Number(seed) >>> 0;
     const str = String(text || '');
     for (let i = 0; i < str.length; i += 1) {
@@ -822,24 +898,24 @@ export class PileViewMode extends SurveyQuestions {
     return h >>> 0;
   };
 
-  buildQuestionListSignature = (list = []) => {
+const buildQuestionListSignature = (engine: PileViewModeEngine, list = []) => {
     if (!Array.isArray(list) || list.length === 0) return '0:0';
     try {
-      const cached = this._questionListSignatureCache.get(list);
+      const cached = engine._questionListSignatureCache.get(list);
       if (cached) return cached;
     } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
     let hash = 2166136261;
     list.forEach((question) => {
-      hash = this.mixQuestionListHash(hash, this.getQuestionObjectSignature(question));
+      hash = engine.mixQuestionListHash(hash, engine.getQuestionObjectSignature(question));
     });
     const signature = `${list.length}:${hash >>> 0}`;
     try {
-      this._questionListSignatureCache.set(list, signature);
+      engine._questionListSignatureCache.set(list, signature);
     } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
     return signature;
   };
 
-  getPileVisibleQuestionIds = (listIn = [], activeIndexIn = 0) => {
+const getPileVisibleQuestionIds = (engine: PileViewModeEngine, listIn = [], activeIndexIn = 0) => {
     const list = Array.isArray(listIn) ? listIn : [];
     if (list.length === 0) return [];
     const activeIndex = Math.max(0, Number(activeIndexIn || 0));
@@ -854,11 +930,7 @@ export class PileViewMode extends SurveyQuestions {
     return Array.from(new Set(ids));
   };
 
-  buildPileVisibleResponseSignature = (
-    questionResponses = {},
-    visibleIds = [],
-    accountIn = this.props?.account
-  ) => {
+const buildPileVisibleResponseSignature = (engine: PileViewModeEngine, questionResponses = {}, visibleIds = [], accountIn = engine.props?.account) => {
     const responderLower = String(accountIn || '').trim().toLowerCase();
     const ids = Array.isArray(visibleIds)
       ? visibleIds.map((id) => normalizeQuestionIdKey(id)).filter(Boolean)
@@ -872,41 +944,41 @@ export class PileViewMode extends SurveyQuestions {
     let hash = 2166136261;
     let filled = 0;
     ids.forEach((qid) => {
-      hash = this.mixQuestionListHash(hash, `q:${qid}`);
+      hash = engine.mixQuestionListHash(hash, `q:${qid}`);
       const byResponder = responsesMap[qid];
       const rawResponse = (byResponder && typeof byResponder === 'object')
         ? byResponder[responderLower]
         : undefined;
       if (rawResponse === undefined) {
-        hash = this.mixQuestionListHash(hash, 'r:__none__');
+        hash = engine.mixQuestionListHash(hash, 'r:__none__');
         return;
       }
       filled += 1;
       if (typeof rawResponse === 'string') {
-        hash = this.mixQuestionListHash(hash, `s:${rawResponse.length}:${rawResponse}`);
+        hash = engine.mixQuestionListHash(hash, `s:${rawResponse.length}:${rawResponse}`);
         return;
       }
-      hash = this.mixQuestionListHash(hash, `o:${buildSliceToken(rawResponse)}`);
+      hash = engine.mixQuestionListHash(hash, `o:${buildSliceToken(rawResponse)}`);
     });
     return `${ids.length}:${filled}:${hash >>> 0}`;
   };
 
-  syncCurrentPileQuestionsSignature = (listIn = this.state?.pileQuestions) => {
+const syncCurrentPileQuestionsSignature = (engine: PileViewModeEngine, listIn = engine.state?.pileQuestions) => {
     const list = Array.isArray(listIn) ? listIn : [];
     if (
-      this._currentPileQuestionsSignatureListRef === list &&
-      typeof this._currentPileQuestionsSignature === 'string' &&
-      this._currentPileQuestionsSignature
+      engine._currentPileQuestionsSignatureListRef === list &&
+      typeof engine._currentPileQuestionsSignature === 'string' &&
+      engine._currentPileQuestionsSignature
     ) {
-      return this._currentPileQuestionsSignature;
+      return engine._currentPileQuestionsSignature;
     }
-    const signature = this.buildQuestionListSignature(list);
-    this._currentPileQuestionsSignatureListRef = list;
-    this._currentPileQuestionsSignature = signature;
+    const signature = engine.buildQuestionListSignature(list);
+    engine._currentPileQuestionsSignatureListRef = list;
+    engine._currentPileQuestionsSignature = signature;
     return signature;
   };
 
-  areQuestionListsEquivalent = (left = [], right = []) => {
+const areQuestionListsEquivalent = (engine: PileViewModeEngine, left = [], right = []) => {
     if (left === right) return true;
     if (!Array.isArray(left) || !Array.isArray(right)) return false;
     if (left.length !== right.length) return false;
@@ -914,14 +986,14 @@ export class PileViewMode extends SurveyQuestions {
       const leftId = String(left[i]?.id || '').trim().toLowerCase();
       const rightId = String(right[i]?.id || '').trim().toLowerCase();
       if (leftId !== rightId) return false;
-      const leftSig = this.getQuestionObjectSignature(left[i]);
-      const rightSig = this.getQuestionObjectSignature(right[i]);
+      const leftSig = engine.getQuestionObjectSignature(left[i]);
+      const rightSig = engine.getQuestionObjectSignature(right[i]);
       if (leftSig !== rightSig) return false;
     }
     return true;
   };
 
-  isRecentRateLimit = () => {
+const isRecentRateLimit = (engine: PileViewModeEngine) => {
     try {
       const info = (typeof window !== 'undefined') ? window.__LAST_RPC_RATE_LIMIT_ERROR__ : null;
       if (!info || !info.ts) return false;
@@ -931,7 +1003,7 @@ export class PileViewMode extends SurveyQuestions {
     }
   };
 
-  getEffectivePileSessionConfig = (propsIn = this.props) => {
+const getEffectivePileSessionConfig = (engine: PileViewModeEngine, propsIn = engine.props) => {
     const slug = resolveEffectiveSlug(propsIn);
     const context = resolvePileLoadContext(propsIn, slug);
     const resolvedConfig = (context?.sessionConfig && typeof context.sessionConfig === 'object')
@@ -968,8 +1040,8 @@ export class PileViewMode extends SurveyQuestions {
     };
   };
 
-  hasRestrictedSessionQuestionGate = (propsIn = this.props) => {
-    const cfg = this.getEffectivePileSessionConfig(propsIn);
+const hasRestrictedSessionQuestionGate = (engine: PileViewModeEngine, propsIn = engine.props) => {
+    const cfg = engine.getEffectivePileSessionConfig(propsIn);
     const primaryState = resolveSponsoredGateStateForResource(cfg, 'questionResponses');
     if (primaryState?.status === SPONSORED_GATE_STATES.OPEN) return false;
     if (primaryState?.status === SPONSORED_GATE_STATES.RESTRICTED && primaryState.gate) return true;
@@ -981,44 +1053,79 @@ export class PileViewMode extends SurveyQuestions {
     return getGateSbtAddresses(legacyGate).length > 0;
   };
 
-  maybeRecoverUnhydratedGatedPile = () => {
-    if (typeof this.props.refreshQuestionMetadata !== 'function') return false;
-    if (!this.hasRestrictedSessionQuestionGate(this.props)) return false;
-    if (Array.isArray(this.state?.pileQuestions) && this.state.pileQuestions.length > 0) return false;
-    if (this.state?.hasHiddenGatedQuestions) return false;
+const buildPileSessionGateDetails = (engine: PileViewModeEngine, questionCount = 1) => {
+    const cfg = engine.getEffectivePileSessionConfig(engine.props);
+    const primaryState = resolveSponsoredGateStateForResource(cfg, 'questionResponses');
+    const defaultState = resolveSponsoredGateStateForResource(cfg, 'default');
+    const restrictedState = [primaryState, defaultState].find((state) => (
+      state?.status === SPONSORED_GATE_STATES.RESTRICTED && state.gate
+    ));
+    const gate = restrictedState?.gate || resolveEncryptionGate(cfg);
+    const sbtAddresses = getGateSbtAddresses(gate);
+    if (!sbtAddresses.length) return [];
 
-    const slug = resolveEffectiveSlug(this.props);
+    const sessionSlug = normalizeSessionSlugValue(
+      resolveEffectiveSlug(engine.props) ||
+      (typeof engine._getEffectiveDraftSlug === 'function' ? engine._getEffectiveDraftSlug() : '')
+    );
+    const count = Math.max(1, Number(questionCount || 0) || 1);
+    const gateId = String(gate?.gateId || restrictedState?.resourceKey || 'session-gate').trim();
+    const label = String(gate?.label || t('gate')).trim() || t('gate');
+    const id = `session:${gateId}:${sbtAddresses.map((address) => address.toLowerCase()).sort().join('|')}`;
+
+    return [{
+      id,
+      label,
+      sbtAddresses,
+      questionIds: new Set(),
+      questionCount: count,
+      sessionSlug,
+      sbts: sbtAddresses.map((address) => ({
+        address,
+        label: engine.resolveSbtGateLabel?.(address) || getShortenedAddress(address, false),
+        href: buildSbtDetailPath(address, sessionSlug),
+      })),
+    }];
+  };
+
+const maybeRecoverUnhydratedGatedPile = (engine: PileViewModeEngine) => {
+    if (typeof engine.props.refreshQuestionMetadata !== 'function') return false;
+    if (!engine.hasRestrictedSessionQuestionGate(engine.props)) return false;
+    if (Array.isArray(engine.state?.pileQuestions) && engine.state.pileQuestions.length > 0) return false;
+    if (engine.state?.hasHiddenGatedQuestions) return false;
+
+    const slug = resolveEffectiveSlug(engine.props);
     const progressSlug = normalizeQuestionProgressSlug(slug);
     const questionScanProgress =
-      this.props.questionScanProgress &&
-      doesQuestionProgressMatchSlug(this.props.questionScanProgress.slug, progressSlug)
-        ? this.props.questionScanProgress
+      engine.props.questionScanProgress &&
+      doesQuestionProgressMatchSlug(engine.props.questionScanProgress.slug, progressSlug)
+        ? engine.props.questionScanProgress
         : null;
     const hydrateDiscovered = Math.max(0, Number(questionScanProgress?.discoveredQuestions || 0));
     const pendingMetadataCount = Math.max(0, Number(questionScanProgress?.pendingMetadataCount || 0));
     const shouldRecover = (
-      !!this.props.isQuestionCacheReady ||
+      !!engine.props.isQuestionCacheReady ||
       hydrateDiscovered > 0 ||
       pendingMetadataCount > 0
     );
     if (!shouldRecover) return false;
 
-    const forceDiscoveryRescan = !!this.props.isQuestionCacheReady && !questionScanProgress;
+    const forceDiscoveryRescan = !!engine.props.isQuestionCacheReady && !questionScanProgress;
     const recoveryKey = [
       normalizeSessionSlugValue(slug),
-      String(this.props.account || '').trim().toLowerCase(),
-      Number(this.props.questionsCacheNonce || 0),
-      Number(this.props.questionResponsesNonce || 0),
+      String(engine.props.account || '').trim().toLowerCase(),
+      Number(engine.props.questionsCacheNonce || 0),
+      Number(engine.props.questionResponsesNonce || 0),
       forceDiscoveryRescan ? 'force' : 'retry',
       String(questionScanProgress?.phase || ''),
       hydrateDiscovered,
       pendingMetadataCount,
     ].join('|');
-    if (this._lastGatedEmptyRecoveryKey === recoveryKey) return false;
-    this._lastGatedEmptyRecoveryKey = recoveryKey;
+    if (engine._lastGatedEmptyRecoveryKey === recoveryKey) return false;
+    engine._lastGatedEmptyRecoveryKey = recoveryKey;
 
     try {
-      const maybePromise = this.props.refreshQuestionMetadata({
+      const maybePromise = engine.props.refreshQuestionMetadata({
         forceDiscoveryRescan,
       });
       if (maybePromise && typeof maybePromise.catch === 'function') {
@@ -1033,13 +1140,13 @@ export class PileViewMode extends SurveyQuestions {
     return true;
   };
 
-  isPileLoadingVisible = () => {
-    const slug = resolveEffectiveSlug(this.props);
+const isPileLoadingVisible = (engine: PileViewModeEngine) => {
+    const slug = resolveEffectiveSlug(engine.props);
     const progressSlug = normalizeQuestionProgressSlug(slug);
     const questionScanProgress =
-      this.props.questionScanProgress &&
-      doesQuestionProgressMatchSlug(this.props.questionScanProgress.slug, progressSlug)
-        ? this.props.questionScanProgress
+      engine.props.questionScanProgress &&
+      doesQuestionProgressMatchSlug(engine.props.questionScanProgress.slug, progressSlug)
+        ? engine.props.questionScanProgress
         : null;
     const scanRemainingBlocks = Math.max(0, Number(questionScanProgress?.remainingBlocks || 0));
     const hydrateDiscovered = Math.max(0, Number(questionScanProgress?.discoveredQuestions || 0));
@@ -1058,28 +1165,28 @@ export class PileViewMode extends SurveyQuestions {
       hydrateDone >= hydrateDiscovered
     );
     const hasTerminalScanError = !!questionScanProgress && questionScanProgress?.phase === 'error';
-    const firstBoot = !hasCacheHydratedFlag(this.props);
-    const hasVisibleQuestions = Array.isArray(this.state?.pileQuestions) && this.state.pileQuestions.length > 0;
+    const firstBoot = !hasCacheHydratedFlag(engine.props);
+    const hasVisibleQuestions = Array.isArray(engine.state?.pileQuestions) && engine.state.pileQuestions.length > 0;
     const isFilterActive = (
-      !!this.state?.isFilterActive ||
-      isSurveyToolFilterStateActive(this.state?.filterState)
+      !!engine.state?.isFilterActive ||
+      isSurveyToolFilterStateActive(engine.state?.filterState)
     );
-    const hasFilterBaseQuestions = Array.isArray(this.state?.allQuestionsForFilter) &&
-      this.state.allQuestionsForFilter.length > 0;
-    const recentRateLimit = this.isRecentRateLimit();
-    const hasSessionQuestionGate = this.hasRestrictedSessionQuestionGate(this.props);
+    const hasFilterBaseQuestions = Array.isArray(engine.state?.allQuestionsForFilter) &&
+      engine.state.allQuestionsForFilter.length > 0;
+    const recentRateLimit = engine.isRecentRateLimit();
+    const hasSessionQuestionGate = engine.hasRestrictedSessionQuestionGate(engine.props);
     const hasUnhydratedGatedQuestions = (
       hasSessionQuestionGate &&
       !hasVisibleQuestions &&
-      !this.state?.hasHiddenGatedQuestions &&
+      !engine.state?.hasHiddenGatedQuestions &&
       (
         hydrateDiscovered > 0 ||
         pendingMetadataCount > 0 ||
-        !!this.props.isQuestionCacheReady
+        !!engine.props.isQuestionCacheReady
       )
     );
-    const preferGatedEmptyState = this.shouldPreferGatedEmptyState({
-      hasConcreteHiddenQuestions: !!this.state.hasHiddenGatedQuestions,
+    const preferGatedEmptyState = engine.shouldPreferGatedEmptyState({
+      hasConcreteHiddenQuestions: !!engine.state.hasHiddenGatedQuestions,
       hasVisibleQuestions,
       firstBoot,
       recentRateLimit,
@@ -1088,8 +1195,8 @@ export class PileViewMode extends SurveyQuestions {
     const allowUnreadyEmptySettlement = (
       !hasVisibleQuestions &&
       !firstBoot &&
-      this.props.cacheHasLoaded !== false &&
-      !this.props.isQuestionCacheReady &&
+      engine.props.cacheHasLoaded !== false &&
+      !engine.props.isQuestionCacheReady &&
       !recentRateLimit &&
       !hasScanOrHydrationWork &&
       !hasPendingMetadataRetries &&
@@ -1099,13 +1206,13 @@ export class PileViewMode extends SurveyQuestions {
       !hasVisibleQuestions &&
       isFilterActive &&
       hasFilterBaseQuestions &&
-      !this.state?.hasHiddenGatedQuestions
+      !engine.state?.hasHiddenGatedQuestions
     );
     return shouldShowPileFullLoadingState({
-      loading: !!this.state.loading,
+      loading: !!engine.state.loading,
       hasVisibleQuestions,
       firstBoot,
-      isQuestionCacheReady: !!this.props.isQuestionCacheReady,
+      isQuestionCacheReady: !!engine.props.isQuestionCacheReady,
       recentRateLimit,
       hasScanOrHydrationWork,
       allowUnreadyEmptySettlement,
@@ -1114,122 +1221,121 @@ export class PileViewMode extends SurveyQuestions {
     });
   };
 
-  shouldPreferGatedEmptyState = ({
+const shouldPreferGatedEmptyState = (engine: PileViewModeEngine, {
     hasConcreteHiddenQuestions = false,
     hasVisibleQuestions = false,
     firstBoot = false,
     recentRateLimit = false,
     hasPendingMetadataRetries = false,
-  } = {}) => shouldPreferPileGatedEmptyState({
+  } = {}) => { return shouldPreferPileGatedEmptyState({
     hasConcreteHiddenQuestions,
     hasVisibleQuestions,
     firstBoot,
-    cacheHasLoaded: this.props.cacheHasLoaded,
+    cacheHasLoaded: engine.props.cacheHasLoaded,
     recentRateLimit,
     hasPendingMetadataRetries,
-  });
+  }); };
 
-  syncLoadingElapsedTimer = () => {
-    const shouldRun = this.isPileLoadingVisible();
+const syncLoadingElapsedTimer = (engine: PileViewModeEngine) => {
+    const shouldRun = engine.isPileLoadingVisible();
     if (shouldRun) {
-      if (!this._loadingStartedAtMs) this._loadingStartedAtMs = Date.now();
-      if (!this._loadingElapsedTimer) {
-        this._loadingElapsedTimer = setInterval(() => {
-          const started = Number(this._loadingStartedAtMs || Date.now());
+      if (!engine._loadingStartedAtMs) engine._loadingStartedAtMs = Date.now();
+      if (!engine._loadingElapsedTimer) {
+        engine._loadingElapsedTimer = setInterval(() => {
+          const started = Number(engine._loadingStartedAtMs || Date.now());
           const elapsed = Math.max(0, Math.floor((Date.now() - started) / 1000));
-          if (elapsed !== Number(this.state.loadingElapsedSec || 0)) {
-            this.setState(buildPileLoadingElapsedPatch(elapsed));
+          if (elapsed !== Number(engine.state.loadingElapsedSec || 0)) {
+            engine.setState(buildPileLoadingElapsedPatch(elapsed));
           }
         }, 1000);
       }
       return;
     }
 
-    if (this._loadingElapsedTimer) {
-      clearInterval(this._loadingElapsedTimer);
-      this._loadingElapsedTimer = null;
+    if (engine._loadingElapsedTimer) {
+      clearInterval(engine._loadingElapsedTimer);
+      engine._loadingElapsedTimer = null;
     }
-    this._loadingStartedAtMs = null;
-    if (this.state.loadingElapsedSec !== 0) {
-      this.setState(buildPileLoadingElapsedPatch(0));
+    engine._loadingStartedAtMs = null;
+    if (engine.state.loadingElapsedSec !== 0) {
+      engine.setState(buildPileLoadingElapsedPatch(0));
     }
   };
 
-  scheduleLoadAndSortQuestions = (delayMs = 80) => {
-    if (this._loadAndSortDebounceTimer) {
-      clearTimeout(this._loadAndSortDebounceTimer);
-      this._loadAndSortDebounceTimer = null;
+const scheduleLoadAndSortQuestions = (engine: PileViewModeEngine, delayMs = 80) => {
+    if (engine._loadAndSortDebounceTimer) {
+      clearTimeout(engine._loadAndSortDebounceTimer);
+      engine._loadAndSortDebounceTimer = null;
     }
-    this._loadAndSortDebounceTimer = setTimeout(() => {
-      this._loadAndSortDebounceTimer = null;
-      this.loadAndSortQuestions();
+    engine._loadAndSortDebounceTimer = setTimeout(() => {
+      engine._loadAndSortDebounceTimer = null;
+      engine.loadAndSortQuestions();
     }, Math.max(0, Number(delayMs) || 0));
   };
 
-  runPileComponentDidMount = () => {
-    this._isMounted = true;
-    this.syncCurrentPileQuestionsSignature(this.state.pileQuestions);
-    this.loadAndSortQuestions();
-    this.maybeRecoverUnhydratedGatedPile();
-    this.syncLoadingElapsedTimer();
-    this.notifyPileSubmitRailVisibility();
-    if (this.state.showListeningPanel) {
-      this.scrollListeningPanelIntoViewIfNeeded('auto');
+const runPileComponentDidMount = (engine: PileViewModeEngine) => {
+    engine._isMounted = true;
+    engine.syncCurrentPileQuestionsSignature(engine.state.pileQuestions);
+    engine.loadAndSortQuestions();
+    engine.maybeRecoverUnhydratedGatedPile();
+    engine.syncLoadingElapsedTimer();
+    engine.notifyPileSubmitRailVisibility();
+    if (engine.state.showListeningPanel) {
+      engine.scrollListeningPanelIntoViewIfNeeded('auto');
     }
     // Start long-loading timer
-    this.loadingTimeout = setTimeout(() => {
-      if (this.state.loading || !this.props.isQuestionCacheReady) {
-        this.setState(buildPileShowLongLoadingPatch(true));
+    engine.loadingTimeout = setTimeout(() => {
+      if (engine.state.loading || !engine.props.isQuestionCacheReady) {
+        engine.setState(buildPileShowLongLoadingPatch(true));
       }
     }, 10000);
   };
 
-
-  runPileComponentDidUpdate = (prevProps, prevState) => {
-    const diffInputsChanged = this.didEditDiffInputsChange(prevProps, prevState);
+const runPileComponentDidUpdate = (engine: PileViewModeEngine, prevProps, prevState) => {
+    const diffInputsChanged = engine.didEditDiffInputsChange(prevProps, prevState);
     if (diffInputsChanged) {
-      this.invalidateDiffCaches();
+      engine.invalidateDiffCaches();
     }
-    if (prevState.userAnswers !== this.state.userAnswers) {
-      this._userAnswersSliceCache = { source: null, value: null };
+    if (prevState.userAnswers !== engine.state.userAnswers) {
+      engine._userAnswersSliceCache = { source: null, value: null };
     }
 
     const pendingStats = diffInputsChanged
-      ? ((typeof this.getPendingEditStats === 'function' && this.getPendingEditStats()) || this.getPendingStatsSnapshot())
-      : this.getPendingStatsSnapshot();
-    this.notifyPileSubmitRailVisibility();
-    this.emitPendingStats(pendingStats);
+      ? ((typeof engine.getPendingEditStats === 'function' && engine.getPendingEditStats()) || engine.getPendingStatsSnapshot())
+      : engine.getPendingStatsSnapshot();
+    engine.notifyPileSubmitRailVisibility();
+    engine.emitPendingStats(pendingStats);
     if (diffInputsChanged) {
-      this.recalculateEditStats && this.recalculateEditStats(pendingStats);
+      engine.recalculateEditStats && engine.recalculateEditStats(pendingStats);
     }
-    if (prevState.pileQuestions !== this.state.pileQuestions) {
-      this.syncCurrentPileQuestionsSignature(this.state.pileQuestions);
+    if (prevState.pileQuestions !== engine.state.pileQuestions) {
+      engine.syncCurrentPileQuestionsSignature(engine.state.pileQuestions);
     }
 
     // Rebuild guard: never rebuild lists/slices while user has pending edits
-    const hasLiveEdits = Number(pendingStats.total || 0) > 0 || this.state.isDirty || (this.state.modifiedCount || 0) > 0;
-    const isOptimistic = this.state.submissionComplete;
+    const hasLiveEdits = Number(pendingStats.total || 0) > 0 || engine.state.isDirty || (engine.state.modifiedCount || 0) > 0;
+    const isOptimistic = engine.state.submissionComplete;
 
     // 1. Handle Account/Network changes (Reset context)
-    const networkChanged = prevProps.network?.id !== this.props.network?.id;
-    const accountChanged = (prevProps.account || '').toLowerCase() !== (this.props.account || '').toLowerCase();
-    const providerChanged = prevProps.provider !== this.props.provider;
+    const networkChanged = prevProps.network?.id !== engine.props.network?.id;
+    const accountChanged = (prevProps.account || '').toLowerCase() !== (engine.props.account || '').toLowerCase();
+    const providerChanged = prevProps.provider !== engine.props.provider;
 
     const cacheReadyTick =
-      (prevProps.isQuestionCacheReady !== this.props.isQuestionCacheReady && this.props.isQuestionCacheReady) ||
-      (prevProps.isResponsesCacheReady !== this.props.isResponsesCacheReady && this.props.isResponsesCacheReady);
-    const cacheJustBecameReady = !prevProps.isResponsesCacheReady && this.props.isResponsesCacheReady;
-    const nonceTick = prevProps.questionsCacheNonce !== this.props.questionsCacheNonce;
+      (prevProps.isQuestionCacheReady !== engine.props.isQuestionCacheReady && engine.props.isQuestionCacheReady) ||
+      (prevProps.isResponsesCacheReady !== engine.props.isResponsesCacheReady && engine.props.isResponsesCacheReady);
+    const cacheJustBecameReady = !prevProps.isResponsesCacheReady && engine.props.isResponsesCacheReady;
+    const nonceTick = prevProps.questionsCacheNonce !== engine.props.questionsCacheNonce;
     const responseNonceTick =
-      prevProps.questionResponsesNonce !== this.props.questionResponsesNonce;
-    const progressSlug = normalizeQuestionProgressSlug(resolveEffectiveSlug(this.props));
+      prevProps.questionResponsesNonce !== engine.props.questionResponsesNonce;
+    const progressSlug = normalizeQuestionProgressSlug(resolveEffectiveSlug(engine.props));
     const previousQuestionProgress = pickScopedPileQuestionProgress({
       progress: prevProps.questionScanProgress,
       progressSlug,
       doesQuestionProgressMatchSlug,
     });
     const nextQuestionProgress = pickScopedPileQuestionProgress({
-      progress: this.props.questionScanProgress,
+      progress: engine.props.questionScanProgress,
       progressSlug,
       doesQuestionProgressMatchSlug,
     });
@@ -1237,11 +1343,11 @@ export class PileViewMode extends SurveyQuestions {
       previousProgress: previousQuestionProgress,
       nextProgress: nextQuestionProgress,
     });
-    const pileQuestionsChanged = prevState.pileQuestions !== this.state.pileQuestions;
-    const surveysResponseStateChanged = prevState.surveysResponseState !== this.state.surveysResponseState;
-    const commentsChanged = prevState.showComments !== this.state.showComments;
-    const autoDecryptBlocked = this.isAutoDecryptBlocked();
-    const autoDecryptJustEnabled = !prevState.autoDecryptEnabled && this.state.autoDecryptEnabled;
+    const pileQuestionsChanged = prevState.pileQuestions !== engine.state.pileQuestions;
+    const surveysResponseStateChanged = prevState.surveysResponseState !== engine.state.surveysResponseState;
+    const commentsChanged = prevState.showComments !== engine.state.showComments;
+    const autoDecryptBlocked = engine.isAutoDecryptBlocked();
+    const autoDecryptJustEnabled = !prevState.autoDecryptEnabled && engine.state.autoDecryptEnabled;
 
     const updatePlan = buildPileComponentUpdatePlan({
       networkChanged,
@@ -1253,13 +1359,13 @@ export class PileViewMode extends SurveyQuestions {
       progressCompletedTick: progressSignals.progressCompletedTick,
       isOptimistic,
       hasLiveEdits,
-      pileQuestionsLength: this.state.pileQuestions.length,
-      isQuestionCacheReady: this.props.isQuestionCacheReady,
-      loading: this.state.loading,
-      showLongLoading: this.state.showLongLoading,
+      pileQuestionsLength: engine.state.pileQuestions.length,
+      isQuestionCacheReady: engine.props.isQuestionCacheReady,
+      loading: engine.state.loading,
+      showLongLoading: engine.state.showLongLoading,
       providerChanged,
       autoDecryptBlocked,
-      autoDecryptEnabled: this.state.autoDecryptEnabled,
+      autoDecryptEnabled: engine.state.autoDecryptEnabled,
       pileQuestionsChanged,
       surveysResponseStateChanged,
       cacheJustBecameReady,
@@ -1269,191 +1375,186 @@ export class PileViewMode extends SurveyQuestions {
 
     if (updatePlan.shouldResetContext) {
       // Persist draft before reset so it survives the login transition
-      try { this.persistDraft(); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-      this._lastLoadAndSortResultSignature = '';
-      this._lastInitializeResponseSig = '';
-      this._emptyReadyProbeStartedAtMs = 0;
+      try { engine.persistDraft(); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
+      engine._lastLoadAndSortResultSignature = '';
+      engine._lastInitializeResponseSig = '';
+      engine._emptyReadyProbeStartedAtMs = 0;
 
       // If context changes, we must reset optimistic flags and reload immediately
-      // We do this regardless of edits because the context (wallet/chain) invalidates the current session
-      this.setState(
+      // We do engine regardless of edits because the context (wallet/chain) invalidates the current session
+      engine.setState(
         buildPileContextResetState({
-          submittedSinceLastEdit: this.state.submittedSinceLastEdit,
+          submittedSinceLastEdit: engine.state.submittedSinceLastEdit,
         }),
         () => {
-            if (this._loadAndSortDebounceTimer) {
-              clearTimeout(this._loadAndSortDebounceTimer);
-              this._loadAndSortDebounceTimer = null;
+            if (engine._loadAndSortDebounceTimer) {
+              clearTimeout(engine._loadAndSortDebounceTimer);
+              engine._loadAndSortDebounceTimer = null;
             }
-            this.loadAndSortQuestions();
+            engine.loadAndSortQuestions();
         }
       );
 
       // Always reset auto-decrypt on context change
-      this._autoDecQueue = [];
-      this._autoDecProcessing = false;
-      this._autoDecryptMaskedAttemptSignature = {};
-      this.clearAutoDecryptSweepScheduling();
-      if (this.state.autoDecryptEnabled) {
-        this.setState(buildAutoDecryptDisabledState());
+      engine._autoDecQueue = [];
+      engine._autoDecProcessing = false;
+      engine._autoDecryptMaskedAttemptSignature = {};
+      engine.clearAutoDecryptSweepScheduling();
+      if (engine.state.autoDecryptEnabled) {
+        engine.setState(buildAutoDecryptDisabledState());
       }
-      this.syncLoadingElapsedTimer();
+      engine.syncLoadingElapsedTimer();
       return;
     }
 
     if (updatePlan.cacheUpdatePlan.action === 'check-optimistic-baseline') {
       // Optimistic guard: do not reload/wipe state yet. Check if cache has caught up.
-      this.checkCacheAgainstBaseline();
+      engine.checkCacheAgainstBaseline();
     } else if (updatePlan.cacheUpdatePlan.action === 'reload') {
-      this.scheduleLoadAndSortQuestions(updatePlan.cacheUpdatePlan.delayMs);
+      engine.scheduleLoadAndSortQuestions(updatePlan.cacheUpdatePlan.delayMs);
     } else if (updatePlan.cacheUpdatePlan.action === 'skip-live-edits') {
       bumpSurveyPerfCounter('noopSkipCount');
       surveyLog.debug('PileViewMode: skipped rebuild due to pending edits');
     } else if (updatePlan.cacheUpdatePlan.action === 'show-loading') {
       // Initial load spinner (guarded against loop)
-      this.setState(buildPileLoadingPatch(true));
+      engine.setState(buildPileLoadingPatch(true));
     }
 
     // Clear long-loading if loaded
     if (updatePlan.shouldClearLongLoading) {
-      this.setState(buildPileShowLongLoadingPatch(false));
+      engine.setState(buildPileShowLongLoadingPatch(false));
     }
 
     // 3. Auto-Decrypt Logic
     if (updatePlan.shouldDisableBlockedAutoDecrypt) {
-      this.resetBlockedAutoDecryptSweepInternals();
-      if (this.state.autoDecryptEnabled || (this.state.decryptingByKey && Object.keys(this.state.decryptingByKey).length > 0)) {
-        this.setState(buildAutoDecryptDisabledState());
+      engine.resetBlockedAutoDecryptSweepInternals();
+      if (engine.state.autoDecryptEnabled || (engine.state.decryptingByKey && Object.keys(engine.state.decryptingByKey).length > 0)) {
+        engine.setState(buildAutoDecryptDisabledState());
       }
     }
 
     updatePlan.queueAutoDecryptReasons.forEach((reason) => {
-      this.queueAutoDecryptVisibleSweep(reason);
+      engine.queueAutoDecryptVisibleSweep(reason);
     });
 
-    this.maybeRecoverUnhydratedGatedPile();
-    this.syncLoadingElapsedTimer();
+    engine.maybeRecoverUnhydratedGatedPile();
+    engine.syncLoadingElapsedTimer();
   };
 
-
-  runPileComponentWillUnmount = () => {
+const runPileComponentWillUnmount = (engine: PileViewModeEngine) => {
     try {
-      if (typeof this.props.onPileSubmitRailVisibilityChange === 'function') {
-        this.props.onPileSubmitRailVisibilityChange(false);
+      if (typeof engine.props.onPileSubmitRailVisibilityChange === 'function') {
+        engine.props.onPileSubmitRailVisibilityChange(false);
       }
     } catch (e) { surveyLog.warn('SurveyTool: callback', e); }
-    if (this._pileSubmitTimer) {
-      clearTimeout(this._pileSubmitTimer);
-      this._pileSubmitTimer = null;
+    if (engine._pileSubmitTimer) {
+      clearTimeout(engine._pileSubmitTimer);
+      engine._pileSubmitTimer = null;
     }
-    if (this._navFadeTimer) {
-      clearTimeout(this._navFadeTimer);
-      this._navFadeTimer = null;
+    if (engine._navFadeTimer) {
+      clearTimeout(engine._navFadeTimer);
+      engine._navFadeTimer = null;
     }
-    if (this.loadingTimeout) {
-      clearTimeout(this.loadingTimeout);
+    if (engine.loadingTimeout) {
+      clearTimeout(engine.loadingTimeout);
     }
-    if (this._loadingElapsedTimer) {
-      clearInterval(this._loadingElapsedTimer);
-      this._loadingElapsedTimer = null;
+    if (engine._loadingElapsedTimer) {
+      clearInterval(engine._loadingElapsedTimer);
+      engine._loadingElapsedTimer = null;
     }
-    if (this._loadAndSortDebounceTimer) {
-      clearTimeout(this._loadAndSortDebounceTimer);
-      this._loadAndSortDebounceTimer = null;
+    if (engine._loadAndSortDebounceTimer) {
+      clearTimeout(engine._loadAndSortDebounceTimer);
+      engine._loadAndSortDebounceTimer = null;
     }
-    this._lastLoadAndSortResultSignature = '';
-    this._lastInitializeResponseSig = '';
-    this._emptyReadyProbeStartedAtMs = 0;
-    this._currentPileQuestionsSignature = '0:0';
-    this._currentPileQuestionsSignatureListRef = null;
-    this._questionListSignatureCache = new WeakMap();
-    this.runDefaultComponentWillUnmount();
+    engine._lastLoadAndSortResultSignature = '';
+    engine._lastInitializeResponseSig = '';
+    engine._emptyReadyProbeStartedAtMs = 0;
+    engine._currentPileQuestionsSignature = '0:0';
+    engine._currentPileQuestionsSignatureListRef = null;
+    engine._questionListSignatureCache = new WeakMap();
+    engine.runDefaultComponentWillUnmount();
   };
 
-  handleViewAllFromPile = () => {
-    if (this._persistTimer) {
-      clearTimeout(this._persistTimer);
-      this._persistTimer = null;
+const handleViewAllFromPile = (engine: PileViewModeEngine) => {
+    if (engine._persistTimer) {
+      clearTimeout(engine._persistTimer);
+      engine._persistTimer = null;
     }
-    try { this.persistDraft(); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-    if (typeof this.props.onViewAllClick === 'function') {
-      this.props.onViewAllClick();
+    try { engine.persistDraft(); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
+    if (typeof engine.props.onViewAllClick === 'function') {
+      engine.props.onViewAllClick();
     }
   };
 
-
-  triggerNavFade = () => {
+const triggerNavFade = (engine: PileViewModeEngine) => {
     // Clear any existing timer so we always get a fresh 2s window
-    if (this._navFadeTimer) {
-      clearTimeout(this._navFadeTimer);
-      this._navFadeTimer = null;
+    if (engine._navFadeTimer) {
+      clearTimeout(engine._navFadeTimer);
+      engine._navFadeTimer = null;
     }
 
     // Show the counter immediately
-    this.setState(buildPileNavCounterVisiblePatch(true));
+    engine.setState(buildPileNavCounterVisiblePatch(true));
 
     // Schedule fade-out after 2 seconds
-    this._navFadeTimer = setTimeout(() => {
-      this.setState(buildPileNavCounterVisiblePatch(false));
-      this._navFadeTimer = null;
+    engine._navFadeTimer = setTimeout(() => {
+      engine.setState(buildPileNavCounterVisiblePatch(false));
+      engine._navFadeTimer = null;
     }, 2000);
   };
 
-
-  handleNext = () => {
-    if (this._persistTimer) {
-      clearTimeout(this._persistTimer);
-      this._persistTimer = null;
-      this.persistDraft();
+const handleNext = (engine: PileViewModeEngine) => {
+    if (engine._persistTimer) {
+      clearTimeout(engine._persistTimer);
+      engine._persistTimer = null;
+      engine.persistDraft();
     }
-    this.setState((prev) => ({
+    engine.setState((prev) => ({
       activePileIndex: Math.min(
         prev.activePileIndex + 1,
         prev.pileQuestions.length - 1
       ),
     }), () => {
-      this.ensureVisiblePileResponseState();
+      engine.ensureVisiblePileResponseState();
     });
-    this.triggerNavFade();
+    engine.triggerNavFade();
   };
 
-
-  handlePrev = () => {
-    if (this._persistTimer) {
-      clearTimeout(this._persistTimer);
-      this._persistTimer = null;
-      this.persistDraft();
+const handlePrev = (engine: PileViewModeEngine) => {
+    if (engine._persistTimer) {
+      clearTimeout(engine._persistTimer);
+      engine._persistTimer = null;
+      engine.persistDraft();
     }
-    this.setState((prev) => ({
+    engine.setState((prev) => ({
       activePileIndex: Math.max(prev.activePileIndex - 1, 0),
     }), () => {
-      this.ensureVisiblePileResponseState();
+      engine.ensureVisiblePileResponseState();
     });
-    this.triggerNavFade();
+    engine.triggerNavFade();
   };
 
-
-  toggleCreate = () => {
-    this.setState((prev) => ({ showCreate: !prev.showCreate }), () => {
+const toggleCreate = (engine: PileViewModeEngine) => {
+    engine.setState((prev) => ({ showCreate: !prev.showCreate }), () => {
       // Auto-scroll to the create section if it was just opened
-      if (this.state.showCreate && this.createSectionRef.current) {
+      if (engine.state.showCreate && engine.createSectionRef.current) {
         try {
-          this.createSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          engine.createSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
         } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
       }
     });
-  }
+  };
 
-  syncListeningModeQuery = (enabled) => {
+const syncListeningModeQuery = (engine: PileViewModeEngine, enabled) => {
     if (typeof window === 'undefined' || !window.history?.replaceState) return;
     try {
       const nextSearch = buildListeningModeSearch(window.location.search || '', enabled);
       const nextUrl = `${window.location.pathname}${nextSearch}${window.location.hash || ''}`;
       window.history.replaceState({}, '', nextUrl);
     } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-  }
+  };
 
-  shouldUseMobileListeningScroll = () => {
+const shouldUseMobileListeningScroll = (engine: PileViewModeEngine) => {
     if (typeof window === 'undefined') return false;
     try {
       if (typeof window.matchMedia === 'function') {
@@ -1461,50 +1562,48 @@ export class PileViewMode extends SurveyQuestions {
       }
     } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
     return Number(window.innerWidth || 0) > 0 && Number(window.innerWidth || 0) <= 1100;
-  }
+  };
 
-  scrollListeningPanelIntoViewIfNeeded = (behavior = 'smooth') => {
-    if (!this.state.showListeningPanel || !this.shouldUseMobileListeningScroll()) return;
-    const target = this.listeningPanelRef?.current;
+const scrollListeningPanelIntoViewIfNeeded = (engine: PileViewModeEngine, behavior = 'smooth') => {
+    if (!engine.state.showListeningPanel || !engine.shouldUseMobileListeningScroll()) return;
+    const target = engine.listeningPanelRef?.current;
     if (!target || typeof target.scrollIntoView !== 'function') return;
     try {
       target.scrollIntoView({ behavior, block: 'start' });
     } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-  }
+  };
 
-  toggleListeningPanel = () => {
-    this.setState((prev) => ({ showListeningPanel: !prev.showListeningPanel }), () => {
-      this.syncListeningModeQuery(!!this.state.showListeningPanel);
-      this.scrollListeningPanelIntoViewIfNeeded('smooth');
+const toggleListeningPanel = (engine: PileViewModeEngine) => {
+    engine.setState((prev) => ({ showListeningPanel: !prev.showListeningPanel }), () => {
+      engine.syncListeningModeQuery(!!engine.state.showListeningPanel);
+      engine.scrollListeningPanelIntoViewIfNeeded('smooth');
     });
-  }
+  };
 
-  closeListeningPanel = () => {
-    if (!this.state.showListeningPanel) return;
-    this.setState({ showListeningPanel: false }, () => {
-      this.syncListeningModeQuery(false);
+const closeListeningPanel = (engine: PileViewModeEngine) => {
+    if (!engine.state.showListeningPanel) return;
+    engine.setState({ showListeningPanel: false }, () => {
+      engine.syncListeningModeQuery(false);
     });
-  }
+  };
 
-  toggleHologramAssistant = () =>
-    this.setState((prev) => ({
+const toggleHologramAssistant = (engine: PileViewModeEngine) => { return engine.setState((prev) => ({
       showHologramAssistant: !prev.showHologramAssistant,
-    }));
+    })); };
 
-  toggleConviction = (questionId) =>
-    this.setState((prev) => ({
+const toggleConviction = (engine: PileViewModeEngine, questionId) => { return engine.setState((prev) => ({
       showConviction: {
         ...prev.showConviction,
         [questionId]: !prev.showConviction[questionId],
       },
-    }));
+    })); };
 
-  openConvictionSlider = (questionId, mode) => {
+const openConvictionSlider = (engine: PileViewModeEngine, questionId, mode) => {
     const nextMode = (mode === 'importance' || mode === 'conviction')
       ? mode
-      : this.getSliderMode(questionId);
-    this.setSliderMode(questionId, nextMode);
-    this.setState((prev) => ({
+      : engine.getSliderMode(questionId);
+    engine.setSliderMode(questionId, nextMode);
+    engine.setState((prev) => ({
       showConviction: {
         ...prev.showConviction,
         [questionId]: true,
@@ -1512,21 +1611,21 @@ export class PileViewMode extends SurveyQuestions {
     }));
   };
 
-  checkCacheAgainstBaseline = () => {
-    const slug = resolveEffectiveSlug(this.props);
-    const pileResponseReadContext = resolvePileResponseReadContext(this.props, slug);
+const checkCacheAgainstBaseline = (engine: PileViewModeEngine) => {
+    const slug = resolveEffectiveSlug(engine.props);
+    const pileResponseReadContext = resolvePileResponseReadContext(engine.props, slug);
     const effectiveSlug = pileResponseReadContext.sessionSlug || slug;
     const networkID = pileResponseReadContext.networkIdStr;
     const baselineCheckPlan = buildPileBaselineCheckPlan({
-      submissionComplete: this.state.submissionComplete,
-      editBaseline: this.state.editBaseline,
+      submissionComplete: engine.state.submissionComplete,
+      editBaseline: engine.state.editBaseline,
       networkIdStr: networkID,
-      pileQuestions: this.state.pileQuestions,
+      pileQuestions: engine.state.pileQuestions,
     });
     if (baselineCheckPlan.shouldSkip) return;
 
-    const acctLower = (this.props.account || '').toLowerCase();
-    const scopeSlugs = [effectiveSlug, ...getExtraQuestionReadSlugs(this.props, effectiveSlug)];
+    const acctLower = (engine.props.account || '').toLowerCase();
+    const scopeSlugs = [effectiveSlug, ...getExtraQuestionReadSlugs(engine.props, effectiveSlug)];
     const qRespMap = readPileScopedQuestionResponses({
       scopeSlugs,
       networkIdStr: networkID,
@@ -1534,35 +1633,35 @@ export class PileViewMode extends SurveyQuestions {
       mergeQuestionResponses,
     });
     const baselineConsistencyPlan = buildPileBaselineConsistencyPlan({
-      baseline: this.state.editBaseline,
+      baseline: engine.state.editBaseline,
       renderedIds: baselineCheckPlan.renderedIds,
       questionResponses: qRespMap,
       account: acctLower,
-      valuesEqual: this.valuesEqual,
+      valuesEqual: engine.valuesEqual,
     });
 
     if (baselineConsistencyPlan.action === 'sync-cache-caught-up') {
       surveyLog.log("PileViewMode: Cache caught up with baseline. Syncing.");
-      this.setState(buildPileSubmissionCompletePatch(false), () => {
+      engine.setState(buildPileSubmissionCompletePatch(false), () => {
         // Now it is safe to reload and wipe/rebuild state, as cache matches our optimistic view
-        this.loadAndSortQuestions();
+        engine.loadAndSortQuestions();
       });
     } else {
       surveyLog.log("PileViewMode: Ignoring stale cache. Maintaining optimistic state.");
     }
   };
 
-  prefillUserAnswersFromCache = () => {
-    const slug = resolveEffectiveSlug(this.props);
-    const pileResponseReadContext = resolvePileResponseReadContext(this.props, slug);
+const prefillUserAnswersFromCache = (engine: PileViewModeEngine) => {
+    const slug = resolveEffectiveSlug(engine.props);
+    const pileResponseReadContext = resolvePileResponseReadContext(engine.props, slug);
     const effectiveSlug = pileResponseReadContext.sessionSlug || slug;
     const networkID = pileResponseReadContext.networkIdStr;
     const prefillReadPlan = buildPilePrefillReadPlan({
-      account: this.props.account,
-      isDirty: this.state.isDirty,
-      modifiedCount: this.state.modifiedCount,
+      account: engine.props.account,
+      isDirty: engine.state.isDirty,
+      modifiedCount: engine.state.modifiedCount,
       networkIdStr: networkID,
-      pileQuestions: this.state.pileQuestions,
+      pileQuestions: engine.state.pileQuestions,
     });
     if (prefillReadPlan.shouldSkip) {
       if (prefillReadPlan.shouldBumpNoop) {
@@ -1572,8 +1671,8 @@ export class PileViewMode extends SurveyQuestions {
       return;
     }
 
-    const acctLower = (this.props.account || '').toLowerCase();
-    const scopeSlugs = [effectiveSlug, ...getExtraQuestionReadSlugs(this.props, effectiveSlug)];
+    const acctLower = (engine.props.account || '').toLowerCase();
+    const scopeSlugs = [effectiveSlug, ...getExtraQuestionReadSlugs(engine.props, effectiveSlug)];
     const qRespMap = readPileScopedQuestionResponses({
       scopeSlugs,
       networkIdStr: networkID,
@@ -1581,46 +1680,45 @@ export class PileViewMode extends SurveyQuestions {
       mergeQuestionResponses,
     });
 
-    const pendingStats = (typeof this.getPendingEditStats === 'function' && this.getPendingEditStats()) || { total: this.state.modifiedCount || 0 };
+    const pendingStats = (typeof engine.getPendingEditStats === 'function' && engine.getPendingEditStats()) || { total: engine.state.modifiedCount || 0 };
     const prefillPlan = buildPileCachePrefillStatePlan({
-      pileQuestions: this.state.pileQuestions,
+      pileQuestions: engine.state.pileQuestions,
       questionResponsesByQuestionId: qRespMap,
       account: acctLower,
-      currentSlice: this.state.surveysResponseState?.[0],
-      editBaseline: this.state.editBaseline,
+      currentSlice: engine.state.surveysResponseState?.[0],
+      editBaseline: engine.state.editBaseline,
       pendingTotal: pendingStats.total,
-      cloneValue: this.deepClone,
+      cloneValue: engine.deepClone,
       applyCachedResponseEntryToSlice: ({ targetSlice, questionId, response }) => (
-        this._applyCachedResponseEntryToSlice({
+        engine._applyCachedResponseEntryToSlice({
           targetSlice,
           questionId,
           response,
-          parseValue: this.parseAnswerValue,
+          parseValue: engine.parseAnswerValue,
         })
       ),
     });
 
-    this.setState(prefillPlan.nextState, () => this.updateJsonPreview());
+    engine.setState(prefillPlan.nextState, () => engine.updateJsonPreview());
   };
 
-
-  loadAndSortQuestions = async () => {
+const loadAndSortQuestions = async (engine: PileViewModeEngine) => {
     bumpSurveyPerfCounter('loadAndSortQuestionsCount');
-    const requestEpoch = (Number(this._loadAndSortQuestionsEpoch || 0) + 1);
-    this._loadAndSortQuestionsEpoch = requestEpoch;
-    const slug = resolveEffectiveSlug(this.props);
-    const extraSlugs = getExtraQuestionReadSlugs(this.props, slug);
+    const requestEpoch = (Number(engine._loadAndSortQuestionsEpoch || 0) + 1);
+    engine._loadAndSortQuestionsEpoch = requestEpoch;
+    const slug = resolveEffectiveSlug(engine.props);
+    const extraSlugs = getExtraQuestionReadSlugs(engine.props, slug);
     const scopeSlugs = [slug, ...extraSlugs];
     const scopeSignature = scopeSlugs.map((value) => normalizeSessionSlugValue(value)).join(',');
-    const pileLoadContext = resolvePileLoadContext(this.props, slug);
+    const pileLoadContext = resolvePileLoadContext(engine.props, slug);
     const networkID = pileLoadContext.networkIdStr || '';
     const progressSlug = normalizeQuestionProgressSlug(slug);
     const scopedProgress =
-      this.props.questionScanProgress &&
-      doesQuestionProgressMatchSlug(this.props.questionScanProgress.slug, progressSlug)
-        ? this.props.questionScanProgress
+      engine.props.questionScanProgress &&
+      doesQuestionProgressMatchSlug(engine.props.questionScanProgress.slug, progressSlug)
+        ? engine.props.questionScanProgress
         : null;
-    const recentRateLimit = this.isRecentRateLimit();
+    const recentRateLimit = engine.isRecentRateLimit();
     const {
       scanTotalBlocks: scopedScanTotalBlocks,
       scanRemainingBlocks: scopedScanRemainingBlocks,
@@ -1631,28 +1729,28 @@ export class PileViewMode extends SurveyQuestions {
       canSettleUnreadyEmpty,
     } = buildPileLoadProgressState({
       scopedProgress,
-      cacheHasLoaded: this.props.cacheHasLoaded,
-      isQuestionCacheReady: !!this.props.isQuestionCacheReady,
+      cacheHasLoaded: engine.props.cacheHasLoaded,
+      isQuestionCacheReady: !!engine.props.isQuestionCacheReady,
       recentRateLimit,
     });
 
     // If no network ID, we can't load specific data, but we shouldn't hang if we can't determine it yet.
     if (!networkID) {
       // Optimistic Loading: If we have no ID, we are likely still initializing.
-      if (requestEpoch !== this._loadAndSortQuestionsEpoch) return;
+      if (requestEpoch !== engine._loadAndSortQuestionsEpoch) return;
       const noNetworkLoadPlan = buildPileNoNetworkLoadPlan({
-        currentLoading: this.state.loading,
-        isQuestionCacheReady: !!this.props.isQuestionCacheReady,
+        currentLoading: engine.state.loading,
+        isQuestionCacheReady: !!engine.props.isQuestionCacheReady,
         recentRateLimit,
       });
       if (noNetworkLoadPlan.shouldClearLastResultSignature) {
-        this._lastLoadAndSortResultSignature = '';
+        engine._lastLoadAndSortResultSignature = '';
       }
       if (noNetworkLoadPlan.shouldSkipStateUpdate) {
         bumpSurveyPerfCounter('noopSkipCount');
         return;
       }
-      this.setState(noNetworkLoadPlan.nextState);
+      engine.setState(noNetworkLoadPlan.nextState);
       return;
     }
 
@@ -1673,23 +1771,23 @@ export class PileViewMode extends SurveyQuestions {
         normalizeQuestionIdKey,
       });
       // Read path only: avoid write-on-read feedback loops via questionsCacheNonce.
-      if (requestEpoch !== this._loadAndSortQuestionsEpoch) return;
+      if (requestEpoch !== engine._loadAndSortQuestionsEpoch) return;
       const hasPendingMetadataRetries = pendingMetadataCount > 0;
-      const responseCountsCacheKey = `${scopeSignature}|${networkID}|${Number(this.props.questionResponsesNonce || 0)}`;
+      const responseCountsCacheKey = `${scopeSignature}|${networkID}|${Number(engine.props.questionResponsesNonce || 0)}`;
       const responseCountsPlan = buildPileResponseCountsCachePlan({
         cacheKey: responseCountsCacheKey,
-        previousCacheKey: this._responseCountsCacheKey,
-        previousCacheValue: this._responseCountsCacheValue,
+        previousCacheKey: engine._responseCountsCacheKey,
+        previousCacheValue: engine._responseCountsCacheValue,
         questionResponses: allResponses,
       });
       const responseCounts = responseCountsPlan.responseCounts;
-      this._responseCountsCacheKey = responseCountsPlan.nextCacheKey;
-      this._responseCountsCacheValue = responseCountsPlan.nextCacheValue;
+      engine._responseCountsCacheKey = responseCountsPlan.nextCacheKey;
+      engine._responseCountsCacheValue = responseCountsPlan.nextCacheValue;
 
       // No defaultTags gating: sessions handle scoping; tags are for organization and user filtering.
 
       if (allQuestions.length > 0) {
-        this._emptyReadyProbeStartedAtMs = 0;
+        engine._emptyReadyProbeStartedAtMs = 0;
       }
 
       // Empty-settlement probe: on early refresh, cache can report ready before
@@ -1697,8 +1795,8 @@ export class PileViewMode extends SurveyQuestions {
       // showing a definitive empty state.
       if (allQuestions.length === 0) {
         const emptyProbePlan = buildPileEmptyProbePlan({
-          cacheHasLoaded: this.props.cacheHasLoaded,
-          isQuestionCacheReady: !!this.props.isQuestionCacheReady,
+          cacheHasLoaded: engine.props.cacheHasLoaded,
+          isQuestionCacheReady: !!engine.props.isQuestionCacheReady,
           recentRateLimit,
           hasPendingMetadataRetries,
           hasScanOrHydrationWork,
@@ -1709,41 +1807,41 @@ export class PileViewMode extends SurveyQuestions {
           scanRemainingBlocks: scopedScanRemainingBlocks,
           hydrateDiscovered: scopedHydrateDiscovered,
           hydrateDone: scopedHydrateDone,
-          emptyReadyProbeStartedAtMs: this._emptyReadyProbeStartedAtMs,
+          emptyReadyProbeStartedAtMs: engine._emptyReadyProbeStartedAtMs,
           nowMs: Date.now(),
         });
         const emptyProbeStatePlan = buildPileEmptyProbeStatePlan({
           action: emptyProbePlan.action,
           nextProbeStartedAtMs: emptyProbePlan.nextProbeStartedAtMs,
           nextProbeDelayMs: emptyProbePlan.nextProbeDelayMs,
-          previousPileQuestions: this.state.pileQuestions,
-          previousAllQuestionsForFilter: this.state.allQuestionsForFilter,
-          previousLoading: this.state.loading,
-          areQuestionListsEquivalent: this.areQuestionListsEquivalent,
+          previousPileQuestions: engine.state.pileQuestions,
+          previousAllQuestionsForFilter: engine.state.allQuestionsForFilter,
+          previousLoading: engine.state.loading,
+          areQuestionListsEquivalent: engine.areQuestionListsEquivalent,
         });
-        this._emptyReadyProbeStartedAtMs = emptyProbeStatePlan.nextProbeStartedAtMs;
+        engine._emptyReadyProbeStartedAtMs = emptyProbeStatePlan.nextProbeStartedAtMs;
 
         if (emptyProbeStatePlan.action !== 'settle-empty') {
-          if (requestEpoch !== this._loadAndSortQuestionsEpoch) return;
+          if (requestEpoch !== engine._loadAndSortQuestionsEpoch) return;
           if (emptyProbeStatePlan.shouldClearLastResultSignature) {
-            this._lastLoadAndSortResultSignature = '';
+            engine._lastLoadAndSortResultSignature = '';
           }
           if (emptyProbeStatePlan.shouldBumpNoop) {
             bumpSurveyPerfCounter('noopSkipCount');
           } else if (emptyProbeStatePlan.shouldIncrementPileQuestionsGeneration) {
-            this._pileQuestionsGeneration += 1;
+            engine._pileQuestionsGeneration += 1;
           }
           if (emptyProbeStatePlan.nextState) {
-            this.setState(emptyProbeStatePlan.nextState);
+            engine.setState(emptyProbeStatePlan.nextState);
           }
           if (emptyProbeStatePlan.action === 'probe-loading') {
-            this.scheduleLoadAndSortQuestions(emptyProbeStatePlan.nextProbeDelayMs);
+            engine.scheduleLoadAndSortQuestions(emptyProbeStatePlan.nextProbeDelayMs);
           }
           return;
         }
       }
 
-      const acctLower = (this.props.account || '').toLowerCase();
+      const acctLower = (engine.props.account || '').toLowerCase();
       const {
         sortedQuestions: sorted,
         visibleQuestions: sortedVisible,
@@ -1756,16 +1854,16 @@ export class PileViewMode extends SurveyQuestions {
         highlightedQuestionIds: hlSet,
         account: acctLower,
       });
-      const filterSig = serializeSurveyToolFilterState(this.state.filterState);
-      const isFilterActive = !!this.state.isFilterActive || !!filterSig;
-      if (requestEpoch !== this._loadAndSortQuestionsEpoch) return;
+      const filterSig = serializeSurveyToolFilterState(engine.state.filterState);
+      const isFilterActive = !!engine.state.isFilterActive || !!filterSig;
+      if (requestEpoch !== engine._loadAndSortQuestionsEpoch) return;
       const settleUnreadyEmpty = canSettleUnreadyEmpty && sortedVisible.length === 0;
       const loadResultPlan = buildPileLoadResultPlan({
-        previousAllQuestionsForFilter: this.state.allQuestionsForFilter,
-        previousPileQuestions: this.state.pileQuestions,
-        previousActivePileIndex: this.state.activePileIndex,
-        previousHasHiddenGatedQuestions: this.state.hasHiddenGatedQuestions,
-        previousLoading: this.state.loading,
+        previousAllQuestionsForFilter: engine.state.allQuestionsForFilter,
+        previousPileQuestions: engine.state.pileQuestions,
+        previousActivePileIndex: engine.state.activePileIndex,
+        previousHasHiddenGatedQuestions: engine.state.hasHiddenGatedQuestions,
+        previousLoading: engine.state.loading,
         sortedQuestions: sorted,
         sortedVisibleQuestions: sortedVisible,
         hiddenQuestions: hiddenGated,
@@ -1775,22 +1873,22 @@ export class PileViewMode extends SurveyQuestions {
         questionResponses: allResponses,
         account: acctLower,
         settleUnreadyEmpty,
-        isQuestionCacheReady: !!this.props.isQuestionCacheReady,
+        isQuestionCacheReady: !!engine.props.isQuestionCacheReady,
         recentRateLimit,
-        areQuestionListsEquivalent: this.areQuestionListsEquivalent,
-        buildQuestionListSignature: this.buildQuestionListSignature,
-        getPileVisibleQuestionIds: this.getPileVisibleQuestionIds,
-        buildPileVisibleResponseSignature: this.buildPileVisibleResponseSignature,
+        areQuestionListsEquivalent: engine.areQuestionListsEquivalent,
+        buildQuestionListSignature: engine.buildQuestionListSignature,
+        getPileVisibleQuestionIds: engine.getPileVisibleQuestionIds,
+        buildPileVisibleResponseSignature: engine.buildPileVisibleResponseSignature,
       });
       if (loadResultPlan.shouldIncrementPileQuestionsGeneration) {
-        this._pileQuestionsGeneration += 1;
+        engine._pileQuestionsGeneration += 1;
       }
 
       const runHydration = () => {
-        this.runPileQuestionSetHydration({
+        engine.runPileQuestionSetHydration({
           requestEpoch,
           resultSignature: loadResultPlan.resultSignature,
-          initializeResponses: !this.state.submissionComplete,
+          initializeResponses: !engine.state.submissionComplete,
           forceOverwriteDraft: true,
           resetAutoDecryptLedger: true,
           autoDecryptReason: 'pile-hydration',
@@ -1804,70 +1902,70 @@ export class PileViewMode extends SurveyQuestions {
         return;
       }
 
-      this.setState(loadResultPlan.nextState, runHydration);
+      engine.setState(loadResultPlan.nextState, runHydration);
     } catch (e) {
       surveyLog.error('Failed to load/sort questions:', e);
       // Treat unexpected errors as warming state if we recently saw rate-limits
-      if (requestEpoch !== this._loadAndSortQuestionsEpoch) return;
-      this._lastLoadAndSortResultSignature = '';
-      this.setState(buildPileLoadFailureState({
-        isQuestionCacheReady: !!this.props.isQuestionCacheReady,
+      if (requestEpoch !== engine._loadAndSortQuestionsEpoch) return;
+      engine._lastLoadAndSortResultSignature = '';
+      engine.setState(buildPileLoadFailureState({
+        isQuestionCacheReady: !!engine.props.isQuestionCacheReady,
         recentRateLimit,
       }));
     }
   };
 
-  shouldAbortPileHydrationRequest = (requestEpoch = null) => (
-    requestEpoch !== null && requestEpoch !== undefined && requestEpoch !== this._loadAndSortQuestionsEpoch
-  );
+const shouldAbortPileHydrationRequest = (engine: PileViewModeEngine, requestEpoch = null) => { return (
+    requestEpoch !== null && requestEpoch !== undefined && requestEpoch !== engine._loadAndSortQuestionsEpoch
+  ); };
 
-  resetPileAutoDecryptLedger = ({
+const resetPileAutoDecryptLedger = (engine: PileViewModeEngine, {
     requestEpoch = null,
     queueReason = 'pile-hydration',
     resetQueueReason = 'pile-hydration-reset',
   } = {}) => {
-    if (this.shouldAbortPileHydrationRequest(requestEpoch)) return;
-    this._autoDecQueue = [];
-    this._autoDecProcessing = false;
+    if (engine.shouldAbortPileHydrationRequest(requestEpoch)) return;
+    engine._autoDecQueue = [];
+    engine._autoDecProcessing = false;
 
     const hasAutoDecryptLedger =
-      Object.keys(this.state.autoDecryptAttempted || {}).length > 0 ||
-      Object.keys(this.state.decryptingByKey || {}).length > 0;
+      Object.keys(engine.state.autoDecryptAttempted || {}).length > 0 ||
+      Object.keys(engine.state.decryptingByKey || {}).length > 0;
 
     if (!hasAutoDecryptLedger) {
-      if (this.state.autoDecryptEnabled) {
-        try { this.queueAutoDecryptVisibleSweep(queueReason); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
+      if (engine.state.autoDecryptEnabled) {
+        try { engine.queueAutoDecryptVisibleSweep(queueReason); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
       }
       return;
     }
 
-    this.setState(
+    engine.setState(
       { autoDecryptAttempted: {}, decryptingByKey: {} },
       () => {
-        if (this.shouldAbortPileHydrationRequest(requestEpoch)) return;
-        this._autoDecryptMaskedAttemptSignature = {};
-        if (this.state.autoDecryptEnabled) {
-          try { this.queueAutoDecryptVisibleSweep(resetQueueReason); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
+        if (engine.shouldAbortPileHydrationRequest(requestEpoch)) return;
+        engine._autoDecryptMaskedAttemptSignature = {};
+        if (engine.state.autoDecryptEnabled) {
+          try { engine.queueAutoDecryptVisibleSweep(resetQueueReason); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
         }
       }
     );
   };
 
-  rehydrateVisiblePileWindow = ({
+const rehydrateVisiblePileWindow = (engine: PileViewModeEngine, {
     requestEpoch = null,
     forceOverwriteDraft = false,
     resetAutoDecryptLedger = false,
     autoDecryptReason = 'pile-hydration',
     autoDecryptResetReason = 'pile-hydration-reset',
   } = {}) => {
-    if (this.shouldAbortPileHydrationRequest(requestEpoch)) return;
-    this.rehydrateLocalCacheAnswersForRenderedIds(() => {
-      if (this.shouldAbortPileHydrationRequest(requestEpoch)) return;
-      if (typeof this.rehydrateDraftForRenderedIds === 'function') {
-        this.rehydrateDraftForRenderedIds(forceOverwriteDraft);
+    if (engine.shouldAbortPileHydrationRequest(requestEpoch)) return;
+    engine.rehydrateLocalCacheAnswersForRenderedIds(() => {
+      if (engine.shouldAbortPileHydrationRequest(requestEpoch)) return;
+      if (typeof engine.rehydrateDraftForRenderedIds === 'function') {
+        engine.rehydrateDraftForRenderedIds(forceOverwriteDraft);
       }
       if (!resetAutoDecryptLedger) return;
-      this.resetPileAutoDecryptLedger({
+      engine.resetPileAutoDecryptLedger({
         requestEpoch,
         queueReason: autoDecryptReason,
         resetQueueReason: autoDecryptResetReason,
@@ -1875,7 +1973,7 @@ export class PileViewMode extends SurveyQuestions {
     });
   };
 
-  runPileQuestionSetHydration = ({
+const runPileQuestionSetHydration = (engine: PileViewModeEngine, {
     requestEpoch = null,
     resultSignature = '',
     initializeResponses = true,
@@ -1887,39 +1985,37 @@ export class PileViewMode extends SurveyQuestions {
     executePileQuestionSetHydration({
       requestEpoch,
       resultSignature,
-      lastResultSignature: this._lastLoadAndSortResultSignature,
+      lastResultSignature: engine._lastLoadAndSortResultSignature,
       initializeResponses,
       forceOverwriteDraft,
       resetAutoDecryptLedger,
       autoDecryptReason,
       autoDecryptResetReason,
-      shouldAbortRequest: (nextRequestEpoch) => this.shouldAbortPileHydrationRequest(nextRequestEpoch),
+      shouldAbortRequest: (nextRequestEpoch) => engine.shouldAbortPileHydrationRequest(nextRequestEpoch),
       setLastResultSignature: (nextResultSignature) => {
-        this._lastLoadAndSortResultSignature = nextResultSignature;
+        engine._lastLoadAndSortResultSignature = nextResultSignature;
       },
-      initializeResponseState: (callback) => this.initializeResponseState(callback),
-      rehydrateVisiblePileWindow: (options) => this.rehydrateVisiblePileWindow(options),
+      initializeResponseState: (callback) => engine.initializeResponseState(callback),
+      rehydrateVisiblePileWindow: (options) => engine.rehydrateVisiblePileWindow(options),
       onNoop: () => {
         bumpSurveyPerfCounter('noopSkipCount');
       },
     });
   };
 
-
-
-  initializeResponseState = (cb) => {
+const initializeResponseState = (engine: PileViewModeEngine, cb) => {
     executePileInitializeResponseState({
-      isDirty: this.state.isDirty,
-      modifiedCount: this.state.modifiedCount,
-      pileQuestions: this.state.pileQuestions,
-      activePileIndex: this.state.activePileIndex,
-      lastInitializeResponseSig: this._lastInitializeResponseSig,
-      buildEmptyResponseFieldState: this.buildEmptyResponseFieldState,
+      isDirty: engine.state.isDirty,
+      modifiedCount: engine.state.modifiedCount,
+      pileQuestions: engine.state.pileQuestions,
+      activePileIndex: engine.state.activePileIndex,
+      lastInitializeResponseSig: engine._lastInitializeResponseSig,
+      buildEmptyResponseFieldState: engine.buildEmptyResponseFieldState,
       setLastInitializeResponseSig: (nextInitializeResponseSig) => {
-        this._lastInitializeResponseSig = nextInitializeResponseSig;
+        engine._lastInitializeResponseSig = nextInitializeResponseSig;
       },
-      cloneValue: this.deepClone,
-      setState: this.setState.bind(this),
+      cloneValue: engine.deepClone,
+      setState: engine.setState.bind(engine),
       onComplete: () => {
         if (typeof cb === 'function') cb();
       },
@@ -1929,13 +2025,13 @@ export class PileViewMode extends SurveyQuestions {
     });
   };
 
-  ensureVisiblePileResponseState = () => {
+const ensureVisiblePileResponseState = (engine: PileViewModeEngine) => {
     executeEnsureVisiblePileResponseState({
-      getState: () => this.state,
-      buildEmptyResponseFieldState: this.buildEmptyResponseFieldState,
-      setState: this.setState.bind(this),
+      getState: () => engine.state,
+      buildEmptyResponseFieldState: engine.buildEmptyResponseFieldState,
+      setState: engine.setState.bind(engine),
       onRehydrateVisibleWindow: () => {
-        this.rehydrateVisiblePileWindow({
+        engine.rehydrateVisiblePileWindow({
           forceOverwriteDraft: false,
           resetAutoDecryptLedger: false,
         });
@@ -1946,77 +2042,78 @@ export class PileViewMode extends SurveyQuestions {
     });
   };
 
-
-  // Wrapper helpers so we don't shadow parent methods
-  handleAnswerPile = (questionId, answer, options = {}) => {
-    this.handleAnswer(0, questionId, answer, options);
+const handleAnswerPile = (engine: PileViewModeEngine, questionId, answer, options = {}) => {
+    engine.handleAnswer(0, questionId, answer, options);
   };
 
-  handleAdditionalPile = (questionId, comments) => {
-    this.handleAdditional(0, questionId, comments);
+const handleAdditionalPile = (engine: PileViewModeEngine, questionId, comments) => {
+    engine.handleAdditional(0, questionId, comments);
   };
 
-  getSubmitCount = () => {
-    const stats = (this.getPendingEditStats?.() || { total: 0 });
+const getSubmitCount = (engine: PileViewModeEngine) => {
+    const stats = (
+      engine.getPendingEditStats?.() ||
+      engine.computePendingEditStatsAtIndex?.(0) ||
+      { total: 0 }
+    );
     return Number(stats.total || 0);
   };
 
-
-  showNoPendingPileSubmitFeedback = (pileSubmitLabel = '') => {
-    if (this._pileSubmitTimer) {
-      clearTimeout(this._pileSubmitTimer);
-      this._pileSubmitTimer = null;
+const showNoPendingPileSubmitFeedback = (engine: PileViewModeEngine, pileSubmitLabel = '') => {
+    if (engine._pileSubmitTimer) {
+      clearTimeout(engine._pileSubmitTimer);
+      engine._pileSubmitTimer = null;
     }
 
     const feedbackPlan = buildNoPendingPileSubmitFeedbackPlan({
       submitLabel: pileSubmitLabel,
     });
 
-    this.setState(buildPileSubmitTempTextPatch(feedbackPlan.initialText));
-    this._pileSubmitTimer = setTimeout(() => {
-      this.setState(buildPileSubmitTempTextPatch(feedbackPlan.restoreText));
-      this._pileSubmitTimer = setTimeout(() => {
-        this.setState(buildPileSubmitTempTextPatch(feedbackPlan.clearText));
-        this._pileSubmitTimer = null;
+    engine.setState(buildPileSubmitTempTextPatch(feedbackPlan.initialText));
+    engine._pileSubmitTimer = setTimeout(() => {
+      engine.setState(buildPileSubmitTempTextPatch(feedbackPlan.restoreText));
+      engine._pileSubmitTimer = setTimeout(() => {
+        engine.setState(buildPileSubmitTempTextPatch(feedbackPlan.clearText));
+        engine._pileSubmitTimer = null;
       }, feedbackPlan.clearDelayMs);
     }, feedbackPlan.initialDelayMs);
   };
 
-  handlePileSubmitClick = async () => {
-    const pendingStats = this.getPendingStatsSnapshot();
-    const pileSubmitLabel = (this.props.computeSubmitLabel || computeSubmitLabel)(this, {
+const handlePileSubmitClick = async (engine: PileViewModeEngine) => {
+    const pendingStats = engine.getPendingStatsSnapshot();
+    const pileSubmitLabel = (engine.props.computeSubmitLabel || computeSubmitLabel)(engine, {
       pendingStats,
     });
     const { pileSubmittedStateActive } = buildPileSubmitViewState({
       pendingStats,
-      isSubmitting: this.state.isSubmitting,
-      submittedSinceLastEdit: this.state.submittedSinceLastEdit,
-      submissionComplete: this.state.submissionComplete,
-      pileSubmitTempText: this.state.pileSubmitTempText,
+      isSubmitting: engine.state.isSubmitting,
+      submittedSinceLastEdit: engine.state.submittedSinceLastEdit,
+      submissionComplete: engine.state.submissionComplete,
+      pileSubmitTempText: engine.state.pileSubmitTempText,
       pileSubmitLabel,
-      account: this.props.account,
+      account: engine.props.account,
       isAddress: utils.isAddress,
     });
 
-    if (!this.props.loginComplete) {
-      await this.encryptAndUpload();
+    if (!engine.props.loginComplete) {
+      await engine.encryptAndUpload();
       return;
     }
     if (pileSubmittedStateActive) return;
-    const currentPending = this.getSubmitCount();
+    const currentPending = engine.getSubmitCount();
     if (currentPending === 0) {
-      this.showNoPendingPileSubmitFeedback(pileSubmitLabel);
+      engine.showNoPendingPileSubmitFeedback(pileSubmitLabel);
       return;
     }
-    await this.encryptAndUpload();
+    await engine.encryptAndUpload();
   };
 
-  getPileFilterQuestionResponses = () => {
-    const slug = resolveEffectiveSlug(this.props);
-    const pileFilterContext = resolvePileFilterContext(this.props, slug);
+const getPileFilterQuestionResponses = (engine: PileViewModeEngine) => {
+    const slug = resolveEffectiveSlug(engine.props);
+    const pileFilterContext = resolvePileFilterContext(engine.props, slug);
     const effectiveSlug = pileFilterContext.sessionSlug || slug;
     const networkID = pileFilterContext.networkIdStr;
-    const scopeSlugs = [effectiveSlug, ...getExtraQuestionReadSlugs(this.props, effectiveSlug)];
+    const scopeSlugs = [effectiveSlug, ...getExtraQuestionReadSlugs(engine.props, effectiveSlug)];
 
     if (!networkID) return {};
 
@@ -2033,18 +2130,14 @@ export class PileViewMode extends SurveyQuestions {
     }
   };
 
+const toggleFilterModal = (engine: PileViewModeEngine) => { return engine.setState((prev) => ({ filterModalOpen: !prev.filterModalOpen })); };
 
-
-  toggleFilterModal = () =>
-    this.setState((prev) => ({ filterModalOpen: !prev.filterModalOpen }));
-
-  handlePileFilterActivityChange = (isActive) => {
-    if (!!this.state.isFilterActive === !!isActive) return;
-    this.setState(buildPileFilterActivePatch(isActive));
+const handlePileFilterActivityChange = (engine: PileViewModeEngine, isActive) => {
+    if (!!engine.state.isFilterActive === !!isActive) return;
+    engine.setState(buildPileFilterActivePatch(isActive));
   };
 
-
-  handleFilter = (filteredQsOrCombined, newFilterState) => {
+const handleFilter = (engine: PileViewModeEngine, filteredQsOrCombined, newFilterState) => {
     let filteredArray = [];
     if (Array.isArray(filteredQsOrCombined)) {
       filteredArray = filteredQsOrCombined;
@@ -2054,14 +2147,14 @@ export class PileViewMode extends SurveyQuestions {
     ) {
       filteredArray = filteredQsOrCombined.filteredQuestions;
     } else {
-      filteredArray = this.state.allQuestionsForFilter;
+      filteredArray = engine.state.allQuestionsForFilter;
     }
 
     // Remove blocked (per-group)
-    const slug = resolveEffectiveSlug(this.props);
-    const pileFilterContext = resolvePileFilterContext(this.props, slug);
+    const slug = resolveEffectiveSlug(engine.props);
+    const pileFilterContext = resolvePileFilterContext(engine.props, slug);
     const effectiveSlug = pileFilterContext.sessionSlug || slug;
-    const scopeSlugs = [effectiveSlug, ...getExtraQuestionReadSlugs(this.props, effectiveSlug)];
+    const scopeSlugs = [effectiveSlug, ...getExtraQuestionReadSlugs(engine.props, effectiveSlug)];
     const BLOCKED_QUESTION_IDS_SET = new Set();
     scopeSlugs.forEach((scopeSlug) => {
       getBlockedQuestionIdsSet(scopeSlug).forEach((questionId) => {
@@ -2078,7 +2171,7 @@ export class PileViewMode extends SurveyQuestions {
     let allResponses = {};
     let responseCounts = {};
     const scopeSignature = scopeSlugs.map((value) => normalizeSessionSlugValue(value)).join(',');
-    const responseCountsCacheKey = `${scopeSignature}|${networkID}|${Number(this.props.questionResponsesNonce || 0)}`;
+    const responseCountsCacheKey = `${scopeSignature}|${networkID}|${Number(engine.props.questionResponsesNonce || 0)}`;
     try {
       if (networkID) {
         scopeSlugs.forEach((scopeSlug) => {
@@ -2088,13 +2181,13 @@ export class PileViewMode extends SurveyQuestions {
         });
         const responseCountsPlan = buildPileResponseCountsCachePlan({
           cacheKey: responseCountsCacheKey,
-          previousCacheKey: this._responseCountsCacheKey,
-          previousCacheValue: this._responseCountsCacheValue,
+          previousCacheKey: engine._responseCountsCacheKey,
+          previousCacheValue: engine._responseCountsCacheValue,
           questionResponses: allResponses,
         });
         responseCounts = responseCountsPlan.responseCounts;
-        this._responseCountsCacheKey = responseCountsPlan.nextCacheKey;
-        this._responseCountsCacheValue = responseCountsPlan.nextCacheValue;
+        engine._responseCountsCacheKey = responseCountsPlan.nextCacheKey;
+        engine._responseCountsCacheValue = responseCountsPlan.nextCacheValue;
       }
     } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
 
@@ -2104,7 +2197,7 @@ export class PileViewMode extends SurveyQuestions {
         hlSet.add(String(questionId || '').toLowerCase());
       });
     });
-    const acctLower = (this.props.account || '').toLowerCase();
+    const acctLower = (engine.props.account || '').toLowerCase();
     const {
       visibleQuestions: sortedFilteredVisible,
       hasHiddenGatedQuestions: nextHiddenGated,
@@ -2115,15 +2208,15 @@ export class PileViewMode extends SurveyQuestions {
       highlightedQuestionIds: hlSet,
       account: acctLower,
     });
-    const nextFilterState = normalizeSurveyToolFilterState(newFilterState || this.state.filterState);
+    const nextFilterState = normalizeSurveyToolFilterState(newFilterState || engine.state.filterState);
     const filterResultPlan = buildPileFilterResultPlan({
-      currentVisibleSignature: this.syncCurrentPileQuestionsSignature(this.state.pileQuestions || []),
+      currentVisibleSignature: engine.syncCurrentPileQuestionsSignature(engine.state.pileQuestions || []),
       nextVisibleQuestions: sortedFilteredVisible,
-      currentFilterState: this.state.filterState,
+      currentFilterState: engine.state.filterState,
       nextFilterState,
       nextHiddenGated,
-      currentHiddenGated: !!this.state.hasHiddenGatedQuestions,
-      buildQuestionListSignature: this.buildQuestionListSignature,
+      currentHiddenGated: !!engine.state.hasHiddenGatedQuestions,
+      buildQuestionListSignature: engine.buildQuestionListSignature,
       serializeFilterState: serializeSurveyToolFilterState,
     });
 
@@ -2133,15 +2226,15 @@ export class PileViewMode extends SurveyQuestions {
     }
 
     if (filterResultPlan.shouldIncrementPileQuestionsGeneration) {
-      this._pileQuestionsGeneration += 1;
+      engine._pileQuestionsGeneration += 1;
     }
-    this.setState(filterResultPlan.nextState, () => {
-        if (typeof this.props.onFilterChange === 'function') {
-          try { this.props.onFilterChange(this.state.filterState); } catch (e) { surveyLog.warn('SurveyTool: callback', e); }
+    engine.setState(filterResultPlan.nextState, () => {
+        if (typeof engine.props.onFilterChange === 'function') {
+          try { engine.props.onFilterChange(engine.state.filterState); } catch (e) { surveyLog.warn('SurveyTool: callback', e); }
         }
         // Ensure state is initialized and hydrated for the new set of filtered questions.
         // This keeps edit baselines and prefilled answers aligned with the active pile window.
-        this.runPileQuestionSetHydration({
+        engine.runPileQuestionSetHydration({
           initializeResponses: true,
           forceOverwriteDraft: true,
           resetAutoDecryptLedger: true,
@@ -2151,28 +2244,28 @@ export class PileViewMode extends SurveyQuestions {
     });
   };
 
-  getIsPileSubmitRailVisible = () => {
-    const pendingStats = this.getPendingStatsSnapshot?.() || { total: 0 };
+const getIsPileSubmitRailVisible = (engine: PileViewModeEngine) => {
+    const pendingStats = engine.getPendingStatsSnapshot?.() || { total: 0 };
     return !!(
-      this.state.isSubmitting ||
+      engine.state.isSubmitting ||
       Number(pendingStats.total || 0) > 0 ||
-      this.state.submittedSinceLastEdit ||
-      this.state.submissionComplete
+      engine.state.submittedSinceLastEdit ||
+      engine.state.submissionComplete
     );
   };
 
-  notifyPileSubmitRailVisibility = () => {
-    const nextVisible = this.getIsPileSubmitRailVisible();
-    if (this._lastNotifiedPileSubmitRailVisible === nextVisible) return;
-    this._lastNotifiedPileSubmitRailVisible = nextVisible;
+const notifyPileSubmitRailVisibility = (engine: PileViewModeEngine) => {
+    const nextVisible = engine.getIsPileSubmitRailVisible();
+    if (engine._lastNotifiedPileSubmitRailVisible === nextVisible) return;
+    engine._lastNotifiedPileSubmitRailVisible = nextVisible;
     try {
-      if (typeof this.props.onPileSubmitRailVisibilityChange === 'function') {
-        this.props.onPileSubmitRailVisibilityChange(nextVisible);
+      if (typeof engine.props.onPileSubmitRailVisibilityChange === 'function') {
+        engine.props.onPileSubmitRailVisibilityChange(nextVisible);
       }
     } catch (e) { surveyLog.warn('SurveyTool: callback', e); }
   };
 
-  renderPileResponseInput = ({
+const renderPileResponseInput = (engine: PileViewModeEngine, {
     question,
     answer,
     glowAnswer,
@@ -2183,7 +2276,7 @@ export class PileViewMode extends SurveyQuestions {
   }) => {
     if (maskedAnswer) {
       return (
-        this.renderQuestionFieldDecryptControl({
+        engine.renderQuestionFieldDecryptControl({
           questionId: question.id,
           fieldKey: 'answer',
           allowDecrypt: allowDecryptAnswer,
@@ -2203,8 +2296,8 @@ export class PileViewMode extends SurveyQuestions {
             questionId={question.id}
             value={answer.value}
             inputNamePrefix="q"
-            onChange={(option) => this.handleAnswerPile(question.id, option)}
-            disabled={this.state.isSubmitting}
+            onChange={(option) => engine.handleAnswerPile(question.id, option)}
+            disabled={engine.state.isSubmitting}
           />
         );
 
@@ -2218,8 +2311,8 @@ export class PileViewMode extends SurveyQuestions {
             options={options}
             selectedValues={selectedValues}
             isSingleSelect={isSingleSelect}
-            disabled={this.state.isSubmitting}
-            onChange={(nextValues) => this.handleAnswerPile(question.id, nextValues)}
+            disabled={engine.state.isSubmitting}
+            onChange={(nextValues) => engine.handleAnswerPile(question.id, nextValues)}
           />
         );
       }
@@ -2234,9 +2327,9 @@ export class PileViewMode extends SurveyQuestions {
               step={1}
               value={ratingValue}
               onChange={(val, event) =>
-                this.handleAnswerPile(question.id, val, this.getSliderPersistOptions(event))}
-              onChangeComplete={this.flushDraftPersistAfterSliderChange}
-              disabled={this.state.isSubmitting}
+                engine.handleAnswerPile(question.id, val, engine.getSliderPersistOptions(event))}
+              onChangeComplete={engine.flushDraftPersistAfterSliderChange}
+              disabled={engine.state.isSubmitting}
               className={styles.ratingSlider}
             />
             <span className={styles.ratingValueDisplay}>
@@ -2250,14 +2343,14 @@ export class PileViewMode extends SurveyQuestions {
       default:
         return (
           <SurveyAudioFieldInput
-            {...this.getAudioInputWorkerProps()}
+            {...engine.getAudioInputWorkerProps()}
             placeholder={'Your response...'}
             value={answer.value || ''}
-            updateFunction={(val) => this.handleAnswerPile(question.id, val)}
+            updateFunction={(val) => engine.handleAnswerPile(question.id, val)}
             toggleEncryption={(newState) =>
-              this.toggleAnswerEncryption(0, question.id, newState)
+              engine.toggleAnswerEncryption(0, question.id, newState)
             }
-            disabled={this.state.isSubmitting}
+            disabled={engine.state.isSubmitting}
             forceGlow={glowAnswer}
             disableEncryption={true}
             enableDownloads={false}
@@ -2266,7 +2359,7 @@ export class PileViewMode extends SurveyQuestions {
     }
   };
 
-  renderPileSliderSection = ({
+const renderPileSliderSection = (engine: PileViewModeEngine, {
     questionId,
     showSlider,
     convictionValue,
@@ -2274,7 +2367,7 @@ export class PileViewMode extends SurveyQuestions {
     activeSliderValue,
     sliderMode,
     hasConvictionImportanceValue,
-  }) => (
+  }) => { return (
     <SurveyQuestionsFullQuestionSliderSection
       activeSliderValue={activeSliderValue}
       collapsedSliderMode={sliderMode}
@@ -2282,73 +2375,73 @@ export class PileViewMode extends SurveyQuestions {
       hasConvictionImportanceValue={hasConvictionImportanceValue}
       importanceToggleEnabled={ENABLE_IMPORTANCE_SLIDER_TOGGLE}
       importanceValue={importanceValue}
-      isSubmitting={this.state.isSubmitting}
+      isSubmitting={engine.state.isSubmitting}
       onChange={(value, event) =>
-        this.handleConvictionImportanceChange(
+        engine.handleConvictionImportanceChange(
           0,
           questionId,
           sliderMode,
           value,
-          this.getSliderPersistOptions(event)
+          engine.getSliderPersistOptions(event)
         )}
-      onChangeComplete={this.flushDraftPersistAfterSliderChange}
+      onChangeComplete={engine.flushDraftPersistAfterSliderChange}
       onSelectMode={(nextMode) => {
         if (ENABLE_IMPORTANCE_SLIDER_TOGGLE) {
-          this.openConvictionSlider(questionId, nextMode);
+          engine.openConvictionSlider(questionId, nextMode);
           return;
         }
-        this.toggleConviction(questionId);
+        engine.toggleConviction(questionId);
       }}
       questionId={questionId}
       sliderMode={sliderMode}
       sliderOpen={showSlider}
-      sliderToggleExpandedByQuestion={this.state.sliderToggleExpandedByQuestion}
+      sliderToggleExpandedByQuestion={engine.state.sliderToggleExpandedByQuestion}
     />
-  );
+  ); };
 
-  renderPileAdditionalInput = ({
+const renderPileAdditionalInput = (engine: PileViewModeEngine, {
     questionId,
     additional,
     glowAdditional,
-  }) => (
+  }) => { return (
     <SurveyAudioFieldInput
-      {...this.getAudioInputWorkerProps()}
+      {...engine.getAudioInputWorkerProps()}
       placeholder="Additional comments..."
       value={additional.value || ''}
-      updateFunction={(val) => this.handleAdditionalPile(questionId, val)}
+      updateFunction={(val) => engine.handleAdditionalPile(questionId, val)}
       toggleEncryption={(newState) =>
-        this.toggleAdditionalCommentsEncryption(0, questionId, newState)
+        engine.toggleAdditionalCommentsEncryption(0, questionId, newState)
       }
       dataTestId={E2E_TESTIDS.SURVEY_ADDITIONAL_INPUT}
       dataCeQuestionId={String(questionId || '').trim().toLowerCase()}
-      disabled={this.state.isSubmitting}
+      disabled={engine.state.isSubmitting}
       forceGlow={glowAdditional}
       encrypted={additional.encrypted || false}
       disableEncryption={true}
       enableDownloads={false}
     />
-  );
+  ); };
 
-  renderPileAdditionalEditorRow = ({
+const renderPileAdditionalEditorRow = (engine: PileViewModeEngine, {
     questionId,
     additional,
     glowAdditional,
-  }) => renderPileAdditionalEditorRow({
-    input: this.renderPileAdditionalInput({
+  }) => { return renderPileAdditionalEditorRowView({
+    input: engine.renderPileAdditionalInput({
       questionId,
       additional,
       glowAdditional,
     }),
-    lockControl: this.renderQuestionAdditionalLockControl({
+    lockControl: engine.renderQuestionAdditionalLockControl({
       surveyIndex: 0,
       questionId,
       additional,
       glowAdditional,
       visualContext: 'pile',
     }),
-  });
+  }); };
 
-  renderPileCommentsSection = ({
+const renderPileCommentsSection = (engine: PileViewModeEngine, {
     questionId,
     showComments,
     additional,
@@ -2357,10 +2450,10 @@ export class PileViewMode extends SurveyQuestions {
     allowDecryptAdditional,
     decryptTooltip,
     isAdditionalDecrypting,
-  }) => renderPileCommentsSection({
+  }) => { return renderPileCommentsSectionView({
     showComments,
     maskedAdditional,
-    decryptAdditionalControl: this.renderQuestionFieldDecryptControl({
+    decryptAdditionalControl: engine.renderQuestionFieldDecryptControl({
       questionId,
       fieldKey: 'additional',
       allowDecrypt: allowDecryptAdditional,
@@ -2369,37 +2462,37 @@ export class PileViewMode extends SurveyQuestions {
       busy: isAdditionalDecrypting,
       showBusySpinnerWhenAutoDecryptEnabled: true,
     }),
-    additionalEditorRow: this.renderPileAdditionalEditorRow({
+    additionalEditorRow: engine.renderPileAdditionalEditorRow({
       questionId,
       additional,
       glowAdditional,
     }),
-  });
+  }); };
 
-  renderPileQuestionIcons = ({
+const renderPileQuestionIcons = (engine: PileViewModeEngine, {
     questionId,
     answer,
     glowAnswer,
     maskedAnswer,
     hasAdditionalContent,
-  }) => renderPileQuestionIcons({
+  }) => { return renderPileQuestionIconsView({
     questionId,
     hasAdditionalContent,
-    onToggleComments: () => this.toggleComments(questionId),
-    answerLockControl: this.renderQuestionAnswerLockControl({
+    onToggleComments: () => engine.toggleComments(questionId),
+    answerLockControl: engine.renderQuestionAnswerLockControl({
       surveyIndex: 0,
       questionId,
       answer,
       glowAnswer,
-      ...this.getAnswerLockDisplayState({
+      ...engine.getAnswerLockDisplayState({
         field: answer,
         masked: maskedAnswer,
       }),
       visualContext: 'pile',
     }),
-  });
+  }); };
 
-  renderPileFooterSection = ({
+const renderPileFooterSection = (engine: PileViewModeEngine, {
     question,
     answer,
     glowAnswer,
@@ -2418,8 +2511,8 @@ export class PileViewMode extends SurveyQuestions {
     allowDecryptAdditional,
     decryptTooltip,
     isAdditionalDecrypting,
-  }) => renderPileFooterSection({
-    sliderSection: this.renderPileSliderSection({
+  }) => { return renderPileFooterSectionView({
+    sliderSection: engine.renderPileSliderSection({
       questionId: question.id,
       showSlider,
       convictionValue,
@@ -2428,14 +2521,14 @@ export class PileViewMode extends SurveyQuestions {
       sliderMode,
       hasConvictionImportanceValue,
     }),
-    questionIcons: this.renderPileQuestionIcons({
+    questionIcons: engine.renderPileQuestionIcons({
       questionId: question.id,
       answer,
       glowAnswer,
       maskedAnswer,
       hasAdditionalContent,
     }),
-    commentsSection: this.renderPileCommentsSection({
+    commentsSection: engine.renderPileCommentsSection({
       questionId: question.id,
       showComments,
       additional,
@@ -2445,32 +2538,32 @@ export class PileViewMode extends SurveyQuestions {
       decryptTooltip,
       isAdditionalDecrypting,
     }),
-  });
+  }); };
 
-  renderPileCardShell = ({
+const renderPileCardShell = (engine: PileViewModeEngine, {
     question,
     questionComponent,
     questionContainerClass,
     footerSection,
-  }) => renderPileCardShell({
-    promptHeader: this.renderPromptWithManualDecrypt(question),
+  }) => { return renderPileCardShellView({
+    promptHeader: engine.renderPromptWithManualDecrypt(question),
     questionComponent,
     questionContainerClass,
     footerSection,
-  });
+  }); };
 
-  renderPileGatedPromptCard = ({
+const renderPileGatedPromptCard = (engine: PileViewModeEngine, {
     question,
-  }) => renderPileGatedPromptCard({
-    promptHeader: this.renderPromptWithManualDecrypt(question),
-    gatedPromptNotice: this.renderGatedPromptNotice({
+  }) => { return renderPileGatedPromptCardView({
+    promptHeader: engine.renderPromptWithManualDecrypt(question),
+    gatedPromptNotice: engine.renderGatedPromptNotice({
       question,
       tooltipIdSuffix: 'pile',
     }),
-  });
+  }); };
 
-  renderActiveQuestion = (question) => {
-    const { surveysResponseState, showComments, showConviction } = this.state;
+const renderActiveQuestion = (engine: PileViewModeEngine, question) => {
+    const { surveysResponseState, showComments, showConviction } = engine.state;
     const slice = surveysResponseState[0] || {
       answers: {},
       additionalComments: {},
@@ -2495,12 +2588,12 @@ export class PileViewMode extends SurveyQuestions {
       allowDecryptAdditional,
       isAnswerDecrypting,
       isAdditionalDecrypting,
-    } = this.getQuestionRenderDisplayState({
+    } = engine.getQuestionRenderDisplayState({
       questionId: question.id,
       responseSlice: slice,
     });
 
-    const questionComponent = this.renderPileResponseInput({
+    const questionComponent = engine.renderPileResponseInput({
       question,
       answer,
       glowAnswer,
@@ -2511,16 +2604,16 @@ export class PileViewMode extends SurveyQuestions {
     });
 
     const questionContainerClass = styles[`${question.type}QuestionContainer`] || '';
-    const promptMasked = this.isQuestionPromptMasked(question);
+    const promptMasked = engine.isQuestionPromptMasked(question);
 
     return renderPileActiveQuestionCard({
       question,
       promptMasked,
-      renderQuestionMaskedPromptCard: this.renderQuestionMaskedPromptCard,
-      promptHeader: this.renderPromptWithManualDecrypt(question),
+      renderQuestionMaskedPromptCard: engine.renderQuestionMaskedPromptCard,
+      promptHeader: engine.renderPromptWithManualDecrypt(question),
       questionComponent,
       questionContainerClass,
-      footerSection: this.renderPileFooterSection({
+      footerSection: engine.renderPileFooterSection({
         question,
         answer,
         glowAnswer,
@@ -2543,8 +2636,7 @@ export class PileViewMode extends SurveyQuestions {
     });
   };
 
-
-  renderPileViewMode = () => {
+const renderPileViewMode = (engine: PileViewModeEngine) => {
     bumpSurveyPerfCounter('renderCount');
     const {
       pileQuestions,
@@ -2556,44 +2648,44 @@ export class PileViewMode extends SurveyQuestions {
       navCounterVisible,
       showHologramAssistant,
       showListeningPanel,
-    } = this.state;
+    } = engine.state;
 
     const hiddenMaskSource = (
-      Array.isArray(this.state.allQuestionsForFilter) && this.state.allQuestionsForFilter.length > 0
+      Array.isArray(engine.state.allQuestionsForFilter) && engine.state.allQuestionsForFilter.length > 0
     )
-      ? this.state.allQuestionsForFilter
-      : (Array.isArray(this.state.questionPool) ? this.state.questionPool : []);
-    const { hiddenMaskedQuestionIds } = this.getMemoizedMaskedQuestionVisibility(hiddenMaskSource, false);
+      ? engine.state.allQuestionsForFilter
+      : (Array.isArray(engine.state.questionPool) ? engine.state.questionPool : []);
+    const { hiddenMaskedQuestionIds } = engine.getMemoizedMaskedQuestionVisibility(hiddenMaskSource, false);
 
-    const slug = resolveEffectiveSlug(this.props);
-    const firstBoot = !hasCacheHydratedFlag(this.props);
-    const recentRateLimit = this.isRecentRateLimit();
-    const hasError = !!this.props.cacheInitializationError;
+    const slug = resolveEffectiveSlug(engine.props);
+    const firstBoot = !hasCacheHydratedFlag(engine.props);
+    const recentRateLimit = engine.isRecentRateLimit();
+    const hasError = !!engine.props.cacheInitializationError;
     const progressSlug = normalizeQuestionProgressSlug(slug);
     const questionScanProgress =
-      this.props.questionScanProgress &&
-      doesQuestionProgressMatchSlug(this.props.questionScanProgress.slug, progressSlug)
-        ? this.props.questionScanProgress
+      engine.props.questionScanProgress &&
+      doesQuestionProgressMatchSlug(engine.props.questionScanProgress.slug, progressSlug)
+        ? engine.props.questionScanProgress
         : null;
     const scanProgressDisplay = buildQuestionScanProgressDisplay(questionScanProgress);
-    const pileScanDisplay = this.getPileLoadingScanDisplay(questionScanProgress, scanProgressDisplay);
+    const pileScanDisplay = engine.getPileLoadingScanDisplay(questionScanProgress, scanProgressDisplay);
     const scanTotalBlocks = scanProgressDisplay.totalBlocks;
     const scanPercent = pileScanDisplay.percentComplete;
     const isFilterActive =
-      !!this.state.isFilterActive ||
-      isSurveyToolFilterStateActive(this.state.filterState);
-    const hasFilterBaseQuestions = Array.isArray(this.state.allQuestionsForFilter) &&
-      this.state.allQuestionsForFilter.length > 0;
-    const hasSessionQuestionGate = this.hasRestrictedSessionQuestionGate(this.props);
+      !!engine.state.isFilterActive ||
+      isSurveyToolFilterStateActive(engine.state.filterState);
+    const hasFilterBaseQuestions = Array.isArray(engine.state.allQuestionsForFilter) &&
+      engine.state.allQuestionsForFilter.length > 0;
+    const hasSessionQuestionGate = engine.hasRestrictedSessionQuestionGate(engine.props);
     const pileWorkspaceViewState = buildPileWorkspaceViewState({
       pileQuestions,
       activePileIndex,
       loading,
       hiddenMaskedQuestionIds,
-      hasHiddenGatedQuestions: !!this.state.hasHiddenGatedQuestions,
+      hasHiddenGatedQuestions: !!engine.state.hasHiddenGatedQuestions,
       firstBoot,
-      cacheHasLoaded: this.props.cacheHasLoaded,
-      isQuestionCacheReady: !!this.props.isQuestionCacheReady,
+      cacheHasLoaded: engine.props.cacheHasLoaded,
+      isQuestionCacheReady: !!engine.props.isQuestionCacheReady,
       recentRateLimit,
       scanRemainingBlocks: scanProgressDisplay.remainingBlocks,
       hydrateDiscovered: questionScanProgress?.discoveredQuestions,
@@ -2601,7 +2693,7 @@ export class PileViewMode extends SurveyQuestions {
       pendingMetadataCount: questionScanProgress?.pendingMetadataCount,
       questionScanPhase: questionScanProgress?.phase,
       questionScanErrorMessage: questionScanProgress?.errorMessage,
-      isHydratingPriorResponses: this.state.isHydratingPriorResponses,
+      isHydratingPriorResponses: engine.state.isHydratingPriorResponses,
       isFilterActive,
       hasFilterBaseQuestions,
       hasSessionQuestionGate,
@@ -2620,14 +2712,14 @@ export class PileViewMode extends SurveyQuestions {
       priorResponsesHydrating,
       showMiniBackgroundSpinner,
     } = pileWorkspaceViewState;
-    const lockedGateDetails = this.getMemoizedLockedQuestionGateDetails(hiddenMaskedQuestionIds);
+    const lockedGateDetails = engine.getMemoizedLockedQuestionGateDetails(hiddenMaskedQuestionIds);
     const isStillLoading = pileWorkspaceViewState.isStillLoading;
 
     /**
      * PILE MODE — Submit button label (central helper)
      */
-    const _pileStats = this.getPendingStatsSnapshot();
-    const pileSubmitLabel = (this.props.computeSubmitLabel || computeSubmitLabel)(this, {
+    const _pileStats = engine.getPendingStatsSnapshot();
+    const pileSubmitLabel = (engine.props.computeSubmitLabel || computeSubmitLabel)(engine, {
       pendingStats: _pileStats,
     });
     const {
@@ -2642,25 +2734,28 @@ export class PileViewMode extends SurveyQuestions {
       showClearPendingButton,
     } = buildPileSubmitRailViewState({
       pendingStats: _pileStats,
-      isSubmitting: this.state.isSubmitting,
-      submittedSinceLastEdit: this.state.submittedSinceLastEdit,
-      submissionComplete: this.state.submissionComplete,
-      pileSubmitTempText: this.state.pileSubmitTempText,
+      isSubmitting: engine.state.isSubmitting,
+      submittedSinceLastEdit: engine.state.submittedSinceLastEdit,
+      submissionComplete: engine.state.submissionComplete,
+      pileSubmitTempText: engine.state.pileSubmitTempText,
       pileSubmitLabel,
-      account: this.props.account,
+      account: engine.props.account,
       isAddress: utils.isAddress,
     });
 
     const gatedEmptyHasDetails = lockedGateDetails.length > 0;
-    const gatedEmptyRequirementSentence = this.getLockedGateRequirementSentence(lockedGateDetails);
-    const sessionGateDetails = gatedEmptyHasDetails
+    const gatedEmptyRequirementSentence = engine.getLockedGateRequirementSentence(lockedGateDetails);
+    const inheritedSessionGateDetails = gatedEmptyHasDetails
       ? lockedGateDetails
-      : this.buildSessionQuestionGateDetails(1);
-    const sessionGateRequirementSentence = this.getLockedGateRequirementSentence(sessionGateDetails);
+      : engine.buildSessionQuestionGateDetails(1);
+    const sessionGateDetails = inheritedSessionGateDetails.length > 0
+      ? inheritedSessionGateDetails
+      : buildPileSessionGateDetails(engine, 1);
+    const sessionGateRequirementSentence = engine.getLockedGateRequirementSentence(sessionGateDetails);
     const gatedEmptyPanel = hiddenMaskedQuestionIds.length > 0
       ? (
         <div className={styles.gatedEmptyPanelShell}>
-          {this.renderLockedQuestionsPanel({
+          {engine.renderLockedQuestionsPanel({
             hiddenMaskedQuestionIds,
             lockedGateDetails,
             title: `This session's questions are ${t('gatedLower')}`,
@@ -2692,14 +2787,14 @@ export class PileViewMode extends SurveyQuestions {
           <div className={styles.pileWrapper}>
             {renderPileInteractionSurface({
               showHologramAssistant,
-              toggleHologramAssistant: this.toggleHologramAssistant,
+              toggleHologramAssistant: engine.toggleHologramAssistant,
               showMiniBackgroundSpinner,
               priorResponsesHydrating,
               showLongLoading,
-              loadingElapsedSec: this.state.loadingElapsedSec,
+              loadingElapsedSec: engine.state.loadingElapsedSec,
               pileQuestions,
               activePileIndex,
-              renderActiveQuestion: this.renderActiveQuestion,
+              renderActiveQuestion: engine.renderActiveQuestion,
               hasTerminalScanError,
               scanErrorMessage,
               hasError,
@@ -2714,38 +2809,38 @@ export class PileViewMode extends SurveyQuestions {
               showGatedEmptyState,
               gatedEmptyPanel,
               isFilterActive,
-              toggleFilterModal: this.toggleFilterModal,
+              toggleFilterModal: engine.toggleFilterModal,
               showCreate,
-              toggleCreate: this.toggleCreate,
+              toggleCreate: engine.toggleCreate,
               showListeningPanel,
-              toggleListeningPanel: this.toggleListeningPanel,
-              onViewAllClick: this.props.onViewAllClick,
-              handleViewAllFromPile: this.handleViewAllFromPile,
+              toggleListeningPanel: engine.toggleListeningPanel,
+              onViewAllClick: engine.props.onViewAllClick,
+              handleViewAllFromPile: engine.handleViewAllFromPile,
               pileTopRailVisible,
               showSuccessBadgeLink,
               pileSubmitResponderHref,
               showSuccessBadgeStatus,
               showSubmitButton,
-              handlePileSubmitClick: this.handlePileSubmitClick,
+              handlePileSubmitClick: engine.handlePileSubmitClick,
               hasPendingPileChanges,
               shouldHidePileSubmitButton,
-              isSubmitting: this.state.isSubmitting,
+              isSubmitting: engine.state.isSubmitting,
               activePromptMasked,
               finalSubmitText,
               showClearPendingButton,
-              handleRevertPendingChanges: this.handleRevertPendingChanges,
+              handleRevertPendingChanges: engine.handleRevertPendingChanges,
               navCounterVisible,
-              handlePrev: this.handlePrev,
-              handleNext: this.handleNext,
+              handlePrev: engine.handlePrev,
+              handleNext: engine.handleNext,
             })}
           </div>
           {showListeningAside && (
-            <div className={styles.sessionListeningPanelAnchor} ref={this.listeningPanelRef}>
+            <div className={styles.sessionListeningPanelAnchor} ref={engine.listeningPanelRef}>
               <React.Suspense fallback={<LazyFallback label="Loading Listening Panel..." minHeight="160px" />}>
                 <LazySessionListeningPanel
-                  {...this.props}
-                  {...this.getAudioInputWorkerProps()}
-                  onClose={this.closeListeningPanel}
+                  {...engine.props}
+                  {...engine.getAudioInputWorkerProps()}
+                  onClose={engine.closeListeningPanel}
                 />
               </React.Suspense>
             </div>
@@ -2753,10 +2848,10 @@ export class PileViewMode extends SurveyQuestions {
         </div>
 
         {!showHologramAssistant && showCreate && (
-          <div className={styles.pileFullControls} ref={this.createSectionRef}>
+          <div className={styles.pileFullControls} ref={engine.createSectionRef}>
             <React.Suspense fallback={<LazyFallback label="Loading Question Authoring..." minHeight="160px" />}>
               <LazyPileCreateQuestionsAndSurveys
-                {...this.props}
+                {...engine.props}
                 hideSurveyQuestionToggleUntilAuthoring={true}
               />
             </React.Suspense>
@@ -2765,31 +2860,39 @@ export class PileViewMode extends SurveyQuestions {
 
         <QuestionFilter
           filterModalOpen={filterModalOpen}
-          toggleFilterModal={this.toggleFilterModal}
-          questions={this.state.allQuestionsForFilter}
-          questionResponses={this.getPileFilterQuestionResponses()}
-          onFilter={this.handleFilter}
-          onFilterActivityChange={this.handlePileFilterActivityChange}
-          filterState={this.state.filterState}
+          toggleFilterModal={engine.toggleFilterModal}
+          questions={engine.state.allQuestionsForFilter}
+          questionResponses={engine.getPileFilterQuestionResponses()}
+          onFilter={engine.handleFilter}
+          onFilterActivityChange={engine.handlePileFilterActivityChange}
+          filterState={engine.state.filterState}
           enableLocalStorage={true}
           currentViewModeForUrl={'questions'}
           currentSurveyIdForUrl={null}
-          provider={this.props.provider}
-          network={this.props.network}
-          activeSessionSlug={getActiveSessionSlugFromProps(this.props)}
-          defaultFilterState={this.props.defaultFilterState}
-          defaultTags={this.props.defaultTags}
-          defaultFeaturedSBTs={this.props.defaultFeaturedSBTs}
-          isQuestionCacheReady={this.props.isQuestionCacheReady}
-          isSurveyCacheReady={this.props.isSurveyCacheReady}
-          isSBTCacheReady={this.props.isSBTCacheReady}
-          questionResponsesNonce={this.props.questionResponsesNonce}
-          questionsCacheNonce={this.props.questionsCacheNonce}
-          storageKeyPrefix={buildQuestionFilterStorageKeyPrefix(this.props, resolveEffectiveSlug(this.props))}
+          provider={engine.props.provider}
+          network={engine.props.network}
+          activeSessionSlug={getActiveSessionSlugFromProps(engine.props)}
+          defaultFilterState={engine.props.defaultFilterState}
+          defaultTags={engine.props.defaultTags}
+          defaultFeaturedSBTs={engine.props.defaultFeaturedSBTs}
+          isQuestionCacheReady={engine.props.isQuestionCacheReady}
+          isSurveyCacheReady={engine.props.isSurveyCacheReady}
+          isSBTCacheReady={engine.props.isSBTCacheReady}
+          questionResponsesNonce={engine.props.questionResponsesNonce}
+          questionsCacheNonce={engine.props.questionsCacheNonce}
+          storageKeyPrefix={buildQuestionFilterStorageKeyPrefix(engine.props, resolveEffectiveSlug(engine.props))}
         />
       </div>
     );
   };
+
+export function PileViewMode(props: any): React.ReactElement {
+  return (
+    <SurveyQuestions
+      {...props}
+      runtimeStrategy={props?.runtimeStrategy || createPileViewRuntimeStrategy()}
+    />
+  );
 }
 
 export default PileViewMode;
