@@ -115,44 +115,18 @@ describe('sessionFallbackRedirect', () => {
   });
 
   describe('getFirstVisitRootRedirectTarget', () => {
-    it('uses the derived primary slug in list mode', () => {
-      const derivePrimarySessionSlugFromList = jest.fn(() => 'edge');
-      const getSessionFallbackScopeSlugs = jest.fn(() => ['', 'edge', 'alpha']);
-
+    it('uses the public about route when enabled', () => {
       expect(getFirstVisitRootRedirectTarget({
         isFirstVisitRootRedirectEnabled: () => true,
-        readSessionScanScope: () => 'list',
-        getSessionFallbackScopeSlugs,
-        derivePrimarySessionSlugFromList,
       })).toEqual({
-        slug: 'edge',
-        path: '/session/edge',
+        path: '/about',
       });
-      expect(derivePrimarySessionSlugFromList).toHaveBeenCalledWith(['', 'edge', 'alpha']);
     });
 
     it('returns null when disabled', () => {
-      const readSessionScanScope = jest.fn(() => 'list');
-
       expect(getFirstVisitRootRedirectTarget({
         isFirstVisitRootRedirectEnabled: () => false,
-        readSessionScanScope,
-        getSessionFallbackScopeSlugs: jest.fn(() => ['edge']),
-        derivePrimarySessionSlugFromList: jest.fn(() => 'edge'),
       })).toBeNull();
-      expect(readSessionScanScope).not.toHaveBeenCalled();
-    });
-
-    it('defaults to demo outside list mode', () => {
-      expect(getFirstVisitRootRedirectTarget({
-        isFirstVisitRootRedirectEnabled: () => true,
-        readSessionScanScope: () => 'active',
-        getSessionFallbackScopeSlugs: jest.fn(() => ['edge']),
-        derivePrimarySessionSlugFromList: jest.fn(() => 'edge'),
-      })).toEqual({
-        slug: 'demo',
-        path: '/session/demo',
-      });
     });
   });
 
