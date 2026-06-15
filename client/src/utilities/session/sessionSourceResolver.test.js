@@ -4,6 +4,7 @@ import {
   findDemoSessionByWorkerUrl,
   getAllDemoSessionConfigs,
   getDefaultSessionConfig,
+  getDemoSessionConfigForDisplay,
   resolveSessionSlugAlias,
 } from './sessionSourceResolver.js';
 
@@ -30,6 +31,10 @@ describe('sessionSourceResolver', () => {
     expect(config).toEqual(expect.any(Object));
     expect(config?.slug ?? '').toBe('');
     expect(typeof config?.sessionName).toBe('string');
+  });
+
+  it('treats /session/demo as a display alias for the default demo config', () => {
+    expect(getDemoSessionConfigForDisplay('demo')).toEqual(getDefaultSessionConfig());
   });
 
   it('returns all demo sessions as normalized [key, config] pairs', () => {

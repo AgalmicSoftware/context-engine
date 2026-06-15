@@ -111,6 +111,7 @@ broadcast/
 /tmp/
 /tmp-launch-channel-chrome.js
 /node-compile-cache/
+**/node-compile-cache/
 /ce-hook-*/
 /ce-install-*/
 /ce-router-*/
@@ -172,6 +173,7 @@ workers/agentBridgeWorker/**/*.pem
 workers/agentBridgeWorker/**/*.jwt
 
 # E2E test layer (stripped from public release)
+scripts/.tmp-*/
 scripts/test-*.js
 scripts/test-*.ui.js
 scripts/lib/e2e/

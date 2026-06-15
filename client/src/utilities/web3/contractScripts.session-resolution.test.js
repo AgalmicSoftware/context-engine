@@ -78,11 +78,18 @@ describe('contractScripts session resolution helpers', () => {
   it('keeps demo-only helper defaults fail-closed in on-chain mode', () => {
     expect(demoSessions.general.slug).toBe('');
     expect(getDemoSessionConfigBySlug(' GeNeRal!!! ')).toBeNull();
+    expect(getDemoSessionConfigBySlug('demo')).toBeNull();
     expect(getDemoSessionConfigBySlug('DEBATE')).toBeNull();
   });
 
   it('still allows explicit demo fallback for compatibility readers that opt in', () => {
     expect(getDemoSessionConfigBySlug(' GeNeRal!!! ', { allowDemoFallback: true })).toEqual(
+      expect.objectContaining({
+        slug: '',
+        sessionName: 'Context Engine',
+      })
+    );
+    expect(getDemoSessionConfigBySlug('demo', { allowDemoFallback: true })).toEqual(
       expect.objectContaining({
         slug: '',
         sessionName: 'Context Engine',
