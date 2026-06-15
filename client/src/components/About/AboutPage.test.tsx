@@ -36,6 +36,9 @@ describe('AboutPage', () => {
     const newSessionLink = within(hero).getByRole('link', { name: /New Session/i });
 
     expect(hero).toBeInTheDocument();
+    expect(within(hero).getByText(
+      'An open-source toolkit for deliberation, sensemaking, and negotiation (for humans and ai agents)'
+    )).toBeVisible();
     expect(demoLink).toHaveAttribute(
       'href',
       getAboutDemoSessionPath()
