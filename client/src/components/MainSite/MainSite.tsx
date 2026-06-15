@@ -1082,9 +1082,6 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
 
   getFirstVisitRootRedirectTarget = () => getFirstVisitRootRedirectTargetFn({
     isFirstVisitRootRedirectEnabled: this.isFirstVisitRootRedirectEnabled,
-    readSessionScanScope,
-    getSessionFallbackScopeSlugs: this.getSessionFallbackScopeSlugs,
-    derivePrimarySessionSlugFromList,
   });
 
   getSessionFallbackRedirectStorageKey = (slugIn: unknown = '') => (
