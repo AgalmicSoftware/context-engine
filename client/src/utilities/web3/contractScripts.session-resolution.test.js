@@ -105,6 +105,12 @@ describe('contractScripts session resolution helpers', () => {
         }),
       }),
     );
+    expect(getDemoSessionConfigBySlug('demo', { allowDemoFallback: true })).toEqual(
+      expect.objectContaining({
+        slug: '',
+        sessionName: 'Context Engine',
+      })
+    );
     expect(getDemoSessionConfigBySlug('DEBATE', { allowDemoFallback: true })).toBeNull();
   });
 

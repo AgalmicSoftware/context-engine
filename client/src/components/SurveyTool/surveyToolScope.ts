@@ -126,7 +126,8 @@ export const resolveEffectiveSlug = (props: SurveyToolScopeProps = {}): string =
     activeSessionSlug: props.activeSessionSlug as string | null | undefined,
     sessionSlug: props.sessionSlug as string | null | undefined,
     sessionSlugPinned: props.sessionSlugPinned === true,
-  });
+  })
+);
 
 export const resolveCurrentTagSessionSlug = ({
   props = {},

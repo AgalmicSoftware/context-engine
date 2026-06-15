@@ -100,6 +100,46 @@ describe('client package modernization contract', () => {
     expect(viteConfig).not.toContain("outDir: path.resolve(__dirname, 'build-vite')");
     expect(viteIndex).toContain('__PUBLIC_URL__');
     expect(viteIndex).toContain('/src/viteEntry.js');
+    expect(viteEntry).toContain("import 'assets/css/contextEngine.scss';");
+    expect(viteEntry).toContain("import('./index.js')");
+    expect(appEntry).not.toContain("import 'assets/css/contextEngine.scss';");
+    expect(legacyOutputCleaner).toContain("const legacyOutputDirs = ['build-vite', 'vite-build']");
+    expect(legacyOutputCleaner).toContain('fs.rmSync(targetDir, { recursive: true, force: true })');
+    expect(contractSourceLoader).toContain('.sol?raw');
+    expect(contractSourceLoader).not.toContain('!!raw-loader!');
+  });
+
+  it('keeps Vite vendor chunk policy explicit', () => {
+    const viteConfig = readClientFile('vite.config.mjs');
+    const expectedVendorChunks = [
+      'vendor-react',
+      'vendor-ethers',
+      'vendor-wallet-core',
+      'vendor-wallet-connectors',
+      'vendor-lit',
+      'vendor-arweave',
+      'vendor-visualization',
+      'vendor-canvas',
+      'vendor-crypto-core',
+      'vendor-crypto-zk-poseidon-low',
+      'vendor-crypto-zk-poseidon-high',
+      'vendor-crypto-zk',
+      'vendor-media-canvas-export',
+      'vendor-media-pdf',
+      'vendor-media-audio',
+      'vendor-ui',
+      'vendor-polyfills',
+      'vendor-misc',
+    ];
+
+    expect(viteConfig).toContain('export const resolveManualChunk');
+    expect(viteConfig).toContain('manualChunks: resolveManualChunk');
+    expectedVendorChunks.forEach((chunkName) => {
+      expect(viteConfig).toContain(chunkName);
+    });
+    expect(viteConfig).toContain("'/node_modules/hash.js/'");
+    expect(viteConfig).toContain("'/node_modules/inherits/'");
+    expect(viteConfig).toContain("'/node_modules/minimalistic-assert/'");
   });
 
   it('keeps Vite browser polyfill dependencies limited to imported runtime shims', () => {

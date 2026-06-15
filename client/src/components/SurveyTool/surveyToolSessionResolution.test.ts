@@ -67,6 +67,15 @@ describe('surveyToolSessionResolution', () => {
     ).toBe('');
   });
 
+  it('lets pinned embedded callers override the browser session path with the default slug', () => {
+    expect(resolveSurveyToolEffectiveSlug({
+      pathname: '/session/demo',
+      activeSessionSlug: 'demo',
+      sessionSlug: '',
+      sessionSlugPinned: true,
+    })).toBe('');
+  });
+
   it('prefers explicit route or prop session context over inferred draft slugs', () => {
     const resolveBySlug = makeResolveBySlug((slug) =>
       slug === 'edge' ? { slug: 'edge', networkChainId: 84532 } : null,

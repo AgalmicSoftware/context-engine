@@ -5,17 +5,7 @@ export type SessionFallbackRedirectTarget = {
 
 export type FirstVisitRootRedirectTarget = {
   path: string;
-  cacheSlug?: string;
-  requiresPersistedCache?: boolean;
 };
-
-type FirstVisitRootRedirectStorage =
-  | {
-      getItem: (key: string) => string | null;
-      setItem: (key: string, value: string) => void;
-    }
-  | null
-  | undefined;
 
 type SessionFallbackRedirectStorageTarget = {
   slug?: string;
@@ -125,64 +115,6 @@ export const getFirstVisitRootRedirectTarget = (deps: {
   isFirstVisitRootRedirectEnabled: () => boolean;
 }): FirstVisitRootRedirectTarget | null => {
   if (!deps.isFirstVisitRootRedirectEnabled()) return null;
-
-  return {
-    path: '/about',
-  };
-};
-
-const getTemporaryInitialLoadSessionCacheSlug = (
-  normalizedPath: string,
-  normalizeSessionSlug: NormalizeSessionSlugFn,
-): string => {
-  if (!normalizedPath.startsWith('/session/')) return '';
-  const token = normalizedPath.slice('/session/'.length).split('/')[0];
-  return normalizeSessionSlug(token || '');
-};
-
-// Temporary demo-launch guard: root loads go to /about, and cached session
-// document loads may go to /about while stale pages retire.
-export const isTemporaryInitialLoadAboutRedirectPath = (
-  pathIn: unknown,
-  deps: { normalizeRoutePath: NormalizeSessionSlugFn },
-): boolean => {
-  const path = deps.normalizeRoutePath(pathIn || '');
-  if (path === '/') return true;
-  if (!path.startsWith('/session/')) return false;
-  return path !== '/session/new' && !path.startsWith('/session/new/');
-};
-
-export const getTemporaryInitialLoadAboutRedirectTarget = (deps: {
-  isFirstVisitRootRedirectEnabled: () => boolean;
-  isTemporaryInitialLoadAboutRedirectSessionSlug?: (slug: string) => boolean;
-  normalizeRoutePath: NormalizeSessionSlugFn;
-  normalizeSessionSlug: NormalizeSessionSlugFn;
-  pathIn: unknown;
-}): FirstVisitRootRedirectTarget | null => {
-  if (!deps.isFirstVisitRootRedirectEnabled()) return null;
-  const path = deps.normalizeRoutePath(deps.pathIn || '');
-  if (
-    !isTemporaryInitialLoadAboutRedirectPath(path, {
-      normalizeRoutePath: deps.normalizeRoutePath,
-    })
-  ) {
-    return null;
-  }
-
-  const cacheSlug = getTemporaryInitialLoadSessionCacheSlug(path, deps.normalizeSessionSlug);
-  if (cacheSlug) {
-    if (
-      typeof deps.isTemporaryInitialLoadAboutRedirectSessionSlug === 'function' &&
-      !deps.isTemporaryInitialLoadAboutRedirectSessionSlug(cacheSlug)
-    ) {
-      return null;
-    }
-    return {
-      path: '/about',
-      cacheSlug,
-      requiresPersistedCache: true,
-    };
-  }
 
   return {
     path: '/about',

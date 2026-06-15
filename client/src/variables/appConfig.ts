@@ -85,11 +85,15 @@ export const CE_GETLOGS_MAX_CONCURRENCY = readPublicIntEnv('REACT_APP_CE_GETLOGS
 export const CE_GETLOGS_MAX_RETRIES = readPublicIntEnv('REACT_APP_CE_GETLOGS_MAX_RETRIES', 2);
 
 // RPC guardrails (defaults). Most are runtime-toggleable via URL/localStorage/globalThis; see docs/path-rpc.md.
-export const CE_SESSION_SCAN_SCOPE = readPublicEnv('REACT_APP_CE_SESSION_SCAN_SCOPE', DEFAULT_SESSION_SCAN_SCOPE); // all|active|general|list
-export const CE_SESSION_SCAN_SLUGS = readPublicListEnv('REACT_APP_CE_SESSION_SCAN_SLUGS', [
-  ...DEFAULT_SESSION_SCAN_SLUGS,
-]); // used when CE_SESSION_SCAN_SCOPE="list" (array of session slugs, use "general" or "" for default; can also use demoSession keys/names when demo-alias toggle is enabled)
-// When true, initial "/" loads auto-open About, and cached session document loads can migrate there.
+export const CE_SESSION_SCAN_SCOPE = readPublicEnv(
+  'REACT_APP_CE_SESSION_SCAN_SCOPE',
+  DEFAULT_SESSION_SCAN_SCOPE
+); // all|active|general|list
+export const CE_SESSION_SCAN_SLUGS = readPublicListEnv(
+  'REACT_APP_CE_SESSION_SCAN_SLUGS',
+  [...DEFAULT_SESSION_SCAN_SLUGS]
+); // used when CE_SESSION_SCAN_SCOPE="list" (array of session slugs, use "general" or "" for default; can also use demoSession keys/names when demo-alias toggle is enabled)
+// When true, first-time visits to "/" auto-open the public About page.
 export const CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED = readPublicBoolEnv(
   'REACT_APP_CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED',
   true,
