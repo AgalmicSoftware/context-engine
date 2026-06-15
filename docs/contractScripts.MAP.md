@@ -55,7 +55,7 @@ contractScripts.js  [CJS compatibility barrel for jest.spyOn]
 
 ### `sessionRegistry.ts`
 - Owns session registry reads, cache hydration, and typed normalization of registry-derived session metadata.
-- Preserves configured chain and Lit chain values when resolving sessions so OP Sepolia can be the default target while Base Sepolia remains supported for legacy and local development.
+- Preserves configured chain and Lit chain values when resolving sessions so OP Sepolia stays the default target while Base Sepolia remains best-effort for legacy and local development.
 - Provides the session-config surface consumed by `contractScripts.impl.ts` before provider, decrypt, worker, and contract-address decisions.
 
 ### `contractHelpers.ts`
