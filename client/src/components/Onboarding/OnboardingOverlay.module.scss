@@ -402,7 +402,7 @@
   .panel {
     --modal-panel-pad-x: 14px;
     --modal-panel-pad-top: 18px;
-    --modal-panel-pad-bottom: 70px;
+    --modal-panel-pad-bottom: 158px;
   }
 
   .onboardingTitle {
@@ -417,14 +417,21 @@
   }
 
   .onboardingControls {
-    position: static;
-    align-self: stretch;
-    width: 100%;
+    position: absolute;
+    top: auto;
+    right: calc(-1 * var(--modal-panel-pad-x));
+    bottom: calc(-1 * var(--modal-panel-pad-bottom));
+    left: calc(-1 * var(--modal-panel-pad-x));
+    transform: none;
+    z-index: 3;
+    width: auto;
     min-width: 0;
-    min-height: 84px;
-    height: 84px;
+    min-height: 76px;
+    height: 76px;
     gap: 0;
     grid-template-rows: none;
+    overflow: hidden;
+    background: transparent;
   }
 
   .onboardingControlsDualArrow {
@@ -460,8 +467,12 @@
   .takeSurveyButton {
     width: 100%;
     font-size: 1.1em;
-    background: rgba(0, 0, 0, 0.46);
-    color: rgba(255, 255, 255, 0.82);
+    background: rgba(139, 183, 150, 0.42);
+    color: rgba(16, 43, 35, 0.82);
+  }
+
+  .skipButton {
+    bottom: 98px;
   }
 
   .takeSurveyIcon {
@@ -481,7 +492,9 @@
   }
 
   .panel {
-    padding: 16px 10px 64px;
+    --modal-panel-pad-x: 10px;
+    --modal-panel-pad-bottom: 138px;
+    padding: 16px 10px var(--modal-panel-pad-bottom);
   }
 
   .panelFrame {
@@ -490,11 +503,17 @@
   }
 
   .skipButton {
-    bottom: 12px;
+    bottom: 82px;
     left: 50%;
     height: 46px;
     padding: 0 18px;
     font-size: 0.9rem;
+  }
+
+  .onboardingControls {
+    bottom: calc(-1 * var(--modal-panel-pad-bottom));
+    min-height: 62px;
+    height: 62px;
   }
 
   .onboardingTitle {
