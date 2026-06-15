@@ -10,6 +10,7 @@ import {
   faBuilding,
   faChalkboardTeacher,
   faCity,
+  faPlay,
   faUsers,
 } from '@fortawesome/free-solid-svg-icons';
 import styles from './AboutPage.module.scss';
@@ -50,6 +51,11 @@ type RecognitionIndividual = {
 const HEADER_LINKS = [
   { url: PUBLIC_WHITEPAPER_URL, text: 'Whitepaper', testId: 'ce-about-link-whitepaper' },
 ];
+
+const ABOUT_DEMO_VIDEO_VIEW_URL = 'https://drive.google.com/file/d/1nss6RZnF4yFwMFE6kjSW3ESi3ImpMcnf/view';
+const ABOUT_DEMO_VIDEO_EMBED_URL = 'https://drive.google.com/file/d/1nss6RZnF4yFwMFE6kjSW3ESi3ImpMcnf/preview';
+const ABOUT_DEMO_VIDEO_MEDIA_URL = buildPublicRoute('/about-demo.mp4');
+const ABOUT_DEMO_VIDEO_THUMBNAIL_URL = 'https://drive.google.com/thumbnail?id=1nss6RZnF4yFwMFE6kjSW3ESi3ImpMcnf&sz=w1000';
 
 const RECOGNITION_GROUPS: RecognitionGroup[] = [
   {
@@ -108,14 +114,6 @@ const RECOGNITION_GROUPS: RecognitionGroup[] = [
       'Residencies like the d/acc residency at Edge Patagonia, sponsored by Protocol Labs, created space to prototype tools for resilient technology, coordination, and governance in live community settings.',
     links: [
       { url: 'https://www.edgecity.live/patagonia', text: 'Edge City' },
-    ],
-  },
-  {
-    name: 'Loophole',
-    description:
-      'Loophole is a useful way to stress-test rules and reason about policy proposals. Context Engine uses it to enrich the debate atlas with concrete loophole, overreach, and patch-comparison cases people can inspect and debate.',
-    links: [
-      { url: 'https://github.com/brendanhogan/loophole', text: 'GitHub Repo' },
     ],
   },
 ];
@@ -223,8 +221,11 @@ const AboutPage = () => {
   const [showPresent, setShowPresent] = useState(false);
   const [showRoadmap, setShowRoadmap] = useState(false);
   const [showRecognition, setShowRecognition] = useState(true);
+  const [mobileDemoVideoStarted, setMobileDemoVideoStarted] = useState(false);
+  const [mobileDemoVideoError, setMobileDemoVideoError] = useState('');
   const [demoSessionPath, setDemoSessionPath] = useState(() => getAboutDemoSessionPath());
   const useCaseDetailRef = useRef<HTMLElement | null>(null);
+  const mobileDemoVideoRef = useRef<HTMLVideoElement | null>(null);
   const activeUseCaseConfig = USE_CASES.find(({ slug }) => slug === activeUseCase) || null;
   const configuredRecognitionIndividuals = getConfiguredRecognitionIndividuals(RECOGNIZED_INDIVIDUALS);
   const hasRecognizedIndividuals = configuredRecognitionIndividuals.length > 0;
@@ -245,6 +246,22 @@ const AboutPage = () => {
 
   const closeRecognitionModal = () => {
     setActiveRecognition(null);
+  };
+
+  const handleMobileDemoVideoPlay = async () => {
+    const video = mobileDemoVideoRef.current;
+    if (!video) return;
+
+    setMobileDemoVideoError('');
+
+    try {
+      video.load();
+      await video.play();
+      setMobileDemoVideoStarted(true);
+    } catch (error) {
+      setMobileDemoVideoStarted(false);
+      setMobileDemoVideoError('Could not start the embedded video here.');
+    }
   };
 
   useEffect(() => {
@@ -329,7 +346,7 @@ const AboutPage = () => {
               </a>
             </div>
             <p className={styles.tagline}>
-              An open-source toolkit for deliberation, sensemaking, and negotiation (for humans and ai agents)
+              An open-source toolkit for deliberation, sensemaking, and negotiation (for humans and AI agents)
             </p>
 
             <div className={styles.heroActions}>
@@ -368,12 +385,67 @@ const AboutPage = () => {
 
           <div className={styles.heroVideo}>
             <iframe
-              src="https://drive.google.com/file/d/1nss6RZnF4yFwMFE6kjSW3ESi3ImpMcnf/preview"
+              src={ABOUT_DEMO_VIDEO_EMBED_URL}
               className={styles.demoVideo}
               allow="autoplay"
               allowFullScreen
               title="Context Engine demo video"
+              data-testid="ce-about-demo-video-desktop"
             />
+            <div className={styles.mobileDemoVideo} data-testid="ce-about-demo-video-mobile">
+              <div className={styles.mobileDemoVideoPlayerWrap}>
+                <video
+                  ref={mobileDemoVideoRef}
+                  className={styles.mobileDemoVideoPlayer}
+                  controls
+                  playsInline
+                  preload="none"
+                  poster={ABOUT_DEMO_VIDEO_THUMBNAIL_URL}
+                  src={ABOUT_DEMO_VIDEO_MEDIA_URL}
+                  data-testid="ce-about-demo-video-player"
+                  aria-label="Context Engine demo video player"
+                  onPlay={() => {
+                    setMobileDemoVideoStarted(true);
+                    setMobileDemoVideoError('');
+                  }}
+                  onError={() => {
+                    setMobileDemoVideoStarted(false);
+                    setMobileDemoVideoError('Could not start the embedded video here.');
+                  }}
+                >
+                  <a href={ABOUT_DEMO_VIDEO_VIEW_URL} target="_blank" rel="noopener noreferrer">
+                    Open the Context Engine demo video in Google Drive.
+                  </a>
+                </video>
+                {!mobileDemoVideoStarted && (
+                  <button
+                    type="button"
+                    className={styles.mobileDemoVideoPlayButton}
+                    onClick={handleMobileDemoVideoPlay}
+                    aria-label="Play Context Engine demo video"
+                    data-testid="ce-about-demo-video-play"
+                  >
+                    <span className={styles.mobileDemoVideoPlayIcon} aria-hidden="true">
+                      <FontAwesomeIcon icon={faPlay} />
+                    </span>
+                  </button>
+                )}
+              </div>
+              {mobileDemoVideoError && (
+                <p className={styles.mobileDemoVideoStatus} role="alert">
+                  {mobileDemoVideoError}
+                </p>
+              )}
+              <a
+                href={ABOUT_DEMO_VIDEO_VIEW_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={styles.mobileDemoVideoFallbackLink}
+                data-testid="ce-about-demo-video-drive-link"
+              >
+                Open in Google Drive
+              </a>
+            </div>
           </div>
         </section>
 

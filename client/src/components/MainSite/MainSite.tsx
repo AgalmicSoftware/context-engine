@@ -157,6 +157,7 @@ import {
   resolveMainSiteRouteSessionIdHint,
   resolveMainSiteRouteSessionSlugHint,
   resolveMainSiteSessionRouteContext,
+  resolveMainSiteSessionRouteSourceSlug,
   resolveMainSiteSessionSlugFromProps,
   resolveMainSiteSessionSlugFromPathToken,
 } from './routeSessionResolution.js';
@@ -1380,6 +1381,26 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
   getActiveSessionSlug = () => (
     this.getSessionSlugFromState() || this.getInitialGroupSlugFromPath()
   );
+
+  getActiveSessionSourceSlug = () => {
+    const path = this.getEffectiveRoutePath(
+      (typeof window !== 'undefined' ? window.location.pathname : '') || this.props.path || ''
+    );
+    const sessionTokenRaw = this.getSessionTokenFromPath(path);
+    if (!sessionTokenRaw) return this.getActiveSessionSlug();
+
+    const sessionSlug = this.resolveSessionSlugFromPathToken(sessionTokenRaw, { allowAsyncResolve: false }) || '';
+    const strictConfig = (
+      sessionRegistryStore.getSessionConfig(sessionSlug) ||
+      getSessionConfigBySlug(sessionSlug)
+    );
+    const displayConfig = strictConfig || getDemoSessionConfigBySlug(sessionSlug, { allowDemoFallback: true });
+    return resolveMainSiteSessionRouteSourceSlug({
+      sessionTokenRaw,
+      sessionSlug,
+      sessionConfig: displayConfig,
+    });
+  };
 
   getBootstrapActiveSessionSlug = (pathIn = '', searchIn = ''): string => {
     const path = this.getEffectiveRoutePath(
@@ -4621,7 +4642,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     (...args) => this._sbtCacheController.onSbtTransferDetectedForGroup(...args);
 
   initializeSurveyCache = async () => {
-    return this.initializeSurveyCacheWithGeneralBackfill(this.getActiveSessionSlug());
+    return this.initializeSurveyCacheWithGeneralBackfill(this.getActiveSessionSourceSlug());
   };
 
   initializeSurveyCacheWithGeneralBackfill = async (slugIn: unknown) => {
@@ -4638,7 +4659,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
 
 
   initializeQuestionCache = async () => {
-    return this.initializeQuestionCacheWithGeneralBackfill(this.getActiveSessionSlug());
+    return this.initializeQuestionCacheWithGeneralBackfill(this.getActiveSessionSourceSlug());
   };
 
   initializeQuestionCacheWithGeneralBackfill = async (slugIn: unknown) => {
@@ -4654,7 +4675,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     (...args) => this._questionCacheController.initializeQuestionCacheForGroup(...args);
 
   fetchQuestionResponsesChunked = async () => {
-    return this.fetchQuestionResponsesChunkedWithGeneralBackfill(this.getActiveSessionSlug());
+    return this.fetchQuestionResponsesChunkedWithGeneralBackfill(this.getActiveSessionSourceSlug());
   };
 
   fetchQuestionResponsesChunkedWithGeneralBackfill = async (slugIn: unknown) => {
@@ -5993,6 +6014,11 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
       return <div />;
     }
 
+    const sessionRouteSourceSlug = resolveMainSiteSessionRouteSourceSlug({
+      sessionTokenRaw,
+      sessionSlug: slug,
+      sessionConfig,
+    });
     const resolvedSessionInfo = this.getSessionInfoForGroup(sessionConfig, sessionConfig?.slug || slug);
     const resolvedSessionName = this.getSessionNameForGroup(sessionConfig, sessionConfig?.slug || slug);
     const resolvedSessionHeader = this.getSessionHeaderForGroup(sessionConfig, sessionConfig?.slug || slug);
@@ -6022,9 +6048,12 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
               network={defaultSessionNetwork}
               {...loginViewProps}
               {...sessionCacheViewProps}
-              refreshSurveyResponsesByID={this.refreshSurveyResponsesByID}
-              refreshQuestionMetadata={this.refreshQuestionMetadata}
-              refreshQuestionResponses={this.refreshQuestionResponses}
+              refreshSurveyResponsesByID={(id: string) => this.refreshSurveyResponsesByIDForGroup(sessionRouteSourceSlug, id)}
+              refreshQuestionMetadata={(opts = {}) => this.refreshQuestionMetadataForGroup(sessionRouteSourceSlug, opts)}
+              refreshQuestionResponses={(questionIds?: string[] | null, opts: RefreshQuestionResponsesOptions = {}) =>
+                this.refreshQuestionResponses(questionIds, { ...(opts || {}), slug: sessionRouteSourceSlug })
+              }
+              questionSessionSlug={sessionRouteSourceSlug}
               refreshSbtData={this.refreshSbtData}
               ensureLightSbtDiscovery={this.ensureLightSbtDiscovery}
               ensureLightSbtUniverse={this.ensureLightSbtUniverse}
@@ -6280,7 +6309,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     this._surveyCacheController.refreshSurveyResponsesByIDForGroup(slug, surveyID);
 
   refreshQuestionMetadata = async (opts = {}): Promise<void> =>
-    this.refreshQuestionMetadataForGroup(this.getActiveSessionSlug(), opts);
+    this.refreshQuestionMetadataForGroup(this.getActiveSessionSourceSlug(), opts);
 
   hasMaskedQuestionPayloadInCache: HasMaskedQuestionPayloadInCacheFn = (slug) =>
     this._questionCacheController.hasMaskedQuestionPayloadInCache(slug);
