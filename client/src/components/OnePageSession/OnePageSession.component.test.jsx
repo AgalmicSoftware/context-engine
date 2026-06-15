@@ -1001,6 +1001,26 @@ describe('OnePageSession view gating', () => {
     expect(within(fullHeader).getByText('Answer or Add')).toHaveClass(styles.sectionHeaderSubtitle);
   });
 
+  it('renders the Context header title and View subtitle with the shared section header classes', async () => {
+    render(
+      <OnePageSession
+        {...buildProps()}
+        slug="demo"
+        sessionConfig={{
+          ...buildProps().sessionConfig,
+          slug: 'demo',
+          sessionName: 'Context Engine',
+          networkChainId: 11155420,
+        }}
+      />
+    );
+
+    expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
+    const contextHeader = screen.getByTestId('ce-demo-documents-toggle');
+    expect(within(contextHeader).getByText('Context')).toHaveClass(styles.sectionHeaderTitle);
+    expect(within(contextHeader).getByText('View')).toHaveClass(styles.sectionHeaderSubtitle);
+  });
+
   it('keeps section-card headers inline through 767px without pulling full phone layout onto tablets', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
     const phoneBlock = extractMediaBlock(scss, '@media only screen and (max-width: 600px)', '.onePageDemoContainer');
@@ -1044,6 +1064,7 @@ describe('OnePageSession view gating', () => {
     expect(phoneBlock).toContain('grid-template-areas:');
     expect(phoneBlock).toContain('"title subtitle"');
     expect(phoneBlock).toContain('"actions actions";');
+    expect(phoneBlock).not.toMatch(/\.documentsSectionHeaderText > \.sectionHeaderSubtitle\s*\{[^}]*font-size:/);
     expect(phoneBlock).toContain('.documentsSectionHeaderTitleRow {');
     expect(phoneBlock).toContain('display: contents;');
     expect(phoneBlock).toContain('.documentsSectionHeaderMain .sectionToggleIcon {');
@@ -1077,6 +1098,7 @@ describe('OnePageSession view gating', () => {
     expect(smallTabletBlock).toContain('grid-template-areas:');
     expect(smallTabletBlock).toContain('"title subtitle"');
     expect(smallTabletBlock).toContain('"actions actions";');
+    expect(smallTabletBlock).not.toMatch(/\.documentsSectionHeaderText > \.sectionHeaderSubtitle\s*\{[^}]*font-size:/);
     expect(smallTabletBlock).toContain('.documentsSectionHeaderTitleRow {');
     expect(smallTabletBlock).toContain('display: contents;');
     expect(smallTabletBlock).toContain('.documentsSectionHeaderMain .sectionToggleIcon {');
