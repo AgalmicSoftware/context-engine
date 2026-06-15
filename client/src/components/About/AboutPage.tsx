@@ -329,7 +329,7 @@ const AboutPage = () => {
               </a>
             </div>
             <p className={styles.tagline}>
-              An open-source toolkit for large-group deliberation, sensemaking, and negotiation
+              An open-source toolkit for deliberation, sensemaking, and negotiation (for humans and ai agents)
             </p>
 
             <div className={styles.heroActions}>
