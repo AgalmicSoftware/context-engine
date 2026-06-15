@@ -6,6 +6,7 @@ import {
   resolveMainSiteRouteSessionIdHint,
   resolveMainSiteRouteSessionSlugHint,
   resolveMainSiteSessionRouteContext,
+  resolveMainSiteSessionRouteSourceSlug,
   resolveMainSiteSessionSlugFromProps,
   resolveMainSiteSessionSlugFromPathToken,
 } from './routeSessionResolution.js';
@@ -309,6 +310,30 @@ describe('routeSessionResolution', () => {
 
     expect(resolveSessionConfigBySlug).toHaveBeenCalledWith('rxc');
     expect(resolveDisplaySessionConfigBySlug).toHaveBeenCalledWith('rxc');
+  });
+
+  it('uses the default bucket as the source slug for the built-in demo route only', () => {
+    expect(resolveMainSiteSessionRouteSourceSlug({
+      sessionTokenRaw: 'demo',
+      sessionSlug: 'demo',
+      sessionConfig: { slug: '', sessionName: 'Context Engine' },
+    })).toBe('');
+
+    expect(resolveMainSiteSessionRouteSourceSlug({
+      sessionTokenRaw: 'demo',
+      sessionSlug: 'demo',
+      sessionConfig: {
+        slug: 'demo',
+        sessionName: 'Registry Demo',
+        __registry: { sessionIdHex: '0xabc' },
+      },
+    })).toBe('demo');
+
+    expect(resolveMainSiteSessionRouteSourceSlug({
+      sessionTokenRaw: 'rxc',
+      sessionSlug: 'rxc',
+      sessionConfig: { slug: 'rxc', sessionName: 'Weyl v. Yarvin Debate' },
+    })).toBe('rxc');
   });
 
   it('resolves non-UUID tokens directly via slug normalization', () => {

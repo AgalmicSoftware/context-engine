@@ -1,5 +1,6 @@
 import React from 'react';
 import { act, render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { MainSite, mainSiteDispatchActions } from './MainSite';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import contractScripts from '../../utilities/web3/contractScripts.js';
@@ -152,6 +153,7 @@ jest.mock('../OnePageSession/OnePageSession', () => {
         'data-testid': 'mock-one-page-demo',
         'data-session-name': String(props.sessionName || ''),
         'data-session-slug': String(props.slug || ''),
+        'data-question-session-slug': String(props.questionSessionSlug || ''),
       });
     },
   };
@@ -244,6 +246,8 @@ jest.mock('../../utilities/web3/contractScripts.js', () => {
     getSbtMintBurnCountsByAddress: jest.fn(),
     getSbtMetadata: jest.fn(),
     listenForSurveyEvents: jest.fn(),
+    removeSBTEventListener: jest.fn(),
+    removeSBTInstanceEventsListener: jest.fn(),
     removeSurveyEventsListener: jest.fn(),
   };
   return {
@@ -415,6 +419,7 @@ const createSubject = ({
   search = '',
   activeSessionSlug = 'edge',
   demoSurfaceMode = true,
+  firstVisit = false,
   sessionConfig = null,
 } = {}) => {
   setRoute(path, search);
@@ -425,6 +430,7 @@ const createSubject = ({
 
   const subject = new MainSite(buildProps({
     path,
+    firstVisit,
     demoSurfaceMode,
     sessionState: {
       primarySessionSlug: activeSessionSlug,
@@ -483,6 +489,7 @@ const createSubject = ({
   subject.getSessionHeaderForGroup = jest.fn((cfg) => cfg?.sessionHeader || 'https://example.com/edge-session.png');
   subject.refreshSbtData = jest.fn();
   subject.refreshSurveyResponsesByID = jest.fn();
+  subject.refreshSurveyResponsesByIDForGroup = jest.fn();
   subject.refreshQuestionMetadata = jest.fn();
   subject.refreshQuestionResponses = jest.fn();
   subject.scanForSurveyGroup = jest.fn();
@@ -599,6 +606,50 @@ describe('MainSite route render smoke', () => {
 
     expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_ROOT)).toBeInTheDocument();
     expect(await screen.findByTestId('mock-one-page-demo')).toHaveAttribute('data-session-slug', 'demo');
+    expect(screen.getByTestId('mock-one-page-demo')).toHaveAttribute('data-question-session-slug', 'demo');
+  });
+
+  it('redirects a first-visit root load to the about page', async () => {
+    const subject = createSubject({
+      path: '/',
+      firstVisit: true,
+    });
+    const replaceStateSpy = jest.spyOn(window.history, 'replaceState');
+    subject.applySessionFallbackRedirect = jest.fn(() => null);
+    subject.syncSessionFallbackRedirectConsumption = jest.fn();
+    subject.manageAutoHashPersistence = jest.fn();
+    subject.getDisplaySessionChainId = jest.fn(() => DEFAULT_NETWORK.id);
+    subject.getDisplaySessionNetwork = jest.fn(() => DEFAULT_NETWORK);
+    subject.resolveSessionPathSlug = jest.fn();
+    subject.syncLitHooks = jest.fn();
+    subject.refreshSessionInfo = jest.fn();
+    subject.refreshSessionMetaFields = jest.fn();
+    subject.refreshGroupCredentials = jest.fn();
+    subject.hasPersistedManagedCacheData = jest.fn(async () => false);
+    subject.syncCacheHasLoadedFlagFromPersistent = jest.fn(async () => undefined);
+    subject.syncCacheHasLoadedFlagOnTransition = jest.fn(async () => undefined);
+    subject.getSessionNetwork = jest.fn(() => null);
+    subject.setReadinessStateIfChanged = jest.fn((patch) => {
+      subject.state = { ...subject.state, ...(patch || {}) };
+    });
+    subject.checkAllCachesReady = jest.fn();
+    subject.handleDeepLinkScan = jest.fn();
+
+    await act(async () => {
+      await subject.componentDidMount();
+    });
+
+    expect(replaceStateSpy).toHaveBeenCalledWith({}, '', '/about');
+    expect(window.location.pathname).toBe('/about');
+
+    render(
+      <MemoryRouter initialEntries={['/about']}>
+        {subject.render()}
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_ABOUT_ROOT)).toBeInTheDocument();
+    subject.componentWillUnmount();
   });
 
   it('does not restore the mount session after navigating during cache initialization', async () => {
@@ -1070,6 +1121,53 @@ describe('MainSite route render smoke', () => {
     expect(await screen.findByTestId('mock-one-page-demo')).toHaveAttribute('data-session-name', 'Weyl v. Yarvin Debate');
     expect(screen.getByTestId('mock-one-page-demo')).toHaveAttribute('data-session-slug', 'rxc');
     expect(getDemoSessionConfigBySlug).toHaveBeenCalledWith('rxc', { allowDemoFallback: true });
+  });
+
+  it('keeps /session/demo as a demo UI route while sourcing questions from the default bucket', async () => {
+    const demoConfig = buildSessionConfig({
+      slug: '',
+      sessionName: 'Context Engine',
+      sessionInfo: 'Default demo session info',
+      __registry: undefined,
+    });
+    const subject = createSubject({
+      path: '/session/demo',
+      activeSessionSlug: 'demo',
+      sessionConfig: null,
+    });
+    getDemoSessionConfigBySlug.mockImplementation((slug) => (
+      slug === 'demo' ? demoConfig : null
+    ));
+
+    render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_ROOT)).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-one-page-demo')).toHaveAttribute('data-session-slug', 'demo');
+    expect(screen.getByTestId('mock-one-page-demo')).toHaveAttribute('data-question-session-slug', '');
+    const latestProps = mockOnePageSession.mock.calls[mockOnePageSession.mock.calls.length - 1][0] || {};
+    latestProps.refreshQuestionResponses(['q1']);
+    latestProps.refreshSurveyResponsesByID('survey-1');
+    expect(subject.refreshQuestionResponses).toHaveBeenCalledWith(['q1'], { slug: '' });
+    expect(subject.refreshSurveyResponsesByIDForGroup).toHaveBeenCalledWith('', 'survey-1');
+    expect(getDemoSessionConfigBySlug).toHaveBeenCalledWith('demo', { allowDemoFallback: true });
+  });
+
+  it('uses the default bucket for /session/demo cache bootstrap when only display fallback exists', () => {
+    const demoConfig = buildSessionConfig({
+      slug: '',
+      sessionName: 'Context Engine',
+      __registry: undefined,
+    });
+    const subject = createSubject({
+      path: '/session/demo',
+      activeSessionSlug: 'demo',
+      sessionConfig: null,
+    });
+    getDemoSessionConfigBySlug.mockImplementation((slug) => (
+      slug === 'demo' ? demoConfig : null
+    ));
+
+    expect(subject.getActiveSessionSourceSlug()).toBe('');
   });
 
   it('preserves session question-results subroutes and forwards route-open flags to OnePageSession', async () => {

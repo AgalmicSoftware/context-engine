@@ -170,6 +170,20 @@ const normalizeOnePageSessionSlug = (value: any = '') => {
   return normalized === 'general' ? '' : normalized;
 };
 
+const hasOwn = (value: any, key: string) => (
+  !!value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, key)
+);
+
+const resolveOnePageSessionSurveySlug = (props: any = '') => {
+  if (hasOwn(props, 'questionSessionSlug')) {
+    return normalizeOnePageSessionSlug(props.questionSessionSlug);
+  }
+  if (hasOwn(props.sessionConfig, 'slug')) {
+    return normalizeOnePageSessionSlug(props.sessionConfig.slug);
+  }
+  return normalizeOnePageSessionSlug(props.slug || '');
+};
+
 const resolveOnePageSessionRouteUiState = (props: any = {}) => {
   const autoOpenResults = props.routeAutoOpenResults === true;
   const showQuestions = autoOpenResults || props.routeQuestionsOpen === true;
@@ -2051,6 +2065,7 @@ class OnePageSession extends Component<any, any> {
       sessionConfig: incomingSessionConfig,
       polisDemoDataBySlug,
     } = this.props;
+    const surveySessionSlug = resolveOnePageSessionSurveySlug(this.props);
     const resolvedSessionConfig = this.getResolvedSessionConfig({
       slug,
       sessionName,
@@ -2393,7 +2408,7 @@ class OnePageSession extends Component<any, any> {
                 sessionSlugPinned={true}
                 preventUrlChange={true}
                 /* per-demo passthroughs */
-                sessionSlug={slug}
+                sessionSlug={surveySessionSlug}
                 sessionConfig={resolvedSessionConfig}
                 contracts={contracts}
                 blockLimits={blockLimits}
@@ -2445,7 +2460,7 @@ class OnePageSession extends Component<any, any> {
                 preventUrlChange={true}
                 onResultsModalClose={this.handleResultsModalClose}
                 /* per-demo passthroughs */
-                sessionSlug={slug}
+                sessionSlug={surveySessionSlug}
                 sessionConfig={resolvedSessionConfig}
                 contracts={contracts}
                 blockLimits={blockLimits}

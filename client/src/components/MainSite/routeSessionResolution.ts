@@ -13,6 +13,25 @@ import type {
 type FormatSessionId = ((value: string) => string | null | undefined) | undefined;
 type ResolveSessionSlugFromPathToken = ((sessionToken: string) => string | null | undefined) | undefined;
 
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+  !!value && typeof value === 'object' && !Array.isArray(value)
+);
+
+const hasAuthoritativeRegistryIdentity = (
+  sessionConfig: SessionConfigLike | null | undefined
+): boolean => {
+  if (!isRecord(sessionConfig)) return false;
+  const registry = isRecord(sessionConfig.__registry) ? sessionConfig.__registry : {};
+  return !!(
+    sessionConfig.sessionId ||
+    sessionConfig.sessionIdHex ||
+    sessionConfig.metadataURI ||
+    registry.sessionId ||
+    registry.sessionIdHex ||
+    registry.metadataURI
+  );
+};
+
 const readSessionTokenFromPath = (path = ''): string => {
   const clean = String(path || '').split('?')[0].split('#')[0];
   const parts = clean.split('/').filter(Boolean);
@@ -353,6 +372,29 @@ export const resolveMainSiteSessionRouteContext = ({
     sessionConfig: sessionConfig || displaySessionConfig,
     hasUnresolvedSessionId,
   };
+};
+
+export const resolveMainSiteSessionRouteSourceSlug = ({
+  sessionTokenRaw = '',
+  sessionSlug = '',
+  sessionConfig = null,
+}: {
+  sessionTokenRaw?: string;
+  sessionSlug?: string;
+  sessionConfig?: SessionConfigLike | null;
+} = {}): string => {
+  const token = String(sessionTokenRaw || '').trim().toLowerCase();
+  const configHasSlug = isRecord(sessionConfig) &&
+    Object.prototype.hasOwnProperty.call(sessionConfig, 'slug');
+  const configSlug = configHasSlug ? normalizeSessionSlug(sessionConfig.slug || '') : '';
+  if (
+    token === 'demo' &&
+    (!sessionConfig || configSlug === '') &&
+    !hasAuthoritativeRegistryIdentity(sessionConfig)
+  ) {
+    return '';
+  }
+  return normalizeSessionSlug(configHasSlug ? configSlug : sessionSlug);
 };
 
 export const resolveMainSiteSessionSlugFromPathToken = ({
