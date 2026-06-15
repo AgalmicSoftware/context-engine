@@ -3,6 +3,10 @@ export type SessionFallbackRedirectTarget = {
   path: string;
 };
 
+export type FirstVisitRootRedirectTarget = {
+  path: string;
+};
+
 type SessionFallbackRedirectStorageTarget = {
   slug?: string;
   path?: string;
@@ -115,27 +119,11 @@ export const isFirstVisitRootRedirectEnabled = (deps: {
 
 export const getFirstVisitRootRedirectTarget = (deps: {
   isFirstVisitRootRedirectEnabled: () => boolean;
-  readSessionScanScope: () => unknown;
-  getSessionFallbackScopeSlugs: () => string[];
-  derivePrimarySessionSlugFromList: (slugs: unknown[]) => string;
-}): SessionFallbackRedirectTarget | null => {
+}): FirstVisitRootRedirectTarget | null => {
   if (!deps.isFirstVisitRootRedirectEnabled()) return null;
 
-  if (String(deps.readSessionScanScope() || '').trim().toLowerCase() === 'list') {
-    const firstScopedSlug = deps.derivePrimarySessionSlugFromList(
-      deps.getSessionFallbackScopeSlugs()
-    );
-    if (firstScopedSlug) {
-      return {
-        slug: firstScopedSlug,
-        path: `/session/${firstScopedSlug}`,
-      };
-    }
-  }
-
   return {
-    slug: 'demo',
-    path: '/session/demo',
+    path: '/about',
   };
 };
 

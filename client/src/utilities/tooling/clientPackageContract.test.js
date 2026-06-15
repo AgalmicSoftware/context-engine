@@ -146,6 +146,9 @@ describe('client package modernization contract', () => {
     expectedVendorChunks.forEach((chunkName) => {
       expect(viteConfig).toContain(chunkName);
     });
+    expect(viteConfig).toContain("'/node_modules/hash.js/'");
+    expect(viteConfig).toContain("'/node_modules/inherits/'");
+    expect(viteConfig).toContain("'/node_modules/minimalistic-assert/'");
   });
 
   it('keeps Vite browser polyfill dependencies limited to imported runtime shims', () => {
