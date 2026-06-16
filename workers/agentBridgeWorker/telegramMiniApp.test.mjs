@@ -223,6 +223,7 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(toolMenu, /<span>Settings<\/span>/);
   assert.match(toolMenu, /id="showDrafts"[^>]*aria-label="Drafts"[\s\S]*<span>Drafts<\/span>/);
   assert.match(toolMenu, /id="demoDataResults"[^>]*aria-label="Demo data"[\s\S]*<span>Demo data<\/span>/);
+  assert.match(toolMenu, /id="showAgentResponses"[^>]*aria-label="Agent predictions"[\s\S]*<span>Agent predictions<\/span>/);
   assert.match(html, /\.menuButton\.active \{[\s\S]*color: var\(--accent\);[\s\S]*background: rgba\(98, 255, 191, 0\.12\);/);
   assert.match(html, /\.toolMenu \.iconButton \{[\s\S]*min-height: 64px;[\s\S]*font-size: 14px;[\s\S]*line-height: 1\.15;/);
   assert.match(html, /\.toolMenu \.menuCheckbox input \{[\s\S]*accent-color: var\(--results-accent\);/);
@@ -560,6 +561,8 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   const draftsStart = html.indexOf('<section class="draftsPanel" id="draftsPanel" aria-label="Drafts">');
   const draftsSection = draftsStart >= 0 ? html.slice(draftsStart, html.indexOf('</section>', draftsStart)) : '';
   assert.equal(settingsSection.includes('id="savedDrafts"'), false);
+  assert.equal(settingsSection.includes('id="showAgentResponses"'), false);
+  assert.equal(settingsSection.includes('Show agent responses'), false);
   assert.match(draftsSection, /id="savedDrafts"/);
   assert.match(draftsSection, /id="submitDrafts"/);
   assert.match(draftsSection, /id="clearDrafts"/);
@@ -573,6 +576,8 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.equal(html.includes("setStatus('Could not submit drafts"), false);
   assert.match(html, /el\.submitDrafts\.onclick = \(\) => submitSavedDrafts\(\);/);
   assert.match(html, /state\.data\.savedDrafts = drafts[\s\S]*\.filter\(\(draft\) => draft\.questionKey !== question\.questionKey\)[\s\S]*\.concat\(savedDraftEntry\);/);
+  assert.match(html, /confirm\.textContent = 'Edit';/);
+  assert.equal(html.includes("confirm.textContent = 'Confirm';"), false);
   assert.match(html, /submittedAnswersByQuestionKey/);
   assert.match(html, /answerHasContent/);
   assert.match(html, /const serverDrafts = body\.draftAnswersByQuestionKey \|\| \{\};/);

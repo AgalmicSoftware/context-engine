@@ -396,6 +396,59 @@ test('answer bulk validates rows, writes sidecar events/state, and replays idemp
   assert.equal(metrics.responsesSubmitted, 3);
   assert.equal(metrics.privacySkips, 1);
   assert.equal(metrics.distinctPrincipals, 1);
+
+  const exported = await exportAgentOnlyData({
+    env: testEnv,
+    sessionSlug: 'alpha',
+    view: 'answers',
+    format: 'jsonl',
+  });
+  const answerRows = exported.body.split('\n').filter(Boolean).map((line) => JSON.parse(line));
+  const skipRow = answerRows.find((row) => row.event_kind === 'privacy_protective_skip');
+  assert.equal(exported.ok, true);
+  assert.equal(answerRows.length, 4);
+  assert.equal(answerRows.every((row) => row.request_id === 'answers-1'), true);
+  assert.equal(skipRow.rationale, null);
+  assert.equal(skipRow.confidence, null);
+
+  const calibration = await exportAgentOnlyData({
+    env: testEnv,
+    sessionSlug: 'alpha',
+    view: 'calibration',
+    format: 'jsonl',
+  });
+  const calibrationRows = calibration.body.split('\n').filter(Boolean).map((line) => JSON.parse(line));
+  assert.equal(calibrationRows.reduce((sum, row) => sum + row.prediction_count, 0), 3);
+  assert.equal(calibrationRows.some((row) => row.confidence_band === '0-9'), false);
+
+  const rerun = await submitAgentOnlyAnswersBulk({
+    env: testEnv,
+    sessionSlug: 'alpha',
+    telegramUserId: '1001',
+    now: '2026-06-12T15:11:00.000Z',
+    body: {
+      ...base,
+      request_id: 'answers-rerun',
+      answers: [{ statement_id: ids[0], answer: { value: 'disagree' }, confidence: 42 }],
+    },
+  });
+  assert.equal(rerun.ok, true);
+  const rerunAnswers = await exportAgentOnlyData({
+    env: testEnv,
+    sessionSlug: 'alpha',
+    view: 'answers',
+    format: 'jsonl',
+  });
+  assert.equal(rerunAnswers.body.split('\n').filter(Boolean).length, 5);
+  const rerunCalibration = await exportAgentOnlyData({
+    env: testEnv,
+    sessionSlug: 'alpha',
+    view: 'calibration',
+    format: 'jsonl',
+  });
+  const rerunCalibrationRows = rerunCalibration.body.split('\n').filter(Boolean).map((line) => JSON.parse(line));
+  assert.equal(rerunCalibrationRows.reduce((sum, row) => sum + row.prediction_count, 0), 3);
+  assert.deepEqual(rerunCalibrationRows.map((row) => row.confidence_band), ['40-49', '60-69', '70-79']);
 });
 
 test('admin metrics count distinct principals once across multiple windows', async () => {

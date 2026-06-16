@@ -7077,6 +7077,10 @@ function telegramMiniAppHtml() {
             <input id="demoDataResults" type="checkbox" aria-label="Demo data">
             <span>Demo data</span>
           </label>
+          <label class="iconButton settingsButton menuCheckbox" title="Agent predictions">
+            <input id="showAgentResponses" type="checkbox" aria-label="Agent predictions">
+            <span>Agent predictions</span>
+          </label>
           <button class="iconButton activityButton" id="showActivity" type="button" aria-label="Activity" aria-expanded="false" title="Activity">
             <svg class="filterIcon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
               <path d="M4 6h16"></path><path d="M4 12h10"></path><path d="M4 18h7"></path><path d="M17 16l2 2 3-5"></path>
@@ -7386,10 +7390,6 @@ function telegramMiniAppHtml() {
         <label class="toggle">
           <input id="draftDivergenceOptIn" type="checkbox">
           <span>Draft edit research</span>
-        </label>
-        <label class="toggle">
-          <input id="showAgentResponses" type="checkbox">
-          <span>Show agent responses</span>
         </label>
         <label class="toggle">
           <input id="agentAutoApplyQuestionVotes" type="checkbox">
@@ -8392,7 +8392,7 @@ function telegramMiniAppHtml() {
         const confirm = document.createElement('button');
         confirm.type = 'button';
         confirm.className = 'secondary agentPredictionConfirm';
-        confirm.textContent = 'Confirm';
+        confirm.textContent = 'Edit';
         confirm.onclick = (event) => {
           event.stopPropagation();
           confirmAgentPrediction(question, confirm);
@@ -10971,6 +10971,10 @@ function telegramMiniAppHtml() {
       }
       if (el.showAgentResponses) {
         el.showAgentResponses.checked = values.showAgentResponses !== false;
+        const agentPredictionsMenuButton = typeof el.showAgentResponses.closest === 'function'
+          ? el.showAgentResponses.closest('.menuCheckbox')
+          : null;
+        if (agentPredictionsMenuButton) agentPredictionsMenuButton.classList.toggle('active', values.showAgentResponses !== false);
       }
       const submittedAnswers = Array.isArray(state.data?.submittedAnswers) ? state.data.submittedAnswers : [];
       const savedDrafts = Array.isArray(state.data?.savedDrafts) ? state.data.savedDrafts : [];
@@ -11005,7 +11009,7 @@ function telegramMiniAppHtml() {
                 const confirm = document.createElement('button');
                 confirm.type = 'button';
                 confirm.className = 'secondary agentPredictionConfirm';
-                confirm.textContent = 'Confirm';
+                confirm.textContent = 'Edit';
                 confirm.onclick = () => confirmAgentPrediction({ questionKey: answer.questionKey }, confirm);
                 row.appendChild(confirm);
               }
@@ -12109,6 +12113,15 @@ function telegramMiniAppHtml() {
       render();
     }
     el.demoDataResults.onchange = () => setResultsDemoData(el.demoDataResults.checked);
+    if (el.showAgentResponses) {
+      el.showAgentResponses.onchange = () => {
+        if (state.data?.agent?.settings?.values) {
+          state.data.agent.settings.values.showAgentResponses = el.showAgentResponses.checked;
+        }
+        render();
+        sendSettings();
+      };
+    }
     el.saveSettings.onclick = () => sendSettings();
     el.submitDrafts.onclick = () => submitSavedDrafts();
     el.clearDrafts.onclick = () => clearSavedDrafts();

@@ -1666,17 +1666,18 @@ export async function exportAgentOnlyData({
   const rows = [];
   const snapshotCache = new Map();
   if (['answers', 'wide', 'calibration', 'gold'].includes(view)) {
-    const eventEntries = await listKvEntriesByPrefix(env, `${AGENT_ONLY_ANSWER_EVENT_KV_PREFIX}${slug}:`);
-    const calibrationBuckets = new Map();
-    const calibrationBandByPrediction = new Map();
-    for (const entry of eventEntries) {
-      const record = await readKvJson(env, entry.key);
-      if (!record || (selectedWindow && safeString(record.windowId) !== selectedWindow)) continue;
-      const principalId = await agentOnlyPrincipalId(env, record.telegramUserId);
-      if (view === 'calibration') {
-        const predictionKey = `${principalId}:${safeString(record.windowId)}:${safeString(record.questionId)}`;
-        if (safeString(record.source) === 'agent_autofill' && Number.isFinite(Number(record.confidence))) {
-          const bandStart = Math.floor(Number(record.confidence) / 10) * 10;
+    if (view === 'calibration') {
+      const calibrationBuckets = new Map();
+      const stateEntries = await listKvEntriesByPrefix(env, `${AGENT_ONLY_ANSWER_STATE_KV_PREFIX}${slug}:`);
+      for (const entry of stateEntries) {
+        const state = await readKvJson(env, entry.key);
+        if (!state || (selectedWindow && safeString(state.windowId) !== selectedWindow)) continue;
+        const byStatement = state.byStatement && typeof state.byStatement === 'object' && !Array.isArray(state.byStatement)
+          ? state.byStatement
+          : {};
+        for (const value of Object.values(byStatement)) {
+          if (!Number.isFinite(Number(value?.agent?.confidence))) continue;
+          const bandStart = Math.floor(Number(value.agent.confidence) / 10) * 10;
           const band = `${bandStart}-${bandStart + 9}`;
           if (!calibrationBuckets.has(band)) {
             calibrationBuckets.set(band, {
@@ -1687,17 +1688,29 @@ export async function exportAgentOnlyData({
               edit_rate: 0,
             });
           }
-          calibrationBuckets.get(band).prediction_count += 1;
-          calibrationBandByPrediction.set(predictionKey, band);
-        } else if (safeString(record.source) === 'human_confirm' || safeString(record.source) === 'human_edit_after_agent') {
-          const band = calibrationBandByPrediction.get(predictionKey);
-          if (band && calibrationBuckets.has(band)) {
-            if (safeString(record.source) === 'human_confirm') calibrationBuckets.get(band).confirm_count += 1;
-            else calibrationBuckets.get(band).edit_count += 1;
-          }
+          const bucket = calibrationBuckets.get(band);
+          bucket.prediction_count += 1;
+          if (safeString(value?.human?.kind) === 'confirm') bucket.confirm_count += 1;
+          if (safeString(value?.human?.kind) === 'edit') bucket.edit_count += 1;
         }
-        continue;
       }
+      rows.push(...[...calibrationBuckets.values()].map((row) => ({
+        ...row,
+        edit_rate: row.prediction_count ? row.edit_count / row.prediction_count : 0,
+      })).sort((left, right) => left.confidence_band.localeCompare(right.confidence_band)));
+      const outputFormat = lower(format) === 'csv' ? 'csv' : 'jsonl';
+      return {
+        ok: true,
+        rows,
+        body: outputFormat === 'csv' ? rowsToCsv(rows) : rowsToJsonl(rows),
+        contentType: outputFormat === 'csv' ? 'text/csv; charset=utf-8' : 'application/x-ndjson; charset=utf-8',
+      };
+    }
+    const eventEntries = await listKvEntriesByPrefix(env, `${AGENT_ONLY_ANSWER_EVENT_KV_PREFIX}${slug}:`);
+    for (const entry of eventEntries) {
+      const record = await readKvJson(env, entry.key);
+      if (!record || (selectedWindow && safeString(record.windowId) !== selectedWindow)) continue;
+      const principalId = await agentOnlyPrincipalId(env, record.telegramUserId);
       if (view === 'answers') {
         rows.push({
           principal_id: principalId,
@@ -1707,11 +1720,12 @@ export async function exportAgentOnlyData({
           event_kind: safeString(record.eventKind),
           answer: record.answer || null,
           confidence: record.confidence ?? null,
-          rationale: safeString(record.rationale),
+          rationale: safeString(record.eventKind) === 'privacy_protective_skip' ? null : safeString(record.rationale),
           agent_initialized_at: safeString(record.agentMetadata?.agentInitializedAt),
           model: safeString(record.agentMetadata?.model),
           scaffold_version: safeString(record.agentMetadata?.scaffoldVersion),
           instructions_version: safeString(record.instructionsVersion),
+          request_id: safeString(record.requestId),
           created_at: safeString(record.createdAt),
         });
       } else if (view === 'gold' && safeString(record.source) === 'agent_autofill' && record.eventKind === 'answer') {
@@ -1745,12 +1759,7 @@ export async function exportAgentOnlyData({
         });
       }
     }
-    if (view === 'calibration') {
-      rows.splice(0, rows.length, ...[...calibrationBuckets.values()].map((row) => ({
-        ...row,
-        edit_rate: row.prediction_count ? row.edit_count / row.prediction_count : 0,
-      })).sort((left, right) => left.confidence_band.localeCompare(right.confidence_band)));
-    } else if (view === 'wide') {
+    if (view === 'wide') {
       const stateEntries = await listKvEntriesByPrefix(env, `${AGENT_ONLY_ANSWER_STATE_KV_PREFIX}${slug}:`);
       for (const entry of stateEntries) {
         const state = await readKvJson(env, entry.key);
