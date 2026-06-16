@@ -154,6 +154,10 @@ test('start payload pins path-only endpoints and instruction size', () => {
   assert.equal(payload.answerEndpoint, '/telegram/agent/api/agent-only/answers/bulk');
   assert.equal(payload.voteEndpoint, '/telegram/agent/api/agent-only/token-votes/bulk');
   assert.equal(payload.wrappedImageEndpoint, '/telegram/agent/api/agent-only/wrapped-image');
+  assert.match(payload.instructions, /Agent Village Wrapped image/);
+  assert.match(payload.instructions, /wrappedImageEndpoint/);
+  assert.match(payload.instructions, /mode "political_compass"/);
+  assert.match(payload.instructions, /render or display the image/);
   assert.ok(agentOnlyInstructionWordCount(AGENT_ONLY_INSTRUCTIONS) >= 400);
   assert.ok(agentOnlyInstructionWordCount(AGENT_ONLY_INSTRUCTIONS) <= 800);
   assert.equal(/https?:\/\//i.test(payload.instructions), false);
@@ -178,6 +182,11 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
         text: 'Agent guess: what is my favorite book?',
         answer_schema: { kind: 'text', maxChars: 280 },
       },
+      {
+        statement_id: 'ceq_movie',
+        text: 'Agent guess: what is my favorite movie?',
+        answer_schema: { kind: 'text', maxChars: 280 },
+      },
     ],
   };
   const state = {
@@ -185,12 +194,13 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
       ceq_trust: { agent: { answer: { value: 'agree' }, confidence: 92 } },
       ceq_info: { agent: { answer: { value: 'unsure' }, confidence: 41 } },
       ceq_book: { agent: { answer: { text: 'The Diamond Age' }, confidence: 52 } },
+      ceq_movie: { agent: { answer: { text: 'N/A' }, confidence: 12 } },
     },
   };
   const prompt = buildAgentOnlyWrappedImagePrompt({
     snapshot,
     state,
-    linearVoteState: { mode: 'linear', votes: { ceq_trust: 20 } },
+    linearVoteState: { mode: 'linear', votes: { ceq_trust: 20, ceq_movie: 30 } },
     quadraticVoteState: { mode: 'quadratic', votes: { ceq_info: 4 } },
   });
   assert.match(prompt, /Most Important To You/);
@@ -199,6 +209,8 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.match(prompt, /flowing calligraphic V/);
   assert.match(prompt, /Do not place a standalone logo icon/);
   assert.match(prompt, /35-45% of the title height/);
+  assert.match(prompt, /Custom aesthetic must vary from person to person/);
+  assert.match(prompt, /Section typography: make section titles large/);
   assert.match(prompt, /Show these actual question prompts/);
   assert.match(prompt, /Do not replace them with theme summaries/);
   assert.match(prompt, /Agree is green with white text/);
@@ -209,8 +221,10 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.match(prompt, /Cautious Reads/);
   assert.match(prompt, /Agent Guesses/);
   assert.match(prompt, /favorite book/);
+  assert.doesNotMatch(prompt, /favorite movie/);
+  assert.match(prompt, /stylized illustrated rendition or portrait silhouette/);
   assert.match(prompt, /several small evidence artifacts\/icons/);
-  assert.match(prompt, /Review or edit your agent's responses in Context Engine/);
+  assert.match(prompt, /Footer in small centered type/);
   assert.doesNotMatch(prompt, /What Your Agent Upvoted/);
 });
 
@@ -750,6 +764,43 @@ test('human review is idempotent and agent reruns never overwrite human preceden
   assert.deepEqual(state.byStatement[ids[0]].agent.answer, { value: 'disagree' });
   assert.equal(state.byStatement[ids[0]].human.kind, 'confirm');
   assert.deepEqual(state.byStatement[ids[0]].human.answer, { questionType: 'agree_unsure_disagree', value: 'agree' });
+  const predictions = await loadAgentOnlyPredictionsForPrincipal({
+    env: testEnv,
+    sessionSlug: 'alpha',
+    telegramUserId: '1001',
+    now: '2026-06-12T15:14:00.000Z',
+  });
+  assert.equal(predictions.predictionsByQuestionId[ids[0]].valueLabel, 'Disagree');
+  assert.equal(predictions.predictionsByQuestionId[ids[0]].confirmed, false);
+  assert.equal(predictions.predictionsByQuestionId[ids[0]].reviewed, true);
+  const exported = await exportAgentOnlyData({
+    env: testEnv,
+    sessionSlug: 'alpha',
+    view: 'answers',
+    format: 'jsonl',
+  });
+  const agentRows = exported.body.split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line))
+    .filter((row) => row.source === 'agent_autofill');
+  assert.deepEqual(agentRows.map((row) => row.answer.value).sort(), ['agree', 'disagree']);
+  const calibration = await exportAgentOnlyData({
+    env: testEnv,
+    sessionSlug: 'alpha',
+    view: 'calibration',
+    format: 'jsonl',
+  });
+  const calibrationRows = calibration.body.split('\n').filter(Boolean).map((line) => JSON.parse(line));
+  assert.equal(calibrationRows[0].confirm_count, 0);
+  assert.equal(calibrationRows[0].edit_count, 1);
+  const wide = await exportAgentOnlyData({
+    env: testEnv,
+    sessionSlug: 'alpha',
+    view: 'wide',
+    format: 'jsonl',
+  });
+  const wideRows = wide.body.split('\n').filter(Boolean).map((line) => JSON.parse(line));
+  assert.equal(wideRows[0].review_status, 'human_stale_confirm');
 });
 
 test('explicit confirm after a human edit is a no-op and preserves edit classification', async () => {

@@ -171,14 +171,15 @@ better at the end of the day. It should ask only:
 - whether to run now;
 - whether it may ingest the user's EdgeOS profile as high-level context;
 - whether to include clearly labeled playful agent guesses, such as favorite
-  book, movie, game, music, or similar taste reads, when there is evidence;
-- which image output to generate after submission: standard Wrapped, political
-  compass meme, both, or no image.
+  book, movie, game, music, or similar taste reads, when there is evidence.
 
 If EdgeOS profile access is declined, the agent should not use profile data. If
 accepted, it should use only non-sensitive high-level signals and never quote raw
 private profile or memory text. If playful guesses are declined, guess-style
-questions should be answered `N/A` where possible.
+questions should be answered `N/A` where possible and omitted from the Wrapped
+image. The initial output is the standard Agent Village Wrapped image; after it
+is displayed, Hermes should ask whether to generate the optional political
+compass meme.
 
 #### A. Autonomy & Delegation (Predicted Human Answer)
 
@@ -1822,6 +1823,10 @@ each Wrapped section would be populated.
 >
 > *"Vannevar Bush — you're building memex for communities, not individuals, and
 > you'd rather the infrastructure be invisible than impressive."*
+>
+> Include a stylized illustrated portrait or silhouette of the comparison figure,
+> plus small evidence artifacts/icons that explain the comparison without adding
+> fake data.
 
 > **The Surprise Read**
 >
@@ -1834,7 +1839,7 @@ each Wrapped section would be populated.
 > beyond connecting — your goals might be more personal than professional, and
 > that would change a lot of these predictions."*
 >
-> Review or edit your agent's predictions in Context Engine
+> Centered footer: Review or edit your agent's predictions in Context Engine
 
 ---
 

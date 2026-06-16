@@ -40,7 +40,7 @@ Create a wide shareable "Agent Village Wrapped" poster, 16:9 or 3:2 aspect ratio
 Title: Agent Village Wrapped
 Subtitle: What your agent thinks it knows about you
 
-Choose the visual aesthetic based on the agent's analysis of the principal. Do not use a fixed house style. Derive color, layout, icons, texture, and metaphor from the predicted archetype, strongest themes, memory signals, and high-confidence answers. Keep it memeable, readable, and screenshot-friendly.
+Choose the visual aesthetic based on the agent's analysis of the principal. Do not use a fixed house style. The reports should look meaningfully different from person to person. Derive color palette, layout rhythm, icons, texture, and metaphor from the predicted archetype, strongest themes, memory signals, and high-confidence answers. Keep it memeable, readable, and screenshot-friendly.
 
 Make "Agent Village Wrapped" a horizontal wordmark along the top, not a separate
 logo badge or large emblem. Use the Agent Village logo as inspiration: "AGENT"
@@ -59,6 +59,11 @@ Core insight one-liner:
 "Your agent thinks you're a privacy-first coordination builder: you trust agents most when they protect context, broker high-signal intros, and strengthen offline communities."
 
 Main sections:
+
+Make section titles large, high-contrast, and easy to read at thumbnail size.
+They should be visibly larger than body copy, with clear hierarchy and enough
+spacing between sections.
+
 1. Agent Core Insight
 Show a bold archetype and one memeable sentence about what the agent thinks of the principal.
 
@@ -98,14 +103,15 @@ Only show supported, non-sensitive signals. Use "N/A" when unknown:
 
 7. Agent Comparison
 Compare the principal to a historical figure or fictional/book character in a
-wide strip. Show the comparison name plus several small evidence
-artifacts/icons beside it, such as a zero-knowledge calendar, civic experiment
-ledger, handshake/introduction network, village infrastructure map, or other
-symbols derived from the predictions. Keep it playful and non-defamatory.
+wide strip. Include a stylized illustrated rendition or portrait silhouette of
+the figure/character, the comparison name, and several small evidence artifacts
+or icons beside it, such as a zero-knowledge calendar, civic experiment ledger,
+handshake/introduction network, village infrastructure map, or other symbols
+derived from the predictions. Keep it playful and non-defamatory.
 
 Footer:
-"Review or edit your agent's responses in Context Engine" in small type; keep
-"Context Engine" readable.
+"Review or edit your agent's responses in Context Engine" centered in small
+type along the bottom edge; keep "Context Engine" readable.
 
 Do not show access credentials, raw Telegram ids, private memory quotes, confidence
 tables, rationales, privacy skip counts, decorative text, fake UI labels, or

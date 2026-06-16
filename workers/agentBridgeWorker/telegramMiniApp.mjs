@@ -8379,6 +8379,23 @@ function telegramMiniAppHtml() {
         if (button) button.disabled = false;
       }
     }
+    function editAgentPrediction(questionRef = {}) {
+      const question = (state.data?.questions || []).find((entry) => entry.questionKey === questionRef.questionKey) || questionRef;
+      if (!question?.questionKey) return;
+      activate(question);
+      expandQuestion(question);
+      if (!syncQuestionCardExpanded(question, true)) renderQuestionStack();
+      window.requestAnimationFrame(() => {
+        const card = cardsForQuestion(question)[0];
+        if (!card) {
+          setStatus('Load this question in the list to edit your answer.', 'error');
+          return;
+        }
+        card.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        const control = card.querySelector('textarea, input[type="range"], .segment, .choice');
+        if (control && typeof control.focus === 'function') control.focus({ preventScroll: true });
+      });
+    }
     function renderAgentOnlyPredictionBadge(question) {
       const prediction = agentOnlyPredictionFor(question);
       if (!prediction?.valueLabel) return null;
@@ -8389,15 +8406,15 @@ function telegramMiniAppHtml() {
       badge.textContent = 'Agent prediction: ' + prediction.valueLabel;
       row.appendChild(badge);
       if (prediction.confirmed !== true) {
-        const confirm = document.createElement('button');
-        confirm.type = 'button';
-        confirm.className = 'secondary agentPredictionConfirm';
-        confirm.textContent = 'Edit';
-        confirm.onclick = (event) => {
+        const edit = document.createElement('button');
+        edit.type = 'button';
+        edit.className = 'secondary agentPredictionConfirm';
+        edit.textContent = 'Edit';
+        edit.onclick = (event) => {
           event.stopPropagation();
-          confirmAgentPrediction(question, confirm);
+          editAgentPrediction(question);
         };
-        row.appendChild(confirm);
+        row.appendChild(edit);
       }
       return row;
     }
@@ -11006,12 +11023,12 @@ function telegramMiniAppHtml() {
               badge.textContent = 'Agent prediction: ' + prediction.valueLabel;
               row.appendChild(badge);
               if (prediction.confirmed !== true && titleText === 'Submitted responses') {
-                const confirm = document.createElement('button');
-                confirm.type = 'button';
-                confirm.className = 'secondary agentPredictionConfirm';
-                confirm.textContent = 'Edit';
-                confirm.onclick = () => confirmAgentPrediction({ questionKey: answer.questionKey }, confirm);
-                row.appendChild(confirm);
+                const edit = document.createElement('button');
+                edit.type = 'button';
+                edit.className = 'secondary agentPredictionConfirm';
+                edit.textContent = 'Edit';
+                edit.onclick = () => editAgentPrediction({ questionKey: answer.questionKey });
+                row.appendChild(edit);
               }
             }
             section.appendChild(row);

@@ -58,11 +58,13 @@ Step 2, answer every statement. POST batches of up to 50 rows to /telegram/agent
 
 Step 3, allocate both token balances. You have two independent 100-token balances for statements your principal would most want raised or lowered. POST once to /telegram/agent/api/agent-only/token-votes/bulk with mode linear: signed integer weights where sum(abs(weight)) is at most 100. POST once with mode quadratic: signed integers from -10 to 10 where sum(weight squared) is at most 100. Submit both modes for the same window. Negative values lower priority; positive values raise priority.
 
+Step 4, Agent Village Wrapped image. After Step 3 succeeds, use the wrappedImageEndpoint path from the start payload. POST to it with the same authorization credential and JSON body { "window_id": "<window_id>", "mode": "wrapped", "format": "json" }. Decode image_base64 as image/png and render or display the image if your host supports it. Do not print raw image_base64 or the full image prompt. After showing the standard Wrapped image, ask whether the principal wants the optional political compass meme; only if they say yes, POST the same endpoint with mode "political_compass" and display that image too.
+
 Metadata. Every POST must include agent_metadata with model, scaffold_version, and agent_initialized_at if known. Use request_id when retrying; replaying the same request_id is idempotent within a window.
 
 Errors and retries. On validation errors, fix the listed rows and resend. On window_mismatch, re-fetch statements because a new window opened, then redo the run for the new window_id. If your cached skill version is older than /telegram/agent/api/skill-version, refresh the skill before continuing.
 
-Completion report. Tell your principal: "Submitted N predicted answers (M privacy skips) and allocated both 100-token balances across K statements for window W. Review or edit in the CE bot." Keep the report short. Do not list confidences, rationales, or token details in chat unless asked.
+Completion report. Tell your principal only: "Submitted N predicted answers (M privacy skips) and both token allocations for window W. Review or edit them in the CE bot, then click Open Mini App." Do not list confidences, rationales, or token details in chat unless asked.
 
 Your answers are predictions. Your principal's own answers always take precedence and are never overwritten. Windows refresh weekly on Mondays at 08:00 Pacific.`;
 
@@ -1274,6 +1276,33 @@ function answerLabelForSchema(answer = {}, schema = {}) {
   return text;
 }
 
+async function reviewSemanticFingerprint(review = {}, schema = {}) {
+  if (!review || typeof review !== 'object') return '';
+  return safeString(review.semanticFingerprint)
+    || (review.answer ? await semanticFingerprintForAgentOnlyAnswer(review.answer, schema) : '');
+}
+
+async function reviewStatusForCurrentAgentAnswer({
+  entry = {},
+  env = {},
+  sessionSlug = '',
+  windowId = '',
+  questionId = '',
+  cache = new Map(),
+} = {}) {
+  const kind = safeString(entry?.human?.kind);
+  if (!kind) return '';
+  if (kind === 'edit') return 'edit';
+  if (kind !== 'confirm') return kind;
+  const snapshot = await snapshotForWindowCached(env, sessionSlug, windowId, cache);
+  const statement = statementMap(snapshot || {}).get(safeString(questionId));
+  const schema = statement?.answer_schema || {};
+  const agentFingerprint = safeString(entry?.agent?.semanticFingerprint)
+    || (entry?.agent?.answer ? await semanticFingerprintForAgentOnlyAnswer(entry.agent.answer, schema) : '');
+  const humanFingerprint = await reviewSemanticFingerprint(entry.human, schema);
+  return agentFingerprint && humanFingerprint === agentFingerprint ? 'confirm' : 'stale_confirm';
+}
+
 export async function loadAgentOnlyPredictionsForPrincipal({
   env = {},
   sessionSlug = '',
@@ -1299,10 +1328,13 @@ export async function loadAgentOnlyPredictionsForPrincipal({
   for (const [questionId, entry] of Object.entries(state.byStatement || {})) {
     if (!entry?.agent?.answer) continue;
     const statement = schemas.get(questionId);
+    const schema = statement?.answer_schema || {};
+    const agentFingerprint = entry.agent.semanticFingerprint || await semanticFingerprintForAgentOnlyAnswer(entry.agent.answer, schema);
+    const humanFingerprint = await reviewSemanticFingerprint(entry.human, schema);
     predictionsByQuestionId[questionId] = {
-      valueLabel: answerLabelForSchema(entry.agent.answer, statement?.answer_schema || {}),
-      semanticFingerprint: entry.agent.semanticFingerprint || await semanticFingerprintForAgentOnlyAnswer(entry.agent.answer, statement?.answer_schema || {}),
-      confirmed: safeString(entry.human?.kind) === 'confirm',
+      valueLabel: answerLabelForSchema(entry.agent.answer, schema),
+      semanticFingerprint: agentFingerprint,
+      confirmed: safeString(entry.human?.kind) === 'confirm' && humanFingerprint === agentFingerprint,
       reviewed: Boolean(entry.human),
     };
   }
@@ -1356,9 +1388,9 @@ function resolveWorkerOpenAiKey(env = {}) {
   );
 }
 
-function wrappedPredictionRows(snapshot = {}, state = {}) {
+function wrappedPredictionRows(snapshot = {}, state = {}, { includeUnavailableGuesses = false } = {}) {
   const statements = statementMap(snapshot);
-  return Object.entries(state.byStatement || {})
+  const rows = Object.entries(state.byStatement || {})
     .map(([questionId, entry]) => {
       const statement = statements.get(questionId);
       if (!entry?.agent?.answer || !statement) return null;
@@ -1370,9 +1402,10 @@ function wrappedPredictionRows(snapshot = {}, state = {}) {
       };
     })
     .filter(Boolean);
+  return includeUnavailableGuesses ? rows : rows.filter((row) => !wrappedRowIsUnavailableGuess(row));
 }
 
-function wrappedImportanceRows(snapshot = {}, voteStates = []) {
+function wrappedImportanceRows(snapshot = {}, voteStates = [], { excludeQuestionIds = new Set() } = {}) {
   const statements = statementMap(snapshot);
   const weights = new Map();
   for (const state of voteStates) {
@@ -1390,6 +1423,7 @@ function wrappedImportanceRows(snapshot = {}, voteStates = []) {
   }
   return [...weights.entries()]
     .map(([questionId, score]) => {
+      if (excludeQuestionIds.has(questionId)) return null;
       const statement = statements.get(questionId);
       if (!statement) return null;
       return {
@@ -1405,6 +1439,16 @@ function wrappedImportanceRows(snapshot = {}, voteStates = []) {
 
 function predictionLine(row = {}) {
   return `"${wrappedDisplayText(row.question, 90)}" -> ${wrappedDisplayText(row.answer || 'N/A', 80)} (${row.confidence}/100 confidence)`;
+}
+
+function wrappedAnswerIsUnavailable(value = '') {
+  const normalized = lower(value).replace(/[^a-z0-9]+/g, '');
+  return !normalized || ['na', 'notsupported', 'unknown', 'unavailable'].includes(normalized);
+}
+
+function wrappedRowIsUnavailableGuess(row = {}) {
+  return /favorite|book|movie|film|game|yes\s*\/\s*no|yes-or-no|yes or no/i.test(row.question || '')
+    && wrappedAnswerIsUnavailable(row.answer);
 }
 
 function wrappedAgentGuessRows(predictions = []) {
@@ -1454,14 +1498,19 @@ export function buildAgentOnlyWrappedImagePrompt({
   styleHint = '',
   mode = 'wrapped',
 } = {}) {
-  const predictions = wrappedPredictionRows(snapshot, state);
+  const rawPredictions = wrappedPredictionRows(snapshot, state, { includeUnavailableGuesses: true });
+  const excludedGuessQuestionIds = new Set(rawPredictions
+    .filter((row) => wrappedRowIsUnavailableGuess(row))
+    .map((row) => row.questionId)
+    .filter(Boolean));
+  const predictions = rawPredictions.filter((row) => !excludedGuessQuestionIds.has(row.questionId));
   const highConfidence = [...predictions]
     .sort((left, right) => right.confidence - left.confidence)
     .slice(0, 3);
   const cautious = [...predictions]
     .sort((left, right) => left.confidence - right.confidence)
     .slice(0, 3);
-  const important = wrappedImportanceRows(snapshot, [linearVoteState, quadraticVoteState]);
+  const important = wrappedImportanceRows(snapshot, [linearVoteState, quadraticVoteState], { excludeQuestionIds: excludedGuessQuestionIds });
   const importantLines = important.length
     ? important.map((row, index) => `${index + 1}. "${wrappedDisplayText(row.question, 165)}"`).join('\n')
     : 'N/A - no importance allocations submitted yet.';
@@ -1490,13 +1539,15 @@ export function buildAgentOnlyWrappedImagePrompt({
   }
   const prompt = `Create a wide 16:9 shareable poster titled "Agent Village Wrapped" with subtitle "What your agent thinks it knows about you".
 
-Make it look like a polished social-share card, readable on mobile, with no tiny text. Custom aesthetic should be derived from the predictions below${styleLine ? `, with this extra style hint: ${styleLine}` : ''}. If the data suggests no stronger theme, use a premium privacy-first civic-tech visual language: cryptographic village map, clean coordination dashboard, warm midnight blue, signal green, soft gold, and white accents. Use elegant map lines, Telegram-like message nodes, tiny lock/check icons, and a village grid, but no literal robots.
+Make it look like a polished social-share card, readable on mobile, with no tiny text. Custom aesthetic must vary from person to person and should be derived from the predictions below${styleLine ? `, with this extra style hint: ${styleLine}` : ''}. Choose color palette, texture, layout rhythm, icons, and visual metaphor from the inferred archetype, strongest preferences, high-confidence answers, and memory signals. If the data suggests no stronger theme, use a premium privacy-first civic-tech visual language: cryptographic village map, clean coordination dashboard, warm midnight blue, signal green, soft gold, and white accents. Use elegant map lines, Telegram-like message nodes, tiny lock/check icons, and a village grid, but no literal robots.
 
 Title treatment: make "Agent Village Wrapped" a horizontal wordmark running along the top, not a separate logo badge or big emblem. Use the Agent Village logo as inspiration: "AGENT" feels bold, uppercase, blocky, and modern; "VILLAGE" feels elegant, high-contrast serif with a flowing calligraphic V; adapt that mixed-type wordmark style for "Agent Village Wrapped". Do not place a standalone logo icon beside it. The subtitle "What your agent thinks it knows about you" must be large enough to read at a glance, roughly 35-45% of the title height, while still leaving the content area below most of the space.
 
 Layout requirements: keep the top-right area visually calm with abstract map lines only, no decorative labels, no fake annotations, no extra numbers, and no filler text. Every visible word must be part of one of the content sections below. Leave clear spacing around the top wordmark and content cards.
 
 Use these content sections:
+
+Section typography: make section titles large, high-contrast, and easy to read at thumbnail size. They should be visibly larger than body copy, with clear hierarchy and enough spacing between sections.
 
 1. Agent Core Insight
 Infer a short archetype from the predictions. Use one bold archetype label and one memeable sentence about what the agent thinks of the principal.
@@ -1521,9 +1572,9 @@ ${agentGuessLines || 'N/A - no favorite book, movie, game, or yes/no agent guess
 Binary answer styling: whenever a prediction answer is Agree, Unsure, or Disagree, render that answer as a large rounded choice pill/button on a dark navy background: Agree is green with white text, Unsure is bright yellow with dark navy text, and Disagree is red with white text. The pills should feel like primary response controls, not small tags.
 
 6. Agent Comparison
-Compare the principal to a historical figure or fictional/book character only if it feels supported by the predictions; otherwise write "N/A". Make this a richer wide strip: show the comparison name plus several small evidence artifacts/icons beside it, such as a zero-knowledge calendar, civic experiment ledger, handshake/introduction network, village infrastructure map, or other symbols derived from the predictions. The artifacts should explain why the comparison fits without adding fake data.
+Compare the principal to a historical figure or fictional/book character only if it feels supported by the predictions; otherwise write "N/A". Make this a richer wide strip with a stylized illustrated rendition or portrait silhouette of that figure/character, plus the comparison name and several small evidence artifacts/icons beside it, such as a zero-knowledge calendar, civic experiment ledger, handshake/introduction network, village infrastructure map, or other symbols derived from the predictions. The artifacts should explain why the comparison fits without adding fake data.
 
-Footer in small type, with "Context Engine" still readable: "Review or edit your agent's responses in Context Engine"
+Footer in small centered type along the bottom edge, with "Context Engine" still readable: "Review or edit your agent's responses in Context Engine"
 
 Do not show access credentials, raw Telegram ids, confidence tables, rationales, privacy skip counts, linear/quadratic allocation mechanics, decorative text, lorem ipsum, fake UI labels, or random numbers. Keep the graphic memeable, premium, and screenshot-friendly. Make all major text legible and avoid overcrowding.`;
   assertNoSecretShape({ prompt }, 'Agent-only wrapped image prompt must not serialize secrets.');
@@ -1638,7 +1689,13 @@ export async function recordAgentOnlyHumanReview({
   if (!entry?.agent) return { ok: true, recorded: false, reason: 'agent_prediction_missing' };
   const createdAt = nowIso(now);
   const source = reviewKind === 'edit' ? 'human_edit_after_agent' : 'human_confirm';
-  if (reviewKind === 'confirm' && safeString(entry.human?.kind) === 'confirm') {
+  const agentFingerprint = safeString(entry.agent.semanticFingerprint) || await semanticFingerprintForAgentOnlyAnswer(entry.agent.answer);
+  const existingHumanFingerprint = await reviewSemanticFingerprint(entry.human);
+  if (
+    reviewKind === 'confirm' &&
+    safeString(entry.human?.kind) === 'confirm' &&
+    existingHumanFingerprint === agentFingerprint
+  ) {
     return { ok: true, recorded: false, reason: 'already_confirmed' };
   }
   if (reviewKind === 'confirm' && safeString(entry.human?.kind) === 'edit') {
@@ -1676,6 +1733,7 @@ export async function recordAgentOnlyHumanReview({
     human: {
       kind: reviewKind,
       answer: record.answer,
+      semanticFingerprint: record.semanticFingerprint,
       eventKey: key,
       updatedAt: createdAt,
     },
@@ -1981,7 +2039,7 @@ export async function exportAgentOnlyData({
         const byStatement = state.byStatement && typeof state.byStatement === 'object' && !Array.isArray(state.byStatement)
           ? state.byStatement
           : {};
-        for (const value of Object.values(byStatement)) {
+        for (const [statementId, value] of Object.entries(byStatement)) {
           if (!Number.isFinite(Number(value?.agent?.confidence))) continue;
           const bandStart = Math.floor(Number(value.agent.confidence) / 10) * 10;
           const band = `${bandStart}-${bandStart + 9}`;
@@ -1996,8 +2054,16 @@ export async function exportAgentOnlyData({
           }
           const bucket = calibrationBuckets.get(band);
           bucket.prediction_count += 1;
-          if (safeString(value?.human?.kind) === 'confirm') bucket.confirm_count += 1;
-          if (safeString(value?.human?.kind) === 'edit') bucket.edit_count += 1;
+          const reviewStatus = await reviewStatusForCurrentAgentAnswer({
+            entry: value,
+            env,
+            sessionSlug: slug,
+            windowId: state.windowId,
+            questionId: statementId,
+            cache: snapshotCache,
+          });
+          if (reviewStatus === 'confirm') bucket.confirm_count += 1;
+          if (reviewStatus === 'edit' || reviewStatus === 'stale_confirm') bucket.edit_count += 1;
         }
       }
       rows.push(...[...calibrationBuckets.values()].map((row) => ({
@@ -2075,6 +2141,14 @@ export async function exportAgentOnlyData({
           ? state.byStatement
           : {};
         for (const [statementId, value] of Object.entries(byStatement)) {
+          const reviewStatus = await reviewStatusForCurrentAgentAnswer({
+            entry: value,
+            env,
+            sessionSlug: slug,
+            windowId: state.windowId,
+            questionId: statementId,
+            cache: snapshotCache,
+          });
           const normal = await latestSubmittedAnswerFor({
             env,
             sessionSlug: slug,
@@ -2088,7 +2162,7 @@ export async function exportAgentOnlyData({
             agent_prediction: value?.agent?.answer || null,
             agent_confidence: value?.agent?.confidence ?? null,
             human_current_answer: normal?.answer || null,
-            review_status: value?.human?.kind ? `human_${safeString(value.human.kind)}` : '',
+            review_status: reviewStatus ? `human_${reviewStatus}` : '',
             eval_type: await evalTypeForStatement({
               env,
               sessionSlug: slug,
