@@ -251,7 +251,6 @@ function skillVersionPayload(env = {}) {
     version: CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION,
     skill: 'context-engine',
     skillUrl,
-    changelogUrl: `${skillUrl}#changelog`,
   };
 }
 

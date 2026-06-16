@@ -65,7 +65,7 @@ Metadata. Every POST must include agent_metadata with model, scaffold_version, a
 
 Errors and retries. On validation errors, fix the listed rows and resend. On window_mismatch, re-fetch statements because a new window opened, then redo the run for the new window_id. If your cached skill version is older than /telegram/agent/api/skill-version, refresh the skill before continuing.
 
-Completion report. After the Wrapped image is displayed, tell your principal only: "Your Agent Village Wrapped is ready. Review or edit your agent's responses in Context Engine Telegram Bot, then click Open Mini App. Want me to generate the optional political compass meme too?" Do not include the window id, confidences, rationales, privacy skip count, raw links, or token details in chat unless asked.
+Completion report. After the Wrapped image is displayed, tell your principal only: "Your Agent Village Wrapped is ready. To inspect or change your agent's responses, open Context Engine Telegram Bot and tap Open Mini App. Want the optional political compass meme too?" Do not include the window id, confidences, rationales, privacy skip count, raw links, or token details in chat unless asked.
 
 Your answers are predictions. Your principal's own answers always take precedence and are never overwritten. Windows refresh weekly on Mondays at 08:00 Pacific.`;
 
@@ -1660,13 +1660,30 @@ function wrappedPredictionRows(snapshot = {}, state = {}, { includeUnavailableGu
       if (!entry?.agent?.answer || !statement) return null;
       return {
         questionId,
-        question: wrappedDisplayText(statement.text, 130),
-        answer: wrappedDisplayText(answerLabelForSchema(entry.agent.answer, statement.answer_schema || {}), 120),
+        question: wrappedDisplayText(statement.text, 280),
+        answer: wrappedDisplayText(wrappedAnswerLabelForSchema(entry.agent.answer, statement.answer_schema || {}), 120),
         confidence: Math.max(0, Math.min(100, Math.floor(Number(entry.agent.confidence) || 0))),
       };
     })
     .filter(Boolean);
   return includeUnavailableGuesses ? rows : rows.filter((row) => !wrappedRowIsUnavailableGuess(row));
+}
+
+function wrappedAnswerLabelForSchema(answer = {}, schema = {}) {
+  const base = answerLabelForSchema(answer, schema);
+  if (schema?.kind !== 'choice') return base;
+  const valueText = answerScalarString(answer?.value);
+  if (!valueText) return base;
+  if (['agree', 'unsure', 'disagree'].includes(lower(valueText))) return base;
+  const numericValue = Number(valueText);
+  if (!Number.isFinite(numericValue)) return base;
+  const numericOptions = (Array.isArray(schema.values) ? schema.values : [])
+    .map((value) => Number(answerScalarString(value)))
+    .filter((value) => Number.isFinite(value));
+  if (numericOptions.length < 2) return base;
+  const max = Math.max(...numericOptions);
+  if (!Number.isFinite(max) || max <= 0) return base;
+  return `${answerScalarString(numericValue)}/${answerScalarString(max)}`;
 }
 
 function wrappedImportanceRows(snapshot = {}, voteStates = [], { excludeQuestionIds = new Set() } = {}) {
@@ -1694,7 +1711,7 @@ function wrappedImportanceRows(snapshot = {}, voteStates = [], { excludeQuestion
       return {
         questionId,
         score: score.positive,
-        question: wrappedDisplayText(statement.text, 190),
+        question: wrappedDisplayText(statement.text, 260),
       };
     })
     .filter((row) => row && row.score > 0)
@@ -1703,7 +1720,7 @@ function wrappedImportanceRows(snapshot = {}, voteStates = [], { excludeQuestion
 }
 
 function predictionLine(row = {}) {
-  return `Question: "${wrappedDisplayText(row.question, 110)}"; prediction: ${wrappedDisplayText(row.answer || 'N/A', 80)}; confidence: ${row.confidence}/100`;
+  return `Question: "${wrappedDisplayText(row.question, 240)}"; prediction: ${wrappedDisplayText(row.answer || 'N/A', 80)}; confidence: ${row.confidence}%`;
 }
 
 function wrappedAnswerIsUnavailable(value = '') {
@@ -1732,6 +1749,7 @@ function wrappedRowIsGuess(row = {}) {
   const question = safeString(row.question);
   return /\bagent guess\b/i.test(question) ||
     /\bguess (?:this|the) principal'?s\b/i.test(question) ||
+    /\bp\s*\(?\s*bloom\s*\)?|probability of bloom|positive future|flourish|flourishing\b/i.test(question) ||
     /\bfavorite (?:book|movie|film|game|song|album|artist|food)\b/i.test(question) ||
     /\bwhat (?:movie|film|tv show|game|song|album|artist)\b/i.test(question);
 }
@@ -1751,6 +1769,7 @@ function wrappedGuessQuestionIdsFromSnapshot(snapshot = {}) {
 
 function wrappedGuessCategory(row = {}) {
   const question = lower(row.question);
+  if (/\bp\s*\(?\s*bloom\s*\)?|probability of bloom|positive future|flourish|flourishing\b/.test(question)) return 'pbloom';
   if (/\bbook|novel|read|recommend\b/.test(question)) return 'book';
   if (/\bmovie|film|tv show|television|show\b/.test(question)) return 'movie';
   if (/\bgame|puzzle|sport|play pattern\b/.test(question)) return 'game';
@@ -1788,7 +1807,7 @@ function buildAgentOnlyPoliticalCompassPrompt({
   const focal = wrappedDisplayText(focalQuestion, 150) || 'N/A - no most-important question was available.';
   return `Create a wide 16:9 Agent Village political compass meme poster${styleLine ? `, with this extra style hint: ${styleLine}` : ''}.
 
-Title treatment: make "Agent Village Compass" a horizontal top wordmark inspired by the Agent Village logo, not a separate logo badge. Render "AGENT" and the final mode word in the same bold uppercase block sans style, same cap height, same weight, and same white/silver material so neither reads as secondary. Render "VILLAGE" in the reference Agent Village style: elegant high-contrast serif, gold, with a flowing calligraphic V, visually matched to the same title scale and baseline. Subtitle: "Where your agent thinks you land."
+Title treatment: make a compact top-left "Agent Village" wordmark inspired by the Agent Village logo, not a full-width title or separate logo badge. Render "AGENT" in bold uppercase block sans and "VILLAGE" in the reference Agent Village style: elegant high-contrast serif with a flowing calligraphic V. Put subtitle "Where your agent thinks you land" on the same top row to create vertical space.
 
 Use the agent's most-important question as the focal issue for the compass: "${focal}". Treat this as the question the principal's agent thinks they would care about most. Build two interpretable axes from that focal issue and the predictions below; examples include privacy <-> proactivity, review-first <-> autonomous action, local community <-> frontier acceleration, or skepticism <-> trust. Do not invent private facts.
 
@@ -1809,7 +1828,7 @@ ${cautiousLines || 'N/A'}
 Agent guesses, if available:
 ${agentGuessLines || 'N/A'}
 
-Include a compact "Why here?" strip with exactly 3 evidence chips when at least 3 concrete evidence items exist. Each chip must have a precise icon and 2-4 word label derived directly from one specific question or prediction above. Do not use generic abstract icons, random symbols, or decorative filler. Include a tiny footer: "Review or edit your agent's responses in Context Engine". Do not show access credentials, raw Telegram ids, confidence tables, rationales, privacy skip counts, linear/quadratic allocation mechanics, decorative filler text, other users, or fake data.`;
+Include a compact "Why here?" strip with exactly 3 evidence chips when at least 3 concrete evidence items exist. Each chip must have a precise icon and 2-4 word label derived directly from one specific question or prediction above. Do not use generic abstract icons, random symbols, or decorative filler. Put only a faint small "contextengine.xyz" link in the bottom-right corner. Do not show access credentials, raw Telegram ids, confidence tables, rationales, privacy skip counts, linear/quadratic allocation mechanics, decorative filler text, other users, or fake data.`;
 }
 
 export function buildAgentOnlyWrappedImagePrompt({
@@ -1843,7 +1862,7 @@ export function buildAgentOnlyWrappedImagePrompt({
     .slice(0, WRAPPED_SECTION_ITEM_LIMIT);
   const important = wrappedImportanceRows(snapshot, [linearVoteState, quadraticVoteState], { excludeQuestionIds: guessQuestionIds });
   const importantLines = important.length
-    ? important.map((row, index) => `${index + 1}. "${wrappedDisplayText(row.question, 165)}"`).join('\n')
+    ? important.map((row, index) => `${index + 1}. "${wrappedDisplayText(row.question, 220)}"`).join('\n')
     : 'N/A - no importance allocations submitted yet.';
   const highLines = highConfidence.length
     ? highConfidence.map((row) => `- ${predictionLine(row)}`).join('\n')
@@ -1868,11 +1887,11 @@ export function buildAgentOnlyWrappedImagePrompt({
     assertNoSecretShape({ prompt }, 'Agent-only wrapped image prompt must not serialize secrets.');
     return prompt;
   }
-  const prompt = `Create a wide 16:9 shareable poster titled "Agent Village Wrapped" with subtitle "What your agent thinks it knows about you".
+  const prompt = `Create a wide 16:9 shareable poster with a compact top-left "Agent Village" wordmark and same-row title "What your agent thinks it knows about you".
 
-Make it look like a polished social-share card, readable on mobile, with no tiny text. Custom aesthetic must vary from person to person and should be derived from the predictions below${styleLine ? `, with this extra style hint: ${styleLine}` : ''}. Choose color palette, texture, layout rhythm, icons, and visual metaphor from the inferred archetype, strongest preferences, high-confidence answers, and memory signals. If the data suggests no stronger theme, use a premium privacy-first civic-tech visual language: cryptographic village map, clean coordination dashboard, warm midnight blue, signal green, soft gold, and white accents. Use elegant map lines, Telegram-like message nodes, tiny lock/check icons, and a village grid, but no literal robots.
+Make it look like a polished social-share card, readable on mobile, with no tiny text. Custom aesthetic must vary from person to person and should be derived from the predictions below${styleLine ? `, with this extra style hint: ${styleLine}` : ''}. Choose color palette, texture, layout rhythm, icons, and visual metaphor from the inferred archetype, strongest preferences, high-confidence answers, and memory signals. Avoid making every report dark navy: use varied, shareable palettes such as dawn civic-tech, paper-and-ink field notes, bright village map, warm botanical, clean sci-fi, or civic poster colors when supported by the data. If the data suggests no stronger theme, use a premium privacy-first civic-tech visual language: airy village map, clean coordination dashboard, misty teal, cream, signal green, soft gold, and white accents. Use elegant map lines, Telegram-like message nodes, tiny lock/check icons, and a village grid, but no literal robots.
 
-Title treatment: make "Agent Village Wrapped" a single horizontal wordmark running along the top, not a separate logo badge or big emblem. Use the Agent Village logo as inspiration. Render "AGENT" and "WRAPPED" in the same bold uppercase block sans style, same cap height, same weight, same white/silver material, and same visual importance. Render "VILLAGE" in the reference Agent Village style: elegant high-contrast serif, gold, with a flowing calligraphic V, visually matched to the same title scale and baseline instead of dwarfing or overpowering the other words. Do not place a standalone logo icon beside it. The subtitle "What your agent thinks it knows about you" must be large enough to read at a glance, roughly 35-45% of the title height, while still leaving the content area below most of the space.
+Title treatment: make "Agent Village" a smaller compact wordmark in the top-left corner, not a full-width headline, not a separate logo badge, and not a giant emblem. Do not render the word "Wrapped"; the format implies it and the extra word wastes space. Use the Agent Village logo as inspiration: render "AGENT" in bold uppercase block sans and render "VILLAGE" in elegant high-contrast serif with a flowing calligraphic V. Put the title "What your agent thinks it knows about you" on the same top row to the right of the wordmark, large enough to read at a glance. Keep the top row short so the content area gets most of the vertical space.
 
 Layout requirements: keep the top-right area visually calm with abstract map lines only, no decorative labels, no fake annotations, no extra numbers, and no filler text. Every visible word must be part of one of the content sections below. Leave clear spacing around the top wordmark and content cards.
 
@@ -1889,25 +1908,25 @@ Show exactly 3 actual question prompts if 3 are available; otherwise show every 
 ${importantLines}
 
 3. High-Confidence Reads
-Show exactly 3 concise prediction cards if 3 are available; otherwise show every available prediction. Each card must include enough of the actual question prompt to explain what the answer refers to:
+Show exactly 3 concise prediction rows if 3 are available; otherwise show every available prediction. Use explicit column headers "Question", "Predicted answer", and "Confidence". Each row must include enough of the actual question prompt to explain what the answer refers to. Do not use the phrase "your agent's take":
 ${highLines}
 
 4. Cautious Reads
-Show exactly 3 concise nuanced prediction cards if 3 are available; otherwise show every available prediction. Each card must include enough of the actual question prompt to explain what the answer refers to. Do not render detached rating labels like "Serendipity 3/5" without the question context:
+Show exactly 3 concise nuanced prediction rows if 3 are available; otherwise show every available prediction. Use explicit column headers "Question", "Predicted answer", and "Confidence". Each row must include enough of the actual question prompt to explain what the answer refers to, and if a shortened prompt would be ambiguous, show the full prompt even if the row becomes tighter. Do not render vague fragments like "Mostly AI-written information environment" when the full prompt is available; show the actual prompt such as "A mostly AI-written information environment could be healthier than today's mostly human-written one." Do not render detached rating labels like "Serendipity 3/5" or a bare "7" without the question context; show scale context like "7/10" when applicable. Do not use the phrase "your agent's take":
 ${cautiousLines}
 
 Confidence display: in both High-Confidence Reads and Cautious Reads, show a clear column or small header labeled "Confidence". Render confidence values as percentages like "95%" rather than "95/100". Do not show a full confidence table, just the per-card percentage.
 
 5. Agent Guesses
-If the data below contains favorite book, movie, game, or yes/no taste/personality guesses, include up to 3 compact "Agent Guesses" items. Show at most one item per guess category, so there is never a duplicate favorite-book/movie/game guess. If no such rows are available, omit this section entirely.
+If the data below contains favorite book, movie, game, p(bloom), or yes/no taste/personality guesses, include compact "Agent Guesses" items. Show at most one item per guess category, so there is never a duplicate favorite-book/movie/game/p(bloom) guess. Prefer placing these guesses in the same horizontal band as Agent Comparison when there is room, as compact chips with precise icons: book, board-game/Go stones, cinema/message screen, flower for p(bloom), etc. These guesses are additive; they must not replace the comparison evidence artifacts. If no such rows are available, omit this section entirely.
 ${agentGuessLines || 'N/A - no favorite book, movie, game, or yes/no agent guesses were submitted.'}
 
 Binary answer styling: whenever a prediction answer is Agree, Unsure, or Disagree, render that answer as a large rounded choice pill/button on a dark navy background: Agree is green with white text, Unsure is bright yellow with dark navy text, and Disagree is red with white text. The pills should feel like primary response controls, not small tags.
 
 6. Agent Comparison
-Compare the principal to a historical figure or fictional/book character only if it feels supported by the predictions; otherwise write "N/A". Prefer historically accurate deep cuts when supported by the evidence: recognizable but less generic comparisons are better than defaulting to Benjamin Franklin, Leonardo da Vinci, or other obvious polymath icons. Make this a richer wide strip with a stylized illustrated rendition or portrait silhouette of that figure/character, plus the comparison name and exactly 3 precise evidence artifacts when 3 concrete evidence items exist. Keep the evidence compact enough that the figure and evidence can share the same horizontal band. The artifacts must explain why this specific comparison fits, not merely repeat generic themes. Each artifact must be a specific icon plus a short label tied to one actual question or prediction above and to the chosen figure/character. For example, if the comparison is Benjamin Franklin, prefer comparison-specific objects like a locked letter labeled "private correspondence", a salon/introduction network labeled "civic introductions", or a repair ledger/printing proof labeled "public repair norm"; avoid generic lock/handshake/wrench icons unless the label makes the comparison clear. If the evidence does not support a specific object, use labeled text chips instead of generic icons. Avoid random gears, medals, hourglasses, charts, or decorative symbols.
+Compare the principal to a historical figure or fictional/book character only if it feels supported by the predictions; otherwise write "N/A". Prefer historically accurate deep cuts when supported by the evidence: recognizable but less generic comparisons are better than defaulting to Benjamin Franklin, Leonardo da Vinci, or other obvious polymath icons. Make this a richer wide strip with a stylized illustrated rendition or portrait silhouette of that figure/character, plus the comparison name and exactly 3 precise evidence artifacts when 3 concrete evidence items exist. If Agent Guesses are available, add them to this same horizontal band as extra chips, but do not replace the 3 comparison evidence artifacts. Keep the evidence and guess chips compact enough that they can share the same horizontal band. The artifacts must explain why this specific comparison fits, not merely repeat generic themes. Each artifact must be a specific icon plus a short label tied to one actual question or prediction above and to the chosen figure/character. For example, if the comparison is Benjamin Franklin, prefer comparison-specific objects like a locked letter labeled "private correspondence", a salon/introduction network labeled "civic introductions", or a repair ledger/printing proof labeled "public repair norm"; avoid generic lock/handshake/wrench icons unless the label makes the comparison clear. If the evidence does not support a specific object, use labeled text chips instead of generic icons. Avoid random gears, medals, hourglasses, charts, or decorative symbols.
 
-Footer in small centered type along the bottom edge, with "Context Engine" still readable: "Review or edit your agent's responses in Context Engine"
+Footer: remove the review/edit sentence entirely. Put only a small low-contrast but readable "contextengine.xyz" link in the bottom-right corner; it should be subtle, not barely invisible.
 
 Do not show access credentials, raw Telegram ids, confidence tables, rationales, privacy skip counts, linear/quadratic allocation mechanics, decorative text, lorem ipsum, fake UI labels, or random numbers. Keep the graphic memeable, premium, and screenshot-friendly. Make all major text legible and avoid overcrowding.`;
   assertNoSecretShape({ prompt }, 'Agent-only wrapped image prompt must not serialize secrets.');

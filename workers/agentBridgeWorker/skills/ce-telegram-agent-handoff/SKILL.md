@@ -1,6 +1,6 @@
 ---
 name: context-engine
-description: Use when an agent needs to connect a user to Context Engine, fetch and rank CE questions, submit approved answers, create questions, or include CE questions in a daily digest.
+description: Use when an agent needs to connect a user to Context Engine, fetch and rank CE questions, submit approved answers, create questions, or run Agent Village Wrapped.
 ---
 
 # Context Engine Agent Runtime
@@ -50,7 +50,7 @@ maps. Agents use it to:
 - create or propose new questions with tags;
 - surface aggregate results such as topic maps, consensus, difference, and
   anonymized groups;
-- add CE questions into morning or evening digests.
+- run Agent Village Wrapped predictions and image generation.
 
 ## Install And Refresh
 
@@ -75,8 +75,8 @@ GET /telegram/agent/api/skill-version
 ```
 
 If `updateAvailable` is true, `latestVersion` is newer, or `version` differs
-from this header, fetch the configured skill URL again and re-read the
-changelog. Normal question reads also include `skillVersion` and
+from this header, fetch the configured skill URL again and re-read this skill.
+Normal question reads also include `skillVersion` and
 `skillUpdateAvailable`.
 
 ## First Action
@@ -94,13 +94,22 @@ answerable question. Do not ask whether to fetch questions, fetch the skill
 endpoint, or "do anything else" first.
 
 If this is Hermes/OpenClaw with authorized Edge profile, calendar, and Telegram
-context, use the Edge-native onboarding flow below before ranking questions.
+context, use Agent Only Mode for Agent Village Wrapped, or Edge-native
+onboarding for ordinary CE question answering.
 
-## Trusted Geo / Hermes Invite Onboarding
+## Agent Only Mode (agent_only_mode)
 
-Use this path when a Telegram-native Hermes or Edge agent surfaces a Context
-Engine Geo node and can observe the current Telegram user's numeric `from.id`.
-The Geo node supplies:
+Use this path when a Geo/Hermes invite or bootstrap message asks for Agent
+Village Wrapped or `agent_only_mode`. This mode predicts the principal's answers
+and importance allocations. It writes structured sidecar data for Agent Village
+Wrapped and future interactive CE report views: statement ids, frozen prompts,
+answer schemas, typed predictions, confidence, optional concise rationale,
+answer/vote events, current prediction state, and later human confirm/edit
+review. It does not submit normal CE answers, drafts, question votes, or posed
+questions.
+
+Use this path only when the agent can observe the current Telegram user's
+numeric `from.id`. The Geo node supplies:
 
 ```json
 {
@@ -113,41 +122,7 @@ The Geo node supplies:
 }
 ```
 
-Ask the user a short prompt such as "Enable Context Engine for Agent Village?"
-A blue link, button, or quick reply can count as yes. Do not require a second
-confirmation unless the user asks for details.
-
-Then call:
-
-```http
-POST /telegram/agent/api/invite/onboard
-Content-Type: application/json
-
-{
-  "inviteToken": "<value from contextEngine.inviteToken>",
-  "telegramUserId": "<Telegram from.id observed by Hermes>",
-  "sessionSlug": "<value from contextEngine.sessionSlug>",
-  "source": "geo:<optional-node-id>"
-}
-```
-
-If successful, CE returns `token`, `worker`, `skillUrl`, `sessionSlug`,
-`expiresAt`, and onboarding state. Store `token` privately and use it as bearer
-auth for all later calls. Do not print or recap it.
-
-Do not use invite onboarding unless the agent actually has Telegram context for
-the person who clicked the Geo/Hermes link. If the agent cannot observe a
-verified Telegram user id, fall back to copied CE bot agent info.
-
-## Agent Only Mode (agent_only_mode)
-
-Use this path only when a Geo/Hermes invite or bootstrap message explicitly
-asks for `agent_only_mode`. This mode predicts the principal's answers and
-allocations for an evaluation window; it does not submit normal CE answers,
-drafts, question votes, or posed questions.
-
-First run the same trusted invite onboarding call, but include `"mode":
-"agent_only"` in the JSON body:
+After the principal agrees to run Agent Village Wrapped, call:
 
 ```http
 POST /telegram/agent/api/invite/onboard
@@ -210,6 +185,39 @@ Before beginning a run, call `/telegram/agent/api/skill-version`. If the worker
 reports a newer skill than this v40 header, refresh this skill and reread the
 agent-only instructions before continuing.
 
+## Trusted Geo / Hermes Invite Onboarding
+
+Use this path only for ordinary Context Engine question/draft workflows, not
+Agent Village Wrapped. It applies when a Telegram-native Hermes or Edge agent
+surfaces a Context Engine Geo node and can observe the current Telegram user's
+numeric `from.id`.
+
+Ask the user a short prompt such as "Enable Context Engine?" A blue link,
+button, or quick reply can count as yes. Do not require a second confirmation
+unless the user asks for details.
+
+Then call:
+
+```http
+POST /telegram/agent/api/invite/onboard
+Content-Type: application/json
+
+{
+  "inviteToken": "<value from contextEngine.inviteToken>",
+  "telegramUserId": "<Telegram from.id observed by Hermes>",
+  "sessionSlug": "<value from contextEngine.sessionSlug>",
+  "source": "geo:<optional-node-id>"
+}
+```
+
+If successful, CE returns `token`, `worker`, `skillUrl`, `sessionSlug`,
+`expiresAt`, and onboarding state. Store `token` privately and use it as bearer
+auth for all later calls. Do not print or recap it.
+
+Do not use invite onboarding unless the agent actually has Telegram context for
+the person who clicked the Geo/Hermes link. If the agent cannot observe a
+verified Telegram user id, fall back to copied CE bot agent info.
+
 ## Edge-Native Onboarding
 
 For Hermes/OpenClaw with authorized Edge profile/calendar context, lead with one
@@ -245,10 +253,6 @@ bio/profile text and ask only if unclear.
 If the user declines or narrows consent, persist only the approved subset and
 use current conversation plus public session context.
 
-If the user wants CE in a digest, ask whether they prefer the morning or evening
-Edge brief and store `dailyDigestOptIn`, `digestFrequency`, and
-`digestTimeOfDay`.
-
 After saving onboarding, call `GET /telegram/agent/api/questions?limit=20` and
 surface a relevant unanswered question. Do not stop at a settings summary.
 
@@ -264,8 +268,7 @@ Authorization: Bearer <token>
 The response marks submitted questions with `answeredByUser`, `answeredAt`,
 `answerStatus`, and `myAnswer`; ordinary listings sort unanswered-first. Keep
 that ordering unless a sponsored question or strong local relevance signal
-should override it. For scheduled digests, fetch up to 20 and rank locally using
-consented profile, schedule, interests, and recent activity.
+should override it.
 
 Present questions conversationally:
 
@@ -395,33 +398,6 @@ statements. Do not try to identify individuals.
 
 For a private interactive client report, use the client login exchange flow from
 the detailed reference only when the user asks for a Mini App or browser UI.
-Mini App links are fallback/editing tools, not the default Hermes digest path.
-
-## Digest / Hermes Cron Install
-
-Use this when the user asks to add CE to a recurring digest. CE does not
-schedule delivery; the host agent's cron owns timing and frequency.
-
-Checklist for Hermes:
-
-1. Install this runtime skill into the cron-visible registry. The expected slug
-   is `context-engine`; verify by listing installed skills after install.
-2. Ensure the directory holding the installed skill, for example
-   `/opt/data/skills`, appears in `skills.external_dirs` in the cron runtime's
-   config. If missing, the digest will say `Skill(s) not found and skipped`.
-3. Bind the active prepare job to the exact installed slug returned by the
-   registry. Do not guess. If the installed slug differs from `context-engine`,
-   use the actual slug.
-4. Keep `geo-esmeralda` and `edgeos` on prepare jobs when using profile,
-   calendar, RSVP, or Geo context to rank questions.
-5. Keep one active prepare job per digest slot. Pause duplicate prepare jobs
-   before deleting them.
-
-In the digest, fetch `GET /telegram/agent/api/questions?limit=20`, rank locally,
-and surface the top three relevant unanswered questions. Admin-sponsored
-questions should come first when the sponsored queue is configured. Include
-draft answers only when the user approved draft responses. Do not show question
-IDs. Ask the user to reply in chat; deep links are secondary fallback.
 
 ## Admin And Operator Notes
 
@@ -455,56 +431,5 @@ launches, group approval links, export flows, and lower-level operator details.
   call invite onboarding again with observed Telegram `from.id`, store the new
   token privately, and retry once. Do not make the user redo completed
   preferences unless onboarding state says incomplete.
-- `Skill(s) not found and skipped: context-engine`: the host cron cannot
-  resolve the installed skill slug. Verify install, `skills.external_dirs`, and
-  the active cron job's exact `skills` list.
 - If a direct submit returns draft-only counts, do not claim it was submitted.
   Repair the payload so `submit: true` and `humanApproved: true` are at the root.
-
-## Changelog
-
-### 2026-06-12 (v40)
-
-- Added `agent_only_mode` onboarding for trusted Geo/Hermes invites, with
-  scoped short-lived credentials and a same-origin start payload.
-- Added agent-only predicted answers, privacy-protective skips, and linear plus
-  quadratic token allocation instructions for weekly evaluation windows.
-- Added Agent Village Wrapped image generation instructions for agent-only runs,
-  with the political compass meme as an opt-in follow-up.
-- Agent-only predictions remain sidecar data: human answers stay authoritative,
-  and normal draft, submit, vote, question, and result flows are unchanged.
-
-### 2026-06-11 (v39)
-
-- Draft records preserve first-revision provenance, edit counts, human-edit
-  counts, and latest agent revision fingerprints across agent, Mini App, and
-  private-chat lanes.
-- Submit records include `draftProvenance` with origin/final plaintext,
-  semantic fingerprints, review latency, and typed deltas for binary, rating,
-  multichoice, and freeform answers.
-- Optional Workers Analytics Engine lifecycle events cover `draft_created`,
-  `draft_edited`, `draft_submitted`, and `draft_discarded` without exposing raw
-  Telegram ids.
-- Tightened concise-draft guidance: comments should be one short reason, and
-  omitted in `concise` mode unless needed for clarity.
-
-### 2026-06-08 (v38)
-
-- Split the default `/telegram/agent/api/skill` document into a shorter
-  `context-engine` runtime skill for Hermes and other agents.
-- Moved Telegram bot, Mini App, callback, and detailed operator material into
-  the separate `ce-telegram-bot-reference` skill.
-- Kept the stable Worker skill URL so existing Geo nodes can refresh without
-  changing their metadata.
-
-### 2026-06-08 (v37)
-
-- Clarified that Edge-native Hermes/OpenClaw onboarding should ask permission
-  to use authorized profile/activity data before bucket setup, treat group
-  fields as a storage schema rather than a user-facing checklist, and avoid
-  narrating token or endpoint mechanics to the user.
-
-### 2026-06-08 (v36)
-
-- Added the direct-submit verification contract and authenticated `myAnswer`
-  echo guidance so agents can verify recorded answers.

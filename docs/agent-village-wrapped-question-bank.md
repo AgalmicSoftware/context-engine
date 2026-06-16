@@ -35,22 +35,25 @@ The image endpoint supports two intended modes:
 ## Current Image Prompt Skeleton
 
 ```text
-Create a wide shareable "Agent Village Wrapped" poster, 16:9 or 3:2 aspect ratio.
+Create a wide shareable Agent Village poster, 16:9 or 3:2 aspect ratio.
 
-Title: Agent Village Wrapped
-Subtitle: What your agent thinks it knows about you
+Top-left wordmark: Agent Village
+Same-row title: What your agent thinks it knows about you
 
-Choose the visual aesthetic based on the agent's analysis of the principal. Do not use a fixed house style. The reports should look meaningfully different from person to person. Derive color palette, layout rhythm, icons, texture, and metaphor from the predicted archetype, strongest themes, memory signals, and high-confidence answers. Keep it memeable, readable, and screenshot-friendly.
+Choose the visual aesthetic based on the agent's analysis of the principal. Do
+not use a fixed house style or always-dark palette. The reports should look
+meaningfully different from person to person. Derive color palette, layout
+rhythm, icons, texture, and metaphor from the predicted archetype, strongest
+themes, memory signals, and high-confidence answers. Keep it memeable, readable,
+and screenshot-friendly.
 
-Make "Agent Village Wrapped" a horizontal wordmark along the top, not a separate
-logo badge or large emblem. Use the Agent Village logo as inspiration. Render
-"AGENT" and "WRAPPED" in the same bold uppercase block sans style, same cap
-height, same weight, same white/silver material, and same visual importance.
+Make "Agent Village" a compact wordmark in the top-left corner, not a separate
+logo badge, giant emblem, or full-width headline. Do not render the word
+"Wrapped"; the format implies it and the extra word wastes space. Use the Agent
+Village logo as inspiration. Render "AGENT" in bold uppercase block sans style.
 Render "VILLAGE" in the reference Agent Village style: elegant high-contrast
-serif, gold, with a flowing calligraphic V, visually matched to the same title
-scale and baseline. Make the subtitle "What your agent thinks it knows about
-you" large enough to read at a glance, roughly 35-45% of the title height, while
-still leaving the content area below most of the room.
+serif with a flowing calligraphic V. Put "What your agent thinks it knows about
+you" on the same top row to the right of the wordmark.
 
 Keep the top-right and other decorative areas visually calm. Use abstract map
 lines, icons, or texture there, but no decorative labels, fake annotations,
@@ -79,7 +82,9 @@ view, not a claim that any answer was boosted.
 3. High-Confidence Reads
 Show 3 concise predicted answers the agent made on the principal's behalf when
 at least 3 are available; otherwise show every available high-confidence
-prediction. Include enough question context for each answer to make sense.
+prediction. Use explicit column headers: Question, Predicted answer, Confidence.
+Include enough question context for each answer to make sense; show scale context
+such as 7/10 rather than a bare 7.
 For binary answers, render Agree / Unsure / Disagree as large rounded response
 pills on a dark navy field: Agree green with white text, Unsure bright yellow
 with dark navy text, Disagree red with white text.
@@ -88,15 +93,19 @@ with dark navy text, Disagree red with white text.
 Show 3 predicted answers the agent was least confident about when at least 3 are
 available. Include the answer and enough question context to make clear what the
 uncertainty refers to. Do not show detached shorthand like "Serendipity 3/5"
-without the actual question prompt. If no low-confidence data exists, write
-"N/A - agent reported uniformly high confidence."
+without the actual question prompt. If a shortened prompt would be ambiguous,
+show the full prompt even if the row is tighter, especially for claims like
+"A mostly AI-written information environment could be healthier than today's
+mostly human-written one." If no low-confidence data exists, write "N/A - agent
+reported uniformly high confidence."
 
 5. Agent Guesses
 If available, include a compact strip of playful low-stakes guesses, such as
-favorite book, movie, game, or yes/no taste/personality guesses. These should be
-clearly framed as guesses, not facts. Show at most one item per guess category,
-so the same favorite-book/movie/game guess cannot appear twice. If unavailable,
-omit the section rather than inventing.
+favorite book, movie, game, p(bloom), or yes/no taste/personality guesses. These
+should be clearly framed as guesses, not facts. Show at most one item per guess
+category, so the same favorite-book/movie/game/p(bloom) guess cannot appear
+twice. Use a flower icon for p(bloom). If unavailable, omit the section rather
+than inventing.
 
 6. Memory Signals Used
 Only show supported, non-sensitive signals. Use "N/A" when unknown:
@@ -113,6 +122,8 @@ the figure/character, the comparison name, and exactly 3 precise evidence
 artifacts or icons when 3 concrete items exist. The artifacts must explain why
 this specific comparison fits, not merely restate generic themes. Each artifact
 must be tied to an actual question or prediction and to the chosen comparison.
+If Agent Guesses are available, add them to this same horizontal band as extra
+chips, but do not replace the 3 comparison evidence artifacts.
 For Benjamin Franklin, good artifacts could be a locked letter labeled "private
 correspondence," a salon/introduction network labeled "civic introductions," or
 a repair ledger/printing proof labeled "public repair norm." If no specific icon
@@ -120,8 +131,8 @@ is supported, use labeled text chips instead of generic symbols. Keep it playful
 and non-defamatory.
 
 Footer:
-"Review or edit your agent's responses in Context Engine" centered in small
-type along the bottom edge; keep "Context Engine" readable.
+Only a small, low-contrast but readable "contextengine.xyz" link in the
+bottom-right corner.
 
 Do not show access credentials, raw Telegram ids, private memory quotes, confidence
 tables, rationales, privacy skip counts, decorative text, fake UI labels, or
@@ -296,15 +307,19 @@ alone.
     - Wrapped: playful identity card.
     - Report: light clustering of play/interaction preferences.
 
-34. **(binary, predicted human answer)** "I would enjoy seeing a playful public guess from my agent, as long as it is clearly labeled as a guess."
+34. **(rating 0-100, agent-about-user analysis)** "Agent guess: what is this principal's p(bloom) - their probability that things broadly flourish from here? Answer `N/A` if unsupported."
+    - Wrapped: p(bloom) flower chip.
+    - Report: optimism/flourishing model; not calibration-critical.
+
+35. **(binary, predicted human answer)** "I would enjoy seeing a playful public guess from my agent, as long as it is clearly labeled as a guess."
     - Wrapped: consent signal for memeable guess sections.
     - Report: appetite for playful agent interpretation.
 
-35. **(binary, predicted human answer)** "I would rather my agent say `N/A` than make a clever but weakly supported guess about me."
+36. **(binary, predicted human answer)** "I would rather my agent say `N/A` than make a clever but weakly supported guess about me."
     - Wrapped: humility/trust motif.
     - Report: tolerance for uncertainty vs entertainment.
 
-36. **(multichoice: books / films or TV / games or puzzles / music / historical figures / no playful guesses, predicted human answer)** "Which kind of playful guess would I be most comfortable seeing in my Agent Village Wrapped?"
+37. **(multichoice: books / films or TV / games or puzzles / music / historical figures / no playful guesses, predicted human answer)** "Which kind of playful guess would I be most comfortable seeing in my Agent Village Wrapped?"
     - Wrapped: chooses the safest guess lane.
     - Report: preference distribution for social-share content.
 
@@ -315,19 +330,19 @@ the most important / most defining question as the focal issue and places the
 principal on a quadrant with historical or fictional/book-character reference
 points.
 
-37. **(multichoice: privacy vs opportunity / review vs autonomy / local community vs frontier acceleration / institutional trust vs exit / play vs productivity / N/A, agent-about-user analysis)** "Which axis best explains this principal's agent delegation politics?"
+38. **(multichoice: privacy vs opportunity / review vs autonomy / local community vs frontier acceleration / institutional trust vs exit / play vs productivity / N/A, agent-about-user analysis)** "Which axis best explains this principal's agent delegation politics?"
     - Wrapped: political compass axis selection.
     - Report: aggregate map of delegation ideologies.
 
-38. **(freeform, agent-about-user analysis)** "What is the most defining question for placing this principal on an Agent Village political compass? Use a short non-sensitive answer."
+39. **(freeform, agent-about-user analysis)** "What is the most defining question for placing this principal on an Agent Village political compass? Use a short non-sensitive answer."
     - Wrapped: focal issue for the compass.
     - Report: qualitative map of salient decision axes.
 
-39. **(multichoice: cautious steward / civic experimentalist / frontier accelerationist / privacy maximalist / community institutionalist / playful operator / N/A, agent-about-user analysis)** "Which quadrant label best fits this principal's agent-delegation posture?"
+40. **(multichoice: cautious steward / civic experimentalist / frontier accelerationist / privacy maximalist / community institutionalist / playful operator / N/A, agent-about-user analysis)** "Which quadrant label best fits this principal's agent-delegation posture?"
     - Wrapped: quadrant label.
     - Report: agent-perceived delegation ideology.
 
-40. **(freeform, agent-about-user analysis)** "Which historical figure or fictional/book character should anchor this principal's compass placement, and what evidence supports it? Use `N/A` if unsupported."
+41. **(freeform, agent-about-user analysis)** "Which historical figure or fictional/book character should anchor this principal's compass placement, and what evidence supports it? Use `N/A` if unsupported."
     - Wrapped: meme reference point.
     - Report: qualitative only; high hallucination risk, so treat as optional.
 
@@ -337,42 +352,42 @@ These came from the Claude review pass and the follow-up product direction:
 make the Wrapped more shareable, but keep every agent-about-user item honest
 with an `N/A` path. These are candidates, not uploaded questions.
 
-41. **(multichoice: tell me immediately / fix it quietly then tell me / apologize to the affected person first / log it and wait for review / N/A, predicted human answer)** "If my agent made a mistake while acting for me, what would I want it to do first?"
+42. **(multichoice: tell me immediately / fix it quietly then tell me / apologize to the affected person first / log it and wait for review / N/A, predicted human answer)** "If my agent made a mistake while acting for me, what would I want it to do first?"
     - Wrapped: failure-recovery preference.
     - Report: norms for repair and accountability after agent mistakes.
 
-42. **(binary, predicted human answer)** "I would want my agent to ask before sharing context about me with another person's agent."
+43. **(binary, predicted human answer)** "I would want my agent to ask before sharing context about me with another person's agent."
     - Wrapped: inter-agent privacy boundary.
     - Report: agent-to-agent social protocol preferences.
 
-43. **(multichoice: formal / concise / warm / opinionated / playful / invisible unless needed / N/A, predicted human answer)** "What voice should my agent use when it acts or writes on my behalf?"
+44. **(multichoice: formal / concise / warm / opinionated / playful / invisible unless needed / N/A, predicted human answer)** "What voice should my agent use when it acts or writes on my behalf?"
     - Wrapped: custom style and tone.
     - Report: preferred agent personality distribution.
 
-44. **(freeform, agent-about-user analysis)** "What does the agent think it knows about this principal that the principal might not realize it has inferred? Use a non-sensitive answer or N/A."
+45. **(freeform, agent-about-user analysis)** "What does the agent think it knows about this principal that the principal might not realize it has inferred? Use a non-sensitive answer or N/A."
     - Wrapped: information-asymmetry insight.
     - Report: what agents infer from ambient context.
 
-45. **(freeform, agent-about-user analysis)** "What prediction would most surprise this principal? Use N/A if unsupported."
+46. **(freeform, agent-about-user analysis)** "What prediction would most surprise this principal? Use N/A if unsupported."
     - Wrapped: surprise read.
     - Report: where agent models diverge from self-perception.
 
-46. **(binary, predicted human answer)** "I would let my agent make a small financial decision on my behalf, such as splitting a bill or buying a ticket, if the amount was under $25."
+47. **(binary, predicted human answer)** "I would let my agent make a small financial decision on my behalf, such as splitting a bill or buying a ticket, if the amount was under $25."
     - Wrapped: concrete delegation boundary.
     - Report: financial autonomy threshold.
 
-47. **(freeform, agent-about-user analysis)** "Agent guess: what song, album, or artist would this principal play for a friend? Answer `N/A` if unsupported."
+48. **(freeform, agent-about-user analysis)** "Agent guess: what song, album, or artist would this principal play for a friend? Answer `N/A` if unsupported."
     - Wrapped: playful taste card.
     - Report: qualitative culture map; not calibration-critical.
 
-48. **(freeform, agent-about-user analysis)** "Agent guess: what historical figure or fictional character would this principal enjoy being compared to? Answer `N/A` if unsupported."
+49. **(freeform, agent-about-user analysis)** "Agent guess: what historical figure or fictional character would this principal enjoy being compared to? Answer `N/A` if unsupported."
     - Wrapped: comparison prompt.
     - Report: shareability and archetype clustering.
 
-49. **(multichoice: favorite book / favorite movie or show / favorite game or puzzle / favorite music / favorite food / no favorite-stuff guesses / N/A, predicted human answer)** "Which favorite-stuff guess would I be most comfortable having my agent make publicly?"
+50. **(multichoice: favorite book / favorite movie or show / favorite game or puzzle / favorite music / favorite food / no favorite-stuff guesses / N/A, predicted human answer)** "Which favorite-stuff guess would I be most comfortable having my agent make publicly?"
     - Wrapped: preference gate for Agent Guesses.
     - Report: what kinds of playful guesses participants welcome.
 
-50. **(freeform, agent-about-user analysis)** "What one question should the principal answer themselves to verify whether your model of them is right? Use a short non-sensitive question."
+51. **(freeform, agent-about-user analysis)** "What one question should the principal answer themselves to verify whether your model of them is right? Use a short non-sensitive question."
     - Wrapped: review CTA.
     - Report: high-value human correction prompts.

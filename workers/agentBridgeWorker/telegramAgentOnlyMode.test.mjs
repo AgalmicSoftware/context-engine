@@ -163,6 +163,8 @@ test('start payload pins path-only endpoints and instruction size', () => {
   assert.match(payload.instructions, /wrappedImageEndpoint/);
   assert.match(payload.instructions, /mode "political_compass"/);
   assert.match(payload.instructions, /render or display the image/);
+  assert.match(payload.instructions, /To inspect or change your agent's responses/);
+  assert.doesNotMatch(payload.instructions, /Review or edit your agent's responses in Context Engine Telegram Bot/);
   assert.ok(agentOnlyInstructionWordCount(AGENT_ONLY_INSTRUCTIONS) >= 400);
   assert.ok(agentOnlyInstructionWordCount(AGENT_ONLY_INSTRUCTIONS) <= 800);
   assert.equal(/https?:\/\//i.test(payload.instructions), false);
@@ -179,7 +181,7 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
       },
       {
         statement_id: 'ceq_info',
-        text: 'A mostly AI-written information environment could be healthier than today.',
+        text: "A mostly AI-written information environment could be healthier than today's mostly human-written one.",
         answer_schema: { kind: 'choice', values: ['agree', 'unsure', 'disagree'] },
       },
       {
@@ -207,6 +209,16 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
         text: 'Would I want my agent to post publicly without review?',
         answer_schema: { kind: 'choice', values: ['agree', 'unsure', 'disagree'] },
       },
+      {
+        statement_id: 'ceq_rating',
+        text: 'How comfortable are you with your agent making commitments on your behalf while you sleep, that you learn about only when you wake up?',
+        answer_schema: { kind: 'choice', values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] },
+      },
+      {
+        statement_id: 'ceq_pbloom',
+        text: 'What is my p(bloom) for a flourishing future after this year?',
+        answer_schema: { kind: 'choice', values: [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100] },
+      },
     ],
   };
   const state = {
@@ -216,6 +228,8 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
       ceq_book: { agent: { answer: { text: 'The Diamond Age' }, confidence: 52 } },
       ceq_book_followup: { agent: { answer: { text: 'Neuromancer' }, confidence: 70 } },
       ceq_movie: { agent: { answer: { text: 'Unsupported' }, confidence: 12 } },
+      ceq_rating: { agent: { answer: { value: 7 }, confidence: 88 } },
+      ceq_pbloom: { agent: { answer: { value: 80 }, confidence: 63 } },
     },
   };
   const prompt = buildAgentOnlyWrappedImagePrompt({
@@ -236,15 +250,14 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.match(prompt, /Most Important To You/);
   assert.match(prompt, /Questions your agent thought you would care about most/);
   assert.match(prompt, /Show exactly 3 actual question prompts/);
-  assert.match(prompt, /horizontal wordmark running along the top/);
-  assert.match(prompt, /"AGENT" and "WRAPPED" in the same bold uppercase block sans style/);
-  assert.match(prompt, /same cap height, same weight/);
-  assert.match(prompt, /same visual importance/);
-  assert.match(prompt, /reference Agent Village style/);
+  assert.match(prompt, /compact top-left "Agent Village" wordmark/);
+  assert.match(prompt, /What your agent thinks it knows about you/);
+  assert.match(prompt, /Do not render the word "Wrapped"/);
+  assert.match(prompt, /"AGENT" in bold uppercase block sans/);
+  assert.match(prompt, /Agent Village logo as inspiration/);
   assert.match(prompt, /flowing calligraphic V/);
-  assert.match(prompt, /visually matched to the same title scale and baseline/);
-  assert.match(prompt, /Do not place a standalone logo icon/);
-  assert.match(prompt, /35-45% of the title height/);
+  assert.match(prompt, /content area gets most of the vertical space/);
+  assert.match(prompt, /varied, shareable palettes/);
   assert.match(prompt, /Custom aesthetic must vary from person to person/);
   assert.match(prompt, /Section typography: make section titles large/);
   assert.match(prompt, /Show exactly 3 actual question prompts/);
@@ -256,8 +269,20 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.match(prompt, /High-Confidence Reads/);
   assert.match(prompt, /Cautious Reads/);
   assert.match(prompt, /Question: "/);
+  assert.match(prompt, /Predicted answer/);
+  assert.match(prompt, /7\/10/);
+  assert.match(prompt, /prediction: 7\/10; confidence: 88%/);
+  assert.doesNotMatch(prompt, /confidence: 88\/100/);
+  assert.doesNotMatch(prompt, /prediction: 7; confidence/);
+  assert.match(prompt, /show the full prompt even if the row becomes tighter/);
+  assert.match(prompt, /Question: "A mostly AI-written information environment could be healthier than today's mostly human-written one\."/);
+  assert.match(prompt, /Do not use the phrase "your agent's take"/);
   assert.match(prompt, /Do not render detached rating labels/);
   assert.match(prompt, /Agent Guesses/);
+  assert.match(prompt, /p\(bloom\)/);
+  assert.match(prompt, /prediction: 80\/100; confidence: 63%/);
+  assert.match(prompt, /flower for p\(bloom\)/);
+  assert.match(prompt, /must not replace the comparison evidence artifacts/);
   assert.match(prompt, /favorite book/);
   assert.match(prompt, /Neuromancer/);
   assert.doesNotMatch(prompt, /The Diamond Age/);
@@ -271,7 +296,9 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.match(prompt, /civic introductions/);
   assert.match(prompt, /public repair norm/);
   assert.match(prompt, /Avoid random gears, medals, hourglasses/);
-  assert.match(prompt, /Footer in small centered type/);
+  assert.match(prompt, /contextengine\.xyz/);
+  assert.match(prompt, /subtle, not barely invisible/);
+  assert.doesNotMatch(prompt, /Review or edit your agent's responses in Context Engine/);
   assert.doesNotMatch(prompt, /What Your Agent Upvoted/);
 });
 
@@ -305,9 +332,9 @@ test('wrapped image prompt supports political compass mode around the most-impor
     mode: 'political_compass',
   });
   assert.match(prompt, /political compass meme/);
-  assert.match(prompt, /Agent Village Compass/);
-  assert.match(prompt, /final mode word in the same bold uppercase block sans style/);
-  assert.match(prompt, /same title scale and baseline/);
+  assert.match(prompt, /compact top-left "Agent Village" wordmark/);
+  assert.match(prompt, /Where your agent thinks you land/);
+  assert.match(prompt, /"AGENT" in bold uppercase block sans/);
   assert.match(prompt, /most-important question/);
   assert.match(prompt, /historical figures or fictional\/book characters/);
   assert.match(prompt, /I would rather my agent be too conservative with privacy/);

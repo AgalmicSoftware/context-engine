@@ -317,8 +317,11 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.match(source, /cache or install this Markdown skill locally/);
   assert.match(source, /not a callable tool name/);
   assert.match(source, /Do not call a tool named `ce-telegram-agent-handoff`/);
-  assert.match(source, /Trusted Geo \/ Hermes Invite Onboarding/);
   assert.match(source, /Agent Only Mode \(agent_only_mode\)/);
+  assert.match(source, /future interactive CE report views/);
+  assert.match(source, /statement ids, frozen prompts/);
+  assert.match(source, /Trusted Geo \/ Hermes Invite Onboarding/);
+  assert.ok(source.indexOf('## Agent Only Mode (agent_only_mode)') < source.indexOf('## Trusted Geo / Hermes Invite Onboarding'));
   assert.match(source, /GET \/telegram\/agent\/api\/agent-only\/start/);
   assert.match(source, /Edge-Native Onboarding/);
   assert.match(source, /demographicLinkOptIn/);
@@ -339,14 +342,13 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.match(source, /GET \/telegram\/agent\/api\/results\?sessionSlug=<slug>&view=topic-map/);
   assert.match(source, /GET \/telegram\/agent\/api\/results\?sessionSlug=<slug>&view=groups/);
   assert.match(source, /GET \/telegram\/agent\/api\/results-image\?sessionSlug=<slug>&view=topic-map/);
-  assert.match(source, /Digest \/ Hermes Cron Install/);
-  assert.match(source, /expected slug\s+is `context-engine`/);
-  assert.match(source, /Skill\(s\) not found and skipped: context-engine/);
+  assert.doesNotMatch(source, /Digest \/ Hermes Cron Install/);
+  assert.doesNotMatch(source, /scheduled digest/i);
+  assert.doesNotMatch(source, /Skill\(s\) not found and skipped: context-engine/);
   assert.match(source, /GET \/telegram\/agent\/api\/admin\/metrics/);
   assert.match(source, /POST \/telegram\/agent\/api\/question-queue\/plan/);
   assert.match(source, /POST \/telegram\/agent\/api\/question-queue\/apply/);
-  assert.match(source, /## Changelog/);
-  assert.match(source, /2026-06-12 \(v40\)/);
+  assert.doesNotMatch(source, /## Changelog/);
 
   assert.match(reference, /name:\s+ce-telegram-bot-reference/);
   assert.match(reference, /^# CE Telegram Bot Reference/m);
@@ -380,7 +382,7 @@ test('Telegram agent handoff exposes unauthenticated skill version metadata', as
   assert.equal(body.version, '2026-06-12 (v40)');
   assert.equal(body.skill, 'context-engine');
   assert.equal(body.skillUrl, 'https://example.test/skills/ce-telegram-agent-handoff/SKILL.md');
-  assert.equal(body.changelogUrl, 'https://example.test/skills/ce-telegram-agent-handoff/SKILL.md#changelog');
+  assert.equal(Object.hasOwn(body, 'changelogUrl'), false);
   assert.equal(body.updateAvailable, false);
   assert.equal(body.latestVersion, '2026-06-12 (v40)');
   assert.equal(body.updateNote, '');
@@ -1651,7 +1653,9 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   assert.equal(openAiRequestBody.output_format, 'png');
   assert.match(openAiRequestBody.prompt, /Most Important To You/);
   assert.match(openAiRequestBody.prompt, /Questions your agent thought you would care about most/);
-  assert.match(openAiRequestBody.prompt, /Review or edit your agent's responses in Context Engine/);
+  assert.match(openAiRequestBody.prompt, /compact top-left "Agent Village" wordmark/);
+  assert.match(openAiRequestBody.prompt, /contextengine\.xyz/);
+  assert.doesNotMatch(openAiRequestBody.prompt, /Review or edit your agent's responses in Context Engine/);
   assert.doesNotMatch(openAiRequestBody.prompt, /What Your Agent Upvoted/);
 
   const metricsResponse = await handleTelegramAgentHandoffRequest({
