@@ -59,13 +59,13 @@ Step 2, answer every statement. POST batches of up to 50 rows to /telegram/agent
 
 Step 3, allocate both token balances. You have two independent 100-token balances for statements your principal would most want raised or lowered. POST once to /telegram/agent/api/agent-only/token-votes/bulk with mode linear: signed integer weights where sum(abs(weight)) is at most 100. POST once with mode quadratic: signed integers from -10 to 10 where sum(weight squared) is at most 100. Submit both modes for the same window. Negative values lower priority; positive values raise priority.
 
-Step 4, Agent Village Wrapped image. After Step 3 succeeds, use the wrappedImageEndpoint path from the start payload. POST to it with the same authorization credential and JSON body { "window_id": "<window_id>", "mode": "wrapped", "format": "json" }. Decode image_base64 as image/png and render or display the image if your host supports it. Do not print raw image_base64 or the full image prompt. After showing the standard Wrapped image, ask whether the principal wants the optional political compass meme; only if they say yes, POST the same endpoint with mode "political_compass" and display that image too.
+Step 4, Agent Village Wrapped image. After Step 3 succeeds, use the wrappedImageEndpoint path from the start payload. POST to it with the same authorization credential and JSON body { "window_id": "<window_id>", "mode": "wrapped", "format": "json" }. Decode image_base64 as image/png and render or display the image if your host supports it. Do not print raw image_base64 or the full image prompt. The image should be shown automatically before the final chat message. After showing the standard Wrapped image, ask whether the principal wants the optional political compass meme; only if they say yes, POST the same endpoint with mode "political_compass" and display that image too.
 
 Metadata. Every POST must include agent_metadata with model, scaffold_version, and agent_initialized_at if known. Use request_id when retrying; replaying the same request_id is idempotent within a window.
 
 Errors and retries. On validation errors, fix the listed rows and resend. On window_mismatch, re-fetch statements because a new window opened, then redo the run for the new window_id. If your cached skill version is older than /telegram/agent/api/skill-version, refresh the skill before continuing.
 
-Completion report. Tell your principal only: "Submitted N predicted answers (M privacy skips) and both token allocations for window W. Review or edit them in the CE bot, then click Open Mini App." Do not list confidences, rationales, or token details in chat unless asked.
+Completion report. After the Wrapped image is displayed, tell your principal only: "Your Agent Village Wrapped is ready. Review or edit your agent's responses in Context Engine Telegram Bot, then click Open Mini App. Want me to generate the optional political compass meme too?" Do not include the window id, confidences, rationales, privacy skip count, raw links, or token details in chat unless asked.
 
 Your answers are predictions. Your principal's own answers always take precedence and are never overwritten. Windows refresh weekly on Mondays at 08:00 Pacific.`;
 
@@ -1277,6 +1277,14 @@ function answerLabelForSchema(answer = {}, schema = {}) {
   return text;
 }
 
+function binaryAnswerKindForSchema(answer = {}, schema = {}) {
+  if (!answer || typeof answer !== 'object' || schema.kind !== 'choice') return '';
+  const values = new Set((Array.isArray(schema.values) ? schema.values : []).map((value) => lower(value)));
+  if (!values.has('agree') || !values.has('unsure') || !values.has('disagree')) return '';
+  const kind = lower(answerScalarString(answer.value));
+  return ['agree', 'unsure', 'disagree'].includes(kind) ? kind : '';
+}
+
 async function reviewSemanticFingerprint(review = {}, schema = {}) {
   if (!review || typeof review !== 'object') return '';
   return safeString(review.semanticFingerprint)
@@ -1334,6 +1342,7 @@ export async function loadAgentOnlyPredictionsForPrincipal({
     const humanFingerprint = await reviewSemanticFingerprint(entry.human, schema);
     predictionsByQuestionId[questionId] = {
       valueLabel: answerLabelForSchema(entry.agent.answer, schema),
+      answerKind: binaryAnswerKindForSchema(entry.agent.answer, schema),
       semanticFingerprint: agentFingerprint,
       confirmed: safeString(entry.human?.kind) === 'confirm' && humanFingerprint === agentFingerprint,
       reviewed: Boolean(entry.human),
@@ -1523,13 +1532,13 @@ function buildAgentOnlyPoliticalCompassPrompt({
   styleLine = '',
 } = {}) {
   const focal = wrappedDisplayText(focalQuestion, 150) || 'N/A - no most-important question was available.';
-  return `Create a wide 16:9 political compass meme poster for Agent Village Wrapped${styleLine ? `, with this extra style hint: ${styleLine}` : ''}.
+  return `Create a wide 16:9 Agent Village political compass meme poster${styleLine ? `, with this extra style hint: ${styleLine}` : ''}.
 
 Title treatment: make "Agent Village Compass" a horizontal top wordmark inspired by the Agent Village logo, not a separate logo badge. Render "AGENT" and the final mode word in the same bold uppercase block sans style, same cap height, same weight, and same white/silver material so neither reads as secondary. Render "VILLAGE" in the reference Agent Village style: elegant high-contrast serif, gold, with a flowing calligraphic V, visually matched to the same title scale and baseline. Subtitle: "Where your agent thinks you land."
 
 Use the agent's most-important question as the focal issue for the compass: "${focal}". Treat this as the question the principal's agent thinks they would care about most. Build two interpretable axes from that focal issue and the predictions below; examples include privacy <-> proactivity, review-first <-> autonomous action, local community <-> frontier acceleration, or skepticism <-> trust. Do not invent private facts.
 
-Make a classic four-quadrant political compass meme, but premium and readable rather than cluttered. Put the principal as a clear glowing marker with a short label. Put several historical figures or fictional/book characters around the quadrants as playful reference points. Keep comparisons non-defamatory and based only on the prediction themes.
+Make it look more like a clean debate-atlas discussion map than a busy internet collage: four quadrants, crisp labeled axes, fine grid lines, and a few discussion-node markers. Put the principal as one clear glowing marker with a short label. Put only recognizable historical figures or fictional/book characters as playful reference points on the same dimensions; do not show other users, crowds, avatars, or fake people. Label each reference point with the figure/character name and one short reason tied to the axes. Keep comparisons non-defamatory and based only on the prediction themes.
 
 Evidence to use:
 Most important questions:
@@ -1544,7 +1553,7 @@ ${cautiousLines || 'N/A'}
 Agent guesses, if available:
 ${agentGuessLines || 'N/A'}
 
-Include a compact "Why here?" strip with exactly 3 evidence chips when at least 3 concrete evidence items exist. Each chip must have a precise icon and 2-4 word label derived directly from one specific question or prediction above. Do not use generic abstract icons, random symbols, or decorative filler. Include a tiny footer: "Review or edit your agent's responses in Context Engine". Do not show access credentials, raw Telegram ids, confidence tables, rationales, privacy skip counts, linear/quadratic allocation mechanics, decorative filler text, or fake data.`;
+Include a compact "Why here?" strip with exactly 3 evidence chips when at least 3 concrete evidence items exist. Each chip must have a precise icon and 2-4 word label derived directly from one specific question or prediction above. Do not use generic abstract icons, random symbols, or decorative filler. Include a tiny footer: "Review or edit your agent's responses in Context Engine". Do not show access credentials, raw Telegram ids, confidence tables, rationales, privacy skip counts, linear/quadratic allocation mechanics, decorative filler text, other users, or fake data.`;
 }
 
 export function buildAgentOnlyWrappedImagePrompt({
@@ -1631,6 +1640,8 @@ ${highLines}
 Show exactly 3 concise nuanced prediction cards if 3 are available; otherwise show every available prediction. Each card must include enough of the actual question prompt to explain what the answer refers to. Do not render detached rating labels like "Serendipity 3/5" without the question context:
 ${cautiousLines}
 
+Confidence display: in both High-Confidence Reads and Cautious Reads, show a clear column or small header labeled "Confidence". Render confidence values as percentages like "95%" rather than "95/100". Do not show a full confidence table, just the per-card percentage.
+
 5. Agent Guesses
 If the data below contains favorite book, movie, game, or yes/no taste/personality guesses, include up to 3 compact "Agent Guesses" items. Show at most one item per guess category, so there is never a duplicate favorite-book/movie/game guess. If no such rows are available, omit this section entirely.
 ${agentGuessLines || 'N/A - no favorite book, movie, game, or yes/no agent guesses were submitted.'}
@@ -1638,7 +1649,7 @@ ${agentGuessLines || 'N/A - no favorite book, movie, game, or yes/no agent guess
 Binary answer styling: whenever a prediction answer is Agree, Unsure, or Disagree, render that answer as a large rounded choice pill/button on a dark navy background: Agree is green with white text, Unsure is bright yellow with dark navy text, and Disagree is red with white text. The pills should feel like primary response controls, not small tags.
 
 6. Agent Comparison
-Compare the principal to a historical figure or fictional/book character only if it feels supported by the predictions; otherwise write "N/A". Make this a richer wide strip with a stylized illustrated rendition or portrait silhouette of that figure/character, plus the comparison name and exactly 3 precise evidence artifacts when 3 concrete evidence items exist. The artifacts must explain why this specific comparison fits, not merely repeat generic themes. Each artifact must be a specific icon plus a short label tied to one actual question or prediction above and to the chosen figure/character. For example, if the comparison is Benjamin Franklin, prefer comparison-specific objects like a locked letter labeled "private correspondence", a salon/introduction network labeled "civic introductions", or a repair ledger/printing proof labeled "public repair norm"; avoid generic lock/handshake/wrench icons unless the label makes the comparison clear. If the evidence does not support a specific object, use labeled text chips instead of generic icons. Avoid random gears, medals, hourglasses, charts, or decorative symbols.
+Compare the principal to a historical figure or fictional/book character only if it feels supported by the predictions; otherwise write "N/A". Make this a richer wide strip with a stylized illustrated rendition or portrait silhouette of that figure/character, plus the comparison name and exactly 3 precise evidence artifacts when 3 concrete evidence items exist. Keep the evidence compact enough that the figure and evidence can share the same horizontal band. The artifacts must explain why this specific comparison fits, not merely repeat generic themes. Each artifact must be a specific icon plus a short label tied to one actual question or prediction above and to the chosen figure/character. For example, if the comparison is Benjamin Franklin, prefer comparison-specific objects like a locked letter labeled "private correspondence", a salon/introduction network labeled "civic introductions", or a repair ledger/printing proof labeled "public repair norm"; avoid generic lock/handshake/wrench icons unless the label makes the comparison clear. If the evidence does not support a specific object, use labeled text chips instead of generic icons. Avoid random gears, medals, hourglasses, charts, or decorative symbols.
 
 Footer in small centered type along the bottom edge, with "Context Engine" still readable: "Review or edit your agent's responses in Context Engine"
 

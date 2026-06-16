@@ -1605,6 +1605,7 @@ async function buildMiniAppAgentOnlyState({
       if (questionKey && valueLabel) {
         predictions[questionKey] = {
           valueLabel,
+          answerKind: safeString(prediction?.answerKind),
           confirmed: prediction?.confirmed === true,
         };
       }
@@ -6667,10 +6668,43 @@ function telegramMiniAppHtml() {
       border: 1px solid var(--border);
       color: var(--muted);
       background: rgba(255,255,255,0.04);
-      font-size: 12px;
+      font-size: 13px;
       font-weight: 700;
       line-height: 1.2;
       padding: 5px 7px;
+    }
+    .agentPredictionBadge.choicePrediction {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      padding: 0;
+    }
+    .agentPredictionChoice {
+      min-width: 96px;
+      min-height: 34px;
+      border-radius: 8px;
+      padding: 7px 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      font-weight: 850;
+      line-height: 1;
+    }
+    .agentPredictionChoice.agree {
+      background: #4caf50;
+      color: #ffffff;
+    }
+    .agentPredictionChoice.unsure {
+      background: #ffeb3b;
+      color: #202458;
+    }
+    .agentPredictionChoice.disagree {
+      background: #f44336;
+      color: #ffffff;
     }
     .agentPredictionConfirm {
       min-height: 28px;
@@ -8402,8 +8436,21 @@ function telegramMiniAppHtml() {
       const row = document.createElement('div');
       row.className = 'agentOnlyBadgeRow';
       const badge = document.createElement('span');
-      badge.className = 'agentPredictionBadge';
-      badge.textContent = 'Agent prediction: ' + prediction.valueLabel;
+      const answerKind = ['agree', 'unsure', 'disagree'].includes(String(prediction.answerKind || ''))
+        ? String(prediction.answerKind)
+        : '';
+      if (answerKind) {
+        badge.className = 'agentPredictionBadge choicePrediction';
+        const label = document.createElement('span');
+        label.textContent = 'Agent prediction';
+        const choice = document.createElement('span');
+        choice.className = 'agentPredictionChoice ' + answerKind;
+        choice.textContent = prediction.valueLabel;
+        badge.append(label, choice);
+      } else {
+        badge.className = 'agentPredictionBadge';
+        badge.textContent = 'Agent prediction: ' + prediction.valueLabel;
+      }
       row.appendChild(badge);
       if (prediction.confirmed !== true) {
         const edit = document.createElement('button');
@@ -11019,8 +11066,21 @@ function telegramMiniAppHtml() {
             const prediction = agentOnlyPredictionFor({ questionKey: answer.questionKey });
             if (prediction?.valueLabel) {
               const badge = document.createElement('span');
-              badge.className = 'agentPredictionBadge';
-              badge.textContent = 'Agent prediction: ' + prediction.valueLabel;
+              const answerKind = ['agree', 'unsure', 'disagree'].includes(String(prediction.answerKind || ''))
+                ? String(prediction.answerKind)
+                : '';
+              if (answerKind) {
+                badge.className = 'agentPredictionBadge choicePrediction';
+                const label = document.createElement('span');
+                label.textContent = 'Agent prediction';
+                const choice = document.createElement('span');
+                choice.className = 'agentPredictionChoice ' + answerKind;
+                choice.textContent = prediction.valueLabel;
+                badge.append(label, choice);
+              } else {
+                badge.className = 'agentPredictionBadge';
+                badge.textContent = 'Agent prediction: ' + prediction.valueLabel;
+              }
               row.appendChild(badge);
               if (prediction.confirmed !== true && titleText === 'Submitted responses') {
                 const edit = document.createElement('button');
