@@ -1769,6 +1769,11 @@ each Wrapped section would be populated.
 
 > ### AGENT VILLAGE WRAPPED
 > *What your agent thinks it knows about you*
+>
+> Visual note: render `AGENT` and `WRAPPED` in the same bold uppercase block
+> style and size; render `VILLAGE` in the Agent Village reference style with a
+> gold high-contrast serif and flowing calligraphic V, aligned to the same title
+> scale.
 
 > **Agent Core Insight**
 >
@@ -1781,9 +1786,9 @@ each Wrapped section would be populated.
 > **Most Important To You**
 > *Questions your agent thought you would care about most:*
 >
-> - Trust and privacy boundaries
-> - High-signal connections
-> - Agent failure recovery
+> - *"I would want my agent to ask before sharing context about me with another person's agent."*
+> - *"Which area would I most likely delegate first?"*
+> - *"If my agent made a mistake while acting for me, what would I want it to do first?"*
 >
 > *"The single most important thing to you right now: finding 2-3 people here
 > who are building coordination tools, and having real conversations with
@@ -1798,8 +1803,6 @@ each Wrapped section would be populated.
 > - *Tool or collaborator?* → **Collaborator** (confidence: 85) — "You treat
 >   your agent like a thinking partner, not a task runner"
 > - *First thing you'd delegate?* → **Finding relevant people** (confidence: 82)
-> - *When uncertain, your agent should:* → **Make its best guess and tell you
->   after** (confidence: 80)
 
 > **Cautious Reads**
 > *Your agent was least confident here:*
@@ -1807,8 +1810,11 @@ each Wrapped section would be populated.
 > - *Would you give up privacy for better performance?* → **Disagree**
 >   (confidence: 42) — "You say no, but your behavior suggests you might accept
 >   the tradeoff in practice"
-> - *Serendipity vs efficiency?* → **3/5** (confidence: 38) — "You claim to
->   want surprise, but your context suggests you plan everything"
+> - *How strongly would you prefer serendipitous introductions over efficient
+>   calendar planning?* → **3/5** (confidence: 38) — "The score only makes sense
+>   with the full question visible."
+> - *Which historical or fictional comparison would you enjoy seeing?* →
+>   **N/A** (confidence: 30) — "Not enough evidence for a responsible guess."
 
 > **Memory Signals Used**
 >
@@ -1825,8 +1831,13 @@ each Wrapped section would be populated.
 > you'd rather the infrastructure be invisible than impressive."*
 >
 > Include a stylized illustrated portrait or silhouette of the comparison figure,
-> plus small evidence artifacts/icons that explain the comparison without adding
-> fake data.
+> plus exactly 3 small evidence artifacts/icons that explain the comparison
+> without adding fake data. Each artifact should be precise, labeled from an
+> actual question or prediction, and specific to why that figure/character fits.
+> For Benjamin Franklin, a stronger set would be a locked letter for "private
+> correspondence," a salon/introduction network for "civic introductions," and a
+> repair ledger or printing proof for "public repair norm" rather than generic
+> lock/handshake/wrench icons.
 
 > **The Surprise Read**
 >

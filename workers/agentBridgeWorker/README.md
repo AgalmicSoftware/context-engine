@@ -99,8 +99,8 @@ tokens do not include `agent_autofill` and receive 403 on these write lanes;
 agent-only tokens do not include normal read, draft, vote, or question-write
 scopes.
 
-Operators configure flagged statements with service-token-only agent-only admin
-routes:
+Operators configure flagged statements with the worker service token or a
+`ceagt_...` token whose managed account is an admin for the session:
 
 ```http
 GET  /telegram/agent/api/admin/agent-only/config

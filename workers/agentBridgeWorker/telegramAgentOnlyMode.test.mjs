@@ -183,6 +183,11 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
         answer_schema: { kind: 'text', maxChars: 280 },
       },
       {
+        statement_id: 'ceq_book_followup',
+        text: 'Agent guess: what is my favorite book if you have a stronger signal?',
+        answer_schema: { kind: 'text', maxChars: 280 },
+      },
+      {
         statement_id: 'ceq_movie',
         text: 'Agent guess: what is my favorite movie?',
         answer_schema: { kind: 'text', maxChars: 280 },
@@ -194,24 +199,31 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
       ceq_trust: { agent: { answer: { value: 'agree' }, confidence: 92 } },
       ceq_info: { agent: { answer: { value: 'unsure' }, confidence: 41 } },
       ceq_book: { agent: { answer: { text: 'The Diamond Age' }, confidence: 52 } },
+      ceq_book_followup: { agent: { answer: { text: 'Neuromancer' }, confidence: 70 } },
       ceq_movie: { agent: { answer: { text: 'N/A' }, confidence: 12 } },
     },
   };
   const prompt = buildAgentOnlyWrappedImagePrompt({
     snapshot,
     state,
-    linearVoteState: { mode: 'linear', votes: { ceq_trust: 20, ceq_movie: 30 } },
+    linearVoteState: { mode: 'linear', votes: { ceq_trust: 20, ceq_movie: 30, ceq_book_followup: 25 } },
     quadraticVoteState: { mode: 'quadratic', votes: { ceq_info: 4 } },
   });
   assert.match(prompt, /Most Important To You/);
   assert.match(prompt, /Questions your agent thought you would care about most/);
+  assert.match(prompt, /Show exactly 3 actual question prompts/);
   assert.match(prompt, /horizontal wordmark running along the top/);
+  assert.match(prompt, /"AGENT" and "WRAPPED" in the same bold uppercase block sans style/);
+  assert.match(prompt, /same cap height, same weight/);
+  assert.match(prompt, /same visual importance/);
+  assert.match(prompt, /reference Agent Village style/);
   assert.match(prompt, /flowing calligraphic V/);
+  assert.match(prompt, /visually matched to the same title scale and baseline/);
   assert.match(prompt, /Do not place a standalone logo icon/);
   assert.match(prompt, /35-45% of the title height/);
   assert.match(prompt, /Custom aesthetic must vary from person to person/);
   assert.match(prompt, /Section typography: make section titles large/);
-  assert.match(prompt, /Show these actual question prompts/);
+  assert.match(prompt, /Show exactly 3 actual question prompts/);
   assert.match(prompt, /Do not replace them with theme summaries/);
   assert.match(prompt, /Agree is green with white text/);
   assert.match(prompt, /Unsure is bright yellow with dark navy text/);
@@ -219,11 +231,20 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.match(prompt, /I would trust my agent to schedule meetings while I sleep/);
   assert.match(prompt, /High-Confidence Reads/);
   assert.match(prompt, /Cautious Reads/);
+  assert.match(prompt, /Question: "/);
+  assert.match(prompt, /Do not render detached rating labels/);
   assert.match(prompt, /Agent Guesses/);
   assert.match(prompt, /favorite book/);
+  assert.match(prompt, /Neuromancer/);
+  assert.doesNotMatch(prompt, /The Diamond Age/);
   assert.doesNotMatch(prompt, /favorite movie/);
   assert.match(prompt, /stylized illustrated rendition or portrait silhouette/);
-  assert.match(prompt, /several small evidence artifacts\/icons/);
+  assert.match(prompt, /exactly 3 precise evidence artifacts/);
+  assert.match(prompt, /explain why this specific comparison fits/);
+  assert.match(prompt, /private correspondence/);
+  assert.match(prompt, /civic introductions/);
+  assert.match(prompt, /public repair norm/);
+  assert.match(prompt, /Avoid random gears, medals, hourglasses/);
   assert.match(prompt, /Footer in small centered type/);
   assert.doesNotMatch(prompt, /What Your Agent Upvoted/);
 });
@@ -259,6 +280,8 @@ test('wrapped image prompt supports political compass mode around the most-impor
   });
   assert.match(prompt, /political compass meme/);
   assert.match(prompt, /Agent Village Compass/);
+  assert.match(prompt, /final mode word in the same bold uppercase block sans style/);
+  assert.match(prompt, /same title scale and baseline/);
   assert.match(prompt, /most-important question/);
   assert.match(prompt, /historical figures or fictional\/book characters/);
   assert.match(prompt, /I would rather my agent be too conservative with privacy/);

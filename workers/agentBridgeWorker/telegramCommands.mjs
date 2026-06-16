@@ -3643,18 +3643,56 @@ async function buildAgentAlreadyOnboardedResponse({
     privateChat: true,
     botUsername: env.TELEGRAM_BOT_USERNAME,
   });
+  let copyInfoButton = null;
+  try {
+    const account = await deriveManagedDemoAccount({
+      principal: normalizeTelegramPrincipal(normalized),
+      deploymentId: env.AGENT_BRIDGE_DEPLOYMENT_ID || 'agent-bridge-live-demo',
+      rootSecret: env.DEMO_SIGNER_ROOT_SECRET || '',
+      lifecycle: AGENT_BRIDGE_EVENT_TYPES.ACCOUNT_RECOVERED,
+      createdAt,
+    });
+    const previousPointer = await readTelegramAgentDelegationTokenUserPointer({
+      env,
+      telegramUserId: normalized.user.telegramUserId,
+    });
+    if (previousPointer.tokenHash) {
+      await revokeTelegramAgentDelegationTokenHash({
+        env,
+        tokenHash: previousPointer.tokenHash,
+      });
+    }
+    const issued = await createTelegramAgentDelegationToken({
+      env,
+      telegramUserId: normalized.user.telegramUserId,
+      username: normalized.user.username,
+      sessionSlug,
+      accountAddress: account.accountAddress,
+      ttlSeconds: TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_TTL_SECONDS,
+      createdAt,
+    });
+    if (issued.ok) {
+      const pointer = await writeTelegramAgentDelegationTokenUserPointer({
+        env,
+        telegramUserId: normalized.user.telegramUserId,
+        tokenHash: issued.tokenHash,
+        issuedAt: issued.record?.issuedAt || createdAt,
+        createdAt,
+      });
+      if (pointer.ok) {
+        copyInfoButton = copyTextButton('Copy New Agent Info', buildAgentInstallCopyInfo({
+          token: issued.token,
+          workerUrl: agentBridgePublicUrl(env),
+          skillUrl: agentSkillUrl(env),
+        }));
+      }
+    }
+  } catch {
+    copyInfoButton = null;
+  }
   const rows = [];
   if (miniAppButton) rows.push([miniAppButton]);
-  const refreshTokenButton = await makeCallbackButton({
-    env,
-    label: 'Copy New Agent Info',
-    action: TELEGRAM_BRIDGE_ACTIONS.CREATE_AGENT_TOKEN,
-    lane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
-    serverContextRef: { sessionSlug, forceToken: true },
-    seed: `agent_onboarded|refresh_token|${sessionSlug || 'default'}|${normalized.user.telegramUserId}|${normalized.updateId}`,
-    createdAt,
-  });
-  if (refreshTokenButton) rows.push([refreshTokenButton]);
+  if (copyInfoButton) rows.push([copyInfoButton]);
   await appendBackToStartRow(rows, {
     env,
     normalized,

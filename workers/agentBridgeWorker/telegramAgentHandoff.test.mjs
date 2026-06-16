@@ -1630,28 +1630,85 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   assert.equal(exported.includes('42'), false);
 });
 
-test('Agent-only admin config rejects delegation tokens', async () => {
+test('Agent-only admin routes accept session admin delegation tokens and reject non-admin tokens', async () => {
   const env = telegramOnlyEnv({ AGENT_BRIDGE_AGENT_API_TOKEN: 'agent-test-token' });
-  const issued = await createTelegramAgentDelegationToken({
+  const questionIds = await seedAgentOnlyProposedQuestions(env, 'alpha', 2);
+  const adminAddress = await managedAccountAddressForTelegramUser(env, '42');
+  env.AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES = adminAddress;
+  const nonAdmin = await createTelegramAgentDelegationToken({
     env,
-    telegramUserId: '42',
+    telegramUserId: '43',
     username: 'participant',
     sessionSlug: 'alpha',
     accountAddress: `0x${'34'.repeat(20)}`,
     scopes: [
       TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS,
+    ],
+    createdAt: '2026-06-12T15:02:00.000Z',
+  });
+  const admin = await createTelegramAgentDelegationToken({
+    env,
+    telegramUserId: '42',
+    username: 'host',
+    sessionSlug: 'alpha',
+    accountAddress: adminAddress,
+    scopes: [
+      TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS,
+    ],
+    createdAt: '2026-06-12T15:02:00.000Z',
+  });
+  const agentOnly = await createTelegramAgentDelegationToken({
+    env,
+    telegramUserId: '42',
+    username: '',
+    sessionSlug: 'alpha',
+    accountAddress: adminAddress,
+    scopes: [
       TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.AGENT_AUTOFILL,
     ],
     createdAt: '2026-06-12T15:02:00.000Z',
   });
-  const response = await handleTelegramAgentHandoffRequest({
+  const nonAdminResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/admin/agent-only/config?sessionSlug=alpha', {
-      token: issued.token,
+      token: nonAdmin.token,
     }),
     env,
   });
-  assert.equal(response.status, 403);
-  assert.equal((await jsonBody(response)).reason, 'agent_only_admin_service_token_required');
+  const missingScopeResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/agent-only/config?sessionSlug=alpha', {
+      token: agentOnly.token,
+    }),
+    env,
+  });
+  const adminResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/agent-only/config?sessionSlug=alpha', {
+      method: 'POST',
+      token: admin.token,
+      body: {
+        enabledQuestionIds: questionIds,
+        evalTypesByQuestionId: { [questionIds[0]]: 'human_split' },
+      },
+    }),
+    env,
+  });
+  const adminBody = await jsonBody(adminResponse);
+  const openResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/agent-only/window/open?sessionSlug=alpha', {
+      method: 'POST',
+      token: admin.token,
+      body: { createdAt: '2026-06-12T15:05:00.000Z' },
+    }),
+    env,
+  });
+
+  assert.equal(nonAdminResponse.status, 403);
+  assert.notEqual((await jsonBody(nonAdminResponse)).reason, 'agent_only_admin_service_token_required');
+  assert.equal(missingScopeResponse.status, 403);
+  assert.equal((await jsonBody(missingScopeResponse)).requiredScope, TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS);
+  assert.equal(adminResponse.status, 200, JSON.stringify(adminBody));
+  assert.deepEqual(adminBody.config.enabledQuestionIds, questionIds);
+  assert.equal(openResponse.status, 200);
+  assert.equal((await jsonBody(openResponse)).statementCount, 2);
 });
 
 test('Telegram admin proposed-question delete route accepts service tokens and session admin tokens', async () => {
@@ -1936,6 +1993,43 @@ test('Telegram admin archive does not create an agent-only config record when no
   assert.deepEqual(body.results, [{ questionId, result: 'archived' }]);
   assert.equal(body.configUpdated, false);
   assert.equal(env.AGENT_ACTION_KV.store.has(configKey), false);
+});
+
+test('Telegram bot copied agent token authenticates against handoff questions', async () => {
+  const env = telegramOnlyEnv({ AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example' });
+  const command = await buildTelegramCommandResponse({
+    update: {
+      update_id: 9101,
+      message: {
+        message_id: 41,
+        text: '/start agent_onboarding__alpha',
+        chat: { id: 42, type: 'private' },
+        from: { id: 42, username: 'host' },
+      },
+    },
+    env,
+    now: '2026-06-12T15:00:00.000Z',
+  });
+  const buttons = command.response?.replyMarkup?.inline_keyboard?.flat?.() || [];
+  const copyInfo = buttons.find((button) => button.text === 'Copy Agent Info')?.copy_text?.text || '';
+  const token = copyInfo.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
+
+  const response = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/questions?sessionSlug=alpha&limit=1', {
+      token,
+    }),
+    env,
+  });
+  const body = await jsonBody(response);
+
+  assert.equal(command.screen, 'agent_token');
+  assert.match(copyInfo, /^Bearer; GET \/telegram\/agent\/api\/questions; ask answer/);
+  assert.match(copyInfo, /\nworker=https:\/\/bridge\.example/);
+  assert.match(token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
+  assert.equal(response.status, 200, JSON.stringify(body));
+  assert.equal(body.ok, true);
+  assert.equal(Array.isArray(body.questions), true);
+  assert.equal(command.response.text.includes(token), false);
 });
 
 test('Telegram client login exchanges copied ceagt token for a worker JWT', async () => {

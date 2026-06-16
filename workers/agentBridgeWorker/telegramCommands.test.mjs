@@ -5073,18 +5073,26 @@ test('/start agent_onboarding opens Mini App when already onboarded', async () =
   });
   const buttons = flattenButtons(linkedAgain.response.replyMarkup);
   const miniApp = buttons.find((button) => button.text === 'Open Mini App');
+  const copyNew = buttons.find((button) => button.text === 'Copy New Agent Info');
+  const secondToken = copyNew?.copy_text?.text?.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
   const secondPointer = JSON.parse(await env.AGENT_ACTION_KV.get(`${TELEGRAM_AGENT_DELEGATION_TOKEN_USER_KV_PREFIX}42`));
-  const stillLoaded = await loadTelegramAgentDelegationToken({ env, token: firstToken, now });
+  const oldLoaded = await loadTelegramAgentDelegationToken({ env, token: firstToken, now });
+  const secondLoaded = await loadTelegramAgentDelegationToken({ env, token: secondToken, now });
 
   assert.equal(firstLoaded.ok, true);
   assert.equal(linkedAgain.screen, 'agent_onboarded_mini_app');
   assert.match(linkedAgain.response.text, /Context Engine is already enabled/);
   assert.equal(buttons.some((button) => button.text === 'Copy Agent Info'), false);
   assert.equal(buttons.some((button) => button.text === 'Copy New Agent Info'), true);
+  assert.ok(copyNew?.copy_text?.text);
+  assert.equal(copyNew.callback_data, undefined);
+  assert.match(secondToken, /^ceagt_[A-Za-z0-9_-]{32,}$/);
   assert.match(miniApp.web_app.url, /^https:\/\/bridge\.example\/telegram\/mini-app\?launch=cecb_[a-z0-9]{10,48}$/);
-  assert.equal(JSON.stringify(linkedAgain).includes('ceagt_'), false);
-  assert.equal(secondPointer.tokenHash, firstPointer.tokenHash);
-  assert.equal(stillLoaded.ok, true);
+  assert.equal(linkedAgain.response.text.includes(secondToken), false);
+  assert.notEqual(secondPointer.tokenHash, firstPointer.tokenHash);
+  assert.equal(oldLoaded.ok, false);
+  assert.equal(secondLoaded.ok, true);
+  assert.equal(secondPointer.tokenHash, secondLoaded.tokenHash);
 });
 
 test('private Onboard Agent callback opens Mini App when already onboarded', async () => {
@@ -5121,17 +5129,22 @@ test('private Onboard Agent callback opens Mini App when already onboarded', asy
   });
   const buttons = flattenButtons(result.response.replyMarkup);
   const miniApp = buttons.find((button) => button.text === 'Open Mini App');
+  const copyNew = buttons.find((button) => button.text === 'Copy New Agent Info');
 
   assert.equal(result.screen, 'agent_onboarded_mini_app');
   assert.equal(result.response.method, 'editMessageText');
   assert.equal(result.callbackQueryId, 'onboard-existing-tap');
   assert.equal(buttons.some((button) => button.text === 'Copy Agent Info'), false);
   assert.equal(buttons.some((button) => button.text === 'Copy New Agent Info'), true);
+  assert.ok(copyNew?.copy_text?.text);
+  assert.equal(copyNew.callback_data, undefined);
   assert.match(miniApp.web_app.url, /^https:\/\/bridge\.example\/telegram\/mini-app\?launch=cecb_[a-z0-9]{10,48}$/);
-  assert.equal(JSON.stringify(result).includes('ceagt_'), false);
+  const token = copyNew.copy_text.text.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
+  assert.match(token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
+  assert.equal(result.response.text.includes(token), false);
 });
 
-test('already-onboarded agent screen can mint a fresh copy token on demand', async () => {
+test('already-onboarded agent screen exposes fresh install info as a copy button', async () => {
   const now = '2026-05-08T12:00:00.000Z';
   const env = agentTokenEnv({ AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example' });
   const first = await buildTelegramCommandResponse({
@@ -5150,43 +5163,23 @@ test('already-onboarded agent screen can mint a fresh copy token on demand', asy
     env,
     now,
   });
-  const refreshButton = flattenButtons(linkedAgain.response.replyMarkup)
+  const copyNewButton = flattenButtons(linkedAgain.response.replyMarkup)
     .find((button) => button.text === 'Copy New Agent Info');
-  assert.ok(refreshButton?.callback_data);
-
-  const refreshed = await buildTelegramCommandResponse({
-    update: {
-      update_id: 9206,
-      callback_query: {
-        id: 'onboard-refresh-token',
-        data: refreshButton.callback_data,
-        from: { id: 42, username: 'participant' },
-        message: {
-          message_id: 80,
-          chat: { id: 42, type: 'private' },
-        },
-      },
-    },
-    env,
-    now,
-  });
-  const refreshedCopy = flattenButtons(refreshed.response.replyMarkup)
-    .find((button) => button.text === 'Copy Agent Info')?.copy_text?.text || '';
+  const refreshedCopy = copyNewButton?.copy_text?.text || '';
   const refreshedToken = refreshedCopy.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
   const oldLoaded = await loadTelegramAgentDelegationToken({ env, token: firstToken, now });
   const refreshedLoaded = await loadTelegramAgentDelegationToken({ env, token: refreshedToken, now });
   const pointer = JSON.parse(await env.AGENT_ACTION_KV.get(`${TELEGRAM_AGENT_DELEGATION_TOKEN_USER_KV_PREFIX}42`));
 
-  assert.equal(refreshed.screen, 'agent_token');
-  assert.equal(refreshed.response.method, 'editMessageText');
-  assert.equal(refreshed.callbackQueryId, 'onboard-refresh-token');
+  assert.equal(linkedAgain.screen, 'agent_onboarded_mini_app');
+  assert.equal(copyNewButton.callback_data, undefined);
   assert.match(refreshedToken, /^ceagt_[A-Za-z0-9_-]{32,}$/);
   assert.notEqual(refreshedToken, firstToken);
   assert.equal(oldLoaded.ok, false);
   assert.equal(refreshedLoaded.ok, true);
   assert.equal(pointer.tokenHash, refreshedLoaded.tokenHash);
   assert.match(refreshedCopy, /\ntoken=ceagt_/);
-  assert.equal(refreshed.response.text.includes(refreshedToken), false);
+  assert.equal(linkedAgain.response.text.includes(refreshedToken), false);
 });
 
 test('/start agent_onboarding non-default slug pins the session', async () => {

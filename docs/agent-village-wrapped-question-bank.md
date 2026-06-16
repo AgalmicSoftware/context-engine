@@ -43,12 +43,14 @@ Subtitle: What your agent thinks it knows about you
 Choose the visual aesthetic based on the agent's analysis of the principal. Do not use a fixed house style. The reports should look meaningfully different from person to person. Derive color palette, layout rhythm, icons, texture, and metaphor from the predicted archetype, strongest themes, memory signals, and high-confidence answers. Keep it memeable, readable, and screenshot-friendly.
 
 Make "Agent Village Wrapped" a horizontal wordmark along the top, not a separate
-logo badge or large emblem. Use the Agent Village logo as inspiration: "AGENT"
-feels bold, uppercase, blocky, and modern; "VILLAGE" feels elegant,
-high-contrast serif with a flowing calligraphic V. Adapt that mixed-type
-wordmark style for "Agent Village Wrapped". Make the subtitle "What your agent
-thinks it knows about you" large enough to read at a glance, roughly 35-45% of
-the title height, while still leaving the content area below most of the room.
+logo badge or large emblem. Use the Agent Village logo as inspiration. Render
+"AGENT" and "WRAPPED" in the same bold uppercase block sans style, same cap
+height, same weight, same white/silver material, and same visual importance.
+Render "VILLAGE" in the reference Agent Village style: elegant high-contrast
+serif, gold, with a flowing calligraphic V, visually matched to the same title
+scale and baseline. Make the subtitle "What your agent thinks it knows about
+you" large enough to read at a glance, roughly 35-45% of the title height, while
+still leaving the content area below most of the room.
 
 Keep the top-right and other decorative areas visually calm. Use abstract map
 lines, icons, or texture there, but no decorative labels, fake annotations,
@@ -69,10 +71,10 @@ Show a bold archetype and one memeable sentence about what the agent thinks of t
 
 2. Most Important To You
 Label this as: "Questions your agent thought you would care about most."
-Show the actual question prompts, lightly shortened only when needed for fit,
-not theme summaries or raw vote math. This section is an importance ranking of
-questions from the principal's point of view, not a claim that any answer was
-boosted.
+Show exactly 3 actual question prompts when at least 3 are available, lightly
+shortened only when needed for fit, not theme summaries or raw vote math. This
+section is an importance ranking of questions from the principal's point of
+view, not a claim that any answer was boosted.
 
 3. High-Confidence Reads
 Show 3 concise predicted answers the agent made on the principal's behalf and was
@@ -82,16 +84,18 @@ pills on a dark navy field: Agree green with white text, Unsure bright yellow
 with dark navy text, Disagree red with white text.
 
 4. Cautious Reads
-Show 2 predicted answers the agent was least confident about. Include the answer
-and enough question context to make clear what the uncertainty refers to. If no
-low-confidence data exists, write "N/A - agent reported uniformly high
-confidence."
+Show 3 predicted answers the agent was least confident about when at least 3 are
+available. Include the answer and enough question context to make clear what the
+uncertainty refers to. Do not show detached shorthand like "Serendipity 3/5"
+without the actual question prompt. If no low-confidence data exists, write
+"N/A - agent reported uniformly high confidence."
 
 5. Agent Guesses
 If available, include a compact strip of playful low-stakes guesses, such as
 favorite book, movie, game, or yes/no taste/personality guesses. These should be
-clearly framed as guesses, not facts. If unavailable, omit the section rather
-than inventing.
+clearly framed as guesses, not facts. Show at most one item per guess category,
+so the same favorite-book/movie/game guess cannot appear twice. If unavailable,
+omit the section rather than inventing.
 
 6. Memory Signals Used
 Only show supported, non-sensitive signals. Use "N/A" when unknown:
@@ -104,10 +108,15 @@ Only show supported, non-sensitive signals. Use "N/A" when unknown:
 7. Agent Comparison
 Compare the principal to a historical figure or fictional/book character in a
 wide strip. Include a stylized illustrated rendition or portrait silhouette of
-the figure/character, the comparison name, and several small evidence artifacts
-or icons beside it, such as a zero-knowledge calendar, civic experiment ledger,
-handshake/introduction network, village infrastructure map, or other symbols
-derived from the predictions. Keep it playful and non-defamatory.
+the figure/character, the comparison name, and exactly 3 precise evidence
+artifacts or icons when 3 concrete items exist. The artifacts must explain why
+this specific comparison fits, not merely restate generic themes. Each artifact
+must be tied to an actual question or prediction and to the chosen comparison.
+For Benjamin Franklin, good artifacts could be a locked letter labeled "private
+correspondence," a salon/introduction network labeled "civic introductions," or
+a repair ledger/printing proof labeled "public repair norm." If no specific icon
+is supported, use labeled text chips instead of generic symbols. Keep it playful
+and non-defamatory.
 
 Footer:
 "Review or edit your agent's responses in Context Engine" centered in small

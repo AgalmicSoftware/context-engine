@@ -757,6 +757,13 @@ function delegationScopeForRequest(pathname = '', method = 'GET') {
   if (pathname === '/telegram/agent/api/admin/metrics') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
+  if (
+    pathname === '/telegram/agent/api/admin/agent-only/config' ||
+    pathname === '/telegram/agent/api/admin/agent-only/window/open' ||
+    pathname === '/telegram/agent/api/admin/agent-only/export'
+  ) {
+    return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
+  }
   if (pathname === '/telegram/agent/api/admin/questions/delete') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
@@ -5840,11 +5847,43 @@ async function handleTelegramAgentHandoffRequestUnsafe({
         ...(auth.action ? { action: auth.action } : {}),
       }, { status: auth.status });
     }
-    if (auth.authMode !== 'service_token') {
-      return json({ ok: false, reason: 'agent_only_admin_service_token_required' }, { status: 403 });
-    }
     const body = await readRequestJson(request);
-    const input = inputFromRequest(request, body);
+    const rawInput = inputFromRequest(request, body);
+    let input = rawInput;
+    if (auth.authMode !== 'service_token') {
+      const delegated = applyDelegationToInput(auth, rawInput, url.pathname, request.method);
+      if (!delegated.ok) {
+        return json({
+          ok: false,
+          reason: delegated.reason,
+          requiredScope: delegated.requiredScope,
+          sessionSlug: delegated.sessionSlug || '',
+        }, { status: delegated.status || 403 });
+      }
+      const context = await resolveHandoffContext({
+        env,
+        input: delegated.input,
+        auth,
+        requireQuestionAuthoring: false,
+      });
+      if (!context.ok) {
+        return json({ ok: false, reason: context.reason, sessionSlug: context.sessionSlug || '' }, { status: context.status });
+      }
+      const admin = await requireQuestionQueueAdmin({
+        env,
+        context,
+        input: delegated.input,
+        allowDelegatedAdmin: true,
+      });
+      if (!admin.ok) {
+        return json({
+          ok: false,
+          reason: admin.reason,
+          accountAddress: admin.accountAddress || '',
+        }, { status: admin.status || 403 });
+      }
+      input = delegated.input;
+    }
     if (url.pathname === '/telegram/agent/api/admin/agent-only/config') {
       return handleAdminAgentOnlyConfigRequest({ env, input, body, method: request.method });
     }
