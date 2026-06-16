@@ -154,7 +154,7 @@ test('windowBoundariesAround handles launch, regular boundary, DST, and edited l
 });
 
 test('start payload pins path-only endpoints and instruction size', () => {
-  const payload = buildAgentOnlyStartPayload({ sessionSlug: 'alpha', skillVersion: '2026-06-12 (v40)' });
+  const payload = buildAgentOnlyStartPayload({ sessionSlug: 'alpha', skillVersion: '2026-06-16 (v41)' });
   assert.equal(payload.statementEndpoint, '/telegram/agent/api/agent-only/statements');
   assert.equal(payload.answerEndpoint, '/telegram/agent/api/agent-only/answers/bulk');
   assert.equal(payload.voteEndpoint, '/telegram/agent/api/agent-only/token-votes/bulk');

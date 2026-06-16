@@ -5,7 +5,7 @@ description: Use when an agent needs to connect a user to Context Engine, fetch 
 
 # Context Engine Agent Runtime
 
-**Skill version:** 2026-06-12 (v40)
+**Skill version:** 2026-06-16 (v41)
 
 Use this skill when acting as Hermes, OpenClaw, Claude Code, or another
 HTTP-capable agent for a user who wants Context Engine questions, answers,
@@ -57,7 +57,7 @@ maps. Agents use it to:
 Install this short runtime skill from the stable Worker skill URL:
 
 ```bash
-hermes skills install https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=40
+hermes skills install https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=41
 ```
 
 For raw public-branch installs:
@@ -116,8 +116,8 @@ numeric `from.id`. The Geo node supplies:
   "contextEngine": {
     "inviteToken": "<geo invite token>",
     "worker": "https://ce-agent-bridge-worker.agalmic.workers.dev",
-    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=40",
-    "sessionSlug": "agent-village-2026"
+    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=41",
+    "sessionSlug": "agent-village-wrapped"
   }
 }
 ```
@@ -182,7 +182,7 @@ If the principal opted out of playful guesses, answer guess-style statements
 with `N/A` when possible and do not include those guesses in the Wrapped image.
 
 Before beginning a run, call `/telegram/agent/api/skill-version`. If the worker
-reports a newer skill than this v40 header, refresh this skill and reread the
+reports a newer skill than this v41 header, refresh this skill and reread the
 agent-only instructions before continuing.
 
 ## Trusted Geo / Hermes Invite Onboarding

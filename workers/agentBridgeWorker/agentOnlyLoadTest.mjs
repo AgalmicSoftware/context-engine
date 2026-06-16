@@ -29,7 +29,7 @@ function parseArgs(argv = process.argv.slice(2), env = process.env) {
     origin,
     inviteToken: safeString(flags['invite-token'] || env.AGENT_ONLY_LOAD_INVITE_TOKEN),
     adminToken: safeString(flags['admin-token'] || env.AGENT_ONLY_LOAD_ADMIN_TOKEN || env.AGENT_BRIDGE_AGENT_API_TOKEN),
-    sessionSlug: safeString(flags['session-slug'] || env.AGENT_ONLY_LOAD_SESSION_SLUG || 'agent-village-2026'),
+    sessionSlug: safeString(flags['session-slug'] || env.AGENT_ONLY_LOAD_SESSION_SLUG || 'agent-village-wrapped'),
     principals: Math.max(1, Number(flags.principals || env.AGENT_ONLY_LOAD_PRINCIPALS || DEFAULT_PRINCIPALS) || DEFAULT_PRINCIPALS),
     concurrency: Math.max(1, Number(flags.concurrency || env.AGENT_ONLY_LOAD_CONCURRENCY || DEFAULT_CONCURRENCY) || DEFAULT_CONCURRENCY),
     timeoutMs: Math.max(1000, Number(flags['timeout-ms'] || env.AGENT_ONLY_LOAD_TIMEOUT_MS || DEFAULT_TIMEOUT_MS) || DEFAULT_TIMEOUT_MS),

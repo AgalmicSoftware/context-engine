@@ -124,7 +124,7 @@ AGENT_BRIDGE_AUTO_FAUCET_ON_JOIN = "true"
 # tokens; the Geo node/link carries the plaintext token and Hermes supplies the
 # Telegram user id it observes.
 # AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITE_TOKEN_HASHES = "64_HEX_SHA256_OF_INVITE_TOKEN"
-# AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON = "[{\"tokenHash\":\"64_HEX_SHA256_OF_INVITE_TOKEN\",\"sessionSlug\":\"agent-village-2026\",\"label\":\"Agent Village 2026\",\"source\":\"geo:agent-village-2026\"}]"
+# AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON = "[{\"tokenHash\":\"64_HEX_SHA256_OF_INVITE_TOKEN\",\"sessionSlug\":\"agent-village-wrapped\",\"label\":\"Agent Village Wrapped\",\"source\":\"geo:agent-village-wrapped\"}]"
 
 # deploy:apply writes these secrets through Cloudflare API. If debugging a
 # manual Wrangler deployment, set secrets with Wrangler, never in this file:

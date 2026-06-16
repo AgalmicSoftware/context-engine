@@ -133,7 +133,7 @@ Authorization: Bearer <service-or-session-admin-token>
 Content-Type: application/json
 
 {
-  "sessionSlug": "agent-village-2026",
+  "sessionSlug": "agent-village-wrapped",
   "questionIds": ["ceq_..."],
   "mode": "archive"
 }

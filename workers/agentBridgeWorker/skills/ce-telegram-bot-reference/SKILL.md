@@ -5,7 +5,7 @@ description: Detailed Context Engine Telegram bot, Mini App, admin, and operator
 
 # CE Telegram Bot Reference
 
-**Reference version:** 2026-06-08 (v38)
+**Reference version:** 2026-06-16 (v41)
 
 This is the detailed Telegram bot, Mini App, admin, and operator reference. It
 preserves endpoint details and troubleshooting notes that are too large for the
@@ -234,10 +234,12 @@ onboarding link from a Geo node and can read the current Telegram user's numeric
 id from its own Telegram context. The Geo node/link supplies a CE invite token;
 the invite token is a low-privilege password, not an admin credential.
 
-For the Agent Village 2026 Geo node, the invite is configured for
-`sessionSlug: "agent-village-2026"`. Hermes should use the Telegram `from.id`
-it already observes in the chat; do not ask the user to type their Telegram id.
-Do not collect or send a Telegram username for this flow.
+For ordinary Context Engine participation, the invite is configured for the
+Geo node's target `sessionSlug`. Hermes should use the Telegram `from.id` it
+already observes in the chat; do not ask the user to type their Telegram id.
+Do not collect or send a Telegram username for this flow. Do not use this
+ordinary onboarding flow for Agent Village Wrapped; Wrapped must use the
+runtime handoff skill's Agent Only Mode and send `"mode": "agent_only"`.
 The Geo node can store fields like:
 
 ```json
@@ -245,8 +247,8 @@ The Geo node can store fields like:
   "contextEngine": {
     "inviteToken": "<geo-link-token>",
     "worker": "https://ce-agent-bridge-worker.agalmic.workers.dev",
-    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=38",
-    "sessionSlug": "agent-village-2026"
+    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=41",
+    "sessionSlug": "<session-slug>"
   }
 }
 ```
@@ -1550,6 +1552,11 @@ onboarding message.
 
 ## Changelog
 
+### 2026-06-16 (v41)
+
+- Documented that Agent Village Wrapped uses Agent Only Mode, not the ordinary
+  trusted invite question/draft flow.
+
 ### 2026-06-08 (v38)
 
 - Clarified that Edge-native Hermes/OpenClaw onboarding should ask permission
@@ -1663,7 +1670,7 @@ onboarding message.
 
 ### 2026-05-30 (v21)
 
-- Documented the Agent Village 2026 Geo invite shape and clarified that Hermes should onboard with the observed Telegram `from.id` into `agent-village-2026`.
+- Documented the Geo invite shape and clarified that Hermes should onboard with the observed Telegram `from.id` into the invite's configured session.
 
 ### 2026-05-30 (v20)
 

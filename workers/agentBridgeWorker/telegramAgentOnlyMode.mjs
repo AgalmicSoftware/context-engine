@@ -8,7 +8,7 @@ import { buildTelegramQuestionAnswerSchema } from './questionUi.mjs';
 import { listTelegramProposedQuestionsForSession } from './telegramQuestionProposals.mjs';
 import { SUBMIT_REQUEST_USER_KV_PREFIX } from './telegramSubmitQueue.mjs';
 
-export const AGENT_ONLY_INSTRUCTIONS_VERSION = '2026-06-12.v40-agent-only.1';
+export const AGENT_ONLY_INSTRUCTIONS_VERSION = '2026-06-16.v41-agent-only.1';
 export const AGENT_ONLY_MODE_CONFIG_KV_PREFIX = 'telegram:agent-mode-config:v1:';
 export const AGENT_ONLY_WINDOW_KV_PREFIX = 'telegram:agent-mode-window:v1:';
 export const AGENT_ONLY_ANSWER_EVENT_KV_PREFIX = 'telegram:agent-only:answer-event:v1:';
@@ -52,7 +52,7 @@ export const AGENT_ONLY_ENDPOINTS = Object.freeze({
   wrappedImage: '/telegram/agent/api/agent-only/wrapped-image',
 });
 
-export const AGENT_ONLY_INSTRUCTIONS = `Context Engine agent_only_mode instructions (v40).
+export const AGENT_ONLY_INSTRUCTIONS = `Context Engine agent_only_mode instructions (v41).
 
 You are answering on behalf of your principal: the human who forwarded you this task. Predict your principal's answers, not your own views.
 

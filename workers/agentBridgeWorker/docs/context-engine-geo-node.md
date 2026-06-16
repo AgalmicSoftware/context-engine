@@ -1,14 +1,14 @@
 # Context Engine Geo Node Template
 
-Last updated: 2026-06-09
+Last updated: 2026-06-16
 
-Use this as the canonical public Geo node template for Agent Village 2026.
+Use this as the canonical public Geo node template for Agent Village Wrapped.
 Do not commit a real invite token, CE bearer token, Telegram bot token, or
 private profile data into this file.
 
 ## Title
 
-Context Engine
+Context Engine (Onboarding - 2026-06-16)
 
 ## Kind
 
@@ -16,10 +16,14 @@ project_pitch
 
 ## Human-Facing Body
 
-Context Engine is a sensemaking toolkit for the Agent Village experiment. It
-asks intelligent questions related to your activity and interests, drafts
-responses for your approval, and creates a privacy-preserving opinion map for
-topics across the event. It surfaces points of consensus and difference so
+Agent Village Wrapped is a Context Engine experiment where your agent predicts
+how you would answer research questions, what questions you would care about
+most, and what those predictions say about your preferences. It produces a
+shareable Wrapped image and lets you review or edit the predictions in the
+Context Engine Telegram Mini App.
+
+Context Engine turns individual preferences, responses, and contextual signals
+into aggregate opinion maps. It surfaces points of consensus and difference so
 participants, organizers, companies, digital communities, and agents can better
 understand what people believe, where they disagree, and what decisions need
 attention.
@@ -49,8 +53,8 @@ future agent negotiation.
     "version": "v6-latest-2026-06-09",
     "inviteToken": "<INSERT_TRUSTED_GEO_INVITE_TOKEN>",
     "worker": "https://ce-agent-bridge-worker.agalmic.workers.dev",
-    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=38",
-    "sessionSlug": "agent-village-2026"
+    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=41",
+    "sessionSlug": "agent-village-wrapped"
   }
 }
 ```
@@ -58,36 +62,34 @@ future agent negotiation.
 ## Agent-Facing Bootstrap Instructions
 
 When a Telegram-native Hermes or Edge agent surfaces this node, ask the user:
-"Enable Context Engine for Agent Village?"
+"Run Agent Village Wrapped?"
 
 If the user says yes, treats the link/button as yes, or otherwise approves:
 
 1. Fetch or load the cached Markdown skill at `contextEngine.skillUrl`. It is the
-   source of truth for onboarding, token handling, permissions, question reads,
-   direct answer submission, digest binding, and formatting. Do not use this Geo
-   node as a stale copy of the API contract.
+   source of truth for Agent Only Mode, token handling, prediction submission,
+   Wrapped image generation, and formatting. Do not use this Geo node as a
+   stale copy of the API contract.
 2. Use the Telegram numeric `from.id` observed by the agent. Do not ask the user
    for Telegram ID, handle, username, or group chat ID.
 3. Exchange `contextEngine.inviteToken`, the observed Telegram id, and
    `contextEngine.sessionSlug` through the trusted invite onboarding flow
-   described in the skill.
+   described in the skill, with request body field `"mode": "agent_only"`.
 4. Store the returned `ceagt_...` token only in private auth context. Never
    print, mask, summarize, recap, log, or show it in chat.
-5. Ask only the concise setup/permission questions required by the skill. If the
-   user says "yes" or "accept all", use authorized Edge profile, calendar,
-   interests, and non-identifying buckets to pick relevant questions and support
-   research grouping.
-6. Fetch up to 20 active questions, choose one interesting unanswered question,
-   and surface it directly in chat with a suggested answer only when permitted.
-   End the first question with a short ask such as "Want another?"
-7. When the user approves an answer in chat, submit through the skill's direct
-   submission success contract. Do not say "submitted" unless the Worker returns
-   a request id and follow-up question verification confirms the recorded
-   `myAnswer` value.
-8. Deep links and Mini App links are secondary fallbacks, not the primary action,
-   unless the user explicitly asks to review in the Mini App.
-
-For morning/evening digest installation, follow the skill's Digest / Hermes Cron
-Install section. The digest should surface the top three relevant questions,
-put admin-sponsored questions first, and include draft answers only when the
-user has granted permission.
+5. Ask only the concise preference and consent questions required by the skill.
+   If the user says "yes" or "accept all", use authorized EdgeOS profile,
+   memory, interests, and non-identifying buckets to improve predictions, but
+   answer unavailable usage-style questions as `N/A` rather than hallucinating.
+6. Fetch `/telegram/agent/api/agent-only/start` from `contextEngine.worker` and
+   follow the returned instructions exactly. Page through statements, submit
+   predicted answers for every current statement, submit both token allocation
+   modes, then generate the standard Agent Village Wrapped image.
+7. Render or display the Wrapped image when the environment supports images. Do
+   not print raw image prompts, base64 payloads, confidences, rationales, or
+   private memory. After the image, link the user to the Context Engine Telegram
+   bot to review or edit predictions and ask whether they want the optional
+   political compass meme.
+8. Do not use the ordinary `/questions`, draft, direct answer, question vote, or
+   question creation flow for Agent Village Wrapped unless the user explicitly
+   asks for regular Context Engine outside this mode.
