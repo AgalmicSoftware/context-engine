@@ -1422,6 +1422,11 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
         votes: [],
       },
     }),
+    agentRequest('/telegram/agent/api/agent-only/wrapped-image?sessionSlug=alpha', {
+      method: 'POST',
+      token: '',
+      body: { window_id: 'w-2026-06-12' },
+    }),
   ]) {
     const unauthenticated = await handleTelegramAgentHandoffRequest({ request, env });
     assert.equal(unauthenticated.status, 401);
@@ -1444,6 +1449,18 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   const denied = await jsonBody(deniedResponse);
   assert.equal(deniedResponse.status, 403);
   assert.equal(denied.requiredScope, TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.AGENT_AUTOFILL);
+
+  const deniedImageResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/agent-only/wrapped-image?sessionSlug=alpha', {
+      method: 'POST',
+      token: normalToken.token,
+      body: { window_id: 'w-2026-06-12', createdAt: '2026-06-12T15:06:00.000Z' },
+    }),
+    env,
+  });
+  const deniedImage = await jsonBody(deniedImageResponse);
+  assert.equal(deniedImageResponse.status, 403);
+  assert.equal(deniedImage.requiredScope, TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.AGENT_AUTOFILL);
 
   const agentOnlyToken = await createTelegramAgentDelegationToken({
     env,
@@ -1531,6 +1548,73 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   const answers = await jsonBody(answersResponse);
   assert.equal(answersResponse.status, 200);
   assert.equal(answers.accepted, 1);
+
+  const wrappedMissingKeyResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/agent-only/wrapped-image?sessionSlug=alpha', {
+      method: 'POST',
+      token: agentOnlyToken.token,
+      body: {
+        window_id: 'w-2026-06-12',
+        createdAt: '2026-06-12T15:08:00.000Z',
+      },
+    }),
+    env,
+  });
+  const wrappedMissingKey = await jsonBody(wrappedMissingKeyResponse);
+  assert.equal(wrappedMissingKeyResponse.status, 503);
+  assert.equal(wrappedMissingKey.reason, 'openai_key_missing');
+
+  const votesResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/agent-only/token-votes/bulk?sessionSlug=alpha', {
+      method: 'POST',
+      token: agentOnlyToken.token,
+      body: {
+        window_id: 'w-2026-06-12',
+        createdAt: '2026-06-12T15:08:00.000Z',
+        request_id: 'route-votes-1',
+        mode: 'linear',
+        agent_metadata: { model: 'unit-model', scaffold_version: 'unit-scaffold' },
+        votes: [{ statement_id: questionIds[0], votes: 20 }],
+      },
+    }),
+    env,
+  });
+  assert.equal(votesResponse.status, 200);
+  env.AGENT_BRIDGE_OPENAI_API_KEY = 'sk-bridge-openai';
+  let openAiRequestBody = null;
+  const wrappedResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/agent-only/wrapped-image?sessionSlug=alpha', {
+      method: 'POST',
+      token: agentOnlyToken.token,
+      body: {
+        window_id: 'w-2026-06-12',
+        createdAt: '2026-06-12T15:09:00.000Z',
+        include_prompt: true,
+      },
+    }),
+    env,
+    fetchImpl: async (url, init = {}) => {
+      assert.equal(url, 'https://api.openai.com/v1/images/generations');
+      assert.equal(init.headers.authorization, 'Bearer sk-bridge-openai');
+      openAiRequestBody = JSON.parse(init.body);
+      return new Response(JSON.stringify({
+        data: [{ b64_json: Buffer.from('fake-png').toString('base64') }],
+      }), { status: 200, headers: { 'content-type': 'application/json' } });
+    },
+  });
+  const wrapped = await jsonBody(wrappedResponse);
+  assert.equal(wrappedResponse.status, 200);
+  assert.equal(wrapped.ok, true);
+  assert.equal(wrapped.window_id, 'w-2026-06-12');
+  assert.equal(wrapped.model, 'gpt-image-2');
+  assert.equal(wrapped.size, '2048x1152');
+  assert.equal(wrapped.image_base64, Buffer.from('fake-png').toString('base64'));
+  assert.equal(openAiRequestBody.model, 'gpt-image-2');
+  assert.equal(openAiRequestBody.output_format, 'png');
+  assert.match(openAiRequestBody.prompt, /Most Important To You/);
+  assert.match(openAiRequestBody.prompt, /Questions your agent thought you would care about most/);
+  assert.match(openAiRequestBody.prompt, /Review or edit your agent's responses in Context Engine/);
+  assert.doesNotMatch(openAiRequestBody.prompt, /What Your Agent Upvoted/);
 
   const metricsResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/admin/agent-only/export?sessionSlug=alpha&view=answers&format=jsonl', {

@@ -1,4 +1,4 @@
-import { assertNoSecretShape } from './redaction.mjs';
+import { assertNoSecretShape, redactSecrets } from './redaction.mjs';
 import { buildTelegramQuestionAnswerSchema } from './questionUi.mjs';
 import { listTelegramProposedQuestionsForSession } from './telegramQuestionProposals.mjs';
 import { SUBMIT_REQUEST_USER_KV_PREFIX } from './telegramSubmitQueue.mjs';
@@ -21,6 +21,10 @@ const MAX_AGENT_ONLY_QUESTIONS = 200;
 const MAX_BULK_ROWS = 50;
 const MAX_RECENT_REQUEST_IDS = 20;
 const AGENT_ONLY_PRINCIPAL_ID_SALT = 'context-engine-agent-only-principal-id-v1';
+const DEFAULT_WRAPPED_IMAGE_MODEL = 'gpt-image-2';
+const DEFAULT_WRAPPED_IMAGE_SIZE = '2048x1152';
+const DEFAULT_WRAPPED_IMAGE_QUALITY = 'medium';
+const DEFAULT_OPENAI_IMAGE_GENERATION_URL = 'https://api.openai.com/v1/images/generations';
 const textEncoder = new TextEncoder();
 
 const AGENT_ONLY_EVAL_TYPES = new Set([
@@ -39,6 +43,7 @@ export const AGENT_ONLY_ENDPOINTS = Object.freeze({
   statements: '/telegram/agent/api/agent-only/statements',
   answersBulk: '/telegram/agent/api/agent-only/answers/bulk',
   tokenVotesBulk: '/telegram/agent/api/agent-only/token-votes/bulk',
+  wrappedImage: '/telegram/agent/api/agent-only/wrapped-image',
 });
 
 export const AGENT_ONLY_INSTRUCTIONS = `Context Engine agent_only_mode instructions (v40).
@@ -571,6 +576,7 @@ export function buildAgentOnlyStartPayload({
     statementEndpoint: AGENT_ONLY_ENDPOINTS.statements,
     answerEndpoint: AGENT_ONLY_ENDPOINTS.answersBulk,
     voteEndpoint: AGENT_ONLY_ENDPOINTS.tokenVotesBulk,
+    wrappedImageEndpoint: AGENT_ONLY_ENDPOINTS.wrappedImage,
     budgets: { agent_linear: 100, agent_quadratic: 100 },
     skillVersion: safeString(skillVersion),
     instructions: AGENT_ONLY_INSTRUCTIONS,
@@ -1312,6 +1318,235 @@ export async function loadAgentOnlyPredictionsForPrincipal({
       budget: 100,
     },
   };
+}
+
+function wrappedDisplayText(value = '', maxChars = 180) {
+  const redacted = redactSecrets(String(value ?? ''));
+  return safeString(redacted).replace(/\s+/g, ' ').slice(0, maxChars);
+}
+
+function normalizeWrappedImageSize(value = '') {
+  const fallback = DEFAULT_WRAPPED_IMAGE_SIZE;
+  const match = safeString(value).match(/^(\d{3,4})x(\d{3,4})$/);
+  if (!match) return fallback;
+  const width = Number(match[1]);
+  const height = Number(match[2]);
+  if (!Number.isFinite(width) || !Number.isFinite(height)) return fallback;
+  if (width < 512 || height < 512 || width > 3840 || height > 3840) return fallback;
+  return `${width}x${height}`;
+}
+
+function normalizeWrappedImageQuality(value = '') {
+  const quality = lower(value);
+  return ['low', 'medium', 'high', 'auto'].includes(quality) ? quality : DEFAULT_WRAPPED_IMAGE_QUALITY;
+}
+
+function resolveWorkerOpenAiKey(env = {}) {
+  return safeString(
+    env.AGENT_BRIDGE_OPENAI_API_KEY ||
+    env.AGENT_BRIDGE_OPENAI_KEY ||
+    env.OPENAI_API_KEY ||
+    env.E2E_OPENAI_KEY,
+  );
+}
+
+function wrappedPredictionRows(snapshot = {}, state = {}) {
+  const statements = statementMap(snapshot);
+  return Object.entries(state.byStatement || {})
+    .map(([questionId, entry]) => {
+      const statement = statements.get(questionId);
+      if (!entry?.agent?.answer || !statement) return null;
+      return {
+        questionId,
+        question: wrappedDisplayText(statement.text, 130),
+        answer: wrappedDisplayText(answerLabelForSchema(entry.agent.answer, statement.answer_schema || {}), 120),
+        confidence: Math.max(0, Math.min(100, Math.floor(Number(entry.agent.confidence) || 0))),
+      };
+    })
+    .filter(Boolean);
+}
+
+function wrappedImportanceRows(snapshot = {}, voteStates = []) {
+  const statements = statementMap(snapshot);
+  const weights = new Map();
+  for (const state of voteStates) {
+    const mode = lower(state?.mode);
+    for (const [questionId, rawWeight] of Object.entries(state?.votes || {})) {
+      const weight = Math.floor(Number(rawWeight) || 0);
+      if (!weight) continue;
+      const contribution = mode === 'quadratic' ? weight * weight : Math.abs(weight);
+      const signedContribution = weight > 0 ? contribution : 0;
+      const existing = weights.get(questionId) || { positive: 0, absolute: 0 };
+      existing.positive += signedContribution;
+      existing.absolute += contribution;
+      weights.set(questionId, existing);
+    }
+  }
+  return [...weights.entries()]
+    .map(([questionId, score]) => {
+      const statement = statements.get(questionId);
+      if (!statement) return null;
+      return {
+        questionId,
+        score: score.positive || score.absolute,
+        question: wrappedDisplayText(statement.text, 115),
+      };
+    })
+    .filter((row) => row && row.score > 0)
+    .sort((left, right) => right.score - left.score)
+    .slice(0, 5);
+}
+
+function predictionLine(row = {}) {
+  return `"${wrappedDisplayText(row.question, 90)}" -> ${wrappedDisplayText(row.answer || 'N/A', 80)} (${row.confidence}/100 confidence)`;
+}
+
+export function buildAgentOnlyWrappedImagePrompt({
+  snapshot = {},
+  state = {},
+  linearVoteState = {},
+  quadraticVoteState = {},
+  styleHint = '',
+} = {}) {
+  const predictions = wrappedPredictionRows(snapshot, state);
+  const highConfidence = [...predictions]
+    .sort((left, right) => right.confidence - left.confidence)
+    .slice(0, 3);
+  const cautious = [...predictions]
+    .sort((left, right) => left.confidence - right.confidence)
+    .slice(0, 3);
+  const important = wrappedImportanceRows(snapshot, [linearVoteState, quadraticVoteState]);
+  const importantLines = important.length
+    ? important.map((row, index) => `${index + 1}. ${wrappedDisplayText(row.question, 95)}`).join('\n')
+    : 'N/A - no importance allocations submitted yet.';
+  const highLines = highConfidence.length
+    ? highConfidence.map((row) => `- ${predictionLine(row)}`).join('\n')
+    : '- N/A - no predictions submitted yet.';
+  const cautiousLines = cautious.length
+    ? cautious.map((row) => `- ${predictionLine(row)}`).join('\n')
+    : '- N/A - no cautious predictions submitted yet.';
+  const styleLine = wrappedDisplayText(styleHint, 240);
+  const prompt = `Create a wide 16:9 shareable poster titled "Agent Village Wrapped" with subtitle "What your agent thinks it knows about you".
+
+Make it look like a polished social-share card, readable on mobile, with no tiny text. Custom aesthetic should be derived from the predictions below${styleLine ? `, with this extra style hint: ${styleLine}` : ''}. If the data suggests no stronger theme, use a premium privacy-first civic-tech visual language: cryptographic village map, clean coordination dashboard, warm midnight blue, signal green, soft gold, and white accents. Use elegant map lines, Telegram-like message nodes, tiny lock/check icons, and a village grid, but no literal robots.
+
+Title treatment: make "Agent Village Wrapped" a horizontal wordmark running along the top, not a separate logo badge or big emblem. Use the Agent Village logo as inspiration: "AGENT" feels bold, uppercase, blocky, and modern; "VILLAGE" feels elegant, high-contrast serif with a flowing calligraphic V; adapt that mixed-type wordmark style for "Agent Village Wrapped". Do not place a standalone logo icon beside it. Keep the subtitle small under or near the wordmark so the content area below has more room.
+
+Layout requirements: keep the top-right area visually calm with abstract map lines only, no decorative labels, no fake annotations, no extra numbers, and no filler text. Every visible word must be part of one of the content sections below. Leave clear spacing around the top wordmark and content cards.
+
+Use these content sections:
+
+1. Agent Core Insight
+Infer a short archetype from the predictions. Use one bold archetype label and one memeable sentence about what the agent thinks of the principal.
+
+2. Most Important To You
+Label this section exactly: "Questions your agent thought you would care about most"
+Show these question themes or short titles, not token math:
+${importantLines}
+
+3. High-Confidence Reads
+Show concise prediction cards based on:
+${highLines}
+
+4. Cautious Reads
+Show concise nuanced prediction cards based on:
+${cautiousLines}
+
+5. Agent Comparison
+Compare the principal to a historical figure or fictional/book character only if it feels supported by the predictions; otherwise write "N/A". Make this a richer wide strip: show the comparison name plus several small evidence artifacts/icons beside it, such as a zero-knowledge calendar, civic experiment ledger, handshake/introduction network, village infrastructure map, or other symbols derived from the predictions. The artifacts should explain why the comparison fits without adding fake data.
+
+Footer in small type, with "Context Engine" still readable: "Review or edit your agent's responses in Context Engine"
+
+Do not show access credentials, raw Telegram ids, confidence tables, rationales, privacy skip counts, linear/quadratic allocation mechanics, decorative text, lorem ipsum, fake UI labels, or random numbers. Keep the graphic memeable, premium, and screenshot-friendly. Make all major text legible and avoid overcrowding.`;
+  assertNoSecretShape({ prompt }, 'Agent-only wrapped image prompt must not serialize secrets.');
+  return prompt;
+}
+
+export async function generateAgentOnlyWrappedImage({
+  env = {},
+  sessionSlug = '',
+  telegramUserId = '',
+  body = {},
+  now = null,
+  fetchImpl = globalThis.fetch,
+} = {}) {
+  const slug = sanitizeSessionSlug(sessionSlug || body.sessionSlug);
+  const loaded = await loadAgentOnlyModeConfig({ env, sessionSlug: slug });
+  const nowMs = Date.parse(nowIso(now || body.createdAt));
+  const boundary = windowBoundariesAround(nowMs, loaded.config.windowing);
+  if (!boundary) return { ok: false, status: 409, reason: 'window_not_open' };
+  const suppliedWindowId = safeString(body.window_id || body.windowId);
+  if (suppliedWindowId && suppliedWindowId !== boundary.windowId) {
+    return { ok: false, status: 409, reason: 'window_mismatch', window_id: boundary.windowId };
+  }
+  const materialized = await materializeAgentOnlyWindow({ env, sessionSlug: slug, now: now || body.createdAt || null });
+  if (!materialized.ok) return materialized;
+  const snapshot = materialized.snapshot;
+  const state = await loadAnswerState({ env, sessionSlug: slug, windowId: snapshot.windowId, telegramUserId });
+  const predictions = wrappedPredictionRows(snapshot, state);
+  if (!predictions.length) {
+    return { ok: false, status: 409, reason: 'agent_only_wrapped_no_predictions', window_id: snapshot.windowId };
+  }
+  const openAiKey = resolveWorkerOpenAiKey(env);
+  if (!openAiKey) return { ok: false, status: 503, reason: 'openai_key_missing' };
+  const linearVoteState = await loadVoteState({ env, sessionSlug: slug, windowId: snapshot.windowId, telegramUserId, mode: 'linear' });
+  const quadraticVoteState = await loadVoteState({ env, sessionSlug: slug, windowId: snapshot.windowId, telegramUserId, mode: 'quadratic' });
+  const prompt = buildAgentOnlyWrappedImagePrompt({
+    snapshot,
+    state,
+    linearVoteState,
+    quadraticVoteState,
+    styleHint: body.style_hint || body.styleHint || '',
+  });
+  const model = safeString(env.AGENT_BRIDGE_AGENT_WRAPPED_IMAGE_MODEL) || DEFAULT_WRAPPED_IMAGE_MODEL;
+  const size = normalizeWrappedImageSize(body.size || env.AGENT_BRIDGE_AGENT_WRAPPED_IMAGE_SIZE);
+  const quality = normalizeWrappedImageQuality(body.quality || env.AGENT_BRIDGE_AGENT_WRAPPED_IMAGE_QUALITY);
+  const targetUrl = safeString(env.AGENT_BRIDGE_OPENAI_IMAGE_URL) || DEFAULT_OPENAI_IMAGE_GENERATION_URL;
+  const requestBody = {
+    model,
+    prompt,
+    size,
+    quality,
+    output_format: 'png',
+    background: 'opaque',
+    n: 1,
+  };
+  assertNoSecretShape(requestBody, 'OpenAI wrapped image request must not serialize secrets.');
+  const response = await fetchImpl(targetUrl, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${openAiKey}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(requestBody),
+  });
+  const responseText = await response.text().catch(() => '');
+  const parsed = safeJsonParse(responseText, null);
+  if (!response.ok) {
+    return {
+      ok: false,
+      status: 502,
+      reason: 'openai_image_generation_failed',
+      upstreamStatus: response.status,
+      upstreamReason: wrappedDisplayText(parsed?.error?.message || parsed?.error || responseText || response.statusText, 240),
+    };
+  }
+  const imageBase64 = safeString(parsed?.data?.[0]?.b64_json);
+  if (!imageBase64) {
+    return { ok: false, status: 502, reason: 'openai_image_generation_missing_image' };
+  }
+  const payload = {
+    ok: true,
+    window_id: snapshot.windowId,
+    model,
+    size,
+    quality,
+    image_content_type: 'image/png',
+    image_base64: imageBase64,
+    ...(body.include_prompt === true || body.includePrompt === true ? { prompt } : {}),
+  };
+  assertNoSecretShape({ ...payload, image_base64: '[image omitted]' }, 'Agent-only wrapped image response metadata must not serialize secrets.');
+  return payload;
 }
 
 export async function recordAgentOnlyHumanReview({

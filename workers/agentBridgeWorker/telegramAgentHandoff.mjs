@@ -99,6 +99,7 @@ import {
   buildAgentOnlyMetrics,
   buildAgentOnlyStartPayload,
   exportAgentOnlyData,
+  generateAgentOnlyWrappedImage,
   getAgentOnlyStatementsPage,
   loadAgentOnlyModeConfig,
   materializeAgentOnlyWindow,
@@ -730,7 +731,8 @@ function delegationScopeForRequest(pathname = '', method = 'GET') {
   if (
     pathname === AGENT_ONLY_ENDPOINTS.statements ||
     pathname === AGENT_ONLY_ENDPOINTS.answersBulk ||
-    pathname === AGENT_ONLY_ENDPOINTS.tokenVotesBulk
+    pathname === AGENT_ONLY_ENDPOINTS.tokenVotesBulk ||
+    pathname === AGENT_ONLY_ENDPOINTS.wrappedImage
   ) {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.AGENT_AUTOFILL;
   }
@@ -3051,6 +3053,50 @@ async function handleAgentOnlyTokenVotesBulkRequest({
   const status = result.ok === false ? (result.status || 400) : 200;
   assertNoSecretShape(result, 'Agent-only token-votes response must not serialize secrets.');
   return json(result, { status });
+}
+
+function base64ToBytes(value = '') {
+  const binary = atob(String(value || ''));
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
+}
+
+async function handleAgentOnlyWrappedImageRequest({
+  env = {},
+  context = {},
+  input = {},
+  body = {},
+  fetchImpl = globalThis.fetch,
+} = {}) {
+  const result = await generateAgentOnlyWrappedImage({
+    env,
+    sessionSlug: context.session.sessionSlug,
+    telegramUserId: input.telegramUserId,
+    body: { ...body, format: input.format || body.format },
+    now: input.createdAt || null,
+    fetchImpl,
+  });
+  const status = result.ok === false ? (result.status || 400) : 200;
+  if (!result.ok) {
+    assertNoSecretShape(result, 'Agent-only wrapped image error must not serialize secrets.');
+    return json(result, { status });
+  }
+  const wantsPng = lower(input.format || body.format) === 'png';
+  if (wantsPng) {
+    return new Response(base64ToBytes(result.image_base64), {
+      status: 200,
+      headers: {
+        'content-type': result.image_content_type || 'image/png',
+        'cache-control': 'no-store',
+        'x-agent-only-window-id': result.window_id || '',
+      },
+    });
+  }
+  assertNoSecretShape({ ...result, image_base64: '[image omitted]' }, 'Agent-only wrapped image response metadata must not serialize secrets.');
+  return json(result, { status, headers: { 'cache-control': 'no-store' } });
 }
 
 function normalizeAdminQuestionDeleteIds(body = {}) {
@@ -5855,6 +5901,7 @@ async function handleTelegramAgentHandoffRequestUnsafe({
     AGENT_ONLY_ENDPOINTS.statements,
     AGENT_ONLY_ENDPOINTS.answersBulk,
     AGENT_ONLY_ENDPOINTS.tokenVotesBulk,
+    AGENT_ONLY_ENDPOINTS.wrappedImage,
     '/telegram/agent/api/results',
     '/telegram/agent/api/results-image',
     '/telegram/agent/api/geo-backlink',
@@ -5907,6 +5954,9 @@ async function handleTelegramAgentHandoffRequestUnsafe({
   }
   if (url.pathname === AGENT_ONLY_ENDPOINTS.tokenVotesBulk && request.method === 'POST') {
     return handleAgentOnlyTokenVotesBulkRequest({ env, context, input, body });
+  }
+  if (url.pathname === AGENT_ONLY_ENDPOINTS.wrappedImage && request.method === 'POST') {
+    return handleAgentOnlyWrappedImageRequest({ env, context, input, body, fetchImpl });
   }
   if (url.pathname === '/telegram/agent/api/admin/status' && (request.method === 'GET' || request.method === 'POST')) {
     return handleAdminStatusRequest({ env, context, input });

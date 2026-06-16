@@ -7,6 +7,7 @@ import {
   AGENT_ONLY_WINDOW_KV_PREFIX,
   __test__telegramAgentOnlyMode,
   agentOnlyInstructionWordCount,
+  buildAgentOnlyWrappedImagePrompt,
   buildAgentOnlyStartPayload,
   buildAgentOnlyMetrics,
   canonicalAgentOnlyAnswerProjection,
@@ -152,9 +153,50 @@ test('start payload pins path-only endpoints and instruction size', () => {
   assert.equal(payload.statementEndpoint, '/telegram/agent/api/agent-only/statements');
   assert.equal(payload.answerEndpoint, '/telegram/agent/api/agent-only/answers/bulk');
   assert.equal(payload.voteEndpoint, '/telegram/agent/api/agent-only/token-votes/bulk');
+  assert.equal(payload.wrappedImageEndpoint, '/telegram/agent/api/agent-only/wrapped-image');
   assert.ok(agentOnlyInstructionWordCount(AGENT_ONLY_INSTRUCTIONS) >= 400);
   assert.ok(agentOnlyInstructionWordCount(AGENT_ONLY_INSTRUCTIONS) <= 800);
   assert.equal(/https?:\/\//i.test(payload.instructions), false);
+});
+
+test('wrapped image prompt uses importance wording and suppresses decorative text', () => {
+  const snapshot = {
+    windowId: 'w-2026-06-15',
+    statements: [
+      {
+        statement_id: 'ceq_trust',
+        text: 'How much would I trust an agent with private coordination?',
+        answer_schema: { kind: 'choice', values: ['agree', 'unsure', 'disagree'] },
+      },
+      {
+        statement_id: 'ceq_info',
+        text: 'A mostly AI-written information environment could be healthier than today.',
+        answer_schema: { kind: 'choice', values: ['agree', 'unsure', 'disagree'] },
+      },
+    ],
+  };
+  const state = {
+    byStatement: {
+      ceq_trust: { agent: { answer: { value: 'agree' }, confidence: 92 } },
+      ceq_info: { agent: { answer: { value: 'unsure' }, confidence: 41 } },
+    },
+  };
+  const prompt = buildAgentOnlyWrappedImagePrompt({
+    snapshot,
+    state,
+    linearVoteState: { mode: 'linear', votes: { ceq_trust: 20 } },
+    quadraticVoteState: { mode: 'quadratic', votes: { ceq_info: 4 } },
+  });
+  assert.match(prompt, /Most Important To You/);
+  assert.match(prompt, /Questions your agent thought you would care about most/);
+  assert.match(prompt, /horizontal wordmark running along the top/);
+  assert.match(prompt, /flowing calligraphic V/);
+  assert.match(prompt, /Do not place a standalone logo icon/);
+  assert.match(prompt, /High-Confidence Reads/);
+  assert.match(prompt, /Cautious Reads/);
+  assert.match(prompt, /several small evidence artifacts\/icons/);
+  assert.match(prompt, /Review or edit your agent's responses in Context Engine/);
+  assert.doesNotMatch(prompt, /What Your Agent Upvoted/);
 });
 
 test('canonical answer fingerprints compare semantics across agent and mini-app shapes', async () => {
