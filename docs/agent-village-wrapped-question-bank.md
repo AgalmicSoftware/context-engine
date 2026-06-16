@@ -77,7 +77,9 @@ Label this as: "Questions your agent thought you would care about most."
 Show exactly 3 actual question prompts when at least 3 are available, lightly
 shortened only when needed for fit, not theme summaries or raw vote math. This
 section is an importance ranking of questions from the principal's point of
-view, not a claim that any answer was boosted.
+view, not a claim that any answer was boosted. It must show questions only:
+never show predicted answers, Agree/Unsure/Disagree pills, ratings, selected
+options, confidence, or token math in this section.
 
 3. High-Confidence Reads
 Show 3 concise predicted answers the agent made on the principal's behalf when
@@ -85,9 +87,12 @@ at least 3 are available; otherwise show every available high-confidence
 prediction. Use explicit column headers: Question, Predicted answer, Confidence.
 Include enough question context for each answer to make sense; show scale context
 such as 7/10 rather than a bare 7.
-For binary answers, render Agree / Unsure / Disagree as large rounded response
-pills on a dark navy field: Agree green with white text, Unsure bright yellow
-with dark navy text, Disagree red with white text.
+Use the supplied answer format for each row. For binary choice answers only,
+render Agree / Unsure / Disagree as large rounded response pills on a dark navy
+field: Agree green with white text, Unsure bright yellow with dark navy text,
+Disagree red with white text. For rating answers, show scale context such as
+7/10. For multichoice answers, show the selected option text as text or option
+chips, never as Agree/Unsure/Disagree. For freeform answers, show compact text.
 
 4. Cautious Reads
 Show 3 predicted answers the agent was least confident about when at least 3 are
@@ -104,8 +109,9 @@ If available, include a compact strip of playful low-stakes guesses, such as
 favorite book, movie, game, p(bloom), or yes/no taste/personality guesses. These
 should be clearly framed as guesses, not facts. Show at most one item per guess
 category, so the same favorite-book/movie/game/p(bloom) guess cannot appear
-twice. Use a flower icon for p(bloom). If unavailable, omit the section rather
-than inventing.
+twice. Use a flower icon for p(bloom). This section is the only place Agent
+Guesses should appear; do not repeat guesses under Agent Comparison. If
+unavailable, omit the section rather than inventing.
 
 6. Memory Signals Used
 Only show supported, non-sensitive signals. Use "N/A" when unknown:
@@ -120,10 +126,9 @@ Compare the principal to a historical figure or fictional/book character in a
 wide strip. Include a stylized illustrated rendition or portrait silhouette of
 the figure/character, the comparison name, and one brief description line of no
 more than 10 words. Prefer historically accurate deep cuts when supported, but
-keep the comparison recognizable. If Agent Guesses are available, add them to
-this same horizontal band as compact chips. Do not add the old trio of
-comparison evidence icons, artifact tiles, or proof objects beside the
-historical figure. Keep it playful and non-defamatory.
+keep the comparison recognizable. Do not include Agent Guesses in this section.
+Do not add the old trio of comparison evidence icons, artifact tiles, or proof
+objects beside the historical figure. Keep it playful and non-defamatory.
 
 8. Abstract Agent Impression
 In the space that used to hold comparison evidence icons, include an abstract

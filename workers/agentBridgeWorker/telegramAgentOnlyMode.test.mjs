@@ -215,6 +215,11 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
         answer_schema: { kind: 'choice', values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] },
       },
       {
+        statement_id: 'ceq_multi',
+        text: 'What would you most want an agent to help with at Edge? Select all that apply.',
+        answer_schema: { kind: 'multichoice', options: ['Find relevant people', 'Coordinate plans', 'Summarize conversations'], minSelections: 1 },
+      },
+      {
         statement_id: 'ceq_pbloom',
         text: 'What is my p(bloom) for a flourishing future after this year?',
         answer_schema: { kind: 'choice', values: [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100] },
@@ -229,6 +234,7 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
       ceq_book_followup: { agent: { answer: { text: 'Neuromancer' }, confidence: 70 } },
       ceq_movie: { agent: { answer: { text: 'Unsupported' }, confidence: 12 } },
       ceq_rating: { agent: { answer: { value: 7 }, confidence: 88 } },
+      ceq_multi: { agent: { answer: { values: ['Find relevant people', 'Coordinate plans'] }, confidence: 90 } },
       ceq_pbloom: { agent: { answer: { value: 80 }, confidence: 63 } },
     },
   };
@@ -261,7 +267,10 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.match(prompt, /Custom aesthetic must vary from person to person/);
   assert.match(prompt, /Section typography: make section titles large/);
   assert.match(prompt, /Show exactly 3 actual question prompts/);
-  assert.match(prompt, /Do not replace them with theme summaries/);
+  assert.match(prompt, /Question only: "I would trust my agent to schedule meetings while I sleep/);
+  assert.match(prompt, /This section is questions only: do not show predicted answers/);
+  assert.match(prompt, /do not show predicted answers, answer pills, Agree\/Unsure\/Disagree, ratings, selected options, confidence, or token math/);
+  assert.match(prompt, /Do not replace prompts with theme summaries/);
   assert.match(prompt, /Agree is green with white text/);
   assert.match(prompt, /Unsure is bright yellow with dark navy text/);
   assert.match(prompt, /Disagree is red with white text/);
@@ -270,8 +279,10 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.match(prompt, /Cautious Reads/);
   assert.match(prompt, /Question: "/);
   assert.match(prompt, /Predicted answer/);
+  assert.match(prompt, /answer format: binary choice; prediction: Agree; confidence: 92%/);
+  assert.match(prompt, /answer format: multichoice selection; prediction: Find relevant people, Coordinate plans; confidence: 90%/);
+  assert.match(prompt, /answer format: rating scale; prediction: 7\/10; confidence: 88%/);
   assert.match(prompt, /7\/10/);
-  assert.match(prompt, /prediction: 7\/10; confidence: 88%/);
   assert.doesNotMatch(prompt, /confidence: 88\/100/);
   assert.doesNotMatch(prompt, /prediction: 7; confidence/);
   assert.match(prompt, /show the full prompt even if the row becomes tighter/);
@@ -280,9 +291,10 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.match(prompt, /Do not render detached rating labels/);
   assert.match(prompt, /Agent Guesses/);
   assert.match(prompt, /p\(bloom\)/);
-  assert.match(prompt, /prediction: 80\/100; confidence: 63%/);
+  assert.match(prompt, /answer format: rating scale; prediction: 80\/100; confidence: 63%/);
   assert.match(prompt, /flower for p\(bloom\)/);
-  assert.match(prompt, /must not replace the historical comparison or abstract agent-impression corner/);
+  assert.match(prompt, /Do not repeat Agent Guesses under Agent Comparison or anywhere else/);
+  assert.match(prompt, /Do not include Agent Guesses in this section/);
   assert.match(prompt, /favorite book/);
   assert.match(prompt, /Neuromancer/);
   assert.doesNotMatch(prompt, /The Diamond Age/);

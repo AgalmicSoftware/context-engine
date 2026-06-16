@@ -1662,11 +1662,27 @@ function wrappedPredictionRows(snapshot = {}, state = {}, { includeUnavailableGu
         questionId,
         question: wrappedDisplayText(statement.text, 280),
         answer: wrappedDisplayText(wrappedAnswerLabelForSchema(entry.agent.answer, statement.answer_schema || {}), 120),
+        answerFormat: wrappedAnswerFormatForSchema(statement.answer_schema || {}),
         confidence: Math.max(0, Math.min(100, Math.floor(Number(entry.agent.confidence) || 0))),
       };
     })
     .filter(Boolean);
   return includeUnavailableGuesses ? rows : rows.filter((row) => !wrappedRowIsUnavailableGuess(row));
+}
+
+function wrappedAnswerFormatForSchema(schema = {}) {
+  const kind = safeString(schema?.kind);
+  if (kind === 'text') return 'freeform text';
+  if (kind === 'multichoice') return 'multichoice selection';
+  if (kind === 'choice') {
+    const values = Array.isArray(schema.values) ? schema.values.map((value) => lower(answerScalarString(value))) : [];
+    const valueSet = new Set(values);
+    if (['agree', 'unsure', 'disagree'].every((value) => valueSet.has(value))) return 'binary choice';
+    const numericValues = values.map(Number).filter((value) => Number.isFinite(value));
+    if (numericValues.length >= 2) return 'rating scale';
+    return 'single choice';
+  }
+  return kind || 'answer';
 }
 
 function wrappedAnswerLabelForSchema(answer = {}, schema = {}) {
@@ -1720,7 +1736,7 @@ function wrappedImportanceRows(snapshot = {}, voteStates = [], { excludeQuestion
 }
 
 function predictionLine(row = {}) {
-  return `Question: "${wrappedDisplayText(row.question, 240)}"; prediction: ${wrappedDisplayText(row.answer || 'N/A', 80)}; confidence: ${row.confidence}%`;
+  return `Question: "${wrappedDisplayText(row.question, 240)}"; answer format: ${wrappedDisplayText(row.answerFormat || 'answer', 40)}; prediction: ${wrappedDisplayText(row.answer || 'N/A', 80)}; confidence: ${row.confidence}%`;
 }
 
 function wrappedAnswerIsUnavailable(value = '') {
@@ -1862,7 +1878,7 @@ export function buildAgentOnlyWrappedImagePrompt({
     .slice(0, WRAPPED_SECTION_ITEM_LIMIT);
   const important = wrappedImportanceRows(snapshot, [linearVoteState, quadraticVoteState], { excludeQuestionIds: guessQuestionIds });
   const importantLines = important.length
-    ? important.map((row, index) => `${index + 1}. "${wrappedDisplayText(row.question, 220)}"`).join('\n')
+    ? important.map((row, index) => `${index + 1}. Question only: "${wrappedDisplayText(row.question, 220)}"`).join('\n')
     : 'N/A - no importance allocations submitted yet.';
   const highLines = highConfidence.length
     ? highConfidence.map((row) => `- ${predictionLine(row)}`).join('\n')
@@ -1904,7 +1920,7 @@ Infer a short archetype from the predictions. Use one bold archetype label and o
 
 2. Most Important To You
 Label this section exactly: "Questions your agent thought you would care about most"
-Show exactly 3 actual question prompts if 3 are available; otherwise show every available prompt. Lightly shorten only if absolutely necessary for fit. Do not replace them with theme summaries, category labels, or token math:
+Show exactly 3 actual question prompts if 3 are available; otherwise show every available prompt. Lightly shorten only if absolutely necessary for fit. This section is questions only: do not show predicted answers, answer pills, Agree/Unsure/Disagree, ratings, selected options, confidence, or token math in this section. Do not replace prompts with theme summaries or category labels:
 ${importantLines}
 
 3. High-Confidence Reads
@@ -1918,13 +1934,15 @@ ${cautiousLines}
 Confidence display: in both High-Confidence Reads and Cautious Reads, show a clear column or small header labeled "Confidence". Render confidence values as percentages like "95%" rather than "95/100". Do not show a full confidence table, just the per-card percentage.
 
 5. Agent Guesses
-If the data below contains favorite book, movie, game, p(bloom), or yes/no taste/personality guesses, include compact "Agent Guesses" items. Show at most one item per guess category, so there is never a duplicate favorite-book/movie/game/p(bloom) guess. Prefer placing these guesses in the same horizontal band as Agent Comparison when there is room, as compact chips with precise icons: book, board-game/Go stones, cinema/message screen, flower for p(bloom), etc. These guesses are additive; they must not replace the historical comparison or abstract agent-impression corner. If no such rows are available, omit this section entirely.
+If the data below contains favorite book, movie, game, p(bloom), or yes/no taste/personality guesses, include compact "Agent Guesses" items in this section only. Show at most one item per guess category, so there is never a duplicate favorite-book/movie/game/p(bloom) guess. Use compact chips with precise icons: book, board-game/Go stones, cinema/message screen, flower for p(bloom), etc. Do not repeat Agent Guesses under Agent Comparison or anywhere else. These guesses are additive; they must not replace the historical comparison or abstract agent-impression corner. If no such rows are available, omit this section entirely.
 ${agentGuessLines || 'N/A - no favorite book, movie, game, or yes/no agent guesses were submitted.'}
 
-Binary answer styling: whenever a prediction answer is Agree, Unsure, or Disagree, render that answer as a large rounded choice pill/button on a dark navy background: Agree is green with white text, Unsure is bright yellow with dark navy text, and Disagree is red with white text. The pills should feel like primary response controls, not small tags.
+Answer rendering rules: use the supplied "answer format" on each prediction row. Only rows with answer format "binary choice" may render Agree, Unsure, or Disagree as large rounded choice pills/buttons. Never render Agree/Unsure/Disagree pills for rating scale, multichoice selection, or freeform text rows. For rating scale rows, show the numeric value with scale context like "7/10". For multichoice selection rows, show the selected option text as text or option chips, never as Agree/Unsure/Disagree. For freeform rows, show the short text answer in quotes or a compact text chip.
+
+Binary answer styling: for binary choice prediction rows only, render Agree / Unsure / Disagree as large rounded choice pills/buttons on a dark navy background: Agree is green with white text, Unsure is bright yellow with dark navy text, and Disagree is red with white text. The pills should feel like primary response controls, not small tags.
 
 6. Agent Comparison
-Compare the principal to a historical figure or fictional/book character only if it feels supported by the predictions; otherwise write "N/A". Prefer historically accurate deep cuts when supported by the evidence: recognizable but less generic comparisons are better than defaulting to Benjamin Franklin, Leonardo da Vinci, or other obvious polymath icons. Make this a calm wide strip with a stylized illustrated rendition or portrait silhouette of that figure/character, the comparison name, and one brief description line of no more than 10 words explaining the fit. If Agent Guesses are available, add them to this same horizontal band as compact chips. Do not add the old trio of comparison evidence icons, artifact tiles, or extra proof objects beside the historical figure.
+Compare the principal to a historical figure or fictional/book character only if it feels supported by the predictions; otherwise write "N/A". Prefer historically accurate deep cuts when supported by the evidence: recognizable but less generic comparisons are better than defaulting to Benjamin Franklin, Leonardo da Vinci, or other obvious polymath icons. Make this a calm wide strip with a stylized illustrated rendition or portrait silhouette of that figure/character, the comparison name, and one brief description line of no more than 10 words explaining the fit. Do not include Agent Guesses in this section. Do not add the old trio of comparison evidence icons, artifact tiles, or extra proof objects beside the historical figure.
 
 7. Abstract Agent Impression
 In the space that would otherwise hold comparison evidence icons, add one abstract artistic corner showing what the agent thinks of the principal. This should be a non-literal visual metaphor derived from the archetype, strongest predictions, memory signals, and aesthetic preference: examples include a botanical circuit-village, careful map lines around a warm signal, a privacy lock woven into roots, a field-note constellation, or a civic dashboard becoming a garden. It must not be another portrait, fake person, robot, trophy wall, random symbols, or decorative filler. Do not label this corner with extra text unless one tiny section label is needed for clarity.
