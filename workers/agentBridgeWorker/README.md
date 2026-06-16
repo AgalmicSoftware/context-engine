@@ -109,9 +109,12 @@ POST /telegram/agent/api/admin/agent-only/window/open
 GET  /telegram/agent/api/admin/agent-only/export?view=answers&format=jsonl
 ```
 
-The config is stored in `AGENT_ACTION_KV` and snapshots freeze flagged
-`ceq_...` question ids, statement text, and answer schemas for each window.
-The launch window defaults to `2026-06-12T08:00:00-07:00` through
+The config is stored in `AGENT_ACTION_KV`. The active window snapshot syncs to
+the current enabled `ceq_...` ids whenever the window is materialized, so newly
+enabled questions can be added and archived/deleted questions can be hidden
+without waiting for the next window. Existing answer/vote events remain
+append-only. Historical snapshots remain stable once their window is no longer
+active. The launch window defaults to `2026-06-12T08:00:00-07:00` through
 `2026-06-15T08:00:00-07:00`; regular windows start Mondays at 08:00
 America/Los_Angeles and use ids such as `w-2026-06-15`.
 
@@ -121,7 +124,8 @@ It manages Telegram proposed questions created under
 `telegram:proposed-question:`. By default it archives `ceq_...` records with
 `status: "archived"`; send `mode: "delete"` to hard-delete them from KV. Both
 modes remove processed ids from the agent-only config for future snapshots, but
-existing window snapshots remain immutable.
+the currently active agent-only snapshot hides those ids on the next
+materialization while preserving old research events.
 
 ```http
 POST /telegram/agent/api/admin/questions/delete

@@ -619,6 +619,31 @@ function snapshotStatementFromQuestion(question = {}) {
   };
 }
 
+function syncActiveEvalTypes(existingEvalTypes = {}, configuredEvalTypes = {}, activeQuestionIds = []) {
+  const existing = existingEvalTypes && typeof existingEvalTypes === 'object' && !Array.isArray(existingEvalTypes)
+    ? existingEvalTypes
+    : {};
+  const configured = configuredEvalTypes && typeof configuredEvalTypes === 'object' && !Array.isArray(configuredEvalTypes)
+    ? configuredEvalTypes
+    : {};
+  const out = { ...existing };
+  for (const questionId of activeQuestionIds) {
+    const id = safeString(questionId);
+    if (!id) continue;
+    const configuredType = safeString(configured[id]);
+    if (configuredType) out[id] = configuredType;
+    else delete out[id];
+  }
+  return out;
+}
+
+function activeEvalTypesChanged(existingEvalTypes = {}, nextEvalTypes = {}, activeQuestionIds = []) {
+  return activeQuestionIds.some((questionId) => {
+    const id = safeString(questionId);
+    return safeString(existingEvalTypes?.[id]) !== safeString(nextEvalTypes?.[id]);
+  });
+}
+
 function configEnablesAgentOnlyQuestions(loaded = {}) {
   const enabledQuestionIds = Array.isArray(loaded.config?.enabledQuestionIds)
     ? loaded.config.enabledQuestionIds
@@ -653,70 +678,161 @@ export async function materializeAgentOnlyWindow({
     if (activeBoundary?.windowId !== boundary.windowId) {
       return { ok: true, snapshot: existing, created: false, extended: false };
     }
-    const existingStatements = Array.isArray(existing.statements) ? existing.statements : [];
-    const existingIds = new Set(existingStatements.map((statement) => safeString(statement?.statement_id)).filter(Boolean));
-    const missingQuestionIds = loaded.config.enabledQuestionIds.filter((questionId) => !existingIds.has(questionId));
-    if (!missingQuestionIds.length) return { ok: true, snapshot: existing, created: false, extended: false };
-    const latestLoaded = await loadAgentOnlyModeConfig({ env, sessionSlug: slug });
-    if (!configEnablesAgentOnlyQuestions(latestLoaded)) {
-      return { ok: true, snapshot: existing, created: false, extended: false };
-    }
-    const latestSnapshot = await loadWindowSnapshot({ env, sessionSlug: slug, windowId: boundary.windowId }) || existing;
-    const latestStatements = Array.isArray(latestSnapshot.statements) ? latestSnapshot.statements : [];
-    const latestIds = new Set(latestStatements.map((statement) => safeString(statement?.statement_id)).filter(Boolean));
-    const latestMissingQuestionIds = latestLoaded.config.enabledQuestionIds.filter((questionId) => !latestIds.has(questionId));
-    if (!latestMissingQuestionIds.length) {
-      return { ok: true, snapshot: latestSnapshot, created: false, extended: false };
-    }
-    const questions = await listTelegramProposedQuestionsForSession(env, slug);
-    const byId = new Map((Array.isArray(questions) ? questions : [])
-      .map((question) => [normalizeQuestionId(question.questionId || question.id), question])
-      .filter(([id]) => id));
-    const additions = [];
-    const additionEvalTypes = {};
-    for (const questionId of latestMissingQuestionIds) {
-      const statement = snapshotStatementFromQuestion(byId.get(questionId));
-      if (statement) {
-        latestIds.add(questionId);
-        additions.push(statement);
-        const evalType = safeString(latestLoaded.config.evalTypesByQuestionId?.[questionId]);
-        if (evalType) additionEvalTypes[questionId] = evalType;
+    const maxSyncAttempts = 6;
+    let snapshot = existing;
+    let totalAddedStatementCount = 0;
+    let totalPrunedStatementCount = 0;
+    let totalEvalTypeChanged = false;
+    let lastExtendedSnapshot = null;
+    for (let attempt = 0; attempt < maxSyncAttempts; attempt += 1) {
+      const latestLoaded = await loadAgentOnlyModeConfig({ env, sessionSlug: slug });
+      if (!configEnablesAgentOnlyQuestions(latestLoaded)) {
+        return {
+          ok: true,
+          snapshot: lastExtendedSnapshot || snapshot,
+          created: false,
+          extended: totalAddedStatementCount > 0 || totalPrunedStatementCount > 0 || totalEvalTypeChanged,
+          addedStatementCount: totalAddedStatementCount,
+        };
       }
+      const latestActiveBoundary = windowBoundariesAround(nowMs, latestLoaded.config.windowing);
+      if (latestActiveBoundary?.windowId !== boundary.windowId) {
+        return {
+          ok: true,
+          snapshot: lastExtendedSnapshot || snapshot,
+          created: false,
+          extended: totalAddedStatementCount > 0 || totalPrunedStatementCount > 0 || totalEvalTypeChanged,
+          addedStatementCount: totalAddedStatementCount,
+        };
+      }
+      const latestSnapshot = await loadWindowSnapshot({ env, sessionSlug: slug, windowId: boundary.windowId }) || snapshot;
+      const latestStatements = Array.isArray(latestSnapshot.statements) ? latestSnapshot.statements : [];
+      const latestById = new Map(latestStatements
+        .map((statement) => [safeString(statement?.statement_id), statement])
+        .filter(([id]) => id));
+      const latestStatementIds = latestStatements.map((statement) => safeString(statement?.statement_id)).filter(Boolean);
+      const latestMissingQuestionIds = latestLoaded.config.enabledQuestionIds.filter((questionId) => !latestById.has(questionId));
+      if (latestMissingQuestionIds.length) {
+        const questions = await listTelegramProposedQuestionsForSession(env, slug);
+        const byId = new Map((Array.isArray(questions) ? questions : [])
+          .map((question) => [normalizeQuestionId(question.questionId || question.id), question])
+          .filter(([id]) => id));
+        for (const questionId of latestMissingQuestionIds) {
+          const statement = snapshotStatementFromQuestion(byId.get(questionId));
+          if (statement) latestById.set(questionId, statement);
+        }
+      }
+      const targetStatements = latestLoaded.config.enabledQuestionIds
+        .map((questionId) => latestById.get(questionId))
+        .filter(Boolean);
+      const targetStatementIds = targetStatements.map((statement) => safeString(statement?.statement_id)).filter(Boolean);
+      const targetIdSet = new Set(targetStatementIds);
+      const latestIdSet = new Set(latestStatementIds);
+      const latestAddCount = targetStatementIds.filter((questionId) => !latestIdSet.has(questionId)).length;
+      const latestPruneCount = latestStatementIds.filter((questionId) => !targetIdSet.has(questionId)).length;
+      const latestEvalTypesByQuestionId = syncActiveEvalTypes(
+        latestSnapshot.evalTypesByQuestionId,
+        latestLoaded.config.evalTypesByQuestionId,
+        targetStatementIds,
+      );
+      const latestEvalTypeChanged = activeEvalTypesChanged(
+        latestSnapshot.evalTypesByQuestionId,
+        latestEvalTypesByQuestionId,
+        targetStatementIds,
+      );
+      if (!latestAddCount && !latestPruneCount && !latestEvalTypeChanged) {
+        return {
+          ok: true,
+          snapshot: latestSnapshot,
+          created: false,
+          extended: totalAddedStatementCount > 0 || totalPrunedStatementCount > 0 || totalEvalTypeChanged,
+          addedStatementCount: totalAddedStatementCount,
+        };
+      }
+      if (attempt === maxSyncAttempts - 1) return { ok: false, status: 409, reason: 'agent_only_window_sync_retry_exhausted' };
+      const preWriteSnapshot = await loadWindowSnapshot({ env, sessionSlug: slug, windowId: boundary.windowId }) || latestSnapshot;
+      const preWriteStatements = Array.isArray(preWriteSnapshot.statements) ? preWriteSnapshot.statements : [];
+      const preWriteLoaded = await loadAgentOnlyModeConfig({ env, sessionSlug: slug });
+      if (!configEnablesAgentOnlyQuestions(preWriteLoaded)) {
+        snapshot = preWriteSnapshot;
+        continue;
+      }
+      const preWriteActiveBoundary = windowBoundariesAround(nowMs, preWriteLoaded.config.windowing);
+      if (preWriteActiveBoundary?.windowId !== boundary.windowId) {
+        snapshot = preWriteSnapshot;
+        continue;
+      }
+      const preWriteById = new Map(preWriteStatements
+        .map((statement) => [safeString(statement?.statement_id), statement])
+        .filter(([id]) => id));
+      const preWriteMissingQuestionIds = preWriteLoaded.config.enabledQuestionIds.filter((questionId) => !preWriteById.has(questionId));
+      if (preWriteMissingQuestionIds.length) {
+        const questions = await listTelegramProposedQuestionsForSession(env, slug);
+        const byId = new Map((Array.isArray(questions) ? questions : [])
+          .map((question) => [normalizeQuestionId(question.questionId || question.id), question])
+          .filter(([id]) => id));
+        for (const questionId of preWriteMissingQuestionIds) {
+          const statement = snapshotStatementFromQuestion(byId.get(questionId));
+          if (statement) preWriteById.set(questionId, statement);
+        }
+      }
+      const finalStatements = preWriteLoaded.config.enabledQuestionIds
+        .map((questionId) => preWriteById.get(questionId))
+        .filter(Boolean);
+      const preWriteStatementIds = preWriteStatements.map((statement) => safeString(statement?.statement_id)).filter(Boolean);
+      const preWriteIdSet = new Set(preWriteStatementIds);
+      const finalStatementIds = finalStatements.map((statement) => safeString(statement?.statement_id)).filter(Boolean);
+      const finalIdSet = new Set(finalStatementIds);
+      const finalAddedStatementCount = finalStatementIds.filter((questionId) => !preWriteIdSet.has(questionId)).length;
+      const finalPrunedStatementCount = preWriteStatementIds.filter((questionId) => !finalIdSet.has(questionId)).length;
+      const finalEvalTypesByQuestionId = syncActiveEvalTypes(
+        preWriteSnapshot.evalTypesByQuestionId,
+        preWriteLoaded.config.evalTypesByQuestionId,
+        finalStatementIds,
+      );
+      const finalEvalTypeChanged = activeEvalTypesChanged(
+        preWriteSnapshot.evalTypesByQuestionId,
+        finalEvalTypesByQuestionId,
+        finalStatementIds,
+      );
+      if (!finalAddedStatementCount && !finalPrunedStatementCount && !finalEvalTypeChanged) {
+        snapshot = preWriteSnapshot;
+        continue;
+      }
+      const updated = {
+        ...preWriteSnapshot,
+        statements: finalStatements,
+        evalTypesByQuestionId: finalEvalTypesByQuestionId,
+        legacyCursorStatementIds: (
+          Array.isArray(preWriteSnapshot.legacyCursorStatementIds) && preWriteSnapshot.legacyCursorStatementIds.length
+        )
+          ? normalizeQuestionIds(preWriteSnapshot.legacyCursorStatementIds)
+          : preWriteStatementIds,
+        sourceConfigUpdatedAt: safeString(preWriteLoaded.config.updatedAt),
+        extendedAt: nowIso(now),
+      };
+      assertNoSecretShape(updated, 'Agent-only window snapshots must not serialize secrets.');
+      await kv.put(key, JSON.stringify(updated), {
+        metadata: { v: 1, t: 'ao_window', sg: slug, w: boundary.windowId, c: updated.statements.length },
+      });
+      snapshot = updated;
+      lastExtendedSnapshot = updated;
+      totalAddedStatementCount += finalAddedStatementCount;
+      totalPrunedStatementCount += finalPrunedStatementCount;
+      totalEvalTypeChanged = totalEvalTypeChanged || finalEvalTypeChanged;
     }
-    if (!additions.length) return { ok: true, snapshot: latestSnapshot, created: false, extended: false };
-    const preWriteSnapshot = await loadWindowSnapshot({ env, sessionSlug: slug, windowId: boundary.windowId }) || latestSnapshot;
-    const preWriteStatements = Array.isArray(preWriteSnapshot.statements) ? preWriteSnapshot.statements : [];
-    const preWriteIds = new Set(preWriteStatements.map((statement) => safeString(statement?.statement_id)).filter(Boolean));
-    const finalAdditions = additions.filter((statement) => {
-      const questionId = safeString(statement?.statement_id);
-      if (!questionId || preWriteIds.has(questionId)) return false;
-      preWriteIds.add(questionId);
-      return true;
-    });
-    if (!finalAdditions.length) {
-      return { ok: true, snapshot: preWriteSnapshot, created: false, extended: false };
-    }
-    const finalAdditionEvalTypes = {};
-    for (const statement of finalAdditions) {
-      const questionId = safeString(statement?.statement_id);
-      const evalType = safeString(additionEvalTypes[questionId]);
-      if (evalType) finalAdditionEvalTypes[questionId] = evalType;
-    }
-    const updated = {
-      ...preWriteSnapshot,
-      statements: [...preWriteStatements, ...finalAdditions],
-      evalTypesByQuestionId: {
-        ...(preWriteSnapshot.evalTypesByQuestionId || {}),
-        ...finalAdditionEvalTypes,
-      },
-      sourceConfigUpdatedAt: safeString(latestLoaded.config.updatedAt),
-      extendedAt: nowIso(now),
+    return {
+      ok: false,
+      status: 409,
+      reason: 'agent_only_window_sync_retry_exhausted',
+      snapshot,
+      created: false,
+      extended: totalAddedStatementCount > 0 || totalPrunedStatementCount > 0 || totalEvalTypeChanged,
+      addedStatementCount: totalAddedStatementCount,
     };
-    assertNoSecretShape(updated, 'Agent-only window snapshots must not serialize secrets.');
-    await kv.put(key, JSON.stringify(updated), {
-      metadata: { v: 1, t: 'ao_window', sg: slug, w: boundary.windowId, c: updated.statements.length },
-    });
-    return { ok: true, snapshot: updated, created: false, extended: true, addedStatementCount: finalAdditions.length };
+  }
+  if (safeString(windowId) && activeBoundary?.windowId !== boundary.windowId) {
+    return { ok: false, status: 409, reason: 'agent_only_window_historical_missing' };
   }
 
   const questions = await listTelegramProposedQuestionsForSession(env, slug);
@@ -742,16 +858,53 @@ export async function materializeAgentOnlyWindow({
     sourceConfigUpdatedAt: safeString(loaded.config.updatedAt),
   };
   assertNoSecretShape(record, 'Agent-only window snapshots must not serialize secrets.');
-  await kv.put(key, JSON.stringify(record), {
+  const recordJson = JSON.stringify(record);
+  await kv.put(key, recordJson, {
     metadata: { v: 1, t: 'ao_window', sg: slug, w: boundary.windowId, c: statements.length },
   });
-  return { ok: true, snapshot: record, created: true };
+  const verified = await materializeAgentOnlyWindow({
+    env,
+    sessionSlug: slug,
+    now,
+    ...(safeString(windowId) ? { windowId: boundary.windowId } : {}),
+  });
+  if (verified.ok && verified.snapshot) {
+    const verifiedWindowId = safeString(verified.snapshot.windowId);
+    if (!safeString(windowId) && verifiedWindowId && verifiedWindowId !== boundary.windowId && typeof kv.get === 'function' && typeof kv.delete === 'function') {
+      const current = await kv.get(key).catch(() => null);
+      if (current === recordJson) await kv.delete(key).catch(() => {});
+    }
+    return {
+      ...verified,
+      created: true,
+      extended: verified.extended === true,
+      addedStatementCount: Number(verified.addedStatementCount) || 0,
+    };
+  }
+  if (!safeString(windowId) && typeof kv.get === 'function' && typeof kv.delete === 'function') {
+    const current = await kv.get(key).catch(() => null);
+    if (current === recordJson) await kv.delete(key).catch(() => {});
+  }
+  return verified.ok === false ? verified : { ok: true, snapshot: record, created: true };
 }
 
-function cursorOffset(cursor = '') {
-  if (!safeString(cursor)) return 0;
-  const parsed = Number(base64UrlDecode(cursor));
-  return Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : 0;
+function statementCursorState(cursor = '') {
+  if (!safeString(cursor)) return { offset: 0, seenQuestionIds: [] };
+  const decoded = base64UrlDecode(cursor);
+  const parsedJson = safeJsonParse(decoded, null);
+  if (parsedJson && typeof parsedJson === 'object' && !Array.isArray(parsedJson) && Number(parsedJson.v) === 2) {
+    return { seenQuestionIds: normalizeQuestionIds(parsedJson.seen || []) };
+  }
+  const parsed = Number(decoded);
+  if (Number.isFinite(parsed) && parsed > 0) return { offset: Math.floor(parsed), seenQuestionIds: [], legacyOffset: Math.floor(parsed) };
+  return { offset: 0, seenQuestionIds: [] };
+}
+
+function statementCursorForSeenIds(seenQuestionIds = [], activeQuestionIds = []) {
+  const activeIds = normalizeQuestionIds(activeQuestionIds);
+  const seen = new Set(normalizeQuestionIds(seenQuestionIds));
+  const seenActiveIds = activeIds.filter((id) => seen.has(id));
+  return seenActiveIds.length >= activeIds.length ? '' : base64UrlEncode(JSON.stringify({ v: 2, seen: seenActiveIds }));
 }
 
 export async function getAgentOnlyStatementsPage({
@@ -776,12 +929,29 @@ export async function getAgentOnlyStatementsPage({
   const materialized = await materializeAgentOnlyWindow({ env, sessionSlug, now });
   if (!materialized.ok) return materialized;
   const pageLimit = Math.max(1, Math.min(50, Math.floor(Number(limit)) || 50));
-  const offset = cursorOffset(cursor);
-  const statements = (Array.isArray(materialized.snapshot.statements) ? materialized.snapshot.statements : [])
-    .slice(offset, offset + pageLimit)
+  const allStatements = Array.isArray(materialized.snapshot.statements) ? materialized.snapshot.statements : [];
+  const cursorState = statementCursorState(cursor);
+  const legacyOffset = Number(cursorState.legacyOffset) || 0;
+  const legacyBaselineIds = legacyOffset > 0
+    ? normalizeQuestionIds(materialized.snapshot.legacyCursorStatementIds || [])
+    : [];
+  const seenQuestionIds = Array.isArray(cursorState.seenQuestionIds) && cursorState.seenQuestionIds.length
+    ? cursorState.seenQuestionIds
+    : legacyBaselineIds.slice(0, legacyOffset);
+  const seen = new Set(seenQuestionIds);
+  const offset = seenQuestionIds.length ? 0 : (Number(cursorState.offset) || 0);
+  const pageSource = seenQuestionIds.length
+    ? allStatements.filter((statement) => !seen.has(safeString(statement?.statement_id)))
+    : allStatements.slice(offset);
+  const rawStatements = pageSource.slice(0, pageLimit);
+  const statements = rawStatements
     .map((statement) => ({ ...statement, window_id: materialized.snapshot.windowId }));
-  const nextOffset = offset + statements.length;
-  const nextCursor = nextOffset >= materialized.snapshot.statements.length ? '' : base64UrlEncode(String(nextOffset));
+  const servedIds = rawStatements.map((statement) => safeString(statement?.statement_id)).filter(Boolean);
+  const nextSeenIds = seenQuestionIds.length
+    ? [...seenQuestionIds, ...servedIds]
+    : allStatements.slice(0, offset + rawStatements.length).map((statement) => safeString(statement?.statement_id)).filter(Boolean);
+  const activeStatementIds = allStatements.map((statement) => safeString(statement?.statement_id)).filter(Boolean);
+  const nextCursor = statementCursorForSeenIds(nextSeenIds, activeStatementIds);
   return {
     ok: true,
     window_id: materialized.snapshot.windowId,
@@ -1381,6 +1551,18 @@ async function reviewStatusForCurrentAgentAnswer({
   return agentFingerprint && humanFingerprint === agentFingerprint ? 'confirm' : 'stale_confirm';
 }
 
+function activeHumanVoteNets(nets = {}, allowedQuestionIds = new Set()) {
+  const active = {};
+  for (const [rawQuestionId, rawValue] of Object.entries(nets || {})) {
+    const questionId = safeString(rawQuestionId);
+    if (!allowedQuestionIds.has(questionId)) continue;
+    const value = Math.trunc(Number(rawValue) || 0);
+    if (value) active[questionId] = value;
+  }
+  const budgetUsed = Object.values(active).reduce((sum, value) => sum + Math.abs(Number(value) || 0), 0);
+  return { nets: active, budgetUsed };
+}
+
 export async function loadAgentOnlyPredictionsForPrincipal({
   env = {},
   sessionSlug = '',
@@ -1406,6 +1588,7 @@ export async function loadAgentOnlyPredictionsForPrincipal({
   for (const [questionId, entry] of Object.entries(state.byStatement || {})) {
     if (!entry?.agent?.answer) continue;
     const statement = schemas.get(questionId);
+    if (!statement) continue;
     const schema = statement?.answer_schema || {};
     const agentFingerprint = entry.agent.semanticFingerprint || await semanticFingerprintForAgentOnlyAnswer(entry.agent.answer, schema);
     const humanFingerprint = await reviewSemanticFingerprint(entry.human, schema);
@@ -1417,15 +1600,17 @@ export async function loadAgentOnlyPredictionsForPrincipal({
       reviewed: Boolean(entry.human),
     };
   }
+  const flaggedQuestionIds = (Array.isArray(snapshot?.statements) ? snapshot.statements : []).map((statement) => statement.statement_id);
   const humanVote = await loadHumanVoteState({ env, sessionSlug, windowId: snapshot.windowId, telegramUserId });
+  const activeHumanVote = activeHumanVoteNets(humanVote.nets || {}, new Set(flaggedQuestionIds));
   return {
     ok: true,
     windowId: snapshot.windowId,
     predictionsByQuestionId,
-    flaggedQuestionIds: (Array.isArray(snapshot?.statements) ? snapshot.statements : []).map((statement) => statement.statement_id),
+    flaggedQuestionIds,
     humanVote: {
-      nets: humanVote.nets || {},
-      budgetUsed: humanVote.budgetUsed || 0,
+      nets: activeHumanVote.nets,
+      budgetUsed: activeHumanVote.budgetUsed,
       budget: 100,
     },
   };
@@ -1832,6 +2017,12 @@ export async function recordAgentOnlyHumanReview({
   const slug = sanitizeSessionSlug(sessionSlug);
   const qid = safeString(questionId);
   const reviewKind = kind === 'edit' ? 'edit' : 'confirm';
+  const materialized = await materializeAgentOnlyWindow({ env, sessionSlug: slug, windowId, now });
+  if (!materialized.ok) return { ok: false, status: materialized.status || 409, reason: materialized.reason || 'window_snapshot_missing' };
+  const allowed = new Set((Array.isArray(materialized.snapshot?.statements) ? materialized.snapshot.statements : [])
+    .map((statement) => safeString(statement?.statement_id))
+    .filter(Boolean));
+  if (!allowed.has(qid)) return { ok: true, recorded: false, reason: 'agent_statement_not_flagged' };
   const state = await loadAnswerState({ env, sessionSlug: slug, windowId, telegramUserId });
   const entry = state.byStatement[qid];
   if (!entry?.agent) return { ok: true, recorded: false, reason: 'agent_prediction_missing' };
@@ -1930,9 +2121,10 @@ export async function submitAgentOnlyHumanVoteTaps({
   now = null,
 } = {}) {
   const slug = sanitizeSessionSlug(sessionSlug);
-  const snapshot = await loadWindowSnapshot({ env, sessionSlug: slug, windowId });
+  const materialized = await materializeAgentOnlyWindow({ env, sessionSlug: slug, windowId, now });
+  const snapshot = materialized.snapshot;
   const allowed = new Set((Array.isArray(snapshot?.statements) ? snapshot.statements : []).map((statement) => statement.statement_id));
-  if (!snapshot) return { ok: false, status: 409, reason: 'window_snapshot_missing' };
+  if (!materialized.ok || !snapshot) return { ok: false, status: materialized.status || 409, reason: materialized.reason || 'window_snapshot_missing' };
   if (!Array.isArray(taps) || taps.length < 1 || taps.length > MAX_BULK_ROWS) {
     return { ok: false, status: 400, reason: 'tap_batch_size_invalid' };
   }
@@ -1946,14 +2138,27 @@ export async function submitAgentOnlyHumanVoteTaps({
     normalizedTaps.push({ questionId, delta });
   }
   const state = await loadHumanVoteState({ env, sessionSlug: slug, windowId, telegramUserId });
-  const nets = { ...(state.nets || {}) };
+  const previousNets = state.nets && typeof state.nets === 'object' && !Array.isArray(state.nets)
+    ? state.nets
+    : {};
+  const activeState = activeHumanVoteNets(previousNets, allowed);
+  const activeNets = { ...activeState.nets };
   for (const tap of normalizedTaps) {
-    const next = Number(nets[tap.questionId] || 0) + tap.delta;
-    if (next === 0) delete nets[tap.questionId];
-    else nets[tap.questionId] = next;
+    const next = Number(activeNets[tap.questionId] || 0) + tap.delta;
+    if (next === 0) delete activeNets[tap.questionId];
+    else activeNets[tap.questionId] = next;
   }
+  const activeBudgetUsed = Object.values(activeNets).reduce((sum, value) => sum + Math.abs(Number(value) || 0), 0);
+  if (activeBudgetUsed > 100) return { ok: false, status: 400, reason: 'human_vote_budget_exceeded', budgetUsed: activeBudgetUsed };
+  const preservedNets = {};
+  for (const [rawQuestionId, rawValue] of Object.entries(previousNets)) {
+    const questionId = safeString(rawQuestionId);
+    const value = Math.trunc(Number(rawValue) || 0);
+    if (!questionId || !value || allowed.has(questionId)) continue;
+    preservedNets[questionId] = value;
+  }
+  const nets = { ...preservedNets, ...activeNets };
   const budgetUsed = Object.values(nets).reduce((sum, value) => sum + Math.abs(Number(value) || 0), 0);
-  if (budgetUsed > 100) return { ok: false, status: 400, reason: 'human_vote_budget_exceeded', budgetUsed };
   const kv = env?.AGENT_ACTION_KV;
   if (!kv || typeof kv.put !== 'function') return { ok: false, status: 500, reason: 'agent_only_human_vote_storage_unavailable' };
   const createdAt = nowIso(now);
@@ -1969,19 +2174,21 @@ export async function submitAgentOnlyHumanVoteTaps({
     mode: 'linear',
     taps: normalizedTaps,
     nets,
+    activeNets,
     budgetUsed,
+    activeBudgetUsed,
     createdAt,
   };
   assertNoSecretShape(event, 'Agent-only human vote events must not serialize secrets.');
   await kv.put(eventKey, JSON.stringify(event), {
     metadata: { v: 1, t: 'ao_hvote_evt', sg: slug, w: safeString(windowId), u: budgetUsed },
   });
-  const record = { ...state, nets, budgetUsed, updatedAt: createdAt };
+  const record = { ...state, nets, budgetUsed, activeBudgetUsed, updatedAt: createdAt };
   assertNoSecretShape(record, 'Agent-only human vote state must not serialize secrets.');
   await kv.put(humanVoteStateKey(slug, windowId, telegramUserId), JSON.stringify(record), {
     metadata: { v: 1, t: 'ao_hvote', sg: slug, w: safeString(windowId), u: budgetUsed },
   });
-  return { ok: true, window_id: safeString(windowId), nets, budgetUsed, budget: 100 };
+  return { ok: true, window_id: safeString(windowId), nets: activeNets, budgetUsed: activeBudgetUsed, budget: 100 };
 }
 
 async function listKvEntriesByPrefix(env = {}, prefix = '', limit = 100000) {
@@ -2138,6 +2345,27 @@ async function evalTypeForStatement({ env = {}, sessionSlug = '', windowId = '',
   return safeString(snapshot?.evalTypesByQuestionId?.[safeString(questionId)]);
 }
 
+async function syncActiveSnapshotForExport({
+  env = {},
+  sessionSlug = '',
+  windowId = '',
+  now = null,
+  cache = new Map(),
+} = {}) {
+  const slug = sanitizeSessionSlug(sessionSlug);
+  if (!slug) return null;
+  const materialized = await materializeAgentOnlyWindow({
+    env,
+    sessionSlug: slug,
+    windowId: safeString(windowId),
+    now,
+  }).catch(() => null);
+  const snapshot = materialized?.ok ? materialized.snapshot : null;
+  const snapshotWindowId = safeString(snapshot?.windowId);
+  if (snapshotWindowId) cache.set(`${slug}:${snapshotWindowId}`, snapshot);
+  return snapshot || null;
+}
+
 async function latestSubmittedAnswerFor({
   env = {},
   sessionSlug = '',
@@ -2172,12 +2400,20 @@ export async function exportAgentOnlyData({
   windowId = '',
   view = 'answers',
   format = 'jsonl',
+  now = null,
 } = {}) {
   const slug = sanitizeSessionSlug(sessionSlug);
   const selectedWindow = safeString(windowId);
   const rows = [];
   const snapshotCache = new Map();
   if (['answers', 'wide', 'calibration', 'gold'].includes(view)) {
+    await syncActiveSnapshotForExport({
+      env,
+      sessionSlug: slug,
+      windowId: selectedWindow,
+      now,
+      cache: snapshotCache,
+    });
     if (view === 'calibration') {
       const calibrationBuckets = new Map();
       const stateEntries = await listKvEntriesByPrefix(env, `${AGENT_ONLY_ANSWER_STATE_KV_PREFIX}${slug}:`);
@@ -2324,8 +2560,8 @@ export async function exportAgentOnlyData({
     }
   } else if (view === 'votes') {
     const prefixes = [
-      `${AGENT_ONLY_VOTE_STATE_KV_PREFIX}${slug}:`,
-      `${AGENT_ONLY_HUMAN_VOTE_STATE_KV_PREFIX}${slug}:`,
+      `${AGENT_ONLY_VOTE_EVENT_KV_PREFIX}${slug}:`,
+      `${AGENT_ONLY_HUMAN_VOTE_EVENT_KV_PREFIX}${slug}:`,
     ];
     for (const prefix of prefixes) {
       const entries = await listKvEntriesByPrefix(env, prefix);
@@ -2343,7 +2579,9 @@ export async function exportAgentOnlyData({
             mode: safeString(record.mode),
             votes: Number(votesValue) || 0,
             budget_used: Number(record.budgetUsed) || 0,
-            updated_at: safeString(record.updatedAt),
+            request_id: safeString(record.requestId),
+            created_at: safeString(record.createdAt),
+            updated_at: safeString(record.updatedAt || record.createdAt),
           });
         });
       }
