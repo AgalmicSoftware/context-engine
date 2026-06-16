@@ -1620,7 +1620,7 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   });
   assert.equal(votesResponse.status, 200);
   env.AGENT_BRIDGE_OPENAI_API_KEY = 'sk-bridge-openai';
-  let openAiRequestBody = null;
+  let openAiRequestForm = null;
   const wrappedResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/agent-only/wrapped-image?sessionSlug=alpha', {
       method: 'POST',
@@ -1633,9 +1633,11 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
     }),
     env,
     fetchImpl: async (url, init = {}) => {
-      assert.equal(url, 'https://api.openai.com/v1/images/generations');
+      assert.equal(url, 'https://api.openai.com/v1/images/edits');
       assert.equal(init.headers.authorization, 'Bearer sk-bridge-openai');
-      openAiRequestBody = JSON.parse(init.body);
+      assert.equal(init.headers['content-type'], undefined);
+      assert.equal(init.body instanceof FormData, true);
+      openAiRequestForm = init.body;
       return new Response(JSON.stringify({
         data: [{ b64_json: Buffer.from('fake-png').toString('base64') }],
       }), { status: 200, headers: { 'content-type': 'application/json' } });
@@ -1648,15 +1650,23 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   assert.equal(wrapped.mode, 'wrapped');
   assert.equal(wrapped.model, 'gpt-image-2');
   assert.equal(wrapped.size, '2048x1152');
+  assert.equal(wrapped.reference_image, 'agent-village-logo-reference.png');
   assert.equal(wrapped.image_base64, Buffer.from('fake-png').toString('base64'));
-  assert.equal(openAiRequestBody.model, 'gpt-image-2');
-  assert.equal(openAiRequestBody.output_format, 'png');
-  assert.match(openAiRequestBody.prompt, /Most Important To You/);
-  assert.match(openAiRequestBody.prompt, /Questions your agent thought you would care about most/);
-  assert.match(openAiRequestBody.prompt, /compact top-left "Agent Village" wordmark/);
-  assert.match(openAiRequestBody.prompt, /contextengine\.xyz/);
-  assert.doesNotMatch(openAiRequestBody.prompt, /Review or edit your agent's responses in Context Engine/);
-  assert.doesNotMatch(openAiRequestBody.prompt, /What Your Agent Upvoted/);
+  assert.equal(openAiRequestForm.get('model'), 'gpt-image-2');
+  assert.equal(openAiRequestForm.get('output_format'), 'png');
+  const logoReference = openAiRequestForm.get('image');
+  assert.equal(logoReference?.name, 'agent-village-logo-reference.png');
+  assert.equal(logoReference?.type, 'image/png');
+  assert.equal(logoReference?.size > 100_000, true);
+  const wrappedPrompt = openAiRequestForm.get('prompt');
+  assert.match(wrappedPrompt, /Most Important To You/);
+  assert.match(wrappedPrompt, /Questions your agent thought you would care about most/);
+  assert.match(wrappedPrompt, /compact top-left "Agent Village" wordmark/);
+  assert.match(wrappedPrompt, /attached Agent Village logo image as the style reference/);
+  assert.match(wrappedPrompt, /lay "AGENT" and "VILLAGE" side-by-side/);
+  assert.match(wrappedPrompt, /contextengine\.xyz/);
+  assert.doesNotMatch(wrappedPrompt, /Review or edit your agent's responses in Context Engine/);
+  assert.doesNotMatch(wrappedPrompt, /What Your Agent Upvoted/);
 
   const metricsResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/admin/agent-only/export?sessionSlug=alpha&view=answers&format=jsonl', {

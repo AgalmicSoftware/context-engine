@@ -259,9 +259,10 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.match(prompt, /compact top-left "Agent Village" wordmark/);
   assert.match(prompt, /What your agent thinks it knows about you/);
   assert.match(prompt, /Do not render the word "Wrapped"/);
-  assert.match(prompt, /"AGENT" in bold uppercase block sans/);
-  assert.match(prompt, /Agent Village logo as inspiration/);
+  assert.match(prompt, /"AGENT" is heavy uppercase block sans/);
+  assert.match(prompt, /attached Agent Village logo image as the style reference/);
   assert.match(prompt, /flowing calligraphic V/);
+  assert.match(prompt, /lay "AGENT" and "VILLAGE" side-by-side/);
   assert.match(prompt, /content area gets most of the vertical space/);
   assert.match(prompt, /varied, shareable palettes/);
   assert.match(prompt, /Custom aesthetic must vary from person to person/);
@@ -347,9 +348,11 @@ test('wrapped image prompt supports political compass mode around the most-impor
     mode: 'political_compass',
   });
   assert.match(prompt, /political compass meme/);
-  assert.match(prompt, /compact top-left "Agent Village" wordmark/);
+  assert.match(prompt, /compact top-left wordmark/);
   assert.match(prompt, /Where your agent thinks you land/);
-  assert.match(prompt, /"AGENT" in bold uppercase block sans/);
+  assert.match(prompt, /attached Agent Village logo image as the style reference/);
+  assert.match(prompt, /"AGENT" is heavy uppercase block sans/);
+  assert.match(prompt, /lay "AGENT" and "VILLAGE" side-by-side/);
   assert.match(prompt, /most-important question/);
   assert.match(prompt, /historical figures or fictional\/book characters/);
   assert.match(prompt, /I would rather my agent be too conservative with privacy/);

@@ -47,13 +47,14 @@ rhythm, icons, texture, and metaphor from the predicted archetype, strongest
 themes, memory signals, and high-confidence answers. Keep it memeable, readable,
 and screenshot-friendly.
 
-Make "Agent Village" a compact wordmark in the top-left corner, not a separate
-logo badge, giant emblem, or full-width headline. Do not render the word
-"Wrapped"; the format implies it and the extra word wastes space. Use the Agent
-Village logo as inspiration. Render "AGENT" in bold uppercase block sans style.
-Render "VILLAGE" in the reference Agent Village style: elegant high-contrast
-serif with a flowing calligraphic V. Put "What your agent thinks it knows about
-you" on the same top row to the right of the wordmark.
+Use the attached Agent Village logo image as the wordmark reference, but do not
+copy its stacked composition into the poster. Make "Agent Village" a compact
+side-by-side wordmark in the top-left corner, not a separate logo badge, giant
+emblem, or full-width headline. Do not render the word "Wrapped"; the format
+implies it and the extra word wastes space. Preserve the logo's typography:
+"AGENT" in bold uppercase block sans style, and "VILLAGE" in elegant
+high-contrast serif with a flowing calligraphic V. Put "What your agent thinks
+it knows about you" on the same top row to the right of the wordmark.
 
 Keep the top-right and other decorative areas visually calm. Use abstract map
 lines, icons, or texture there, but no decorative labels, fake annotations,

@@ -1,4 +1,9 @@
 import { assertNoSecretShape, redactSecrets } from './redaction.mjs';
+import {
+  AGENT_VILLAGE_LOGO_REFERENCE_BASE64,
+  AGENT_VILLAGE_LOGO_REFERENCE_CONTENT_TYPE,
+  AGENT_VILLAGE_LOGO_REFERENCE_FILENAME,
+} from './agentVillageLogoReference.mjs';
 import { buildTelegramQuestionAnswerSchema } from './questionUi.mjs';
 import { listTelegramProposedQuestionsForSession } from './telegramQuestionProposals.mjs';
 import { SUBMIT_REQUEST_USER_KV_PREFIX } from './telegramSubmitQueue.mjs';
@@ -25,7 +30,7 @@ const DEFAULT_WRAPPED_IMAGE_MODEL = 'gpt-image-2';
 const DEFAULT_WRAPPED_IMAGE_SIZE = '2048x1152';
 const DEFAULT_WRAPPED_IMAGE_QUALITY = 'medium';
 const WRAPPED_SECTION_ITEM_LIMIT = 3;
-const DEFAULT_OPENAI_IMAGE_GENERATION_URL = 'https://api.openai.com/v1/images/generations';
+const DEFAULT_OPENAI_IMAGE_EDIT_URL = 'https://api.openai.com/v1/images/edits';
 const textEncoder = new TextEncoder();
 
 const AGENT_ONLY_EVAL_TYPES = new Set([
@@ -93,6 +98,15 @@ function stableJson(value) {
     return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`).join(',')}}`;
   }
   return JSON.stringify(value ?? null);
+}
+
+function base64ToUint8Array(base64 = '') {
+  const binary = atob(safeString(base64));
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
 }
 
 function stableFingerprint(value = {}) {
@@ -1823,7 +1837,7 @@ function buildAgentOnlyPoliticalCompassPrompt({
   const focal = wrappedDisplayText(focalQuestion, 150) || 'N/A - no most-important question was available.';
   return `Create a wide 16:9 Agent Village political compass meme poster${styleLine ? `, with this extra style hint: ${styleLine}` : ''}.
 
-Title treatment: make a compact top-left "Agent Village" wordmark inspired by the Agent Village logo, not a full-width title or separate logo badge. Render "AGENT" in bold uppercase block sans and "VILLAGE" in the reference Agent Village style: elegant high-contrast serif with a flowing calligraphic V. Put subtitle "Where your agent thinks you land" on the same top row to create vertical space.
+Logo reference: use the attached Agent Village logo image as the style reference for the wordmark. Preserve its core typography: "AGENT" is heavy uppercase block sans, "VILLAGE" is elegant high-contrast serif with a dramatic flowing calligraphic V. Do not copy the logo's stacked layout into the poster; lay "AGENT" and "VILLAGE" side-by-side in a compact top-left wordmark. Put subtitle "Where your agent thinks you land" on the same top row to create vertical space.
 
 Use the agent's most-important question as the focal issue for the compass: "${focal}". Treat this as the question the principal's agent thinks they would care about most. Build two interpretable axes from that focal issue and the predictions below; examples include privacy <-> proactivity, review-first <-> autonomous action, local community <-> frontier acceleration, or skepticism <-> trust. Do not invent private facts.
 
@@ -1907,7 +1921,7 @@ export function buildAgentOnlyWrappedImagePrompt({
 
 Make it look like a polished social-share card, readable on mobile, with no tiny text. Custom aesthetic must vary from person to person and should be derived from the predictions below${styleLine ? `, with this extra style hint: ${styleLine}` : ''}. Choose color palette, texture, layout rhythm, icons, and visual metaphor from the inferred archetype, strongest preferences, high-confidence answers, and memory signals. Avoid making every report dark navy: use varied, shareable palettes such as dawn civic-tech, paper-and-ink field notes, bright village map, warm botanical, clean sci-fi, or civic poster colors when supported by the data. If the data suggests no stronger theme, use a premium privacy-first civic-tech visual language: airy village map, clean coordination dashboard, misty teal, cream, signal green, soft gold, and white accents. Use elegant map lines, Telegram-like message nodes, tiny lock/check icons, and a village grid, but no literal robots.
 
-Title treatment: make "Agent Village" a smaller compact wordmark in the top-left corner, not a full-width headline, not a separate logo badge, and not a giant emblem. Do not render the word "Wrapped"; the format implies it and the extra word wastes space. Use the Agent Village logo as inspiration: render "AGENT" in bold uppercase block sans and render "VILLAGE" in elegant high-contrast serif with a flowing calligraphic V. Put the title "What your agent thinks it knows about you" on the same top row to the right of the wordmark, large enough to read at a glance. Keep the top row short so the content area gets most of the vertical space.
+Logo reference: use the attached Agent Village logo image as the style reference for the wordmark. Preserve its core typography: "AGENT" is heavy uppercase block sans, "VILLAGE" is elegant high-contrast serif with a dramatic flowing calligraphic V. Do not copy the logo's stacked layout into the poster; lay "AGENT" and "VILLAGE" side-by-side on one compact top-left line. Do not render the word "Wrapped"; the format implies it and the extra word wastes space. Put the title "What your agent thinks it knows about you" on the same top row to the right of the wordmark, large enough to read at a glance. Keep the top row short so the content area gets most of the vertical space.
 
 Layout requirements: keep the top-right area visually calm with abstract map lines only, no decorative labels, no fake annotations, no extra numbers, and no filler text. Every visible word must be part of one of the content sections below. Leave clear spacing around the top wordmark and content cards.
 
@@ -1995,8 +2009,19 @@ export async function generateAgentOnlyWrappedImage({
   const model = safeString(env.AGENT_BRIDGE_AGENT_WRAPPED_IMAGE_MODEL) || DEFAULT_WRAPPED_IMAGE_MODEL;
   const size = normalizeWrappedImageSize(body.size || env.AGENT_BRIDGE_AGENT_WRAPPED_IMAGE_SIZE);
   const quality = normalizeWrappedImageQuality(body.quality || env.AGENT_BRIDGE_AGENT_WRAPPED_IMAGE_QUALITY);
-  const targetUrl = safeString(env.AGENT_BRIDGE_OPENAI_IMAGE_URL) || DEFAULT_OPENAI_IMAGE_GENERATION_URL;
-  const requestBody = {
+  const targetUrl = safeString(env.AGENT_BRIDGE_OPENAI_IMAGE_URL) || DEFAULT_OPENAI_IMAGE_EDIT_URL;
+  const referenceBytes = base64ToUint8Array(AGENT_VILLAGE_LOGO_REFERENCE_BASE64);
+  const referenceBlob = new Blob([referenceBytes], { type: AGENT_VILLAGE_LOGO_REFERENCE_CONTENT_TYPE });
+  const requestBody = new FormData();
+  requestBody.append('model', model);
+  requestBody.append('prompt', prompt);
+  requestBody.append('size', size);
+  requestBody.append('quality', quality);
+  requestBody.append('output_format', 'png');
+  requestBody.append('background', 'opaque');
+  requestBody.append('n', '1');
+  requestBody.append('image', referenceBlob, AGENT_VILLAGE_LOGO_REFERENCE_FILENAME);
+  assertNoSecretShape({
     model,
     prompt,
     size,
@@ -2004,15 +2029,15 @@ export async function generateAgentOnlyWrappedImage({
     output_format: 'png',
     background: 'opaque',
     n: 1,
-  };
-  assertNoSecretShape(requestBody, 'OpenAI wrapped image request must not serialize secrets.');
+    referenceImageFilename: AGENT_VILLAGE_LOGO_REFERENCE_FILENAME,
+    referenceImageBytes: referenceBytes.byteLength,
+  }, 'OpenAI wrapped image request must not serialize secrets.');
   const response = await fetchImpl(targetUrl, {
     method: 'POST',
     headers: {
       authorization: `Bearer ${openAiKey}`,
-      'content-type': 'application/json',
     },
-    body: JSON.stringify(requestBody),
+    body: requestBody,
   });
   const responseText = await response.text().catch(() => '');
   const parsed = safeJsonParse(responseText, null);
@@ -2036,6 +2061,7 @@ export async function generateAgentOnlyWrappedImage({
     model,
     size,
     quality,
+    reference_image: AGENT_VILLAGE_LOGO_REFERENCE_FILENAME,
     image_content_type: 'image/png',
     image_base64: imageBase64,
     ...(body.include_prompt === true || body.includePrompt === true ? { prompt } : {}),
