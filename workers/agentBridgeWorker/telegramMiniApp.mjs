@@ -6660,37 +6660,55 @@ function telegramMiniAppHtml() {
     .agentOnlyBadgeRow {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
       flex-wrap: wrap;
-      margin-top: 8px;
+      margin-top: 10px;
     }
     .agentPredictionBadge, .agentVoteMarker {
       border: 1px solid var(--border);
-      color: var(--muted);
-      background: rgba(255,255,255,0.04);
-      font-size: 13px;
-      font-weight: 700;
-      line-height: 1.2;
-      padding: 5px 7px;
+      border-radius: 8px;
+      color: var(--text);
+      background: rgba(255,255,255,0.07);
+      font-size: 15px;
+      font-weight: 800;
+      line-height: 1.25;
+      padding: 8px 10px;
+      overflow-wrap: anywhere;
     }
-    .agentPredictionBadge.choicePrediction {
+    .agentPredictionBadge {
       display: inline-flex;
       align-items: center;
-      gap: 7px;
-      border: 0;
-      background: transparent;
+      gap: 9px;
+      max-width: 100%;
+    }
+    .agentPredictionBadge.choicePrediction {
+      gap: 10px;
+      border-color: rgba(255,255,255,0.14);
+      background: rgba(255,255,255,0.07);
+      color: var(--text);
+      padding: 7px;
+    }
+    .agentPredictionLabel {
       color: var(--muted);
-      padding: 0;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+    .agentPredictionValue {
+      color: var(--text);
+      font-size: 17px;
+      font-weight: 850;
     }
     .agentPredictionChoice {
-      min-width: 96px;
-      min-height: 34px;
+      min-width: 112px;
+      min-height: 42px;
       border-radius: 8px;
-      padding: 7px 12px;
+      padding: 9px 16px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      font-size: 16px;
+      font-size: 20px;
       font-weight: 850;
       line-height: 1;
     }
@@ -6705,12 +6723,6 @@ function telegramMiniAppHtml() {
     .agentPredictionChoice.disagree {
       background: #f44336;
       color: #ffffff;
-    }
-    .agentPredictionConfirm {
-      min-height: 28px;
-      border-radius: 0;
-      padding: 4px 8px;
-      font-size: 12px;
     }
     .agentOnlyVotes {
       display: grid;
@@ -8413,23 +8425,6 @@ function telegramMiniAppHtml() {
         if (button) button.disabled = false;
       }
     }
-    function editAgentPrediction(questionRef = {}) {
-      const question = (state.data?.questions || []).find((entry) => entry.questionKey === questionRef.questionKey) || questionRef;
-      if (!question?.questionKey) return;
-      activate(question);
-      expandQuestion(question);
-      if (!syncQuestionCardExpanded(question, true)) renderQuestionStack();
-      window.requestAnimationFrame(() => {
-        const card = cardsForQuestion(question)[0];
-        if (!card) {
-          setStatus('Load this question in the list to edit your answer.', 'error');
-          return;
-        }
-        card.scrollIntoView({ block: 'start', behavior: 'smooth' });
-        const control = card.querySelector('textarea, input[type="range"], .segment, .choice');
-        if (control && typeof control.focus === 'function') control.focus({ preventScroll: true });
-      });
-    }
     function renderAgentOnlyPredictionBadge(question) {
       const prediction = agentOnlyPredictionFor(question);
       if (!prediction?.valueLabel) return null;
@@ -8442,6 +8437,7 @@ function telegramMiniAppHtml() {
       if (answerKind) {
         badge.className = 'agentPredictionBadge choicePrediction';
         const label = document.createElement('span');
+        label.className = 'agentPredictionLabel';
         label.textContent = 'Agent prediction';
         const choice = document.createElement('span');
         choice.className = 'agentPredictionChoice ' + answerKind;
@@ -8449,20 +8445,15 @@ function telegramMiniAppHtml() {
         badge.append(label, choice);
       } else {
         badge.className = 'agentPredictionBadge';
-        badge.textContent = 'Agent prediction: ' + prediction.valueLabel;
+        const label = document.createElement('span');
+        label.className = 'agentPredictionLabel';
+        label.textContent = 'Agent prediction';
+        const value = document.createElement('span');
+        value.className = 'agentPredictionValue';
+        value.textContent = prediction.valueLabel;
+        badge.append(label, value);
       }
       row.appendChild(badge);
-      if (prediction.confirmed !== true) {
-        const edit = document.createElement('button');
-        edit.type = 'button';
-        edit.className = 'secondary agentPredictionConfirm';
-        edit.textContent = 'Edit';
-        edit.onclick = (event) => {
-          event.stopPropagation();
-          editAgentPrediction(question);
-        };
-        row.appendChild(edit);
-      }
       return row;
     }
     function renderAgentOnlyVoteControls(question) {
@@ -11072,6 +11063,7 @@ function telegramMiniAppHtml() {
               if (answerKind) {
                 badge.className = 'agentPredictionBadge choicePrediction';
                 const label = document.createElement('span');
+                label.className = 'agentPredictionLabel';
                 label.textContent = 'Agent prediction';
                 const choice = document.createElement('span');
                 choice.className = 'agentPredictionChoice ' + answerKind;
@@ -11079,17 +11071,15 @@ function telegramMiniAppHtml() {
                 badge.append(label, choice);
               } else {
                 badge.className = 'agentPredictionBadge';
-                badge.textContent = 'Agent prediction: ' + prediction.valueLabel;
+                const label = document.createElement('span');
+                label.className = 'agentPredictionLabel';
+                label.textContent = 'Agent prediction';
+                const value = document.createElement('span');
+                value.className = 'agentPredictionValue';
+                value.textContent = prediction.valueLabel;
+                badge.append(label, value);
               }
               row.appendChild(badge);
-              if (prediction.confirmed !== true && titleText === 'Submitted responses') {
-                const edit = document.createElement('button');
-                edit.type = 'button';
-                edit.className = 'secondary agentPredictionConfirm';
-                edit.textContent = 'Edit';
-                edit.onclick = () => editAgentPrediction({ questionKey: answer.questionKey });
-                row.appendChild(edit);
-              }
             }
             section.appendChild(row);
           });

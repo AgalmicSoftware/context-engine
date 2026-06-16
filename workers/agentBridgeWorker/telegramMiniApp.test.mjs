@@ -576,10 +576,12 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.equal(html.includes("setStatus('Could not submit drafts"), false);
   assert.match(html, /el\.submitDrafts\.onclick = \(\) => submitSavedDrafts\(\);/);
   assert.match(html, /state\.data\.savedDrafts = drafts[\s\S]*\.filter\(\(draft\) => draft\.questionKey !== question\.questionKey\)[\s\S]*\.concat\(savedDraftEntry\);/);
-  assert.match(html, /edit\.textContent = 'Edit';/);
-  assert.match(html, /function editAgentPrediction\(questionRef = \{\}\)/);
-  assert.match(html, /editAgentPrediction\(question\);/);
-  assert.match(html, /editAgentPrediction\(\{ questionKey: answer\.questionKey \}\);/);
+  assert.match(html, /\.agentPredictionChoice \{[\s\S]*min-height: 42px;[\s\S]*font-size: 20px;/);
+  assert.match(html, /label\.className = 'agentPredictionLabel';/);
+  assert.match(html, /value\.className = 'agentPredictionValue';/);
+  assert.equal(html.includes("edit.textContent = 'Edit';"), false);
+  assert.equal(html.includes('agentPredictionConfirm'), false);
+  assert.equal(html.includes('function editAgentPrediction'), false);
   assert.equal(html.includes('confirmAgentPrediction(question, confirm)'), false);
   assert.equal(html.includes('confirmAgentPrediction({ questionKey: answer.questionKey }'), false);
   assert.equal(html.includes("confirm.textContent = 'Confirm';"), false);
