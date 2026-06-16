@@ -1395,7 +1395,7 @@ function wrappedImportanceRows(snapshot = {}, voteStates = []) {
       return {
         questionId,
         score: score.positive || score.absolute,
-        question: wrappedDisplayText(statement.text, 115),
+        question: wrappedDisplayText(statement.text, 190),
       };
     })
     .filter((row) => row && row.score > 0)
@@ -1463,7 +1463,7 @@ export function buildAgentOnlyWrappedImagePrompt({
     .slice(0, 3);
   const important = wrappedImportanceRows(snapshot, [linearVoteState, quadraticVoteState]);
   const importantLines = important.length
-    ? important.map((row, index) => `${index + 1}. ${wrappedDisplayText(row.question, 95)}`).join('\n')
+    ? important.map((row, index) => `${index + 1}. "${wrappedDisplayText(row.question, 165)}"`).join('\n')
     : 'N/A - no importance allocations submitted yet.';
   const highLines = highConfidence.length
     ? highConfidence.map((row) => `- ${predictionLine(row)}`).join('\n')
@@ -1492,7 +1492,7 @@ export function buildAgentOnlyWrappedImagePrompt({
 
 Make it look like a polished social-share card, readable on mobile, with no tiny text. Custom aesthetic should be derived from the predictions below${styleLine ? `, with this extra style hint: ${styleLine}` : ''}. If the data suggests no stronger theme, use a premium privacy-first civic-tech visual language: cryptographic village map, clean coordination dashboard, warm midnight blue, signal green, soft gold, and white accents. Use elegant map lines, Telegram-like message nodes, tiny lock/check icons, and a village grid, but no literal robots.
 
-Title treatment: make "Agent Village Wrapped" a horizontal wordmark running along the top, not a separate logo badge or big emblem. Use the Agent Village logo as inspiration: "AGENT" feels bold, uppercase, blocky, and modern; "VILLAGE" feels elegant, high-contrast serif with a flowing calligraphic V; adapt that mixed-type wordmark style for "Agent Village Wrapped". Do not place a standalone logo icon beside it. Keep the subtitle small under or near the wordmark so the content area below has more room.
+Title treatment: make "Agent Village Wrapped" a horizontal wordmark running along the top, not a separate logo badge or big emblem. Use the Agent Village logo as inspiration: "AGENT" feels bold, uppercase, blocky, and modern; "VILLAGE" feels elegant, high-contrast serif with a flowing calligraphic V; adapt that mixed-type wordmark style for "Agent Village Wrapped". Do not place a standalone logo icon beside it. The subtitle "What your agent thinks it knows about you" must be large enough to read at a glance, roughly 35-45% of the title height, while still leaving the content area below most of the space.
 
 Layout requirements: keep the top-right area visually calm with abstract map lines only, no decorative labels, no fake annotations, no extra numbers, and no filler text. Every visible word must be part of one of the content sections below. Leave clear spacing around the top wordmark and content cards.
 
@@ -1503,7 +1503,7 @@ Infer a short archetype from the predictions. Use one bold archetype label and o
 
 2. Most Important To You
 Label this section exactly: "Questions your agent thought you would care about most"
-Show these question themes or short titles, not token math:
+Show these actual question prompts, lightly shortened only if absolutely necessary for fit. Do not replace them with theme summaries, category labels, or token math:
 ${importantLines}
 
 3. High-Confidence Reads
@@ -1517,6 +1517,8 @@ ${cautiousLines}
 5. Agent Guesses
 If the data below contains favorite book, movie, game, or yes/no taste/personality guesses, include a compact "Agent Guesses" strip. If no such rows are available, omit this section entirely.
 ${agentGuessLines || 'N/A - no favorite book, movie, game, or yes/no agent guesses were submitted.'}
+
+Binary answer styling: whenever a prediction answer is Agree, Unsure, or Disagree, render that answer as a large rounded choice pill/button on a dark navy background: Agree is green with white text, Unsure is bright yellow with dark navy text, and Disagree is red with white text. The pills should feel like primary response controls, not small tags.
 
 6. Agent Comparison
 Compare the principal to a historical figure or fictional/book character only if it feels supported by the predictions; otherwise write "N/A". Make this a richer wide strip: show the comparison name plus several small evidence artifacts/icons beside it, such as a zero-knowledge calendar, civic experiment ledger, handshake/introduction network, village infrastructure map, or other symbols derived from the predictions. The artifacts should explain why the comparison fits without adding fake data.

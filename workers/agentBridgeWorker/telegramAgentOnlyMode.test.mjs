@@ -165,7 +165,7 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
     statements: [
       {
         statement_id: 'ceq_trust',
-        text: 'How much would I trust an agent with private coordination?',
+        text: 'I would trust my agent to schedule meetings while I sleep if it could preserve enough private coordination context.',
         answer_schema: { kind: 'choice', values: ['agree', 'unsure', 'disagree'] },
       },
       {
@@ -198,6 +198,13 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.match(prompt, /horizontal wordmark running along the top/);
   assert.match(prompt, /flowing calligraphic V/);
   assert.match(prompt, /Do not place a standalone logo icon/);
+  assert.match(prompt, /35-45% of the title height/);
+  assert.match(prompt, /Show these actual question prompts/);
+  assert.match(prompt, /Do not replace them with theme summaries/);
+  assert.match(prompt, /Agree is green with white text/);
+  assert.match(prompt, /Unsure is bright yellow with dark navy text/);
+  assert.match(prompt, /Disagree is red with white text/);
+  assert.match(prompt, /I would trust my agent to schedule meetings while I sleep/);
   assert.match(prompt, /High-Confidence Reads/);
   assert.match(prompt, /Cautious Reads/);
   assert.match(prompt, /Agent Guesses/);

@@ -162,17 +162,23 @@ The current V2 has no questions about:
 
 #### Launch Preference Step (Hermes Prompt, Not A Stored Question)
 
-Before running the workflow, Hermes should warn the user that the full run can
-take about 10 minutes and may be better at the end of the day. It should ask:
+Before running the workflow, Hermes should briefly explain that this is Context
+Engine research on whether personal agents can predict their principals, and
+that the same data can produce a shareable Agent Village Wrapped image. It
+should warn the user that the full run can take about 10 minutes and may be
+better at the end of the day. It should ask only:
 
 - whether to run now;
 - whether it may ingest the user's EdgeOS profile as high-level context;
+- whether to include clearly labeled playful agent guesses, such as favorite
+  book, movie, game, music, or similar taste reads, when there is evidence;
 - which image output to generate after submission: standard Wrapped, political
   compass meme, both, or no image.
 
 If EdgeOS profile access is declined, the agent should not use profile data. If
 accepted, it should use only non-sensitive high-level signals and never quote raw
-private profile or memory text.
+private profile or memory text. If playful guesses are declined, guess-style
+questions should be answered `N/A` where possible.
 
 #### A. Autonomy & Delegation (Predicted Human Answer)
 

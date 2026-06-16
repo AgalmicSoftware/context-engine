@@ -46,8 +46,9 @@ Make "Agent Village Wrapped" a horizontal wordmark along the top, not a separate
 logo badge or large emblem. Use the Agent Village logo as inspiration: "AGENT"
 feels bold, uppercase, blocky, and modern; "VILLAGE" feels elegant,
 high-contrast serif with a flowing calligraphic V. Adapt that mixed-type
-wordmark style for "Agent Village Wrapped". Keep the subtitle small under or
-near the wordmark so the content area below has more room.
+wordmark style for "Agent Village Wrapped". Make the subtitle "What your agent
+thinks it knows about you" large enough to read at a glance, roughly 35-45% of
+the title height, while still leaving the content area below most of the room.
 
 Keep the top-right and other decorative areas visually calm. Use abstract map
 lines, icons, or texture there, but no decorative labels, fake annotations,
@@ -63,13 +64,17 @@ Show a bold archetype and one memeable sentence about what the agent thinks of t
 
 2. Most Important To You
 Label this as: "Questions your agent thought you would care about most."
-Show the actual question themes or short question titles, not raw vote math. This
-section is an importance ranking of questions from the principal's point of view,
-not a claim that any answer was boosted.
+Show the actual question prompts, lightly shortened only when needed for fit,
+not theme summaries or raw vote math. This section is an importance ranking of
+questions from the principal's point of view, not a claim that any answer was
+boosted.
 
 3. High-Confidence Reads
 Show 3 concise predicted answers the agent made on the principal's behalf and was
 confident about. Include enough question context for each answer to make sense.
+For binary answers, render Agree / Unsure / Disagree as large rounded response
+pills on a dark navy field: Agree green with white text, Unsure bright yellow
+with dark navy text, Disagree red with white text.
 
 4. Cautious Reads
 Show 2 predicted answers the agent was least confident about. Include the answer
@@ -240,7 +245,7 @@ of binary, rating, multichoice, and freeform questions.
 
 ### D. Priorities For Voting / Wrapped Ranking
 
-27. **(multichoice: private trust / sleep-time delegation / high-signal introductions / community capital / memory and context / creative output / governance / N/A, agent-about-user analysis)** "Which theme should the Wrapped say your agent upvoted most strongly?"
+27. **(multichoice: private trust / sleep-time delegation / high-signal introductions / community capital / memory and context / creative output / governance / N/A, agent-about-user analysis)** "Which theme should the Wrapped say your agent thought I would care about most?"
     - Wrapped: replaces opaque vote math with readable theme.
     - Report: most salient priority by agent.
 
@@ -309,3 +314,49 @@ points.
 40. **(freeform, agent-about-user analysis)** "Which historical figure or fictional/book character should anchor this principal's compass placement, and what evidence supports it? Use `N/A` if unsupported."
     - Wrapped: meme reference point.
     - Report: qualitative only; high hallucination risk, so treat as optional.
+
+### G. Additional High-Value Wrapped / Research Candidates
+
+These came from the Claude review pass and the follow-up product direction:
+make the Wrapped more shareable, but keep every agent-about-user item honest
+with an `N/A` path. These are candidates, not uploaded questions.
+
+41. **(multichoice: tell me immediately / fix it quietly then tell me / apologize to the affected person first / log it and wait for review / N/A, predicted human answer)** "If my agent made a mistake while acting for me, what would I want it to do first?"
+    - Wrapped: failure-recovery preference.
+    - Report: norms for repair and accountability after agent mistakes.
+
+42. **(binary, predicted human answer)** "I would want my agent to ask before sharing context about me with another person's agent."
+    - Wrapped: inter-agent privacy boundary.
+    - Report: agent-to-agent social protocol preferences.
+
+43. **(multichoice: formal / concise / warm / opinionated / playful / invisible unless needed / N/A, predicted human answer)** "What voice should my agent use when it acts or writes on my behalf?"
+    - Wrapped: custom style and tone.
+    - Report: preferred agent personality distribution.
+
+44. **(freeform, agent-about-user analysis)** "What does the agent think it knows about this principal that the principal might not realize it has inferred? Use a non-sensitive answer or N/A."
+    - Wrapped: information-asymmetry insight.
+    - Report: what agents infer from ambient context.
+
+45. **(freeform, agent-about-user analysis)** "What prediction would most surprise this principal? Use N/A if unsupported."
+    - Wrapped: surprise read.
+    - Report: where agent models diverge from self-perception.
+
+46. **(binary, predicted human answer)** "I would let my agent make a small financial decision on my behalf, such as splitting a bill or buying a ticket, if the amount was under $25."
+    - Wrapped: concrete delegation boundary.
+    - Report: financial autonomy threshold.
+
+47. **(freeform, agent-about-user analysis)** "Agent guess: what song, album, or artist would this principal play for a friend? Answer `N/A` if unsupported."
+    - Wrapped: playful taste card.
+    - Report: qualitative culture map; not calibration-critical.
+
+48. **(freeform, agent-about-user analysis)** "Agent guess: what historical figure or fictional character would this principal enjoy being compared to? Answer `N/A` if unsupported."
+    - Wrapped: comparison prompt.
+    - Report: shareability and archetype clustering.
+
+49. **(multichoice: favorite book / favorite movie or show / favorite game or puzzle / favorite music / favorite food / no favorite-stuff guesses / N/A, predicted human answer)** "Which favorite-stuff guess would I be most comfortable having my agent make publicly?"
+    - Wrapped: preference gate for Agent Guesses.
+    - Report: what kinds of playful guesses participants welcome.
+
+50. **(freeform, agent-about-user analysis)** "What one question should the principal answer themselves to verify whether your model of them is right? Use a short non-sensitive question."
+    - Wrapped: review CTA.
+    - Report: high-value human correction prompts.
