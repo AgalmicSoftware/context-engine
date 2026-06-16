@@ -77,8 +77,9 @@ section is an importance ranking of questions from the principal's point of
 view, not a claim that any answer was boosted.
 
 3. High-Confidence Reads
-Show 3 concise predicted answers the agent made on the principal's behalf and was
-confident about. Include enough question context for each answer to make sense.
+Show 3 concise predicted answers the agent made on the principal's behalf when
+at least 3 are available; otherwise show every available high-confidence
+prediction. Include enough question context for each answer to make sense.
 For binary answers, render Agree / Unsure / Disagree as large rounded response
 pills on a dark navy field: Agree green with white text, Unsure bright yellow
 with dark navy text, Disagree red with white text.

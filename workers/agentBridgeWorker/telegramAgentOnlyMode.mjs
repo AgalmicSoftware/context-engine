@@ -1427,9 +1427,10 @@ function wrappedImportanceRows(snapshot = {}, voteStates = [], { excludeQuestion
       if (excludeQuestionIds.has(questionId)) return null;
       const statement = statements.get(questionId);
       if (!statement) return null;
+      if (score.positive <= 0) return null;
       return {
         questionId,
-        score: score.positive || score.absolute,
+        score: score.positive,
         question: wrappedDisplayText(statement.text, 190),
       };
     })
@@ -1444,7 +1445,24 @@ function predictionLine(row = {}) {
 
 function wrappedAnswerIsUnavailable(value = '') {
   const normalized = lower(value).replace(/[^a-z0-9]+/g, '');
-  return !normalized || ['na', 'notsupported', 'unknown', 'unavailable'].includes(normalized);
+  if (!normalized) return true;
+  if ([
+    'na',
+    'notsupported',
+    'unsupported',
+    'unknown',
+    'unavailable',
+    'notapplicable',
+    'notenoughcontext',
+    'notenoughevidence',
+    'notenoughinformation',
+    'insufficientcontext',
+    'insufficientevidence',
+    'insufficientdata',
+    'nodata',
+    'noevidence',
+  ].includes(normalized)) return true;
+  return normalized.startsWith('notenough') || normalized.startsWith('insufficient');
 }
 
 function wrappedRowIsGuess(row = {}) {
@@ -1457,6 +1475,15 @@ function wrappedRowIsGuess(row = {}) {
 
 function wrappedRowIsUnavailableGuess(row = {}) {
   return wrappedRowIsGuess(row) && wrappedAnswerIsUnavailable(row.answer);
+}
+
+function wrappedGuessQuestionIdsFromSnapshot(snapshot = {}) {
+  return new Set(Array.isArray(snapshot.statements)
+    ? snapshot.statements
+      .filter((statement) => wrappedRowIsGuess({ question: statement?.text || '' }))
+      .map((statement) => safeString(statement?.statement_id || statement?.questionId))
+      .filter(Boolean)
+    : []);
 }
 
 function wrappedGuessCategory(row = {}) {
@@ -1529,14 +1556,18 @@ export function buildAgentOnlyWrappedImagePrompt({
   mode = 'wrapped',
 } = {}) {
   const rawPredictions = wrappedPredictionRows(snapshot, state, { includeUnavailableGuesses: true });
+  const snapshotGuessQuestionIds = wrappedGuessQuestionIdsFromSnapshot(snapshot);
   const excludedGuessQuestionIds = new Set(rawPredictions
     .filter((row) => wrappedRowIsUnavailableGuess(row))
     .map((row) => row.questionId)
     .filter(Boolean));
-  const guessQuestionIds = new Set(rawPredictions
-    .filter((row) => wrappedRowIsGuess(row))
-    .map((row) => row.questionId)
-    .filter(Boolean));
+  const guessQuestionIds = new Set([
+    ...snapshotGuessQuestionIds,
+    ...rawPredictions
+      .filter((row) => wrappedRowIsGuess(row))
+      .map((row) => row.questionId)
+      .filter(Boolean),
+  ]);
   const predictions = rawPredictions.filter((row) => !excludedGuessQuestionIds.has(row.questionId));
   const scoredPredictions = predictions.filter((row) => !guessQuestionIds.has(row.questionId));
   const highConfidence = [...scoredPredictions]

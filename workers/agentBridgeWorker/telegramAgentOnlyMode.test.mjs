@@ -192,6 +192,16 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
         text: 'Agent guess: what is my favorite movie?',
         answer_schema: { kind: 'text', maxChars: 280 },
       },
+      {
+        statement_id: 'ceq_unanswered_guess',
+        text: 'Agent guess: which impossible pet would I choose?',
+        answer_schema: { kind: 'text', maxChars: 280 },
+      },
+      {
+        statement_id: 'ceq_lowered',
+        text: 'Would I want my agent to post publicly without review?',
+        answer_schema: { kind: 'choice', values: ['agree', 'unsure', 'disagree'] },
+      },
     ],
   };
   const state = {
@@ -200,13 +210,22 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
       ceq_info: { agent: { answer: { value: 'unsure' }, confidence: 41 } },
       ceq_book: { agent: { answer: { text: 'The Diamond Age' }, confidence: 52 } },
       ceq_book_followup: { agent: { answer: { text: 'Neuromancer' }, confidence: 70 } },
-      ceq_movie: { agent: { answer: { text: 'N/A' }, confidence: 12 } },
+      ceq_movie: { agent: { answer: { text: 'Unsupported' }, confidence: 12 } },
     },
   };
   const prompt = buildAgentOnlyWrappedImagePrompt({
     snapshot,
     state,
-    linearVoteState: { mode: 'linear', votes: { ceq_trust: 20, ceq_movie: 30, ceq_book_followup: 25 } },
+    linearVoteState: {
+      mode: 'linear',
+      votes: {
+        ceq_trust: 20,
+        ceq_movie: 30,
+        ceq_book_followup: 25,
+        ceq_unanswered_guess: 90,
+        ceq_lowered: -100,
+      },
+    },
     quadraticVoteState: { mode: 'quadratic', votes: { ceq_info: 4 } },
   });
   assert.match(prompt, /Most Important To You/);
@@ -237,7 +256,9 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.match(prompt, /favorite book/);
   assert.match(prompt, /Neuromancer/);
   assert.doesNotMatch(prompt, /The Diamond Age/);
-  assert.doesNotMatch(prompt, /favorite movie/);
+  assert.doesNotMatch(prompt, /Agent guess: what is my favorite movie/);
+  assert.doesNotMatch(prompt, /impossible pet/);
+  assert.doesNotMatch(prompt, /post publicly without review/);
   assert.match(prompt, /stylized illustrated rendition or portrait silhouette/);
   assert.match(prompt, /exactly 3 precise evidence artifacts/);
   assert.match(prompt, /explain why this specific comparison fits/);
