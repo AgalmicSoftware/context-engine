@@ -15,15 +15,22 @@ Run Context Engine agent_only_mode for my Telegram principal.
 
 Worker origin: https://ce-agent-bridge-worker.agalmic.workers.dev
 
-Before starting, verify my Hermes / OpenRouter balance through a normal Hermes balance surface, gateway balance endpoint, or OpenRouter credential already available to your current process. Minimum balance: $2.00 for the default gemini-3.5-flash run. Do not hunt for credentials in `/proc`, logs, shell history, or other process environments. If the balance is below $2.00, or you cannot verify it safely, stop and tell me exactly: "You need to add more credit before I can run agent_only_mode." Do not fetch statements or submit answers until the balance is verified.
+Before starting, verify my Hermes / OpenRouter balance through a normal Hermes
+balance surface, gateway balance endpoint, or OpenRouter credential already
+available to your current process. Minimum balance: $2.00 for the default
+gemini-3.5-flash run. Do not hunt for credentials in `/proc`, logs, shell
+history, or other process environments. If the balance is below $2.00, or you
+cannot verify it safely, stop and tell me exactly: "You need to add more credit
+before I can run agent_only_mode." Do not fetch statements or submit answers
+until the balance is verified.
 
 Before fetching statements, run a short preferences step. Explain in one or two sentences that this is for Context Engine research on whether personal agents can predict their principals, and that the results can produce a shareable Agent Village Wrapped image. Tell me this can take about 10 minutes and may be better to run at the end of the day. Ask only these preferences: whether I want to run it now; whether you may ingest and use my EdgeOS profile as high-level, non-sensitive context; and whether I want playful clearly-labeled agent guesses such as favorite book, movie, game, or similar taste reads included in the Wrapped when there is evidence. Generate the standard Agent Village Wrapped image after submission unless I say no. If I decline EdgeOS profile access, do not use profile data. If I allow EdgeOS profile access, use it only for non-sensitive, high-level signals and never quote private profile or memory text. If I decline playful guesses, answer those guess-style questions with N/A when possible and do not show those guesses in the Wrapped image. Do not continue until I answer these preferences.
 
-Never print, reveal, echo, or summarize my ceagt token. Send it only as a Bearer token to the worker origin above.
+Read the skill URL or use the installed Context Engine skill if available; installing the skill is not required when you can fetch the URL directly. Use the current Hermes/Telegram principal context and the Context Engine agent-only onboarding flow from the skill; do not ask me to manually provide or reveal credentials. First check /telegram/agent/api/skill-version and confirm it reports v40. Then fetch /telegram/agent/api/agent-only/start and follow the returned instructions exactly.
 
-Read the skill URL or use the installed Context Engine skill if available; installing the skill is not required when you can fetch the URL directly. First check /telegram/agent/api/skill-version and confirm it reports v40. Then fetch /telegram/agent/api/agent-only/start and follow the returned instructions exactly.
-
-Use the Bearer token I provide. Page through /telegram/agent/api/agent-only/statements until cursor is empty. Submit predicted answers for every statement, then submit both linear and quadratic token allocations.
+Page through /telegram/agent/api/agent-only/statements until cursor is empty.
+Submit predicted answers for every statement, then submit both linear and
+quadratic token allocations.
 
 After submitting, generate and display the standard Agent Village Wrapped image by following the image instructions from the skill/start payload. Render or display the returned PNG image if your host supports it. Do not print the raw base64 or full image prompt.
 
