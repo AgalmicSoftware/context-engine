@@ -1401,6 +1401,43 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   assert.equal(opened.windowId, 'w-2026-06-12');
   assert.equal(opened.statementCount, 4);
 
+  const lateQuestion = await persistTelegramProposedQuestion({
+    env,
+    normalized: {
+      user: { telegramUserId: '42' },
+      chat: { chatId: '42' },
+    },
+    sessionSlug: 'alpha',
+    prompt: 'Agent-only late route question?',
+    questionType: 'binary',
+    createdAt: '2026-06-12T15:09:00.000Z',
+  });
+  const extendConfigResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/agent-only/config?sessionSlug=alpha', {
+      method: 'POST',
+      token: 'agent-test-token',
+      body: {
+        enabledQuestionIds: [...questionIds, lateQuestion.questionId],
+      },
+    }),
+    env,
+  });
+  assert.equal(extendConfigResponse.status, 200);
+  const extendOpenResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/agent-only/window/open?sessionSlug=alpha', {
+      method: 'POST',
+      token: 'agent-test-token',
+      body: { createdAt: '2026-06-12T15:10:00.000Z' },
+    }),
+    env,
+  });
+  const extendedOpen = await jsonBody(extendOpenResponse);
+  assert.equal(extendOpenResponse.status, 200);
+  assert.equal(extendedOpen.created, false);
+  assert.equal(extendedOpen.extended, true);
+  assert.equal(extendedOpen.addedStatementCount, 1);
+  assert.equal(extendedOpen.statementCount, 5);
+
   for (const request of [
     agentRequest('/telegram/agent/api/agent-only/statements?sessionSlug=alpha', { token: '' }),
     agentRequest('/telegram/agent/api/agent-only/answers/bulk?sessionSlug=alpha', {

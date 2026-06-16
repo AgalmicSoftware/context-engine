@@ -3245,6 +3245,8 @@ async function handleAdminAgentOnlyWindowOpenRequest({
     ? {
       ok: true,
       created: opened.created === true,
+      extended: opened.extended === true,
+      addedStatementCount: Number(opened.addedStatementCount || 0) || 0,
       windowId: opened.snapshot.windowId,
       statementCount: Array.isArray(opened.snapshot.statements) ? opened.snapshot.statements.length : 0,
       opensAt: opened.snapshot.opensAt,

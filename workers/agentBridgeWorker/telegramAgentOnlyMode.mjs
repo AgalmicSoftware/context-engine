@@ -642,13 +642,82 @@ export async function materializeAgentOnlyWindow({
     ? boundaryFromWindowId(windowId, loaded.config.windowing)
     : windowBoundariesAround(nowMs, loaded.config.windowing);
   if (!boundary) return { ok: false, status: 409, reason: 'window_not_open' };
+  const activeBoundary = windowBoundariesAround(nowMs, loaded.config.windowing);
   const key = windowKvKey(slug, boundary.windowId);
   const kv = env?.AGENT_ACTION_KV;
   if (!key || !kv || typeof kv.put !== 'function') {
     return { ok: false, status: 500, reason: 'agent_only_window_storage_unavailable' };
   }
   const existing = await loadWindowSnapshot({ env, sessionSlug: slug, windowId: boundary.windowId });
-  if (existing) return { ok: true, snapshot: existing, created: false };
+  if (existing) {
+    if (activeBoundary?.windowId !== boundary.windowId) {
+      return { ok: true, snapshot: existing, created: false, extended: false };
+    }
+    const existingStatements = Array.isArray(existing.statements) ? existing.statements : [];
+    const existingIds = new Set(existingStatements.map((statement) => safeString(statement?.statement_id)).filter(Boolean));
+    const missingQuestionIds = loaded.config.enabledQuestionIds.filter((questionId) => !existingIds.has(questionId));
+    if (!missingQuestionIds.length) return { ok: true, snapshot: existing, created: false, extended: false };
+    const latestLoaded = await loadAgentOnlyModeConfig({ env, sessionSlug: slug });
+    if (!configEnablesAgentOnlyQuestions(latestLoaded)) {
+      return { ok: true, snapshot: existing, created: false, extended: false };
+    }
+    const latestSnapshot = await loadWindowSnapshot({ env, sessionSlug: slug, windowId: boundary.windowId }) || existing;
+    const latestStatements = Array.isArray(latestSnapshot.statements) ? latestSnapshot.statements : [];
+    const latestIds = new Set(latestStatements.map((statement) => safeString(statement?.statement_id)).filter(Boolean));
+    const latestMissingQuestionIds = latestLoaded.config.enabledQuestionIds.filter((questionId) => !latestIds.has(questionId));
+    if (!latestMissingQuestionIds.length) {
+      return { ok: true, snapshot: latestSnapshot, created: false, extended: false };
+    }
+    const questions = await listTelegramProposedQuestionsForSession(env, slug);
+    const byId = new Map((Array.isArray(questions) ? questions : [])
+      .map((question) => [normalizeQuestionId(question.questionId || question.id), question])
+      .filter(([id]) => id));
+    const additions = [];
+    const additionEvalTypes = {};
+    for (const questionId of latestMissingQuestionIds) {
+      const statement = snapshotStatementFromQuestion(byId.get(questionId));
+      if (statement) {
+        latestIds.add(questionId);
+        additions.push(statement);
+        const evalType = safeString(latestLoaded.config.evalTypesByQuestionId?.[questionId]);
+        if (evalType) additionEvalTypes[questionId] = evalType;
+      }
+    }
+    if (!additions.length) return { ok: true, snapshot: latestSnapshot, created: false, extended: false };
+    const preWriteSnapshot = await loadWindowSnapshot({ env, sessionSlug: slug, windowId: boundary.windowId }) || latestSnapshot;
+    const preWriteStatements = Array.isArray(preWriteSnapshot.statements) ? preWriteSnapshot.statements : [];
+    const preWriteIds = new Set(preWriteStatements.map((statement) => safeString(statement?.statement_id)).filter(Boolean));
+    const finalAdditions = additions.filter((statement) => {
+      const questionId = safeString(statement?.statement_id);
+      if (!questionId || preWriteIds.has(questionId)) return false;
+      preWriteIds.add(questionId);
+      return true;
+    });
+    if (!finalAdditions.length) {
+      return { ok: true, snapshot: preWriteSnapshot, created: false, extended: false };
+    }
+    const finalAdditionEvalTypes = {};
+    for (const statement of finalAdditions) {
+      const questionId = safeString(statement?.statement_id);
+      const evalType = safeString(additionEvalTypes[questionId]);
+      if (evalType) finalAdditionEvalTypes[questionId] = evalType;
+    }
+    const updated = {
+      ...preWriteSnapshot,
+      statements: [...preWriteStatements, ...finalAdditions],
+      evalTypesByQuestionId: {
+        ...(preWriteSnapshot.evalTypesByQuestionId || {}),
+        ...finalAdditionEvalTypes,
+      },
+      sourceConfigUpdatedAt: safeString(latestLoaded.config.updatedAt),
+      extendedAt: nowIso(now),
+    };
+    assertNoSecretShape(updated, 'Agent-only window snapshots must not serialize secrets.');
+    await kv.put(key, JSON.stringify(updated), {
+      metadata: { v: 1, t: 'ao_window', sg: slug, w: boundary.windowId, c: updated.statements.length },
+    });
+    return { ok: true, snapshot: updated, created: false, extended: true, addedStatementCount: finalAdditions.length };
+  }
 
   const questions = await listTelegramProposedQuestionsForSession(env, slug);
   const byId = new Map((Array.isArray(questions) ? questions : [])
@@ -1538,7 +1607,9 @@ Title treatment: make "Agent Village Compass" a horizontal top wordmark inspired
 
 Use the agent's most-important question as the focal issue for the compass: "${focal}". Treat this as the question the principal's agent thinks they would care about most. Build two interpretable axes from that focal issue and the predictions below; examples include privacy <-> proactivity, review-first <-> autonomous action, local community <-> frontier acceleration, or skepticism <-> trust. Do not invent private facts.
 
-Make it look more like a clean debate-atlas discussion map than a busy internet collage: four quadrants, crisp labeled axes, fine grid lines, and a few discussion-node markers. Put the principal as one clear glowing marker with a short label. Put only recognizable historical figures or fictional/book characters as playful reference points on the same dimensions; do not show other users, crowds, avatars, or fake people. Label each reference point with the figure/character name and one short reason tied to the axes. Keep comparisons non-defamatory and based only on the prediction themes.
+Make it look more like a clean debate-atlas discussion map than a busy internet collage: four quadrants, crisp labeled axes, fine grid lines, and a few discussion-node markers. Put the principal as one clear glowing marker with a short label. Put only recognizable historical figures or fictional/book characters as playful reference points on the same dimensions; do not show other users, crowds, avatars, or fake people. Prefer accurate, interesting deep-cut reference points over the most obvious names when the evidence supports them, but keep every figure recognizable enough for a viewer to understand the meme. Label each reference point with the figure/character name and one short reason tied to the axes. Keep comparisons non-defamatory and based only on the prediction themes.
+
+Quadrant content: render one concise argument in each quadrant, not just a quadrant title. Each argument should sound like a plausible position in an Agent Village debate, such as "Agents should ask before crossing social context" or "Reversible autonomy beats approval bottlenecks." Keep the arguments short, legible, and tied to the axes and evidence below.
 
 Evidence to use:
 Most important questions:
@@ -1649,7 +1720,7 @@ ${agentGuessLines || 'N/A - no favorite book, movie, game, or yes/no agent guess
 Binary answer styling: whenever a prediction answer is Agree, Unsure, or Disagree, render that answer as a large rounded choice pill/button on a dark navy background: Agree is green with white text, Unsure is bright yellow with dark navy text, and Disagree is red with white text. The pills should feel like primary response controls, not small tags.
 
 6. Agent Comparison
-Compare the principal to a historical figure or fictional/book character only if it feels supported by the predictions; otherwise write "N/A". Make this a richer wide strip with a stylized illustrated rendition or portrait silhouette of that figure/character, plus the comparison name and exactly 3 precise evidence artifacts when 3 concrete evidence items exist. Keep the evidence compact enough that the figure and evidence can share the same horizontal band. The artifacts must explain why this specific comparison fits, not merely repeat generic themes. Each artifact must be a specific icon plus a short label tied to one actual question or prediction above and to the chosen figure/character. For example, if the comparison is Benjamin Franklin, prefer comparison-specific objects like a locked letter labeled "private correspondence", a salon/introduction network labeled "civic introductions", or a repair ledger/printing proof labeled "public repair norm"; avoid generic lock/handshake/wrench icons unless the label makes the comparison clear. If the evidence does not support a specific object, use labeled text chips instead of generic icons. Avoid random gears, medals, hourglasses, charts, or decorative symbols.
+Compare the principal to a historical figure or fictional/book character only if it feels supported by the predictions; otherwise write "N/A". Prefer historically accurate deep cuts when supported by the evidence: recognizable but less generic comparisons are better than defaulting to Benjamin Franklin, Leonardo da Vinci, or other obvious polymath icons. Make this a richer wide strip with a stylized illustrated rendition or portrait silhouette of that figure/character, plus the comparison name and exactly 3 precise evidence artifacts when 3 concrete evidence items exist. Keep the evidence compact enough that the figure and evidence can share the same horizontal band. The artifacts must explain why this specific comparison fits, not merely repeat generic themes. Each artifact must be a specific icon plus a short label tied to one actual question or prediction above and to the chosen figure/character. For example, if the comparison is Benjamin Franklin, prefer comparison-specific objects like a locked letter labeled "private correspondence", a salon/introduction network labeled "civic introductions", or a repair ledger/printing proof labeled "public repair norm"; avoid generic lock/handshake/wrench icons unless the label makes the comparison clear. If the evidence does not support a specific object, use labeled text chips instead of generic icons. Avoid random gears, medals, hourglasses, charts, or decorative symbols.
 
 Footer in small centered type along the bottom edge, with "Context Engine" still readable: "Review or edit your agent's responses in Context Engine"
 

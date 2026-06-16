@@ -32,6 +32,7 @@ class MemoryKv {
     this.store = new Map();
     this.metadata = new Map();
     this.getCalls = 0;
+    this.listCalls = 0;
   }
 
   async put(key, value, options = {}) {
@@ -42,7 +43,9 @@ class MemoryKv {
 
   async get(key) {
     this.getCalls += 1;
-    return this.store.get(key) || null;
+    const value = this.store.get(key) || null;
+    if (typeof this.afterGet === 'function') await this.afterGet(key, value, this);
+    return value;
   }
 
   async delete(key) {
@@ -51,6 +54,7 @@ class MemoryKv {
   }
 
   async list({ prefix = '', limit = 1000, cursor = '' } = {}) {
+    this.listCalls += 1;
     const keys = [...this.store.keys()].filter((key) => key.startsWith(prefix)).sort();
     const start = cursor ? Number(cursor) || 0 : 0;
     const page = keys.slice(start, start + limit);
@@ -372,6 +376,7 @@ test('config normalizes ceq ids and snapshots freeze flagged statements with sha
     patch: { enabledQuestionIds: ids.slice(0, 1) },
     createdAt: '2026-06-12T16:00:00.000Z',
   });
+  testEnv.AGENT_ACTION_KV.listCalls = 0;
   const reopened = await materializeAgentOnlyWindow({
     env: testEnv,
     sessionSlug: 'alpha',
@@ -379,6 +384,186 @@ test('config normalizes ceq ids and snapshots freeze flagged statements with sha
   });
   assert.equal(reopened.created, false);
   assert.equal(reopened.snapshot.statements.length, 4);
+  assert.equal(testEnv.AGENT_ACTION_KV.listCalls, 0);
+
+  const added = await persistTelegramProposedQuestion({
+    env: testEnv,
+    normalized: normalizedUser(),
+    sessionSlug: 'alpha',
+    prompt: 'Should Alpha add a late-window agent-only question?',
+    questionType: 'binary',
+  });
+  await saveAgentOnlyModeConfig({
+    env: testEnv,
+    sessionSlug: 'alpha',
+    patch: {
+      enabledQuestionIds: [ids[0], added.questionId],
+      evalTypesByQuestionId: {
+        [ids[0]]: 'gold',
+        [added.questionId]: 'preference',
+      },
+    },
+    createdAt: '2026-06-12T16:10:00.000Z',
+  });
+  testEnv.AGENT_ACTION_KV.listCalls = 0;
+  const extended = await materializeAgentOnlyWindow({
+    env: testEnv,
+    sessionSlug: 'alpha',
+    now: '2026-06-12T16:15:00.000Z',
+  });
+  assert.equal(extended.created, false);
+  assert.equal(extended.extended, true);
+  assert.equal(extended.addedStatementCount, 1);
+  assert.equal(extended.snapshot.statements.length, 5);
+  assert.equal(extended.snapshot.statements[4].statement_id, added.questionId);
+  assert.equal(extended.snapshot.statements[4].text, 'Should Alpha add a late-window agent-only question?');
+  assert.equal(extended.snapshot.evalTypesByQuestionId[ids[0]], 'human_split');
+  assert.equal(extended.snapshot.evalTypesByQuestionId[added.questionId], 'preference');
+  assert.equal(testEnv.AGENT_ACTION_KV.listCalls > 0, true);
+  assert.equal(testEnv.AGENT_ACTION_KV.metadata.get(`${AGENT_ONLY_WINDOW_KV_PREFIX}alpha:w-2026-06-12`).c, 5);
+});
+
+test('window extension re-reads latest snapshot and config before appending', async () => {
+  const testEnv = env();
+  const { ids } = await seedQuestions(testEnv);
+  const opened = await materializeAgentOnlyWindow({
+    env: testEnv,
+    sessionSlug: 'alpha',
+    now: '2026-06-12T15:05:00.000Z',
+  });
+  assert.equal(opened.ok, true);
+
+  const concurrent = await persistTelegramProposedQuestion({
+    env: testEnv,
+    normalized: normalizedUser(),
+    sessionSlug: 'alpha',
+    prompt: 'Should Alpha keep concurrent appends?',
+    questionType: 'binary',
+  });
+  const preWrite = await persistTelegramProposedQuestion({
+    env: testEnv,
+    normalized: normalizedUser(),
+    sessionSlug: 'alpha',
+    prompt: 'Should Alpha keep pre-write appends?',
+    questionType: 'binary',
+  });
+  const late = await persistTelegramProposedQuestion({
+    env: testEnv,
+    normalized: normalizedUser(),
+    sessionSlug: 'alpha',
+    prompt: 'Should Alpha keep the local late append?',
+    questionType: 'binary',
+  });
+  await saveAgentOnlyModeConfig({
+    env: testEnv,
+    sessionSlug: 'alpha',
+    patch: {
+      enabledQuestionIds: [...ids, late.questionId],
+      evalTypesByQuestionId: { [late.questionId]: 'preference' },
+    },
+    createdAt: '2026-06-12T16:00:00.000Z',
+  });
+
+  const key = `${AGENT_ONLY_WINDOW_KV_PREFIX}alpha:w-2026-06-12`;
+  let windowSnapshotReads = 0;
+  testEnv.AGENT_ACTION_KV.afterGet = async (getKey, value) => {
+    if (getKey !== key || !value) return;
+    windowSnapshotReads += 1;
+    if (windowSnapshotReads > 2) return;
+    const append = windowSnapshotReads === 1 ? concurrent : preWrite;
+    await saveAgentOnlyModeConfig({
+      env: testEnv,
+      sessionSlug: 'alpha',
+      patch: {
+        enabledQuestionIds: windowSnapshotReads === 1
+          ? [...ids, concurrent.questionId, late.questionId]
+          : [...ids, concurrent.questionId, preWrite.questionId, late.questionId],
+        evalTypesByQuestionId: {
+          [concurrent.questionId]: 'human_split',
+          [preWrite.questionId]: 'calibration',
+          [late.questionId]: 'preference',
+        },
+      },
+      createdAt: windowSnapshotReads === 1 ? '2026-06-12T16:01:00.000Z' : '2026-06-12T16:02:00.000Z',
+    });
+    const snapshot = JSON.parse(testEnv.AGENT_ACTION_KV.store.get(key) || value);
+    const updated = {
+      ...snapshot,
+      statements: [
+        ...(Array.isArray(snapshot.statements) ? snapshot.statements : []),
+        {
+          statement_id: append.questionId,
+          text: append.question.prompt,
+          question_type: append.question.questionType,
+          answer_schema: { kind: 'choice', values: ['agree', 'disagree', 'unsure'] },
+        },
+      ],
+      evalTypesByQuestionId: {
+        ...(snapshot.evalTypesByQuestionId || {}),
+        [append.questionId]: windowSnapshotReads === 1 ? 'human_split' : 'calibration',
+      },
+      extendedAt: windowSnapshotReads === 1 ? '2026-06-12T16:01:00.000Z' : '2026-06-12T16:02:00.000Z',
+    };
+    await testEnv.AGENT_ACTION_KV.put(key, JSON.stringify(updated), {
+      metadata: { v: 1, t: 'ao_window', sg: 'alpha', w: 'w-2026-06-12', c: updated.statements.length },
+    });
+  };
+
+  const extended = await materializeAgentOnlyWindow({
+    env: testEnv,
+    sessionSlug: 'alpha',
+    now: '2026-06-12T16:05:00.000Z',
+  });
+  testEnv.AGENT_ACTION_KV.afterGet = null;
+  assert.equal(extended.ok, true);
+  assert.equal(extended.extended, true);
+  assert.equal(extended.addedStatementCount, 1);
+  assert.deepEqual(
+    extended.snapshot.statements.slice(-3).map((statement) => statement.statement_id),
+    [concurrent.questionId, preWrite.questionId, late.questionId],
+  );
+  assert.equal(extended.snapshot.evalTypesByQuestionId[concurrent.questionId], 'human_split');
+  assert.equal(extended.snapshot.evalTypesByQuestionId[preWrite.questionId], 'calibration');
+  assert.equal(extended.snapshot.evalTypesByQuestionId[late.questionId], 'preference');
+});
+
+test('window extension does not mutate historical snapshots', async () => {
+  const testEnv = env();
+  const { ids } = await seedQuestions(testEnv);
+  const opened = await materializeAgentOnlyWindow({
+    env: testEnv,
+    sessionSlug: 'alpha',
+    now: '2026-06-12T15:05:00.000Z',
+  });
+  assert.equal(opened.snapshot.windowId, 'w-2026-06-12');
+  assert.equal(opened.snapshot.statements.length, 4);
+
+  const late = await persistTelegramProposedQuestion({
+    env: testEnv,
+    normalized: normalizedUser(),
+    sessionSlug: 'alpha',
+    prompt: 'Should Alpha add a historical-window question?',
+    questionType: 'binary',
+  });
+  await saveAgentOnlyModeConfig({
+    env: testEnv,
+    sessionSlug: 'alpha',
+    patch: { enabledQuestionIds: [...ids, late.questionId] },
+    createdAt: '2026-06-16T15:00:00.000Z',
+  });
+  testEnv.AGENT_ACTION_KV.listCalls = 0;
+  const historical = await materializeAgentOnlyWindow({
+    env: testEnv,
+    sessionSlug: 'alpha',
+    windowId: 'w-2026-06-12',
+    now: '2026-06-16T15:05:00.000Z',
+  });
+  assert.equal(historical.ok, true);
+  assert.equal(historical.extended, false);
+  assert.equal(historical.snapshot.windowId, 'w-2026-06-12');
+  assert.equal(historical.snapshot.statements.length, 4);
+  assert.equal(historical.snapshot.statements.some((statement) => statement.statement_id === late.questionId), false);
+  assert.equal(testEnv.AGENT_ACTION_KV.listCalls, 0);
 });
 
 test('agent-only prediction reads do not materialize windows before config exists', async () => {
