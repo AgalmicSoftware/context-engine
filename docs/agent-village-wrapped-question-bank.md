@@ -118,17 +118,21 @@ Only show supported, non-sensitive signals. Use "N/A" when unknown:
 7. Agent Comparison
 Compare the principal to a historical figure or fictional/book character in a
 wide strip. Include a stylized illustrated rendition or portrait silhouette of
-the figure/character, the comparison name, and exactly 3 precise evidence
-artifacts or icons when 3 concrete items exist. The artifacts must explain why
-this specific comparison fits, not merely restate generic themes. Each artifact
-must be tied to an actual question or prediction and to the chosen comparison.
-If Agent Guesses are available, add them to this same horizontal band as extra
-chips, but do not replace the 3 comparison evidence artifacts.
-For Benjamin Franklin, good artifacts could be a locked letter labeled "private
-correspondence," a salon/introduction network labeled "civic introductions," or
-a repair ledger/printing proof labeled "public repair norm." If no specific icon
-is supported, use labeled text chips instead of generic symbols. Keep it playful
-and non-defamatory.
+the figure/character, the comparison name, and one brief description line of no
+more than 10 words. Prefer historically accurate deep cuts when supported, but
+keep the comparison recognizable. If Agent Guesses are available, add them to
+this same horizontal band as compact chips. Do not add the old trio of
+comparison evidence icons, artifact tiles, or proof objects beside the
+historical figure. Keep it playful and non-defamatory.
+
+8. Abstract Agent Impression
+In the space that used to hold comparison evidence icons, include an abstract
+artistic corner showing what the agent thinks of the principal. This should be a
+non-literal visual metaphor derived from the archetype, strongest predictions,
+memory signals, and aesthetic preference: botanical circuit-village, careful map
+lines around a warm signal, a privacy lock woven into roots, field-note
+constellation, or civic dashboard becoming a garden. It must not be another
+portrait, fake person, robot, trophy wall, random symbols, or decorative filler.
 
 Footer:
 Only a small, low-contrast but readable "contextengine.xyz" link in the
