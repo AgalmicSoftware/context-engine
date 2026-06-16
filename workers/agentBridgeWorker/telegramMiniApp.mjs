@@ -124,6 +124,13 @@ import {
   TELEGRAM_MINI_APP_LOADING_GIF_SOURCE,
   TELEGRAM_MINI_APP_LOADING_GIF_WIDTH,
 } from './telegramMiniAppLoadingAsset.mjs';
+import {
+  loadAgentOnlyModeConfig,
+  loadAgentOnlyPredictionsForPrincipal,
+  recordAgentOnlyHumanReview,
+  semanticFingerprintForAgentOnlyAnswer,
+  submitAgentOnlyHumanVoteTaps,
+} from './telegramAgentOnlyMode.mjs';
 
 const DEFAULT_MINI_APP_AUTH_MAX_AGE_SECONDS = 24 * 60 * 60;
 const DEFAULT_MINI_APP_PAGE_SIZE = 50;
@@ -947,6 +954,7 @@ function defaultAgentSettingsState({
     settings: {
       draftStyle: 'balanced',
       showUnansweredFirst: true,
+      showAgentResponses: true,
       agentAutoApplyQuestionVotes: false,
       ...settings,
     },
@@ -1545,6 +1553,79 @@ async function loadSavedMiniAppDrafts({
   };
 }
 
+async function buildMiniAppAgentOnlyState({
+  env = {},
+  auth = {},
+  sessionSlug = '',
+  questions = [],
+  settings = {},
+  createdAt = null,
+} = {}) {
+  const loadedConfig = await loadMiniAppAgentOnlyConfig({ env, sessionSlug });
+  if (!loadedConfig) return null;
+  const telegramUserId = safeString(auth.user?.telegramUserId);
+  if (!telegramUserId) return null;
+  const questionKeyById = new Map();
+  for (const question of Array.isArray(questions) ? questions : []) {
+    const qid = safeString(question.questionId);
+    const questionKey = safeString(question.questionKey);
+    if (!qid || !questionKey) continue;
+    questionKeyById.set(qid, questionKey);
+  }
+  const review = await loadAgentOnlyPredictionsForPrincipal({
+    env,
+    sessionSlug,
+    telegramUserId,
+    now: createdAt,
+  });
+  const flaggedQuestionKeys = (Array.isArray(review.flaggedQuestionIds) ? review.flaggedQuestionIds : [])
+    .map((questionId) => questionKeyById.get(questionId))
+    .filter(Boolean);
+  const humanVoteNets = {};
+  Object.entries(review.humanVote?.nets || {}).forEach(([questionId, value]) => {
+    const questionKey = questionKeyById.get(questionId);
+    if (questionKey) humanVoteNets[questionKey] = Number(value) || 0;
+  });
+  const showAgentResponses = settings.showAgentResponses !== false;
+  const block = {
+    windowId: safeString(review.windowId),
+    flaggedQuestionKeys,
+    humanVote: {
+      nets: humanVoteNets,
+      budgetUsed: Number(review.humanVote?.budgetUsed || 0) || 0,
+      budget: 100,
+    },
+    showAgentResponses,
+  };
+  if (showAgentResponses) {
+    const predictions = {};
+    Object.entries(review.predictionsByQuestionId || {}).forEach(([questionId, prediction]) => {
+      const questionKey = questionKeyById.get(questionId);
+      const valueLabel = safeString(prediction?.valueLabel);
+      if (questionKey && valueLabel) {
+        predictions[questionKey] = {
+          valueLabel,
+          confirmed: prediction?.confirmed === true,
+        };
+      }
+    });
+    block.predictions = predictions;
+  }
+  return block;
+}
+
+async function loadMiniAppAgentOnlyConfig({
+  env = {},
+  sessionSlug = '',
+} = {}) {
+  const loadedConfig = await loadAgentOnlyModeConfig({ env, sessionSlug });
+  const enabledQuestionIds = Array.isArray(loadedConfig.config?.enabledQuestionIds)
+    ? loadedConfig.config.enabledQuestionIds
+    : [];
+  if (loadedConfig.source !== 'kv' && !enabledQuestionIds.length) return null;
+  return loadedConfig;
+}
+
 async function buildMiniAppState({
   request,
   env = {},
@@ -1826,6 +1907,14 @@ async function buildMiniAppState({
     settings: agentSettingsValues,
     createdAt,
   });
+  const agentOnly = await buildMiniAppAgentOnlyState({
+    env,
+    auth,
+    sessionSlug,
+    questions,
+    settings: agentSettingsValues,
+    createdAt,
+  });
   const primaryResolved = resolveSessionInvocation(policy, sessionSlug);
   const groups = primaryResolved.ok
     ? await loadTelegramLightweightGroups({
@@ -1905,6 +1994,7 @@ async function buildMiniAppState({
     questionSourceReason: sourceReasons.join(', '),
     sourceOk,
     sourceError: sourceOk ? '' : (sourceReasons.join(', ') || 'question_source_unavailable'),
+    ...(agentOnly ? { agentOnly } : {}),
     admin,
     agent: {
       actions: listAgentApiCapabilities({ lane: TELEGRAM_CHAT_LANES.MINI_APP, includeGroupUnsafe: true })
@@ -2580,6 +2670,44 @@ async function handleDraftRequest({
       draftDivergence = { stored: false, reason: 'initial_draft_missing' };
     }
   }
+  let agentOnlyReview = { recorded: false, reason: 'not_submitted' };
+  if (body.submit === true && submitRequest?.ok === true) {
+    try {
+      const loadedAgentOnlyConfig = await loadMiniAppAgentOnlyConfig({ env, sessionSlug: questionRef.sessionSlug });
+      if (!loadedAgentOnlyConfig) {
+        agentOnlyReview = { recorded: false, reason: 'agent_only_not_configured' };
+      } else {
+        const review = await loadAgentOnlyPredictionsForPrincipal({
+          env,
+          sessionSlug: questionRef.sessionSlug,
+          telegramUserId: auth.user?.telegramUserId,
+          now: createdAt,
+        });
+        const prediction = review.predictionsByQuestionId?.[safeString(questionRef.questionId)];
+        if (review.windowId && prediction) {
+          const humanFingerprint = await semanticFingerprintForAgentOnlyAnswer(normalizedAnswer.answer);
+          const kind = safeString(prediction.semanticFingerprint) === humanFingerprint ? 'confirm' : 'edit';
+          agentOnlyReview = await recordAgentOnlyHumanReview({
+            env,
+            sessionSlug: questionRef.sessionSlug,
+            windowId: review.windowId,
+            telegramUserId: auth.user?.telegramUserId,
+            questionId: questionRef.questionId,
+            answer: normalizedAnswer.answer,
+            kind,
+            now: createdAt,
+          });
+        } else {
+          agentOnlyReview = { recorded: false, reason: 'agent_prediction_missing' };
+        }
+      }
+    } catch {
+      agentOnlyReview = {
+        recorded: false,
+        reason: 'agent_only_review_unavailable',
+      };
+    }
+  }
 
   return json({
     ok: true,
@@ -2593,6 +2721,7 @@ async function handleDraftRequest({
     },
     submitRequest,
     draftDivergence,
+    agentOnlyReview,
   });
 }
 
@@ -2757,6 +2886,145 @@ async function handleQuestionVoteRequest({
     vote,
     voteSummary: question.voteSummary || emptyMiniAppQuestionVoteSummary(vote),
   });
+}
+
+async function miniAppQuestionRefForKey({
+  env = {},
+  questionKey = '',
+  launchRecord = null,
+  authMode = 'telegram',
+} = {}) {
+  const parsed = parseOpaqueActionId(questionKey);
+  if (!parsed.ok) return { ok: false, status: 400, error: 'question_action_invalid' };
+  const actionRecord = await readActionRecord(env, parsed.actionId);
+  const questionRef = actionRecord?.serverContextRef || {};
+  if (
+    !actionRecord ||
+    actionRecord.action !== TELEGRAM_BRIDGE_ACTIONS.DRAFT_RESPONSE ||
+    actionRecord.lane !== TELEGRAM_CHAT_LANES.MINI_APP ||
+    actionRecord.miniAppQuestionAction !== true
+  ) {
+    return { ok: false, status: 404, error: 'question_action_expired' };
+  }
+  if (authMode === 'telegram' && !miniAppLaunchMatchesQuestion(launchRecord, questionRef)) {
+    return { ok: false, status: 403, error: 'mini_app_launch_mismatch' };
+  }
+  return { ok: true, questionRef };
+}
+
+async function miniAppLaunchForAgentOnlyRequest({ auth = {}, env = {}, launch = '' } = {}) {
+  if (auth.authMode !== 'telegram') return { ok: true, launchRecord: null };
+  const launchRecord = await resolveLaunchRecord(env, launch);
+  if (!launchRecord) return { ok: false, status: 404, error: 'mini_app_launch_invalid' };
+  return { ok: true, launchRecord };
+}
+
+async function handleAgentOnlyHumanVoteRequest({
+  request,
+  env = {},
+  createdAt = new Date().toISOString(),
+} = {}) {
+  const auth = await authorizeMiniAppRequest(request, env);
+  if (!auth.ok) return json({ ok: false, error: auth.reason || 'telegram_init_data_invalid' }, { status: 401 });
+  const telegramUserId = safeString(auth.user?.telegramUserId);
+  if (!telegramUserId) return json({ ok: false, error: 'telegram_user_missing' }, { status: 401 });
+  const body = await request.json().catch(() => ({}));
+  const url = new URL(request.url);
+  const launch = safeString(body.launch || url.searchParams.get('launch') || url.searchParams.get('tgWebAppStartParam'));
+  const launchResult = await miniAppLaunchForAgentOnlyRequest({ auth, env, launch });
+  if (!launchResult.ok) return json({ ok: false, error: launchResult.error }, { status: launchResult.status });
+  const taps = Array.isArray(body.taps) ? body.taps : [];
+  if (!taps.length || taps.length > 50) return json({ ok: false, error: 'tap_batch_size_invalid' }, { status: 400 });
+  const normalizedTaps = [];
+  let sessionSlug = '';
+  for (const tap of taps) {
+    const questionKey = safeString(tap?.questionKey);
+    const ref = await miniAppQuestionRefForKey({
+      env,
+      questionKey,
+      launchRecord: launchResult.launchRecord,
+      authMode: auth.authMode,
+    });
+    if (!ref.ok) return json({ ok: false, error: ref.error, questionKey }, { status: ref.status });
+    const refSessionSlug = sanitizeSessionSlug(ref.questionRef.sessionSlug);
+    if (!sessionSlug) sessionSlug = refSessionSlug;
+    if (sessionSlug !== refSessionSlug) return json({ ok: false, error: 'tap_session_mismatch' }, { status: 400 });
+    normalizedTaps.push({
+      questionId: safeString(ref.questionRef.questionId),
+      delta: Number(tap.delta),
+    });
+  }
+  const review = await loadAgentOnlyPredictionsForPrincipal({
+    env,
+    sessionSlug,
+    telegramUserId,
+    now: createdAt,
+  });
+  if (!review.windowId) return json({ ok: false, error: 'agent_only_window_not_open' }, { status: 409 });
+  const saved = await submitAgentOnlyHumanVoteTaps({
+    env,
+    sessionSlug,
+    windowId: review.windowId,
+    telegramUserId,
+    taps: normalizedTaps,
+    now: createdAt,
+  });
+  if (!saved.ok) return json({ ok: false, error: saved.reason || 'agent_only_human_vote_failed' }, { status: saved.status || 400 });
+  return json(saved);
+}
+
+async function handleAgentOnlyConfirmRequest({
+  request,
+  env = {},
+  createdAt = new Date().toISOString(),
+} = {}) {
+  const auth = await authorizeMiniAppRequest(request, env);
+  if (!auth.ok) return json({ ok: false, error: auth.reason || 'telegram_init_data_invalid' }, { status: 401 });
+  const telegramUserId = safeString(auth.user?.telegramUserId);
+  if (!telegramUserId) return json({ ok: false, error: 'telegram_user_missing' }, { status: 401 });
+  const body = await request.json().catch(() => ({}));
+  const url = new URL(request.url);
+  const launch = safeString(body.launch || url.searchParams.get('launch') || url.searchParams.get('tgWebAppStartParam'));
+  const launchResult = await miniAppLaunchForAgentOnlyRequest({ auth, env, launch });
+  if (!launchResult.ok) return json({ ok: false, error: launchResult.error }, { status: launchResult.status });
+  const questionKey = safeString(body.questionKey);
+  const ref = await miniAppQuestionRefForKey({
+    env,
+    questionKey,
+    launchRecord: launchResult.launchRecord,
+    authMode: auth.authMode,
+  });
+  if (!ref.ok) return json({ ok: false, error: ref.error }, { status: ref.status });
+  const sessionSlug = sanitizeSessionSlug(ref.questionRef.sessionSlug);
+  const review = await loadAgentOnlyPredictionsForPrincipal({
+    env,
+    sessionSlug,
+    telegramUserId,
+    now: createdAt,
+  });
+  if (!review.windowId) return json({ ok: false, error: 'agent_only_window_not_open' }, { status: 409 });
+  const question = {
+    questionKey,
+    displayIndex: 1,
+    sessionSlug,
+    questionId: safeString(ref.questionRef.questionId),
+    questionType: safeString(ref.questionRef.questionType),
+    options: Array.isArray(ref.questionRef.options) ? ref.questionRef.options : [],
+  };
+  const submitted = await loadSubmittedMiniAppAnswers({ env, auth, questions: [question] });
+  const answer = submitted.submittedAnswers?.[0]?.answer || null;
+  const recorded = await recordAgentOnlyHumanReview({
+    env,
+    sessionSlug,
+    windowId: review.windowId,
+    telegramUserId,
+    questionId: question.questionId,
+    answer,
+    kind: 'confirm',
+    now: createdAt,
+  });
+  if (!recorded.ok) return json({ ok: false, error: recorded.reason || 'agent_only_confirm_failed' }, { status: recorded.status || 400 });
+  return json({ ok: true, status: recorded.recorded ? 'agent_prediction_confirmed' : 'agent_prediction_confirm_noop', recorded: recorded.recorded === true });
 }
 
 async function handleTranscribeRequest({
@@ -6388,6 +6656,41 @@ function telegramMiniAppHtml() {
       display: flex;
       justify-content: flex-end;
     }
+    .agentOnlyBadgeRow {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+    .agentPredictionBadge, .agentVoteMarker {
+      border: 1px solid var(--border);
+      color: var(--muted);
+      background: rgba(255,255,255,0.04);
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1.2;
+      padding: 5px 7px;
+    }
+    .agentPredictionConfirm {
+      min-height: 28px;
+      border-radius: 0;
+      padding: 4px 8px;
+      font-size: 12px;
+    }
+    .agentOnlyVotes {
+      display: grid;
+      grid-template-columns: 30px minmax(34px, auto) 30px minmax(72px, auto);
+      align-items: center;
+      justify-content: end;
+      gap: 6px;
+    }
+    .agentOnlyBudget {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
     .voteButton {
       min-height: 30px;
       min-width: 30px;
@@ -7085,6 +7388,10 @@ function telegramMiniAppHtml() {
           <span>Draft edit research</span>
         </label>
         <label class="toggle">
+          <input id="showAgentResponses" type="checkbox">
+          <span>Show agent responses</span>
+        </label>
+        <label class="toggle">
           <input id="agentAutoApplyQuestionVotes" type="checkbox">
           <span>Agent auto-votes</span>
         </label>
@@ -7362,6 +7669,7 @@ function telegramMiniAppHtml() {
       demographicLinkOptIn: document.getElementById('demographicLinkOptIn'),
       attendanceLinkOptIn: document.getElementById('attendanceLinkOptIn'),
       draftDivergenceOptIn: document.getElementById('draftDivergenceOptIn'),
+      showAgentResponses: document.getElementById('showAgentResponses'),
       demoDataResults: document.getElementById('demoDataResults'),
       agentAutoApplyQuestionVotes: document.getElementById('agentAutoApplyQuestionVotes'),
       saveSettings: document.getElementById('saveSettings'),
@@ -8009,6 +8317,120 @@ function telegramMiniAppHtml() {
       wrap.append(makeButton('up', VOTE_UP_ICON, 'Upvote question'), score, makeButton('down', VOTE_DOWN_ICON, 'Downvote question'));
       return wrap;
     }
+    const agentOnlyState = () => state.data?.agentOnly || {};
+    const agentOnlyFlagged = (question) => {
+      const keys = Array.isArray(agentOnlyState().flaggedQuestionKeys) ? agentOnlyState().flaggedQuestionKeys : [];
+      return Boolean(question?.questionKey && keys.includes(question.questionKey));
+    };
+    const agentOnlyPredictionFor = (question) => {
+      if (!question?.questionKey || agentOnlyState().showAgentResponses === false) return null;
+      return agentOnlyState().predictions?.[question.questionKey] || null;
+    };
+    const agentOnlyHumanVote = () => {
+      const block = agentOnlyState();
+      block.humanVote = block.humanVote || { nets: {}, budgetUsed: 0, budget: 100 };
+      block.humanVote.nets = block.humanVote.nets || {};
+      block.humanVote.budget = Number(block.humanVote.budget || 100) || 100;
+      block.humanVote.budgetUsed = Number(block.humanVote.budgetUsed || 0) || 0;
+      return block.humanVote;
+    };
+    const agentOnlyBudgetAfter = (questionKey, delta) => {
+      const humanVote = agentOnlyHumanVote();
+      const current = Number(humanVote.nets[questionKey] || 0) || 0;
+      return humanVote.budgetUsed - Math.abs(current) + Math.abs(current + delta);
+    };
+    async function submitAgentOnlyHumanVote(question, delta, button) {
+      if (!question?.questionKey) return;
+      if (button) button.disabled = true;
+      try {
+        const response = await fetch('/telegram/mini-app/api/agent-only/token-votes', {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify({ launch, taps: [{ questionKey: question.questionKey, delta }] }),
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok || body.ok === false) throw new Error(body.error || body.reason || 'agent_only_vote_failed');
+        const humanVote = agentOnlyHumanVote();
+        humanVote.nets = body.nets || {};
+        humanVote.budgetUsed = Number(body.budgetUsed || 0) || 0;
+        humanVote.budget = Number(body.budget || 100) || 100;
+        renderQuestionStack();
+      } catch (error) {
+        setStatus(String(error?.message || error || 'Could not save agent-only vote.'), 'error');
+        if (button) button.disabled = false;
+      }
+    }
+    async function confirmAgentPrediction(question, button) {
+      if (!question?.questionKey) return;
+      if (button) button.disabled = true;
+      try {
+        const response = await fetch('/telegram/mini-app/api/agent-only/confirm', {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify({ launch, questionKey: question.questionKey }),
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok || body.ok === false) throw new Error(body.error || body.reason || 'agent_only_confirm_failed');
+        const prediction = agentOnlyPredictionFor(question);
+        if (prediction) prediction.confirmed = true;
+        renderQuestionStack();
+      } catch (error) {
+        setStatus(String(error?.message || error || 'Could not confirm agent prediction.'), 'error');
+        if (button) button.disabled = false;
+      }
+    }
+    function renderAgentOnlyPredictionBadge(question) {
+      const prediction = agentOnlyPredictionFor(question);
+      if (!prediction?.valueLabel) return null;
+      const row = document.createElement('div');
+      row.className = 'agentOnlyBadgeRow';
+      const badge = document.createElement('span');
+      badge.className = 'agentPredictionBadge';
+      badge.textContent = 'Agent prediction: ' + prediction.valueLabel;
+      row.appendChild(badge);
+      if (prediction.confirmed !== true) {
+        const confirm = document.createElement('button');
+        confirm.type = 'button';
+        confirm.className = 'secondary agentPredictionConfirm';
+        confirm.textContent = 'Confirm';
+        confirm.onclick = (event) => {
+          event.stopPropagation();
+          confirmAgentPrediction(question, confirm);
+        };
+        row.appendChild(confirm);
+      }
+      return row;
+    }
+    function renderAgentOnlyVoteControls(question) {
+      if (!agentOnlyFlagged(question)) return null;
+      const humanVote = agentOnlyHumanVote();
+      const current = Number(humanVote.nets[question.questionKey] || 0) || 0;
+      const budget = Number(humanVote.budget || 100) || 100;
+      const left = Math.max(0, budget - Number(humanVote.budgetUsed || 0));
+      const wrap = document.createElement('div');
+      wrap.className = 'agentOnlyVotes';
+      const makeButton = (delta, label) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'voteButton ' + (delta > 0 ? 'up' : 'down');
+        button.innerHTML = delta > 0 ? VOTE_UP_ICON : VOTE_DOWN_ICON;
+        button.setAttribute('aria-label', label);
+        button.disabled = !question?.questionKey || agentOnlyBudgetAfter(question.questionKey, delta) > budget;
+        button.onclick = (event) => {
+          event.stopPropagation();
+          submitAgentOnlyHumanVote(question, delta, button);
+        };
+        return button;
+      };
+      const net = document.createElement('span');
+      net.className = 'voteScore' + (current > 0 ? ' positive' : (current < 0 ? ' negative' : ''));
+      net.textContent = String(current);
+      const budgetText = document.createElement('span');
+      budgetText.className = 'agentOnlyBudget';
+      budgetText.textContent = left + '/' + budget + ' left';
+      wrap.append(makeButton(-1, 'Lower with agent-only vote'), net, makeButton(1, 'Raise with agent-only vote'), budgetText);
+      return wrap;
+    }
     function renderQuestionStack() {
       const questions = orderedQuestions();
       el.questionStack.innerHTML = '';
@@ -8037,6 +8459,8 @@ function telegramMiniAppHtml() {
         prompt.className = 'prompt';
         prompt.textContent = question.prompt || question.title || '';
         headText.appendChild(prompt);
+        const predictionBadge = renderAgentOnlyPredictionBadge(question);
+        if (predictionBadge) headText.appendChild(predictionBadge);
         const toggle = document.createElement('button');
         toggle.type = 'button';
         toggle.className = 'cardToggle';
@@ -8055,6 +8479,13 @@ function telegramMiniAppHtml() {
         voteRow.className = 'questionVoteRow expandedOnly';
         voteRow.appendChild(renderQuestionVoteControls(question));
         body.appendChild(voteRow);
+        const agentVoteControls = renderAgentOnlyVoteControls(question);
+        if (agentVoteControls) {
+          const agentVoteRow = document.createElement('div');
+          agentVoteRow.className = 'questionVoteRow expandedOnly';
+          agentVoteRow.appendChild(agentVoteControls);
+          body.appendChild(agentVoteRow);
+        }
         card.append(head, body);
         el.questionStack.appendChild(card);
       });
@@ -10538,6 +10969,9 @@ function telegramMiniAppHtml() {
       if (el.draftDivergenceOptIn) {
         el.draftDivergenceOptIn.checked = values.draftDivergenceOptIn === true;
       }
+      if (el.showAgentResponses) {
+        el.showAgentResponses.checked = values.showAgentResponses !== false;
+      }
       const submittedAnswers = Array.isArray(state.data?.submittedAnswers) ? state.data.submittedAnswers : [];
       const savedDrafts = Array.isArray(state.data?.savedDrafts) ? state.data.savedDrafts : [];
       el.savedDrafts.innerHTML = '';
@@ -10557,7 +10991,25 @@ function telegramMiniAppHtml() {
         } else {
           rows.forEach((answer) => {
             const row = document.createElement('div');
-            row.textContent = 'Q' + answer.displayIndex + ': ' + answer.answerLabel;
+            row.className = 'agentOnlyBadgeRow';
+            const text = document.createElement('span');
+            text.textContent = 'Q' + answer.displayIndex + ': ' + answer.answerLabel;
+            row.appendChild(text);
+            const prediction = agentOnlyPredictionFor({ questionKey: answer.questionKey });
+            if (prediction?.valueLabel) {
+              const badge = document.createElement('span');
+              badge.className = 'agentPredictionBadge';
+              badge.textContent = 'Agent prediction: ' + prediction.valueLabel;
+              row.appendChild(badge);
+              if (prediction.confirmed !== true && titleText === 'Submitted responses') {
+                const confirm = document.createElement('button');
+                confirm.type = 'button';
+                confirm.className = 'secondary agentPredictionConfirm';
+                confirm.textContent = 'Confirm';
+                confirm.onclick = () => confirmAgentPrediction({ questionKey: answer.questionKey }, confirm);
+                row.appendChild(confirm);
+              }
+            }
             section.appendChild(row);
           });
         }
@@ -10729,6 +11181,7 @@ function telegramMiniAppHtml() {
             demographicLinkOptIn: el.demographicLinkOptIn ? el.demographicLinkOptIn.checked : false,
             attendanceLinkOptIn: el.attendanceLinkOptIn ? el.attendanceLinkOptIn.checked : false,
             draftDivergenceOptIn: el.draftDivergenceOptIn ? el.draftDivergenceOptIn.checked : false,
+            showAgentResponses: el.showAgentResponses ? el.showAgentResponses.checked : true,
             agentAutoApplyQuestionVotes: el.agentAutoApplyQuestionVotes ? el.agentAutoApplyQuestionVotes.checked : false,
           },
         }),
@@ -11685,6 +12138,7 @@ export async function handleTelegramMiniAppRequest({
   request,
   env = {},
   waitUntil = null,
+  createdAt = null,
 } = {}) {
   const url = new URL(request.url);
   if (url.pathname === '/telegram/mini-app' && request.method === 'GET') {
@@ -11698,17 +12152,24 @@ export async function handleTelegramMiniAppRequest({
       request,
       env,
       waitUntil,
+      ...(createdAt ? { createdAt } : {}),
     });
     return json(state, { status: Number(state.httpStatus || (state.ok === false ? 401 : 200)) });
   }
   if (url.pathname === '/telegram/mini-app/api/draft' && request.method === 'POST') {
-    return handleDraftRequest({ request, env });
+    return handleDraftRequest({ request, env, ...(createdAt ? { createdAt } : {}) });
   }
   if (url.pathname === '/telegram/mini-app/api/clear-drafts' && request.method === 'POST') {
     return handleClearDraftsRequest({ request, env });
   }
   if (url.pathname === '/telegram/mini-app/api/question-vote' && request.method === 'POST') {
-    return handleQuestionVoteRequest({ request, env });
+    return handleQuestionVoteRequest({ request, env, ...(createdAt ? { createdAt } : {}) });
+  }
+  if (url.pathname === '/telegram/mini-app/api/agent-only/token-votes' && request.method === 'POST') {
+    return handleAgentOnlyHumanVoteRequest({ request, env, ...(createdAt ? { createdAt } : {}) });
+  }
+  if (url.pathname === '/telegram/mini-app/api/agent-only/confirm' && request.method === 'POST') {
+    return handleAgentOnlyConfirmRequest({ request, env, ...(createdAt ? { createdAt } : {}) });
   }
   if (url.pathname === '/telegram/mini-app/api/transcribe' && request.method === 'POST') {
     return handleTranscribeRequest({ request, env });

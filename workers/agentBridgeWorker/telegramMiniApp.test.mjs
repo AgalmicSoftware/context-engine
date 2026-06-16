@@ -15,6 +15,12 @@ import {
 import { saveTelegramAgentSettingsPatch } from './telegramAgentSettings.mjs';
 import { deriveTelegramResponseExportAccount } from './telegramResponseExport.mjs';
 import { submitRequestUserKvKey } from './telegramSubmitQueue.mjs';
+import { persistTelegramProposedQuestion } from './telegramQuestionProposals.mjs';
+import {
+  materializeAgentOnlyWindow,
+  saveAgentOnlyModeConfig,
+  submitAgentOnlyAnswersBulk,
+} from './telegramAgentOnlyMode.mjs';
 
 class MemoryKv {
   constructor() {
@@ -1861,6 +1867,462 @@ test('Mini App draft save endpoint returns draft metadata and reloads saved draf
   });
 });
 
+test('Mini App exposes agent-only sidecar state, human votes, confirm, and edit-after-agent events', async () => {
+  const kv = new MemoryKv();
+  const env = {
+    AGENT_ACTION_KV: kv,
+    AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
+    }),
+    AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
+  };
+  const proposed = await persistTelegramProposedQuestion({
+    env,
+    normalized: {
+      user: { telegramUserId: 'preview-user' },
+      chat: { chatId: 'preview-user' },
+    },
+    sessionSlug: 'alpha',
+    prompt: 'Should the agent-only prediction be visible?',
+    questionType: 'binary',
+    createdAt: '2026-06-12T15:00:00.000Z',
+  });
+  env.AGENT_BRIDGE_DEMO_QUESTIONS_JSON = JSON.stringify([{
+    sessionSlug: 'alpha',
+    questionId: proposed.questionId,
+    questionType: 'agree_unsure_disagree',
+    prompt: proposed.record.prompt,
+  }]);
+  await saveAgentOnlyModeConfig({
+    env,
+    sessionSlug: 'alpha',
+    patch: { enabledQuestionIds: [proposed.questionId] },
+    createdAt: '2026-06-12T15:01:00.000Z',
+  });
+  await materializeAgentOnlyWindow({
+    env,
+    sessionSlug: 'alpha',
+    now: '2026-06-12T15:02:00.000Z',
+  });
+  await submitAgentOnlyAnswersBulk({
+    env,
+    sessionSlug: 'alpha',
+    telegramUserId: 'preview-user',
+    now: '2026-06-12T15:03:00.000Z',
+    body: {
+      window_id: 'w-2026-06-12',
+      request_id: 'mini-agent-answer',
+      agent_metadata: { model: 'unit-model', scaffold_version: 'unit-scaffold' },
+      answers: [{
+        statement_id: proposed.questionId,
+        answer: { value: 'agree' },
+        confidence: 91,
+      }],
+    },
+  });
+
+  const state = await __test__telegramMiniApp.buildMiniAppState({
+    request: new Request('https://bridge.example/telegram/mini-app/api/state'),
+    env,
+    createdAt: '2026-06-12T15:04:00.000Z',
+  });
+  assert.equal(state.ok, true);
+  const questionKey = state.questions[0].questionKey;
+  assert.deepEqual(state.agentOnly.flaggedQuestionKeys, [questionKey]);
+  assert.equal(state.agentOnly.windowId, 'w-2026-06-12');
+  assert.equal(state.agentOnly.predictions[questionKey].valueLabel, 'Agree');
+  assert.equal(JSON.stringify(state.agentOnly).includes('confidence'), false);
+
+  await saveTelegramAgentSettingsPatch({
+    env,
+    sessionSlug: 'alpha',
+    telegramUserId: 'preview-user',
+    patch: { showAgentResponses: false },
+    createdAt: '2026-06-12T15:04:30.000Z',
+  });
+  const hidden = await __test__telegramMiniApp.buildMiniAppState({
+    request: new Request('https://bridge.example/telegram/mini-app/api/state'),
+    env,
+    createdAt: '2026-06-12T15:05:00.000Z',
+  });
+  assert.equal(hidden.agentOnly.showAgentResponses, false);
+  assert.equal(Object.hasOwn(hidden.agentOnly, 'predictions'), false);
+  await saveTelegramAgentSettingsPatch({
+    env,
+    sessionSlug: 'alpha',
+    telegramUserId: 'preview-user',
+    patch: { showAgentResponses: true },
+    createdAt: '2026-06-12T15:05:30.000Z',
+  });
+
+  const voteResponse = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/agent-only/token-votes', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        taps: [
+          { questionKey, delta: 1 },
+          { questionKey, delta: 1 },
+          { questionKey, delta: -1 },
+        ],
+      }),
+    }),
+    env,
+    createdAt: '2026-06-12T15:06:00.000Z',
+  });
+  const voteBody = await voteResponse.json();
+  assert.equal(voteResponse.status, 200);
+  assert.equal(voteBody.budgetUsed, 1);
+
+  const confirmResponse = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/agent-only/confirm', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ questionKey }),
+    }),
+    env,
+    createdAt: '2026-06-12T15:07:00.000Z',
+  });
+  const confirmBody = await confirmResponse.json();
+  assert.equal(confirmResponse.status, 200);
+  assert.equal(confirmBody.ok, true);
+
+  const editResponse = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/draft', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        questionKey,
+        answer: { value: 'disagree' },
+        submit: true,
+      }),
+    }),
+    env,
+    createdAt: '2026-06-12T15:08:00.000Z',
+  });
+  const editBody = await editResponse.json();
+  assert.equal(editResponse.status, 200);
+  assert.equal(editBody.ok, true);
+  assert.equal(editBody.agentOnlyReview.source, 'human_edit_after_agent');
+});
+
+test('Mini App classifies agent-only confirm/edit by answer semantics, not display labels', async () => {
+  const kv = new MemoryKv();
+  const env = {
+    AGENT_ACTION_KV: kv,
+    AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
+    }),
+    AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
+  };
+  const normalized = {
+    user: { telegramUserId: 'preview-user' },
+    chat: { chatId: 'preview-user' },
+  };
+  const longText = 'This is a deliberately long freeform answer that is identical but too long for the display label.';
+  const freeform = await persistTelegramProposedQuestion({
+    env,
+    normalized,
+    sessionSlug: 'alpha',
+    prompt: 'What should Alpha improve?',
+    questionType: 'freeform',
+    createdAt: '2026-06-12T15:00:00.000Z',
+  });
+  const multichoice = await persistTelegramProposedQuestion({
+    env,
+    normalized,
+    sessionSlug: 'alpha',
+    prompt: 'Which priorities matter?',
+    questionType: 'multichoice',
+    options: ['Alpha', 'Beta', 'Gamma'],
+    createdAt: '2026-06-12T15:00:01.000Z',
+  });
+  env.AGENT_BRIDGE_DEMO_QUESTIONS_JSON = JSON.stringify([
+    {
+      sessionSlug: 'alpha',
+      questionId: freeform.questionId,
+      questionType: 'freeform',
+      prompt: freeform.record.prompt,
+    },
+    {
+      sessionSlug: 'alpha',
+      questionId: multichoice.questionId,
+      questionType: 'multichoice',
+      prompt: multichoice.record.prompt,
+      options: ['Alpha', 'Beta', 'Gamma'],
+    },
+  ]);
+  await saveAgentOnlyModeConfig({
+    env,
+    sessionSlug: 'alpha',
+    patch: { enabledQuestionIds: [freeform.questionId, multichoice.questionId] },
+    createdAt: '2026-06-12T15:01:00.000Z',
+  });
+  await materializeAgentOnlyWindow({
+    env,
+    sessionSlug: 'alpha',
+    now: '2026-06-12T15:02:00.000Z',
+  });
+  const submittedPredictions = await submitAgentOnlyAnswersBulk({
+    env,
+    sessionSlug: 'alpha',
+    telegramUserId: 'preview-user',
+    now: '2026-06-12T15:03:00.000Z',
+    body: {
+      window_id: 'w-2026-06-12',
+      request_id: 'semantic-agent-answers',
+      agent_metadata: { model: 'unit-model', scaffold_version: 'unit-scaffold' },
+      answers: [
+        {
+          statement_id: freeform.questionId,
+          answer: { text: longText },
+          confidence: 88,
+        },
+        {
+          statement_id: multichoice.questionId,
+          answer: { values: ['Alpha', 'Beta'] },
+          confidence: 82,
+        },
+      ],
+    },
+  });
+  assert.equal(submittedPredictions.ok, true);
+
+  const state = await __test__telegramMiniApp.buildMiniAppState({
+    request: new Request('https://bridge.example/telegram/mini-app/api/state'),
+    env,
+    createdAt: '2026-06-12T15:04:00.000Z',
+  });
+  const freeformKey = state.questions.find((question) => question.questionId === freeform.questionId)?.questionKey;
+  const multichoiceKey = state.questions.find((question) => question.questionId === multichoice.questionId)?.questionKey;
+  assert.ok(freeformKey);
+  assert.ok(multichoiceKey);
+
+  const freeformConfirmResponse = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/draft', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        questionKey: freeformKey,
+        answer: { text: longText },
+        submit: true,
+      }),
+    }),
+    env,
+    createdAt: '2026-06-12T15:05:00.000Z',
+  });
+  const freeformConfirm = await freeformConfirmResponse.json();
+  assert.equal(freeformConfirmResponse.status, 200);
+  assert.equal(freeformConfirm.agentOnlyReview.source, 'human_confirm');
+
+  const multichoiceConfirmResponse = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/draft', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        questionKey: multichoiceKey,
+        answer: { values: ['Beta', 'Alpha'] },
+        submit: true,
+      }),
+    }),
+    env,
+    createdAt: '2026-06-12T15:06:00.000Z',
+  });
+  const multichoiceConfirm = await multichoiceConfirmResponse.json();
+  assert.equal(multichoiceConfirmResponse.status, 200);
+  assert.equal(multichoiceConfirm.agentOnlyReview.source, 'human_confirm');
+
+  const editResponse = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/draft', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        questionKey: freeformKey,
+        answer: { text: `${longText} Changed.` },
+        submit: true,
+      }),
+    }),
+    env,
+    createdAt: '2026-06-12T15:07:00.000Z',
+  });
+  const edit = await editResponse.json();
+  assert.equal(editResponse.status, 200);
+  assert.equal(edit.agentOnlyReview.source, 'human_edit_after_agent');
+});
+
+test('Mini App submit skips agent-only sidecar work when the session is not configured', async () => {
+  const kv = new MemoryKv();
+  const env = {
+    AGENT_ACTION_KV: kv,
+    AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
+    }),
+    AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([{
+      sessionSlug: 'alpha',
+      questionId: 'q-not-agent-only',
+      questionType: 'agree_unsure_disagree',
+      prompt: 'Should normal sessions avoid agent-only sidecar work?',
+    }]),
+  };
+  const state = await __test__telegramMiniApp.buildMiniAppState({
+    request: new Request('https://bridge.example/telegram/mini-app/api/state'),
+    env,
+    createdAt: '2026-06-12T15:04:00.000Z',
+  });
+  assert.equal(state.ok, true);
+  assert.equal(Object.hasOwn(state, 'agentOnly'), false);
+  const questionKey = state.questions[0].questionKey;
+
+  const response = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/draft', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        questionKey,
+        answer: { value: 'agree' },
+        submit: true,
+      }),
+    }),
+    env,
+    createdAt: '2026-06-12T15:05:00.000Z',
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, true);
+  assert.deepEqual(body.agentOnlyReview, { recorded: false, reason: 'agent_only_not_configured' });
+
+  const confirmResponse = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/agent-only/confirm', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ questionKey }),
+    }),
+    env,
+    createdAt: '2026-06-12T15:06:00.000Z',
+  });
+  const confirmBody = await confirmResponse.json();
+  assert.equal(confirmResponse.status, 409);
+  assert.equal(confirmBody.error, 'agent_only_window_not_open');
+
+  const voteResponse = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/agent-only/token-votes', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ taps: [{ questionKey, delta: 1 }] }),
+    }),
+    env,
+    createdAt: '2026-06-12T15:07:00.000Z',
+  });
+  const voteBody = await voteResponse.json();
+  assert.equal(voteResponse.status, 409);
+  assert.equal(voteBody.error, 'agent_only_window_not_open');
+
+  const keys = Array.from(kv.store.keys());
+  assert.equal(keys.some((key) => key.startsWith('telegram:agent-mode-window:v1:')), false);
+  assert.equal(keys.some((key) => key.startsWith('telegram:agent-only:')), false);
+});
+
+test('Mini App submit contains agent-only review failures after persisting the human submit', async () => {
+  const kv = new MemoryKv();
+  const env = {
+    AGENT_ACTION_KV: kv,
+    AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
+    }),
+    AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
+  };
+  const normalized = {
+    user: { telegramUserId: 'preview-user' },
+    chat: { chatId: 'preview-user' },
+  };
+  const proposed = await persistTelegramProposedQuestion({
+    env,
+    normalized,
+    sessionSlug: 'alpha',
+    prompt: 'Should optional agent-only review failures be contained?',
+    questionType: 'binary',
+    createdAt: '2026-06-12T15:00:00.000Z',
+  });
+  env.AGENT_BRIDGE_DEMO_QUESTIONS_JSON = JSON.stringify([{
+    sessionSlug: 'alpha',
+    questionId: proposed.questionId,
+    questionType: 'agree_unsure_disagree',
+    prompt: proposed.record.prompt,
+  }]);
+  await saveAgentOnlyModeConfig({
+    env,
+    sessionSlug: 'alpha',
+    patch: { enabledQuestionIds: [proposed.questionId] },
+    createdAt: '2026-06-12T15:01:00.000Z',
+  });
+  await materializeAgentOnlyWindow({
+    env,
+    sessionSlug: 'alpha',
+    now: '2026-06-12T15:02:00.000Z',
+  });
+  const submittedPredictions = await submitAgentOnlyAnswersBulk({
+    env,
+    sessionSlug: 'alpha',
+    telegramUserId: 'preview-user',
+    now: '2026-06-12T15:03:00.000Z',
+    body: {
+      window_id: 'w-2026-06-12',
+      request_id: 'contained-review-agent-answer',
+      agent_metadata: { model: 'unit-model', scaffold_version: 'unit-scaffold' },
+      answers: [{
+        statement_id: proposed.questionId,
+        answer: { value: 'agree' },
+        confidence: 87,
+      }],
+    },
+  });
+  assert.equal(submittedPredictions.ok, true);
+  const state = await __test__telegramMiniApp.buildMiniAppState({
+    request: new Request('https://bridge.example/telegram/mini-app/api/state'),
+    env,
+    createdAt: '2026-06-12T15:04:00.000Z',
+  });
+  const questionKey = state.questions[0].questionKey;
+  const originalPut = kv.put.bind(kv);
+  kv.put = async (key, value, options = null) => {
+    if (String(key).startsWith('telegram:agent-only:answer-event:v1:')) {
+      throw new Error('agent-only review write unavailable');
+    }
+    return originalPut(key, value, options);
+  };
+
+  const response = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/draft', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        questionKey,
+        answer: { value: 'agree' },
+        submit: true,
+      }),
+    }),
+    env,
+    createdAt: '2026-06-12T15:05:00.000Z',
+  });
+  const body = await response.json();
+  const submitKeys = Array.from(kv.store.keys()).filter((key) => key.startsWith('telegram:submit-request:'));
+
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, true);
+  assert.deepEqual(body.agentOnlyReview, { recorded: false, reason: 'agent_only_review_unavailable' });
+  assert.equal(submitKeys.length, 1);
+});
+
 test('Mini App stores draft divergence only after explicit opt in', async () => {
   const kv = new MemoryKv();
   const botToken = '123456:test-token';
@@ -2533,6 +2995,32 @@ test('Mini App state exposes per-question response counts for popularity scoring
   assert.equal(counts['Should answered questions count toward popularity?'], 2);
   assert.equal(counts['Should lightly answered questions rank lower?'], 1);
   assert.equal(counts['Should unanswered questions start at zero?'], 0);
+
+  await kv.put('telegram:agent-only:answer-state:v1:alpha:w-2026-06-12:user-a', JSON.stringify({
+    type: 'telegram_agent_only_answer_state',
+    version: 1,
+    sessionSlug: 'alpha',
+    windowId: 'w-2026-06-12',
+    telegramUserId: 'user-a',
+    byStatement: {
+      'q-many': {
+        agent: { answer: { value: 'agent-only-sidecar-answer' }, confidence: 99 },
+        agentSkip: null,
+        human: null,
+      },
+    },
+    counts: { answers: 1, skips: 0 },
+    createdAt: '2026-06-12T15:10:00.000Z',
+    updatedAt: '2026-06-12T15:10:00.000Z',
+  }), { metadata: { v: 1, t: 'ao_ans', sg: 'alpha', w: 'w-2026-06-12', a: 1, s: 0 } });
+  const afterSidecar = await __test__telegramMiniApp.buildMiniAppState({
+    request: new Request('https://bridge.example/telegram/mini-app/api/state'),
+    env,
+    createdAt: '2026-05-08T12:00:05.000Z',
+  });
+  const afterCounts = Object.fromEntries(afterSidecar.questions.map((question) => [question.prompt, question.responseCount]));
+  assert.deepEqual(afterCounts, counts);
+  assert.equal(JSON.stringify(afterSidecar).includes('agent-only-sidecar-answer'), false);
 });
 
 test('Mini App results endpoint summarizes consensus, divisive questions, groups, and group analysis', async () => {
@@ -2621,6 +3109,47 @@ test('Mini App results endpoint summarizes consensus, divisive questions, groups
   assert.equal(body.topicMap.counts.answeredQuestions, 2);
   assert.equal(body.topicMap.topics.length > 0, true);
   assert.equal(body.publicSnapshot.topicMap.enabled, true);
+
+  await kv.put('telegram:agent-only:answer-event:v1:alpha:w-2026-06-12:user-a:1718192021223-deadbeef', JSON.stringify({
+    type: 'telegram_agent_only_answer_event',
+    version: 1,
+    sessionSlug: 'alpha',
+    windowId: 'w-2026-06-12',
+    telegramUserId: 'user-a',
+    questionId: 'q-consensus',
+    source: 'agent_autofill',
+    eventKind: 'answer',
+    answer: { value: 'agent-only-sidecar-answer' },
+    confidence: 99,
+    createdAt: '2026-06-12T15:10:00.000Z',
+  }), { metadata: { v: 1, t: 'ao_evt', k: 'a', src: 'agent_autofill' } });
+  await kv.put('telegram:agent-only:answer-state:v1:alpha:w-2026-06-12:user-a', JSON.stringify({
+    type: 'telegram_agent_only_answer_state',
+    version: 1,
+    sessionSlug: 'alpha',
+    windowId: 'w-2026-06-12',
+    telegramUserId: 'user-a',
+    byStatement: {
+      'q-consensus': {
+        agent: { answer: { value: 'agent-only-sidecar-answer' }, confidence: 99 },
+        agentSkip: null,
+        human: null,
+      },
+    },
+    counts: { answers: 1, skips: 0 },
+    createdAt: '2026-06-12T15:10:00.000Z',
+    updatedAt: '2026-06-12T15:10:00.000Z',
+  }), { metadata: { v: 1, t: 'ao_ans', sg: 'alpha', w: 'w-2026-06-12', a: 1, s: 0 } });
+  const afterSidecarResponse = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/results?sessionSlug=alpha&clusters=2'),
+    env,
+  });
+  const afterSidecarBody = await afterSidecarResponse.json();
+  assert.equal(afterSidecarResponse.status, 200);
+  assert.equal(afterSidecarBody.responseCount, body.responseCount);
+  assert.deepEqual(afterSidecarBody.questions.consensus, body.questions.consensus);
+  assert.deepEqual(afterSidecarBody.questions.divisive, body.questions.divisive);
+  assert.equal(JSON.stringify(afterSidecarBody).includes('agent-only-sidecar-answer'), false);
 
   const cachedResponse = await handleTelegramMiniAppRequest({
     request: new Request('https://bridge.example/telegram/mini-app/api/results?sessionSlug=alpha&clusters=2'),

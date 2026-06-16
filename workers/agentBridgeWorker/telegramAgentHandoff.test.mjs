@@ -19,12 +19,18 @@ import {
 import {
   createTelegramAgentDelegationToken,
   loadTelegramAgentDelegationToken,
+  readTelegramAgentOnlyTokenUserPointer,
   TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_SCOPES,
   TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES,
   writeTelegramAgentDelegationTokenUserPointer,
 } from './telegramAgentDelegationTokens.mjs';
+import {
+  AGENT_ONLY_MODE_CONFIG_KV_PREFIX,
+  AGENT_ONLY_WINDOW_KV_PREFIX,
+} from './telegramAgentOnlyMode.mjs';
 import { deriveTelegramResponseExportAccount } from './telegramResponseExport.mjs';
 import { persistTelegramSubmitRecord } from './telegramSubmitQueue.mjs';
+import { persistTelegramProposedQuestion } from './telegramQuestionProposals.mjs';
 
 class MemoryKv {
   constructor() {
@@ -52,6 +58,7 @@ class MemoryKv {
 
   async delete(key) {
     this.store.delete(key);
+    this.metadata.delete(key);
   }
 
   async list({ prefix = '', limit = 1000, cursor = '' } = {}) {
@@ -209,6 +216,28 @@ function agentRequest(path, {
   });
 }
 
+async function seedAgentOnlyProposedQuestions(env, sessionSlug = 'alpha', count = 4) {
+  const types = ['binary', 'freeform', 'rating', 'multichoice'];
+  const ids = [];
+  for (let index = 0; index < count; index += 1) {
+    const type = types[index % types.length];
+    const result = await persistTelegramProposedQuestion({
+      env,
+      normalized: {
+        user: { telegramUserId: '42' },
+        chat: { chatId: '42' },
+      },
+      sessionSlug,
+      prompt: `Agent-only route question ${index + 1}?`,
+      questionType: type,
+      options: type === 'multichoice' ? ['One', 'Two', 'Three'] : [],
+      createdAt: `2026-06-12T15:${String(index).padStart(2, '0')}:00.000Z`,
+    });
+    ids.push(result.questionId);
+  }
+  return ids;
+}
+
 function signInitData(fields = {}, botToken = '') {
   const dataCheckString = Object.entries(fields)
     .sort(([leftKey, leftValue], [rightKey, rightValue]) => (
@@ -280,7 +309,7 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
 
   assert.match(source, /name:\s+context-engine/);
   assert.match(source, /^# Context Engine Agent Runtime/m);
-  assert.match(source, /\*\*Skill version:\*\* 2026-06-11 \(v39\)/);
+  assert.match(source, /\*\*Skill version:\*\* 2026-06-12 \(v40\)/);
   assert.match(source, /short runtime skill/);
   assert.match(source, /ce-telegram-bot-reference\/SKILL\.md/);
   assert.match(source, /Never make unauthenticated\s+question, draft, answer, vote, or results requests/);
@@ -289,6 +318,8 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.match(source, /not a callable tool name/);
   assert.match(source, /Do not call a tool named `ce-telegram-agent-handoff`/);
   assert.match(source, /Trusted Geo \/ Hermes Invite Onboarding/);
+  assert.match(source, /Agent Only Mode \(agent_only_mode\)/);
+  assert.match(source, /GET \/telegram\/agent\/api\/agent-only\/start/);
   assert.match(source, /Edge-Native Onboarding/);
   assert.match(source, /demographicLinkOptIn/);
   assert.match(source, /attendanceLinkOptIn/);
@@ -315,7 +346,7 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.match(source, /POST \/telegram\/agent\/api\/question-queue\/plan/);
   assert.match(source, /POST \/telegram\/agent\/api\/question-queue\/apply/);
   assert.match(source, /## Changelog/);
-  assert.match(source, /2026-06-11 \(v39\)/);
+  assert.match(source, /2026-06-12 \(v40\)/);
 
   assert.match(reference, /name:\s+ce-telegram-bot-reference/);
   assert.match(reference, /^# CE Telegram Bot Reference/m);
@@ -346,12 +377,12 @@ test('Telegram agent handoff exposes unauthenticated skill version metadata', as
 
   assert.equal(response.status, 200);
   assert.equal(body.ok, true);
-  assert.equal(body.version, '2026-06-11 (v39)');
+  assert.equal(body.version, '2026-06-12 (v40)');
   assert.equal(body.skill, 'context-engine');
   assert.equal(body.skillUrl, 'https://example.test/skills/ce-telegram-agent-handoff/SKILL.md');
   assert.equal(body.changelogUrl, 'https://example.test/skills/ce-telegram-agent-handoff/SKILL.md#changelog');
   assert.equal(body.updateAvailable, false);
-  assert.equal(body.latestVersion, '2026-06-11 (v39)');
+  assert.equal(body.latestVersion, '2026-06-12 (v40)');
   assert.equal(body.updateNote, '');
 });
 
@@ -364,7 +395,7 @@ test('Telegram agent handoff serves a short skill redirect', async () => {
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
   assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-telegram-agent-handoff\/SKILL\.md/);
-  assert.match(location, /v=2026-06-11-v39-/);
+  assert.match(location, /v=2026-06-12-v40-/);
 });
 
 test('Telegram agent handoff wraps unexpected throws as JSON errors', async () => {
@@ -380,14 +411,14 @@ test('Telegram agent skill-version payload includes admin update flag', async ()
   await env.AGENT_ACTION_KV.put('telegram:agent-skill-update:v1', JSON.stringify({
     version: 1,
     updateAvailable: true,
-    latestVersion: '2026-06-11 (v39)',
+    latestVersion: '2026-06-12 (v40)',
     note: 'Refresh before answering.',
     updatedAt: '2026-05-30T00:00:00.000Z',
   }));
 
   const payload = await __test__telegramAgentHandoff.skillVersionPayloadWithFlag(env);
   assert.equal(payload.updateAvailable, true);
-  assert.equal(payload.latestVersion, '2026-06-11 (v39)');
+  assert.equal(payload.latestVersion, '2026-06-12 (v40)');
   assert.equal(payload.updateNote, 'Refresh before answering.');
 });
 
@@ -409,7 +440,7 @@ test('Telegram agent handoff accepts scoped user delegation tokens without a sha
   const env = telegramOnlyEnv({ AGENT_BRIDGE_AGENT_API_TOKEN: '' });
   const issued = await createTelegramAgentDelegationToken({
     env,
-    telegramUserId: '42',
+    telegramUserId: '43',
     username: 'participant',
     sessionSlug: 'alpha',
     accountAddress: `0x${'12'.repeat(20)}`,
@@ -515,7 +546,7 @@ test('Telegram agent questions endpoint caps candidate batches when requested', 
   const env = telegramOnlyEnv({ AGENT_BRIDGE_AGENT_API_TOKEN: '' });
   const issued = await createTelegramAgentDelegationToken({
     env,
-    telegramUserId: '42',
+    telegramUserId: '43',
     username: 'participant',
     sessionSlug: 'alpha',
     accountAddress: `0x${'12'.repeat(20)}`,
@@ -1159,6 +1190,124 @@ test('Invite onboarding mints a user token from a configured Geo invite', async 
   assert.equal(JSON.stringify(onboarding).includes(body.token), false);
 });
 
+test('Invite onboarding mode agent_only mints short scoped token without revoking normal token', async () => {
+  const env = multiTelegramOnlyEnv({
+    defaultSessionSlug: 'alpha',
+    sessions: ['alpha'],
+    overrides: {
+      AGENT_BRIDGE_AGENT_API_TOKEN: '',
+      AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
+      AGENT_BRIDGE_AGENT_ONLY_TOKEN_TTL_SECONDS: '604800',
+      AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON: JSON.stringify([{
+        tokenHash: sha256Hex('agent-only-invite'),
+        sessionSlug: 'alpha',
+        label: 'Agent Only',
+      }]),
+    },
+  });
+  const previous = await createTelegramAgentDelegationToken({
+    env,
+    telegramUserId: '42',
+    username: 'normal_user',
+    sessionSlug: 'alpha',
+    accountAddress: `0x${'12'.repeat(20)}`,
+    createdAt: '2026-06-01T12:00:00.000Z',
+  });
+  await writeTelegramAgentDelegationTokenUserPointer({
+    env,
+    telegramUserId: '42',
+    tokenHash: previous.tokenHash,
+    issuedAt: previous.record.issuedAt,
+    createdAt: '2026-06-01T12:00:00.000Z',
+  });
+
+  const response = await handleTelegramAgentHandoffRequest({
+    request: new Request('https://bridge.example/telegram/agent/api/invite/onboard', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        inviteToken: 'agent-only-invite',
+        telegramUserId: '42',
+        mode: 'agent_only',
+      }),
+    }),
+    env,
+  });
+  const body = await jsonBody(response);
+
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(body.mode, 'agent_only');
+  assert.equal(body.start, 'https://bridge.example/telegram/agent/api/agent-only/start');
+  assert.equal(Object.hasOwn(body, 'onboarding'), false);
+  const loaded = await loadTelegramAgentDelegationToken({ env, token: body.token });
+  assert.equal(loaded.ok, true);
+  assert.deepEqual(loaded.record.scopes, [
+    TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.AGENT_AUTOFILL,
+  ]);
+  assert.equal(loaded.record.scopes.includes(TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS), false);
+  assert.equal(loaded.record.scopes.includes(TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.DRAFT_ANSWERS), false);
+  assert.equal(loaded.record.username, '');
+  assert.equal(loaded.record.ttlSeconds, 604800);
+  assert.equal((await loadTelegramAgentDelegationToken({ env, token: previous.token })).ok, true);
+  const pointer = await readTelegramAgentOnlyTokenUserPointer({ env, telegramUserId: '42' });
+  assert.equal(pointer.tokenHash, loaded.tokenHash);
+});
+
+test('Agent-only invite tokens cannot apply normal sponsored question writes even for admins', async () => {
+  const env = multiTelegramOnlyEnv({
+    defaultSessionSlug: 'alpha',
+    sessions: ['alpha'],
+    overrides: {
+      AGENT_BRIDGE_AGENT_API_TOKEN: '',
+      AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
+      AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON: JSON.stringify([{
+        tokenHash: sha256Hex('agent-only-admin-invite'),
+        sessionSlug: 'alpha',
+        label: 'Agent Only Admin',
+      }]),
+    },
+  });
+  env.AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES = await managedAccountAddressForTelegramUser(env, '42');
+  const onboardResponse = await handleTelegramAgentHandoffRequest({
+    request: new Request('https://bridge.example/telegram/agent/api/invite/onboard', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        inviteToken: 'agent-only-admin-invite',
+        telegramUserId: '42',
+        mode: 'agent_only',
+      }),
+    }),
+    env,
+  });
+  const onboard = await jsonBody(onboardResponse);
+  assert.equal(onboardResponse.status, 200);
+
+  const applyResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/question-queue/apply?sessionSlug=alpha', {
+      method: 'POST',
+      token: onboard.token,
+      body: {
+        approved: true,
+        draftQuestions: [{
+          prompt: 'Should agent-only tokens manage sponsored questions?',
+          questionType: 'binary',
+        }],
+      },
+    }),
+    env,
+  });
+  const denied = await jsonBody(applyResponse);
+  const proposedKeys = Array.from(env.AGENT_ACTION_KV.store.keys())
+    .filter((key) => String(key).startsWith('telegram:proposed-question:alpha:'));
+
+  assert.equal(applyResponse.status, 403);
+  assert.equal(denied.reason, 'agent_token_scope_denied');
+  assert.equal(denied.requiredScope, TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS);
+  assert.deepEqual(proposedKeys, []);
+});
+
 test('Invite onboarding rejects random Telegram ids without a valid invite token', async () => {
   const env = telegramOnlyEnv({
     AGENT_BRIDGE_AGENT_API_TOKEN: '',
@@ -1218,6 +1367,490 @@ test('Invite onboarding ignores plaintext invite token env config', async () => 
   assert.equal(response.status, 503);
   assert.equal(body.reason, 'invite_onboarding_not_configured');
   assert.equal(Array.from(env.AGENT_ACTION_KV.store.keys()).some((key) => key.includes('agent-delegation-token')), false);
+});
+
+test('Agent-only routes require agent_autofill scope and serve flagged snapshot pages', async () => {
+  const env = telegramOnlyEnv({
+    AGENT_BRIDGE_AGENT_API_TOKEN: 'agent-test-token',
+  });
+  const questionIds = await seedAgentOnlyProposedQuestions(env, 'alpha', 4);
+  const configResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/agent-only/config?sessionSlug=alpha', {
+      method: 'POST',
+      token: 'agent-test-token',
+      body: {
+        enabledQuestionIds: questionIds,
+        evalTypesByQuestionId: { [questionIds[0]]: 'human_split' },
+      },
+    }),
+    env,
+  });
+  assert.equal(configResponse.status, 200);
+  assert.equal((await jsonBody(configResponse)).config.enabledQuestionIds.length, 4);
+
+  const openResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/agent-only/window/open?sessionSlug=alpha', {
+      method: 'POST',
+      token: 'agent-test-token',
+      body: { createdAt: '2026-06-12T15:05:00.000Z' },
+    }),
+    env,
+  });
+  const opened = await jsonBody(openResponse);
+  assert.equal(openResponse.status, 200);
+  assert.equal(opened.windowId, 'w-2026-06-12');
+  assert.equal(opened.statementCount, 4);
+
+  for (const request of [
+    agentRequest('/telegram/agent/api/agent-only/statements?sessionSlug=alpha', { token: '' }),
+    agentRequest('/telegram/agent/api/agent-only/answers/bulk?sessionSlug=alpha', {
+      method: 'POST',
+      token: '',
+      body: {
+        window_id: 'w-2026-06-12',
+        agent_metadata: { model: 'unit-model', scaffold_version: 'unit-scaffold' },
+        answers: [],
+      },
+    }),
+    agentRequest('/telegram/agent/api/agent-only/token-votes/bulk?sessionSlug=alpha', {
+      method: 'POST',
+      token: '',
+      body: {
+        window_id: 'w-2026-06-12',
+        mode: 'linear',
+        agent_metadata: { model: 'unit-model', scaffold_version: 'unit-scaffold' },
+        votes: [],
+      },
+    }),
+  ]) {
+    const unauthenticated = await handleTelegramAgentHandoffRequest({ request, env });
+    assert.equal(unauthenticated.status, 401);
+  }
+
+  const normalToken = await createTelegramAgentDelegationToken({
+    env,
+    telegramUserId: '42',
+    username: 'normal',
+    sessionSlug: 'alpha',
+    accountAddress: `0x${'34'.repeat(20)}`,
+    createdAt: '2026-06-12T15:01:00.000Z',
+  });
+  const deniedResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/agent-only/statements?sessionSlug=alpha&limit=2&createdAt=2026-06-12T15%3A06%3A00.000Z', {
+      token: normalToken.token,
+    }),
+    env,
+  });
+  const denied = await jsonBody(deniedResponse);
+  assert.equal(deniedResponse.status, 403);
+  assert.equal(denied.requiredScope, TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.AGENT_AUTOFILL);
+
+  const agentOnlyToken = await createTelegramAgentDelegationToken({
+    env,
+    telegramUserId: '42',
+    username: '',
+    sessionSlug: 'alpha',
+    accountAddress: `0x${'34'.repeat(20)}`,
+    scopes: [
+      TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.AGENT_AUTOFILL,
+    ],
+    createdAt: '2026-06-12T15:02:00.000Z',
+  });
+  const statementsResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/agent-only/statements?sessionSlug=alpha&limit=2&createdAt=2026-06-12T15%3A06%3A00.000Z', {
+      token: agentOnlyToken.token,
+    }),
+    env,
+  });
+  const statements = await jsonBody(statementsResponse);
+  assert.equal(statementsResponse.status, 200);
+  assert.equal(statements.window_id, 'w-2026-06-12');
+  assert.equal(statements.statements.length, 2);
+  assert.ok(statements.cursor);
+  assert.equal(JSON.stringify(statements).includes('eval_type'), false);
+
+  const staleAnswersResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/agent-only/answers/bulk?sessionSlug=alpha', {
+      method: 'POST',
+      token: agentOnlyToken.token,
+      body: {
+        window_id: 'w-2026-06-15',
+        createdAt: '2026-06-12T15:07:00.000Z',
+        request_id: 'route-answers-stale',
+        agent_metadata: { model: 'unit-model', scaffold_version: 'unit-scaffold' },
+        answers: [{
+          statement_id: questionIds[0],
+          answer: { value: 'agree' },
+          confidence: 80,
+        }],
+      },
+    }),
+    env,
+  });
+  const staleAnswers = await jsonBody(staleAnswersResponse);
+  assert.equal(staleAnswersResponse.status, 409);
+  assert.equal(staleAnswers.reason, 'window_mismatch');
+
+  const staleVotesResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/agent-only/token-votes/bulk?sessionSlug=alpha', {
+      method: 'POST',
+      token: agentOnlyToken.token,
+      body: {
+        window_id: 'w-2026-06-15',
+        createdAt: '2026-06-12T15:07:00.000Z',
+        request_id: 'route-votes-stale',
+        mode: 'linear',
+        agent_metadata: { model: 'unit-model', scaffold_version: 'unit-scaffold' },
+        votes: [{ statement_id: questionIds[0], votes: 1 }],
+      },
+    }),
+    env,
+  });
+  const staleVotes = await jsonBody(staleVotesResponse);
+  assert.equal(staleVotesResponse.status, 409);
+  assert.equal(staleVotes.reason, 'window_mismatch');
+
+  const answersResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/agent-only/answers/bulk?sessionSlug=alpha', {
+      method: 'POST',
+      token: agentOnlyToken.token,
+      body: {
+        window_id: 'w-2026-06-12',
+        createdAt: '2026-06-12T15:07:00.000Z',
+        request_id: 'route-answers-1',
+        agent_metadata: { model: 'unit-model', scaffold_version: 'unit-scaffold' },
+        answers: [{
+          statement_id: questionIds[0],
+          answer: { value: 'agree' },
+          confidence: 80,
+        }],
+      },
+    }),
+    env,
+  });
+  const answers = await jsonBody(answersResponse);
+  assert.equal(answersResponse.status, 200);
+  assert.equal(answers.accepted, 1);
+
+  const metricsResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/agent-only/export?sessionSlug=alpha&view=answers&format=jsonl', {
+      token: 'agent-test-token',
+    }),
+    env,
+  });
+  const exported = await metricsResponse.text();
+  assert.equal(metricsResponse.status, 200);
+  assert.equal(exported.includes('cep_'), true);
+  assert.equal(exported.includes('telegramUserId'), false);
+  assert.equal(exported.includes('42'), false);
+});
+
+test('Agent-only admin config rejects delegation tokens', async () => {
+  const env = telegramOnlyEnv({ AGENT_BRIDGE_AGENT_API_TOKEN: 'agent-test-token' });
+  const issued = await createTelegramAgentDelegationToken({
+    env,
+    telegramUserId: '42',
+    username: 'participant',
+    sessionSlug: 'alpha',
+    accountAddress: `0x${'34'.repeat(20)}`,
+    scopes: [
+      TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS,
+      TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.AGENT_AUTOFILL,
+    ],
+    createdAt: '2026-06-12T15:02:00.000Z',
+  });
+  const response = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/agent-only/config?sessionSlug=alpha', {
+      token: issued.token,
+    }),
+    env,
+  });
+  assert.equal(response.status, 403);
+  assert.equal((await jsonBody(response)).reason, 'agent_only_admin_service_token_required');
+});
+
+test('Telegram admin proposed-question delete route accepts service tokens and session admin tokens', async () => {
+  const env = telegramOnlyEnv({ AGENT_BRIDGE_AGENT_API_TOKEN: 'agent-test-token' });
+  const adminAddress = await managedAccountAddressForTelegramUser(env, '42');
+  env.AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES = adminAddress;
+  const serviceResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/questions/delete', {
+      method: 'POST',
+      token: 'agent-test-token',
+      body: {
+        sessionSlug: 'alpha',
+        questionId: 'ceq_missing_auth',
+      },
+    }),
+    env,
+  });
+  const service = await jsonBody(serviceResponse);
+  const issued = await createTelegramAgentDelegationToken({
+    env,
+    telegramUserId: '43',
+    username: 'participant',
+    sessionSlug: 'alpha',
+    accountAddress: `0x${'34'.repeat(20)}`,
+    scopes: [
+      TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS,
+    ],
+    createdAt: '2026-06-12T15:02:00.000Z',
+  });
+  const adminIssued = await createTelegramAgentDelegationToken({
+    env,
+    telegramUserId: '42',
+    username: 'admin',
+    sessionSlug: 'alpha',
+    accountAddress: adminAddress,
+    scopes: [
+      TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS,
+    ],
+    createdAt: '2026-06-12T15:02:00.000Z',
+  });
+  const adminDelegatedResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/questions/delete', {
+      method: 'POST',
+      token: adminIssued.token,
+      body: {
+        sessionSlug: 'alpha',
+        questionId: 'ceq_missing_admin',
+      },
+    }),
+    env,
+  });
+  const delegatedNonAdminResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/questions/delete', {
+      method: 'POST',
+      token: issued.token,
+      body: {
+        sessionSlug: 'alpha',
+        questionId: 'ceq_missing_auth',
+      },
+    }),
+    env,
+  });
+  const missingResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/questions/delete', {
+      method: 'POST',
+      token: '',
+      body: {
+        sessionSlug: 'alpha',
+        questionId: 'ceq_missing_auth',
+      },
+    }),
+    env,
+  });
+
+  assert.equal(serviceResponse.status, 200);
+  assert.equal(service.ok, true);
+  assert.deepEqual(service.results, [{ questionId: 'ceq_missing_auth', result: 'not_found' }]);
+  assert.equal(adminDelegatedResponse.status, 200);
+  assert.deepEqual((await jsonBody(adminDelegatedResponse)).results, [{ questionId: 'ceq_missing_admin', result: 'not_found' }]);
+  assert.equal(delegatedNonAdminResponse.status, 403);
+  assert.equal((await jsonBody(delegatedNonAdminResponse)).reason, 'response_export_admin_required');
+  assert.equal(missingResponse.status, 401);
+  assert.equal((await jsonBody(missingResponse)).reason, 'agent_api_token_invalid');
+});
+
+test('Telegram admin can archive proposed questions without mutating existing agent-only snapshots', async () => {
+  const env = telegramOnlyEnv({
+    AGENT_BRIDGE_AGENT_API_TOKEN: 'agent-test-token',
+  });
+  await buildTelegramCommandResponse({
+    update: groupMessage('/join alpha'),
+    env,
+    now: '2026-06-12T15:00:00.000Z',
+  });
+  const [archivedId, keptId] = await seedAgentOnlyProposedQuestions(env, 'alpha', 2);
+  const configResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/agent-only/config?sessionSlug=alpha', {
+      method: 'POST',
+      token: 'agent-test-token',
+      body: {
+        createdAt: '2026-06-12T15:01:00.000Z',
+        enabledQuestionIds: [archivedId, keptId],
+        evalTypesByQuestionId: {
+          [archivedId]: 'human_split',
+          [keptId]: 'gold',
+        },
+        windowing: {
+          timezone: 'America/Los_Angeles',
+          launchOpensAt: '2026-06-12T08:00:00-07:00',
+          launchClosesAt: '2026-06-15T08:00:00-07:00',
+          regularBoundaryWeekday: 'monday',
+          regularBoundaryHour: 9,
+        },
+      },
+    }),
+    env,
+  });
+  const beforeConfig = (await jsonBody(configResponse)).config;
+  const openResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/agent-only/window/open?sessionSlug=alpha', {
+      method: 'POST',
+      token: 'agent-test-token',
+      body: { createdAt: '2026-06-12T15:05:00.000Z' },
+    }),
+    env,
+  });
+  assert.equal(openResponse.status, 200);
+  const snapshotKey = `${AGENT_ONLY_WINDOW_KV_PREFIX}alpha:w-2026-06-12`;
+  const snapshotBefore = env.AGENT_ACTION_KV.store.get(snapshotKey);
+  const archiveResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/questions/delete', {
+      method: 'POST',
+      token: 'agent-test-token',
+      body: {
+        sessionSlug: 'alpha',
+        questionId: archivedId,
+        mode: 'archive',
+        createdAt: '2026-06-12T15:10:00.000Z',
+      },
+    }),
+    env,
+  });
+  const archive = await jsonBody(archiveResponse);
+  const questionsResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/questions?sessionSlug=alpha&telegramUserId=42&groupChatId=-100123', {
+      token: 'agent-test-token',
+    }),
+    env,
+  });
+  const questions = await jsonBody(questionsResponse);
+  const afterConfigResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/agent-only/config?sessionSlug=alpha', {
+      token: 'agent-test-token',
+    }),
+    env,
+  });
+  const afterConfig = (await jsonBody(afterConfigResponse)).config;
+
+  assert.equal(archiveResponse.status, 200);
+  assert.deepEqual(archive.results, [{ questionId: archivedId, result: 'archived' }]);
+  assert.equal(archive.configUpdated, true);
+  assert.equal(questionsResponse.status, 200, JSON.stringify(questions));
+  assert.equal(questions.questions.some((question) => question.questionId === archivedId), false);
+  assert.equal(questions.questions.some((question) => question.questionId === keptId), true);
+  assert.deepEqual(afterConfig.enabledQuestionIds, [keptId]);
+  assert.equal(Object.hasOwn(afterConfig.evalTypesByQuestionId, archivedId), false);
+  assert.equal(afterConfig.evalTypesByQuestionId[keptId], 'gold');
+  assert.equal(afterConfig.createdAt, beforeConfig.createdAt);
+  assert.deepEqual(afterConfig.windowing, beforeConfig.windowing);
+  assert.equal(env.AGENT_ACTION_KV.store.get(snapshotKey), snapshotBefore);
+});
+
+test('Telegram admin can delete proposed questions and remove them from agent-only config', async () => {
+  const env = telegramOnlyEnv({ AGENT_BRIDGE_AGENT_API_TOKEN: 'agent-test-token' });
+  const [questionId] = await seedAgentOnlyProposedQuestions(env, 'alpha', 1);
+  const questionKey = Array.from(env.AGENT_ACTION_KV.store.keys())
+    .find((key) => key.startsWith('telegram:proposed-question:alpha:') && key.endsWith(`:${questionId}`));
+  await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/agent-only/config?sessionSlug=alpha', {
+      method: 'POST',
+      token: 'agent-test-token',
+      body: { enabledQuestionIds: [questionId] },
+    }),
+    env,
+  });
+
+  const response = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/questions/delete', {
+      method: 'POST',
+      token: 'agent-test-token',
+      body: {
+        sessionSlug: 'alpha',
+        questionId,
+        mode: 'delete',
+      },
+    }),
+    env,
+  });
+  const body = await jsonBody(response);
+  const configResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/agent-only/config?sessionSlug=alpha', {
+      token: 'agent-test-token',
+    }),
+    env,
+  });
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(body.results, [{ questionId, result: 'deleted' }]);
+  assert.equal(env.AGENT_ACTION_KV.store.has(questionKey), false);
+  assert.deepEqual((await jsonBody(configResponse)).config.enabledQuestionIds, []);
+});
+
+test('Telegram admin proposed-question delete batches continue across missing ids', async () => {
+  const env = telegramOnlyEnv({ AGENT_BRIDGE_AGENT_API_TOKEN: 'agent-test-token' });
+  const [questionId] = await seedAgentOnlyProposedQuestions(env, 'alpha', 1);
+  const missingId = 'ceq_unknown_batch';
+  const response = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/questions/delete', {
+      method: 'POST',
+      token: 'agent-test-token',
+      body: {
+        sessionSlug: 'alpha',
+        questionIds: [missingId, questionId],
+        mode: 'archive',
+      },
+    }),
+    env,
+  });
+  const body = await jsonBody(response);
+
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, true);
+  assert.deepEqual(body.results, [
+    { questionId: missingId, result: 'not_found' },
+    { questionId, result: 'archived' },
+  ]);
+});
+
+test('Telegram admin proposed-question delete skips non-ceq ids before KV reads', async () => {
+  const env = telegramOnlyEnv({ AGENT_BRIDGE_AGENT_API_TOKEN: 'agent-test-token' });
+  env.AGENT_ACTION_KV.resetGetCalls();
+  const response = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/questions/delete', {
+      method: 'POST',
+      token: 'agent-test-token',
+      body: {
+        sessionSlug: 'alpha',
+        questionId: 'q-not-proposed',
+        mode: 'archive',
+      },
+    }),
+    env,
+  });
+  const body = await jsonBody(response);
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(body.results, [{ questionId: 'q-not-proposed', result: 'not_proposed' }]);
+  assert.equal(env.AGENT_ACTION_KV.getCalls, 0);
+});
+
+test('Telegram admin archive does not create an agent-only config record when none exists', async () => {
+  const env = telegramOnlyEnv({ AGENT_BRIDGE_AGENT_API_TOKEN: 'agent-test-token' });
+  const [questionId] = await seedAgentOnlyProposedQuestions(env, 'alpha', 1);
+  const configKey = `${AGENT_ONLY_MODE_CONFIG_KV_PREFIX}alpha`;
+  assert.equal(env.AGENT_ACTION_KV.store.has(configKey), false);
+
+  const response = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/questions/delete', {
+      method: 'POST',
+      token: 'agent-test-token',
+      body: {
+        sessionSlug: 'alpha',
+        questionId,
+        mode: 'archive',
+      },
+    }),
+    env,
+  });
+  const body = await jsonBody(response);
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(body.results, [{ questionId, result: 'archived' }]);
+  assert.equal(body.configUpdated, false);
+  assert.equal(env.AGENT_ACTION_KV.store.has(configKey), false);
 });
 
 test('Telegram client login exchanges copied ceagt token for a worker JWT', async () => {
@@ -2180,7 +2813,7 @@ test('Telegram agent can read active questions and draft preferences after group
   assert.equal(privateBoundResponse.status, 200);
   assert.equal(questions.questions.length, 2);
   assert.equal(questions.questions[0].answerable, true);
-  assert.equal(questions.skillVersion, '2026-06-11 (v39)');
+  assert.equal(questions.skillVersion, '2026-06-12 (v40)');
   assert.equal(questions.skillUpdateAvailable, false);
 
   const draftResponse = await handleTelegramAgentHandoffRequest({
@@ -2449,6 +3082,57 @@ test('Telegram agent can read and render topic-map results without raw response 
   assert.equal(body.topicMap.topics.length, 2);
   assert.equal(JSON.stringify(body).includes('telegramUserId'), false);
   assert.equal(JSON.stringify(body).includes('direct_submitted'), false);
+
+  await env.AGENT_ACTION_KV.put(
+    'telegram:agent-only:answer-event:v1:alpha:w-2026-06-12:42:1718192021223-deadbeef',
+    JSON.stringify({
+      type: 'telegram_agent_only_answer_event',
+      version: 1,
+      sessionSlug: 'alpha',
+      windowId: 'w-2026-06-12',
+      telegramUserId: '42',
+      questionId: 'ceq_sidecar',
+      source: 'agent_autofill',
+      eventKind: 'answer',
+      answer: { value: 'agent-only-sidecar-answer' },
+      confidence: 99,
+      rationale: 'Sidecar data must not enter live results.',
+      createdAt: '2026-06-12T15:10:00.000Z',
+    }),
+    { metadata: { v: 1, t: 'ao_evt', k: 'a', src: 'agent_autofill' } },
+  );
+  await env.AGENT_ACTION_KV.put(
+    'telegram:agent-only:answer-state:v1:alpha:w-2026-06-12:42',
+    JSON.stringify({
+      type: 'telegram_agent_only_answer_state',
+      version: 1,
+      sessionSlug: 'alpha',
+      windowId: 'w-2026-06-12',
+      telegramUserId: '42',
+      byStatement: {
+        ceq_sidecar: {
+          agent: { answer: { value: 'agent-only-sidecar-answer' }, confidence: 99 },
+          agentSkip: null,
+          human: null,
+        },
+      },
+      counts: { answers: 1, skips: 0 },
+      createdAt: '2026-06-12T15:10:00.000Z',
+      updatedAt: '2026-06-12T15:10:00.000Z',
+    }),
+    { metadata: { v: 1, t: 'ao_ans', sg: 'alpha', w: 'w-2026-06-12', a: 1, s: 0 } },
+  );
+
+  const afterAgentOnlyResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/results?sessionSlug=alpha&telegramUserId=42&view=topic-map'),
+    env,
+  });
+  const afterAgentOnlyBody = await jsonBody(afterAgentOnlyResponse);
+  assert.equal(afterAgentOnlyResponse.status, 200);
+  assert.deepEqual(afterAgentOnlyBody.counts, body.counts);
+  assert.deepEqual(afterAgentOnlyBody.topicMap.counts, body.topicMap.counts);
+  assert.deepEqual(afterAgentOnlyBody.topicMap.topics, body.topicMap.topics);
+  assert.equal(JSON.stringify(afterAgentOnlyBody).includes('agent-only-sidecar-answer'), false);
 
   const imageResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/results-image?sessionSlug=alpha&telegramUserId=42&view=topic-map'),
@@ -3726,7 +4410,7 @@ test('Telegram admin skill-update endpoint exposes status and service-token muta
       body: {
         telegramUserId: '42',
         sessionSlug: 'alpha',
-        latestVersion: '2026-06-11 (v39)',
+        latestVersion: '2026-06-12 (v40)',
         note: 'Refresh before answering.',
       },
     }),
@@ -3758,13 +4442,13 @@ test('Telegram admin skill-update endpoint exposes status and service-token muta
   assert.equal(initialStatusResponse.status, 200);
   assert.equal(initialStatus.ok, true);
   assert.equal(initialStatus.updateAvailable, false);
-  assert.equal(initialStatus.version, '2026-06-11 (v39)');
+  assert.equal(initialStatus.version, '2026-06-12 (v40)');
   assert.equal(delegatedPostResponse.status, 403);
   assert.equal(delegatedPost.reason, 'question_queue_service_token_required');
   assert.equal(setResponse.status, 200);
   assert.equal(set.ok, true);
   assert.equal(set.updateAvailable, true);
-  assert.equal(set.latestVersion, '2026-06-11 (v39)');
+  assert.equal(set.latestVersion, '2026-06-12 (v40)');
   assert.equal(flaggedStatusResponse.status, 200);
   assert.equal(flaggedStatus.updateAvailable, true);
   assert.equal(flaggedStatus.updateNote, 'Refresh before answering.');

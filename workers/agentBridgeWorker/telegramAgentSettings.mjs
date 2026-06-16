@@ -144,6 +144,7 @@ export function defaultTelegramAgentSettings(env = {}) {
   const settings = {
     draftStyle: normalizeDraftStyle(source.draftStyle),
     showUnansweredFirst: normalizeBoolean(source.showUnansweredFirst, true),
+    showAgentResponses: normalizeBoolean(source.showAgentResponses, true),
     agentAutoApplyQuestionVotes: normalizeBoolean(source.agentAutoApplyQuestionVotes, false),
     allowedProfileFields: normalizeStringList(source.allowedProfileFields),
     allowedUses: normalizeStringList(source.allowedUses),
@@ -177,6 +178,11 @@ export function normalizeTelegramAgentSettingsPatch(settings = {}) {
     const normalized = normalizeBoolean(input.showUnansweredFirst, null);
     if (normalized === null) return { ok: false, reason: 'show_unanswered_first_invalid' };
     patch.showUnansweredFirst = normalized;
+  }
+  if (Object.hasOwn(input, 'showAgentResponses')) {
+    const normalized = normalizeBoolean(input.showAgentResponses, null);
+    if (normalized === null) return { ok: false, reason: 'show_agent_responses_invalid' };
+    patch.showAgentResponses = normalized;
   }
   if (Object.hasOwn(input, 'agentAutoApplyQuestionVotes')) {
     const normalized = normalizeBoolean(input.agentAutoApplyQuestionVotes, null);
@@ -264,6 +270,7 @@ export async function loadTelegramAgentSettings({
   return {
     draftStyle: normalizeDraftStyle(settings.draftStyle || defaults.draftStyle),
     showUnansweredFirst: normalizeBoolean(settings.showUnansweredFirst, defaults.showUnansweredFirst),
+    showAgentResponses: normalizeBoolean(settings.showAgentResponses, defaults.showAgentResponses),
     agentAutoApplyQuestionVotes: normalizeBoolean(
       settings.agentAutoApplyQuestionVotes,
       defaults.agentAutoApplyQuestionVotes

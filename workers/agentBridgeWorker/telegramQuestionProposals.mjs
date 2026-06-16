@@ -315,6 +315,32 @@ function proposedQuestionPrefix(sessionSlug = '') {
   return slug ? `${PROPOSED_QUESTION_KV_PREFIX}${slug}:` : '';
 }
 
+function normalizeProposedQuestionId(value = '') {
+  // Validate, never sanitize: stripping characters would alias a malformed id
+  // (e.g. "ceq_abc!") onto a different record's key ("ceq_abc").
+  const id = safeString(value);
+  if (!id.startsWith(PROPOSED_QUESTION_ID_PREFIX) || id.length > 96) return '';
+  return /^[A-Za-z0-9_-]+$/.test(id) ? id : '';
+}
+
+function proposedQuestionKey(sessionSlug = '', questionId = '') {
+  const prefix = proposedQuestionPrefix(sessionSlug);
+  const id = normalizeProposedQuestionId(questionId);
+  return prefix && id ? `${prefix}${id}` : '';
+}
+
+async function readProposedQuestionMetadata(env = {}, key = '') {
+  const kv = env?.AGENT_ACTION_KV;
+  if (!key || !kv || typeof kv.list !== 'function') return null;
+  const listed = await kv.list({ prefix: key, limit: 1 }).catch(() => null);
+  const entry = (Array.isArray(listed?.keys) ? listed.keys : [])
+    .find((item) => safeString(item?.name || item) === key);
+  const metadata = entry && typeof entry === 'object' && !Array.isArray(entry)
+    ? entry.metadata
+    : null;
+  return metadata && typeof metadata === 'object' && !Array.isArray(metadata) ? metadata : null;
+}
+
 function questionIdFromPrompt({
   sessionSlug = '',
   prompt = '',
@@ -495,6 +521,72 @@ export async function persistTelegramProposedQuestion({
   };
 }
 
+export async function archiveTelegramProposedQuestion({
+  env = {},
+  sessionSlug = '',
+  questionId = '',
+  now = null,
+} = {}) {
+  const id = normalizeProposedQuestionId(questionId);
+  if (!id) return { ok: true, result: 'not_proposed' };
+  const key = proposedQuestionKey(sessionSlug, id);
+  const kv = env?.AGENT_ACTION_KV;
+  if (!key || !kv || typeof kv.get !== 'function' || typeof kv.put !== 'function') {
+    throw new Error('proposed_question_storage_unavailable');
+  }
+  const existingText = await kv.get(key);
+  if (!existingText) return { ok: true, result: 'not_found' };
+  const existing = safeJsonParse(existingText, null);
+  if (!existing || typeof existing !== 'object' || Array.isArray(existing)) {
+    throw new Error('proposed_question_record_invalid');
+  }
+  const record = {
+    ...existing,
+    status: 'archived',
+    archivedAt: lower(existing.status) === 'archived' && safeString(existing.archivedAt)
+      ? safeString(existing.archivedAt)
+      : nowIso(now),
+    archivedBy: 'service',
+  };
+  assertNoSecretShape(record, 'Telegram proposed questions must not serialize secrets.');
+  const existingMetadata = await readProposedQuestionMetadata(env, key);
+  const metadata = existingMetadata
+    ? { ...existingMetadata, s: 'archived' }
+    : buildTelegramAgentActivityMetadata({
+      type: 'proposed_question',
+      status: record.status,
+      createdAt: record.createdAt,
+      pendingAction: '',
+      sessionSlug: record.sessionSlug,
+      questionId: record.questionId,
+      telegramUserId: record.createdByTelegramUserId,
+    });
+  assertNoSecretShape(metadata, 'Telegram proposed question metadata must not serialize secrets.');
+  await kv.put(key, JSON.stringify(record), {
+    expirationTtl: DEFAULT_PROPOSED_QUESTION_TTL_SECONDS,
+    metadata,
+  });
+  return { ok: true, result: 'archived' };
+}
+
+export async function deleteTelegramProposedQuestion({
+  env = {},
+  sessionSlug = '',
+  questionId = '',
+} = {}) {
+  const id = normalizeProposedQuestionId(questionId);
+  if (!id) return { ok: true, result: 'not_proposed' };
+  const key = proposedQuestionKey(sessionSlug, id);
+  const kv = env?.AGENT_ACTION_KV;
+  if (!key || !kv || typeof kv.get !== 'function' || typeof kv.delete !== 'function') {
+    throw new Error('proposed_question_storage_unavailable');
+  }
+  const existingText = await kv.get(key);
+  if (!existingText) return { ok: true, result: 'not_found' };
+  await kv.delete(key);
+  return { ok: true, result: 'deleted' };
+}
+
 export async function listTelegramProposedQuestionsForSessionWithSummary(env = {}, sessionSlug = '') {
   const prefix = proposedQuestionPrefix(sessionSlug);
   if (!prefix || !env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.list !== 'function') {
@@ -569,6 +661,8 @@ export const __test__telegramQuestionProposals = {
   normalizeQuestionTags,
   normalizeQuestionType,
   normalizeSessionContext,
+  normalizeProposedQuestionId,
+  proposedQuestionKey,
   proposedQuestionPrefix,
   questionIdFromPrompt,
   proposedRecordToQuestion,

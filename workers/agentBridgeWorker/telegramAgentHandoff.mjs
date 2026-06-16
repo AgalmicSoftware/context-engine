@@ -39,6 +39,8 @@ import {
   normalizeQuestionReferences,
   normalizeQuestionGeoRefs,
   normalizeQuestionTags,
+  archiveTelegramProposedQuestion,
+  deleteTelegramProposedQuestion,
   persistTelegramProposedQuestion,
   sessionContextFromPolicySession,
 } from './telegramQuestionProposals.mjs';
@@ -82,13 +84,28 @@ import {
   createTelegramAgentDelegationToken,
   delegationTokenHasScope,
   loadTelegramAgentDelegationToken,
+  readTelegramAgentOnlyTokenUserPointer,
   readTelegramAgentDelegationTokenUserPointer,
   revokeTelegramAgentDelegationTokenHash,
   TELEGRAM_AGENT_DELEGATION_TOKEN_KV_PREFIX,
   TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_TTL_SECONDS,
   TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES,
+  writeTelegramAgentOnlyTokenUserPointer,
   writeTelegramAgentDelegationTokenUserPointer,
 } from './telegramAgentDelegationTokens.mjs';
+import {
+  AGENT_ONLY_ENDPOINTS,
+  agentOnlyTokenTtlSeconds,
+  buildAgentOnlyMetrics,
+  buildAgentOnlyStartPayload,
+  exportAgentOnlyData,
+  getAgentOnlyStatementsPage,
+  loadAgentOnlyModeConfig,
+  materializeAgentOnlyWindow,
+  saveAgentOnlyModeConfig,
+  submitAgentOnlyAnswersBulk,
+  submitAgentOnlyTokenVotesBulk,
+} from './telegramAgentOnlyMode.mjs';
 import {
   SUBMIT_REQUEST_KV_PREFIX,
   SUBMIT_REQUEST_SESSION_KV_PREFIX,
@@ -101,9 +118,9 @@ import {
 import { authenticateSessionWorker } from './onChainResponses.mjs';
 
 const DEFAULT_AGENT_BRIDGE_PUBLIC_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev';
-const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=39';
+const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=40';
 const DEFAULT_AGENT_RAW_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/edge-2026/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
-const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-06-11 (v39)';
+const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-06-12 (v40)';
 const MINI_APP_QUESTION_VOTE_KV_PREFIX = 'telegram:mini-app-question-vote:v1:';
 const AGENT_QUESTION_VOTE_DECISION_KV_PREFIX = 'telegram:agent-question-vote-decision:v1:';
 const ANSWER_DRAFT_KV_PREFIX = 'telegram:answer-draft:';
@@ -119,6 +136,7 @@ const RESULT_VIEW_GENERIC_MAX_ARRAY_ITEMS = 200;
 const RESULT_VIEW_GENERIC_MAX_OBJECT_KEYS = 200;
 const RESULT_VIEW_GENERIC_MAX_DEPTH = 6;
 const RESULT_VIEW_CACHE_MAX_BYTES = 512 * 1024;
+const ADMIN_QUESTIONS_DELETE_MAX_IDS = 50;
 const textEncoder = new TextEncoder();
 const TELEGRAM_AGENT_ONBOARDING_QUESTIONS = Object.freeze([
   {
@@ -642,6 +660,7 @@ function inputFromRequest(request, body = {}) {
     ...body,
     sessionSlug: safeString(body.sessionSlug || url.searchParams.get('sessionSlug')),
     telegramUserId: safeString(body.telegramUserId || url.searchParams.get('telegramUserId')),
+    createdAt: safeString(body.createdAt || url.searchParams.get('createdAt')),
     chatId: safeString(body.chatId || url.searchParams.get('chatId')),
     groupChatId: safeString(body.groupChatId || url.searchParams.get('groupChatId')),
     username: safeString(body.username || url.searchParams.get('username')),
@@ -653,6 +672,9 @@ function inputFromRequest(request, body = {}) {
     limit: Object.hasOwn(body, 'limit') ? body.limit : url.searchParams.get('limit'),
     count: Object.hasOwn(body, 'count') ? body.count : url.searchParams.get('count'),
     topN: Object.hasOwn(body, 'topN') ? body.topN : url.searchParams.get('topN'),
+    cursor: safeString(body.cursor || url.searchParams.get('cursor')),
+    windowId: safeString(body.windowId || body.window_id || url.searchParams.get('windowId') || url.searchParams.get('window')),
+    format: safeString(body.format || url.searchParams.get('format')),
     queueKey: safeString(body.queueKey || url.searchParams.get('queueKey')),
     advance: Object.hasOwn(body, 'advance') ? body.advance : url.searchParams.get('advance'),
     resetQueue: Object.hasOwn(body, 'resetQueue') ? body.resetQueue : (body.reset || url.searchParams.get('resetQueue') || url.searchParams.get('reset')),
@@ -705,6 +727,13 @@ function delegationScopeForRequest(pathname = '', method = 'GET') {
   if (pathname === '/telegram/agent/api/actions') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
+  if (
+    pathname === AGENT_ONLY_ENDPOINTS.statements ||
+    pathname === AGENT_ONLY_ENDPOINTS.answersBulk ||
+    pathname === AGENT_ONLY_ENDPOINTS.tokenVotesBulk
+  ) {
+    return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.AGENT_AUTOFILL;
+  }
   if (pathname === '/telegram/agent/api/mini-app-launch') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.DRAFT_ANSWERS;
   }
@@ -724,6 +753,9 @@ function delegationScopeForRequest(pathname = '', method = 'GET') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
   if (pathname === '/telegram/agent/api/admin/metrics') {
+    return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
+  }
+  if (pathname === '/telegram/agent/api/admin/questions/delete') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
   if (pathname === '/telegram/agent/api/admin/default-session') {
@@ -2912,6 +2944,12 @@ async function handleAdminMetricsRequest({ env = {}, context = {}, input = {} } 
     sessionSlug,
     visibleSessionSlugs,
   });
+  const agentOnly = await buildAgentOnlyMetrics({
+    env,
+    scope,
+    sessionSlug,
+    visibleSessionSlugs,
+  });
   const metricVisibility = scope === 'global' && cutoffConfigured
     ? {
       mode: includeLegacySessions ? 'all_sessions' : 'telegram_visible_sessions',
@@ -2935,13 +2973,261 @@ async function handleAdminMetricsRequest({ env = {}, context = {}, input = {} } 
       agentDraftedAnswers: 'Live drafts whose first revision was written through the agent handoff preferences endpoint.',
       metricVisibility: 'When the Telegram session created-after cutoff is configured, root-admin global metrics default to currently visible Telegram sessions. Add includeLegacySessions=1 for a historical all-session sweep.',
       questionsAnswered: `Submit queue records with submitted statuses over the rolling ${Math.round(SUBMIT_REQUEST_TTL_SECONDS / 86400)} day submit-record window.`,
+      agentOnly: 'Agent-only sidecar predictions, privacy skips, and token allocations counted from KV metadata only; these records are source-separated from normal drafts and submits.',
     },
     totals: snapshot.totals,
+    agentOnly,
     ...(rootAdmin ? { perSession: snapshot.perSession } : {}),
   };
   assertNoSecretShape(payload, 'Telegram admin metrics response must not serialize secrets.');
   await saveAdminMetricsCache(env, cacheKey, payload);
   return json(payload);
+}
+
+async function handleAgentOnlyStartRequest({ request, env = {} } = {}) {
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: sessionMetaCorsHeaders() });
+  }
+  if (request.method !== 'GET') {
+    return jsonSessionMeta(request, env, { ok: false, reason: 'method_not_allowed' }, { status: 405 });
+  }
+  const policy = await loadSessionPolicy(env);
+  const sessionSlug = sanitizeSessionSlug(policy.defaultSessionSlug);
+  const payload = buildAgentOnlyStartPayload({
+    sessionSlug,
+    skillVersion: CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION,
+  });
+  return jsonSessionMeta(request, env, payload);
+}
+
+async function handleAgentOnlyStatementsRequest({
+  env = {},
+  context = {},
+  input = {},
+} = {}) {
+  const page = await getAgentOnlyStatementsPage({
+    env,
+    sessionSlug: context.session.sessionSlug,
+    cursor: input.cursor,
+    limit: input.limit,
+    now: input.createdAt || null,
+  });
+  const status = page.ok === false ? (page.status || 500) : 200;
+  assertNoSecretShape(page, 'Agent-only statements response must not serialize secrets.');
+  return json(page, { status });
+}
+
+async function handleAgentOnlyAnswersBulkRequest({
+  env = {},
+  context = {},
+  input = {},
+  body = {},
+} = {}) {
+  const result = await submitAgentOnlyAnswersBulk({
+    env,
+    sessionSlug: context.session.sessionSlug,
+    telegramUserId: input.telegramUserId,
+    body,
+    now: input.createdAt || null,
+  });
+  const status = result.ok === false ? (result.status || 400) : 200;
+  assertNoSecretShape(result, 'Agent-only answers response must not serialize secrets.');
+  return json(result, { status });
+}
+
+async function handleAgentOnlyTokenVotesBulkRequest({
+  env = {},
+  context = {},
+  input = {},
+  body = {},
+} = {}) {
+  const result = await submitAgentOnlyTokenVotesBulk({
+    env,
+    sessionSlug: context.session.sessionSlug,
+    telegramUserId: input.telegramUserId,
+    body,
+    now: input.createdAt || null,
+  });
+  const status = result.ok === false ? (result.status || 400) : 200;
+  assertNoSecretShape(result, 'Agent-only token-votes response must not serialize secrets.');
+  return json(result, { status });
+}
+
+function normalizeAdminQuestionDeleteIds(body = {}) {
+  const source = [];
+  if (Object.hasOwn(body, 'questionId')) source.push(body.questionId);
+  if (Array.isArray(body.questionIds)) {
+    source.push(...body.questionIds);
+  } else if (Object.hasOwn(body, 'questionIds')) {
+    source.push(body.questionIds);
+  }
+  const seen = new Set();
+  const ids = [];
+  for (const raw of source) {
+    const id = safeString(raw);
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    ids.push(id);
+  }
+  return ids;
+}
+
+async function removeProcessedQuestionIdsFromAgentOnlyConfig({
+  env = {},
+  sessionSlug = '',
+  results = [],
+} = {}) {
+  const idsToRemove = new Set((Array.isArray(results) ? results : [])
+    .filter((entry) => !['failed', 'not_proposed'].includes(safeString(entry?.result)))
+    .map((entry) => safeString(entry?.questionId))
+    .filter((id) => id.startsWith('ceq_')));
+  if (!idsToRemove.size) return false;
+  const loaded = await loadAgentOnlyModeConfig({ env, sessionSlug });
+  if (loaded.source !== 'kv') return false;
+  const current = Array.isArray(loaded.config?.enabledQuestionIds)
+    ? loaded.config.enabledQuestionIds
+    : [];
+  const next = current.filter((id) => !idsToRemove.has(safeString(id)));
+  if (next.length === current.length) return false;
+  const saved = await saveAgentOnlyModeConfig({
+    env,
+    sessionSlug,
+    patch: {
+      ...loaded.config,
+      enabledQuestionIds: next,
+    },
+    updatedBy: 'service',
+  });
+  return saved.ok !== false;
+}
+
+async function handleAdminQuestionsDeleteRequest({
+  env = {},
+  input = {},
+  body = {},
+} = {}) {
+  const sessionSlug = sanitizeSessionSlug(input.sessionSlug || body.sessionSlug);
+  if (!sessionSlug) return json({ ok: false, reason: 'session_slug_required' }, { status: 400 });
+  // Mode is read from body.mode only: input.view aggregates ?view=/?mode= query
+  // params, which must never escalate the default archive to a hard delete.
+  const mode = lower(safeString(body.mode)) || 'archive';
+  if (!['archive', 'delete'].includes(mode)) {
+    return json({ ok: false, reason: 'questions_delete_mode_invalid' }, { status: 400 });
+  }
+  const questionIds = normalizeAdminQuestionDeleteIds(body);
+  if (!questionIds.length) return json({ ok: false, reason: 'question_ids_required' }, { status: 400 });
+  if (questionIds.length > ADMIN_QUESTIONS_DELETE_MAX_IDS) {
+    return json({ ok: false, reason: 'question_ids_too_many' }, { status: 400 });
+  }
+  const results = [];
+  for (const questionId of questionIds) {
+    try {
+      const processed = mode === 'delete'
+        ? await deleteTelegramProposedQuestion({ env, sessionSlug, questionId })
+        : await archiveTelegramProposedQuestion({
+          env,
+          sessionSlug,
+          questionId,
+          now: input.createdAt || null,
+        });
+      results.push({ questionId, result: safeString(processed?.result) || 'failed' });
+    } catch {
+      results.push({ questionId, result: 'failed' });
+    }
+  }
+  let configUpdated = false;
+  try {
+    configUpdated = await removeProcessedQuestionIdsFromAgentOnlyConfig({ env, sessionSlug, results });
+  } catch {
+    configUpdated = false;
+  }
+  const payload = { ok: true, sessionSlug, mode, results, configUpdated };
+  assertNoSecretShape(payload, 'Telegram admin questions delete response must not serialize secrets.');
+  return json(payload);
+}
+
+async function handleAdminAgentOnlyConfigRequest({
+  env = {},
+  input = {},
+  body = {},
+  method = 'GET',
+} = {}) {
+  const sessionSlug = sanitizeSessionSlug(input.sessionSlug || body.sessionSlug);
+  if (!sessionSlug) return json({ ok: false, reason: 'session_slug_required' }, { status: 400 });
+  if (method === 'GET') {
+    const loaded = await loadAgentOnlyModeConfig({ env, sessionSlug });
+    const payload = { ok: true, source: loaded.source, config: loaded.config };
+    assertNoSecretShape(payload, 'Agent-only admin config response must not serialize secrets.');
+    return json(payload);
+  }
+  if (method !== 'POST') {
+    return json({ ok: false, reason: 'method_not_allowed' }, { status: 405 });
+  }
+  const saved = await saveAgentOnlyModeConfig({
+    env,
+    sessionSlug,
+    patch: body,
+    updatedBy: 'service',
+    createdAt: input.createdAt || null,
+  });
+  const status = saved.ok === false ? (saved.status || 400) : 200;
+  assertNoSecretShape(saved, 'Agent-only admin config save response must not serialize secrets.');
+  return json(saved, { status });
+}
+
+async function handleAdminAgentOnlyWindowOpenRequest({
+  env = {},
+  input = {},
+  body = {},
+} = {}) {
+  const sessionSlug = sanitizeSessionSlug(input.sessionSlug || body.sessionSlug);
+  if (!sessionSlug) return json({ ok: false, reason: 'session_slug_required' }, { status: 400 });
+  const opened = await materializeAgentOnlyWindow({
+    env,
+    sessionSlug,
+    windowId: input.windowId || body.windowId || body.window_id,
+    now: input.createdAt || null,
+  });
+  const payload = opened.ok
+    ? {
+      ok: true,
+      created: opened.created === true,
+      windowId: opened.snapshot.windowId,
+      statementCount: Array.isArray(opened.snapshot.statements) ? opened.snapshot.statements.length : 0,
+      opensAt: opened.snapshot.opensAt,
+      closesAt: opened.snapshot.closesAt,
+    }
+    : opened;
+  const status = payload.ok === false ? (payload.status || 400) : 200;
+  assertNoSecretShape(payload, 'Agent-only admin window-open response must not serialize secrets.');
+  return json(payload, { status });
+}
+
+async function handleAdminAgentOnlyExportRequest({
+  env = {},
+  input = {},
+} = {}) {
+  const sessionSlug = sanitizeSessionSlug(input.sessionSlug);
+  if (!sessionSlug) return json({ ok: false, reason: 'session_slug_required' }, { status: 400 });
+  const exported = await exportAgentOnlyData({
+    env,
+    sessionSlug,
+    windowId: input.windowId,
+    view: input.view || 'answers',
+    format: input.format || 'jsonl',
+  });
+  if (!exported.ok) {
+    const payload = { ok: false, reason: exported.reason };
+    assertNoSecretShape(payload, 'Agent-only admin export error must not serialize secrets.');
+    return json(payload, { status: exported.status || 400 });
+  }
+  return new Response(exported.body, {
+    status: 200,
+    headers: {
+      'content-type': exported.contentType,
+      'cache-control': 'no-store',
+    },
+  });
 }
 
 async function handleQuestionQueuePlanRequest({
@@ -5163,6 +5449,69 @@ async function handleInviteOnboardRequest({
     lifecycle: AGENT_BRIDGE_EVENT_TYPES.ACCOUNT_RECOVERED,
     createdAt,
   });
+  const onboardingMode = lower(body.mode || body.onboardingMode);
+  if (onboardingMode === 'agent_only') {
+    const previousAgentOnlyPointer = await readTelegramAgentOnlyTokenUserPointer({ env, telegramUserId });
+    if (previousAgentOnlyPointer.tokenHash) {
+      await revokeTelegramAgentDelegationTokenHash({ env, tokenHash: previousAgentOnlyPointer.tokenHash });
+    }
+    if (explicitSessionSlug) {
+      const followDefault = sanitizeSessionSlug(resolved.session.sessionSlug) === sanitizeSessionSlug(policy.defaultSessionSlug);
+      await persistTelegramUserSessionBinding({
+        env,
+        normalized,
+        session: resolved.session,
+        createdAt,
+        source: 'trusted_invite_agent_only_onboarding',
+        followDefault,
+      });
+    }
+    const issued = await createTelegramAgentDelegationToken({
+      env,
+      telegramUserId,
+      username: '',
+      sessionSlug: resolved.session.sessionSlug,
+      accountAddress: account.accountAddress,
+      scopes: [
+        TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.AGENT_AUTOFILL,
+      ],
+      ttlSeconds: agentOnlyTokenTtlSeconds(env),
+      createdAt,
+    });
+    if (!issued.ok) {
+      const payload = { ok: false, reason: issued.reason || 'agent_token_create_failed' };
+      assertNoSecretShape(payload, 'Telegram invite onboarding token failure must not serialize secrets.');
+      return json(payload, { status: 500 });
+    }
+    const pointer = await writeTelegramAgentOnlyTokenUserPointer({
+      env,
+      telegramUserId,
+      tokenHash: issued.tokenHash,
+      issuedAt: issued.record?.issuedAt || createdAt,
+      createdAt,
+    });
+    if (!pointer.ok) {
+      const payload = { ok: false, reason: pointer.reason || 'agent_token_pointer_write_failed' };
+      assertNoSecretShape(payload, 'Telegram invite onboarding pointer failure must not serialize secrets.');
+      return json(payload, { status: 500 });
+    }
+    const response = {
+      ok: true,
+      token: issued.token,
+      worker: agentBridgePublicUrl(env),
+      skill: 'context-engine',
+      skillUrl: agentSkillUrl(env),
+      sessionSlug: resolved.session.sessionSlug,
+      expiresAt: issued.record.expiresAt,
+      inviteLabel: invite.invite.label || '',
+      inviteSource: safeString(body.source || invite.invite.source).slice(0, 160),
+      mode: 'agent_only',
+      start: `${agentBridgePublicUrl(env)}${AGENT_ONLY_ENDPOINTS.start}`,
+    };
+    const { token: _token, ...secretFree } = response;
+    assertNoSecretShape(secretFree, 'Telegram invite agent-only onboarding response metadata must not serialize secrets.');
+    return json(response);
+  }
   const previousPointer = await readTelegramAgentDelegationTokenUserPointer({ env, telegramUserId });
   if (previousPointer.tokenHash) {
     await revokeTelegramAgentDelegationTokenHash({ env, tokenHash: previousPointer.tokenHash });
@@ -5360,6 +5709,9 @@ async function handleTelegramAgentHandoffRequestUnsafe({
   if (url.pathname === '/telegram/agent/api/session-meta') {
     return handleSessionMetaHttpRequest({ request, env });
   }
+  if (url.pathname === AGENT_ONLY_ENDPOINTS.start) {
+    return handleAgentOnlyStartRequest({ request, env });
+  }
   if (AGENT_BROWSER_READ_CORS_PATHS.includes(url.pathname) && request.method === 'OPTIONS') {
     const cors = agentBrowserReadCorsHeaders(request, env, url.pathname);
     if (cors === null) {
@@ -5373,6 +5725,90 @@ async function handleTelegramAgentHandoffRequestUnsafe({
   }
   if (url.pathname === '/telegram/agent/api/skill' && request.method === 'GET') {
     return skillRedirectResponse();
+  }
+
+  if (url.pathname === '/telegram/agent/api/admin/questions/delete') {
+    const auth = await authenticateAgentHandoff(request, env);
+    if (!auth.ok) {
+      return json({
+        ok: false,
+        reason: auth.reason,
+        ...(auth.message ? { message: auth.message } : {}),
+        ...(auth.action ? { action: auth.action } : {}),
+      }, { status: auth.status });
+    }
+    if (request.method !== 'POST') {
+      return json({ ok: false, reason: 'method_not_allowed' }, { status: 405 });
+    }
+    const body = await readRequestJson(request);
+    const rawInput = inputFromRequest(request, body);
+    if (auth.authMode === 'service_token') {
+      return handleAdminQuestionsDeleteRequest({ env, input: rawInput, body });
+    }
+    const delegated = applyDelegationToInput(auth, rawInput, url.pathname, request.method);
+    if (!delegated.ok) {
+      return json({
+        ok: false,
+        reason: delegated.reason,
+        requiredScope: delegated.requiredScope,
+        sessionSlug: delegated.sessionSlug || '',
+      }, { status: delegated.status || 403 });
+    }
+    const context = await resolveHandoffContext({
+      env,
+      input: delegated.input,
+      auth,
+      requireQuestionAuthoring: false,
+    });
+    if (!context.ok) {
+      return json({ ok: false, reason: context.reason, sessionSlug: context.sessionSlug || '' }, { status: context.status });
+    }
+    const admin = await requireQuestionQueueAdmin({
+      env,
+      context,
+      input: delegated.input,
+      allowDelegatedAdmin: true,
+    });
+    if (!admin.ok) {
+      return json({
+        ok: false,
+        reason: admin.reason,
+        accountAddress: admin.accountAddress || '',
+      }, { status: admin.status || 403 });
+    }
+    return handleAdminQuestionsDeleteRequest({ env, input: delegated.input, body });
+  }
+
+  const adminAgentOnlyPaths = new Set([
+    '/telegram/agent/api/admin/agent-only/config',
+    '/telegram/agent/api/admin/agent-only/window/open',
+    '/telegram/agent/api/admin/agent-only/export',
+  ]);
+  if (adminAgentOnlyPaths.has(url.pathname)) {
+    const auth = await authenticateAgentHandoff(request, env);
+    if (!auth.ok) {
+      return json({
+        ok: false,
+        reason: auth.reason,
+        ...(auth.message ? { message: auth.message } : {}),
+        ...(auth.action ? { action: auth.action } : {}),
+      }, { status: auth.status });
+    }
+    if (auth.authMode !== 'service_token') {
+      return json({ ok: false, reason: 'agent_only_admin_service_token_required' }, { status: 403 });
+    }
+    const body = await readRequestJson(request);
+    const input = inputFromRequest(request, body);
+    if (url.pathname === '/telegram/agent/api/admin/agent-only/config') {
+      return handleAdminAgentOnlyConfigRequest({ env, input, body, method: request.method });
+    }
+    if (url.pathname === '/telegram/agent/api/admin/agent-only/window/open' && request.method === 'POST') {
+      return handleAdminAgentOnlyWindowOpenRequest({ env, input, body });
+    }
+    if (url.pathname === '/telegram/agent/api/admin/agent-only/export' && request.method === 'GET') {
+      return handleAdminAgentOnlyExportRequest({ env, input });
+    }
+    return json({ ok: false, reason: 'method_not_allowed' }, { status: 405 });
   }
 
   const auth = await authenticateAgentHandoff(request, env);
@@ -5416,6 +5852,9 @@ async function handleTelegramAgentHandoffRequestUnsafe({
     '/telegram/agent/api/group-approval-link',
     '/telegram/agent/api/group-approval-revoke',
     '/telegram/agent/api/onboarding',
+    AGENT_ONLY_ENDPOINTS.statements,
+    AGENT_ONLY_ENDPOINTS.answersBulk,
+    AGENT_ONLY_ENDPOINTS.tokenVotesBulk,
     '/telegram/agent/api/results',
     '/telegram/agent/api/results-image',
     '/telegram/agent/api/geo-backlink',
@@ -5459,6 +5898,15 @@ async function handleTelegramAgentHandoffRequestUnsafe({
   }
   if (url.pathname === '/telegram/agent/api/tags' && (request.method === 'GET' || request.method === 'POST')) {
     return handleTagsRequest({ env, context, waitUntil });
+  }
+  if (url.pathname === AGENT_ONLY_ENDPOINTS.statements && request.method === 'GET') {
+    return handleAgentOnlyStatementsRequest({ env, context, input });
+  }
+  if (url.pathname === AGENT_ONLY_ENDPOINTS.answersBulk && request.method === 'POST') {
+    return handleAgentOnlyAnswersBulkRequest({ env, context, input, body });
+  }
+  if (url.pathname === AGENT_ONLY_ENDPOINTS.tokenVotesBulk && request.method === 'POST') {
+    return handleAgentOnlyTokenVotesBulkRequest({ env, context, input, body });
   }
   if (url.pathname === '/telegram/agent/api/admin/status' && (request.method === 'GET' || request.method === 'POST')) {
     return handleAdminStatusRequest({ env, context, input });

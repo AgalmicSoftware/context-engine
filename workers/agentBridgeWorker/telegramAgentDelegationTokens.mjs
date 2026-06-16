@@ -3,6 +3,7 @@ import { assertNoSecretShape } from './redaction.mjs';
 
 export const TELEGRAM_AGENT_DELEGATION_TOKEN_KV_PREFIX = 'telegram:agent-delegation-token:v1:';
 export const TELEGRAM_AGENT_DELEGATION_TOKEN_USER_KV_PREFIX = 'telegram:agent-token:user:';
+export const TELEGRAM_AGENT_ONLY_TOKEN_USER_KV_PREFIX = 'telegram:agent-only-token:user:';
 export const TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_TTL_SECONDS = 28 * 24 * 60 * 60;
 export const TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES = Object.freeze({
   READ_QUESTIONS: 'read_questions',
@@ -13,6 +14,7 @@ export const TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES = Object.freeze({
   PROPOSE_GROUPS: 'propose_groups',
   POSE_QUESTIONS: 'pose_questions',
   MANAGE_GROUP_APPROVALS: 'manage_group_approvals',
+  AGENT_AUTOFILL: 'agent_autofill',
 });
 export const TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_SCOPES = Object.freeze([
   TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS,
@@ -74,11 +76,11 @@ function tokenKvKey(tokenHash = '') {
   return /^[0-9a-f]{64}$/.test(hash) ? `${TELEGRAM_AGENT_DELEGATION_TOKEN_KV_PREFIX}${hash}` : '';
 }
 
-function tokenUserPointerKvKey(telegramUserId = '') {
+function tokenUserPointerKvKey(telegramUserId = '', prefix = TELEGRAM_AGENT_DELEGATION_TOKEN_USER_KV_PREFIX) {
   const userId = safeString(telegramUserId)
     .replace(/[^0-9A-Za-z_-]+/g, '_')
     .slice(0, 64);
-  return userId ? `${TELEGRAM_AGENT_DELEGATION_TOKEN_USER_KV_PREFIX}${userId}` : '';
+  return userId ? `${prefix}${userId}` : '';
 }
 
 function normalizeScopes(scopes = [], { defaultIfEmpty = false } = {}) {
@@ -194,9 +196,10 @@ export async function loadTelegramAgentDelegationToken({
 export async function readTelegramAgentDelegationTokenUserPointer({
   env = {},
   telegramUserId = '',
+  prefix = TELEGRAM_AGENT_DELEGATION_TOKEN_USER_KV_PREFIX,
 } = {}) {
   const kv = env?.AGENT_ACTION_KV;
-  const key = tokenUserPointerKvKey(telegramUserId);
+  const key = tokenUserPointerKvKey(telegramUserId, prefix);
   if (!key || !kv || typeof kv.get !== 'function') return {};
   const parsed = safeJsonParse(await kv.get(key).catch(() => null), null);
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
@@ -217,9 +220,11 @@ export async function writeTelegramAgentDelegationTokenUserPointer({
   tokenHash = '',
   issuedAt = '',
   createdAt = null,
+  prefix = TELEGRAM_AGENT_DELEGATION_TOKEN_USER_KV_PREFIX,
+  type = 'telegram_agent_token_user_pointer',
 } = {}) {
   const kv = env?.AGENT_ACTION_KV;
-  const key = tokenUserPointerKvKey(telegramUserId);
+  const key = tokenUserPointerKvKey(telegramUserId, prefix);
   const hash = safeString(tokenHash).toLowerCase();
   if (!key || !kv || typeof kv.put !== 'function') {
     return { ok: false, reason: 'agent_token_pointer_storage_unavailable' };
@@ -229,7 +234,7 @@ export async function writeTelegramAgentDelegationTokenUserPointer({
   }
   const record = {
     version: 1,
-    type: 'telegram_agent_token_user_pointer',
+    type,
     telegramUserId: safeString(telegramUserId).slice(0, 64),
     tokenHash: hash,
     issuedAt: safeString(issuedAt) || safeString(createdAt) || nowIso(),
@@ -238,6 +243,21 @@ export async function writeTelegramAgentDelegationTokenUserPointer({
   assertNoSecretShape(record, 'Telegram agent token user pointers must not serialize bearer tokens.');
   await kv.put(key, JSON.stringify(record));
   return { ok: true, tokenHash: hash };
+}
+
+export async function readTelegramAgentOnlyTokenUserPointer(args = {}) {
+  return readTelegramAgentDelegationTokenUserPointer({
+    ...args,
+    prefix: TELEGRAM_AGENT_ONLY_TOKEN_USER_KV_PREFIX,
+  });
+}
+
+export async function writeTelegramAgentOnlyTokenUserPointer(args = {}) {
+  return writeTelegramAgentDelegationTokenUserPointer({
+    ...args,
+    prefix: TELEGRAM_AGENT_ONLY_TOKEN_USER_KV_PREFIX,
+    type: 'telegram_agent_only_token_user_pointer',
+  });
 }
 
 export async function revokeTelegramAgentDelegationTokenHash({
@@ -263,4 +283,8 @@ export const __test__telegramAgentDelegationTokens = {
   sha256Hex,
   tokenKvKey,
   tokenUserPointerKvKey,
+  agentOnlyTokenUserPointerKvKey: (telegramUserId = '') => tokenUserPointerKvKey(
+    telegramUserId,
+    TELEGRAM_AGENT_ONLY_TOKEN_USER_KV_PREFIX,
+  ),
 };

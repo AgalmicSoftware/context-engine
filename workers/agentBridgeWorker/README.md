@@ -75,6 +75,96 @@ After install, the agent should use the `ce-telegram-agent-handoff` skill and
 ask the user to tap `Onboard Agent` from the CE bot `/start` screen, then paste
 the copied 28-day install info into the agent.
 
+### Agent Only Mode
+
+`agent_only_mode` is a sidecar research/evaluation lane for trusted Geo/Hermes
+invites. It predicts a principal's answers and token allocations without
+writing normal CE drafts, submits, question votes, posed questions, results, or
+report data.
+
+Agent-only onboarding reuses `POST /telegram/agent/api/invite/onboard` with
+`"mode": "agent_only"`. The worker mints a short-lived scoped delegation token
+with `agent_autofill` only, stores it under the separate
+`telegram:agent-only-token:user:` pointer namespace, and leaves the normal
+28-day agent token pointer untouched. Agent-only tokens default to 7 days; set
+`AGENT_BRIDGE_AGENT_ONLY_TOKEN_TTL_SECONDS` to override.
+
+The public start payload is `GET /telegram/agent/api/agent-only/start`. Scoped
+agent-only tokens can read the current window snapshot at
+`GET /telegram/agent/api/agent-only/statements`, submit predicted answers at
+`POST /telegram/agent/api/agent-only/answers/bulk`, and submit linear or
+quadratic allocations at
+`POST /telegram/agent/api/agent-only/token-votes/bulk`. Normal delegation
+tokens do not include `agent_autofill` and receive 403 on these write lanes;
+agent-only tokens do not include normal read, draft, vote, or question-write
+scopes.
+
+Operators configure flagged statements with service-token-only agent-only admin
+routes:
+
+```http
+GET  /telegram/agent/api/admin/agent-only/config
+POST /telegram/agent/api/admin/agent-only/config
+POST /telegram/agent/api/admin/agent-only/window/open
+GET  /telegram/agent/api/admin/agent-only/export?view=answers&format=jsonl
+```
+
+The config is stored in `AGENT_ACTION_KV` and snapshots freeze flagged
+`ceq_...` question ids, statement text, and answer schemas for each window.
+The launch window defaults to `2026-06-12T08:00:00-07:00` through
+`2026-06-15T08:00:00-07:00`; regular windows start Mondays at 08:00
+America/Los_Angeles and use ids such as `w-2026-06-15`.
+
+`POST /telegram/agent/api/admin/questions/delete` accepts the worker service
+token or a `ceagt_...` token whose managed account is an admin for the session.
+It manages Telegram proposed questions created under
+`telegram:proposed-question:`. By default it archives `ceq_...` records with
+`status: "archived"`; send `mode: "delete"` to hard-delete them from KV. Both
+modes remove processed ids from the agent-only config for future snapshots, but
+existing window snapshots remain immutable.
+
+```http
+POST /telegram/agent/api/admin/questions/delete
+Authorization: Bearer <service-or-session-admin-token>
+Content-Type: application/json
+
+{
+  "sessionSlug": "agent-village-2026",
+  "questionIds": ["ceq_..."],
+  "mode": "archive"
+}
+```
+
+`questionId` may be sent instead of `questionIds` for a single question.
+`mode` defaults to `archive`; use `delete` only when the proposed-question KV
+record should be removed permanently.
+
+Agent-only exports use a built-in worker pseudonym salt for `principal_id`
+values, so operators do not need to configure a separate export secret. Admin
+metrics count agent-only answers, privacy skips, vote state, principals, and
+windows from KV metadata only, behind the existing metrics cache.
+
+For staging load tests, deploy a separate worker and KV namespace with the
+existing helper flags:
+
+```bash
+npm run deploy:plan -- --worker-name ce-agent-bridge-worker-staging
+npm run deploy:apply -- --worker-name ce-agent-bridge-worker-staging --apply
+```
+
+The helper derives the default action KV title from the worker name; pass
+`--action-kv-title` only when reusing or selecting an explicit staging
+namespace.
+
+After seeding and opening a staging window, run the load harness with:
+
+```bash
+AGENT_ONLY_LOAD_ORIGIN=https://ce-agent-bridge-worker-staging.<workers-subdomain>.workers.dev \
+AGENT_ONLY_LOAD_INVITE_TOKEN=<staging-trusted-invite> \
+AGENT_ONLY_LOAD_SESSION_SLUG=<session> \
+npm run load:agent-only
+```
+
 ## Telegram Screens
 
 Every `telegram_screen_state` carries launch metadata: a command, an opaque callback, or the `t.me/<bot>?start=<opaque-action-id>` deep link template.
@@ -347,6 +437,7 @@ Required values:
 | Optional per-session Telegram group allowlist | Add `approvedTelegramGroupChatIds` / `telegramApprovedGroupChatIds` / `approvedTelegramChats` to a session policy entry to restrict which Telegram groups can bind to that session. Set `telegramGroupApprovalRequired: true` when a session should require static approval or an admin-generated invite link even before any groups are listed. Run `/group_id` inside the target Telegram group to have the bot display the numeric `chat.id` to copy into the policy. Configured export admins can run `/group_link [session]` or use Admin Actions to create a one-use `https://t.me/<bot>?startgroup=<opaque>` link that approves the first group that opens it. Sessions without an allowlist or approval-required flag remain available to any group where the bot is present |
 | Optional Telegram API timeout | `AGENT_BRIDGE_TELEGRAM_API_TIMEOUT_MS` bounds outbound Bot API calls before media sends fall back to document/text replies; default `8000` |
 | Optional response export allowlist | `AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES` is a comma-separated or JSON-array list of managed Telegram ETH addresses allowed to use `/export_all` and manage added exporters. Session policy can also use `responseExportAllowedAddresses` or `telegramResponseExportAllowedAddresses` for per-session root admin allowlists. Root admins can grant additional session-scoped exporters through `/export_allow` without changing config |
+| Optional agent-only token TTL | `AGENT_BRIDGE_AGENT_ONLY_TOKEN_TTL_SECONDS` overrides the default 7-day lifespan for `mode: "agent_only"` invite onboarding tokens |
 | Cloudflare account ID | Do not ask the operator to paste this in product setup. `/telegram-demo-setup` and `deploy:plan` derive the account from `CLOUDFLARE_API_TOKEN`; if multiple accounts are visible, setup blocks because account selection is not implemented yet. `CLOUDFLARE_ACCOUNT_ID` is a developer fallback only |
 | Cloudflare API token | Put in untracked local env as `CLOUDFLARE_API_TOKEN`; never commit it. The planning helper validates presence and prints only redacted status |
 | KV namespace | `deploy:apply -- --apply` creates or reuses and binds as `AGENT_ACTION_KV` for opaque callback/action IDs and replay cache |

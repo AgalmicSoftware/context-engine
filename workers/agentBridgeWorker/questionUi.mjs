@@ -1028,6 +1028,7 @@ export function buildTelegramAgentSettingsOverviewState({
   const normalizedSettings = sanitizeForGroup({
     draftStyle: normalizeDraftStyle(settings.draftStyle),
     showUnansweredFirst: normalizeBoolean(settings.showUnansweredFirst, true),
+    showAgentResponses: normalizeBoolean(settings.showAgentResponses, true),
     agentAutoApplyQuestionVotes: normalizeBoolean(settings.agentAutoApplyQuestionVotes, false),
     topicPreferences: Array.isArray(settings.topicPreferences) ? settings.topicPreferences : [],
     demographicLinkOptIn: normalizeBoolean(settings.demographicLinkOptIn, false),
@@ -1040,6 +1041,7 @@ export function buildTelegramAgentSettingsOverviewState({
     editableFields: [
       'draftStyle',
       'showUnansweredFirst',
+      'showAgentResponses',
       'agentAutoApplyQuestionVotes',
       'topicPreferences',
       'demographicLinkOptIn',
@@ -1065,6 +1067,7 @@ export function buildTelegramAgentSettingsEditState({
   const current = sanitizeForGroup({
     draftStyle: normalizeDraftStyle(settings.draftStyle),
     showUnansweredFirst: normalizeBoolean(settings.showUnansweredFirst, true),
+    showAgentResponses: normalizeBoolean(settings.showAgentResponses, true),
     agentAutoApplyQuestionVotes: normalizeBoolean(settings.agentAutoApplyQuestionVotes, false),
     topicPreferences: Array.isArray(settings.topicPreferences) ? settings.topicPreferences : [],
     demographicLinkOptIn: normalizeBoolean(settings.demographicLinkOptIn, false),
@@ -1085,6 +1088,11 @@ export function buildTelegramAgentSettingsEditState({
     label: 'Show un-answered questions first',
     input: 'toggle',
     value: current.showUnansweredFirst,
+  }, {
+    field: 'showAgentResponses',
+    label: 'Show agent responses',
+    input: 'toggle',
+    value: current.showAgentResponses,
   }, {
     field: 'agentAutoApplyQuestionVotes',
     label: 'Allow agents to auto-apply question votes',
@@ -1643,6 +1651,51 @@ export function buildTelegramQuestionControls(question = {}, {
     }));
   }
   return controls;
+}
+
+export function buildTelegramQuestionAnswerSchema(question = {}) {
+  const questionType = normalizeQuestionType(question.questionType || question.type);
+  if (questionType === QUESTION_TYPES.AGREE_UNSURE_DISAGREE) {
+    const values = buildTelegramQuestionControls(question, { microphoneSupported: false })
+      .filter((control) => control.controlType === 'agree_unsure_disagree')
+      .map((control) => control.value)
+      .filter((value, index, list) => value !== undefined && value !== null && list.indexOf(value) === index);
+    return {
+      questionType: 'binary',
+      answerSchema: { kind: 'choice', values },
+    };
+  }
+  if (questionType === QUESTION_TYPES.RATING) {
+    const values = buildTelegramQuestionControls(question, { microphoneSupported: false })
+      .filter((control) => control.controlType === 'rating_button')
+      .map((control) => control.value)
+      .filter((value, index, list) => value !== undefined && value !== null && list.indexOf(value) === index);
+    return {
+      questionType: 'rating',
+      answerSchema: { kind: 'choice', values },
+    };
+  }
+  if (questionType === QUESTION_TYPES.MULTICHOICE) {
+    const selectionMode = normalizeChoiceSelectionMode(question);
+    const options = buildTelegramQuestionControls(question, { microphoneSupported: false })
+      .filter((control) => ['single_select', 'multi_select_toggle'].includes(control.controlType))
+      .map((control) => safeString(control.value || control.label))
+      .filter((value, index, list) => value && list.indexOf(value) === index);
+    return {
+      questionType: 'multichoice',
+      answerSchema: {
+        kind: 'multichoice',
+        options,
+        minSelections: 1,
+        maxSelections: selectionMode === 'single' ? 1 : options.length,
+        selectionMode,
+      },
+    };
+  }
+  return {
+    questionType: 'freeform',
+    answerSchema: { kind: 'text', maxChars: 280 },
+  };
 }
 
 export function buildTelegramQuestionCard(question = {}, options = {}) {

@@ -50,6 +50,16 @@ test('resolveAgentBridgeDeployConfig builds the default workers.dev public URL a
   assert.equal(JSON.stringify(config).includes('webhook-secret'), false);
   assert.equal(JSON.stringify(config).includes('demo-root'), false);
   assert.equal(JSON.stringify(config).includes('agent-api-token'), false);
+
+  const staging = resolveAgentBridgeDeployConfig({
+    flags: { 'worker-name': 'ce-agent-bridge-worker-staging' },
+    env: completeEnv({
+      AGENT_BRIDGE_AGENT_ONLY_TOKEN_TTL_SECONDS: '604800',
+    }),
+  });
+  assert.equal(staging.workerName, 'ce-agent-bridge-worker-staging');
+  assert.equal(staging.resources.actionKvTitle, 'ContextEngineAgentBridgeActions:ce-agent-bridge-worker-staging');
+  assert.equal(staging.vars.AGENT_BRIDGE_AGENT_ONLY_TOKEN_TTL_SECONDS, '604800');
 });
 
 test('validateAgentBridgeDeployConfig requires only live deploy credentials, not unit-test credentials', () => {
