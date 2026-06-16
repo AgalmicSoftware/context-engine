@@ -173,12 +173,18 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
         text: 'A mostly AI-written information environment could be healthier than today.',
         answer_schema: { kind: 'choice', values: ['agree', 'unsure', 'disagree'] },
       },
+      {
+        statement_id: 'ceq_book',
+        text: 'Agent guess: what is my favorite book?',
+        answer_schema: { kind: 'text', maxChars: 280 },
+      },
     ],
   };
   const state = {
     byStatement: {
       ceq_trust: { agent: { answer: { value: 'agree' }, confidence: 92 } },
       ceq_info: { agent: { answer: { value: 'unsure' }, confidence: 41 } },
+      ceq_book: { agent: { answer: { text: 'The Diamond Age' }, confidence: 52 } },
     },
   };
   const prompt = buildAgentOnlyWrappedImagePrompt({
@@ -194,9 +200,49 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.match(prompt, /Do not place a standalone logo icon/);
   assert.match(prompt, /High-Confidence Reads/);
   assert.match(prompt, /Cautious Reads/);
+  assert.match(prompt, /Agent Guesses/);
+  assert.match(prompt, /favorite book/);
   assert.match(prompt, /several small evidence artifacts\/icons/);
   assert.match(prompt, /Review or edit your agent's responses in Context Engine/);
   assert.doesNotMatch(prompt, /What Your Agent Upvoted/);
+});
+
+test('wrapped image prompt supports political compass mode around the most-important question', () => {
+  const snapshot = {
+    windowId: 'w-2026-06-15',
+    statements: [
+      {
+        statement_id: 'ceq_privacy',
+        text: 'I would rather my agent be too conservative with privacy than too proactive with opportunities.',
+        answer_schema: { kind: 'choice', values: ['agree', 'unsure', 'disagree'] },
+      },
+      {
+        statement_id: 'ceq_movie',
+        text: 'Agent guess: what movie would I recommend?',
+        answer_schema: { kind: 'text', maxChars: 280 },
+      },
+    ],
+  };
+  const state = {
+    byStatement: {
+      ceq_privacy: { agent: { answer: { value: 'agree' }, confidence: 88 } },
+      ceq_movie: { agent: { answer: { text: 'Her' }, confidence: 49 } },
+    },
+  };
+  const prompt = buildAgentOnlyWrappedImagePrompt({
+    snapshot,
+    state,
+    linearVoteState: { mode: 'linear', votes: { ceq_privacy: 30 } },
+    quadraticVoteState: { mode: 'quadratic', votes: {} },
+    mode: 'political_compass',
+  });
+  assert.match(prompt, /political compass meme/);
+  assert.match(prompt, /Agent Village Compass/);
+  assert.match(prompt, /most-important question/);
+  assert.match(prompt, /historical figures or fictional\/book characters/);
+  assert.match(prompt, /I would rather my agent be too conservative with privacy/);
+  assert.match(prompt, /Agent guesses/);
+  assert.doesNotMatch(prompt, /Most Important To You/);
 });
 
 test('canonical answer fingerprints compare semantics across agent and mini-app shapes', async () => {

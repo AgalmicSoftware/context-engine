@@ -1341,6 +1341,12 @@ function normalizeWrappedImageQuality(value = '') {
   return ['low', 'medium', 'high', 'auto'].includes(quality) ? quality : DEFAULT_WRAPPED_IMAGE_QUALITY;
 }
 
+function normalizeWrappedImageMode(value = '') {
+  const mode = lower(value).replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  if (['political_compass', 'compass', 'political_meme'].includes(mode)) return 'political_compass';
+  return 'wrapped';
+}
+
 function resolveWorkerOpenAiKey(env = {}) {
   return safeString(
     env.AGENT_BRIDGE_OPENAI_API_KEY ||
@@ -1401,12 +1407,52 @@ function predictionLine(row = {}) {
   return `"${wrappedDisplayText(row.question, 90)}" -> ${wrappedDisplayText(row.answer || 'N/A', 80)} (${row.confidence}/100 confidence)`;
 }
 
+function wrappedAgentGuessRows(predictions = []) {
+  return predictions
+    .filter((row) => /favorite|book|movie|film|game|yes\s*\/\s*no|yes-or-no|yes or no/i.test(row.question || ''))
+    .slice(0, 5);
+}
+
+function buildAgentOnlyPoliticalCompassPrompt({
+  importantLines = '',
+  highLines = '',
+  cautiousLines = '',
+  agentGuessLines = '',
+  focalQuestion = '',
+  styleLine = '',
+} = {}) {
+  const focal = wrappedDisplayText(focalQuestion, 150) || 'N/A - no most-important question was available.';
+  return `Create a wide 16:9 political compass meme poster for Agent Village Wrapped${styleLine ? `, with this extra style hint: ${styleLine}` : ''}.
+
+Title treatment: make "Agent Village Compass" a horizontal top wordmark inspired by the Agent Village logo: "AGENT" feels bold, uppercase, blocky, and modern; "VILLAGE" feels elegant, high-contrast serif with a flowing calligraphic V. Do not place a standalone logo icon beside it. Subtitle: "Where your agent thinks you land."
+
+Use the agent's most-important question as the focal issue for the compass: "${focal}". Treat this as the question the principal's agent thinks they would care about most. Build two interpretable axes from that focal issue and the predictions below; examples include privacy <-> proactivity, review-first <-> autonomous action, local community <-> frontier acceleration, or skepticism <-> trust. Do not invent private facts.
+
+Make a classic four-quadrant political compass meme, but premium and readable rather than cluttered. Put the principal as a clear glowing marker with a short label. Put several historical figures or fictional/book characters around the quadrants as playful reference points. Keep comparisons non-defamatory and based only on the prediction themes.
+
+Evidence to use:
+Most important questions:
+${importantLines || 'N/A'}
+
+High-confidence reads:
+${highLines || 'N/A'}
+
+Cautious reads:
+${cautiousLines || 'N/A'}
+
+Agent guesses, if available:
+${agentGuessLines || 'N/A'}
+
+Include a compact "Why here?" strip with 3 evidence chips. Include a tiny footer: "Review or edit your agent's responses in Context Engine". Do not show access credentials, raw Telegram ids, confidence tables, rationales, privacy skip counts, linear/quadratic allocation mechanics, decorative filler text, or fake data.`;
+}
+
 export function buildAgentOnlyWrappedImagePrompt({
   snapshot = {},
   state = {},
   linearVoteState = {},
   quadraticVoteState = {},
   styleHint = '',
+  mode = 'wrapped',
 } = {}) {
   const predictions = wrappedPredictionRows(snapshot, state);
   const highConfidence = [...predictions]
@@ -1425,7 +1471,23 @@ export function buildAgentOnlyWrappedImagePrompt({
   const cautiousLines = cautious.length
     ? cautious.map((row) => `- ${predictionLine(row)}`).join('\n')
     : '- N/A - no cautious predictions submitted yet.';
+  const agentGuesses = wrappedAgentGuessRows(predictions);
+  const agentGuessLines = agentGuesses.length
+    ? agentGuesses.map((row) => `- ${predictionLine(row)}`).join('\n')
+    : '';
   const styleLine = wrappedDisplayText(styleHint, 240);
+  if (normalizeWrappedImageMode(mode) === 'political_compass') {
+    const prompt = buildAgentOnlyPoliticalCompassPrompt({
+      importantLines,
+      highLines,
+      cautiousLines,
+      agentGuessLines,
+      focalQuestion: important[0]?.question || '',
+      styleLine,
+    });
+    assertNoSecretShape({ prompt }, 'Agent-only wrapped image prompt must not serialize secrets.');
+    return prompt;
+  }
   const prompt = `Create a wide 16:9 shareable poster titled "Agent Village Wrapped" with subtitle "What your agent thinks it knows about you".
 
 Make it look like a polished social-share card, readable on mobile, with no tiny text. Custom aesthetic should be derived from the predictions below${styleLine ? `, with this extra style hint: ${styleLine}` : ''}. If the data suggests no stronger theme, use a premium privacy-first civic-tech visual language: cryptographic village map, clean coordination dashboard, warm midnight blue, signal green, soft gold, and white accents. Use elegant map lines, Telegram-like message nodes, tiny lock/check icons, and a village grid, but no literal robots.
@@ -1452,7 +1514,11 @@ ${highLines}
 Show concise nuanced prediction cards based on:
 ${cautiousLines}
 
-5. Agent Comparison
+5. Agent Guesses
+If the data below contains favorite book, movie, game, or yes/no taste/personality guesses, include a compact "Agent Guesses" strip. If no such rows are available, omit this section entirely.
+${agentGuessLines || 'N/A - no favorite book, movie, game, or yes/no agent guesses were submitted.'}
+
+6. Agent Comparison
 Compare the principal to a historical figure or fictional/book character only if it feels supported by the predictions; otherwise write "N/A". Make this a richer wide strip: show the comparison name plus several small evidence artifacts/icons beside it, such as a zero-knowledge calendar, civic experiment ledger, handshake/introduction network, village infrastructure map, or other symbols derived from the predictions. The artifacts should explain why the comparison fits without adding fake data.
 
 Footer in small type, with "Context Engine" still readable: "Review or edit your agent's responses in Context Engine"
@@ -1491,12 +1557,14 @@ export async function generateAgentOnlyWrappedImage({
   if (!openAiKey) return { ok: false, status: 503, reason: 'openai_key_missing' };
   const linearVoteState = await loadVoteState({ env, sessionSlug: slug, windowId: snapshot.windowId, telegramUserId, mode: 'linear' });
   const quadraticVoteState = await loadVoteState({ env, sessionSlug: slug, windowId: snapshot.windowId, telegramUserId, mode: 'quadratic' });
+  const imageMode = normalizeWrappedImageMode(body.mode || body.image_mode || body.imageMode || body.view);
   const prompt = buildAgentOnlyWrappedImagePrompt({
     snapshot,
     state,
     linearVoteState,
     quadraticVoteState,
     styleHint: body.style_hint || body.styleHint || '',
+    mode: imageMode,
   });
   const model = safeString(env.AGENT_BRIDGE_AGENT_WRAPPED_IMAGE_MODEL) || DEFAULT_WRAPPED_IMAGE_MODEL;
   const size = normalizeWrappedImageSize(body.size || env.AGENT_BRIDGE_AGENT_WRAPPED_IMAGE_SIZE);
@@ -1538,6 +1606,7 @@ export async function generateAgentOnlyWrappedImage({
   const payload = {
     ok: true,
     window_id: snapshot.windowId,
+    mode: imageMode,
     model,
     size,
     quality,

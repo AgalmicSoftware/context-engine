@@ -1606,6 +1606,7 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   assert.equal(wrappedResponse.status, 200);
   assert.equal(wrapped.ok, true);
   assert.equal(wrapped.window_id, 'w-2026-06-12');
+  assert.equal(wrapped.mode, 'wrapped');
   assert.equal(wrapped.model, 'gpt-image-2');
   assert.equal(wrapped.size, '2048x1152');
   assert.equal(wrapped.image_base64, Buffer.from('fake-png').toString('base64'));
