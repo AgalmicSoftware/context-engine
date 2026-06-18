@@ -101,6 +101,21 @@ For manual drag-and-drop deploys, the `_redirects` file must be present inside
 the uploaded `client/build/` directory. Keep any specific legacy redirects above
 the SPA fallback rule.
 
+Set browser cache headers so search-result clicks and fresh navigations
+revalidate the deployed files after each deploy. For manual drag-and-drop
+deploys, keep the `_headers` file inside `client/public/` so Vite copies it into
+the uploaded `client/build/` directory:
+
+```text
+/*
+  Cache-Control: no-cache, max-age=0, must-revalidate
+  Pragma: no-cache
+  Expires: 0
+```
+
+This cannot replace already-running JavaScript in an open tab. It makes the
+browser re-check the app shell on the next navigation, reload, or new visit.
+
 ### 4. Attach the custom domain
 
 In Netlify, add the domain under the site domain settings and complete the DNS
@@ -215,9 +230,10 @@ SPA fallback concept, but their redirect config syntax differs.
     at a live SessionRegistry session seeded with copied Context fixture
     questions and featured SBT metadata. `demo_sessions.json` also carries a
     display-only `demo-1` fallback so the route can mount when live registry
-    metadata is slow. Remove both compatibility entries after the
-    Cloudflare-backed demo question/response storage replaces the Arweave/on-chain
-    copy.
+    metadata is slow. Worker URL, faucet sponsorship, and gate authority stay in
+    SessionRegistry plus Worker KV, not in the demo fixture. Remove both
+    compatibility entries after the Cloudflare-backed demo question/response
+    storage replaces the Arweave/on-chain copy.
 
 - `REACT_APP_CE_ENABLE_WALLETCONNECT_FALLBACK=false`
   - Controls RainbowKit's MetaMask fallback when MetaMask is not injected.

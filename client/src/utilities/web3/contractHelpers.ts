@@ -198,6 +198,14 @@ type ContractHelperDeps = {
   DEFAULT_CHAIN_ID: number;
   store: StoreLike | any;
   getSessionConfigBySlug: (slug: string) => SessionConfigLike | null | undefined;
+  refreshSessionRegistryFieldsCache?: ((args: {
+    chainId?: number | string | null;
+    slug?: string | null;
+    sessionId?: string | null;
+    providerLike?: unknown;
+    fieldKeys?: string[];
+    bootstrapRpc?: boolean;
+  }) => Promise<SessionConfigLike | null | undefined>) | null;
   getCorsProxyUrlOrThrow: (args: {
     sessionConfig?: SessionConfigLike | null;
     sessionSlug?: string;
@@ -301,6 +309,18 @@ const isRetryableSponsoredBootstrapFundingError = (error: unknown): boolean => {
   );
 };
 
+const isRetryableWorkerUrlResolutionFundingError = (error: unknown): boolean => {
+  const fundingError = error as FundingError;
+  const stage = String(fundingError?.stage || '').trim().toLowerCase();
+  if (stage !== 'worker-url-resolution') return false;
+  const message = normalizeFundingErrorMessage(error);
+  return (
+    message.includes('worker url unavailable') ||
+    message.includes('worker url is not configured') ||
+    message.includes('not deployable yet')
+  );
+};
+
 export function createContractHelperMethods(deps: ContractHelperDeps): ContractHelperMethods {
   const {
     resolveSession,
@@ -324,6 +344,7 @@ export function createContractHelperMethods(deps: ContractHelperDeps): ContractH
     DEFAULT_CHAIN_ID,
     store,
     getSessionConfigBySlug,
+    refreshSessionRegistryFieldsCache = null,
     getCorsProxyUrlOrThrow,
     fetchWorkerWithAuth,
     fetchImpl = (...args: Parameters<typeof fetch>) => fetch(...args),
@@ -751,10 +772,11 @@ export function createContractHelperMethods(deps: ContractHelperDeps): ContractH
         const profile = state?.profile || {};
         const network = profile.network || {};
         const overrideChainId = contextOverride.chainId ?? contextOverride.networkChainId ?? null;
+        const sessionChainId = cfg?.networkChainId ?? cfg?.chainId ?? cfg?.registryChainId ?? null;
         const context: RequestContext = {
           account: contextOverride.account || profile.account || '',
           providerLike: contextOverride.providerLike || profile.provider || 'wagmi',
-          chainId: overrideChainId || network.id || network.chainId || cfg?.networkChainId || null,
+          chainId: overrideChainId || sessionChainId || network.id || network.chainId || null,
         };
         const requestBody: FaucetRequestBody = {
           action: 'request_test_eth',
@@ -826,6 +848,36 @@ export function createContractHelperMethods(deps: ContractHelperDeps): ContractH
           }
           return data;
         };
+        const refreshSessionFieldsForFunding = async (): Promise<SessionConfigLike | null> => {
+          if (!resolvedSessionSlug || typeof refreshSessionRegistryFieldsCache !== 'function') return null;
+          const refreshChainId = (
+            sessionChainId ||
+            cfg?.__registry?.registryChainId ||
+            cfg?.__registry?.chainId ||
+            cfg?.networkChainId ||
+            context.chainId ||
+            null
+          );
+          try {
+            const refreshed = await refreshSessionRegistryFieldsCache({
+              chainId: refreshChainId,
+              slug: resolvedSessionSlug,
+              sessionId: cfg?.sessionId || cfg?.__registry?.sessionId || cfg?.__registry?.sessionIdHex || null,
+              providerLike: context.providerLike,
+            });
+            return (
+              refreshed ||
+              getSessionConfigBySlug(resolvedSessionSlug) ||
+              null
+            );
+          } catch (refreshError: any) {
+            contractsLog.warn('[faucet] Failed to refresh session registry fields before funding retry.', {
+              slug: resolvedSessionSlug,
+              error: refreshError?.message || String(refreshError),
+            });
+            return null;
+          }
+        };
         const sponsoredBootstrapFundingContext = readSponsoredBootstrapFundingContext();
         const bootstrapSessionSlug = normalizeSessionSlug(sponsoredBootstrapFundingContext?.sessionSlug || '');
         const bootstrapWorkerUrl = sponsoredBootstrapFundingContext?.workerUrl || '';
@@ -876,6 +928,23 @@ export function createContractHelperMethods(deps: ContractHelperDeps): ContractH
             sessionConfig: cfg,
           });
         } catch (primaryError: any) {
+          let fundingErrorForFallback = primaryError;
+          if (isRetryableWorkerUrlResolutionFundingError(primaryError)) {
+            const refreshedConfig = await refreshSessionFieldsForFunding();
+            if (refreshedConfig) {
+              try {
+                return await requestWithWorker({
+                  sessionSlug: resolvedSessionSlug,
+                  sessionConfig: refreshedConfig,
+                });
+              } catch (retryError: any) {
+                fundingErrorForFallback = retryError;
+                if (!isRetryableSponsoredBootstrapFundingError(retryError)) {
+                  throw retryError;
+                }
+              }
+            }
+          }
           const shouldRetryWithSponsoredBootstrap = (
             (bootstrapSessionSlug || bootstrapWorkerUrl) &&
             bootstrapTargetSessionSlug === resolvedSessionSlug &&
@@ -883,12 +952,12 @@ export function createContractHelperMethods(deps: ContractHelperDeps): ContractH
               bootstrapSessionSlug !== resolvedSessionSlug ||
               !!bootstrapWorkerUrl
             ) &&
-            isRetryableSponsoredBootstrapFundingError(primaryError)
+            isRetryableSponsoredBootstrapFundingError(fundingErrorForFallback)
           );
           if (!shouldRetryWithSponsoredBootstrap) {
-            throw primaryError;
+            throw fundingErrorForFallback;
           }
-          if (isMissingLocalFaucetKeyFundingError(primaryError)) {
+          if (isMissingLocalFaucetKeyFundingError(fundingErrorForFallback)) {
             // Bootstrap faucet grants are single-use; once consumed, later
             // requests must come from the deployed session's own faucet key.
             if (bootstrapFaucetGrantToken && bootstrapWorkerUrl) {
@@ -899,12 +968,12 @@ export function createContractHelperMethods(deps: ContractHelperDeps): ContractH
                 });
               } catch (grantError: any) {
                 if (Number(grantError?.status || 0) === 404) {
-                  throw primaryError;
+                  throw fundingErrorForFallback;
                 }
                 throw grantError;
               }
             }
-            throw primaryError;
+            throw fundingErrorForFallback;
           }
           if (bootstrapFaucetGrantToken && bootstrapWorkerUrl) {
             try {

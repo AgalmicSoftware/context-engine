@@ -1,0 +1,6 @@
+/*
+  Cache-Control: no-cache, max-age=0, must-revalidate
+  Pragma: no-cache
+  Expires: 0
+  Cross-Origin-Opener-Policy: same-origin-allow-popups
+  Cross-Origin-Embedder-Policy: unsafe-none

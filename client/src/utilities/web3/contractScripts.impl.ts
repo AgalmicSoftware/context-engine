@@ -1473,6 +1473,7 @@ const contractHelperDeps = {
   DEFAULT_CHAIN_ID,
   store,
   getSessionConfigBySlug,
+  refreshSessionRegistryFieldsCache: sessionRegistryUtils.refreshSessionRegistryFieldsCache,
   getCorsProxyUrlOrThrow,
   fetchWorkerWithAuth,
 };

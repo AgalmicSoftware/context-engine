@@ -1597,7 +1597,12 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     const nextPath = this.normalizeRoutePath(strippedPath);
     const search = window.location.search || '';
     const hash = window.location.hash || '';
-    window.history.replaceState({}, '', buildPublicUrl(nextPath, search, hash));
+    const nextUrl = buildPublicUrl(nextPath, search, hash);
+    if (/^\/demo\/dacc\/?$/i.test(strippedPath) && typeof window.location.replace === 'function') {
+      window.location.replace(nextUrl);
+      return true;
+    }
+    window.history.replaceState({}, '', nextUrl);
     return true;
   };
 
@@ -3799,7 +3804,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     try {
       // Demo session question data was resubmitted with tighter block limits. Force a one-time
       // refresh of derived caches so stale broad-scan question/response data cannot survive.
-      const CURRENT_CACHE_VERSION = '2026-06-17-demo-question-cache-bust-v1';
+      const CURRENT_CACHE_VERSION = '2026-06-18-demo-session-worker-cache-bust-v2';
       const VERSION_KEY = 'appCacheVersion';
       const storedVersion = localStorage.getItem(VERSION_KEY);
       if (storedVersion !== CURRENT_CACHE_VERSION) {
