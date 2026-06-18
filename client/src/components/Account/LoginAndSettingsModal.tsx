@@ -126,6 +126,9 @@ type AccountUserPageProps = {
   provider?: string;
   minimized?: boolean;
   network?: unknown;
+  activeSessionSlug?: string;
+  sessionConfig?: unknown;
+  networkChainId?: unknown;
 };
 const AccountUserPage = React.lazy(
   () => import("components/UserPage/UserPage")
@@ -502,11 +505,17 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     return `${provider}|${account}|${chainId == null ? 'null' : chainId}`;
   };
 
-  getWalletRequestContext = (props: LoginAndSettingsModalProps = this.props) => ({
-    account: this.getWalletAccount(props),
-    providerLike: toStr(props.provider).trim() || 'wagmi',
-    chainId: this.getWalletChainId(props),
-  });
+  getWalletRequestContext = (props: LoginAndSettingsModalProps = this.props) => {
+    const targetNetwork = this.getTargetNetwork();
+    const targetChainId = Number(targetNetwork?.id ?? targetNetwork?.chainId ?? 0) || null;
+    const walletChainId = this.getWalletChainId(props);
+    return {
+      account: this.getWalletAccount(props),
+      providerLike: toStr(props.provider).trim() || 'wagmi',
+      chainId: targetChainId || walletChainId,
+      walletChainId,
+    };
+  };
 
   getTestFundsRequestContextKey = (
     props: LoginAndSettingsModalProps = this.props,
@@ -2771,6 +2780,9 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
                       provider={this.props.provider}
                       minimized={true}
                       network={this.props.network}
+                      activeSessionSlug={activeSessionSlug}
+                      sessionConfig={activeSessionConfig}
+                      networkChainId={activeSessionConfig?.networkChainId}
                     />
                   </Suspense>
                 </div>

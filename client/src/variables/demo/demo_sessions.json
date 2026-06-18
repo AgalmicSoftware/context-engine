@@ -44,7 +44,7 @@
   "demo-1": {
     "networkChainId": 11155420,
     "slug": "demo-1",
-    "sessionName": "Context Demo",
+    "sessionName": "Demo Session",
     "sessionInfo": "Public demo session seeded from the Context corpus fixture.",
     "sessionHeaderImg": null,
     "corsWorkerUrl": "",

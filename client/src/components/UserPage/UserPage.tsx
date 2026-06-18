@@ -3207,11 +3207,33 @@ class UserPage extends Component<any, any> {
   };
 
 
-  getExplorerUrl = (): string | null => {
+  getExplorerChainId = (): number | null => {
     const network = this.props.network;
+    const sessionConfigProp = (
+      this.props.sessionConfig &&
+      typeof this.props.sessionConfig === 'object' &&
+      !Array.isArray(this.props.sessionConfig)
+    )
+      ? this.props.sessionConfig as UnknownRecord
+      : null;
+    const rawSessionSlug = this.props.sessionSlug ?? this.props.activeSessionSlug ?? '';
+    const sessionSlug = normalizeSessionSlug(rawSessionSlug || '');
+    const hasSessionContext = !!sessionConfigProp || !!sessionSlug;
+    const sessionConfig = sessionConfigProp || (
+      hasSessionContext
+        ? this._getSessionConfigForSlugExact(sessionSlug)
+        : null
+    );
+    const sessionChainId = hasSessionContext
+      ? Number(sessionConfig?.networkChainId ?? this.props.networkChainId ?? 0) || null
+      : null;
+    return sessionChainId || Number(network?.chainId ?? network?.id ?? 0) || null;
+  }
+
+  getExplorerUrl = (): string | null => {
     const address = String(this.props.viewAddress || '').trim();
     if (!address) return null;
-    const chainIdForLink = Number(network?.chainId ?? network?.id ?? 0) || null;
+    const chainIdForLink = this.getExplorerChainId();
     const explorerUrl = buildExplorerAddressUrl(chainIdForLink, address);
     if (!explorerUrl && chainIdForLink) {
       accountLog.warn(`UserPage: Unknown chain ID (${chainIdForLink}) for explorer link.`);

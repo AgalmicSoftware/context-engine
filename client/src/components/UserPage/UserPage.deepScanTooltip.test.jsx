@@ -956,6 +956,33 @@ describe('UserPage deep scan tooltip formatting', () => {
     expect(addressLinks[0]?.props?.target).toBe('_blank');
   });
 
+  it('uses the session network for explorer links on session-scoped pages', () => {
+    const viewAddress = '0x00000000000000000000000000000000000000aa';
+    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockReturnValue({
+      slug: 'demo-1',
+      networkChainId: 11155420,
+    });
+    const instance = makeInstance({
+      account: viewAddress,
+      viewAddress,
+      minimized: false,
+      activeSessionSlug: 'demo-1',
+      network: { id: 84532, chainId: 84532 },
+    });
+
+    const tree = instance.render();
+    const explorerHref = `https://optimism-sepolia.blockscout.com/address/${viewAddress}`;
+    const addressLinks = collectTreeNodes(
+      tree,
+      (node) => node?.type === 'a' && node?.props?.href === explorerHref && node?.props?.className === styles.addressLink
+    );
+
+    expect(instance.getExplorerUrl()).toBe(explorerHref);
+    expect(addressLinks).toHaveLength(1);
+    expect(addressLinks[0]?.props?.target).toBe('_blank');
+    expect(contractScriptsModule.getSessionConfigBySlug).toHaveBeenCalledWith('demo-1');
+  });
+
   it('omits explorer links when the active chain has no known explorer metadata', () => {
     const viewAddress = '0x00000000000000000000000000000000000000aa';
     const instance = makeInstance({

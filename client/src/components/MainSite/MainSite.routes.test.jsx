@@ -1332,7 +1332,7 @@ describe('MainSite route render smoke', () => {
   it('initializes session-route caches when only display fallback metadata provides the network', async () => {
     const demoConfig = buildSessionConfig({
       slug: 'demo-1',
-      sessionName: 'Context Demo',
+      sessionName: 'Demo Session',
       networkChainId: DEFAULT_NETWORK.id,
       __registry: undefined,
     });
@@ -1385,7 +1385,7 @@ describe('MainSite route render smoke', () => {
   it('preloads the primary demo session data when the about page mounts', async () => {
     const demoConfig = buildSessionConfig({
       slug: 'demo-1',
-      sessionName: 'Context Demo',
+      sessionName: 'Demo Session',
       networkChainId: DEFAULT_NETWORK.id,
       __registry: undefined,
     });
