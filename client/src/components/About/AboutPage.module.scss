@@ -1192,6 +1192,15 @@ $modal-muted: rgba(22, 48, 84, 0.82);
     padding: 0 18px;
     font-size: 1.05rem;
   }
+
+  .useCaseGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+  }
+
+  .useCaseTile {
+    min-height: 142px;
+  }
 }
 
 @media (max-width: 640px) {
@@ -1296,7 +1305,7 @@ $modal-muted: rgba(22, 48, 84, 0.82);
   }
 
   .useCaseGrid {
-    grid-template-columns: 1fr;
+    gap: 12px;
   }
 
   .useCaseTile {
@@ -1380,5 +1389,17 @@ $modal-muted: rgba(22, 48, 84, 0.82);
 
   .mobileDemoVideoFallbackLink {
     width: 100%;
+  }
+}
+
+@media (min-width: 520px) and (max-width: 640px) {
+  .useCaseGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 519px) {
+  .useCaseGrid {
+    grid-template-columns: 1fr;
   }
 }

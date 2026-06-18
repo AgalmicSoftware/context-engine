@@ -6,6 +6,11 @@
     Cross-Origin-Embedder-Policy = "unsafe-none"
 
 [[redirects]]
+  from = "/demo/dacc"
+  to = "/about"
+  status = 301
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200

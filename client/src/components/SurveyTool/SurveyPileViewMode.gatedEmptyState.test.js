@@ -3,6 +3,7 @@ import { PileViewMode } from './SurveyPileViewMode';
 import SurveyQuestionsLockedQuestionsPanel from './SurveyQuestionsLockedQuestionsPanel';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
 
 const expandInspectableNode = (node) => (
@@ -31,6 +32,16 @@ const treeHasText = (node, text) => {
   }
   if (typeof node !== 'object') return false;
   return treeHasText(node?.props?.children, text);
+};
+
+const treeHasLinkHref = (node, href) => {
+  if (node == null) return false;
+  const expandedNode = expandInspectableNode(node);
+  if (expandedNode !== node) return treeHasLinkHref(expandedNode, href);
+  if (Array.isArray(node)) return node.some((child) => treeHasLinkHref(child, href));
+  if (typeof node !== 'object') return false;
+  if (node?.type === 'a' && node?.props?.href === href) return true;
+  return treeHasLinkHref(node?.props?.children, href);
 };
 
 describe('SurveyPileViewMode gated empty states', () => {
@@ -442,9 +453,13 @@ describe('SurveyPileViewMode gated empty states', () => {
     };
 
     const tree = subject.render();
+    const expectedSbtHref = buildSbtDetailPath(gateSbt, 'edge');
     expect(treeHasDataTestId(tree, E2E_TESTIDS.SURVEY_LOCKED_BANNER)).toBe(true);
     expect(treeHasText(tree, `This session's questions are ${t('gatedLower')}`)).toBe(true);
-    expect(treeHasText(tree, `${t('sbt')} required: VIP SBT. Connect an eligible ${t('walletLower')} that satisfies the ${t('gateLower')} requirements below, then decrypt to view the questions.`)).toBe(true);
+    expect(treeHasText(tree, t('sbt'))).toBe(true);
+    expect(treeHasText(tree, 'required:')).toBe(true);
+    expect(treeHasText(tree, `Connect an eligible ${t('walletLower')} that satisfies the ${t('gateLower')} requirements below, then decrypt to view the questions.`)).toBe(true);
+    expect(treeHasLinkHref(tree, expectedSbtHref)).toBe(true);
     expect(treeHasText(tree, 'VIP Gate')).toBe(false);
     expect(treeHasText(tree, 'VIP SBT')).toBe(true);
     expect(treeHasText(tree, 'Retry decrypt')).toBe(false);

@@ -91,6 +91,7 @@ import {
 import {
   loadPileScopeCacheSnapshot,
 } from './surveyPileScopeCacheData';
+import { isPendingQuestionMetadataPlaceholder } from './surveyQuestionMetadataPlaceholders.js';
 import {
   buildPileFilterResultPlan,
   buildPileLoadResultPlan,
@@ -569,6 +570,7 @@ export class PileViewMode extends SurveyQuestions {
         mergeQuestionResponses(allResponses, networkCache.questionResponses || {});
         Object.keys(networkCache.questions || {}).forEach((questionId) => {
           const question = networkCache.questions?.[questionId];
+          if (isPendingQuestionMetadataPlaceholder(question)) return;
           const normalizedQuestionId = normalizeQuestionIdKey(question?.id || questionId);
           if (!normalizedQuestionId || blockedQuestionIds.has(normalizedQuestionId)) return;
           if (seenQuestionIds.has(normalizedQuestionId)) return;

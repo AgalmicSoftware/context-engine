@@ -42,6 +42,7 @@ import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 import { hasCachedCreateSbtForm as hasCachedCreateSbtFormCache } from '../../utilities/sbt/sbtCreateFormCache.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
+import { isDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
 import { isCryptoMode, sbtsListPath, t } from '../../utilities/ui/terminology.js';
 import { PUBLIC_AI_DISCOURSE_CORPUS_URL } from '../../variables/publicRepoMetadata.js';
 import { resolveMainSiteLitSessionConfig } from '../MainSite/litSessionConfig.js';
@@ -2082,8 +2083,8 @@ class OnePageSession extends Component<any, any> {
       null;
     const scopedLitHooks = this.resolveScopedLitHooks(resolvedSessionConfig);
     const effectiveSlug = resolveEffectiveSlug(this.props) || slug;
-    // Only show DebateHUD/CorpusViewer on the generic demo session.
-    const isDemoSlug = effectiveSlug === 'demo';
+    // Only show demo-specific result surfaces on configured public demo sessions.
+    const isDemoSlug = isDemoSessionSlug(effectiveSlug);
     const resultsViewMode = isDemoSlug ? this.state.resultsViewMode : 'polis';
     const resultsViewOptions = [
       { key: 'polis', label: 'Report', icon: '🧾' },

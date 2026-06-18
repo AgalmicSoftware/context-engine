@@ -41,7 +41,7 @@ describe('sbtSelectorUiStateHelpers', () => {
     })).toBe('No Badges');
     expect(resolveSbtSelectorNoOptionsMessage({ isLoading: true })).toBeNull();
     expect(getSbtSelectorLoadingStatusText({ compact: false, count: 3 })).toBe('Loading 3');
-    expect(getSbtSelectorLoadingStatusText({ compact: true, count: 3 })).toBe('3');
+    expect(getSbtSelectorLoadingStatusText({ compact: true, count: 3 })).toBe('Loading 3');
     expect(getSbtSelectorLoadingStatusText({ compact: true, count: 0 })).toBe('Loading');
   });
 

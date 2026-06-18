@@ -1341,6 +1341,20 @@ const shouldUseShortNotFoundCooldown = (debugContext = null) => {
   return resolvePreflightTxExistenceDecision({}, debugContext).enabled === false;
 };
 
+const resolveDownloadGatewaysForContext = (opts = {}, debugContext = null) => {
+  void debugContext;
+  const configuredGateways = Array.isArray(opts.gateways) && opts.gateways.length
+    ? normalizeGatewayList(opts.gateways)
+    : [];
+  if (configuredGateways.length) return configuredGateways;
+  return getDefaultArweaveGateways();
+};
+
+const resolveDirectToArIoForContext = (opts = {}, debugContext = null) => {
+  void debugContext;
+  return isDirectToArIoEnabled(opts);
+};
+
 const shouldLogArweaveFetchDebug = (opts = {}, debugContext = null) => {
   if (opts?.debugArweave === true) return true;
   if (debugContext?.enabled === true) return true;
@@ -2211,9 +2225,7 @@ async function downloadDataFromArweave(txID, opts = {}) {
     }
 
     const run = (async () => {
-      const gateways = Array.isArray(opts.gateways) && opts.gateways.length
-        ? normalizeGatewayList(opts.gateways)
-        : getDefaultArweaveGateways();
+      const gateways = resolveDownloadGatewaysForContext(opts, debugContext);
       const retries = Number.isFinite(opts.retries) ? Math.max(0, opts.retries) : 3;
       const retryDelayMs = Number.isFinite(opts.retryDelayMs) ? opts.retryDelayMs : 1500;
       // Guard against a single hung gateway request stalling the entire read path.
@@ -2225,7 +2237,7 @@ async function downloadDataFromArweave(txID, opts = {}) {
       let lastError = null;
       let lastRetryableNonNotFoundError = null;
       let sawRetryableNonNotFoundOverall = false;
-      const directToArIo = isDirectToArIoEnabled(opts);
+      const directToArIo = resolveDirectToArIoForContext(opts, debugContext);
       const attemptedUrlsAcrossAllPasses = new Set();
       try {
         if (preflightTxExistence) {

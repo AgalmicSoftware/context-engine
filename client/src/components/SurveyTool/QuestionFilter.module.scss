@@ -253,6 +253,17 @@ $text-color: #444;
     }
   }
 
+  .sbtSectionLoadingStatus {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 10px;
+    color: #2f6f64;
+    font-size: 0.82rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
   .sectionContent {
     padding: 1rem;
     border: 1px solid $pastel-border;

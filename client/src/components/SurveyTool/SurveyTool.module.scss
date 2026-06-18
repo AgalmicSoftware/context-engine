@@ -948,6 +948,20 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   color: rgba(29, 39, 66, 0.76);
 }
 
+.lockedSbtInlineLink {
+  color: #1f315f;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 0.18s ease, text-decoration-color 0.18s ease;
+
+  &:hover,
+  &:focus {
+    color: #3158b9;
+    text-decoration-color: #3158b9;
+  }
+}
+
 .lockedQuestionsAction {
   display: inline-flex;
   align-items: center;
@@ -1159,6 +1173,16 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 .lockedQuestionsBannerOnDark .lockedQuestionsSubtext {
   color: rgba(229, 235, 255, 0.78);
+}
+
+.lockedQuestionsBannerOnDark .lockedSbtInlineLink {
+  color: #89ffd0;
+
+  &:hover,
+  &:focus {
+    color: #b3ffe2;
+    text-decoration-color: #b3ffe2;
+  }
 }
 
 .lockedQuestionsBannerOnDark .lockedQuestionsDecryptButton {

@@ -6,6 +6,7 @@ import {
   doesQuestionProgressMatchSlug,
   normalizeQuestionProgressSlug,
 } from './surveyToolViewState.js';
+import { filterPendingQuestionMetadataPlaceholders } from './surveyQuestionMetadataPlaceholders.js';
 
 export type SurveyQuestionsProps = UnknownRecord & {
   displayAnswerMode?: boolean;
@@ -441,7 +442,9 @@ export const buildSurveyQuestionsMaskedQuestionVisibility = ({
   questionPool?: unknown;
   singleQuestionMode?: unknown;
 } = {}): SurveyQuestionsMaskedQuestionVisibilityState => {
-  const fullQuestionPool = Array.isArray(questionPool) ? questionPool : [];
+  const fullQuestionPool = filterPendingQuestionMetadataPlaceholders(
+    Array.isArray(questionPool) ? questionPool : []
+  );
   const isPromptMasked = typeof isMaskedPromptText === 'function'
     ? isMaskedPromptText
     : isSurveyQuestionsMaskedPromptText;
@@ -512,17 +515,19 @@ export const buildSurveyQuestionsRenderReadinessDescriptor = ({
   const currentSurveyResponseState = responses.length > normalizedSurveyIndex
     ? (responses[normalizedSurveyIndex] as ResponseSlice)
     : null;
-  const normalizedQuestionPool = Array.isArray(questionPool) ? questionPool : [];
+  const normalizedQuestionPool = filterPendingQuestionMetadataPlaceholders(
+    Array.isArray(questionPool) ? questionPool : []
+  );
   const normalizedFullQuestionPool = Array.isArray(fullQuestionPool)
-    ? fullQuestionPool
+    ? filterPendingQuestionMetadataPlaceholders(fullQuestionPool)
     : normalizedQuestionPool;
   const normalizedVisibleQuestionPool = Array.isArray(visibleQuestionPool)
-    ? visibleQuestionPool
+    ? filterPendingQuestionMetadataPlaceholders(visibleQuestionPool)
     : normalizedQuestionPool;
   const normalizedHiddenMaskedQuestionIds = Array.isArray(hiddenMaskedQuestionIds)
     ? hiddenMaskedQuestionIds.map((questionId) => String(questionId))
     : [];
-  const questionPoolReady = normalizedQuestionPool.length > 0;
+  const questionPoolReady = normalizedFullQuestionPool.length > 0;
   const canFallThroughDisplayAnswerMode = !!displayAnswerMode && !!parsedViewAddressAnswers;
   const shouldShowLoadingState = !!(
     (

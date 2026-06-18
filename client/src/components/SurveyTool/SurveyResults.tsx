@@ -55,6 +55,7 @@ import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { callAI } from '../../utilities/ai/aiScripts.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
+import { isDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
 import {
   resolveSurveyResultsExplicitSessionSlug,
   resolveSurveyResultsQuestionReadScope,
@@ -2042,7 +2043,7 @@ class SurveyResults extends Component<SurveyResultsProps, SurveyResultsState> {
 
   getIsDemoQuestionResultsContext = (): boolean => (
     String(this.state.viewMode || '').trim().toLowerCase() === 'questions' &&
-    normalizeSessionSlug(this.getEffectiveSlug()) === 'demo'
+    isDemoSessionSlug(this.getEffectiveSlug())
   );
 
   handleDemoResultsViewSelect = (nextView: unknown = 'report'): void => {
@@ -3132,7 +3133,7 @@ const candidates = [
   this.props.activeSessionSlug,
   this.state.surveyTitle,
 ].map((value) => String(value || '').trim().toLowerCase());
-return candidates.includes('demo');
+return candidates.some((value) => isDemoSessionSlug(value));
 }
 
 isHtmlReportDemoModeActive = (): boolean => (

@@ -40,5 +40,70 @@
         }
       }
     }
+  },
+  "demo-1": {
+    "networkChainId": 11155420,
+    "slug": "demo-1",
+    "sessionName": "Context Demo",
+    "sessionInfo": "Public demo session seeded from the Context corpus fixture.",
+    "sessionHeaderImg": null,
+    "corsWorkerUrl": "",
+    "defaultTags": "demo-fixture,context-corpus",
+    "questionsGenPrompt": "",
+    "defaultSbtTags": "",
+    "defaultFilterState": null,
+    "defaultFeaturedSBTs": [
+      "0x29563ff3aCC8AFb220D810F8022218095e25C1f6",
+      "0x5d2f0207B7EB26e807C4a12f2A185928558C00b9",
+      "0xeAe3498C31302B421E19Cf30A3e87E814ae5C955"
+    ],
+    "autoFeatureSBTsBySessionSlug": false,
+    "HIGHLIGHTED_QUESTION_IDS": [],
+    "BLOCKED_QUESTION_IDS": [],
+    "HIGHLIGHTED_SURVEY_IDS": [],
+    "BLOCKED_SURVEY_IDS": [],
+    "ignored_SBTs_LIST": [],
+    "featured_SBTs_LIST": [
+      "0x29563ff3aCC8AFb220D810F8022218095e25C1f6",
+      "0x5d2f0207B7EB26e807C4a12f2A185928558C00b9",
+      "0xeAe3498C31302B421E19Cf30A3e87E814ae5C955"
+    ],
+    "contracts": {
+      "surveys": {
+        "address": "0x59664B9dA510a33F2edB7E14Cf0c2749bf506B8A"
+      }
+    },
+    "blockLimits": {
+      "start": 44967477,
+      "end": null
+    },
+    "demoCompatibilitySeed": {
+      "temporary": true,
+      "seededOn": "2026-06-17",
+      "sessionSlug": "demo-1",
+      "sourceSessionSlug": "demo",
+      "questionFixture": "client/src/variables/demo/demo_polis_data.json#comments",
+      "questionCount": 42,
+      "questionIdStrategy": "ethers.utils.id(\"demo-1:\" + sourceCommentId)",
+      "featuredSbtCount": 3,
+      "removalNote": "Remove after the Cloudflare-backed demo question/response session replaces this temporary Arweave/on-chain seed."
+    },
+    "ai": {
+      "reasoningEffort": "low",
+      "models": {
+        "fast": {
+          "model": "gpt-4o-mini",
+          "provider": "openai"
+        },
+        "thinking": {
+          "model": "gpt-4o-mini",
+          "provider": "openai"
+        },
+        "transcription": {
+          "provider": "openai",
+          "model": "whisper-1"
+        }
+      }
+    }
   }
 }

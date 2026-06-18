@@ -879,7 +879,20 @@ describe('surveyQuestionsTypes', () => {
     const decryptedPrompt = { id: 'Q2', prompt: '[encrypted]', promptDecrypted: true };
     const plainPrompt = { id: 'Q3', prompt: 'Plain prompt' };
     const anonymousMaskedPrompt = { prompt: '[encrypted]' };
+    const pendingMetadataPlaceholder = {
+      id: 'QPending',
+      prompt: '[encrypted]',
+      __ceQuestionMetadataPending: true,
+    };
     const questionPool = [
+      encryptedPrompt,
+      decryptedPrompt,
+      plainPrompt,
+      anonymousMaskedPrompt,
+      null,
+      pendingMetadataPlaceholder,
+    ];
+    const concreteQuestionPool = [
       encryptedPrompt,
       decryptedPrompt,
       plainPrompt,
@@ -893,7 +906,7 @@ describe('surveyQuestionsTypes', () => {
       questionPool,
       singleQuestionMode: false,
     })).toEqual({
-      fullQuestionPool: questionPool,
+      fullQuestionPool: concreteQuestionPool,
       visibleQuestionPool: [decryptedPrompt, plainPrompt, null],
       hiddenMaskedQuestionIds: ['q1'],
     });
@@ -901,8 +914,8 @@ describe('surveyQuestionsTypes', () => {
       questionPool,
       singleQuestionMode: true,
     })).toEqual({
-      fullQuestionPool: questionPool,
-      visibleQuestionPool: questionPool,
+      fullQuestionPool: concreteQuestionPool,
+      visibleQuestionPool: concreteQuestionPool,
       hiddenMaskedQuestionIds: [],
     });
 
@@ -943,6 +956,32 @@ describe('surveyQuestionsTypes', () => {
       shouldShowLoadingState: false,
       gatedEmptyStateReady: false,
       hasHiddenMaskedQuestions: false,
+    });
+  });
+
+  it('keeps render readiness loading when only pending metadata placeholders exist', () => {
+    const responseSlice = { answers: {} };
+    const descriptor = buildSurveyQuestionsRenderReadinessDescriptor({
+      fullQuestionPool: [],
+      hiddenMaskedQuestionIds: [],
+      isQuestionCacheReady: false,
+      questionPool: [{
+        id: 'qpending',
+        prompt: '[encrypted]',
+        __ceQuestionMetadataPending: true,
+      }],
+      singleQuestionMode: false,
+      surveyIndex: 0,
+      surveysResponseState: [responseSlice],
+      visibleQuestionPool: [],
+    });
+
+    expect(descriptor).toMatchObject({
+      currentSurveyResponseState: responseSlice,
+      questionPoolReady: false,
+      gatedEmptyStateReady: false,
+      hasHiddenMaskedQuestions: false,
+      shouldShowLoadingState: true,
     });
   });
 

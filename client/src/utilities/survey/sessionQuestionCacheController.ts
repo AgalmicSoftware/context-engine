@@ -11,6 +11,7 @@ import {
   readSessionScanMaxBlockRange,
   resolveValidatedSessionScanWindow,
 } from '../session/sessionScanScope.js';
+import { getTemporaryDemoSessionQuestionFixtures } from '../session/demoSessionQuestionFixtures.js';
 import { getGlobalLitHooks } from '../crypto/litProtocol.js';
 import {
   buildQuestionDecryptContextForSession,
@@ -269,6 +270,11 @@ const isPendingQuestionMetadataPlaceholder = (value: unknown): boolean => (
 const hasHydratedQuestionMetadata = (value: unknown): boolean => (
   isRecord(value) && !isPendingQuestionMetadataPlaceholder(value)
 );
+
+const countHydratedQuestionMetadata = (questionMap: unknown): number => {
+  if (!isRecord(questionMap)) return 0;
+  return Object.values(questionMap).filter((value) => hasHydratedQuestionMetadata(value)).length;
+};
 
 const buildPendingQuestionMetadataPlaceholder = (
   qid: unknown,
@@ -592,6 +598,104 @@ export const createSessionQuestionCacheController = (
         });
         return;
       }
+      const blockLimitsForScan = isRecord(sessionCfgForScan?.blockLimits)
+        ? sessionCfgForScan.blockLimits
+        : null;
+      const cfgStartBlock = Number(blockLimitsForScan?.start || 0);
+      const initialLastBlockQuestionFromCfg = Number.isFinite(cfgStartBlock) && cfgStartBlock > 0
+        ? Math.max(0, Math.floor(cfgStartBlock) - 1)
+        : 0;
+      let questionsCache = (dgRead("questionsCache", slug) || {}) as QuestionCache;
+      if (questionsCache && networkID) {
+        mergeLegacyNumericNetworkKey(questionsCache, networkID);
+      }
+      const rebucketedQuestionIds = new Set<string>();
+      const ensureLocalQuestionCacheNode = (
+        initialLastBlockQuestion: number
+      ): QuestionCacheNetworkNode => {
+        if (!questionsCache[networkID]) {
+          questionsCache[networkID] = createEmptyQuestionNetworkCacheNode(initialLastBlockQuestion);
+        }
+        if (
+          typeof questionsCache[networkID].pendingQuestionMetadata !== 'object' ||
+          !questionsCache[networkID].pendingQuestionMetadata
+        ) {
+          questionsCache[networkID].pendingQuestionMetadata = {};
+        }
+        ensureQuestionArweaveCacheBranches(questionsCache[networkID]);
+        if (!Number.isFinite(Number(questionsCache[networkID].questionsDiscoveryCheckpointBlock))) {
+          questionsCache[networkID].questionsDiscoveryCheckpointBlock = Number(
+            questionsCache[networkID].questionsLatestBlock
+          ) || initialLastBlockQuestion;
+        }
+        return questionsCache[networkID];
+      };
+      const seedTemporaryDemoQuestionFixtures = (initialLastBlockQuestion: number): number => {
+        const fixtureQuestions = getTemporaryDemoSessionQuestionFixtures(
+          scopedSlug,
+          sessionCfgForScan || {}
+        );
+        if (!fixtureQuestions.length) return 0;
+
+        const localNet = ensureLocalQuestionCacheNode(initialLastBlockQuestion);
+        if (!localNet.questions || typeof localNet.questions !== 'object') {
+          localNet.questions = {};
+        }
+        if (!localNet.pendingQuestionMetadata || typeof localNet.pendingQuestionMetadata !== 'object') {
+          localNet.pendingQuestionMetadata = {};
+        }
+
+        let seeded = 0;
+        fixtureQuestions.forEach((questionRaw) => {
+          const lowered = String(questionRaw?.id || '').trim().toLowerCase();
+          if (!lowered) return;
+          if (hasHydratedQuestionMetadata(localNet.questions[lowered])) return;
+
+          const questionData = {
+            ...questionRaw,
+            id: lowered,
+          } as QuestionMetadata;
+          const preparedQuestion = buildMetadataSessionCacheEnvelope(questionData, slug, {
+            scoped: true,
+          });
+          const preparedQuestionData = {
+            ...questionData,
+            ...preparedQuestion.metadata,
+            id: lowered,
+          } as QuestionMetadata;
+          const targetSlug = normalizeSessionSlug(preparedQuestion.targetSlug || slug);
+
+          if (targetSlug === slug) {
+            localNet.questions[lowered] = preparedQuestionData;
+            try { delete localNet.pendingQuestionMetadata[lowered]; } catch (e: unknown) { mainSiteLog.warn('MainSite: fallback', e); }
+          } else {
+            rebucketedQuestionIds.add(lowered);
+            writeQuestionMetadataToCache(
+              targetSlug,
+              lowered,
+              preparedQuestionData,
+              networkID,
+              { enforceScopedIsolation: true }
+            );
+          }
+          seeded += 1;
+        });
+
+        if (seeded <= 0) return 0;
+        dgWrite("questionsCache", slug, questionsCache);
+        mainSiteLog.info('[MainSite] Seeded temporary demo question fixture metadata', {
+          group: slug,
+          count: seeded,
+        });
+        setQuestionState((prev) => ({
+          isQuestionCacheReady: true,
+          questionResponsesNonce: Number(prev?.questionResponsesNonce || 0) + 1,
+        }), maybeCheckAllCachesReady);
+        return seeded;
+      };
+
+      seedTemporaryDemoQuestionFixtures(initialLastBlockQuestionFromCfg);
+
       let resolvedWindow: unknown = null;
       try {
         resolvedWindow = await questionCacheContractScripts.getRelevantBlockWindowForFilter(slug);
@@ -643,31 +747,14 @@ export const createSessionQuestionCacheController = (
         return;
       }
       const initialLastBlockQuestion = Math.max(0, baseFrom - 1);
-      let questionsCache = (dgRead("questionsCache", slug) || {}) as QuestionCache;
-      // Migration: merge legacy numeric key into string key once
-      if (questionsCache && networkID) {
-        mergeLegacyNumericNetworkKey(questionsCache, networkID);
-      }
-
-      // Create structure if missing
-      if (!questionsCache[networkID]) {
-        questionsCache[networkID] = createEmptyQuestionNetworkCacheNode(initialLastBlockQuestion);
-      }
-      if (typeof questionsCache[networkID].pendingQuestionMetadata !== 'object' || !questionsCache[networkID].pendingQuestionMetadata) {
-        questionsCache[networkID].pendingQuestionMetadata = {};
-      }
-      ensureQuestionArweaveCacheBranches(questionsCache[networkID]);
-      if (!Number.isFinite(Number(questionsCache[networkID].questionsDiscoveryCheckpointBlock))) {
-        questionsCache[networkID].questionsDiscoveryCheckpointBlock = Number(questionsCache[networkID].questionsLatestBlock) || initialLastBlockQuestion;
-      }
+      ensureLocalQuestionCacheNode(initialLastBlockQuestion);
       if (
         forceDiscoveryRescan &&
-        Object.keys(questionsCache?.[networkID]?.questions || {}).length === 0
+        countHydratedQuestionMetadata(questionsCache?.[networkID]?.questions) === 0
       ) {
         questionsCache[networkID].questionsLatestBlock = initialLastBlockQuestion;
         questionsCache[networkID].questionsDiscoveryCheckpointBlock = initialLastBlockQuestion;
       }
-      const rebucketedQuestionIds = new Set<string>();
 
       // Merge helper to avoid stomping concurrent responses writes
       const mergeFreshIntoLocalCopy = () => {
@@ -1465,7 +1552,7 @@ export const createSessionQuestionCacheController = (
         const recoveredPendingCount = await retryPendingQuestionMetadata().catch(() => 0);
         // Retry-only mode must not advance discovery watermark without a real log scan.
         if (!skipDiscoveryScan) finalizeDiscoveryWatermark(latestBlock);
-        const cachedCount = Object.keys(questionsCache?.[networkID]?.questions || {}).length;
+        const cachedCount = countHydratedQuestionMetadata(questionsCache?.[networkID]?.questions);
         const pendingCount = Object.keys(questionsCache?.[networkID]?.pendingQuestionMetadata || {}).length;
         const ready = cachedCount > 0 || pendingCount === 0;
         flushQuestionCacheWrite({ force: true });
@@ -1555,7 +1642,7 @@ export const createSessionQuestionCacheController = (
       } catch (chunkErr: unknown) {
         mainSiteLog.error("Error fetching chunked question IDs:", chunkErr);
         persistDiscoveryCheckpoint(contiguousDiscoveryFrontier, { force: true });
-        const cachedCount = Object.keys(questionsCache?.[networkID]?.questions || {}).length;
+        const cachedCount = countHydratedQuestionMetadata(questionsCache?.[networkID]?.questions);
         // If we have cached data, allow UI to proceed with it; otherwise keep the "ready" gate closed.
         flushQuestionCacheWrite({ force: true });
         clearQueuedQuestionProgress();
@@ -1623,7 +1710,9 @@ export const createSessionQuestionCacheController = (
         ...finalNewQIDs,
         ...cachedQuestionRefreshIds,
       ]));
-      const totalCachedQuestionsBeforeHydration = Object.keys(questionsCache?.[networkID]?.questions || {}).length;
+      const totalCachedQuestionsBeforeHydration = countHydratedQuestionMetadata(
+        questionsCache?.[networkID]?.questions
+      );
       const pendingQuestionMetadataCountBeforeHydration = Object.keys(
         questionsCache?.[networkID]?.pendingQuestionMetadata || {}
       ).length;
@@ -1666,7 +1755,7 @@ export const createSessionQuestionCacheController = (
         questionsCache[networkID].questionsLatestBlock = latestBlock;
         queueQuestionCacheWrite({ force: true });
         mainSiteLog.log("No new question IDs to fetch. question cache up-to-date.");
-        const cachedCount = Object.keys(questionsCache?.[networkID]?.questions || {}).length;
+        const cachedCount = countHydratedQuestionMetadata(questionsCache?.[networkID]?.questions);
         const pendingCount = Object.keys(questionsCache?.[networkID]?.pendingQuestionMetadata || {}).length;
         const ready = cachedCount > 0 || pendingCount === 0;
         clearQueuedQuestionProgress();
@@ -1690,9 +1779,13 @@ export const createSessionQuestionCacheController = (
         Object.keys(questionsCache?.[networkID]?.pendingQuestionMetadata || {}).length
       );
       const updateHydrationProgress = (
-        { hydratedCount = 0, failedCount = 0 }: { hydratedCount?: number; failedCount?: number } = {}
+        {
+          hydratedCount = 0,
+          failedCount = 0,
+          force = false,
+        }: { hydratedCount?: number; failedCount?: number; force?: boolean } = {}
       ): void => {
-        const hasAnyQuestions = Object.keys(questionsCache?.[networkID]?.questions || {}).length > 0;
+        const hasAnyQuestions = countHydratedQuestionMetadata(questionsCache?.[networkID]?.questions) > 0;
         queueQuestionProgressPatch({
           slug,
           phase: 'hydrate',
@@ -1703,7 +1796,7 @@ export const createSessionQuestionCacheController = (
           requestedTotalBlocks: requestedTotalScanBlocks,
           wasCapped: didCapScanRange,
           ...buildQuestionScanProgressCounts(totalScanBlocks),
-        }, { markReady: hasAnyQuestions });
+        }, { force, markReady: hasAnyQuestions });
         if (hasAnyQuestions && !hasHydrationDataNonceSignal) {
           hasHydrationDataNonceSignal = true;
           setQuestionState((prev) => ({
@@ -1713,13 +1806,79 @@ export const createSessionQuestionCacheController = (
         }
       };
       let failedFetchCount = 0;
+      const processHydrationResult = (item: QuestionHydrationResult): void => {
+        const lowered = String(item.qId || '').toLowerCase();
+        if (item.questionData) {
+          // Force ID to lowerCase. Also do item.questionData.id = qId
+          item.questionData.id = lowered;
+          const preparedQuestion = buildMetadataSessionCacheEnvelope(item.questionData, slug, {
+            scoped: true,
+          });
+          const preparedQuestionData: QuestionMetadata = {
+            ...item.questionData,
+            ...preparedQuestion.metadata,
+          };
+          const targetSlug = preparedQuestion.targetSlug;
+          if (targetSlug === slug) {
+            // Insert into our local structure
+            questionsCache[networkID].questions[lowered] = preparedQuestionData;
+          } else {
+            rebucketedQuestionIds.add(lowered);
+            try { delete questionsCache[networkID].questions[lowered]; } catch (e: unknown) { mainSiteLog.warn('MainSite: fallback', e); }
+            writeQuestionMetadataToCache(targetSlug, lowered, preparedQuestionData, networkID, {
+              enforceScopedIsolation: true,
+            });
+          }
+          clearPendingQuestion(lowered);
+          hydratedSuccessCount += 1;
+
+          // Update user cache (creator)
+          if (targetSlug === slug && preparedQuestionData.creator) {
+            const uData = ensureUserNode(preparedQuestionData.creator, latestBlock);
+            if (!uData.createdQuestions) uData.createdQuestions = [];
+            if (!uData.createdQuestions.some((q: CreatedQuestionEntry) => q.id === lowered)) {
+              uData.createdQuestions.push({ id: lowered, data: preparedQuestionData });
+              userCacheModified = true;
+            }
+          }
+        } else {
+          failedFetchCount++;
+          markPendingQuestion(lowered, { error: item.err });
+          const pendingMetadataEntry = questionsCache[networkID].pendingQuestionMetadata?.[lowered];
+          const existingQuestion = questionsCache[networkID].questions[lowered] || null;
+          if (pendingMetadataEntry && !hasHydratedQuestionMetadata(existingQuestion)) {
+            const placeholder = buildPendingQuestionMetadataPlaceholder(
+              lowered,
+              slug,
+              existingQuestion
+            );
+            if (placeholder) {
+              questionsCache[networkID].questions[lowered] = placeholder;
+            }
+          }
+        }
+
+        const forcePublish = (
+          !!item.questionData &&
+          countHydratedQuestionMetadata(questionsCache?.[networkID]?.questions) === 1
+        );
+        // Save incremental progress as metadata arrives (merge to keep responses).
+        queueQuestionCacheWrite({ force: forcePublish });
+        updateHydrationProgress({
+          hydratedCount: hydratedSuccessCount,
+          failedCount: failedFetchCount,
+          force: forcePublish,
+        });
+      };
       for (let i = 0; i < finalNewQIDs.length; i += BATCH_SIZE) {
         const batch = finalNewQIDs.slice(i, i + BATCH_SIZE);
 
-        // Parallel fetch each question's data from Arweave (group-aware)
+        // Parallel fetch each question's data from Arweave (group-aware), publishing
+        // each result as soon as it lands so the UI can render the first card.
         // eslint-disable-next-line no-loop-func
-        const results: QuestionHydrationResult[] = await Promise.all(
+        await Promise.all(
           batch.map(async (qId: string) => {
+            let result: QuestionHydrationResult;
             try {
               const questionData = await questionCacheContractScripts.getQuestionData('none', qId, slug, {
                 decryptContext: buildQuestionDecryptContext(slug),
@@ -1730,74 +1889,14 @@ export const createSessionQuestionCacheController = (
                 arweaveRetries: QUESTION_METADATA_BULK_ARWEAVE_RETRIES,
                 arweaveGatewayTimeoutMs: QUESTION_METADATA_BULK_ARWEAVE_TIMEOUT_MS,
               });
-              return { qId, questionData };
+              result = { qId, questionData };
             } catch (err: unknown) {
               mainSiteLog.warn(`Error fetching question data for ID ${qId}:`, err);
-              return { qId, questionData: null, err };
+              result = { qId, questionData: null, err };
             }
+            processHydrationResult(result);
           })
         );
-
-        // Store successfully fetched question data in questionsCache
-        for (const item of results) {
-          const lowered = String(item.qId || '').toLowerCase();
-          if (item.questionData) {
-            // Force ID to lowerCase. Also do item.questionData.id = qId
-            item.questionData.id = lowered;
-            const preparedQuestion = buildMetadataSessionCacheEnvelope(item.questionData, slug, {
-              scoped: true,
-            });
-            const preparedQuestionData: QuestionMetadata = {
-              ...item.questionData,
-              ...preparedQuestion.metadata,
-            };
-            const targetSlug = preparedQuestion.targetSlug;
-            if (targetSlug === slug) {
-              // Insert into our local structure
-              questionsCache[networkID].questions[lowered] = preparedQuestionData;
-            } else {
-              rebucketedQuestionIds.add(lowered);
-              try { delete questionsCache[networkID].questions[lowered]; } catch (e: unknown) { mainSiteLog.warn('MainSite: fallback', e); }
-              writeQuestionMetadataToCache(targetSlug, lowered, preparedQuestionData, networkID, {
-                enforceScopedIsolation: true,
-              });
-            }
-            clearPendingQuestion(lowered);
-            hydratedSuccessCount += 1;
-
-            // Update user cache (creator)
-            if (targetSlug === slug && preparedQuestionData.creator) {
-              const uData = ensureUserNode(preparedQuestionData.creator, latestBlock);
-              if (!uData.createdQuestions) uData.createdQuestions = [];
-              if (!uData.createdQuestions.some((q: CreatedQuestionEntry) => q.id === lowered)) {
-                uData.createdQuestions.push({ id: lowered, data: preparedQuestionData });
-                userCacheModified = true;
-              }
-            }
-          } else {
-            failedFetchCount++;
-            markPendingQuestion(lowered, { error: item.err });
-            const pendingMetadataEntry = questionsCache[networkID].pendingQuestionMetadata?.[lowered];
-            const existingQuestion = questionsCache[networkID].questions[lowered] || null;
-            if (pendingMetadataEntry && !hasHydratedQuestionMetadata(existingQuestion)) {
-              const placeholder = buildPendingQuestionMetadataPlaceholder(
-                lowered,
-                slug,
-                existingQuestion
-              );
-              if (placeholder) {
-                questionsCache[networkID].questions[lowered] = placeholder;
-              }
-            }
-          }
-        }
-
-        // Save partial progress to localStorage after each batch (merge to keep responses)
-        queueQuestionCacheWrite();
-        updateHydrationProgress({
-          hydratedCount: hydratedSuccessCount,
-          failedCount: failedFetchCount,
-        });
         // small sleep to avoid rate-limits
         await new Promise((resolve) => setTimeout(resolve, 200));
       }
@@ -1826,7 +1925,7 @@ export const createSessionQuestionCacheController = (
         dgWrite("userCache", slug, userCache);
       }
 
-      const totalCachedQuestions = Object.keys(questionsCache[networkID].questions).length;
+      const totalCachedQuestions = countHydratedQuestionMetadata(questionsCache[networkID].questions);
       mainSiteLog.log(
         `initializeQuestionCacheForGroup: completed. We now have ${
           totalCachedQuestions

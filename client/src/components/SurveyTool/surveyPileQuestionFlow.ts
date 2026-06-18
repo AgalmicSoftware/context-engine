@@ -1,4 +1,5 @@
 import { isQuestionPromptMasked } from './surveyToolViewState.js';
+import { filterPendingQuestionMetadataPlaceholders } from './surveyQuestionMetadataPlaceholders.js';
 
 export type PileQuestionLike = {
   id?: unknown;
@@ -41,7 +42,9 @@ export const sortPileQuestionsByPriority = ({
   highlightedQuestionIds?: Set<string> | null;
   account?: string | null;
 } = {}): PileQuestionLike[] => {
-  const normalizedQuestions = Array.isArray(questions) ? questions : [];
+  const normalizedQuestions = filterPendingQuestionMetadataPlaceholders(
+    Array.isArray(questions) ? questions : []
+  );
   const normalizedResponses = questionResponses && typeof questionResponses === 'object'
     ? questionResponses
     : {};
@@ -91,7 +94,9 @@ export const splitPileMaskedQuestions = ({
 }: {
   questions?: PileQuestionLike[] | null;
 } = {}) => {
-  const normalizedQuestions = Array.isArray(questions) ? questions : [];
+  const normalizedQuestions = filterPendingQuestionMetadataPlaceholders(
+    Array.isArray(questions) ? questions : []
+  );
   const hiddenQuestions = normalizedQuestions.filter((question) => isQuestionPromptMasked(question));
   const visibleQuestions = normalizedQuestions.filter((question) => !isQuestionPromptMasked(question));
 

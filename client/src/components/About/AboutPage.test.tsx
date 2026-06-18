@@ -321,11 +321,11 @@ describe('AboutPage', () => {
     ]);
   });
 
-  it('falls back to the legacy demo route when list scope has no concrete session slug', () => {
+  it('uses the configured public demo route when list scope has no concrete session slug', () => {
     expect(getAboutDemoSessionPath({
       selectedSessionScope: 'list',
       selectedSessionSlugs: ['general'],
-    } as any)).toBe('/session/demo');
+    } as any)).toBe('/session/demo-1');
   });
 
   it.each([
@@ -399,10 +399,12 @@ describe('AboutPage', () => {
     expect(scss).toMatch(/\.heroPrimaryButton\s*{[\s\S]*?font-size:\s*1\.14rem;[\s\S]*?font-weight:\s*700;/);
   });
 
-  it('keeps mobile recognition rows aligned and stacks the use-case grid on small screens', () => {
+  it('keeps mobile recognition rows aligned and keeps use-case buttons responsive', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'AboutPage.module.scss'), 'utf8');
 
-    expect(scss).toMatch(/@media \(max-width:\s*640px\)\s*{[\s\S]*?\.useCaseGrid\s*{[\s\S]*?grid-template-columns:\s*1fr;/);
+    expect(scss).toMatch(/@media \(min-width:\s*641px\) and \(max-width:\s*1023px\)\s*{[\s\S]*?\.useCaseGrid\s*{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/);
+    expect(scss).toMatch(/@media \(min-width:\s*520px\) and \(max-width:\s*640px\)\s*{[\s\S]*?\.useCaseGrid\s*{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/);
+    expect(scss).toMatch(/@media \(max-width:\s*519px\)\s*{[\s\S]*?\.useCaseGrid\s*{[\s\S]*?grid-template-columns:\s*1fr;/);
     expect(scss).toMatch(/@media \(max-width:\s*640px\)\s*{[\s\S]*?\.useCaseDetailRow\s*{[\s\S]*?flex-direction:\s*column;/);
     expect(scss).toMatch(/@media \(max-width:\s*640px\)\s*{[\s\S]*?\.toggleHeaderAside\s*{[\s\S]*?margin-left:\s*auto;/);
     expect(scss).toMatch(/@media \(max-width:\s*640px\)\s*{[\s\S]*?\.recognitionSummary\s*{[\s\S]*?display:\s*none;/);

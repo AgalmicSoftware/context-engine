@@ -203,6 +203,19 @@
   margin-right: 5px;
 }
 
+@media (min-width: 1367px) {
+  .footer {
+    .copyright {
+      font-size: 1.18rem;
+      line-height: 1.4;
+    }
+  }
+
+  .footerLink {
+    font-size: 1.14rem;
+  }
+}
+
 .copyrightContent {
   display: inline-flex;
   align-items: center;
