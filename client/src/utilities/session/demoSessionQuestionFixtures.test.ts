@@ -1,5 +1,6 @@
 import { ethers } from 'ethers';
 
+import demo1OnchainQuestionIds from '../../variables/demo/demo_1_onchain_question_ids.json';
 import { getTemporaryDemoSessionQuestionFixtures } from './demoSessionQuestionFixtures.js';
 
 describe('getTemporaryDemoSessionQuestionFixtures', () => {
@@ -10,8 +11,9 @@ describe('getTemporaryDemoSessionQuestionFixtures', () => {
     });
 
     expect(questions).toHaveLength(42);
+    expect(questions.map((question) => question.id)).toEqual(demo1OnchainQuestionIds);
     expect(questions[0]).toMatchObject({
-      id: ethers.utils.id('demo-1:0x6a1ce29ec6002bf93c666cba8c5139766544d55bbeb6317fbf4c970861a2f262'),
+      id: '0xa1f2ff65069c4fbce9c0728364c5c0dc59f45c3caedb45fa3c8988cc79d06735',
       type: 'binary',
       prompt: 'Existential risk from AI justifies extraordinary precautions.',
       sessionName: 'Context Demo',
@@ -22,9 +24,13 @@ describe('getTemporaryDemoSessionQuestionFixtures', () => {
         sourceSessionSlug: 'demo',
         fixtureFile: 'client/src/variables/demo/demo_polis_data.json',
         fixturePath: 'comments',
+        onchainQuestionIdsFile: 'client/src/variables/demo/demo_1_onchain_question_ids.json',
         sourceCommentIndex: 0,
       },
     });
+    expect(questions[0].id).toBe(
+      ethers.utils.id('demo-1:0x6a1ce29ec6002bf93c666cba8c5139766544d55bbeb6317fbf4c970861a2f262')
+    );
   });
 
   it('converts poll comments to single-select multichoice questions', () => {
