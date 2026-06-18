@@ -10,6 +10,7 @@ export const normalizeRoutePath = (pathIn = ''): string => {
   const raw = stripConfiguredPublicBasePath(
     String(pathIn || '').trim().split('?')[0].split('#')[0]
   );
+  if (/^\/demo\/dacc\/?$/i.test(raw)) return '/about';
   const legacyDemoNormalized = /^\/demo(?:\/|$)/i.test(raw)
     ? raw.replace(/^\/demo(?=\/|$)/i, '/session/demo')
     : raw;

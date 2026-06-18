@@ -424,6 +424,42 @@ describe('QuestionFilter encrypted count gate tooltip integration', () => {
     expect(responseStatusHeader).not.toBeNull();
   });
 
+  it('shows visible group-loading status while SBT cache is still hydrating', () => {
+    const instance = new QuestionFilter({
+      questions: [{ id: 'q1', prompt: 'Q1', type: 'freeform' }],
+      questionResponses: {},
+      network: { id: 84532 },
+      resultsMode: true,
+      filterModalOpen: true,
+      isQuestionCacheReady: true,
+      isSBTCacheReady: false,
+    });
+
+    instance.state = {
+      ...instance.state,
+      filteredQuestionsCount: 1,
+    };
+    instance.buildFilterPipelineResult = jest.fn(() => ({
+      finalQuestions: [{ id: 'q1', prompt: 'Q1', type: 'freeform' }],
+      count: 1,
+    }));
+    instance.getFilterSummaryItems = jest.fn(() => []);
+    instance.getAllTagsWithCounts = jest.fn(() => []);
+    instance.getAiAccessState = jest.fn(() => ({
+      enabled: false,
+      localKeyAvailable: false,
+    }));
+
+    const tree = instance.render();
+    const sbtHeader = findElement(
+      tree,
+      (element) => element?.type === 'h3' && getNodeText(element).includes('Group(s) of Question Creator')
+    );
+
+    expect(sbtHeader).toBeTruthy();
+    expect(getNodeText(sbtHeader)).toContain('Loading groups');
+  });
+
   it('passes session gate details into the encrypted-count badge tooltip when available', () => {
     const gateSbt = '0x1111111111111111111111111111111111111111';
     const instance = new QuestionFilter({

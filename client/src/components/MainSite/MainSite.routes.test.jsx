@@ -1213,6 +1213,59 @@ describe('MainSite route render smoke', () => {
     expect(subject.getActiveSessionSourceSlug()).toBe('');
   });
 
+  it('initializes session-route caches when only display fallback metadata provides the network', async () => {
+    const demoConfig = buildSessionConfig({
+      slug: 'demo-1',
+      sessionName: 'Context Demo',
+      networkChainId: DEFAULT_NETWORK.id,
+      __registry: undefined,
+    });
+    const subject = createSubject({
+      path: '/session/demo-1',
+      activeSessionSlug: 'demo-1',
+      sessionConfig: null,
+    });
+    getDemoSessionConfigBySlug.mockImplementation((slug) => (
+      slug === 'demo-1' ? demoConfig : null
+    ));
+    subject.applySessionFallbackRedirect = jest.fn(() => null);
+    subject.syncSessionFallbackRedirectConsumption = jest.fn();
+    subject.manageAutoHashPersistence = jest.fn();
+    subject.resolveSessionPathSlug = jest.fn();
+    subject.syncLitHooks = jest.fn();
+    subject.refreshSessionInfo = jest.fn();
+    subject.refreshSessionMetaFields = jest.fn();
+    subject.refreshGroupCredentials = jest.fn();
+    subject.hasPersistedManagedCacheData = jest.fn(async () => false);
+    subject.syncCacheHasLoadedFlagFromPersistent = jest.fn(async () => undefined);
+    subject.syncCacheHasLoadedFlagOnTransition = jest.fn(async () => undefined);
+    subject.getSessionNetwork = jest.fn(() => null);
+    subject.getDisplaySessionNetwork = jest.fn(() => DEFAULT_NETWORK);
+    subject.initializeQuestionCache = jest.fn(async () => undefined);
+    subject.initializeSbtCache = jest.fn(async () => undefined);
+    subject.fetchQuestionResponsesChunked = jest.fn(async () => undefined);
+    subject.initializeSurveyCache = jest.fn(async () => undefined);
+    subject.startSbtEventListener = jest.fn();
+    subject.startSurveyAndQuestionEventListener = jest.fn();
+    subject.setReadinessStateIfChanged = jest.fn((patch) => {
+      subject.state = { ...subject.state, ...(patch || {}) };
+    });
+    subject.checkAllCachesReady = jest.fn();
+    subject.handleDeepLinkScan = jest.fn();
+
+    await act(async () => {
+      await subject.componentDidMount();
+    });
+
+    expect(subject.getDisplaySessionNetwork).toHaveBeenCalledWith('demo-1');
+    expect(subject.initializeQuestionCache).toHaveBeenCalledTimes(1);
+    expect(subject.initializeSbtCache).toHaveBeenCalledWith({ mode: 'partial' });
+    expect(subject.fetchQuestionResponsesChunked).toHaveBeenCalledTimes(1);
+    expect(subject.initializeSurveyCache).toHaveBeenCalledTimes(1);
+
+    subject.componentWillUnmount();
+  });
+
   it('preserves session question-results subroutes and forwards route-open flags to OnePageSession', async () => {
     const sessionConfig = buildSessionConfig({
       sessionName: 'Signals Session',

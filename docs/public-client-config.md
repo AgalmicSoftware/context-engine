@@ -79,6 +79,7 @@ Because the app uses client-side routing, configure an SPA route fallback. Eithe
 include a Netlify `_redirects` file in the published build output:
 
 ```text
+/demo/dacc /about 301
 /*    /index.html   200
 ```
 
@@ -86,13 +87,19 @@ Or configure the same rule in `netlify.toml`:
 
 ```toml
 [[redirects]]
+  from = "/demo/dacc"
+  to = "/about"
+  status = 301
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
 ```
 
 For manual drag-and-drop deploys, the `_redirects` file must be present inside
-the uploaded `client/build/` directory.
+the uploaded `client/build/` directory. Keep any specific legacy redirects above
+the SPA fallback rule.
 
 ### 4. Attach the custom domain
 
@@ -200,6 +207,18 @@ SPA fallback concept, but their redirect config syntax differs.
   - Stored `ce:demoSurfaceMode` localStorage preferences win over this setting.
   - This only takes effect on fresh installs or when no stored preference exists.
 
+- `REACT_APP_CE_DEMO_SESSION_SLUGS=demo-1,demo-3,demo-2,demo`
+  - Sets the ordered list of session slugs that receive public demo-session affordances.
+  - The first slug is used by the About-page Demo CTA when no explicit list-scoped session is selected.
+  - These slugs also reuse the bundled Context Polis fixture unless a caller provides a per-slug `demoDataBySlug` dataset.
+  - Temporary June 17, 2026 migration note: `demo-1` points the public demo CTA
+    at a live SessionRegistry session seeded with copied Context fixture
+    questions and featured SBT metadata. `demo_sessions.json` also carries a
+    display-only `demo-1` fallback so the route can mount when live registry
+    metadata is slow. Remove both compatibility entries after the
+    Cloudflare-backed demo question/response storage replaces the Arweave/on-chain
+    copy.
+
 - `REACT_APP_CE_ENABLE_WALLETCONNECT_FALLBACK=false`
   - Controls RainbowKit's MetaMask fallback when MetaMask is not injected.
   - Default `false` keeps the login modal on the injected MetaMask connector and avoids opening WalletConnect bridge sockets during normal startup.
@@ -210,6 +229,9 @@ SPA fallback concept, but their redirect config syntax differs.
 - `REACT_APP_CE_ARWEAVE_DIRECT_TO_AR_IO=true`
   - Controls whether browser Arweave payload reads stay on the configured AR.IO gateway for their retry budget.
   - Default `true` uses `REACT_APP_CE_ARWEAVE_AR_IO_URL` / `window.CE_ARWEAVE_AR_IO_URL` when provided, otherwise `https://ar-io.dev`.
+  - Display-critical metadata reads for sessions, SBTs, surveys, and questions
+    also stay on AR.IO while this is enabled; they do not fan out through legacy
+    gateways unless direct mode is intentionally disabled.
   - Set `false` only when a deployment intentionally wants legacy fallback fanout through `https://arweave.net`, Irys, Permagate, and alternate raw/tx-data routes.
 
 - `REACT_APP_CE_ARWEAVE_PREFLIGHT_SESSION_METADATA=false`
@@ -231,7 +253,7 @@ SPA fallback concept, but their redirect config syntax differs.
 
 - `REACT_APP_CE_SESSION_SCAN_SLUGS=slug-a,slug-b`
   - Sets the default list-scope session slugs.
-  - The repo no longer hardcodes a fallback slug; leave this unset for an empty default list.
+  - The repo default is the active public demo slug, currently `demo-1`.
 
 - `REACT_APP_CE_USER_PROFILE_SCAN_ALL_SESSIONS=false`
   - Legacy broad override for per-user deep scans.

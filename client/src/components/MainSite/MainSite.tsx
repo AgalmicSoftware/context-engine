@@ -821,8 +821,8 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     ),
     dgKey: (name: unknown, slug: unknown) => this.DG.key(name as string, slug as string),
     getActiveSessionSlug: () => this.getActiveSessionSlug(),
-    getSessionCfg: (slug: string) => this.getSessionCfg(slug),
-    getSessionChainId: (slug: string) => this.getSessionChainId(slug),
+    getSessionCfg: (slug: string) => this.getCacheSessionCfg(slug),
+    getSessionChainId: (slug: string) => this.getCacheSessionChainId(slug),
     getSessionScanScope: () => this.getSessionScanScope(),
     getSessionScanScopeContext: (scope?: string) => this.getSessionScanScopeContext(scope),
     getAccount: () => (this.props?.account || ''),
@@ -872,8 +872,8 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     dgRead: (name: string, slug: string) => this.readDgRecord(name, slug),
     dgWrite: (name: string, slug: string, value: Record<string, unknown>) => this.DG.write(name, slug, value),
     getActiveSessionSlug: () => this.getActiveSessionSlug(),
-    getSessionCfg: (slug: string) => this.getSessionCfg(slug),
-    getSessionChainId: (slug: string) => this.getSessionChainId(slug),
+    getSessionCfg: (slug: string) => this.getCacheSessionCfg(slug),
+    getSessionChainId: (slug: string) => this.getCacheSessionChainId(slug),
     getAccount: () => this.props.account,
     getCurrentPath: () => this.props?.path || (typeof window !== 'undefined' ? window.location.pathname : '') || '',
     shouldSkipSessionScanForSlug: (slug: string, op: string, scopeCtx?: unknown) => (
@@ -918,8 +918,8 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     dgRead: (name: string, slug: string, opts?: Record<string, unknown>) => this.readDgRecord(name, slug, opts),
     dgWrite: (name: string, slug: string, value: Record<string, unknown>) => this.DG.write(name, slug, value),
     getActiveSessionSlug: () => this.getActiveSessionSlug(),
-    getSessionCfg: (slug: string) => this.getSessionCfg(slug),
-    getSessionChainId: (slug: string) => this.getSessionChainId(slug),
+    getSessionCfg: (slug: string) => this.getCacheSessionCfg(slug),
+    getSessionChainId: (slug: string) => this.getCacheSessionChainId(slug),
     getSessionScanScope: () => this.getSessionScanScope(),
     getAccount: () => this.props.account,
     getProviderLike: () => this.props.provider,
@@ -959,7 +959,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     dgRead: (name: string, slug: string) => this.readDgRecord(name, slug),
     dgWrite: (name: string, slug: string, value: Record<string, unknown>) => this.DG.write(name, slug, value),
     getActiveSessionSlug: () => this.getActiveSessionSlug(),
-    getSessionChainId: (slug: string) => this.getSessionChainId(slug),
+    getSessionChainId: (slug: string) => this.getCacheSessionChainId(slug),
     getAccount: () => this.props.account,
     scanScopeNoop: (slug: string, op: string, onSkipped?: () => void) => this.scanScopeNoop(slug, op, onSkipped),
     setReadinessStateIfChanged: (nextState: Record<string, unknown> | null | undefined, cb?: () => void) => (
@@ -1342,6 +1342,16 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     return Number.isFinite(chainId) && chainId > 0 ? chainId : null;
   };
 
+  getCacheSessionCfg = (slugIn: unknown): MainSiteSessionConfigLike | null => {
+    const normalized = normalizeSessionSlug(slugIn ?? '');
+    return this.getSessionCfg(normalized) || this.getDisplaySessionCfg(normalized);
+  };
+
+  getCacheSessionChainId = (slugIn: unknown): number | null => {
+    const normalized = normalizeSessionSlug(slugIn ?? '');
+    return this.getSessionChainId(normalized) || this.getDisplaySessionChainId(normalized);
+  };
+
   getDisplaySessionNetwork = (slugIn: unknown) => {
     const normalized = normalizeSessionSlug(slugIn ?? '');
     const strictNetwork = this.getSessionNetwork(normalized);
@@ -1359,6 +1369,20 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
       blockExplorers: { default: { name: '', url: '' } },
       unsupported: false,
     };
+  };
+
+  getInitializableSessionNetwork = (slugIn: unknown, pathIn: unknown = '') => {
+    const normalized = normalizeSessionSlug(slugIn ?? '');
+    const strictNetwork = this.getSessionNetwork(normalized);
+    if (strictNetwork?.id) return strictNetwork;
+    const path = this.getEffectiveRoutePath(
+      String(pathIn || '') ||
+      (typeof window !== 'undefined' ? window.location.pathname : '') ||
+      this.props.path ||
+      ''
+    );
+    if (!path.startsWith('/session/')) return strictNetwork;
+    return this.getDisplaySessionNetwork(normalized);
   };
 
   handleSessionRegistryCacheUpdated = () => {
@@ -3712,9 +3736,9 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
 
     // Cache busting (versioned; slug-scoped)
     try {
-      // The Arweave reliability rollout changed precheck/cooldown semantics. Force a one-time
-      // refresh of derived caches so stale display-blocking failure entries cannot survive.
-      const CURRENT_CACHE_VERSION = '2026-04-30-client-refresh-cache-bust-v2';
+      // Demo session question data was resubmitted with tighter block limits. Force a one-time
+      // refresh of derived caches so stale broad-scan question/response data cannot survive.
+      const CURRENT_CACHE_VERSION = '2026-06-17-demo-question-cache-bust-v1';
       const VERSION_KEY = 'appCacheVersion';
       const storedVersion = localStorage.getItem(VERSION_KEY);
       if (storedVersion !== CURRENT_CACHE_VERSION) {
@@ -3794,7 +3818,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     mainSiteLog.log(isDemoPath ? "Initializing caches (demo prioritized order)..." : "Initializing caches sequentially...");
 
 
-    const sessionNet = this.getSessionNetwork(slug);
+    const sessionNet = this.getInitializableSessionNetwork(slug, pathname);
     mainSiteLog.log("session network (derived):", sessionNet);
     if (sessionNet && sessionNet.id) {
       if (isSbtDetailRoute) {
@@ -4236,7 +4260,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
             currPath.startsWith('/sbt/') ||
             currPath.startsWith('/group/');
 
-          const sessionNet = this.getSessionNetwork(nextActiveSlug);
+          const sessionNet = this.getInitializableSessionNetwork(nextActiveSlug, currPath);
           if (sessionNet && sessionNet.id) {
             if (isSbtRoute) {
               // SBT-first when landing on /sbts or /sbt/:address
@@ -4412,10 +4436,10 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     });
 
     const slug = this.getActiveSessionSlug();
-    const sessionNet = this.getSessionNetwork(slug);
+    const pathname = this.getCurrentPathname();
+    const sessionNet = this.getInitializableSessionNetwork(slug, pathname);
     if (!isCacheReinitRunActive()) return;
 
-    const pathname = this.getCurrentPathname();
     const search = (typeof window !== 'undefined' ? window.location.search : '') || '';
     const sbtAddressFromPath = this.getSbtAddressFromPath(pathname);
     const isSbtDetailRoute = !!sbtAddressFromPath;
