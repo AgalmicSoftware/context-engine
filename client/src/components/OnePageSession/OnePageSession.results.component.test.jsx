@@ -820,7 +820,7 @@ describe('OnePageSession results routing', () => {
     expect(screen.getAllByRole('button', { name: 'Exponential Progress Debate' }).length).toBeGreaterThan(0);
   });
 
-  it('shows the Breakdown results mode only for /session/demo', async () => {
+  it('shows the Breakdown results mode for configured demo sessions', async () => {
     const baseProps = buildProps();
 
     const nonDemoView = render(<OnePageSession {...baseProps} />);
@@ -837,8 +837,8 @@ describe('OnePageSession results routing', () => {
     render(
       <OnePageSession
         {...baseProps}
-        slug="demo"
-        sessionConfig={{ ...baseProps.sessionConfig, slug: 'demo' }}
+        slug="demo-1"
+        sessionConfig={{ ...baseProps.sessionConfig, slug: 'demo-1' }}
       />
     );
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));

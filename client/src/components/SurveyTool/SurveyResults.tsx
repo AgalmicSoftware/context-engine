@@ -53,7 +53,7 @@ import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { callAI } from '../../utilities/ai/aiScripts.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
-import LazyFallback from '../Shared/LazyFallback';
+import { isDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
 import {
   resolveSurveyResultsExplicitSessionSlug,
   resolveSurveyResultsQuestionReadScope,
@@ -1542,13 +1542,10 @@ class SurveyResults extends Component<any, any> {
     setState(asSurveyResultsStatePatch(buildSurveyResultsFilterActivePatch(isActive)));
   };
 
-  const getIsDemoQuestionResultsContext = (
-    viewMode: unknown = stateRef.current.viewMode || propsRef.current.viewMode || 'questions',
-  ): boolean =>
-    isSurveyResultsDemoQuestionResultsContext({
-      effectiveSlug: getEffectiveSlug(),
-      viewMode,
-    });
+  getIsDemoQuestionResultsContext = (): boolean => (
+    String(this.state.viewMode || '').trim().toLowerCase() === 'questions' &&
+    isDemoSessionSlug(this.getEffectiveSlug())
+  );
 
   const applyBuiltInDemoQuestionMetadataFallbackToBucket = (
     bucket: SurveyResultsQuestionBucketRecord | null | undefined,
@@ -2523,7 +2520,28 @@ return this.getFilteredQuestionsForExport().map((question) => {
 });
 }
 
-getHtmlReportExporterMetadata = () => {
+isHtmlReportDemoSession = (): boolean => {
+const candidates = [
+  this.getEffectiveSlug(),
+  this.props.sessionSlug,
+  this.props.activeSessionSlug,
+  this.state.surveyTitle,
+].map((value) => String(value || '').trim().toLowerCase());
+return candidates.some((value) => isDemoSessionSlug(value));
+}
+
+isHtmlReportDemoModeActive = (): boolean => (
+  this.isHtmlReportDemoSession() && !!this.state.htmlReportDemoMode
+);
+
+getHtmlReportExporterMetadata = (): SurveyResultsHtmlReportExporterMetadata | null => {
+if (this.isHtmlReportDemoModeActive()) {
+  return {
+    address: 'demo-preview',
+    chainId: this.getHtmlReportChainId(),
+    displayAddress: 'Demo preview',
+  };
+}
 const account = String(this.props.account || '').trim();
 if (!this.props.loginComplete || !account) return null;
 return {

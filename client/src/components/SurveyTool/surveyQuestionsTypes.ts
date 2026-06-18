@@ -7,6 +7,7 @@ import {
   doesQuestionProgressMatchSlug,
   normalizeQuestionProgressSlug,
 } from './surveyToolViewState.js';
+import { filterPendingQuestionMetadataPlaceholders } from './surveyQuestionMetadataPlaceholders.js';
 
 export type SurveyQuestionsLegacyRecord = Record<string, any>;
 export type SurveyQuestionsLegacyValue = SurveyQuestionsLegacyRecord[string];
@@ -575,9 +576,12 @@ export const buildSurveyQuestionsMaskedQuestionVisibility = ({
   questionPool?: unknown;
   singleQuestionMode?: unknown;
 } = {}): SurveyQuestionsMaskedQuestionVisibilityState => {
-  const fullQuestionPool = filterPendingQuestionMetadataPlaceholders(Array.isArray(questionPool) ? questionPool : []);
-  const isPromptMasked =
-    typeof isMaskedPromptText === 'function' ? isMaskedPromptText : isSurveyQuestionsMaskedPromptText;
+  const fullQuestionPool = filterPendingQuestionMetadataPlaceholders(
+    Array.isArray(questionPool) ? questionPool : []
+  );
+  const isPromptMasked = typeof isMaskedPromptText === 'function'
+    ? isMaskedPromptText
+    : isSurveyQuestionsMaskedPromptText;
   if (singleQuestionMode) {
     return {
       fullQuestionPool,
@@ -637,10 +641,11 @@ export const buildSurveyQuestionsRenderReadinessDescriptor = ({
   const standalone = !!isStandalone;
   const normalizedSurveyIndex = standalone || isSingleQuestion ? 0 : Number(surveyIndex || 0);
   const responses = Array.isArray(surveysResponseState) ? surveysResponseState : [];
-  const currentSurveyResponseState =
-    responses.length > normalizedSurveyIndex ? (responses[normalizedSurveyIndex] as ResponseSlice) : null;
+  const currentSurveyResponseState = responses.length > normalizedSurveyIndex
+    ? (responses[normalizedSurveyIndex] as ResponseSlice)
+    : null;
   const normalizedQuestionPool = filterPendingQuestionMetadataPlaceholders(
-    Array.isArray(questionPool) ? questionPool : [],
+    Array.isArray(questionPool) ? questionPool : []
   );
   const normalizedFullQuestionPool = Array.isArray(fullQuestionPool)
     ? filterPendingQuestionMetadataPlaceholders(fullQuestionPool)

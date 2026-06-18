@@ -108,6 +108,28 @@ describe('arweaveScripts.downloadDataFromArweave direct routing', () => {
     expect(calledUrls.some((url) => url.includes('/raw/ar-io-first-mode'))).toBe(false);
   });
 
+  it('keeps display-critical metadata on AR.IO when direct-to-AR.IO mode is enabled', async () => {
+    globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
+    globalThis.CE_ARWEAVE_AR_IO_URL = TEST_AR_IO_GATEWAY;
+    global.fetch.mockResolvedValueOnce(
+      textResp(200, '{"ok":"metadata-ar-io-hit"}', 'application/json')
+    );
+
+    const text = await arweaveScripts.downloadDataFromArweave('session-meta-ar-io', {
+      gateways: [TEST_ARWEAVE_GATEWAY],
+      retries: 0,
+      bypassCache: true,
+      disableExistencePrecheck: true,
+      debugContext: { category: 'session_registry_metadata' },
+    });
+
+    expect(text).toBe('{"ok":"metadata-ar-io-hit"}');
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    const calledUrls = global.fetch.mock.calls.map((call) => String(call?.[0] || ''));
+    expect(calledUrls[0]).toContain(`${TEST_AR_IO_GATEWAY}/session-meta-ar-io`);
+    expect(calledUrls.some((url) => url.includes(TEST_ARWEAVE_GATEWAY))).toBe(false);
+  });
+
   it('does not fall back to legacy gateways after an AR.IO html miss', async () => {
     globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
     globalThis.CE_ARWEAVE_AR_IO_URL = TEST_AR_IO_GATEWAY;

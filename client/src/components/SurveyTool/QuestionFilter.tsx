@@ -3414,7 +3414,10 @@ class QuestionFilter extends React.Component<any, any> {
                 ? 'Group(s) of Question Creator / Responder'
                 : 'Group(s) of Question Creator'}
               {!this.props.isSBTCacheReady && (
-                <FontAwesomeIcon icon={faSpinner} spin style={{ marginLeft: '8px' }} />
+                <span className={styles.sbtSectionLoadingStatus}>
+                  <FontAwesomeIcon icon={faSpinner} spin style={QUESTION_FILTER_SBT_SPINNER_STYLE} />
+                  <span>Loading groups</span>
+                </span>
               )}
             </>,
             'sbts',

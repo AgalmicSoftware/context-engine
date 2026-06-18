@@ -506,41 +506,6 @@ describe('QuestionFilter encrypted count gate tooltip integration', () => {
     expect(responseStatusHeader).not.toBeNull();
   });
 
-  it('hides response-status summary chips while AI override owns the results', () => {
-    const instance = new QuestionFilter({
-      questions: [{ id: 'q1', prompt: 'Q1', type: 'freeform' }],
-      questionResponses: {},
-      network: { id: 84532 },
-      resultsMode: true,
-      filterModalOpen: true,
-      isQuestionCacheReady: true,
-      isSBTCacheReady: true,
-      account: '0xabc',
-    });
-
-    instance.state = {
-      ...instance.state,
-      aiAppliedTopN: 5,
-      aiCombineWithOtherFilters: false,
-      aiFilterApplied: true,
-      aiSearchQuery: 'priority topics',
-      filterByResponded: true,
-      filteredQuestionsCount: 1,
-    };
-
-    let summaryItems = instance.getFilterSummaryItems();
-    expect(summaryItems.find((item: any) => item.type === 'ai')).toBeTruthy();
-    expect(summaryItems.find((item: any) => item.label === 'Responded')).toBeUndefined();
-
-    instance.state = {
-      ...instance.state,
-      aiCombineWithOtherFilters: true,
-    };
-
-    summaryItems = instance.getFilterSummaryItems();
-    expect(summaryItems.find((item: any) => item.label === 'Responded')).toBeTruthy();
-  });
-
   it('shows visible group-loading status while SBT cache is still hydrating', () => {
     const instance = new QuestionFilter({
       questions: [{ id: 'q1', prompt: 'Q1', type: 'freeform' }],
@@ -570,117 +535,11 @@ describe('QuestionFilter encrypted count gate tooltip integration', () => {
     const tree = instance.render();
     const sbtHeader = findElement(
       tree,
-      (element) => element?.type === 'h3' && getNodeText(element).includes('Group(s) of Question Creator'),
+      (element) => element?.type === 'h3' && getNodeText(element).includes('Group(s) of Question Creator')
     );
 
     expect(sbtHeader).toBeTruthy();
     expect(getNodeText(sbtHeader)).toContain('Loading groups');
-  });
-
-  it('does not mount or apply the SBT filter for an exact pure-Worker profile', () => {
-    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
-    const questions = [
-      { id: 'q1', prompt: 'Q1', type: 'freeform' },
-      { id: 'q2', prompt: 'Q2', type: 'freeform' },
-    ];
-    const instance = new QuestionFilter({
-      questions,
-      questionResponses: {},
-      network: { id: 11155420 },
-      resultsMode: true,
-      filterModalOpen: true,
-      isQuestionCacheReady: true,
-      isSBTCacheReady: true,
-      sessionConfig: {
-        slug: 'demo-sh',
-        // Compatibility metadata must not grant an undeclared chain capability.
-        networkChainId: 11155420,
-        sessionModeProfile,
-      },
-      filterState: {
-        sbtFilter: {
-          selectedSBTGroups: [{ address: '0x00000000000000000000000000000000000000aa', name: 'Legacy' }],
-        },
-      },
-    });
-
-    expect(validateSessionModeProfile(sessionModeProfile).valid).toBe(true);
-    expect(shouldEnableQuestionFilterSbt(instance.props.sessionConfig)).toBe(false);
-    expect(instance.state.sbtFilterLocalState).toBeNull();
-
-    instance.state = {
-      ...instance.state,
-      sbtFilterLocalState: {
-        selectedSBTGroups: [{ address: '0x00000000000000000000000000000000000000aa', name: 'Stale' }],
-      },
-      sbtFilteredQuestions: [questions[0]],
-      pendingSbtFilteredQuestions: [questions[0]],
-      filteredQuestionsCount: questions.length,
-    };
-    instance.getAllTagsWithCounts = jest.fn(() => []);
-    instance.getAiAccessState = jest.fn(() => ({
-      enabled: false,
-      localKeyAvailable: false,
-    }));
-
-    const tree = instance.render();
-
-    expect(findElement(tree, (element) => element?.type === QuestionFilterSbtSection)).toBeNull();
-    expect(getNodeText(tree)).not.toContain('Group(s) of Question Creator');
-    expect(instance.buildFilterPipelineResult(true).finalQuestions).toEqual(questions);
-    expect(instance.buildFilterState().sbtFilter).toBeNull();
-    expect(instance.getFilterSummaryItems().some((item: any) => item.type === 'sbt')).toBe(false);
-
-    instance.setState = jest.fn();
-    instance.handleFilteredQuestions([questions[0]], {
-      selectedSBTGroups: [{ address: '0x00000000000000000000000000000000000000aa' }],
-    });
-    expect(instance.setState).not.toHaveBeenCalled();
-  });
-
-  it('preserves the SBT filter for reachable registry and Worker-hybrid profiles', () => {
-    const registryProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
-    const hybridProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
-    hybridProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
-    hybridProfile.evm.registryChainId = 11155420;
-    hybridProfile.encryption.accessConditions = {
-      match: 'all',
-      conditions: [
-        { kind: 'worker_role', role: 'reviewer' },
-        {
-          kind: 'sbt_onchain',
-          chainId: 11155420,
-          contract: '0x00000000000000000000000000000000000000aa',
-          anyOrAll: 'any',
-        },
-      ],
-    };
-
-    expect(validateSessionModeProfile(registryProfile).valid).toBe(true);
-    expect(validateSessionModeProfile(hybridProfile).valid).toBe(true);
-    expect(shouldEnableQuestionFilterSbt({ sessionModeProfile: registryProfile })).toBe(true);
-    expect(shouldEnableQuestionFilterSbt({ sessionModeProfile: hybridProfile })).toBe(true);
-
-    const instance = new QuestionFilter({
-      questions: [{ id: 'q1', prompt: 'Q1', type: 'freeform' }],
-      questionResponses: {},
-      network: { id: 11155420 },
-      resultsMode: true,
-      filterModalOpen: true,
-      isQuestionCacheReady: true,
-      isSBTCacheReady: true,
-      sessionConfig: {
-        slug: 'hybrid',
-        sessionModeProfile: hybridProfile,
-      },
-    });
-    instance.getAllTagsWithCounts = jest.fn(() => []);
-    instance.getAiAccessState = jest.fn(() => ({
-      enabled: false,
-      localKeyAvailable: false,
-    }));
-
-    expect(findElement(instance.render(), (element) => element?.type === QuestionFilterSbtSection)).toBeTruthy();
   });
 
   it('passes session gate details into the encrypted-count badge tooltip when available', () => {

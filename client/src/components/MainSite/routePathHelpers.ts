@@ -14,7 +14,9 @@ export const normalizeRoutePath = (pathIn = ''): string => {
       .split('#')[0],
   );
   if (/^\/demo\/dacc\/?$/i.test(raw)) return '/about';
-  const legacyDemoNormalized = /^\/demo(?:\/|$)/i.test(raw) ? raw.replace(/^\/demo(?=\/|$)/i, '/session/demo') : raw;
+  const legacyDemoNormalized = /^\/demo(?:\/|$)/i.test(raw)
+    ? raw.replace(/^\/demo(?=\/|$)/i, '/session/demo')
+    : raw;
   if (!legacyDemoNormalized) return '';
   if (legacyDemoNormalized === '/') return '/';
   return legacyDemoNormalized.replace(/\/+$/, '');

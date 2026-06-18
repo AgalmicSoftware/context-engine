@@ -676,26 +676,29 @@ describe('surveyQuestionsTypes', () => {
       null,
       pendingMetadataPlaceholder,
     ];
+    const concreteQuestionPool = [
+      encryptedPrompt,
+      decryptedPrompt,
+      plainPrompt,
+      anonymousMaskedPrompt,
+      null,
+    ];
     const concreteQuestionPool = [encryptedPrompt, decryptedPrompt, plainPrompt, anonymousMaskedPrompt, null];
 
     expect(isSurveyQuestionsMaskedPromptText(' [encrypted] ')).toBe(true);
     expect(isSurveyQuestionsMaskedPromptText('[Encrypted]')).toBe(false);
-    expect(
-      buildSurveyQuestionsMaskedQuestionVisibility({
-        questionPool,
-        singleQuestionMode: false,
-      }),
-    ).toEqual({
+    expect(buildSurveyQuestionsMaskedQuestionVisibility({
+      questionPool,
+      singleQuestionMode: false,
+    })).toEqual({
       fullQuestionPool: concreteQuestionPool,
       visibleQuestionPool: [decryptedPrompt, plainPrompt, null],
       hiddenMaskedQuestionIds: ['q1'],
     });
-    expect(
-      buildSurveyQuestionsMaskedQuestionVisibility({
-        questionPool,
-        singleQuestionMode: true,
-      }),
-    ).toEqual({
+    expect(buildSurveyQuestionsMaskedQuestionVisibility({
+      questionPool,
+      singleQuestionMode: true,
+    })).toEqual({
       fullQuestionPool: concreteQuestionPool,
       visibleQuestionPool: concreteQuestionPool,
       hiddenMaskedQuestionIds: [],
@@ -749,13 +752,11 @@ describe('surveyQuestionsTypes', () => {
       fullQuestionPool: [],
       hiddenMaskedQuestionIds: [],
       isQuestionCacheReady: false,
-      questionPool: [
-        {
-          id: 'qpending',
-          prompt: '[encrypted]',
-          __ceQuestionMetadataPending: true,
-        },
-      ],
+      questionPool: [{
+        id: 'qpending',
+        prompt: '[encrypted]',
+        __ceQuestionMetadataPending: true,
+      }],
       singleQuestionMode: false,
       surveyIndex: 0,
       surveysResponseState: [responseSlice],

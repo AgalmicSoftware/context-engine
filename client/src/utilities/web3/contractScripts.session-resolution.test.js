@@ -132,7 +132,7 @@ describe('contractScripts session resolution helpers', () => {
           '0x5d2f0207B7EB26e807C4a12f2A185928558C00b9',
           '0xeAe3498C31302B421E19Cf30A3e87E814ae5C955',
         ]),
-      }),
+      })
     );
   });
 

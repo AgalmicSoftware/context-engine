@@ -508,7 +508,7 @@ describe('SurveyResults filter summary counts', () => {
 });
 
 describe('SurveyResults demo results views', () => {
-  it('shows the demo results switcher only for demo question results', () => {
+  it('shows the demo results switcher only for configured demo question results', () => {
     const nonDemoSubject = createSubject({
       isOpen: true,
       viewMode: 'questions',
@@ -564,6 +564,26 @@ describe('SurveyResults demo results views', () => {
     expect(treeHasText(demoNav, 'Risk Matrix')).toBe(true);
     expect(syncIndex).toBeGreaterThanOrEqual(0);
     expect(demoNavIndex).toBeGreaterThan(syncIndex);
+
+    const demoThreeSubject = createSubject({
+      isOpen: true,
+      viewMode: 'questions',
+      sessionSlug: 'demo-1',
+    });
+    demoThreeSubject.state = {
+      ...demoThreeSubject.state,
+      viewMode: 'questions',
+    };
+
+    const demoThreeTree = demoThreeSubject.render();
+    const demoThreeHeader = findElement(
+      demoThreeTree,
+      (element) => element?.type === SurveyResultsModalHeader
+    );
+    const demoThreeMarkup = renderToStaticMarkup(demoThreeHeader);
+
+    expect(demoThreeMarkup).toContain('ce-surveyresults-demo-view-nav');
+    expect(demoThreeMarkup).toContain('Breakdown');
   });
 
   it('switches the demo modal surface from the top bar buttons and maps report to Polis', async () => {

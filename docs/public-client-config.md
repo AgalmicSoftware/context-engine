@@ -178,34 +178,9 @@ The connected-build equivalent is:
   status = 200
 ```
 
-Keep specific legacy redirects above the SPA fallback rule in both files.
-
-For rollback, use Netlify's deploy history to republish the previous known-good
-production deploy, then correct `main` normally. A frontend rollback does not
-roll back workers, contracts, or externally stored session data.
-
-When hosting the app under a subpath, set `PUBLIC_URL` to that mount path before
-building, for example `PUBLIC_URL=/ce npm run build`. Internal session,
-question/results, contract, and group routes strip that configured base before
-matching app routes and reapply it when generating links, so deep links such as
-`/ce/session/demo/questions`, `/ce/contracts`, and `/ce/groups` stay inside the
-mounted app. The SPA fallback must also be scoped to the same deployed base path
-by the hosting platform.
-
-Set browser cache headers so search-result clicks and fresh navigations
-revalidate the deployed files after each deploy. For manual drag-and-drop
-deploys, keep the `_headers` file inside `client/public/` so Vite copies it into
-the uploaded `client/build/` directory:
-
-```text
-/*
-  Cache-Control: no-cache, max-age=0, must-revalidate
-  Pragma: no-cache
-  Expires: 0
-```
-
-This cannot replace already-running JavaScript in an open tab. It makes the
-browser re-check the app shell on the next navigation, reload, or new visit.
+For manual drag-and-drop deploys, the `_redirects` file must be present inside
+the uploaded `client/build/` directory. Keep any specific legacy redirects above
+the SPA fallback rule.
 
 ### 4. Attach the custom domain
 
@@ -326,16 +301,23 @@ SPA fallback concept, but their redirect config syntax differs.
     at a live SessionRegistry session seeded with copied Context fixture
     questions and featured SBT metadata. `demo_sessions.json` also carries a
     display-only `demo-1` fallback so the route can mount when live registry
-    metadata is slow. Worker URL, faucet sponsorship, and gate authority stay in
-    SessionRegistry plus Worker KV, not in the demo fixture. Remove both
-    compatibility entries after the Cloudflare-backed demo question/response
-    storage replaces the Arweave/on-chain copy.
+    metadata is slow. Remove both compatibility entries after the
+    Cloudflare-backed demo question/response storage replaces the Arweave/on-chain
+    copy.
+
+- `REACT_APP_CE_ENABLE_WALLETCONNECT_FALLBACK=false`
+  - Controls RainbowKit's MetaMask fallback when MetaMask is not injected.
+  - Default `false` keeps the login modal on the injected MetaMask connector and avoids opening WalletConnect bridge sockets during normal startup.
+  - Set `true` only when a deployment intentionally wants the legacy WalletConnect fallback for MetaMask mobile/QR flows.
 
 ## Arweave Read Policy Toggles
 
 - `REACT_APP_CE_ARWEAVE_DIRECT_TO_AR_IO=true`
   - Controls whether browser Arweave payload reads stay on the configured AR.IO gateway for their retry budget.
   - Default `true` uses `REACT_APP_CE_ARWEAVE_AR_IO_URL` / `window.CE_ARWEAVE_AR_IO_URL` when provided, otherwise `https://ar-io.dev`.
+  - Display-critical metadata reads for sessions, SBTs, surveys, and questions
+    also stay on AR.IO while this is enabled; they do not fan out through legacy
+    gateways unless direct mode is intentionally disabled.
   - Set `false` only when a deployment intentionally wants legacy fallback fanout through `https://arweave.net`, Irys, Permagate, and alternate raw/tx-data routes.
 
 - `REACT_APP_CE_ARWEAVE_PREFLIGHT_SESSION_METADATA=false`

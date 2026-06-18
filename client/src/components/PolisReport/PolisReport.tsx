@@ -23,6 +23,9 @@ import {
 } from '../../utilities/survey/consensusReportMath.js';
 
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
+import demoData from '../../variables/demo/demo_polis_data.json';
+import { CE_DEMO_SESSION_SLUGS, POLIS_DEMO_DATA_AUTOLOAD_SLUGS } from '../../variables/appConfig.js';
+import { getChainById } from '../../variables/chains.js';
 import styles from './PolisReport.module.scss';
 import { QRCodeSVG } from 'qrcode.react';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -30,6 +33,7 @@ import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
 import { createLogger } from 'utilities/logging.js';
 import { isDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
+import { isDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
 import {
   buildQuestionScanProgressDisplay,
   doesQuestionProgressMatchSlug,
@@ -303,12 +307,18 @@ function safeJsonParse(str: unknown): UnknownRecord | null {
 const DEFAULT_POLIS_DEMO_DATA = demoData;
 const DEFAULT_EXPLORATORY_CLUSTER_COUNT = 3;
 const POLIS_DEMO_CLUSTER_ANALYSIS_VERSION = 2;
-// Regression guard: this built-in `demo` mapping is the original `/session/demo`
-// behavior. Before per-slug Polis fixtures existed, that route always used the
-// shared `demo_polis_data.json`; future demo pages should extend via `demoDataBySlug`.
-const BUILT_IN_POLIS_DEMO_DATASETS_BY_SLUG = Object.freeze({
-  demo: DEFAULT_POLIS_DEMO_DATA,
-});
+// Registry-backed demo pages can reuse the shared Context corpus fixture while
+// their question/response storage migrates independently.
+const BUILT_IN_POLIS_DEMO_DATASETS_BY_SLUG = Object.freeze(
+  (Array.isArray(CE_DEMO_SESSION_SLUGS) ? CE_DEMO_SESSION_SLUGS : ['demo']).reduce<Record<string, unknown>>(
+    (acc, rawSlug) => {
+      const slug = normalizeSessionSlug(rawSlug);
+      if (slug) acc[slug] = DEFAULT_POLIS_DEMO_DATA;
+      return acc;
+    },
+    { demo: DEFAULT_POLIS_DEMO_DATA }
+  )
+);
 
 function buildPolisDemoDatasetsBySlug(demoDataBySlug: unknown = null) {
   const out: Record<string, unknown> = { ...BUILT_IN_POLIS_DEMO_DATASETS_BY_SLUG };
@@ -1419,7 +1429,7 @@ export default function PolisReport({
   };
 
   // Show/hide the top settings row
-  const [showSettingsRow, setShowSettingsRow] = useState<boolean>(() => activeReportSlug === 'demo');
+  const [showSettingsRow, setShowSettingsRow] = useState<boolean>(() => isDemoSessionSlug(activeReportSlug));
   const [reportStyle, setReportStyle] = useState<string>('original');
   const embeddingDefaultSignatureRef = useRef<string>(
     `${activeReportSlug}|${defaultEmbeddingChoice}|${defaultManualClusterCount}`
@@ -1529,12 +1539,12 @@ export default function PolisReport({
   // auto-hydrate precomputed cluster summaries. Custom per-slug fixtures still
   // stay on the normal computed/AI path.
   const shouldUsePrecomputedDemoClusters = !!(
-    precomputedDemoClusterState &&
-    isDemoSessionSlug(activeReportSlug) &&
-    effectiveUseDemoData &&
-    activeDemoData === DEFAULT_POLIS_DEMO_DATA &&
-    embeddingChoice === 'POLIS' &&
-    manualClusterCountValue === null
+    precomputedDemoClusterState
+    && isDemoSessionSlug(activeReportSlug)
+    && useDemoData
+    && activeDemoData === DEFAULT_POLIS_DEMO_DATA
+    && embeddingChoice === 'POLIS'
+    && manualClusterCountValue === null
   );
   const isExploratoryMode = embeddingChoice !== 'POLIS' || manualClusterCountValue !== null;
   const activeParticipantCoords = embeddingChoice === 'UMAP' ? umapParticipantCoords : participantCoords;

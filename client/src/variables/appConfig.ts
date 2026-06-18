@@ -13,7 +13,7 @@ import {
 const DEFAULT_SESSION_SCAN_SCOPE = 'list';
 // Demo-like sessions that should receive public demo UI affordances. The first
 // entry is the About-page CTA target; keep older slugs in the list while links migrate.
-const DEFAULT_DEMO_SESSION_SLUGS = Object.freeze(['demo-sh', 'demo-1', 'demo-3', 'demo-2', 'demo']);
+const DEFAULT_DEMO_SESSION_SLUGS = Object.freeze(['demo-1', 'demo-3', 'demo-2', 'demo']);
 // Default cross-session scans follow the active public demo while legacy slugs
 // remain demo-like for direct links during migration.
 const DEFAULT_SESSION_SCAN_SLUGS = Object.freeze([DEFAULT_DEMO_SESSION_SLUGS[0]]);
@@ -157,15 +157,20 @@ export const CE_SBT_SELECTOR_AUTO_SEARCH_OTHER_SESSIONS = readPublicBoolEnv(
   true,
 );
 // Show shipped demo sessions from demo_sessions.json in SBT session universe chips.
-export const SHOW_DEMO_SESSIONS = readPublicBoolEnv('REACT_APP_SHOW_DEMO_SESSIONS', false);
+export const SHOW_DEMO_SESSIONS = readPublicBoolEnv(
+  'REACT_APP_SHOW_DEMO_SESSIONS',
+  false
+);
 // Public/demo session slugs that should use demo presentation affordances.
-export const CE_DEMO_SESSION_SLUGS = readPublicListEnv('REACT_APP_CE_DEMO_SESSION_SLUGS', [
-  ...DEFAULT_DEMO_SESSION_SLUGS,
-]);
+export const CE_DEMO_SESSION_SLUGS = readPublicListEnv(
+  'REACT_APP_CE_DEMO_SESSION_SLUGS',
+  [...DEFAULT_DEMO_SESSION_SLUGS]
+);
 // PolisReport auto-enables fixture-backed demo data for these canonical session slugs.
-export const POLIS_DEMO_DATA_AUTOLOAD_SLUGS = readPublicListEnv('REACT_APP_POLIS_DEMO_DATA_AUTOLOAD_SLUGS', [
-  ...CE_DEMO_SESSION_SLUGS,
-]);
+export const POLIS_DEMO_DATA_AUTOLOAD_SLUGS = readPublicListEnv(
+  'REACT_APP_POLIS_DEMO_DATA_AUTOLOAD_SLUGS',
+  [...CE_DEMO_SESSION_SLUGS]
+);
 // One-shot testing flag: clamps cross-session fanout defaults to general/list.
 export const CE_RPC_TESTING_MODE = readPublicBoolEnv(
   'REACT_APP_CE_RPC_TESTING_MODE',

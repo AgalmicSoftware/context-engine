@@ -750,6 +750,18 @@ describe('PolisReport demo data defaults', () => {
     );
   });
 
+  it('maps demo session slugs to the shared Context demo corpus fixture', () => {
+    expect(getPolisDemoDatasetForSlug('demo-1', { allowFallback: false })).toBe(
+      getPolisDemoDatasetForSlug('demo', { allowFallback: false })
+    );
+    expect(getPolisDemoDatasetForSlug('demo-3', { allowFallback: false })).toBe(
+      getPolisDemoDatasetForSlug('demo', { allowFallback: false })
+    );
+    expect(getPolisDemoDatasetForSlug('demo-2', { allowFallback: false })).toBe(
+      getPolisDemoDatasetForSlug('demo', { allowFallback: false })
+    );
+  });
+
   it('shows the demo data toggle as enabled by default for the demo slug', () => {
     const { container } = render(<PolisReport {...baseReportProps} slug="demo" />);
 
@@ -759,7 +771,22 @@ describe('PolisReport demo data defaults', () => {
     expect(screen.getByTestId(E2E_TESTIDS.POLIS_DEMO_DATA_TOGGLE)).toBeChecked();
   });
 
-  it('defaults built-in /session/demo to UMAP with 3 groups and still exposes precomputed Polis analysis after switching modes', async () => {
+  it('shows the demo data toggle as enabled by default for demo-1', () => {
+    const { container } = render(<PolisReport {...baseReportProps} slug="demo-1" />);
+
+    expect(container.querySelector('.settingsRow')).toHaveClass('pdfIgnore');
+    expect(screen.getByTestId(E2E_TESTIDS.POLIS_DEMO_DATA_TOGGLE)).toBeChecked();
+  });
+
+  it('includes the participants list in the global collapse and expand controls', async () => {
+    const demoDataset = getPolisDemoDatasetForSlug('demo');
+    const participant = Array.isArray(demoDataset?.participantsVotes)
+      ? demoDataset.participantsVotes.find((entry) => entry?.xid || entry?.participant)
+      : null;
+    const participantLabel = participant?.xid || participant?.participant;
+
+    expect(participantLabel).toBeTruthy();
+
     computePolisConversationMath.mockReturnValue({
       stats: {
         nParticipants: 4,

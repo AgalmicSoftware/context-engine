@@ -51,6 +51,22 @@ const syncClassSetState = (subject) => {
   return subject.setState;
 };
 
+const createDeferred = () => {
+  let resolve;
+  let reject;
+  const promise = new Promise((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+};
+
+const flushMicrotasks = async (cycles = 4) => {
+  for (let index = 0; index < cycles; index += 1) {
+    await Promise.resolve();
+  }
+};
+
 describe('SurveyTool question pool lifecycle', () => {
   afterEach(() => {
     jest.clearAllMocks();
@@ -381,6 +397,159 @@ describe('SurveyTool question pool lifecycle', () => {
     expect(ensureQuestionCached).toHaveBeenCalledTimes(10);
     expect(subject.state.questionPool).toHaveLength(10);
     expect(subject.state.questionPool[9]).toEqual(expect.objectContaining({ id: 'q10' }));
+  });
+
+  it('publishes a survey question pool as soon as the first question metadata resolves', async () => {
+    const surveyQuestionIds = ['q1', 'q2'];
+    const questionsCache = { '84532': { questions: {} } };
+    const firstQuestion = createDeferred();
+    const secondQuestion = createDeferred();
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace) => {
+      if (namespace === 'surveysCache') {
+        return {
+          '84532': {
+            surveys: {
+              '0xsurvey': {
+                id: '0xsurvey',
+                surveyID: '0xsurvey',
+                questionIDs: surveyQuestionIds,
+                title: 'Survey',
+              },
+            },
+          },
+        };
+      }
+      if (namespace === 'questionsCache') {
+        return questionsCache;
+      }
+      return {};
+    });
+
+    const ensureQuestionCached = jest.fn((qid) => {
+      const lowered = String(qid).toLowerCase();
+      const deferred = lowered === 'q1' ? firstQuestion : secondQuestion;
+      return deferred.promise.then(() => {
+        questionsCache['84532'].questions[lowered] = {
+          id: lowered,
+          type: 'freeform',
+          prompt: `Prompt ${lowered}`,
+        };
+      });
+    });
+
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      surveyId: '0xsurvey',
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+      networkChainId: 84532,
+      ensureQuestionCached,
+      sessionSlug: 'edge',
+      activeSessionSlug: 'edge',
+    });
+
+    subject.state = {
+      ...subject.state,
+      questionPool: [],
+    };
+
+    subject.setState = jest.fn((update, cb) => {
+      const patch = typeof update === 'function' ? update(subject.state, subject.props) : update;
+      if (patch && typeof patch === 'object') {
+        subject.state = { ...subject.state, ...patch };
+      }
+      if (typeof cb === 'function') cb();
+      return patch;
+    });
+
+    let fetchSettled = false;
+    const fetchPromise = subject.fetchQuestionPool().finally(() => {
+      fetchSettled = true;
+    });
+    await flushMicrotasks();
+
+    expect(ensureQuestionCached).toHaveBeenCalledTimes(2);
+    expect(subject.state.questionPool).toEqual([]);
+
+    firstQuestion.resolve();
+    await flushMicrotasks(8);
+
+    expect(fetchSettled).toBe(false);
+    expect(subject.state.questionPool).toHaveLength(1);
+    expect(subject.state.questionPool[0]).toEqual(expect.objectContaining({
+      id: 'q1',
+      prompt: 'Prompt q1',
+    }));
+    expect(subject.state.questionPoolExpectedIds).toEqual(['q1', 'q2']);
+    expect(subject.state.questionPoolPendingIds).toEqual(['q2']);
+
+    secondQuestion.resolve();
+    await fetchPromise;
+
+    expect(subject.state.questionPool.map((question) => question.id)).toEqual(['q1', 'q2']);
+    expect(subject.state.questionPoolPendingIds).toEqual([]);
+  });
+
+  it('does not publish pending metadata placeholders as survey questions', async () => {
+    const surveyQuestionIds = ['q1', 'q2'];
+    const questionsCache = {
+      '84532': {
+        questions: {
+          q1: { id: 'q1', type: 'freeform', prompt: 'Ready prompt' },
+          q2: {
+            id: 'q2',
+            prompt: '[loading]',
+            __ceQuestionMetadataPending: true,
+          },
+        },
+      },
+    };
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace) => {
+      if (namespace === 'surveysCache') {
+        return {
+          '84532': {
+            surveys: {
+              '0xsurvey': {
+                id: '0xsurvey',
+                surveyID: '0xsurvey',
+                questionIDs: surveyQuestionIds,
+                title: 'Survey',
+              },
+            },
+          },
+        };
+      }
+      if (namespace === 'questionsCache') {
+        return questionsCache;
+      }
+      return {};
+    });
+
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      surveyId: '0xsurvey',
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+      networkChainId: 84532,
+      ensureQuestionCached: jest.fn().mockResolvedValue(undefined),
+      sessionSlug: 'edge',
+      activeSessionSlug: 'edge',
+    });
+
+    syncClassSetState(subject);
+
+    await subject.fetchQuestionPool();
+
+    expect(subject.state.questionPool).toEqual([
+      expect.objectContaining({ id: 'q1', prompt: 'Ready prompt' }),
+    ]);
+    expect(subject.state.questionPoolPendingIds).toEqual(['q2']);
   });
 
   it('keeps direct-route survey questions that hydrated successfully when one cache fetch fails', async () => {

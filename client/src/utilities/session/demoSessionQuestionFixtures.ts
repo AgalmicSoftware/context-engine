@@ -1,6 +1,5 @@
 import { ethers } from 'ethers';
 
-import demo1OnchainQuestionIds from '../../variables/demo/demo_1_onchain_question_ids.json';
 import demoPolisData from '../../variables/demo/demo_polis_data.json';
 import { normalizeSessionSlug } from './sessionNaming.js';
 
@@ -13,7 +12,6 @@ type DemoQuestion = Record<string, unknown> & {
 };
 
 const TEMPORARY_DEMO_QUESTION_SLUG = 'demo-1';
-const CLOUDFLARE_DEMO_QUESTION_SLUG = 'demo-sh';
 const ZERO_SURVEY_ID = '0x0000000000000000000000000000000000000000000000000000000000000000';
 const POLL_OPTIONS = [
   'Technical researchers',
@@ -37,50 +35,45 @@ const uniqueStrings = (values: unknown[]): string[] => {
   return out;
 };
 
-const splitSources = (value: unknown): string[] =>
+const splitSources = (value: unknown): string[] => (
   String(value || '')
     .split(',')
     .map((source) => source.trim())
-    .filter(Boolean);
+    .filter(Boolean)
+);
 
 const buildDemoQuestionFromComment = (
   comment: DemoComment,
   index: number,
-  sessionConfig: DemoSessionConfig = {},
-  onchainQuestionId: unknown = '',
-  targetSlug = TEMPORARY_DEMO_QUESTION_SLUG,
-  workerCanonical = false,
+  sessionConfig: DemoSessionConfig = {}
 ): DemoQuestion | null => {
   const sourceCommentId = String(comment?.commentId || '').trim();
   const prompt = String(comment?.commentBody || '').trim();
   if (!sourceCommentId || !prompt) return null;
 
-  const canonicalQuestionId = String(onchainQuestionId || '')
-    .trim()
-    .toLowerCase();
-  const fixtureType =
-    String(comment?.type || '')
-      .trim()
-      .toLowerCase() || 'freeform';
+  const fixtureType = String(comment?.type || '').trim().toLowerCase() || 'freeform';
   const type = fixtureType === 'poll' ? 'multichoice' : fixtureType;
   const question: DemoQuestion = {
-    id: canonicalQuestionId || ethers.utils.id(`${targetSlug}:${sourceCommentId}`),
+    id: ethers.utils.id(`${TEMPORARY_DEMO_QUESTION_SLUG}:${sourceCommentId}`),
     type,
     prompt,
-    tags: uniqueStrings([fixtureType, comment?.category, ...splitSources(comment?.sources)]),
+    tags: uniqueStrings([
+      'demo-fixture',
+      'context-corpus',
+      fixtureType,
+      comment?.category,
+      ...splitSources(comment?.sources),
+    ]),
     creator: String(comment?.authorId || ''),
     associatedSurveyId: ZERO_SURVEY_ID,
-    sessionName: String(sessionConfig?.sessionName || targetSlug),
-    sessionSlug: targetSlug,
+    sessionName: String(sessionConfig?.sessionName || TEMPORARY_DEMO_QUESTION_SLUG),
+    sessionSlug: TEMPORARY_DEMO_QUESTION_SLUG,
     corpus: 'Context',
-    temporaryDemoSeed: !workerCanonical,
-    cloudflareDemoSeed: workerCanonical,
+    temporaryDemoSeed: true,
     demoFixture: {
       sourceSessionSlug: 'demo',
       fixtureFile: 'client/src/variables/demo/demo_polis_data.json',
       fixturePath: 'comments',
-      onchainQuestionIdsFile: 'client/src/variables/demo/demo_1_onchain_question_ids.json',
-      workerCanonical,
       sourceCommentIndex: index,
       sourceCommentId,
       fixtureType,
@@ -106,23 +99,19 @@ const buildDemoQuestionFromComment = (
 
 export const getTemporaryDemoSessionQuestionFixtures = (
   slugIn: unknown,
-  sessionConfig: DemoSessionConfig = {},
+  sessionConfig: DemoSessionConfig = {}
 ): DemoQuestion[] => {
   const slug = normalizeSessionSlug(slugIn);
-  if (slug !== TEMPORARY_DEMO_QUESTION_SLUG && slug !== CLOUDFLARE_DEMO_QUESTION_SLUG) return [];
+  if (slug !== TEMPORARY_DEMO_QUESTION_SLUG) return [];
   const seed = sessionConfig?.demoCompatibilitySeed;
-  const seedConfig = seed && typeof seed === 'object' ? (seed as Record<string, unknown>) : {};
-  const workerCanonical = slug === CLOUDFLARE_DEMO_QUESTION_SLUG && seedConfig.workerCanonical === true;
-  if (seedConfig.temporary === false && !workerCanonical) {
+  if (seed && typeof seed === 'object' && (seed as Record<string, unknown>).temporary === false) {
     return [];
   }
   const comments = Array.isArray((demoPolisData as Record<string, unknown>)?.comments)
     ? ((demoPolisData as Record<string, unknown>).comments as DemoComment[])
     : [];
-  const questionIds = Array.isArray(demo1OnchainQuestionIds) ? demo1OnchainQuestionIds : [];
   return comments
-    .map((comment, index) =>
-      buildDemoQuestionFromComment(comment, index, sessionConfig, questionIds[index], slug, workerCanonical),
-    )
+    .map((comment, index) => buildDemoQuestionFromComment(comment, index, sessionConfig))
     .filter((question): question is DemoQuestion => !!question);
 };
+

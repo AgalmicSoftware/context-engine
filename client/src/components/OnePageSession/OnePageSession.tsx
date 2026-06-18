@@ -30,6 +30,7 @@ import { listNamespaceEntriesSync, peekCacheSync, writeCache } from '../../utili
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
+import { isDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
 import { isCryptoMode, sbtsListPath, t } from '../../utilities/ui/terminology.js';
 import { PUBLIC_AI_DISCOURSE_CORPUS_URL } from '../../variables/publicRepoMetadata.js';
 import { resolveMainSiteLitSessionConfig } from '../MainSite/litSessionConfig.js';
@@ -2247,35 +2248,36 @@ class OnePageSession extends Component<any, any> {
       null;
     const scopedLitHooks = this.resolveScopedLitHooks(resolvedSessionConfig);
     const effectiveSlug = resolveEffectiveSlug(this.props) || slug;
-    const surveySessionSlug = resolveOnePageSessionSurveySlug({
-      ...this.props,
-      sessionConfig: resolvedSessionConfig,
-    });
     // Only show demo-specific result surfaces on configured public demo sessions.
     const isDemoSlug = isDemoSessionSlug(effectiveSlug);
-    const displaySessionSlug = normalizeOnePageSessionSlug(effectiveSlug || slug);
-    const demoQuestionPool = resolvePolisDemoQuestionPool({
-      displaySlug: displaySessionSlug,
-      sourceSlug: surveySessionSlug,
-    });
-    const scopedDemoQuestionPool =
-      demoQuestionPool.length > 0
-        ? demoQuestionPool.map((entry: any) => ({
-            ...entry,
-            sessionSlug: displaySessionSlug,
-            sessionSlugExplicit: true,
-          }))
-        : [];
-    const sharedQuestionPool = scopedDemoQuestionPool.length > 0 ? scopedDemoQuestionPool : undefined;
-    const embeddedQuestionSessionSlug = sharedQuestionPool ? displaySessionSlug : surveySessionSlug;
-    const embeddedGroupsSessionSlug = displaySessionSlug || surveySessionSlug;
-    const embeddedGroupsSessionConfig = isDemoSlug
-      ? {
-          ...resolvedSessionConfig,
-          slug: embeddedGroupsSessionSlug,
-        }
-      : resolvedSessionConfig;
-    const fallbackSessionLabel = slug && String(slug).trim() ? String(slug).trim() : 'Session';
+    const resultsViewMode = isDemoSlug ? this.state.resultsViewMode : 'polis';
+    const resultsViewOptions = [
+      { key: 'polis', label: 'Report', icon: '🧾' },
+      ...(isDemoSlug
+        ? [
+            { key: 'debateAtlas', label: 'Debate Map', icon: '🗺️' },
+            { key: 'analysis', label: 'Breakdown', icon: '📊' },
+            { key: 'riskMatrix', label: 'Risk Matrix', icon: '⚠️' },
+          ]
+        : []),
+    ];
+    const basePath = readPublicUrlBasePath();
+    const sectionsGridClassName = [
+      styles.sectionsGrid,
+      !isDemoSlug ? styles.sectionsGridTwoUp : '',
+    ].filter(Boolean).join(' ');
+
+    // Resolve first target group name (spinner if not ready)
+    const firstTargetAddrLower =
+      (this.state.autoMintTargets && this.state.autoMintTargets[0] && this.state.autoMintTargets[0].sbt)
+        ? this.state.autoMintTargets[0].sbt.toLowerCase()
+        : null;
+    const firstTargetName = firstTargetAddrLower ? this.state.sbtNames[firstTargetAddrLower] : null;
+
+    // Ensure close button is visible; prefer module class if present, else use existing global fallback
+    const alertCloseClass = styles.alertCloseButton || 'sbt-alert-close-btn';
+
+    const fallbackSessionLabel = (slug && String(slug).trim()) ? String(slug).trim() : 'Session';
     const titleText = sessionName ? `${sessionName}` : fallbackSessionLabel;
     const corpusViewerLoadState = this.state.corpusViewerLoadState || DEFAULT_CORPUS_VIEWER_LOAD_STATE;
     const loadFullCorpusButtonLabel = corpusViewerLoadState.loadButtonLabel || DEFAULT_CORPUS_VIEWER_LOAD_STATE.loadButtonLabel;

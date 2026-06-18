@@ -108,7 +108,9 @@ import {
   buildPileLoadFailureState,
   buildPileLoadProgressState,
 } from './surveyPileLoadPlanner';
-import { loadPileScopeCacheSnapshot } from './surveyPileScopeCacheData';
+import {
+  loadPileScopeCacheSnapshot,
+} from './surveyPileScopeCacheData';
 import { isPendingQuestionMetadataPlaceholder } from './surveyQuestionMetadataPlaceholders.js';
 import {
   buildPileFilterResultPlan,
@@ -501,13 +503,46 @@ export const buildPileRuntimeInitialState = (engine: SurveyQuestionsRuntimeEngin
   let initialFilterState = normalizeSurveyToolFilterState(props.filterState);
   if (Object.keys(initialFilterState).length === 0 && typeof window !== 'undefined') {
     try {
-      const url = new URL(window.location.href);
-      const f = url.searchParams.get('filter');
-      if (f) {
-        initialFilterState = normalizeSurveyToolFilterState(deserializeFilterState(f));
-        // Clear from URL immediately
-        url.searchParams.delete('filter');
-        window.history.replaceState({}, '', url.toString());
+      if (!propsIn?.isQuestionCacheReady) return null;
+      const slug = resolveEffectiveSlug(propsIn);
+      const extraSlugs = getExtraQuestionReadSlugs(propsIn, slug);
+      const context = resolvePileWarmSeedContext(propsIn, slug);
+      const networkID = context.networkIdStr || '';
+      if (!networkID) return null;
+
+      const scopeSlugs = [slug, ...extraSlugs];
+      const seenQuestionIds = new Set();
+      const hlSet = new Set();
+      const allQuestions = [];
+      const allResponses = {};
+      scopeSlugs.forEach((scopeSlug) => {
+        const questionsCache = readQuestionsCacheRef(scopeSlug) || {};
+        const networkCache = questionsCache?.[networkID] || {};
+        const blockedQuestionIds = getBlockedQuestionIdsSet(scopeSlug);
+        getHighlightedQuestionIdsSet(scopeSlug).forEach((questionId) => {
+          hlSet.add(String(questionId || '').toLowerCase());
+        });
+        mergeQuestionResponses(allResponses, networkCache.questionResponses || {});
+        Object.keys(networkCache.questions || {}).forEach((questionId) => {
+          const question = networkCache.questions?.[questionId];
+          if (isPendingQuestionMetadataPlaceholder(question)) return;
+          const normalizedQuestionId = normalizeQuestionIdKey(question?.id || questionId);
+          if (!normalizedQuestionId || blockedQuestionIds.has(normalizedQuestionId)) return;
+          if (seenQuestionIds.has(normalizedQuestionId)) return;
+          seenQuestionIds.add(normalizedQuestionId);
+          allQuestions.push({
+            id: normalizedQuestionId,
+            creator: question?.creator || '',
+            tags: question?.tags || [],
+            ...(question || {}),
+            sessionSlug: scopeSlug,
+          });
+        });
+      });
+
+      const responseCounts = {};
+      for (const qId in allResponses) {
+        responseCounts[qId] = Object.keys(allResponses[qId] || {}).length;
       }
     } catch (e) {
       surveyLog.error('PileViewMode: Error hydrating filter state', e);

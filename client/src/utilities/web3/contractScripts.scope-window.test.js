@@ -72,7 +72,6 @@ describe('contractScripts.getRelevantBlockWindowForFilter scope windows', () => 
   });
 
   it('uses configured blockLimits.start for demo session windows', async () => {
-    localStorage.setItem('ce:sessionScanSlugs', JSON.stringify(['demo-1']));
     const cfg = makeGroupCfg('demo-1', 44967477);
     const windowForSlug = await contractScripts.getRelevantBlockWindowForFilter(cfg);
 

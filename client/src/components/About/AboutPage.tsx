@@ -24,6 +24,7 @@ import {
   GLOBAL_SESSION_SELECTION_UPDATED_EVENT,
   readStoredGlobalSessionSelection,
 } from '../../utilities/session/globalSessionState.js';
+import { getPrimaryDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
 import { buildPublicRoute } from '../MainSite/urlUtils.js';
 
 const HEADER_LINKS = [

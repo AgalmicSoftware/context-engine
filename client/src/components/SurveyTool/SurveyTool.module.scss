@@ -951,9 +951,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   font-weight: 700;
   text-decoration: underline;
   text-underline-offset: 2px;
-  transition:
-    color 0.18s ease,
-    text-decoration-color 0.18s ease;
+  transition: color 0.18s ease, text-decoration-color 0.18s ease;
 
   &:hover,
   &:focus {

@@ -36,62 +36,15 @@ const treeHasText = (node, text) => {
   return treeHasText(node?.props?.children, text);
 };
 
-const mockQuestionsCache = (networkCache = defaultNetworkCache) =>
-  jest
-    .spyOn(cacheScripts, 'readCache')
-    .mockImplementation(async (namespace) =>
-      namespace === 'questionsCache' ? { 84532: { ...defaultNetworkCache, ...networkCache } } : {},
-    );
-
-const renderPile = (props = {}) =>
-  renderSurveyPileViewMode({
-    minifiedMode: 'pile',
-    network: { id: 84532 },
-    networkChainId: 84532,
-    account: '',
-    loginComplete: false,
-    sessionSlug: 'edge',
-    cacheHasLoaded: true,
-    isQuestionCacheReady: false,
-    questionResponsesNonce: 2,
-    questionsCacheNonce: 2,
-    questionScanProgress: defaultQuestionScanProgress,
-    onFilterChange: jest.fn(),
-    runtimeStrategy: createPileViewRuntimeStrategy(),
-    ...props,
-  });
-
-const createLegacyChainSessionConfig = () => ({
-  slug: 'edge',
-  networkChainId: 84532,
-  __registry: {
-    sessionIdHex: '0x00112233445566778899aabbccddeeff',
-    registryChainId: 84532,
-  },
-});
-
-const createDefaultGatedSessionConfig = () => ({
-  ...createLegacyChainSessionConfig(),
-  __registry: {
-    ...createLegacyChainSessionConfig().__registry,
-    gateAuthority: 'onchain',
-    gatesByResource: {
-      default: {
-        lookupStatus: 'ok',
-        sbtAddresses: [SESSION_SBT],
-        chainId: 84532,
-        mode: 'any',
-      },
-    },
-  },
-});
-
-const mockSbtLabels = () =>
-  jest
-    .spyOn(sbtDisplayNameUtils, 'resolveSbtDisplayLabel')
-    .mockImplementation(({ address }) =>
-      String(address || '').toLowerCase() === SESSION_SBT.toLowerCase() ? 'Session SBT' : 'VIP SBT',
-    );
+const treeHasLinkHref = (node, href) => {
+  if (node == null) return false;
+  const expandedNode = expandInspectableNode(node);
+  if (expandedNode !== node) return treeHasLinkHref(expandedNode, href);
+  if (Array.isArray(node)) return node.some((child) => treeHasLinkHref(child, href));
+  if (typeof node !== 'object') return false;
+  if (node?.type === 'a' && node?.props?.href === href) return true;
+  return treeHasLinkHref(node?.props?.children, href);
+};
 
 describe('SurveyPileViewMode gated empty states', () => {
   afterEach(() => {
@@ -354,9 +307,13 @@ describe('SurveyPileViewMode gated empty states', () => {
     };
 
     const tree = subject.render();
+    const expectedSbtHref = buildSbtDetailPath(gateSbt, 'edge');
     expect(treeHasDataTestId(tree, E2E_TESTIDS.SURVEY_LOCKED_BANNER)).toBe(true);
     expect(treeHasText(tree, `This session's questions are ${t('gatedLower')}`)).toBe(true);
-    expect(treeHasText(tree, `${t('sbt')} required: VIP SBT. Connect an eligible ${t('walletLower')} that satisfies the ${t('gateLower')} requirements below, then decrypt to view the questions.`)).toBe(true);
+    expect(treeHasText(tree, t('sbt'))).toBe(true);
+    expect(treeHasText(tree, 'required:')).toBe(true);
+    expect(treeHasText(tree, `Connect an eligible ${t('walletLower')} that satisfies the ${t('gateLower')} requirements below, then decrypt to view the questions.`)).toBe(true);
+    expect(treeHasLinkHref(tree, expectedSbtHref)).toBe(true);
     expect(treeHasText(tree, 'VIP Gate')).toBe(false);
     expect(treeHasText(tree, 'VIP SBT')).toBe(true);
     expect(treeHasText(tree, 'Retry decrypt')).toBe(false);
