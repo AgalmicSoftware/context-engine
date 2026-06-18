@@ -53,6 +53,10 @@ The main consumers of this folder are:
 - [`CommunityTab.tsx`](../../components/CommunityTab/CommunityTab.tsx)
 - [`SimUserPage.tsx`](../../components/UserPage/SimUserPage.tsx)
 
+## Temporary Demo Session Seed
+
+`demo_sessions.json` keeps `demo-1` as a temporary display/question compatibility seed until the Cloudflare-backed demo session replaces the Arweave/on-chain preload path. Worker URLs, faucet sponsorship, and gate authority must stay in the live SessionRegistry plus Worker KV config, not in this fixture. Remove the preloaded question IDs when the pure Cloudflare demo session ships.
+
 ## Conceptual Data Pipeline
 
 This is the logical relationship between the core demo fixtures. It describes how the datasets build on each other; it is not an automated build graph by itself.

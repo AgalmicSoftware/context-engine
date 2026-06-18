@@ -66,6 +66,16 @@ describe('corsProxy fallback policy', () => {
     expect(resolved.url).toBe(expectedSharedFallbackWorkerUrl);
   });
 
+  it('does not use local demo-1 fixture data as worker authority', async () => {
+    const resolved = await resolveCorsProxyUrl({
+      sessionSlug: 'demo-1',
+      sessionConfig: demoSessions['demo-1'],
+    });
+
+    expect(resolved.status).toBe('missing');
+    expect(resolved.url).toBe('');
+  });
+
   it('suppresses shared fallback for non-general slugs with missing worker URL', async () => {
     const resolved = await resolveCorsProxyUrl({
       sessionSlug: 'test-3',

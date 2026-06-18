@@ -212,6 +212,156 @@ describe('contractHelpers sendTestnetFunds', () => {
     );
   });
 
+  it('uses the session chain for faucet auth when the wallet is on a different network', async () => {
+    const fetchWorkerWithAuth = jest.fn(async () => ({
+      ok: true,
+      json: async () => ({ ok: true, txHash: '0xop123' }),
+    }));
+    const getCorsProxyUrlOrThrow = jest.fn(async () => 'https://worker.example.com/base/');
+    const helper = createContractHelperMethods({
+      resolveSession: jest.fn(() => ({ slug: 'demo-1', networkChainId: 11155420 })),
+      latestBlockCache: {},
+      gasPriceCache: {},
+      BLOCK_CACHE_MS: 1000,
+      getReadProviderForGroup: jest.fn(),
+      shouldLog: jest.fn(() => false),
+      rpcLog: jest.fn(),
+      callWithRetry: jest.fn(),
+      MAX_CACHE_SIZE: 50,
+      isLogsRangeTooLargeError: jest.fn(() => false),
+      contractsLog: { warn: jest.fn(), log: jest.fn() },
+      getReadProviderForChain: jest.fn(),
+      normalizeSessionSlug: jest.fn((value) => value),
+      shouldBypassSessionScopeWindow: jest.fn(() => false),
+      getScopeDecisionForSlug: jest.fn(() => null),
+      logScopeWindowSkipOnce: jest.fn(),
+      parsePositiveBlockNumber: jest.fn(() => null),
+      resolveSessionStartFromRegistry: jest.fn(() => null),
+      DEFAULT_CHAIN_ID: 11155420,
+      store: {
+        getState: () => ({
+          profile: {
+            account: '0x1111111111111111111111111111111111111111',
+            provider: 'wagmi',
+            network: { id: 84532, chainId: 84532 },
+          },
+          sessionState: { activeSessionSlug: 'demo-1' },
+        }),
+      },
+      getSessionConfigBySlug: jest.fn(() => ({
+        slug: 'demo-1',
+        networkChainId: 11155420,
+      })),
+      getCorsProxyUrlOrThrow,
+      fetchWorkerWithAuth,
+    });
+
+    const recipientAddress = '0x1111111111111111111111111111111111111111';
+    await helper.sendTestnetFunds(recipientAddress, 'demo-1');
+
+    expect(getCorsProxyUrlOrThrow).toHaveBeenCalledWith(expect.objectContaining({
+      sessionSlug: 'demo-1',
+      context: expect.objectContaining({
+        chainId: 11155420,
+      }),
+    }));
+    expect(fetchWorkerWithAuth).toHaveBeenCalledWith(
+      'https://worker.example.com/base',
+      expect.any(Object),
+      expect.objectContaining({
+        sessionSlug: 'demo-1',
+        context: expect.objectContaining({
+          chainId: 11155420,
+        }),
+      })
+    );
+  });
+
+  it('refreshes session registry fields once when faucet worker URL resolution sees a stale cache', async () => {
+    const staleConfig = {
+      slug: 'demo-1',
+      networkChainId: 11155420,
+      __registry: { registryChainId: 11155420 },
+    };
+    const refreshedConfig = {
+      ...staleConfig,
+      corsWorkerUrl: 'https://demo-worker.example',
+      sponsoredKeys: { faucet: true },
+    };
+    const fetchWorkerWithAuth = jest.fn(async () => ({
+      ok: true,
+      json: async () => ({ ok: true, txHash: '0xrefreshed123' }),
+    }));
+    const refreshSessionRegistryFieldsCache = jest.fn(async () => refreshedConfig);
+    const getCorsProxyUrlOrThrow = jest.fn()
+      .mockRejectedValueOnce(new Error('Worker URL is not configured.'))
+      .mockResolvedValueOnce('https://demo-worker.example/');
+    const getSessionConfigBySlug = jest.fn(() => staleConfig);
+    const helper = createContractHelperMethods({
+      resolveSession: jest.fn(() => staleConfig),
+      latestBlockCache: {},
+      gasPriceCache: {},
+      BLOCK_CACHE_MS: 1000,
+      getReadProviderForGroup: jest.fn(),
+      shouldLog: jest.fn(() => false),
+      rpcLog: jest.fn(),
+      callWithRetry: jest.fn(),
+      MAX_CACHE_SIZE: 50,
+      isLogsRangeTooLargeError: jest.fn(() => false),
+      contractsLog: { warn: jest.fn(), log: jest.fn() },
+      getReadProviderForChain: jest.fn(),
+      normalizeSessionSlug: jest.fn((value) => value),
+      shouldBypassSessionScopeWindow: jest.fn(() => false),
+      getScopeDecisionForSlug: jest.fn(() => null),
+      logScopeWindowSkipOnce: jest.fn(),
+      parsePositiveBlockNumber: jest.fn(() => null),
+      resolveSessionStartFromRegistry: jest.fn(() => null),
+      DEFAULT_CHAIN_ID: 11155420,
+      store: {
+        getState: () => ({
+          profile: {
+            account: '0x1111111111111111111111111111111111111111',
+            provider: 'wagmi',
+            network: { id: 84532, chainId: 84532 },
+          },
+          sessionState: { activeSessionSlug: 'demo-1' },
+        }),
+      },
+      getSessionConfigBySlug,
+      refreshSessionRegistryFieldsCache,
+      getCorsProxyUrlOrThrow,
+      fetchWorkerWithAuth,
+    });
+
+    const recipientAddress = '0x1111111111111111111111111111111111111111';
+    const result = await helper.sendTestnetFunds(recipientAddress, 'demo-1');
+
+    expect(refreshSessionRegistryFieldsCache).toHaveBeenCalledTimes(1);
+    expect(refreshSessionRegistryFieldsCache).toHaveBeenCalledWith(expect.objectContaining({
+      chainId: 11155420,
+      slug: 'demo-1',
+      providerLike: 'wagmi',
+    }));
+    expect(getCorsProxyUrlOrThrow).toHaveBeenCalledTimes(2);
+    expect(getCorsProxyUrlOrThrow).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      sessionSlug: 'demo-1',
+      sessionConfig: staleConfig,
+    }));
+    expect(getCorsProxyUrlOrThrow).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      sessionSlug: 'demo-1',
+      sessionConfig: refreshedConfig,
+    }));
+    expect(fetchWorkerWithAuth).toHaveBeenCalledWith(
+      'https://demo-worker.example',
+      expect.any(Object),
+      expect.objectContaining({
+        sessionSlug: 'demo-1',
+        workerUrl: 'https://demo-worker.example',
+      })
+    );
+    expect(result).toEqual({ ok: true, txHash: '0xrefreshed123' });
+  });
+
   it('retries testnet funding against the sponsored source session when the requested session is not deployable yet', async () => {
     sessionStorage.setItem(SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY, JSON.stringify({
       sessionSlug: 'source-session',
