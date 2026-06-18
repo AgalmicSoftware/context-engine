@@ -1,5 +1,6 @@
 import { ethers } from 'ethers';
 
+import demo1OnchainQuestionIds from '../../variables/demo/demo_1_onchain_question_ids.json';
 import demoPolisData from '../../variables/demo/demo_polis_data.json';
 import { normalizeSessionSlug } from './sessionNaming.js';
 
@@ -45,16 +46,18 @@ const splitSources = (value: unknown): string[] => (
 const buildDemoQuestionFromComment = (
   comment: DemoComment,
   index: number,
-  sessionConfig: DemoSessionConfig = {}
+  sessionConfig: DemoSessionConfig = {},
+  onchainQuestionId: unknown = ''
 ): DemoQuestion | null => {
   const sourceCommentId = String(comment?.commentId || '').trim();
   const prompt = String(comment?.commentBody || '').trim();
   if (!sourceCommentId || !prompt) return null;
 
+  const canonicalQuestionId = String(onchainQuestionId || '').trim().toLowerCase();
   const fixtureType = String(comment?.type || '').trim().toLowerCase() || 'freeform';
   const type = fixtureType === 'poll' ? 'multichoice' : fixtureType;
   const question: DemoQuestion = {
-    id: ethers.utils.id(`${TEMPORARY_DEMO_QUESTION_SLUG}:${sourceCommentId}`),
+    id: canonicalQuestionId || ethers.utils.id(`${TEMPORARY_DEMO_QUESTION_SLUG}:${sourceCommentId}`),
     type,
     prompt,
     tags: uniqueStrings([
@@ -74,6 +77,7 @@ const buildDemoQuestionFromComment = (
       sourceSessionSlug: 'demo',
       fixtureFile: 'client/src/variables/demo/demo_polis_data.json',
       fixturePath: 'comments',
+      onchainQuestionIdsFile: 'client/src/variables/demo/demo_1_onchain_question_ids.json',
       sourceCommentIndex: index,
       sourceCommentId,
       fixtureType,
@@ -110,8 +114,8 @@ export const getTemporaryDemoSessionQuestionFixtures = (
   const comments = Array.isArray((demoPolisData as Record<string, unknown>)?.comments)
     ? ((demoPolisData as Record<string, unknown>).comments as DemoComment[])
     : [];
+  const questionIds = Array.isArray(demo1OnchainQuestionIds) ? demo1OnchainQuestionIds : [];
   return comments
-    .map((comment, index) => buildDemoQuestionFromComment(comment, index, sessionConfig))
+    .map((comment, index) => buildDemoQuestionFromComment(comment, index, sessionConfig, questionIds[index]))
     .filter((question): question is DemoQuestion => !!question);
 };
-
