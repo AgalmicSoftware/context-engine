@@ -2025,15 +2025,7 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
       isLoading: isSelectorLoading,
     });
     const headerLoadingStatus = headerLoadingStatusState.shouldRenderHeaderLoadingStatus
-      ? (
-        <span
-          className={styles.loadingStatusSrOnly}
-          data-testid={E2E_TESTIDS.SBT_SELECTOR_LOADING_STATUS}
-          aria-live="polite"
-        >
-          {this.getLoadingStatusText({ compact: true })}
-        </span>
-      )
+      ? this.renderLoadingStatus({ compact: true, includeTestId: true })
       : null;
 
     return (

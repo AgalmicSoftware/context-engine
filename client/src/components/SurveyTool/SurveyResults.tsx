@@ -55,6 +55,7 @@ import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { callAI } from '../../utilities/ai/aiScripts.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
+import { isDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
 import {
   resolveSurveyResultsExplicitSessionSlug,
   resolveSurveyResultsQuestionReadScope,
@@ -1604,9 +1605,9 @@ const handleFilterActivityChange = (isActive: unknown): void => {
     setState(asSurveyResultsStatePatch(buildSurveyResultsFilterActivePatch(isActive)));
   };
 
-const getIsDemoQuestionResultsContext = (): boolean => (
-    String(stateRef.current.viewMode || '').trim().toLowerCase() === 'questions' &&
-    normalizeSessionSlug(getEffectiveSlug()) === 'demo'
+  getIsDemoQuestionResultsContext = (): boolean => (
+    String(this.state.viewMode || '').trim().toLowerCase() === 'questions' &&
+    isDemoSessionSlug(this.getEffectiveSlug())
   );
 
 const handleDemoResultsViewSelect = (nextView: unknown = 'report'): void => {
@@ -2688,8 +2689,8 @@ const candidates = [
   propsRef.current.activeSessionSlug,
   stateRef.current.surveyTitle,
 ].map((value) => String(value || '').trim().toLowerCase());
-return candidates.includes('demo');
-};
+return candidates.some((value) => isDemoSessionSlug(value));
+}
 
 const isHtmlReportDemoModeActive = (): boolean => (
   isHtmlReportDemoSession() && !!stateRef.current.htmlReportDemoMode

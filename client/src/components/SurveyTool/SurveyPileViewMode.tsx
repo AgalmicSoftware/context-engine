@@ -90,6 +90,7 @@ import {
 import {
   loadPileScopeCacheSnapshot,
 } from './surveyPileScopeCacheData';
+import { isPendingQuestionMetadataPlaceholder } from './surveyQuestionMetadataPlaceholders.js';
 import {
   buildPileFilterResultPlan,
   buildPileLoadResultPlan,
@@ -745,6 +746,7 @@ function buildWarmPileSeedState(engine: PileViewModeEngine, propsIn: any = engin
         mergeQuestionResponsesForPile(allResponses, networkCache.questionResponses || {});
         Object.keys(networkCache.questions || {}).forEach((questionId: any) => {
           const question = networkCache.questions?.[questionId];
+          if (isPendingQuestionMetadataPlaceholder(question)) return;
           const normalizedQuestionId = normalizeQuestionIdKey(question?.id || questionId);
           if (!normalizedQuestionId || blockedQuestionIds.has(normalizedQuestionId)) return;
           if (seenQuestionIds.has(normalizedQuestionId)) return;

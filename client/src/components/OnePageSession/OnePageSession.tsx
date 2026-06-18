@@ -2145,33 +2145,8 @@ class OnePageSession extends Component<any, any> {
       null;
     const scopedLitHooks = this.resolveScopedLitHooks(resolvedSessionConfig);
     const effectiveSlug = resolveEffectiveSlug(this.props) || slug;
-    const surveySessionSlug = resolveOnePageSessionSurveySlug({
-      ...this.props,
-      sessionConfig: resolvedSessionConfig,
-    });
     // Only show demo-specific result surfaces on configured public demo sessions.
     const isDemoSlug = isDemoSessionSlug(effectiveSlug);
-    const displaySessionSlug = normalizeOnePageSessionSlug(effectiveSlug || slug);
-    const demoQuestionPool = resolvePolisDemoQuestionPool({
-      displaySlug: displaySessionSlug,
-      sourceSlug: surveySessionSlug,
-    });
-    const scopedDemoQuestionPool = demoQuestionPool.length > 0
-      ? demoQuestionPool.map((entry: any) => ({
-          ...entry,
-          sessionSlug: displaySessionSlug,
-          sessionSlugExplicit: true,
-        }))
-      : [];
-    const sharedQuestionPool = scopedDemoQuestionPool.length > 0 ? scopedDemoQuestionPool : undefined;
-    const embeddedQuestionSessionSlug = sharedQuestionPool ? displaySessionSlug : surveySessionSlug;
-    const embeddedGroupsSessionSlug = displaySessionSlug || surveySessionSlug;
-    const embeddedGroupsSessionConfig = isDemoSlug
-      ? {
-          ...resolvedSessionConfig,
-          slug: embeddedGroupsSessionSlug,
-        }
-      : resolvedSessionConfig;
     const resultsViewMode = isDemoSlug ? this.state.resultsViewMode : 'polis';
     const resultsViewOptions = [
       { key: 'polis', label: 'Report', icon: '🧾' },

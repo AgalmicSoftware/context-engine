@@ -721,6 +721,13 @@ describe('PolisReport demo data defaults', () => {
     expect(screen.getByTestId(E2E_TESTIDS.POLIS_DEMO_DATA_TOGGLE)).toBeChecked();
   });
 
+  it('shows the demo data toggle as enabled by default for demo-1', () => {
+    const { container } = render(<PolisReport {...baseReportProps} slug="demo-1" />);
+
+    expect(container.querySelector('.settingsRow')).toHaveClass('pdfIgnore');
+    expect(screen.getByTestId(E2E_TESTIDS.POLIS_DEMO_DATA_TOGGLE)).toBeChecked();
+  });
+
   it('includes the participants list in the global collapse and expand controls', async () => {
     const demoDataset = getPolisDemoDatasetForSlug('demo');
     const participant = Array.isArray(demoDataset?.participantsVotes)

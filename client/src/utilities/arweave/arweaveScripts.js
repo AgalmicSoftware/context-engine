@@ -1341,6 +1341,20 @@ const shouldUseShortNotFoundCooldown = (debugContext = null) => {
   return resolvePreflightTxExistenceDecision({}, debugContext).enabled === false;
 };
 
+const resolveDownloadGatewaysForContext = (opts = {}, debugContext = null) => {
+  void debugContext;
+  const configuredGateways = Array.isArray(opts.gateways) && opts.gateways.length
+    ? normalizeGatewayList(opts.gateways)
+    : [];
+  if (configuredGateways.length) return configuredGateways;
+  return getDefaultArweaveGateways();
+};
+
+const resolveDirectToArIoForContext = (opts = {}, debugContext = null) => {
+  void debugContext;
+  return isDirectToArIoEnabled(opts);
+};
+
 const shouldLogArweaveFetchDebug = (opts = {}, debugContext = null) => {
   if (opts?.debugArweave === true) return true;
   if (debugContext?.enabled === true) return true;

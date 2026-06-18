@@ -26,6 +26,7 @@ import {
   GLOBAL_SESSION_SELECTION_UPDATED_EVENT,
   readStoredGlobalSessionSelection,
 } from '../../utilities/session/globalSessionState.js';
+import { getPrimaryDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
 import { buildPublicRoute } from '../MainSite/urlUtils.js';
 
 type RecognitionLink = {
@@ -202,7 +203,7 @@ export const getAboutDemoSessionPath = (selection = readStoredGlobalSessionSelec
     const firstScopedSlug = derivePrimarySessionSlugFromList(selection?.selectedSessionSlugs || []);
     if (firstScopedSlug) return `/session/${encodeURIComponent(firstScopedSlug)}`;
   }
-  return '/session/demo';
+  return `/session/${encodeURIComponent(getPrimaryDemoSessionSlug())}`;
 };
 
 const getRecognitionSlug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-');

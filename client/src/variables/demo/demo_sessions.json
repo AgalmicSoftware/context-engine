@@ -44,7 +44,7 @@
   "demo-1": {
     "networkChainId": 11155420,
     "slug": "demo-1",
-    "sessionName": "Demo Session",
+    "sessionName": "Context Demo",
     "sessionInfo": "Public demo session seeded from the Context corpus fixture.",
     "sessionHeaderImg": null,
     "corsWorkerUrl": "",
@@ -84,8 +84,7 @@
       "sourceSessionSlug": "demo",
       "questionFixture": "client/src/variables/demo/demo_polis_data.json#comments",
       "questionCount": 42,
-      "questionIds": "client/src/variables/demo/demo_1_onchain_question_ids.json",
-      "questionIdStrategy": "preload OP Sepolia QuestionsAdded IDs; IDs were originally derived with ethers.utils.id(\"demo-1:\" + sourceCommentId)",
+      "questionIdStrategy": "ethers.utils.id(\"demo-1:\" + sourceCommentId)",
       "featuredSbtCount": 3,
       "removalNote": "Remove after the Cloudflare-backed demo question/response session replaces this temporary Arweave/on-chain seed."
     },

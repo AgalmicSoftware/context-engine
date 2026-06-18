@@ -40,6 +40,7 @@ import { analyzeClusterOpinions } from '../../utilities/ai/aiScripts.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { peekCacheSync } from '../../utilities/cache/cacheScripts.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
+import { isDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
 import {
   buildQuestionScanProgressDisplay,
   doesQuestionProgressMatchSlug,
@@ -1482,7 +1483,7 @@ export default function PolisReport({
   };
 
   // Show/hide the top settings row
-  const [showSettingsRow, setShowSettingsRow] = useState<boolean>(() => activeReportSlug === 'demo');
+  const [showSettingsRow, setShowSettingsRow] = useState<boolean>(() => isDemoSessionSlug(activeReportSlug));
   const [reportStyle, setReportStyle] = useState<string>('original');
   const embeddingDefaultSignatureRef = useRef<string>(
     `${activeReportSlug}|${defaultEmbeddingChoice}|${defaultManualClusterCount}`
@@ -1590,7 +1591,7 @@ export default function PolisReport({
   const shouldUsePrecomputedDemoClusters = !!(
     precomputedDemoClusterState
     && isDemoSessionSlug(activeReportSlug)
-    && effectiveUseDemoData
+    && useDemoData
     && activeDemoData === DEFAULT_POLIS_DEMO_DATA
     && embeddingChoice === 'POLIS'
     && manualClusterCountValue === null

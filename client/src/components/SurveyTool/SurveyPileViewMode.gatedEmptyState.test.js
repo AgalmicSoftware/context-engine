@@ -5,6 +5,7 @@ import { createPileViewRuntimeStrategy } from './SurveyPileViewMode';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as sbtDisplayNameUtils from '../../utilities/sbt/sbtDisplayNames.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
 
 const SESSION_SBT = '0x1111111111111111111111111111111111111111';
@@ -73,6 +74,16 @@ const mockSbtLabels = () => (
       : 'VIP SBT'
   ))
 );
+
+const treeHasLinkHref = (node, href) => {
+  if (node == null) return false;
+  const expandedNode = expandInspectableNode(node);
+  if (expandedNode !== node) return treeHasLinkHref(expandedNode, href);
+  if (Array.isArray(node)) return node.some((child) => treeHasLinkHref(child, href));
+  if (typeof node !== 'object') return false;
+  if (node?.type === 'a' && node?.props?.href === href) return true;
+  return treeHasLinkHref(node?.props?.children, href);
+};
 
 describe('SurveyPileViewMode gated empty states', () => {
   afterEach(() => {
@@ -191,7 +202,27 @@ describe('SurveyPileViewMode gated empty states', () => {
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SURVEY_LOCKED_BANNER_CARET));
 
-    expect(screen.getByText('VIP Gate')).toBeInTheDocument();
-    expect(screen.getAllByText(/VIP SBT/).length).toBeGreaterThan(0);
+    const tree = subject.render();
+    const expectedSbtHref = buildSbtDetailPath(gateSbt, 'edge');
+    expect(treeHasDataTestId(tree, E2E_TESTIDS.SURVEY_LOCKED_BANNER)).toBe(true);
+    expect(treeHasText(tree, `This session's questions are ${t('gatedLower')}`)).toBe(true);
+    expect(treeHasText(tree, t('sbt'))).toBe(true);
+    expect(treeHasText(tree, 'required:')).toBe(true);
+    expect(treeHasText(tree, `Connect an eligible ${t('walletLower')} that satisfies the ${t('gateLower')} requirements below, then decrypt to view the questions.`)).toBe(true);
+    expect(treeHasLinkHref(tree, expectedSbtHref)).toBe(true);
+    expect(treeHasText(tree, 'VIP Gate')).toBe(false);
+    expect(treeHasText(tree, 'VIP SBT')).toBe(true);
+    expect(treeHasText(tree, 'Retry decrypt')).toBe(false);
+    expect(treeHasText(tree, 'Decrypt')).toBe(true);
+    expect(treeHasDataTestId(tree, E2E_TESTIDS.SURVEY_LOCKED_BANNER_CARET)).toBe(true);
+
+    subject.state = {
+      ...subject.state,
+      lockedGateDetailsExpanded: true,
+    };
+
+    const expandedTree = subject.render();
+    expect(treeHasText(expandedTree, 'VIP Gate')).toBe(true);
+    expect(treeHasText(expandedTree, 'VIP SBT')).toBe(true);
   });
 });
