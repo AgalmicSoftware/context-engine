@@ -54,19 +54,9 @@ The main consumers of this folder are:
 - [`CommunityTab.tsx`](../../components/CommunityTab/CommunityTab.tsx)
 - [`SimUserPage.tsx`](../../components/UserPage/SimUserPage.tsx)
 
-## Default Cloudflare Demo Session
+## Temporary Demo Session Seed
 
-`demo-sh` is the first/default public demo slug. Its dedicated full Session
-Worker is worker-canonical, uses Cloudflare KV for all 42 question payloads,
-accepts `https://contextengine.sh` and `https://www.contextengine.sh`, and has
-embedded deploy-helper capability disabled. The checked-in entry contains the
-public bootstrap identity and Worker URL needed to discover `/session-config`;
-the live Worker KV remains authoritative for operational configuration.
-
-The question fixture supplies an immediate client rendering of the same
-stable IDs and prompts stored in `demo-sh` KV. These rows are marked
-`cloudflareDemoSeed`, not `temporaryDemoSeed`. `demo-1` remains in the fixture
-as a temporary compatibility route while links migrate.
+`demo_sessions.json` keeps `demo-1` as a temporary display/question compatibility seed until the Cloudflare-backed demo session replaces the Arweave/on-chain preload path. Worker URLs, faucet sponsorship, and gate authority must stay in the live SessionRegistry plus Worker KV config, not in this fixture. Remove the preloaded question IDs when the pure Cloudflare demo session ships.
 
 ## Conceptual Data Pipeline
 

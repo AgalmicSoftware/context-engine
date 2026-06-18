@@ -1259,20 +1259,17 @@ const mergeSessionFieldsIntoCachedConfig = ({
   session,
   fieldsByKey,
   registryChainId,
-}: {
-  baseConfig?: AnyRecord | null;
-  session?: AnyRecord | null;
-  fieldsByKey?: AnyRecord | null;
-  registryChainId?: number | string | null;
 }) => {
   const base = normalizeSessionNaming(
-    baseConfig && typeof baseConfig === 'object' ? { ...baseConfig } : {},
-  ) as AnyRecord;
-  const registryMeta = base.__registry && typeof base.__registry === 'object' ? base.__registry : {};
+    baseConfig && typeof baseConfig === 'object' ? { ...baseConfig } : {}
+  );
+  const registryMeta = base.__registry && typeof base.__registry === 'object'
+    ? base.__registry
+    : {};
   const sessionIdHex = normalizeSessionIdHex(session?.sessionIdHex || session?.sessionId || registryMeta.sessionIdHex);
   const sessionId = formatSessionId(sessionIdHex);
   const networkChainId = Number(session?.chainId || base.networkChainId || registryMeta.chainId || 0) || null;
-  const config: AnyRecord = {
+  const config = {
     ...base,
     slug: normalizeSlug(session?.slug || base.slug),
     ...(sessionId ? { sessionId } : {}),
@@ -1280,8 +1277,8 @@ const mergeSessionFieldsIntoCachedConfig = ({
   };
 
   const resolvedChainId = Number(networkChainId || 0) || 0;
-  const chainContractsRaw: AnyRecord = resolvedChainId ? getSessionContractsForChain(resolvedChainId) : {};
-  const chainContracts = REGISTRY_CONTRACT_DEFAULT_KEYS.reduce<AnyRecord>((acc, key) => {
+  const chainContractsRaw = resolvedChainId ? getSessionContractsForChain(resolvedChainId) : {};
+  const chainContracts = REGISTRY_CONTRACT_DEFAULT_KEYS.reduce((acc, key) => {
     const value = toStr(chainContractsRaw?.[key]).trim();
     if (!value) return acc;
     acc[key] = { address: value, chainId: resolvedChainId };
@@ -1316,7 +1313,6 @@ const mergeSessionFieldsIntoCachedConfig = ({
     metadataURI: session?.metadataURI || registryMeta.metadataURI || '',
     encryptedMetadataURI: session?.encryptedMetadataURI || registryMeta.encryptedMetadataURI || '',
     adminAddress: session?.adminAddress || registryMeta.adminAddress || null,
-    createdAt: session?.createdAt || registryMeta.createdAt || null,
     updatedAt: session?.updatedAt || registryMeta.updatedAt || null,
     sessionId: sessionId || registryMeta.sessionId || null,
     sessionIdHex: sessionIdHex || registryMeta.sessionIdHex || null,
@@ -1327,7 +1323,7 @@ const mergeSessionFieldsIntoCachedConfig = ({
   return normalizeSessionNaming(config);
 };
 
-const addSessionConfigToCache = (cache: RegistryCache | null, config: AnyRecord | null, opts: AnyRecord = {}) => {
+const addSessionConfigToCache = (cache, config, opts = {}) => {
   if (!cache || !config || typeof config !== 'object') return;
   const slug = normalizeSlug(config.slug);
 
@@ -1570,6 +1566,62 @@ export const refreshSessionRegistryFieldsCache = async ({
   chainId,
   slug,
   sessionId,
+  providerLike,
+  fieldKeys,
+  bootstrapRpc,
+} = {}) => {
+  const registrySlug = toRegistrySlug(slug || '');
+  const existingConfig = sessionRegistryStore.getSessionConfig(registrySlug);
+  const existingRegistry = existingConfig?.__registry && typeof existingConfig.__registry === 'object'
+    ? existingConfig.__registry
+    : {};
+  const resolvedChainId = Number(
+    chainId ||
+    existingRegistry.registryChainId ||
+    existingRegistry.chainId ||
+    existingConfig?.networkChainId ||
+    0
+  ) || 0;
+  if (!resolvedChainId) throw new Error('Registry chain id is required.');
+
+  const useBootstrapRpc = typeof bootstrapRpc === 'boolean' ? bootstrapRpc : true;
+  let contract = getRegistryContract(resolvedChainId, null, { bootstrapRpc: useBootstrapRpc });
+  if (!contract && providerLike) {
+    const provider = cryptoUtils._getProvider(providerLike || 'wagmi');
+    contract = getRegistryContract(
+      resolvedChainId,
+      new ethers.providers.Web3Provider(provider, 'any'),
+      { bootstrapRpc: useBootstrapRpc }
+    );
+  }
+  if (!contract) throw new Error('Session registry contract not configured.');
+
+  const sessionIdHex = normalizeSessionIdHex(sessionId);
+  const tuple = await resolveSessionTuple({
+    contract,
+    registrySlug,
+    sessionIdHex,
+  });
+  const session = decodeSessionTuple(tuple);
+  if (!session || !session.slug) return null;
+
+  const fieldsByKey = await fetchSessionFields(
+    contract,
+    session.slug,
+    Array.isArray(fieldKeys) && fieldKeys.length ? fieldKeys : DEFAULT_FIELDS
+  );
+  const config = mergeSessionFieldsIntoCachedConfig({
+    baseConfig: existingConfig,
+    session,
+    fieldsByKey,
+    registryChainId: resolvedChainId,
+  });
+  upsertSessionRegistryCache({ config });
+  return config;
+};
+
+export const loadSessionRegistryCache = async ({
+  chainIds,
   providerLike,
   fieldKeys,
   bootstrapRpc,

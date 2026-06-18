@@ -209,7 +209,6 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     mockedGetDemoSessionConfigBySlug.mockReturnValue(null);
     localStorage.clear();
     mockedGetSessionNetwork.mockReturnValue({ id: 84532, chainId: 84532, name: 'Base Sepolia' });
-    window.history.replaceState({}, '', '/');
   });
 
   it('does not update local state after unmount while session restore is pending', async () => {
@@ -871,28 +870,20 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
   });
 
   it('uses the active session chain for faucet requests even when the wallet is on another chain', async () => {
-    enableRegistryFundingForAllSessions();
-    mockedGetSessionConfigBySlugOrDefault.mockImplementation((slug: string) =>
-      buildRegistryFundingConfig(String(slug || ''), slug === 'demo-1' ? 11155420 : 84532),
-    );
-    mockedGetSessionNetwork.mockImplementation((slug: string) =>
+    mockedGetSessionNetwork.mockImplementation((slug: string) => (
       slug === 'demo-1'
         ? { id: 11155420, chainId: 11155420, name: 'OP Sepolia' }
-        : { id: 84532, chainId: 84532, name: 'Base Sepolia' },
-    );
-    const subject = mountClassSubject(
-      new LoginAndSettingsModalSubject(
-        buildProps({
-          account: WAGMI_ADDRESS,
-          loginComplete: true,
-          provider: 'wagmi',
-          activeSessionSlug: 'demo-1',
-          network: { id: 84532, chainId: 84532, name: 'Base Sepolia' },
-          wagmiNetwork: { id: 84532, chainId: 84532, name: 'Base Sepolia' },
-          wagmiBalance: { data: { value: 0n } },
-        }),
-      ),
-    );
+        : { id: 84532, chainId: 84532, name: 'Base Sepolia' }
+    ));
+    const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps({
+      account: WAGMI_ADDRESS,
+      loginComplete: true,
+      provider: 'wagmi',
+      activeSessionSlug: 'demo-1',
+      network: { id: 84532, chainId: 84532, name: 'Base Sepolia' },
+      wagmiNetwork: { id: 84532, chainId: 84532, name: 'Base Sepolia' },
+      wagmiBalance: { data: { value: 0n } },
+    })));
 
     await subject.checkAndSendTestFundsIfNeeded();
 
@@ -906,7 +897,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
           chainId: 11155420,
           walletChainId: 84532,
         }),
-      }),
+      })
     );
   });
 

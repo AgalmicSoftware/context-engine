@@ -274,14 +274,12 @@ describe('contractHelpers sendTestnetFunds', () => {
     const recipientAddress = '0x1111111111111111111111111111111111111111';
     await helper.sendTestnetFunds(recipientAddress, 'demo-1');
 
-    expect(getCorsProxyUrlOrThrow).toHaveBeenCalledWith(
-      expect.objectContaining({
-        sessionSlug: 'demo-1',
-        context: expect.objectContaining({
-          chainId: 11155420,
-        }),
+    expect(getCorsProxyUrlOrThrow).toHaveBeenCalledWith(expect.objectContaining({
+      sessionSlug: 'demo-1',
+      context: expect.objectContaining({
+        chainId: 11155420,
       }),
-    );
+    }));
     expect(fetchWorkerWithAuth).toHaveBeenCalledWith(
       'https://worker.example.com/base',
       expect.any(Object),
@@ -290,7 +288,7 @@ describe('contractHelpers sendTestnetFunds', () => {
         context: expect.objectContaining({
           chainId: 11155420,
         }),
-      }),
+      })
     );
   });
 
@@ -310,8 +308,7 @@ describe('contractHelpers sendTestnetFunds', () => {
       json: async () => ({ ok: true, txHash: '0xrefreshed123' }),
     }));
     const refreshSessionRegistryFieldsCache = jest.fn(async () => refreshedConfig);
-    const getCorsProxyUrlOrThrow = jest
-      .fn()
+    const getCorsProxyUrlOrThrow = jest.fn()
       .mockRejectedValueOnce(new Error('Worker URL is not configured.'))
       .mockResolvedValueOnce('https://demo-worker.example/');
     const getSessionConfigBySlug = jest.fn(() => staleConfig);
@@ -355,35 +352,27 @@ describe('contractHelpers sendTestnetFunds', () => {
     const result = await helper.sendTestnetFunds(recipientAddress, 'demo-1');
 
     expect(refreshSessionRegistryFieldsCache).toHaveBeenCalledTimes(1);
-    expect(refreshSessionRegistryFieldsCache).toHaveBeenCalledWith(
-      expect.objectContaining({
-        chainId: 11155420,
-        slug: 'demo-1',
-        providerLike: 'wagmi',
-      }),
-    );
+    expect(refreshSessionRegistryFieldsCache).toHaveBeenCalledWith(expect.objectContaining({
+      chainId: 11155420,
+      slug: 'demo-1',
+      providerLike: 'wagmi',
+    }));
     expect(getCorsProxyUrlOrThrow).toHaveBeenCalledTimes(2);
-    expect(getCorsProxyUrlOrThrow).toHaveBeenNthCalledWith(
-      1,
-      expect.objectContaining({
-        sessionSlug: 'demo-1',
-        sessionConfig: staleConfig,
-      }),
-    );
-    expect(getCorsProxyUrlOrThrow).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({
-        sessionSlug: 'demo-1',
-        sessionConfig: refreshedConfig,
-      }),
-    );
+    expect(getCorsProxyUrlOrThrow).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      sessionSlug: 'demo-1',
+      sessionConfig: staleConfig,
+    }));
+    expect(getCorsProxyUrlOrThrow).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      sessionSlug: 'demo-1',
+      sessionConfig: refreshedConfig,
+    }));
     expect(fetchWorkerWithAuth).toHaveBeenCalledWith(
       'https://demo-worker.example',
       expect.any(Object),
       expect.objectContaining({
         sessionSlug: 'demo-1',
         workerUrl: 'https://demo-worker.example',
-      }),
+      })
     );
     expect(result).toEqual({ ok: true, txHash: '0xrefreshed123' });
   });

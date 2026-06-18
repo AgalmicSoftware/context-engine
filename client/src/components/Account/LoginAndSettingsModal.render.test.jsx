@@ -1158,15 +1158,11 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
   });
 
   it('renders logged-in controls and disconnects wagmi users from the modal', async () => {
-    getSessionConfigBySlugOrDefault.mockImplementation((slug) =>
+    getSessionConfigBySlugOrDefault.mockImplementation((slug) => (
       slug === 'demo-1'
-        ? buildRegistrySessionConfig({
-            slug: 'demo-1',
-            sessionName: 'Demo Session',
-            networkChainId: 11155420,
-          })
-        : {},
-    );
+        ? { slug: 'demo-1', sessionName: 'Demo Session', networkChainId: 11155420 }
+        : {}
+    ));
     const props = buildProps({
       account: WAGMI_ADDRESS,
       activeSessionSlug: 'demo-1',

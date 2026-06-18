@@ -440,14 +440,12 @@ describe('sessionRegistryStore worker config overlay', () => {
 
 describe('refreshSessionRegistryFieldsCache', () => {
   afterEach(() => {
-    try {
-      localStorage.removeItem('dg:sessionRegistryCache:v1');
-    } catch (_) {}
+    try { localStorage.removeItem('dg:sessionRegistryCache:v1'); } catch (_) {}
     jest.restoreAllMocks();
   });
 
   it('updates worker fields without clearing cached metadata or gates', async () => {
-    arweaveClient.downloadDataFromArweave.mockClear();
+    arweaveScripts.downloadDataFromArweave.mockClear();
     const sessionIdHex = '0x00000000000000000000000000000033';
     const txGasGate = {
       lookupStatus: 'ok',
@@ -482,27 +480,20 @@ describe('refreshSessionRegistryFieldsCache', () => {
     });
     const contractMock = {
       getSessionById: jest.fn().mockResolvedValue(null),
-      getSessionBySlug: jest
-        .fn()
-        .mockResolvedValue([
-          'demo-1',
-          CONFIGURED_REGISTRY_CHAIN_ID,
-          'ar://metadata-tx',
-          '',
-          TEST_SIGNER_ADDRESS,
-          1,
-          2,
-          sessionIdHex,
-        ]),
-      getSessionFields: jest.fn(async (_slug, keys) =>
-        keys.map(
-          (key) =>
-            ({
-              corsWorkerUrl: 'https://demo-worker.example',
-              sponsored_faucet: 'true',
-            })[key] || '',
-        ),
-      ),
+      getSessionBySlug: jest.fn().mockResolvedValue([
+        'demo-1',
+        CONFIGURED_REGISTRY_CHAIN_ID,
+        'ar://metadata-tx',
+        '',
+        TEST_SIGNER_ADDRESS,
+        1,
+        2,
+        sessionIdHex,
+      ]),
+      getSessionFields: jest.fn(async (_slug, keys) => keys.map((key) => ({
+        corsWorkerUrl: 'https://demo-worker.example',
+        sponsored_faucet: 'true',
+      }[key] || ''))),
     };
     jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract() {
       return contractMock;
@@ -513,35 +504,29 @@ describe('refreshSessionRegistryFieldsCache', () => {
       slug: 'demo-1',
     });
 
-    expect(arweaveClient.downloadDataFromArweave).not.toHaveBeenCalled();
+    expect(arweaveScripts.downloadDataFromArweave).not.toHaveBeenCalled();
     expect(contractMock.getSessionBySlug).toHaveBeenCalledWith('demo-1');
     expect(contractMock.getSessionFields).toHaveBeenCalledWith(
       'demo-1',
-      expect.arrayContaining(['corsWorkerUrl', 'sponsored_faucet']),
+      expect.arrayContaining(['corsWorkerUrl', 'sponsored_faucet'])
     );
-    expect(refreshed).toEqual(
-      expect.objectContaining({
-        slug: 'demo-1',
-        sessionName: 'Demo Session',
-        corsWorkerUrl: 'https://demo-worker.example',
-        sponsoredKeys: expect.objectContaining({
-          faucet: true,
-        }),
+    expect(refreshed).toEqual(expect.objectContaining({
+      slug: 'demo-1',
+      sessionName: 'Demo Session',
+      corsWorkerUrl: 'https://demo-worker.example',
+      sponsoredKeys: expect.objectContaining({
+        faucet: true,
       }),
-    );
+    }));
     expect(refreshed.__registry.gatesByResource.txGas).toEqual(txGasGate);
-    expect(refreshed.__registry.fields).toEqual(
-      expect.objectContaining({
-        corsWorkerUrl: 'https://demo-worker.example',
-        sponsored_faucet: 'true',
-      }),
-    );
-    expect(sessionRegistryStore.getSessionConfig('demo-1')).toEqual(
-      expect.objectContaining({
-        corsWorkerUrl: 'https://demo-worker.example',
-        sessionName: 'Demo Session',
-      }),
-    );
+    expect(refreshed.__registry.fields).toEqual(expect.objectContaining({
+      corsWorkerUrl: 'https://demo-worker.example',
+      sponsored_faucet: 'true',
+    }));
+    expect(sessionRegistryStore.getSessionConfig('demo-1')).toEqual(expect.objectContaining({
+      corsWorkerUrl: 'https://demo-worker.example',
+      sessionName: 'Demo Session',
+    }));
   });
 });
 

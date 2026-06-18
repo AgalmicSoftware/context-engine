@@ -436,7 +436,7 @@ describe('SurveyTool question pool lifecycle', () => {
       sessionSlug: 'demo-1',
       activeSessionSlug: 'demo-1',
       sessionConfig: {
-        sessionName: 'Context Demo',
+        sessionName: 'Demo Session',
         demoCompatibilitySeed: { temporary: true },
       },
     });

@@ -5661,7 +5661,7 @@ export class SurveyQuestions extends Component {
         ...(surveyData || surveyDataFromCache || {}),
         id: surveyIdLower,
         surveyID: surveyIdLower,
-        title: surveyData?.title || surveyDataFromCache?.title || this.props.surveyTitle || 'Context Demo',
+        title: surveyData?.title || surveyDataFromCache?.title || this.props.surveyTitle || 'Demo Session',
         sessionName: surveyData?.sessionName || surveyDataFromCache?.sessionName || this.props.sessionName || effectiveSlug,
         questionIDs: temporaryDemoQuestionIds,
         temporaryDemoSeed: true,

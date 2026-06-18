@@ -111,6 +111,9 @@ type AccountUserPageProps = {
   provider?: string;
   minimized?: boolean;
   network?: unknown;
+  activeSessionSlug?: string;
+  sessionConfig?: unknown;
+  networkChainId?: unknown;
 };
 const AccountUserPage = React.lazy(
   () => import("components/UserPage/UserPage")
@@ -2517,19 +2520,26 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
 
     // Logged-in view for all providers (Porto, Wagmi)
     if (this.props.loginComplete) {
+      const activeSessionSlug = this.getActiveSessionSlug();
+      const activeSessionConfig = this.getDisplaySessionConfig(activeSessionSlug);
        return (
         <CardBody id={styles.accountModalCard}>
           <div id={styles.accountModalPanel}>
             <div className={styles.accountModalBody}>
               {this.props.account && (
                 <div className={styles.accountModalProfileShell}>
-                  <UserPage
-                    viewAddress={this.props.account}
-                    account={this.props.account}
-                    provider={this.props.provider}
-                    minimized={true}
-                    network={this.props.network}
-                  />
+                  <Suspense fallback={null}>
+                    <AccountUserPage
+                      viewAddress={this.props.account}
+                      account={this.props.account}
+                      provider={this.props.provider}
+                      minimized={true}
+                      network={this.props.network}
+                      activeSessionSlug={activeSessionSlug}
+                      sessionConfig={activeSessionConfig}
+                      networkChainId={activeSessionConfig?.networkChainId}
+                    />
+                  </Suspense>
                 </div>
               )}
               <div className={styles.accountModalControls}>
