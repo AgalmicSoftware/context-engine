@@ -1,10 +1,32 @@
 import {
-  buildClearedSurveyQuestionPoolState,
-  buildEditStatsState,
-  buildFetchedQuestionPoolState,
-  buildRenderedQuestionPayloadPoolsState,
-  buildSurveyQuestionPoolLoadState,
-} from './surveyQuestionsTypes.js';
+  computeSubmitLabel,
+  doesQuestionProgressMatchSlug,
+  normalizeSurveyToolFilterState,
+  shouldShowPileFullLoadingState,
+  buildSurveyDraftSemanticSignature,
+} from './surveyToolUtils.js';
+import { SurveyQuestions } from './SurveyQuestions';
+import { PileViewMode } from './SurveyPileViewMode';
+import { QuestionsDashboard } from './SurveySelector';
+import DeferredRatingSlider from './DeferredRatingSlider';
+import FullQuestionRatingInput from './FullQuestionRatingInput';
+import SurveyQuestionTagControl from './SurveyQuestionTagControl';
+import { DeferredCommitSlider } from './DeferredCommitSlider';
+import { QuestionFilter as RawQuestionFilter } from './QuestionFilter';
+import TagModal from '../TagPage/TagModal';
+import GatedPromptNotice from './GatedPromptNotice';
+import styles from './SurveyTool.module.scss';
+import { renderToStaticMarkup } from 'react-dom/server';
+import contractScripts, * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
+import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
+import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
+import * as sbtDisplayNameUtils from '../../utilities/sbt/sbtDisplayNames.js';
+import * as sponsoredAccess from '../../utilities/web3/sponsoredAccess.js';
+import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
+import { t } from '../../utilities/ui/terminology.js';
+import demo1OnchainQuestionIds from '../../variables/demo/demo_1_onchain_question_ids.json';
 import {
   executeSurveyFormStateReset,
   executeSurveyStartFresh,
@@ -300,6 +322,64 @@ describe('SurveyTool question pool lifecycle', () => {
     expect(patch.questionPoolPendingIds).toEqual([]);
     // port note: async `ensureQuestionCached` fan-out is shell-private; the
     // port asserts the fetched-pool state produced after all ids hydrate.
+  });
+
+  it('publishes temporary demo-1 fixture questions without waiting for metadata hydration', async () => {
+    const questionsCache = {};
+    const surveysCache = {};
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace, slug) => {
+      if (slug !== 'demo-1') return {};
+      if (namespace === 'questionsCache') return questionsCache;
+      if (namespace === 'surveysCache') return surveysCache;
+      return {};
+    });
+    jest.spyOn(cacheScripts, 'writeCacheOptimistic').mockImplementation((namespace, slug, value) => {
+      if (slug === 'demo-1' && namespace === 'questionsCache') {
+        Object.keys(questionsCache).forEach((key) => delete questionsCache[key]);
+        Object.assign(questionsCache, value || {});
+      }
+      if (slug === 'demo-1' && namespace === 'surveysCache') {
+        Object.keys(surveysCache).forEach((key) => delete surveysCache[key]);
+        Object.assign(surveysCache, value || {});
+      }
+      return Promise.resolve(value);
+    });
+    const getSurveyDataByIdSpy = jest.spyOn(contractScripts, 'getSurveyDataById').mockResolvedValue(null);
+    const ensureQuestionCached = jest.fn().mockResolvedValue(undefined);
+
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      surveyId: '0xsurvey',
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 11155420 },
+      networkChainId: 11155420,
+      ensureQuestionCached,
+      sessionSlug: 'demo-1',
+      activeSessionSlug: 'demo-1',
+      sessionConfig: {
+        sessionName: 'Context Demo',
+        demoCompatibilitySeed: { temporary: true },
+      },
+    });
+
+    syncClassSetState(subject);
+
+    await subject.fetchQuestionPool();
+
+    expect(getSurveyDataByIdSpy).not.toHaveBeenCalled();
+    expect(ensureQuestionCached).not.toHaveBeenCalled();
+    expect(subject.state.questionPool).toHaveLength(42);
+    expect(subject.state.questionPoolExpectedIds).toHaveLength(42);
+    expect(subject.state.questionPoolPendingIds).toEqual([]);
+    expect(subject.state.questionPool[0]).toEqual(expect.objectContaining({
+      id: demo1OnchainQuestionIds[0],
+      prompt: 'Existential risk from AI justifies extraordinary precautions.',
+      sessionSlug: 'demo-1',
+      temporaryDemoSeed: true,
+    }));
   });
 
   it('publishes a survey question pool as soon as the first question metadata resolves', async () => {

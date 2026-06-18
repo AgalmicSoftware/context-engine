@@ -55,6 +55,7 @@ import {
   readSessionScanScope,
   readSessionScanSlugs,
 } from '../../utilities/session/sessionScanScope.js';
+import { getPrimaryDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
 import { derivePrimarySessionSlugFromList } from '../../utilities/session/globalSessionState.js';
 import {
   createInitialProfileScanReport,
@@ -1006,6 +1007,8 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
   _cacheUpdateUnsubscribe: (() => void) | null = null;
   _userPriorityPromise: Promise<MainSiteProfileScanReport | null> | null = null;
   _userPriorityTarget: string | null = null;
+  _aboutDemoSessionPreloadSlug = '';
+  _aboutDemoSessionPreloadPromise: Promise<void> | null = null;
   _sessionFallbackRedirectPath = '';
   _lastProcessedQuestionIdFromPath = '';
   _lastProcessedQuestionSlugFromPath: string | null = null;
@@ -1383,6 +1386,64 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     );
     if (!path.startsWith('/session/')) return strictNetwork;
     return this.getDisplaySessionNetwork(normalized);
+  };
+
+  isAboutRoutePath = (pathIn: unknown = ''): boolean => {
+    const path = this.getEffectiveRoutePath(
+      String(pathIn || '') ||
+      (typeof window !== 'undefined' ? window.location.pathname : '') ||
+      this.props.path ||
+      ''
+    );
+    return path === '/about' || path === '/about/';
+  };
+
+  preloadAboutDemoSessionData = (pathIn: unknown = ''): Promise<void> | null => {
+    if (!this.isAboutRoutePath(pathIn)) return null;
+
+    const slug = normalizeSessionSlug(getPrimaryDemoSessionSlug());
+    if (!slug) return null;
+
+    const sessionNet = this.getDisplaySessionNetwork(slug);
+    if (!sessionNet?.id) return null;
+
+    if (
+      this._aboutDemoSessionPreloadSlug === slug &&
+      this._aboutDemoSessionPreloadPromise
+    ) {
+      return this._aboutDemoSessionPreloadPromise;
+    }
+
+    const run = (async () => {
+      mainSiteLog.log('[About] Preloading public demo session data', { slug });
+      const questionPreload = this.initializeQuestionCacheForGroup(slug, { background: true });
+      const responsePreload = questionPreload.then(() => (
+        this.fetchQuestionResponsesChunkedForGroup(slug, { background: true })
+      ));
+      const preloadResults = await Promise.allSettled([
+        questionPreload,
+        responsePreload,
+        this.initializeSurveyCacheForGroup(slug, { background: true }),
+        this.initializeSbtCacheForGroup(slug, { mode: 'partial', background: true }),
+      ]);
+      const firstRejected = preloadResults.find((result) => result.status === 'rejected');
+      if (firstRejected?.status === 'rejected') {
+        throw firstRejected.reason;
+      }
+    })().catch((err: unknown) => {
+      mainSiteLog.warn('[About] Demo session preload failed', {
+        slug,
+        error: readMainSiteErrorMessage(err),
+      });
+    }).finally(() => {
+      if (this._aboutDemoSessionPreloadPromise === run) {
+        this._aboutDemoSessionPreloadPromise = null;
+      }
+    });
+
+    this._aboutDemoSessionPreloadSlug = slug;
+    this._aboutDemoSessionPreloadPromise = run;
+    return run;
   };
 
   handleSessionRegistryCacheUpdated = () => {
@@ -3806,6 +3867,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     } catch (e) { mainSiteLog.warn('MainSite: cleanup', e); }
 
     const pathname = this.getEffectiveRoutePath(this.getCurrentPathname());
+    this.preloadAboutDemoSessionData(pathname);
     const isDemoPath = pathname.startsWith('/session/');
     const sbtAddressFromPath = this.getSbtAddressFromPath(pathname);
     const isSbtDetailRoute = !!sbtAddressFromPath;
@@ -4357,6 +4419,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
 
     // Check for deep link scan if path changed
     if (currPath !== prevPath) {
+      this.preloadAboutDemoSessionData(currPath);
       this.handleDeepLinkScan();
     }
   }

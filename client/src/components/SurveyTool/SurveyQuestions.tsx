@@ -124,6 +124,7 @@ import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
 import { buildResponseGatePolicy } from '../../utilities/crypto/litGatePolicy.js';
 import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
+import { getTemporaryDemoSessionQuestionFixtures } from '../../utilities/session/demoSessionQuestionFixtures.js';
 import { buildQuestionDecryptContextForSession } from '../../utilities/session/sessionQuestionDecryption.js';
 import {
   buildQuestionRoutePath,
@@ -4711,12 +4712,12 @@ async function fetchQuestionPool() {
     }
 
     // Prefer ID-aware resolver for /survey/:id routes (no /session/:slug)
-    const slug: any = propsRef.current.surveyId
-      ? resolveSlugForIds({ surveyId: propsRef.current.surveyId, props: propsRef.current, network: propsRef.current.network })
-      : resolveEffectiveSlug(propsRef.current);
-    const questionReadContext: any = resolveQuestionReadCacheContext(propsRef.current, slug);
-    const effectiveSlug: any = questionReadContext.sessionSlug || slug;
-    const netIdStr: any = questionReadContext.networkIdStr;
+    const slug = this.props.surveyId
+      ? resolveSlugForIds({ surveyId: this.props.surveyId, props: this.props, network: this.props.network })
+      : resolveEffectiveSlug(this.props);
+    const questionReadContext = resolveQuestionReadCacheContext(this.props, slug);
+    let effectiveSlug = questionReadContext.sessionSlug || slug;
+    const netIdStr = questionReadContext.networkIdStr;
     if (!netIdStr) {
       surveyLog.error("SurveyQuestions: fetchQuestionPool – network.id undefined");
       setState(buildClearedSurveyQuestionPoolState());
@@ -4744,6 +4745,68 @@ async function fetchQuestionPool() {
       }
     }
     if (!surveyData) { surveyData = surveyDataFromCache; }
+
+    // Temporary demo-1 compatibility: render fixture questions synchronously while
+    // the durable Cloudflare-backed demo session is still pending.
+    const temporaryDemoSessionConfig = this.props.sessionConfig || {};
+    const temporaryDemoSlugCandidates = [
+      effectiveSlug,
+      questionReadContext.sessionSlug,
+      slug,
+      this.props.sessionSlug,
+      this.props.activeSessionSlug,
+    ];
+    let temporaryDemoFixtureSlug = '';
+    let temporaryDemoFixtureQuestions = [];
+    for (const candidateSlug of temporaryDemoSlugCandidates) {
+      const candidateQuestions = getTemporaryDemoSessionQuestionFixtures(
+        candidateSlug,
+        temporaryDemoSessionConfig
+      );
+      if (!candidateQuestions.length) continue;
+      temporaryDemoFixtureSlug = normalizeSessionSlugValue(candidateSlug);
+      temporaryDemoFixtureQuestions = candidateQuestions;
+      break;
+    }
+    const temporaryDemoQuestionIds = temporaryDemoFixtureQuestions
+      .map((question) => normalizeQuestionIdKey(question?.id))
+      .filter(Boolean);
+    const shouldUseTemporaryDemoQuestionPool = temporaryDemoQuestionIds.length > 0;
+    if (shouldUseTemporaryDemoQuestionPool) {
+      if (temporaryDemoFixtureSlug) effectiveSlug = temporaryDemoFixtureSlug;
+      const currentQuestionsCache = ensureQuestionsNet(readQuestionsCache(effectiveSlug) || {}, netIdStr);
+      const questionsNet = currentQuestionsCache[netIdStr];
+      if (!questionsNet.questions || typeof questionsNet.questions !== 'object') questionsNet.questions = {};
+      temporaryDemoFixtureQuestions.forEach((question) => {
+        const qid = normalizeQuestionIdKey(question?.id);
+        if (!qid) return;
+        questionsNet.questions[qid] = {
+          ...question,
+          id: qid,
+        };
+        if (questionsNet.pendingQuestionMetadata && typeof questionsNet.pendingQuestionMetadata === 'object') {
+          delete questionsNet.pendingQuestionMetadata[qid];
+        }
+      });
+      writeQuestionsCache(effectiveSlug, currentQuestionsCache);
+
+      surveyData = {
+        ...(surveyData || surveyDataFromCache || {}),
+        id: surveyIdLower,
+        surveyID: surveyIdLower,
+        title: surveyData?.title || surveyDataFromCache?.title || this.props.surveyTitle || 'Context Demo',
+        sessionName: surveyData?.sessionName || surveyDataFromCache?.sessionName || this.props.sessionName || effectiveSlug,
+        questionIDs: temporaryDemoQuestionIds,
+        temporaryDemoSeed: true,
+      };
+
+      const currentSurveysCache = ensureSurveysNet(readSurveysCache(effectiveSlug) || {}, netIdStr);
+      if (!currentSurveysCache[netIdStr].surveys || typeof currentSurveysCache[netIdStr].surveys !== 'object') {
+        currentSurveysCache[netIdStr].surveys = {};
+      }
+      currentSurveysCache[netIdStr].surveys[surveyIdLower] = surveyData;
+      writeSurveysCache(effectiveSlug, currentSurveysCache);
+    }
 
     if (!surveyData || !Array.isArray(surveyData.questionIDs) || surveyData.questionIDs.length === 0) {
       try {
@@ -4783,6 +4846,24 @@ async function fetchQuestionPool() {
     const expectedQuestionIds: any = surveyData.questionIDs
       .map((qid: any) => normalizeQuestionIdKey(qid))
       .filter((qid: any) => qid && !blockedQuestionIds.has(qid));
+
+    if (shouldUseTemporaryDemoQuestionPool) {
+      const fixtureQuestionById = new Map();
+      temporaryDemoFixtureQuestions.forEach((question) => {
+        const qid = normalizeQuestionIdKey(question?.id);
+        if (!qid || fixtureQuestionById.has(qid)) return;
+        fixtureQuestionById.set(qid, { ...question, id: qid });
+      });
+      const questionPool = expectedQuestionIds
+        .map((qid) => fixtureQuestionById.get(qid))
+        .filter(Boolean);
+      this.setState({
+        questionPool,
+        questionPoolExpectedIds: expectedQuestionIds,
+        questionPoolPendingIds: expectedQuestionIds.filter((qid) => !fixtureQuestionById.has(qid)),
+      });
+      return;
+    }
 
     let lastPublishedQuestionPoolSnapshotSig = '';
     const publishQuestionPoolFromCache = ({ warnMissing = false } = {}) => {
