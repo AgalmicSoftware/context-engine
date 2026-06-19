@@ -177,6 +177,96 @@ const readResolvedSessionConfigById = (
     : null
 );
 
+const DEMO_DISPLAY_ARRAY_FIELDS = [
+  'defaultFeaturedSBTs',
+  'featured_SBTs_LIST',
+  'ignored_SBTs_LIST',
+  'HIGHLIGHTED_QUESTION_IDS',
+  'BLOCKED_QUESTION_IDS',
+  'HIGHLIGHTED_SURVEY_IDS',
+  'BLOCKED_SURVEY_IDS',
+] as const;
+
+const DEMO_DISPLAY_VALUE_FIELDS = [
+  'sessionName',
+  'sessionInfo',
+  'sessionHeaderImg',
+  'defaultTags',
+  'defaultSbtTags',
+  'defaultFilterState',
+  'autoFeatureSBTsBySessionSlug',
+  'demoCompatibilitySeed',
+] as const;
+
+const DEMO_DISPLAY_OBJECT_FIELDS = [
+  'contracts',
+  'blockLimits',
+  'ai',
+] as const;
+
+const isMissingDisplayValue = (value: unknown): boolean => (
+  value === null ||
+  value === undefined ||
+  value === '' ||
+  (Array.isArray(value) && value.length === 0)
+);
+
+const sameRouteSessionSlug = (
+  strictConfig: SessionConfigLike,
+  displayConfig: SessionConfigLike
+): boolean => {
+  const strictSlug = normalizeSessionSlug(strictConfig.slug || strictConfig.sessionSlug || '');
+  const displaySlug = normalizeSessionSlug(displayConfig.slug || displayConfig.sessionSlug || '');
+  return !strictSlug || !displaySlug || strictSlug === displaySlug;
+};
+
+const shouldApplyDemoDisplayOverlay = (
+  strictConfig: SessionConfigLike | null | undefined,
+  displayConfig: SessionConfigLike | null | undefined
+): strictConfig is SessionConfigLike => (
+  isRecord(strictConfig) &&
+  isRecord(displayConfig) &&
+  sameRouteSessionSlug(strictConfig, displayConfig) &&
+  (
+    isRecord(displayConfig.demoCompatibilitySeed) ||
+    normalizeSessionSlug(displayConfig.slug || displayConfig.sessionSlug || '').startsWith('demo-')
+  )
+);
+
+export const mergeMainSiteSessionDisplayConfig = (
+  strictConfig: SessionConfigLike | null | undefined,
+  displayConfig: SessionConfigLike | null | undefined
+): SessionConfigLike | null => {
+  if (!strictConfig) return displayConfig || null;
+  if (!shouldApplyDemoDisplayOverlay(strictConfig, displayConfig)) return strictConfig;
+
+  const display = displayConfig as SessionConfigLike;
+  const merged: SessionConfigLike = { ...display, ...strictConfig };
+
+  for (const field of DEMO_DISPLAY_ARRAY_FIELDS) {
+    if (
+      Array.isArray(display[field]) &&
+      display[field].length > 0
+    ) {
+      merged[field] = [...display[field]];
+    }
+  }
+
+  for (const field of DEMO_DISPLAY_VALUE_FIELDS) {
+    if (!isMissingDisplayValue(display[field])) {
+      merged[field] = display[field];
+    }
+  }
+
+  for (const field of DEMO_DISPLAY_OBJECT_FIELDS) {
+    if (isRecord(display[field]) && !isRecord(strictConfig[field])) {
+      merged[field] = { ...display[field] };
+    }
+  }
+
+  return merged;
+};
+
 export const resolveMainSiteRouteSessionSlugHint = ({
   search = '',
   allowSessionIdLookup = true,
@@ -361,7 +451,7 @@ export const resolveMainSiteSessionRouteContext = ({
       ? (resolveSessionConfigBySlug(sessionSlug) || null)
       : null
   );
-  const displaySessionConfig = !sessionConfig && !hasUnresolvedSessionId && typeof resolveDisplaySessionConfigBySlug === 'function'
+  const displaySessionConfig = !hasUnresolvedSessionId && typeof resolveDisplaySessionConfigBySlug === 'function'
     ? (resolveDisplaySessionConfigBySlug(sessionSlug) || null)
     : null;
 
@@ -369,7 +459,7 @@ export const resolveMainSiteSessionRouteContext = ({
     sessionIdFromPath,
     configBySessionId,
     sessionSlug,
-    sessionConfig: sessionConfig || displaySessionConfig,
+    sessionConfig: mergeMainSiteSessionDisplayConfig(sessionConfig, displaySessionConfig),
     hasUnresolvedSessionId,
   };
 };

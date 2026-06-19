@@ -4068,58 +4068,15 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     top: 14px;
   }
 
-  .pileActions {
-    flex-direction: row;
-    gap: 16px;
-    order: 1;
-    padding: 0;
-  }
-
-  .pileActionButtonGroup {
-    flex-direction: row;
-    gap: 16px;
+  .pileFooter {
+    flex: 1 1 190px;
+    gap: 8px;
+    margin-right: 0;
   }
 
   .pileNav {
-    flex-direction: row;
-    gap: 12px;
-    order: 2;
-    margin-left: auto;
-    padding: 6px 16px;
-    border-radius: 50px;
-    min-width: auto;
-  }
-
-  .pileFooter {
-    position: absolute;
-    top: -52px;
-    right: 20px;
-    left: 10px;
-    flex: 0 0 auto;
-    width: auto;
-    justify-content: center;
-    min-height: 0;
-    gap: 10px;
-    transform: none;
-  }
-
-  .pileFooter .pileSubmitButton {
-    flex: 1 1 auto;
-    width: auto;
-    max-width: none;
-    min-height: 54px;
-    padding: 11px 18px;
-    font-size: 1rem;
-    border-radius: var(--ce-radius-16);
-  }
-
-  .pileFooter .pileIconButton,
-  .pileFooter .pileSubmitLink {
-    position: static;
-    top: auto;
-    left: auto;
-    transform: none;
-    flex: 0 0 auto;
+    gap: 8px;
+    padding: 6px 4px;
   }
 
   .pileNavArrow {
@@ -4422,7 +4379,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   font-size: 1.35rem;
 }
 
-@media (min-width: 769px), (max-width: 480px) {
+@media (min-width: 769px) {
   .pileSubmitButtonTrail {
     display: inline-flex;
   }
@@ -4495,12 +4452,14 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 @media (max-width: 480px) {
   .pileFooter .pileSubmitButton {
-    --pile-submit-button-radius: var(--ce-radius-16);
+    --pile-submit-button-radius: var(--ce-radius-8);
     width: 100%;
     max-width: none;
-    min-height: 54px;
-    padding: 11px 18px;
-    border-radius: var(--ce-radius-16);
+    min-width: 150px;
+    min-height: 0;
+    padding: 12px 18px;
+    font-size: 1rem;
+    border-radius: var(--ce-radius-8);
   }
 
   .pileSubmitSuccessBadge {
