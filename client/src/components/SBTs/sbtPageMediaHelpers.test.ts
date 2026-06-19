@@ -151,9 +151,12 @@ describe('sbtPageMediaHelpers', () => {
     const firstState = getDisplayImageRenderState({ image }, {}, '/default.png');
     expect(firstState.sourceKey).toBe(image);
     expect(firstState.activeIndex).toBe(0);
-    expect(firstState.src).toBe(`https://ar-io.dev/${txId}`);
+    expect(firstState.src).toBe(`https://arweave.net/${txId}`);
     expect(firstState.canRetry).toBe(true);
-    expect(firstState.candidates).toEqual([`https://ar-io.dev/${txId}`]);
+    expect(firstState.candidates).toEqual([
+      `https://arweave.net/${txId}`,
+      `https://gateway.irys.xyz/${txId}`,
+    ]);
 
     const fallbackState = getDisplayImageRenderState(
       { image },
@@ -164,7 +167,7 @@ describe('sbtPageMediaHelpers', () => {
       '/default.png',
     );
     expect(fallbackState.activeIndex).toBe(1);
-    expect(fallbackState.src).toBe('/default.png');
+    expect(fallbackState.src).toBe(`https://gateway.irys.xyz/${txId}`);
 
     const defaultFallbackState = getDisplayImageRenderState(
       { image },
@@ -172,7 +175,7 @@ describe('sbtPageMediaHelpers', () => {
         displayImageFallbackKey: image,
         displayImageFallbackIndex: 2,
       },
-      '/default.png',
+      '/default.png'
     );
     expect(defaultFallbackState.activeIndex).toBe(2);
     expect(defaultFallbackState.src).toBe('/default.png');

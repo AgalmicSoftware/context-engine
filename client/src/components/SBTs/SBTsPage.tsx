@@ -381,16 +381,18 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
         } catch (e) {
           sbtLog.warn('[SBTsPage] cache-backed featured lookup failed:', e);
         }
-        const resolvedCacheMatch = cacheMatch as CacheBackedFeaturedCard['sbt'] | null;
-        if (!resolvedCacheMatch || !resolvedCacheMatch.sbtInfo) return null;
-        if (!hasCacheFeaturedCardImageMetadata(resolvedCacheMatch.sbtInfo)) return null;
-        return {
-          address: entry.address,
-          sessionSlug: entry.sessionSlug,
-          sbt: resolvedCacheMatch,
-        };
-      })
-      .filter((entry): entry is CacheBackedFeaturedCard => !!entry);
+      } catch (e) {
+        sbtLog.warn('[SBTsPage] cache-backed featured lookup failed:', e);
+      }
+      const resolvedCacheMatch = cacheMatch as CacheBackedFeaturedCard['sbt'] | null;
+      if (!resolvedCacheMatch || !resolvedCacheMatch.sbtInfo) return null;
+      if (!hasCacheFeaturedCardImageMetadata(resolvedCacheMatch.sbtInfo)) return null;
+      return {
+        address: entry.address,
+        sessionSlug: entry.sessionSlug,
+        sbt: resolvedCacheMatch,
+      };
+    }).filter((entry): entry is CacheBackedFeaturedCard => !!entry);
 
     this._featuredCacheCardsMemo = { key, result: next };
     return next;

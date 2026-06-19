@@ -183,6 +183,7 @@ export const normalizeSBTsPageFeaturedCardImageUrl = (value: unknown): string =>
   if (/^ipfs:\/\//i.test(raw)) return `https://ipfs.io/ipfs/${raw.replace(/^ipfs:\/\//i, '')}`;
   return normalizeArweaveUrl(raw, {
     contextLabel: 'sbt_page_featured_image',
+    gateway: 'https://arweave.net',
   });
 };
 
@@ -194,7 +195,10 @@ export const hasSBTsPageCacheFeaturedCardImageMetadata = (infoInput: unknown): b
     info.imageLocked === true ||
     !!info.imageEncrypted ||
     !!info.encryptedImage ||
-    !!(isSBTsPageRecord(info.encryptedFields) && info.encryptedFields.image)
+    !!(
+      isSBTsPageRecord(info.encryptedFields) &&
+      info.encryptedFields.image
+    )
   );
 };
 

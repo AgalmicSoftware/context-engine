@@ -7,12 +7,7 @@
 //
 // Depends on: ethers (v5)
 
-import bufferModule from 'buffer';
 import * as ethersModule from 'ethers';
-
-const Buffer =
-  bufferModule?.Buffer ||
-  bufferModule;
 
 const resolveEthersCompat = (loadedModule) => {
   const direct = loadedModule?.ethers || loadedModule?.default?.ethers || loadedModule?.default || loadedModule;
@@ -48,6 +43,42 @@ export function generateQuestionId(type, prompt, options = [], singleSelect = fa
 
 // --- Hex ↔ Base64url conversion ---
 // Canonical implementation. Matches arweaveClient.js.
+
+function padBase64String(b64string) {
+  const remainder = b64string.length % 4;
+  return remainder === 0 ? b64string : `${b64string}${'='.repeat(4 - remainder)}`;
+}
+
+function encodeBytesToBase64(byteArray) {
+  const bytes = byteArray instanceof Uint8Array ? byteArray : Uint8Array.from(byteArray);
+  if (typeof globalThis !== 'undefined' && typeof globalThis.btoa === 'function') {
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += 1) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return globalThis.btoa(binary);
+  }
+  if (typeof Buffer !== 'undefined' && typeof Buffer.from === 'function') {
+    return Buffer.from(bytes).toString('base64');
+  }
+  throw new Error('No base64 encoder is available.');
+}
+
+function decodeBase64ToBytes(b64string) {
+  const padded = padBase64String(b64string);
+  if (typeof globalThis !== 'undefined' && typeof globalThis.atob === 'function') {
+    const binary = globalThis.atob(padded);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
+  }
+  if (typeof Buffer !== 'undefined' && typeof Buffer.from === 'function') {
+    return Uint8Array.from(Buffer.from(padded, 'base64'));
+  }
+  throw new Error('No base64 decoder is available.');
+}
 
 function padBase64String(b64string) {
   const remainder = b64string.length % 4;
