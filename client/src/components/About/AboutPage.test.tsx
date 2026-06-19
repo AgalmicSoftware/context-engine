@@ -8,7 +8,6 @@ import AboutPage, { getAboutDemoSessionPath, getConfiguredRecognitionIndividuals
 
 const mutableEnv = process.env as Record<string, string | undefined>;
 const ORIGINAL_PUBLIC_URL = process.env.PUBLIC_URL;
-const ABOUT_DEMO_VIDEO_VIEW_URL = 'https://drive.google.com/file/d/1nss6RZnF4yFwMFE6kjSW3ESi3ImpMcnf/view';
 const ABOUT_DEMO_VIDEO_EMBED_URL = 'https://drive.google.com/file/d/1nss6RZnF4yFwMFE6kjSW3ESi3ImpMcnf/preview';
 const ABOUT_DEMO_VIDEO_MEDIA_URL = '/about-demo.mp4';
 const ABOUT_DEMO_VIDEO_THUMBNAIL_URL = 'https://drive.google.com/thumbnail?id=1nss6RZnF4yFwMFE6kjSW3ESi3ImpMcnf&sz=w1000';
@@ -92,7 +91,6 @@ describe('AboutPage', () => {
       const hero = screen.getByTestId('ce-about-hero');
       const videoPlayer = within(hero).getByTestId('ce-about-demo-video-player');
       const inlinePlayButton = within(hero).getByRole('button', { name: /play context engine demo video/i });
-      const driveButton = within(hero).getByTestId('ce-about-demo-video-drive-link');
 
       expect(videoPlayer.tagName.toLowerCase()).toBe('video');
       expect(videoPlayer).toHaveAttribute('controls');
@@ -101,7 +99,8 @@ describe('AboutPage', () => {
       expect(videoPlayer).toHaveAttribute('poster', ABOUT_DEMO_VIDEO_THUMBNAIL_URL);
       expect(videoPlayer).toHaveAttribute('src', ABOUT_DEMO_VIDEO_MEDIA_URL);
       expect(inlinePlayButton).toBeVisible();
-      expect(driveButton).toHaveAttribute('href', ABOUT_DEMO_VIDEO_VIEW_URL);
+      expect(within(hero).queryByTestId('ce-about-demo-video-drive-link')).not.toBeInTheDocument();
+      expect(within(hero).queryByRole('link', { name: /google drive/i })).not.toBeInTheDocument();
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 
       fireEvent.click(inlinePlayButton);

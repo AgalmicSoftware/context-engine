@@ -5,7 +5,14 @@ export type SessionFallbackRedirectTarget = {
 
 export type FirstVisitRootRedirectTarget = {
   path: string;
+  cacheSlug?: string;
+  requiresPersistedCache?: boolean;
 };
+
+type FirstVisitRootRedirectStorage = {
+  getItem: (key: string) => string | null;
+  setItem: (key: string, value: string) => void;
+} | null | undefined;
 
 type SessionFallbackRedirectStorageTarget = {
   slug?: string;
@@ -20,9 +27,13 @@ type NormalizeSessionSlugFn = (slug: unknown) => string;
 
 const isGeneralSessionSlug = (slug: unknown, defaultAlias: string): boolean => slug === '' || slug === defaultAlias;
 
-export const FIRST_VISIT_ROOT_REDIRECT_CONSUMED_STORAGE_KEY = 'ce:firstVisitRootAboutRedirectConsumed:v20260618b';
+export const FIRST_VISIT_ROOT_REDIRECT_CONSUMED_STORAGE_KEY =
+  'ce:firstVisitRootAboutRedirectConsumed:v20260618b';
 
-const dedupeNormalizedSessionSlugs = (values: unknown, normalizeSessionSlug: NormalizeSessionSlugFn): string[] => {
+const dedupeNormalizedSessionSlugs = (
+  values: unknown,
+  normalizeSessionSlug: NormalizeSessionSlugFn
+): string[] => {
   if (!Array.isArray(values)) return [];
   const out: string[] = [];
   const seen = new Set<string>();
@@ -121,7 +132,58 @@ export const getFirstVisitRootRedirectTarget = (deps: {
   };
 };
 
-export const hasConsumedOneTimeFirstVisitRootRedirect = (storage: FirstVisitRootRedirectStorage): boolean => {
+const getTemporaryInitialLoadSessionCacheSlug = (
+  normalizedPath: string,
+  normalizeSessionSlug: NormalizeSessionSlugFn
+): string => {
+  if (!normalizedPath.startsWith('/session/')) return '';
+  const token = normalizedPath.slice('/session/'.length).split('/')[0];
+  return normalizeSessionSlug(token || '');
+};
+
+// Temporary demo-launch guard: root loads go to /about, and cached session
+// document loads may go to /about while stale pages retire.
+export const isTemporaryInitialLoadAboutRedirectPath = (
+  pathIn: unknown,
+  deps: { normalizeRoutePath: NormalizeSessionSlugFn }
+): boolean => {
+  const path = deps.normalizeRoutePath(pathIn || '');
+  if (path === '/') return true;
+  if (!path.startsWith('/session/')) return false;
+  return path !== '/session/new' && !path.startsWith('/session/new/');
+};
+
+export const getTemporaryInitialLoadAboutRedirectTarget = (deps: {
+  isFirstVisitRootRedirectEnabled: () => boolean;
+  normalizeRoutePath: NormalizeSessionSlugFn;
+  normalizeSessionSlug: NormalizeSessionSlugFn;
+  pathIn: unknown;
+}): FirstVisitRootRedirectTarget | null => {
+  if (!deps.isFirstVisitRootRedirectEnabled()) return null;
+  const path = deps.normalizeRoutePath(deps.pathIn || '');
+  if (!isTemporaryInitialLoadAboutRedirectPath(path, {
+    normalizeRoutePath: deps.normalizeRoutePath,
+  })) {
+    return null;
+  }
+
+  const cacheSlug = getTemporaryInitialLoadSessionCacheSlug(path, deps.normalizeSessionSlug);
+  if (cacheSlug) {
+    return {
+      path: '/about',
+      cacheSlug,
+      requiresPersistedCache: true,
+    };
+  }
+
+  return {
+    path: '/about',
+  };
+};
+
+export const hasConsumedOneTimeFirstVisitRootRedirect = (
+  storage: FirstVisitRootRedirectStorage
+): boolean => {
   if (!storage) return true;
 
   try {
@@ -131,12 +193,13 @@ export const hasConsumedOneTimeFirstVisitRootRedirect = (storage: FirstVisitRoot
   }
 };
 
-export const shouldForceOneTimeFirstVisitRootRedirect = (storage: FirstVisitRootRedirectStorage): boolean =>
-  !hasConsumedOneTimeFirstVisitRootRedirect(storage);
+export const shouldForceOneTimeFirstVisitRootRedirect = (
+  storage: FirstVisitRootRedirectStorage
+): boolean => !hasConsumedOneTimeFirstVisitRootRedirect(storage);
 
 export const consumeOneTimeFirstVisitRootRedirect = (
   storage: FirstVisitRootRedirectStorage,
-  deps: { firstVisitStorageKey?: string } = {},
+  deps: { firstVisitStorageKey?: string } = {}
 ): boolean => {
   if (!storage) return false;
 

@@ -31,6 +31,13 @@ const normalizeRoutePath = (value: unknown): string => {
   return withSlash.length > 1 ? withSlash.replace(/\/+$/, '') : withSlash;
 };
 
+const normalizeRoutePath = (value: unknown): string => {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized || normalized === '/') return '/';
+  const withSlash = normalized.startsWith('/') ? normalized : `/${normalized}`;
+  return withSlash.length > 1 ? withSlash.replace(/\/+$/, '') : withSlash;
+};
+
 describe('sessionFallbackRedirect', () => {
   beforeEach(() => {
     delete runtimeGlobals[GLOBAL_FIRST_VISIT_REDIRECT_KEY];
@@ -161,6 +168,64 @@ describe('sessionFallbackRedirect', () => {
       expect(getFirstVisitRootRedirectTarget({
         isFirstVisitRootRedirectEnabled: () => false,
       })).toBeNull();
+    });
+  });
+
+  describe('temporary initial-load about redirect', () => {
+    it('matches root and concrete session pages while excluding the session wizard', () => {
+      expect(isTemporaryInitialLoadAboutRedirectPath('/', { normalizeRoutePath })).toBe(true);
+      expect(isTemporaryInitialLoadAboutRedirectPath('/session/demo-1', { normalizeRoutePath })).toBe(true);
+      expect(isTemporaryInitialLoadAboutRedirectPath('/session/demo-1/questions/results', { normalizeRoutePath })).toBe(true);
+      expect(isTemporaryInitialLoadAboutRedirectPath('/session/new', { normalizeRoutePath })).toBe(false);
+      expect(isTemporaryInitialLoadAboutRedirectPath('/session/new/details', { normalizeRoutePath })).toBe(false);
+      expect(isTemporaryInitialLoadAboutRedirectPath('/about', { normalizeRoutePath })).toBe(false);
+    });
+
+    it('returns the about target only when the redirect flag is enabled', () => {
+      expect(getTemporaryInitialLoadAboutRedirectTarget({
+        isFirstVisitRootRedirectEnabled: () => true,
+        normalizeRoutePath,
+        normalizeSessionSlug,
+        pathIn: '/',
+      })).toEqual({ path: '/about' });
+      expect(getTemporaryInitialLoadAboutRedirectTarget({
+        isFirstVisitRootRedirectEnabled: () => true,
+        normalizeRoutePath,
+        normalizeSessionSlug,
+        pathIn: '/session/demo-1',
+      })).toEqual({
+        path: '/about',
+        cacheSlug: 'demo-1',
+        requiresPersistedCache: true,
+      });
+      expect(getTemporaryInitialLoadAboutRedirectTarget({
+        isFirstVisitRootRedirectEnabled: () => false,
+        normalizeRoutePath,
+        normalizeSessionSlug,
+        pathIn: '/session/demo-1',
+      })).toBeNull();
+    });
+  });
+
+  describe('one-time first-visit root redirect consumption', () => {
+    it('forces the redirect until the versioned consumed key is written', () => {
+      expect(hasConsumedOneTimeFirstVisitRootRedirect(window.localStorage)).toBe(false);
+      expect(shouldForceOneTimeFirstVisitRootRedirect(window.localStorage)).toBe(true);
+
+      expect(consumeOneTimeFirstVisitRootRedirect(window.localStorage, {
+        firstVisitStorageKey: 'firstVisit',
+      })).toBe(true);
+
+      expect(window.localStorage.getItem(FIRST_VISIT_ROOT_REDIRECT_CONSUMED_STORAGE_KEY)).toBe('true');
+      expect(window.localStorage.getItem('firstVisit')).toBe('false');
+      expect(hasConsumedOneTimeFirstVisitRootRedirect(window.localStorage)).toBe(true);
+      expect(shouldForceOneTimeFirstVisitRootRedirect(window.localStorage)).toBe(false);
+    });
+
+    it('does not force the redirect when storage is unavailable', () => {
+      expect(hasConsumedOneTimeFirstVisitRootRedirect(null)).toBe(true);
+      expect(shouldForceOneTimeFirstVisitRootRedirect(null)).toBe(false);
+      expect(consumeOneTimeFirstVisitRootRedirect(null)).toBe(false);
     });
   });
 
