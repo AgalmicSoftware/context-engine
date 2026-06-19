@@ -156,7 +156,7 @@ export const CE_SESSION_SCAN_SLUGS = readPublicListEnv(
   'REACT_APP_CE_SESSION_SCAN_SLUGS',
   [...DEFAULT_SESSION_SCAN_SLUGS]
 ); // used when CE_SESSION_SCAN_SCOPE="list" (array of session slugs, use "general" or "" for default; can also use demoSession keys/names when demo-alias toggle is enabled)
-// When true, first-time visits to "/" auto-open the public About page.
+// When true, initial "/" loads auto-open About, and cached session document loads can migrate there.
 export const CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED = readPublicBoolEnv(
   'REACT_APP_CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED',
   true
