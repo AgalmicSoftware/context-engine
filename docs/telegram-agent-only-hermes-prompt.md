@@ -34,7 +34,7 @@ fetch the next page even when the first page contains 50 statements.
 Submit predicted answers for every statement, then submit both linear and
 quadratic token allocations.
 
-After submitting, generate and display the standard Agent Village Wrapped image by following the image instructions from the skill/start payload. Render or display the returned PNG image if your host supports it. If needed, write the decoded PNG bytes to a temporary local file and attach or show that file. Do not print the raw base64 or full image prompt. Do not say the Wrapped image is ready until the image has actually been displayed or attached. If image generation fails or you cannot display the decoded image, report the exact endpoint reason in one short sentence and ask whether to retry.
+After submitting, generate and display the standard Agent Village Wrapped image by following the image instructions from the skill/start payload. Prefer the returned `image_url`: render, attach, or link that HTTPS PNG. If `image_url` is absent, decode the returned PNG bytes from `image_base64` and display or attach the image if your host supports it. Do not print the raw base64 or full image prompt. Do not say the Wrapped image is ready until the image has actually been displayed, attached, or linked. If image generation fails or you cannot display/link the image, report the exact endpoint reason in one short sentence and ask whether to retry.
 
 When answering questions that depend on memory, usage history, model history, events attended, messages per day, non-default skills/tools tried, or other personal context: do not hallucinate. Use only memory/context you actually have. If you do not know, answer "N/A". Do not infer private facts from thin evidence. Do not quote private memory verbatim unless I explicitly ask. Use memory only as high-level, non-sensitive signal.
 
@@ -49,5 +49,5 @@ If image generation succeeded, show me the image but do not add extra report tex
 - The `$2.00` minimum is tied to the default `gemini-3.5-flash` run. If Hermes changes the default model or exposes a model-specific estimator, update the threshold text here.
 - The prompt intentionally requires a verified balance before fetching statements so failed or underfunded runs do not consume the launch window with partial work.
 - The balance check is for Hermes/OpenRouter credit only and must use normal credential surfaces, not process/env scraping.
-- The preferences step is deliberately before statement fetching: the user should know the run can take about 10 minutes, that this is research, and that EdgeOS profile context and playful favorite/taste guesses are opt-in.
+- The preferences step is deliberately before statement fetching: the user should know the run can take about 10 minutes, that this is research, and that EdgeOS profile context is opt-in. Playful favorite/taste/p(bloom) guesses are image-time synthesis from actual predictions, not stored research questions.
 - The final report is short by design. Detailed predictions, edits, and review belong in the Context Engine Telegram mini-app.

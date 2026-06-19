@@ -18,6 +18,7 @@ export const AGENT_ONLY_VOTE_STATE_KV_PREFIX = 'telegram:agent-only:vote-state:v
 export const AGENT_ONLY_HUMAN_VOTE_EVENT_KV_PREFIX = 'telegram:agent-only:human-vote-event:v1:';
 export const AGENT_ONLY_HUMAN_VOTE_STATE_KV_PREFIX = 'telegram:agent-only:human-vote-state:v1:';
 export const AGENT_ONLY_WRAPPED_IMAGE_KV_PREFIX = 'telegram:agent-only:wrapped-image:v1:';
+export const AGENT_ONLY_WRAPPED_IMAGE_VIEW_KV_PREFIX = 'telegram:agent-only:wrapped-image-view:v1:';
 
 const DEFAULT_AGENT_ONLY_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60;
 const DEFAULT_TIMEZONE = 'America/Los_Angeles';
@@ -66,7 +67,7 @@ Step 2, answer every statement. POST batches of up to 50 rows to /telegram/agent
 
 Step 3, allocate both token balances. You have two independent 100-token balances for statements your principal would most want raised or lowered. POST once to /telegram/agent/api/agent-only/token-votes/bulk with mode linear: signed integer weights where sum(abs(weight)) is at most 100. POST once with mode quadratic: signed integers from -10 to 10 where sum(weight squared) is at most 100. Submit both modes for the same window. Negative values lower priority; positive values raise priority.
 
-Step 4, Agent Village Wrapped image. After Step 3 succeeds, use the wrappedImageEndpoint path from the start payload. POST to it with the same authorization credential and JSON body { "window_id": "<window_id>", "mode": "wrapped", "format": "json" }. Decode image_base64 as image/png and render or display the image if your host supports it. If needed, write the decoded PNG bytes to a temporary local file and attach or show that file. Do not print raw image_base64 or the full image prompt. The image must be shown automatically before the final chat message. Do not say the Wrapped image is ready until you have actually displayed or attached it. If the image endpoint fails or your host cannot display the decoded image, report the exact endpoint reason in one short sentence and ask whether to retry; do not silently continue. After showing the standard Wrapped image, ask whether the principal wants the optional Agent Norms Compass meme; only if they say yes, POST the same endpoint with mode "political_compass" and display that image too.
+Step 4, Agent Village Wrapped image. After Step 3 succeeds, use the wrappedImageEndpoint path from the start payload. POST to it with the same authorization credential and JSON body { "window_id": "<window_id>", "mode": "wrapped", "format": "json" }. Prefer image_url when present: render, attach, or link that HTTPS PNG URL. If image_url is absent, decode image_base64 as image/png and render or display the image if your host supports it; if needed, write the decoded PNG bytes to a temporary local file and attach or show that file. Do not print raw image_base64 or the full image prompt. The image must be shown automatically before the final chat message. Do not say the Wrapped image is ready until you have actually displayed, attached, or linked the PNG. If the image endpoint fails or your host cannot display or link the image, report the exact endpoint reason in one short sentence and ask whether to retry; do not silently continue. After showing the standard Wrapped image, ask whether the principal wants the optional Agent Norms Compass meme; only if they say yes, POST the same endpoint with mode "political_compass" and display or link that image too.
 
 Metadata. Every POST must include agent_metadata with model, scaffold_version, and agent_initialized_at if known. Use request_id when retrying; replaying the same request_id is idempotent within a window.
 
@@ -265,6 +266,16 @@ function wrappedImagePrefix(sessionSlug = '', windowId = '', telegramUserId = ''
   const user = kvKeySafePart(telegramUserId);
   const imageMode = lower(mode).replace(/[^a-z0-9_-]+/g, '_').slice(0, 48) || 'wrapped';
   return slug && id && user ? `${AGENT_ONLY_WRAPPED_IMAGE_KV_PREFIX}${slug}:${id}:${user}:${imageMode}:` : '';
+}
+
+function normalizeWrappedImageViewId(value = '') {
+  const id = lower(value).replace(/[^a-f0-9]/g, '').slice(0, 32);
+  return /^[a-f0-9]{32}$/.test(id) ? id : '';
+}
+
+function wrappedImageViewKey(imageViewId = '') {
+  const id = normalizeWrappedImageViewId(imageViewId);
+  return id ? `${AGENT_ONLY_WRAPPED_IMAGE_VIEW_KV_PREFIX}${id}` : '';
 }
 
 function normalizeWindowingConfig(value = {}) {
@@ -1810,8 +1821,10 @@ async function saveAgentOnlyWrappedImage({
   if (!imageText) return { ok: false, reason: 'wrapped_image_missing' };
   const createdAt = nowIso(now);
   const imageId = eventId();
+  const imageViewId = randomHex(16);
   const promptHash = `sha256:${(await sha256Hex(prompt)).slice(0, 32)}`;
   const key = `${prefix}${imageId}`;
+  const viewKey = wrappedImageViewKey(imageViewId);
   const record = {
     type: 'telegram_agent_only_wrapped_image',
     version: 1,
@@ -1826,6 +1839,7 @@ async function saveAgentOnlyWrappedImage({
     imageContentType: safeString(imageContentType) || 'image/png',
     imageBase64: imageText,
     imageByteLengthApprox: Math.floor((imageText.length * 3) / 4),
+    imageViewId,
     promptHash,
     createdAt,
   };
@@ -1833,6 +1847,18 @@ async function saveAgentOnlyWrappedImage({
     ...record,
     imageBase64: '[image omitted]',
   }, 'Agent-only wrapped image metadata must not serialize secrets.');
+  const viewRecord = {
+    type: 'telegram_agent_only_wrapped_image_view',
+    version: 1,
+    imageViewId,
+    imageKey: key,
+    sessionSlug: record.sessionSlug,
+    windowId: record.windowId,
+    mode: record.mode,
+    imageContentType: record.imageContentType,
+    createdAt,
+  };
+  assertNoSecretShape(viewRecord, 'Agent-only wrapped image view metadata must not serialize secrets.');
   await kv.put(key, JSON.stringify(record), {
     metadata: {
       v: 1,
@@ -1842,7 +1868,49 @@ async function saveAgentOnlyWrappedImage({
       b: record.imageByteLengthApprox,
     },
   });
-  return { ok: true, imageId, key, createdAt, promptHash };
+  await kv.put(viewKey, JSON.stringify(viewRecord), {
+    metadata: {
+      v: 1,
+      t: 'ao_img_view',
+      w: safeString(windowId),
+      m: record.mode === 'political_compass' ? 'c' : 'w',
+    },
+  });
+  return { ok: true, imageId, imageViewId, key, viewKey, createdAt, promptHash };
+}
+
+export async function loadAgentOnlyWrappedImageByViewId({
+  env = {},
+  imageViewId = '',
+} = {}) {
+  const kv = env?.AGENT_ACTION_KV;
+  const viewKey = wrappedImageViewKey(imageViewId);
+  if (!viewKey || !kv || typeof kv.get !== 'function') {
+    return { ok: false, status: 404, reason: 'wrapped_image_not_found' };
+  }
+  const viewRecord = safeJsonParse(await kv.get(viewKey).catch(() => null), null);
+  if (!viewRecord || safeString(viewRecord.type) !== 'telegram_agent_only_wrapped_image_view') {
+    return { ok: false, status: 404, reason: 'wrapped_image_not_found' };
+  }
+  const imageKey = safeString(viewRecord.imageKey);
+  if (!imageKey.startsWith(AGENT_ONLY_WRAPPED_IMAGE_KV_PREFIX)) {
+    return { ok: false, status: 404, reason: 'wrapped_image_not_found' };
+  }
+  const imageRecord = safeJsonParse(await kv.get(imageKey).catch(() => null), null);
+  if (!imageRecord || safeString(imageRecord.type) !== 'telegram_agent_only_wrapped_image') {
+    return { ok: false, status: 404, reason: 'wrapped_image_not_found' };
+  }
+  const imageBase64 = safeString(imageRecord.imageBase64);
+  if (!imageBase64) {
+    return { ok: false, status: 404, reason: 'wrapped_image_not_found' };
+  }
+  return {
+    ok: true,
+    image_content_type: safeString(imageRecord.imageContentType) || safeString(viewRecord.imageContentType) || 'image/png',
+    image_base64: imageBase64,
+    image_id: safeString(imageKey).split(':').pop() || '',
+    image_view_id: normalizeWrappedImageViewId(imageViewId),
+  };
 }
 
 function wrappedRowIsGuess(row = {}) {
@@ -2004,10 +2072,6 @@ export function buildAgentOnlyWrappedImagePrompt({
   const cautiousLines = cautious.length
     ? cautious.map((row) => `- ${predictionLine(row)}`).join('\n')
     : '- N/A - no cautious predictions submitted yet.';
-  const agentGuesses = wrappedAgentGuessRows(predictions);
-  const agentGuessLines = agentGuesses.length
-    ? agentGuesses.map((row) => `- ${predictionLine(row)}`).join('\n')
-    : '';
   const agentAnalysis = wrappedAgentAnalysisRows(predictions);
   const agentAnalysisLines = agentAnalysis.length
     ? agentAnalysis.map((row) => `- ${analysisLine(row)}`).join('\n')
@@ -2018,7 +2082,7 @@ export function buildAgentOnlyWrappedImagePrompt({
       importantLines,
       highLines,
       cautiousLines,
-      agentGuessLines,
+      agentGuessLines: 'N/A - playful guesses are synthesized from prediction themes at image-generation time, not read from stored favorite/book/movie/game/p(bloom) question rows.',
       focalQuestion: important[0]?.question || '',
       styleLine,
     });
@@ -2059,8 +2123,10 @@ ${cautiousLines}
 Confidence display: in both High-Confidence Reads and Cautious Reads, show a clear column or small header labeled "Confidence". Render confidence values as percentages like "95%" rather than "95/100". Do not show a full confidence table, just the per-card percentage.
 
 5. Agent Guesses
-If the data below contains favorite book, movie, game, p(bloom), or yes/no taste/personality guesses, include compact "Agent Guesses" items in this section only. Show at most one item per guess category, so there is never a duplicate favorite-book/movie/game/p(bloom) guess. Use compact chips with precise icons: book, board-game/Go stones, cinema/message screen, flower for p(bloom), etc. Do not repeat Agent Guesses under Agent Comparison or anywhere else. These guesses are additive; they must not replace the historical comparison or abstract agent-impression corner. If no such rows are available, omit this section entirely.
-${agentGuessLines || 'N/A - no favorite book, movie, game, or yes/no agent guesses were submitted.'}
+This section is synthesized at image-generation time from the actual prediction evidence above; it is not based on dedicated favorite-book/movie/game/p(bloom) questions and should not be treated as research data. If supported by the evidence, include compact playful guesses for favorite book or book vibe, movie/show, game/play pattern, and p(bloom). Use at most one item per category, so there is never a duplicate favorite-book/movie/game/p(bloom) guess. Use compact chips with precise icons: book, board-game/Go stones, cinema/message screen, flower for p(bloom), etc. These must be clearly framed as playful guesses, not facts. If evidence is weak for a category, show "N/A" for that chip instead of inventing a confident specific answer. Do not repeat Agent Guesses under Agent Comparison or anywhere else. These guesses are additive; they must not replace the historical comparison or abstract agent-impression corner.
+Supporting evidence for optional playful guesses:
+- Use the Most Important, High-Confidence, Cautious, Agent-about-user, and style evidence already provided in this prompt.
+- Do not use stored favorite/book/movie/game/p(bloom) answer rows as source data; those rows are not part of the current research question set.
 
 Answer rendering rules: use the supplied "answer format" on each prediction row. Only rows with answer format "binary choice" may render Agree, Unsure, or Disagree as large rounded choice pills/buttons. Never render Agree/Unsure/Disagree pills for rating scale, multichoice selection, or freeform text rows. For rating scale rows, show the numeric value with scale context like "7/10". For multichoice selection rows, show the selected option text as text or option chips, never as Agree/Unsure/Disagree. For freeform rows, show the short text answer in quotes or a compact text chip.
 
@@ -2193,6 +2259,7 @@ export async function generateAgentOnlyWrappedImage({
     image_saved: savedImage.ok === true,
     ...(savedImage.ok ? {
       image_id: savedImage.imageId,
+      image_view_id: savedImage.imageViewId,
       image_prompt_hash: savedImage.promptHash,
     } : {
       image_save_reason: savedImage.reason || 'wrapped_image_save_failed',
@@ -2793,6 +2860,7 @@ export async function exportAgentOnlyData({
       rows.push({
         principal_id: await agentOnlyPrincipalId(env, record.telegramUserId),
         image_id: safeString(entry.key).split(':').pop() || '',
+        image_view_id: safeString(record.imageViewId),
         window_id: safeString(record.windowId),
         mode: safeString(record.mode),
         model: safeString(record.model),

@@ -101,6 +101,7 @@ import {
   exportAgentOnlyData,
   generateAgentOnlyWrappedImage,
   getAgentOnlyStatementsPage,
+  loadAgentOnlyWrappedImageByViewId,
   loadAgentOnlyModeConfig,
   materializeAgentOnlyWindow,
   saveAgentOnlyModeConfig,
@@ -3070,6 +3071,42 @@ function base64ToBytes(value = '') {
   return bytes;
 }
 
+function agentOnlyWrappedImageViewUrl(env = {}, imageViewId = '') {
+  const id = safeString(imageViewId).replace(/[^a-fA-F0-9]/g, '').slice(0, 32);
+  return id ? `${agentBridgePublicUrl(env)}${AGENT_ONLY_ENDPOINTS.wrappedImage}/view/${encodeURIComponent(id)}` : '';
+}
+
+async function handleAgentOnlyWrappedImageViewRequest({
+  env = {},
+  imageViewId = '',
+  method = 'GET',
+} = {}) {
+  const result = await loadAgentOnlyWrappedImageByViewId({ env, imageViewId });
+  if (!result.ok) {
+    return json({
+      ok: false,
+      reason: result.reason || 'wrapped_image_not_found',
+    }, { status: result.status || 404 });
+  }
+  const imageResponse = new Response(base64ToBytes(result.image_base64), {
+    status: 200,
+    headers: {
+      'content-type': result.image_content_type || 'image/png',
+      'cache-control': 'private, max-age=3600',
+      'content-disposition': 'inline; filename="agent-village-wrapped.png"',
+      'x-agent-only-image-id': result.image_id || '',
+      'x-agent-only-image-view-id': result.image_view_id || '',
+    },
+  });
+  if (method === 'HEAD') {
+    return new Response(null, {
+      status: imageResponse.status,
+      headers: imageResponse.headers,
+    });
+  }
+  return imageResponse;
+}
+
 async function handleAgentOnlyWrappedImageRequest({
   env = {},
   context = {},
@@ -3101,8 +3138,14 @@ async function handleAgentOnlyWrappedImageRequest({
       },
     });
   }
-  assertNoSecretShape({ ...result, image_base64: '[image omitted]' }, 'Agent-only wrapped image response metadata must not serialize secrets.');
-  return json(result, { status, headers: { 'cache-control': 'no-store' } });
+  const payload = {
+    ...result,
+    ...(result.image_view_id ? {
+      image_url: agentOnlyWrappedImageViewUrl(env, result.image_view_id),
+    } : {}),
+  };
+  assertNoSecretShape({ ...payload, image_base64: '[image omitted]' }, 'Agent-only wrapped image response metadata must not serialize secrets.');
+  return json(payload, { status, headers: { 'cache-control': 'no-store' } });
 }
 
 function normalizeAdminQuestionDeleteIds(body = {}) {
@@ -5765,6 +5808,20 @@ async function handleTelegramAgentHandoffRequestUnsafe({
   }
   if (url.pathname === AGENT_ONLY_ENDPOINTS.start) {
     return handleAgentOnlyStartRequest({ request, env });
+  }
+  const wrappedImageViewPrefix = `${AGENT_ONLY_ENDPOINTS.wrappedImage}/view/`;
+  if (url.pathname.startsWith(wrappedImageViewPrefix) && (request.method === 'GET' || request.method === 'HEAD')) {
+    let imageViewId = url.pathname.slice(wrappedImageViewPrefix.length);
+    try {
+      imageViewId = decodeURIComponent(imageViewId);
+    } catch {
+      // Keep the raw path segment; invalid encoding should behave like a missing image, not a 500.
+    }
+    return handleAgentOnlyWrappedImageViewRequest({
+      env,
+      imageViewId,
+      method: request.method,
+    });
   }
   if (AGENT_BROWSER_READ_CORS_PATHS.includes(url.pathname) && request.method === 'OPTIONS') {
     const cors = agentBrowserReadCorsHeaders(request, env, url.pathname);

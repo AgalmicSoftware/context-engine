@@ -1620,6 +1620,7 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   });
   assert.equal(votesResponse.status, 200);
   env.AGENT_BRIDGE_OPENAI_API_KEY = 'sk-bridge-openai';
+  env.AGENT_BRIDGE_PUBLIC_URL = 'https://bridge.example';
   let openAiRequestForm = null;
   const wrappedResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/agent-only/wrapped-image?sessionSlug=alpha', {
@@ -1654,6 +1655,8 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   assert.equal(wrapped.image_base64, Buffer.from('fake-png').toString('base64'));
   assert.equal(wrapped.image_saved, true);
   assert.match(wrapped.image_id, /^\d{13}-[0-9a-f]{8}$/);
+  assert.match(wrapped.image_view_id, /^[0-9a-f]{32}$/);
+  assert.equal(wrapped.image_url, `https://bridge.example/telegram/agent/api/agent-only/wrapped-image/view/${wrapped.image_view_id}`);
   assert.match(wrapped.image_prompt_hash, /^sha256:[0-9a-f]{32}$/);
   assert.equal(openAiRequestForm.get('model'), 'gpt-image-2');
   assert.equal(openAiRequestForm.get('output_format'), 'png');
@@ -1671,6 +1674,31 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   assert.doesNotMatch(wrappedPrompt, /Review or edit your agent's responses in Context Engine/);
   assert.doesNotMatch(wrappedPrompt, /What Your Agent Upvoted/);
 
+  const imageViewResponse = await handleTelegramAgentHandoffRequest({
+    request: new Request(wrapped.image_url),
+    env,
+  });
+  assert.equal(imageViewResponse.status, 200);
+  assert.equal(imageViewResponse.headers.get('content-type'), 'image/png');
+  assert.equal(imageViewResponse.headers.get('content-disposition'), 'inline; filename="agent-village-wrapped.png"');
+  assert.equal(Buffer.from(await imageViewResponse.arrayBuffer()).toString(), 'fake-png');
+
+  const imageViewHeadResponse = await handleTelegramAgentHandoffRequest({
+    request: new Request(wrapped.image_url, { method: 'HEAD' }),
+    env,
+  });
+  assert.equal(imageViewHeadResponse.status, 200);
+  assert.equal(imageViewHeadResponse.headers.get('content-type'), 'image/png');
+  assert.equal((await imageViewHeadResponse.text()), '');
+
+  const missingImageViewResponse = await handleTelegramAgentHandoffRequest({
+    request: new Request('https://bridge.example/telegram/agent/api/agent-only/wrapped-image/view/not-real'),
+    env,
+  });
+  const missingImageView = await jsonBody(missingImageViewResponse);
+  assert.equal(missingImageViewResponse.status, 404);
+  assert.equal(missingImageView.reason, 'wrapped_image_not_found');
+
   const imageExportResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/admin/agent-only/export?sessionSlug=alpha&view=images&format=jsonl', {
       token: 'agent-test-token',
@@ -1682,6 +1710,7 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   const imageRows = imageExportText.trim().split('\n').filter(Boolean).map((line) => JSON.parse(line));
   assert.equal(imageRows.length, 1);
   assert.equal(imageRows[0].image_id, wrapped.image_id);
+  assert.equal(imageRows[0].image_view_id, wrapped.image_view_id);
   assert.equal(imageRows[0].mode, 'wrapped');
   assert.equal(imageRows[0].image_base64, Buffer.from('fake-png').toString('base64'));
   assert.equal(imageRows[0].prompt_hash, wrapped.image_prompt_hash);

@@ -1,5 +1,10 @@
 # Agent Village Wrapped — Final Launch Question Set
 
+> Superseded note (2026-06-19): favorite book/movie/game/p(bloom) guesses are
+> no longer stored as agent-only question rows. The current launch bank is
+> `docs/agent-village-wrapped-questions-current.json`; playful guesses are
+> synthesized by the Wrapped image prompt from the real predictions.
+
 ## Part 1: Audit of Existing Question Bank (51 questions)
 
 ### Strongest questions to keep (minimal edits needed)

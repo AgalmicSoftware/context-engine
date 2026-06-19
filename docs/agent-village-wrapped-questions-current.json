@@ -393,20 +393,20 @@
     "eval_type": "calibration"
   },
   {
-    "id": "G1",
-    "type": "freeform",
-    "prompt": "Agent guess: this principal's favorite or most-recommended book. Answer N/A if unsupported.",
-    "category": "playful_guesses",
-    "eval_lane": "agent_about_user",
-    "eval_type": "wrapped_guess"
+    "id": "R1",
+    "type": "binary",
+    "prompt": "I would want my agent to show a short evidence trail for any recommendation that affects another person.",
+    "category": "agent_norms",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
   },
   {
-    "id": "G2",
-    "type": "freeform",
-    "prompt": "Agent guess: a movie or TV show this principal would recommend. Answer N/A if unsupported.",
-    "category": "playful_guesses",
-    "eval_lane": "agent_about_user",
-    "eval_type": "wrapped_guess"
+    "id": "R2",
+    "type": "binary",
+    "prompt": "Communities should agree on agent norms before allowing agents to make commitments or introductions at scale.",
+    "category": "agent_norms",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
   },
   {
     "id": "W1",
@@ -491,19 +491,21 @@
     "eval_type": "calibration"
   },
   {
-    "id": "G3",
-    "type": "freeform",
-    "prompt": "Agent guess: a game, puzzle, sport, or play pattern that fits this principal. Answer N/A if unsupported.",
-    "category": "playful_guesses",
-    "eval_lane": "agent_about_user",
-    "eval_type": "wrapped_guess"
+    "id": "R3",
+    "type": "multichoice",
+    "prompt": "Which AI future would I most want to help bring about?",
+    "options": ["Personal agency and capability", "Scientific and medical progress", "Better governance and deliberation", "Creative tools and culture", "Care, education, and flourishing", "None of these / N/A"],
+    "select_mode": "single",
+    "category": "ai_futures",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "human_split"
   },
   {
-    "id": "G4",
-    "type": "freeform",
-    "prompt": "Agent guess: this principal's p(bloom) as a percentage from 0 to 100. Answer N/A if unsupported.",
-    "category": "playful_guesses",
-    "eval_lane": "agent_about_user",
-    "eval_type": "wrapped_guess"
+    "id": "R4",
+    "type": "binary",
+    "prompt": "The most interesting thing about personal agents is what they reveal about humans, not what they automate.",
+    "category": "agent_norms",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "human_split"
   }
 ]

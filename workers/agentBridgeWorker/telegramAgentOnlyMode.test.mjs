@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import {
   AGENT_ONLY_ANSWER_EVENT_KV_PREFIX,
   AGENT_ONLY_INSTRUCTIONS,
@@ -319,14 +320,17 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.match(prompt, /Do not render detached rating labels/);
   assert.match(prompt, /Agent Guesses/);
   assert.match(prompt, /p\(bloom\)/);
-  assert.match(prompt, /answer format: rating scale; prediction: 80\/100; confidence: 63%/);
+  assert.match(prompt, /synthesized at image-generation time from the actual prediction evidence/);
+  assert.match(prompt, /not based on dedicated favorite-book\/movie\/game\/p\(bloom\) questions/);
+  assert.match(prompt, /Do not use stored favorite\/book\/movie\/game\/p\(bloom\) answer rows as source data/);
   assert.match(prompt, /flower for p\(bloom\)/);
   assert.match(prompt, /Do not repeat Agent Guesses under Agent Comparison or anywhere else/);
   assert.match(prompt, /Do not include Agent Guesses in this section/);
   assert.match(prompt, /favorite book/);
-  assert.match(prompt, /Neuromancer/);
-  assert.match(prompt, /Her/);
-  assert.match(prompt, /Go/);
+  assert.doesNotMatch(prompt, /answer format: rating scale; prediction: 80\/100; confidence: 63%/);
+  assert.doesNotMatch(prompt, /prediction: Neuromancer/);
+  assert.doesNotMatch(prompt, /prediction: Her/);
+  assert.doesNotMatch(prompt, /prediction: Go\b/);
   assert.doesNotMatch(prompt, /The Diamond Age/);
   assert.doesNotMatch(prompt, /impossible pet/);
   assert.doesNotMatch(prompt, /post publicly without review/);
@@ -389,6 +393,16 @@ test('wrapped image prompt supports Agent Norms Compass mode around the most-imp
   assert.match(prompt, /I would rather my agent be too conservative with privacy/);
   assert.match(prompt, /Agent guesses/);
   assert.doesNotMatch(prompt, /Most Important To You/);
+});
+
+test('current Wrapped question bank excludes image-only taste and p(bloom) guess prompts', () => {
+  const questionBank = JSON.parse(readFileSync(new URL('../../docs/agent-village-wrapped-questions-current.json', import.meta.url), 'utf8'));
+  assert.equal(questionBank.length, 60);
+  const serialized = JSON.stringify(questionBank);
+  assert.doesNotMatch(serialized, /Agent guess:/i);
+  assert.doesNotMatch(serialized, /favorite book|favorite movie|movie or TV show|favorite game|p\(bloom\)/i);
+  assert.equal(questionBank.some((question) => question.id === 'R1'), true);
+  assert.equal(questionBank.some((question) => question.id === 'R4'), true);
 });
 
 test('canonical answer fingerprints compare semantics across agent and mini-app shapes', async () => {

@@ -4,6 +4,12 @@ Revised question set for Context Engine `agent_only_mode`, targeting both a
 shareable Wrapped artifact and an aggregate research report on human-agent
 delegation, trust, and social coordination.
 
+> Superseded note (2026-06-19): this design bank includes exploratory
+> favorite-book/movie/game/p(bloom) prompt ideas. Those are no longer part of
+> the stored agent-only question set. The current launch bank is
+> `docs/agent-village-wrapped-questions-current.json`; playful guesses are
+> synthesized by the Wrapped image prompt from the real predictions.
+
 ---
 
 ## 1. Critique of the Current V2 Draft

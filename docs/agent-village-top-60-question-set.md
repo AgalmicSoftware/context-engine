@@ -82,17 +82,19 @@ must answer `N/A` when unsupported rather than hallucinating.
 55. **(freeform, agent-about-user)** "What abstract visual metaphor best represents what you think of this principal? Use a short non-sensitive phrase or N/A."
 56. **(freeform, agent-about-user)** "What one question should the principal answer themselves to verify whether your model of them is right?"
 
-## G. Playful Guesses For Wrapped
+## G. Extra Norms And AI-Futures Anchors
 
-57. **(freeform, agent-about-user)** "Agent guess: what is this principal's favorite book, or a book they would strongly recommend? Answer N/A if unsupported."
-58. **(freeform, agent-about-user)** "Agent guess: what movie or TV show would this principal recommend? Answer N/A if unsupported."
-59. **(freeform, agent-about-user)** "Agent guess: what game, puzzle, sport, or play pattern best fits this principal? Answer N/A if unsupported."
-60. **(freeform, agent-about-user)** "Agent guess: what is this principal's p(bloom) as a percentage from 0 to 100? Answer N/A if unsupported."
+57. **(binary, predicted human answer)** "I would want my agent to show a short evidence trail for any recommendation that affects another person."
+58. **(binary, predicted human answer)** "Communities should agree on agent norms before allowing agents to make commitments or introductions at scale."
+59. **(multichoice, predicted human answer)** "Which AI future would I most want to help bring about?"
+    - Options: Personal agency and capability / Scientific and medical progress / Better governance and deliberation / Creative tools and culture / Care, education, and flourishing / None of these / N/A
+60. **(binary, predicted human answer)** "The most interesting thing about personal agents is what they reveal about humans, not what they automate."
 
 ## Coverage Notes
 
-- **Most likely disagreement**: 1, 4, 7, 13, 17, 21, 22, 24, 27, 31, 36, 38.
-- **Best research/report items**: 16, 20, 21-32, 33, 39, 49, 51, 52.
+- **Most likely disagreement**: 1, 4, 7, 13, 17, 21, 22, 24, 27, 31, 36, 38, 59, 60.
+- **Best research/report items**: 16, 20, 21-32, 33, 39, 49, 51, 52, 57-60.
+- **Wrapped-only playful guesses**: favorite book/movie/game/p(bloom) are synthesized by the image prompt from the real answer set, not stored as questions.
 - **Best Wrapped image items**: 35, 49-60.
 - **Best calibration items**: 1-8, 13-18, 41-48.
 - **Highest redundancy risk removed**: repeated consent gates, duplicate historical-comparison prompts, multiple "which theme should Wrapped show" prompts, and direct implementation/meta questions.

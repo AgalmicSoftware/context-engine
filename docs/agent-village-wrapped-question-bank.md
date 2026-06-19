@@ -106,13 +106,15 @@ mostly human-written one." If no low-confidence data exists, write "N/A - agent
 reported uniformly high confidence."
 
 5. Agent Guesses
-If available, include a compact strip of playful low-stakes guesses, such as
-favorite book, movie, game, p(bloom), or yes/no taste/personality guesses. These
-should be clearly framed as guesses, not facts. Show at most one item per guess
-category, so the same favorite-book/movie/game/p(bloom) guess cannot appear
-twice. Use a flower icon for p(bloom). This section is the only place Agent
-Guesses should appear; do not repeat guesses under Agent Comparison. If
-unavailable, omit the section rather than inventing.
+This is synthesized at image-generation time from the real answer set, not from
+dedicated favorite-book/movie/game/p(bloom) questions. If supported by the
+evidence, include a compact strip of playful low-stakes guesses such as favorite
+book or book vibe, movie/show, game/play pattern, and p(bloom). These should be
+clearly framed as guesses, not facts. Show at most one item per category, so the
+same favorite-book/movie/game/p(bloom) guess cannot appear twice. Use a flower
+icon for p(bloom). If evidence is weak for a category, show N/A rather than a
+false specific answer. This section is the only place Agent Guesses should
+appear; do not repeat guesses under Agent Comparison.
 
 6. Memory Signals Used
 Only show supported, non-sensitive signals. Use "N/A" when unknown:
@@ -298,31 +300,28 @@ of binary, rating, multichoice, and freeform questions.
     - Wrapped: guardrail.
     - Report: evidence-boundary analysis.
 
-### E. Agent Guesses And Taste Signals
+### E. Wrapped Boundaries And Extra Norms
 
-These are intentionally playful, low-stakes questions for Wrapped shareability.
-They should be marked as guesses in the image and report copy. The agent should
-use `N/A` when it has no real signal and should not hallucinate from vibes
-alone.
+Playful favorite-book/movie/game/p(bloom) guesses are not stored as questions.
+The image-generation prompt may synthesize them from the real answer set and
+must label them as guesses. The question bank keeps only consent/boundary and
+research-grade items.
 
-31. **(freeform, agent-about-user analysis)** "Agent guess: what is this principal's favorite book, or a book they would strongly recommend? Answer `N/A` if unsupported."
-    - Wrapped: shareable taste card.
-    - Report: qualitative culture map; not calibration-critical.
-
-32. **(freeform, agent-about-user analysis)** "Agent guess: what movie or TV show would this principal recommend? Answer `N/A` if unsupported."
-    - Wrapped: shareable taste card.
-    - Report: qualitative culture map; not calibration-critical.
-
-33. **(freeform, agent-about-user analysis)** "Agent guess: what game, puzzle, sport, or play pattern best fits this principal? Answer `N/A` if unsupported."
-    - Wrapped: playful identity card.
-    - Report: light clustering of play/interaction preferences.
-
-34. **(rating 0-100, agent-about-user analysis)** "Agent guess: what is this principal's p(bloom) - their probability that things broadly flourish from here? Answer `N/A` if unsupported."
-    - Wrapped: p(bloom) flower chip.
-    - Report: optimism/flourishing model; not calibration-critical.
-
-35. **(binary, predicted human answer)** "I would enjoy seeing a playful public guess from my agent, as long as it is clearly labeled as a guess."
+31. **(binary, predicted human answer)** "I would enjoy seeing a playful public guess from my agent, as long as it is clearly labeled as a guess."
     - Wrapped: consent signal for memeable guess sections.
+
+32. **(binary, predicted human answer)** "I would want my agent to show a short evidence trail for any recommendation that affects another person."
+    - Wrapped/report: evidence-trail norm; governance signal.
+
+33. **(binary, predicted human answer)** "Communities should agree on agent norms before allowing agents to make commitments or introductions at scale."
+    - Wrapped/report: community norm-setting signal.
+
+34. **(multichoice, predicted human answer)** "Which AI future would I most want to help bring about?"
+    - Options: Personal agency and capability / Scientific and medical progress / Better governance and deliberation / Creative tools and culture / Care, education, and flourishing / None of these / N/A
+    - Wrapped/report: AI-futures priority.
+
+35. **(binary, predicted human answer)** "The most interesting thing about personal agents is what they reveal about humans, not what they automate."
+    - Wrapped/report: agent-village research framing.
     - Report: appetite for playful agent interpretation.
 
 36. **(binary, predicted human answer)** "I would rather my agent say `N/A` than make a clever but weakly supported guess about me."

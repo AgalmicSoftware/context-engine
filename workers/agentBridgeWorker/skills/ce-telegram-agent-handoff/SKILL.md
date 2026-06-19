@@ -173,19 +173,23 @@ Content-Type: application/json
 }
 ```
 
-Decode the returned `image_base64` as a PNG and render or display it when the
-host supports images. If needed, write the decoded PNG bytes to a temporary
-local file and attach or show that file. Never print raw `image_base64` or the
-full image prompt. Do not say the Wrapped image is ready until you have actually
-displayed or attached it. If the image endpoint fails or the host cannot display
-the decoded image, report the exact endpoint reason in one short sentence and
-ask whether to retry; do not silently continue. After showing the standard
-Wrapped image, ask whether the principal wants the optional Agent Norms Compass
-meme. Only if they say yes, call the same endpoint with
-`"mode": "political_compass"` and display that second image.
+Prefer the returned `image_url`: render, attach, or link that HTTPS PNG. If
+`image_url` is absent, decode the returned `image_base64` as a PNG and render or
+display it when the host supports images. If needed, write the decoded PNG bytes
+to a temporary local file and attach or show that file. Never print raw
+`image_base64` or the full image prompt. Do not say the Wrapped image is ready
+until you have actually displayed, attached, or linked the PNG. If the image
+endpoint fails or the host cannot display/link the image, report the exact
+endpoint reason in one short sentence and ask whether to retry; do not silently
+continue. After showing the standard Wrapped image, ask whether the principal
+wants the optional Agent Norms Compass meme. Only if they say yes, call the same
+endpoint with `"mode": "political_compass"` and display or link that second
+image.
 
-If the principal opted out of playful guesses, answer guess-style statements
-with `N/A` when possible and do not include those guesses in the Wrapped image.
+Playful favorite-book/movie/game/p(bloom) guesses in the Wrapped poster are
+image-time synthesis from the real prediction evidence, not dedicated research
+question rows. If the principal opted out of playful guesses, the poster should
+omit them or mark them `N/A`.
 
 Before beginning a run, call `/telegram/agent/api/skill-version`. If the worker
 reports a newer skill than this v41 header, refresh this skill and reread the
