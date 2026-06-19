@@ -180,6 +180,60 @@ describe('SBTPage holder modal rendering', () => {
     expect(sbtFilterNode.props.network).toEqual(expect.objectContaining({ id: 84532 }));
   });
 
+  it('renders the holders filter in the modal title row with a light button surface', () => {
+    const holderAddress = '0x00000000000000000000000000000000000000b1';
+    const tree = renderSbtPageHolderModal({
+      isOpen: true,
+      onClose: jest.fn(),
+      showHeaderCount: true,
+      holdersDisplayCount: '1',
+      showCornerSpinner: false,
+      holderItemsForFilter: [holderAddress],
+      provider: 'mock',
+      network: { id: 84532 },
+      sessionSlug: 'rxc',
+      defaultFeaturedSBTs: [],
+      onFilter: jest.fn(),
+      isSBTCacheReady: true,
+      sbtCacheRevision: 1,
+      loadingMintedFilter: false,
+      hasFilteredHolders: true,
+      hasComputedHolders: true,
+      showScanProgressInModal: false,
+      scanProgressText: '',
+      scanProgressSessionText: '',
+      scanProgressPct: 0,
+      scanProgressFillStyle: {},
+      showEmptyStateInModal: false,
+      showApproximateCountHint: false,
+      showSpinnerInModalBody: false,
+      filteredMintedUsers: [holderAddress],
+      copiedAddress: '',
+      copyToClipboard: jest.fn(),
+      getExplorerUrl: () => 'https://explorer.example/address',
+    });
+    const modalHeader = findElementInTree(
+      tree,
+      (element) => element?.props?.className === styles.modalHeader
+    );
+    const modalBody = findElementInTree(
+      tree,
+      (element) => element?.props?.className === styles.modalBody
+    );
+    const headerFilter = findElementInTree(
+      modalHeader,
+      (element) => element?.props?.mode === 'addresses' && Array.isArray(element?.props?.items)
+    );
+    const bodyFilter = findElementInTree(
+      modalBody,
+      (element) => element?.props?.mode === 'addresses' && Array.isArray(element?.props?.items)
+    );
+
+    expect(headerFilter).toBeTruthy();
+    expect(headerFilter.props.buttonSurface).toBe('light');
+    expect(bodyFilter).toBeNull();
+  });
+
   it('preserves PUBLIC_URL for holder modal user links', () => {
     const previousPublicUrl = process.env.PUBLIC_URL;
     process.env.PUBLIC_URL = '/ce/';

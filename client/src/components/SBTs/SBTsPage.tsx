@@ -35,6 +35,7 @@ import {
   buildSBTsPageInitialState as buildInitialState,
   dedupeSBTsPageAddressListCaseInsensitive as dedupeAddressListCaseInsensitive,
   dedupeSBTsPageSessionSlugList as dedupeSessionSlugList,
+  hasSBTsPageCacheFeaturedCardImageMetadata as hasCacheFeaturedCardImageMetadata,
   isSBTsPageSessionAutoFeatureEnabled as isSessionAutoFeatureEnabled,
   isSBTsPageRecord as isRecord,
   normalizeSBTsPageFeaturedEntries as normalizeFeaturedEntries,
@@ -412,6 +413,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
       }
       const resolvedCacheMatch = cacheMatch as CacheBackedFeaturedCard['sbt'] | null;
       if (!resolvedCacheMatch || !resolvedCacheMatch.sbtInfo) return null;
+      if (!hasCacheFeaturedCardImageMetadata(resolvedCacheMatch.sbtInfo)) return null;
       return {
         address: entry.address,
         sessionSlug: entry.sessionSlug,

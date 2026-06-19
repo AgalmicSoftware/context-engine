@@ -883,6 +883,12 @@ describe('error paths', () => {
     expect(arweaveScripts.uploadDataToArweave).not.toHaveBeenCalled();
     expect(uploadDataToSessionStorage).toHaveBeenCalledTimes(2);
     expect(uploadDataToSessionStorage.mock.calls.every((call) => call[2].resource === 'responses')).toBe(true);
+    expect(uploadDataToSessionStorage.mock.calls[0][2].context).toEqual(expect.objectContaining({
+      account: TEST_ADDRESS,
+      chainId: 84532,
+      providerLike: expect.any(Object),
+      signer: expect.any(Object),
+    }));
     expect(mockSurveyContract.interface.encodeFunctionData).toHaveBeenCalledWith('submitResponses', [
       [expect.any(String)],
       [`0x${'22'.repeat(32)}`],

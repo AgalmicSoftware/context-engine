@@ -99,34 +99,38 @@ export const renderSbtPageHolderModal = ({
     >
       <ModalHeader toggle={onClose} close={closeButton} className={styles.modalHeader}>
         <div className={styles.modalTitleStack}>
-          <span className={styles.modalTitle}>
-            Holders
-            {showHeaderCount && (
-              <span className={styles.modalTitleCount}>({holdersDisplayCount})</span>
-            )}
-          </span>
-          {showCornerSpinner && (
-            <span className={styles.modalTitleSpinnerRow}>
-              <FontAwesomeIcon icon={faSpinner} spin className={styles.cornerSpinner} title="Refreshing holders..." />
+          <div className={styles.modalTitleRow}>
+            <span className={styles.modalTitle}>
+              Holders
+              {showHeaderCount && (
+                <span className={styles.modalTitleCount}>({holdersDisplayCount})</span>
+              )}
             </span>
-          )}
+            <div className={styles.holdersHeaderFilter}>
+              <SBTFilter
+                items={holderItemsForFilter}
+                mode="addresses"
+                provider={provider}
+                network={network}
+                sessionSlug={sessionSlug}
+                defaultFeaturedSBTs={defaultFeaturedSBTs}
+                onFilter={onFilter}
+                autoExpand={false}
+                isSBTCacheReady={isSBTCacheReady}
+                sbtCacheRevision={sbtCacheRevision}
+                buttonSurface="light"
+              />
+            </div>
+            {showCornerSpinner && (
+              <span className={styles.modalTitleSpinnerRow}>
+                <FontAwesomeIcon icon={faSpinner} spin className={styles.cornerSpinner} title="Refreshing holders..." />
+              </span>
+            )}
+          </div>
         </div>
       </ModalHeader>
       <ModalBody className={styles.modalBody}>
         <div>
-          <SBTFilter
-            items={holderItemsForFilter}
-            mode="addresses"
-            provider={provider}
-            network={network}
-            sessionSlug={sessionSlug}
-            defaultFeaturedSBTs={defaultFeaturedSBTs}
-            onFilter={onFilter}
-            autoExpand={false}
-            isSBTCacheReady={isSBTCacheReady}
-            sbtCacheRevision={sbtCacheRevision}
-          />
-
           {loadingMintedFilter && !hasFilteredHolders && !hasComputedHolders && (
             <div className={styles.filteringStatus}>Filtering...</div>
           )}
