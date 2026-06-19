@@ -21,6 +21,10 @@ export type SBTsPageFeaturedProgressLike = SBTsPageUnknownRecord & {
 };
 export type SBTsPageFeaturedSbtMetadataLike = SBTsPageUnknownRecord & {
   image?: unknown;
+  imageEncrypted?: unknown;
+  imageLocked?: unknown;
+  encryptedImage?: unknown;
+  encryptedFields?: unknown;
   mintingEndTime?: unknown;
   hasPasswordMint?: unknown;
   sessionSlug?: unknown;
@@ -174,7 +178,25 @@ export const normalizeSBTsPageFeaturedCardImageUrl = (value: unknown): string =>
   const raw = String(value || '').trim();
   if (!raw) return '';
   if (/^ipfs:\/\//i.test(raw)) return `https://ipfs.io/ipfs/${raw.replace(/^ipfs:\/\//i, '')}`;
-  return normalizeArweaveUrl(raw, { contextLabel: 'sbt_page_featured_image' });
+  return normalizeArweaveUrl(raw, {
+    contextLabel: 'sbt_page_featured_image',
+    gateway: 'https://arweave.net',
+  });
+};
+
+export const hasSBTsPageCacheFeaturedCardImageMetadata = (infoInput: unknown): boolean => {
+  const info = asSBTsPageFeaturedSbt(infoInput) as SBTsPageFeaturedSbtMetadataLike | null;
+  if (!info) return false;
+  if (normalizeSBTsPageFeaturedCardImageUrl(info.image)) return true;
+  return (
+    info.imageLocked === true ||
+    !!info.imageEncrypted ||
+    !!info.encryptedImage ||
+    !!(
+      isSBTsPageRecord(info.encryptedFields) &&
+      info.encryptedFields.image
+    )
+  );
 };
 
 export const buildSBTsPageCacheFeaturedCardModel = ({

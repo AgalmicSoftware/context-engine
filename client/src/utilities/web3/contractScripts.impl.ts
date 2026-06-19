@@ -27,6 +27,7 @@ import {
   USE_ONCHAIN_SESSION_REGISTRY,
   DEFAULT_CHAIN_ID,
 } from '../../variables/appConfig.js';
+import { ARWEAVE_DEFAULT_GATEWAY_CANDIDATES } from '../../variables/arweaveGateways.js';
 import { createLogger, shouldLog } from '../logging.js';
 import { notify } from '../ui/notify.js';
 
@@ -3050,7 +3051,19 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
   const cfg = resolveSession(groupKeyOrCfg || '');
   const canUseSessionStorage = isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.RESPONSES);
   if (ARWEAVE_ACTIVE || canUseSessionStorage) {
-    const arweaveOpts = await resolveArweaveUploadOpts(groupKeyOrCfg);
+    const uploadContext = {
+      account: userAddress,
+      providerLike: ethersProvider,
+      signer,
+      chainId: cfg?.networkChainId || null,
+    };
+    const arweaveOpts = {
+      ...(await resolveArweaveUploadOpts(groupKeyOrCfg, {
+        providerLike: ethersProvider,
+        signer,
+      })),
+      context: uploadContext,
+    };
     if (surveyResponse) {
       validateNoLockedPlaintextInPayload(surveyResponse, {
         family: 'survey_response_payload',
@@ -3063,7 +3076,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
         cfg,
         arweaveUploadOpts: arweaveOpts,
         uploadWithRetry: true,
-        storageContext: { account: userAddress },
+        storageContext: uploadContext,
       });
       surveyResponseHashBytes = surveyResponseUpload.pointerBytes;
     }
@@ -3083,7 +3096,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
         cfg,
         arweaveUploadOpts: arweaveOpts,
         uploadWithRetry: true,
-        storageContext: { account: userAddress },
+        storageContext: uploadContext,
       });
       questionResponseUploads.push(responseUpload);
     }
@@ -4335,11 +4348,11 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
       const chId = extractChainId(cfg, SBT_READ_PROVIDER_OPTIONS);
 
       // Helpers (local scope)
-      const normalizeUri = (u) => {
+      const normalizeUri = (u, options = {}) => {
         if (!u) return null;
         const s = String(u).trim();
         if (!s) return null;
-        const arweaveNormalized = normalizeArweaveUrl(s);
+        const arweaveNormalized = normalizeArweaveUrl(s, options);
         if (arweaveNormalized !== s) return arweaveNormalized;
         if (/^ipfs:\/\//i.test(s)) return `https://ipfs.io/ipfs/${s.replace(/^ipfs:\/\//i, '')}`;
         return s;
@@ -4430,6 +4443,9 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
                 txId: tokenUriArweaveTxId,
                 groupKeyOrCfg,
                 arweaveOpts: {
+                  bypassFailureCache: true,
+                  directToArIo: false,
+                  gateways: ARWEAVE_DEFAULT_GATEWAY_CANDIDATES,
                   shortCircuitNotFound: true,
                   retries: 0,
                   gatewayTimeoutMs: Math.max(1000, SBT_TOKENURI_METADATA_TIMEOUT_MS - 500),
@@ -4517,28 +4533,9 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
               out.name = MASKED_SBT_FIELD_VALUE;
             }
             if (!isLockedField('image') && typeof json.image === 'string') {
-              const normalizedImage = normalizeUri(json.image);
+              const normalizedImage = normalizeUri(json.image, { gateway: 'https://arweave.net' });
               if (normalizedImage) {
-                const imageArweaveTxId = parseArweaveTxId(normalizedImage);
-                if (imageArweaveTxId) {
-                  let imageExists = null;
-                  try {
-                    imageExists = await arweaveScripts.checkTxExists(imageArweaveTxId, {
-                      debugContext: buildArweaveDebugContext(groupKeyOrCfg, 'sbt_metadata', {
-                        fn: 'getSbtMetadata',
-                        sbtAddress: String(sbtAddress || '').toLowerCase(),
-                        field: 'image',
-                      }),
-                    });
-                  } catch (_) {
-                    imageExists = null;
-                  }
-                  if (imageExists !== false) {
-                    out.image = normalizedImage;
-                  }
-                } else {
-                  out.image = normalizedImage;
-                }
+                out.image = normalizedImage;
               }
             }
             if (encryptedFields?.image) out.imageEncrypted = encryptedFields.image;

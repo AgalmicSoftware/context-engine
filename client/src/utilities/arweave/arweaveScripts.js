@@ -2600,10 +2600,46 @@ async function downloadDataFromArweave(txID, opts = {}) {
     }
   }
 
+function padBase64String(b64string) {
+    const remainder = b64string.length % 4;
+    return remainder === 0 ? b64string : `${b64string}${'='.repeat(4 - remainder)}`;
+  }
+
+function encodeBytesToBase64(byteArray) {
+    const bytes = byteArray instanceof Uint8Array ? byteArray : Uint8Array.from(byteArray);
+    if (typeof globalThis !== 'undefined' && typeof globalThis.btoa === 'function') {
+      let binary = '';
+      for (let i = 0; i < bytes.length; i += 1) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      return globalThis.btoa(binary);
+    }
+    if (typeof Buffer !== 'undefined' && typeof Buffer.from === 'function') {
+      return Buffer.from(bytes).toString('base64');
+    }
+    throw new Error('No base64 encoder is available.');
+  }
+
+function decodeBase64ToBytes(b64string) {
+    const padded = padBase64String(b64string);
+    if (typeof globalThis !== 'undefined' && typeof globalThis.atob === 'function') {
+      const binary = globalThis.atob(padded);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i += 1) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return bytes;
+    }
+    if (typeof Buffer !== 'undefined' && typeof Buffer.from === 'function') {
+      return Uint8Array.from(Buffer.from(padded, 'base64'));
+    }
+    throw new Error('No base64 decoder is available.');
+  }
+
 function hexToBase64url(hexString) {
     if (!hexString || hexString === '0x') return '';
     let byteArray = ethers.utils.arrayify(hexString);
-    let b64string = Buffer.from(byteArray).toString('base64');
+    let b64string = encodeBytesToBase64(byteArray);
     let b64urlstring = b64string.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     return b64urlstring;
   }
@@ -2617,7 +2653,7 @@ function base64urlToHex(b64urlstring) {
 
 function base64DecodeURL(b64urlstring) {
     let b64string = b64urlstring.replace(/-/g, '+').replace(/_/g, '/');
-    let byteArray = Buffer.from(b64string, 'base64');
+    let byteArray = decodeBase64ToBytes(b64string);
     return byteArray;
   }
 
