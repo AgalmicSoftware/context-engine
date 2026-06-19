@@ -79,7 +79,7 @@
 - `client/src/components/MainSite/sessionFallbackRedirect.ts`
   Pattern: Pure exported functions (no host DI)
   Exports: `getSessionFallbackScopeSlugs`, `getSessionFallbackPreferredTarget`, `isFirstVisitRootRedirectEnabled`, `getFirstVisitRootRedirectTarget`, `getSessionFallbackRedirectStorageKey`, `hasConsumedSessionFallbackRedirect`, `consumeSessionFallbackRedirect`
-  Purpose: List-scope session fallback redirects, preferred target selection, first-visit root redirect target resolution, and sessionStorage consumption tracking
+  Purpose: List-scope session fallback redirects, preferred target selection, temporary root/About redirect target resolution, cached session-load migration guards, and redirect consumption tracking
   Test: `sessionFallbackRedirect.test.ts`
   What stays in MainSite: route-shell application through `applySessionFallbackRedirect`, first-visit `replaceState`, and forwarding wrappers for runtime/config dependencies
 - `client/src/components/MainSite/sessionDisplayHelpers.ts`

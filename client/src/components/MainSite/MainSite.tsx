@@ -132,6 +132,7 @@ import NavbarRaw from "../Navbar/Navbar";
 import MainAreaTabsRaw from "../MainContent/MainAreaTabs";
 import RightSideRaw from '../RightSidebar/RightSide';
 import OnboardingOverlayRaw from '../Onboarding/OnboardingOverlay';
+import { FIRST_VISIT_STORAGE_KEY } from '../Onboarding/onboardingConfig.js';
 import FooterRaw from "../Footer/Footer";
 import LazyFallbackRaw from "../Shared/LazyFallback";
 import DevE2eNavRaw from "../E2E/DevE2eNav";
@@ -236,13 +237,15 @@ import {
   type SessionPathResolverController,
 } from './sessionPathResolverController.js';
 import {
+  consumeOneTimeFirstVisitRootRedirect as consumeOneTimeFirstVisitRootRedirectFn,
   consumeSessionFallbackRedirect as consumeSessionFallbackRedirectFn,
-  getFirstVisitRootRedirectTarget as getFirstVisitRootRedirectTargetFn,
   getSessionFallbackPreferredTarget as getSessionFallbackPreferredTargetFn,
   getSessionFallbackRedirectStorageKey as getSessionFallbackRedirectStorageKeyFn,
   getSessionFallbackScopeSlugs as getSessionFallbackScopeSlugsFn,
+  getTemporaryInitialLoadAboutRedirectTarget as getTemporaryInitialLoadAboutRedirectTargetFn,
   hasConsumedSessionFallbackRedirect as hasConsumedSessionFallbackRedirectFn,
   isFirstVisitRootRedirectEnabled as isFirstVisitRootRedirectEnabledFn,
+  shouldForceOneTimeFirstVisitRootRedirect as shouldForceOneTimeFirstVisitRootRedirectFn,
   type SessionFallbackRedirectTarget,
 } from './sessionFallbackRedirect.js';
 import {
@@ -1084,9 +1087,37 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED,
   });
 
-  getFirstVisitRootRedirectTarget = () => getFirstVisitRootRedirectTargetFn({
-    isFirstVisitRootRedirectEnabled: this.isFirstVisitRootRedirectEnabled,
-  });
+  getTemporaryInitialLoadAboutRedirectTarget = (pathIn: unknown = '') => (
+    getTemporaryInitialLoadAboutRedirectTargetFn({
+      isFirstVisitRootRedirectEnabled: this.isFirstVisitRootRedirectEnabled,
+      normalizeRoutePath: (value: unknown) => this.normalizeRoutePath(String(value || '')),
+      normalizeSessionSlug,
+      pathIn,
+    })
+  );
+
+  getFirstVisitRootRedirectStorage = (): Storage | null => {
+    if (typeof window === 'undefined') return null;
+
+    try {
+      return window.localStorage;
+    } catch (_) {
+      try {
+        return window.sessionStorage;
+      } catch (__) {
+        return null;
+      }
+    }
+  };
+
+  shouldForceOneTimeFirstVisitRootRedirect = () => shouldForceOneTimeFirstVisitRootRedirectFn(
+    this.getFirstVisitRootRedirectStorage()
+  );
+
+  consumeOneTimeFirstVisitRootRedirect = () => consumeOneTimeFirstVisitRootRedirectFn(
+    this.getFirstVisitRootRedirectStorage(),
+    { firstVisitStorageKey: FIRST_VISIT_STORAGE_KEY }
+  );
 
   getSessionFallbackRedirectStorageKey = (slugIn: unknown = '') => (
     getSessionFallbackRedirectStorageKeyFn(slugIn, {
@@ -3680,25 +3711,31 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
       startCeRuntimeStats();
     }
     this.redirectLegacyDemoPath();
-    let didRedirectFirstVisitRoot = false;
-    if (this.props.firstVisit && typeof window !== 'undefined') {
+    let didRedirectInitialLoadToAbout = false;
+    if (typeof window !== 'undefined') {
       const currentPath = window.location.pathname || this.props.path || '';
-      const firstVisitRedirectTarget = this.getFirstVisitRootRedirectTarget();
+      const aboutRedirectTarget = this.getTemporaryInitialLoadAboutRedirectTarget(currentPath);
+      const shouldRedirectForPersistedCache = aboutRedirectTarget?.requiresPersistedCache
+        ? !!(
+          aboutRedirectTarget.cacheSlug &&
+          await this.hasPersistedManagedCacheData(aboutRedirectTarget.cacheSlug)
+        )
+        : true;
       if (
-        firstVisitRedirectTarget?.path &&
-        this.isGeneralRoutePath(currentPath) &&
-        this.normalizeRoutePath(currentPath) === '/'
+        aboutRedirectTarget?.path &&
+        shouldRedirectForPersistedCache &&
+        this.normalizeRoutePath(currentPath) !== aboutRedirectTarget.path
       ) {
         window.history.replaceState(
           {},
           '',
           buildPublicUrl(
-            firstVisitRedirectTarget.path,
+            aboutRedirectTarget.path,
             window.location.search || '',
             window.location.hash || ''
           )
         );
-        didRedirectFirstVisitRoot = true;
+        didRedirectInitialLoadToAbout = true;
       }
     }
     this._mounted = true;
@@ -3709,7 +3746,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
       );
     }
     const mountPathRaw = (
-      didRedirectFirstVisitRoot && typeof window !== 'undefined'
+      didRedirectInitialLoadToAbout && typeof window !== 'undefined'
         ? window.location.pathname
         : this.getCurrentPathname()
     ) || '';
