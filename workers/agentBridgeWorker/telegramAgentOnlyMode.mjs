@@ -44,6 +44,7 @@ const AGENT_ONLY_EVAL_TYPES = new Set([
   'priority',
   'prediction',
   'bucket',
+  'wrapped_generation',
   'control',
 ]);
 
@@ -67,7 +68,7 @@ Step 2, answer every statement. POST batches of up to 50 rows to /telegram/agent
 
 Step 3, allocate both token balances. You have two independent 100-token balances for statements your principal would most want raised or lowered. POST once to /telegram/agent/api/agent-only/token-votes/bulk with mode linear: signed integer weights where sum(abs(weight)) is at most 100. POST once with mode quadratic: signed integers from -10 to 10 where sum(weight squared) is at most 100. Submit both modes for the same window. Negative values lower priority; positive values raise priority.
 
-Step 4, Agent Village Wrapped image. After Step 3 succeeds, use the wrappedImageEndpoint path from the start payload. POST to it with the same authorization credential and JSON body { "window_id": "<window_id>", "mode": "wrapped", "format": "json" }. Prefer image_url when present: render, attach, or link that HTTPS PNG URL. If image_url is absent, decode image_base64 as image/png and render or display the image if your host supports it; if needed, write the decoded PNG bytes to a temporary local file and attach or show that file. Do not print raw image_base64 or the full image prompt. The image must be shown automatically before the final chat message. Do not say the Wrapped image is ready until you have actually displayed, attached, or linked the PNG. If the image endpoint fails or your host cannot display or link the image, report the exact endpoint reason in one short sentence and ask whether to retry; do not silently continue. After showing the standard Wrapped image, ask whether the principal wants the optional Agent Norms Compass meme; only if they say yes, POST the same endpoint with mode "political_compass" and display or link that image too.
+Step 4, Agent Village Wrapped image. After Step 3 succeeds, use the wrappedImageEndpoint path from the start payload. POST to it with the same authorization credential and JSON body { "window_id": "<window_id>", "mode": "wrapped", "format": "json" }. If the endpoint returns agent_only_wrapped_incomplete_predictions or all_statements_covered false, re-fetch statements, resubmit predictions or privacy skips once, then call the wrapped image endpoint again; do not present a partial image response. Prefer image_url when present: render, attach, or link that HTTPS PNG URL. If image_url is absent, decode image_base64 as image/png and render or display the image if your host supports it; if needed, write the decoded PNG bytes to a temporary local file and attach or show that file. Do not print raw image_base64 or the full image prompt. The image must be shown automatically before the final chat message. Do not say the Wrapped image is ready until you have actually displayed, attached, or linked the PNG. If the image endpoint fails or your host cannot display or link the image, report the exact endpoint reason in one short sentence and ask whether to retry; do not silently continue. After showing the standard Wrapped image, ask whether the principal wants the optional Agent Norms Compass meme; only if they say yes, POST the same endpoint with mode "political_compass" and display or link that image too.
 
 Metadata. Every POST must include agent_metadata with model, scaffold_version, and agent_initialized_at if known. Use request_id when retrying; replaying the same request_id is idempotent within a window.
 
@@ -1706,6 +1707,28 @@ function wrappedPredictionRows(snapshot = {}, state = {}, { includeUnavailableGu
   return includeUnavailableGuesses ? rows : rows.filter((row) => !wrappedRowIsUnavailableGuess(row));
 }
 
+function agentOnlyResponseCoverage(snapshot = {}, state = {}) {
+  const statementIds = new Set((Array.isArray(snapshot.statements) ? snapshot.statements : [])
+    .map((statement) => safeString(statement?.statement_id || statement?.questionId))
+    .filter(Boolean));
+  let agentPredictionCount = 0;
+  let privacySkipCount = 0;
+  statementIds.forEach((statementId) => {
+    const entry = state?.byStatement?.[statementId];
+    if (entry?.agent?.answer) agentPredictionCount += 1;
+    else if (entry?.agentSkip) privacySkipCount += 1;
+  });
+  const agentResponseCount = agentPredictionCount + privacySkipCount;
+  return {
+    statementCount: statementIds.size,
+    agentPredictionCount,
+    privacySkipCount,
+    agentResponseCount,
+    allStatementsPredicted: statementIds.size > 0 && agentPredictionCount >= statementIds.size,
+    allStatementsCovered: statementIds.size > 0 && agentResponseCount >= statementIds.size,
+  };
+}
+
 function wrappedAnswerFormatForSchema(schema = {}) {
   const kind = safeString(schema?.kind);
   if (kind === 'text') return 'freeform text';
@@ -1771,12 +1794,15 @@ function wrappedImportanceRows(snapshot = {}, voteStates = [], { excludeQuestion
     .slice(0, WRAPPED_SECTION_ITEM_LIMIT);
 }
 
-function predictionLine(row = {}) {
-  return `Question: "${wrappedDisplayText(row.question, 240)}"; answer format: ${wrappedDisplayText(row.answerFormat || 'answer', 40)}; prediction: ${wrappedDisplayText(row.answer || 'N/A', 80)}; confidence: ${row.confidence}%`;
+function predictionLine(row = {}, { questionChars = 240, answerChars = 80 } = {}) {
+  return `Question: "${wrappedDisplayText(row.question, questionChars)}"; answer format: ${wrappedDisplayText(row.answerFormat || 'answer', 40)}; prediction: ${wrappedDisplayText(row.answer || 'N/A', answerChars)}; confidence: ${row.confidence}%`;
 }
 
 function wrappedAnswerIsUnavailable(value = '') {
-  const normalized = lower(value).replace(/[^a-z0-9]+/g, '');
+  const text = (value === undefined || value === null ? '' : String(value)).trim().toLowerCase();
+  if (/(^|[^a-z0-9])n\s*\/?\s*a([^a-z0-9]|$)/i.test(text)) return true;
+  if (/\bnot\s+applicable\b|\bnot\s+enough\b|\binsufficient\b|\bunsupported\b|\bunknown\b|\bunavailable\b/.test(text)) return true;
+  const normalized = text.replace(/[^a-z0-9]+/g, '');
   if (!normalized) return true;
   if ([
     'na',
@@ -1917,7 +1943,9 @@ function wrappedRowIsGuess(row = {}) {
   const question = safeString(row.question);
   return /\bagent guess\b/i.test(question) ||
     /\bguess (?:this|the) principal'?s\b/i.test(question) ||
-    /\bp\s*\(?\s*bloom\s*\)?|probability of bloom|positive future|flourish|flourishing\b/i.test(question) ||
+    /\b(?:book|movie|film|game|play|music|song|artist|food|ai\s+optimism)\s+guess\b/i.test(question) ||
+    /\bai\s+optimism\s+score\b/i.test(question) ||
+    /\bp\s*\(?\s*bloom\s*\)?|probability of bloom\b/i.test(question) ||
     /\bfavorite (?:book|movie|film|game|song|album|artist|food)\b/i.test(question) ||
     /\bwhat (?:movie|film|tv show|game|song|album|artist)\b/i.test(question);
 }
@@ -1926,8 +1954,13 @@ function wrappedRowIsUnavailableGuess(row = {}) {
   return wrappedRowIsGuess(row) && wrappedAnswerIsUnavailable(row.answer);
 }
 
+function wrappedRowIsUnavailable(row = {}) {
+  return wrappedAnswerIsUnavailable(row.answer);
+}
+
 function wrappedRowIsAgentAboutUserAnalysis(row = {}) {
-  if (lower(row.evalType) === 'bucket') return true;
+  const evalType = lower(row.evalType);
+  if (evalType === 'bucket' || evalType === 'wrapped_generation') return true;
   const question = safeString(row.question);
   return /\bthis principal\b/i.test(question) ||
     /\bthe principal'?s\b/i.test(question) ||
@@ -1940,6 +1973,18 @@ function wrappedRowIsAgentAboutUserAnalysis(row = {}) {
     /\bwhat one question should the principal\b/i.test(question);
 }
 
+function wrappedAnalysisQuestionIdsFromSnapshot(snapshot = {}) {
+  return new Set(Array.isArray(snapshot.statements)
+    ? snapshot.statements
+      .filter((statement) => wrappedRowIsAgentAboutUserAnalysis({
+        question: statement?.text || '',
+        evalType: snapshot?.evalTypesByQuestionId?.[statement?.statement_id || statement?.questionId] || '',
+      }))
+      .map((statement) => safeString(statement?.statement_id || statement?.questionId))
+      .filter(Boolean)
+    : []);
+}
+
 function wrappedGuessQuestionIdsFromSnapshot(snapshot = {}) {
   return new Set(Array.isArray(snapshot.statements)
     ? snapshot.statements
@@ -1949,38 +1994,10 @@ function wrappedGuessQuestionIdsFromSnapshot(snapshot = {}) {
     : []);
 }
 
-function wrappedGuessCategory(row = {}) {
-  const question = lower(row.question);
-  if (/\bp\s*\(?\s*bloom\s*\)?|probability of bloom|positive future|flourish|flourishing\b/.test(question)) return 'pbloom';
-  if (/\bbook|novel|read|recommend\b/.test(question)) return 'book';
-  if (/\bmovie|film|tv show|television|show\b/.test(question)) return 'movie';
-  if (/\bgame|puzzle|sport|play pattern\b/.test(question)) return 'game';
-  if (/\bsong|album|artist|music\b/.test(question)) return 'music';
-  if (/\bfood|comfort food\b/.test(question)) return 'food';
-  if (/\bhistorical|fictional|character|figure|comparison\b/.test(question)) return 'comparison';
-  if (/\byes\s*\/\s*no|yes-or-no|yes or no\b/.test(question)) return 'yesno';
-  return wrappedDisplayText(question, 48);
-}
-
-function wrappedAgentGuessRows(predictions = []) {
-  const seen = new Set();
-  const rows = [];
-  const candidates = [...predictions]
-    .filter((row) => wrappedRowIsGuess(row))
-    .sort((left, right) => right.confidence - left.confidence);
-  for (const row of candidates) {
-    const category = wrappedGuessCategory(row);
-    if (seen.has(category)) continue;
-    seen.add(category);
-    rows.push(row);
-    if (rows.length >= WRAPPED_AGENT_GUESS_ITEM_LIMIT) break;
-  }
-  return rows;
-}
-
 function wrappedAgentAnalysisRows(predictions = []) {
   return [...predictions]
     .filter((row) => wrappedRowIsAgentAboutUserAnalysis(row) && !wrappedRowIsGuess(row))
+    .filter((row) => !wrappedRowIsUnavailable(row))
     .sort((left, right) => right.confidence - left.confidence)
     .slice(0, WRAPPED_SECTION_ITEM_LIMIT);
 }
@@ -1997,7 +2014,7 @@ function buildAgentOnlyPoliticalCompassPrompt({
   focalQuestion = '',
   styleLine = '',
 } = {}) {
-  const focal = wrappedDisplayText(focalQuestion, 150) || 'N/A - no most-important question was available.';
+  const focal = wrappedDisplayText(focalQuestion, 150) || 'No most-important question was available.';
   return `Create a wide 16:9 Agent Village Norms Compass poster${styleLine ? `, with this extra style hint: ${styleLine}` : ''}.
 
 Logo reference: use the attached Agent Village logo image as the style reference for the wordmark. Preserve its core typography: "AGENT" is heavy uppercase block sans, "VILLAGE" is elegant high-contrast serif with a dramatic flowing calligraphic V. Do not copy the logo's stacked layout into the poster; lay "AGENT" and "VILLAGE" side-by-side in a compact top-left wordmark. Put subtitle "Where your agent thinks you land" on the same top row to create vertical space.
@@ -2006,22 +2023,24 @@ Use the agent's most-important question as the focal issue for the map: "${focal
 
 Make it look like a clean debate-atlas discussion map rather than a busy internet collage: four quadrants, crisp labeled axes, fine grid lines, soft quadrant colors, and a few discussion-node markers. Put the principal as one clear glowing marker with a short label. Put only recognizable historical figures or fictional/book characters as playful reference points on the same dimensions; do not show other users, crowds, avatars, or fake people. Prefer accurate, interesting deep-cut reference points over the most obvious names when the evidence supports them, but keep every figure recognizable enough for a viewer to understand the meme. Label each reference point with the figure/character name and one short reason tied to the axes. Keep comparisons non-defamatory and based only on the prediction themes.
 
+Principal placement rule: place the principal at a meaningful non-center coordinate derived from the evidence. Never put the principal directly on the axis crossing or exact center. If the evidence is mixed, choose a slight non-center lean and label it "mixed evidence"; if evidence is too sparse to choose, omit the principal marker rather than centering it. If the strongest predictions lean privacy/review-first, move the marker left and/or upward. If they lean autonomy/opportunity, move it right and/or downward. The marker should visibly communicate the inferred stance.
+
 The visual should be similar to a polished 2x2 strategy map: generous white or light background, rounded outer card, large readable axis labels outside the square, colored quadrants, arrowheads on both axes, and compact written arguments inside each quadrant. Good axis examples include "Humans approve high-stakes actions" at top, "Agents act with broad latitude" at bottom, "Assist tools keep humans central" on the left, and "Delegate tasks to active agents" on the right. Adapt the exact labels to the focal issue and evidence.
 
 Quadrant content: render one concise argument in each quadrant, not just a quadrant title. Each argument should sound like a plausible position in an Agent Village debate, such as "Agents should ask before crossing social context" or "Reversible autonomy beats approval bottlenecks." Keep the arguments short, legible, and tied to the axes and evidence below.
 
 Evidence to use:
 Most important questions:
-${importantLines || 'N/A'}
+${importantLines || 'No visible items; omit this section entirely.'}
 
 High-confidence reads:
-${highLines || 'N/A'}
+${highLines || 'No visible items; omit this section entirely.'}
 
 Cautious reads:
-${cautiousLines || 'N/A'}
+${cautiousLines || 'No visible items; omit this section entirely.'}
 
 Agent guesses, if available:
-${agentGuessLines || 'N/A'}
+${agentGuessLines || 'No visible items; omit this section entirely.'}
 
 Include a compact "Why here?" strip with exactly 3 evidence chips when at least 3 concrete evidence items exist. Each chip must have a precise icon and 2-4 word label derived directly from one specific question or prediction above. Do not use generic abstract icons, random symbols, or decorative filler. Put only a faint small "contextengine.xyz" link in the bottom-right corner. Do not show access credentials, raw Telegram ids, confidence tables, rationales, privacy skip counts, linear/quadratic allocation mechanics, decorative filler text, other users, or fake data.`;
 }
@@ -2036,6 +2055,7 @@ export function buildAgentOnlyWrappedImagePrompt({
 } = {}) {
   const rawPredictions = wrappedPredictionRows(snapshot, state, { includeUnavailableGuesses: true });
   const snapshotGuessQuestionIds = wrappedGuessQuestionIdsFromSnapshot(snapshot);
+  const snapshotAnalysisQuestionIds = wrappedAnalysisQuestionIdsFromSnapshot(snapshot);
   const excludedGuessQuestionIds = new Set(rawPredictions
     .filter((row) => wrappedRowIsUnavailableGuess(row))
     .map((row) => row.questionId)
@@ -2048,30 +2068,43 @@ export function buildAgentOnlyWrappedImagePrompt({
       .filter(Boolean),
   ]);
   const predictions = rawPredictions.filter((row) => !excludedGuessQuestionIds.has(row.questionId));
-  const analysisQuestionIds = new Set(predictions
-    .filter((row) => wrappedRowIsAgentAboutUserAnalysis(row))
-    .map((row) => row.questionId)
-    .filter(Boolean));
+  const analysisQuestionIds = new Set([
+    ...snapshotAnalysisQuestionIds,
+    ...predictions
+      .filter((row) => wrappedRowIsAgentAboutUserAnalysis(row))
+      .map((row) => row.questionId)
+      .filter(Boolean),
+  ]);
   const scoredPredictions = predictions
     .filter((row) => !guessQuestionIds.has(row.questionId))
-    .filter((row) => !analysisQuestionIds.has(row.questionId));
+    .filter((row) => !analysisQuestionIds.has(row.questionId))
+    .filter((row) => !wrappedRowIsUnavailable(row));
+  const unavailableQuestionIds = new Set(predictions
+    .filter((row) => wrappedRowIsUnavailable(row))
+    .map((row) => row.questionId)
+    .filter(Boolean));
   const highConfidence = [...scoredPredictions]
     .sort((left, right) => right.confidence - left.confidence)
     .slice(0, WRAPPED_SECTION_ITEM_LIMIT);
   const cautious = [...scoredPredictions]
     .sort((left, right) => left.confidence - right.confidence)
     .slice(0, WRAPPED_SECTION_ITEM_LIMIT);
-  const hiddenQuestionIds = new Set([...guessQuestionIds, ...analysisQuestionIds]);
+  const hiddenQuestionIds = new Set([...guessQuestionIds, ...analysisQuestionIds, ...unavailableQuestionIds]);
   const important = wrappedImportanceRows(snapshot, [linearVoteState, quadraticVoteState], { excludeQuestionIds: hiddenQuestionIds });
   const importantLines = important.length
     ? important.map((row, index) => `${index + 1}. Question only: "${wrappedDisplayText(row.question, 220)}"`).join('\n')
-    : 'N/A - no importance allocations submitted yet.';
+    : 'No visible items; omit this section entirely.';
   const highLines = highConfidence.length
     ? highConfidence.map((row) => `- ${predictionLine(row)}`).join('\n')
-    : '- N/A - no predictions submitted yet.';
+    : '- No visible items; omit this section entirely.';
   const cautiousLines = cautious.length
     ? cautious.map((row) => `- ${predictionLine(row)}`).join('\n')
-    : '- N/A - no cautious predictions submitted yet.';
+    : '- No visible items; omit this section entirely.';
+  const allPredictionEvidenceLines = scoredPredictions.length
+    ? scoredPredictions
+      .map((row) => `- ${predictionLine(row, { questionChars: 180, answerChars: 70 })}`)
+      .join('\n')
+    : '- No eligible predicted-human-answer evidence rows were submitted.';
   const agentAnalysis = wrappedAgentAnalysisRows(predictions);
   const agentAnalysisLines = agentAnalysis.length
     ? agentAnalysis.map((row) => `- ${analysisLine(row)}`).join('\n')
@@ -2082,7 +2115,7 @@ export function buildAgentOnlyWrappedImagePrompt({
       importantLines,
       highLines,
       cautiousLines,
-      agentGuessLines: 'N/A - playful guesses are synthesized from prediction themes at image-generation time, not read from stored favorite/book/movie/game/p(bloom) question rows.',
+      agentGuessLines: 'Playful guesses are synthesized from prediction themes at image-generation time, not read from stored favorite/book/movie/game question rows.',
       focalQuestion: important[0]?.question || '',
       styleLine,
     });
@@ -2105,7 +2138,10 @@ Section typography: make section titles large, high-contrast, and easy to read a
 Infer a short archetype from the predicted human responses and the agent-about-user evidence below. Use one bold archetype label and one memeable sentence about what the agent thinks of the principal.
 
 Agent-about-user evidence for sections 1, 6, and 7 only. Do not render this as a visible table, High-Confidence Read, Cautious Read, or Most Important item:
-${agentAnalysisLines || 'N/A - no separate agent-about-user analysis rows were submitted.'}
+${agentAnalysisLines || 'No separate agent-about-user analysis rows were submitted.'}
+
+Prediction Evidence Pool for synthesis only. Use this compact list to infer themes, style, playful guesses, comparison, and abstract impression. Do not render it as its own visible table, and do not duplicate all of it visibly; the visible High-Confidence and Cautious sections are separately listed below:
+${allPredictionEvidenceLines}
 
 2. Most Important To You
 Label this section exactly: "Questions your agent thought you would care about most"
@@ -2113,27 +2149,29 @@ Show exactly 3 actual question prompts if 3 are available; otherwise show every 
 ${importantLines}
 
 3. High-Confidence Reads
-Show exactly 3 concise predicted human response rows if 3 are available; otherwise show every available predicted human response. These rows must be questions the principal could answer about their own views/preferences, not agent-about-user analysis prompts like archetype, theme, historical comparison, abstract metaphor, favorite book/movie/game, or p(bloom). Use explicit column headers "Question", "Predicted answer", and "Confidence". Each row must include enough of the actual question prompt to explain what the answer refers to. Do not use the phrase "your agent's take":
+Show exactly 3 concise predicted human response rows if 3 are available; otherwise show every available predicted human response. These rows must be questions the principal could answer about their own views/preferences, not agent-about-user analysis prompts like archetype, theme, historical comparison, abstract metaphor, or favorite book/movie/game prompts. Use explicit column headers "Question", "Predicted answer", and "Confidence". Each row must include enough of the actual question prompt to explain what the answer refers to. Do not use the phrase "your agent's take":
 ${highLines}
 
 4. Cautious Reads
-Show exactly 3 concise nuanced predicted human response rows if 3 are available; otherwise show every available predicted human response. These rows must be questions the principal could answer about their own views/preferences, not agent-about-user analysis prompts like archetype, theme, historical comparison, abstract metaphor, favorite book/movie/game, or p(bloom). Use explicit column headers "Question", "Predicted answer", and "Confidence". Each row must include enough of the actual question prompt to explain what the answer refers to, and if a shortened prompt would be ambiguous, show the full prompt even if the row becomes tighter. Do not render vague fragments like "Mostly AI-written information environment" when the full prompt is available; show the actual prompt such as "A mostly AI-written information environment could be healthier than today's mostly human-written one." Do not render detached rating labels like "Serendipity 3/5" or a bare "7" without the question context; show scale context like "7/10" when applicable. Do not use the phrase "your agent's take":
+Show exactly 3 concise nuanced predicted human response rows if 3 are available; otherwise show every available predicted human response. These rows must be questions the principal could answer about their own views/preferences, not agent-about-user analysis prompts like archetype, theme, historical comparison, abstract metaphor, or favorite book/movie/game prompts. Use explicit column headers "Question", "Predicted answer", and "Confidence". Each row must include enough of the actual question prompt to explain what the answer refers to, and if a shortened prompt would be ambiguous, show the full prompt even if the row becomes tighter. Do not render vague fragments like "Mostly AI-written information environment" when the full prompt is available; show the actual prompt such as "A mostly AI-written information environment could be healthier than today's mostly human-written one." Do not render detached rating labels like "Serendipity 3/5" or a bare "7" without the question context; show scale context like "7/10" when applicable. Do not use the phrase "your agent's take":
 ${cautiousLines}
 
 Confidence display: in both High-Confidence Reads and Cautious Reads, show a clear column or small header labeled "Confidence". Render confidence values as percentages like "95%" rather than "95/100". Do not show a full confidence table, just the per-card percentage.
 
+No visible unavailable rows: do not render any visible row, chip, card, or label with "N/A", "unknown", "unsupported", "not enough context", or similar unavailable text. Omit that item instead, even if its confidence is high.
+
 5. Agent Guesses
-This section is synthesized at image-generation time from the actual prediction evidence above; it is not based on dedicated favorite-book/movie/game/p(bloom) questions and should not be treated as research data. If supported by the evidence, include compact playful guesses for favorite book or book vibe, movie/show, game/play pattern, and p(bloom). Use at most one item per category, so there is never a duplicate favorite-book/movie/game/p(bloom) guess. Use compact chips with precise icons: book, board-game/Go stones, cinema/message screen, flower for p(bloom), etc. These must be clearly framed as playful guesses, not facts. If evidence is weak for a category, show "N/A" for that chip instead of inventing a confident specific answer. Do not repeat Agent Guesses under Agent Comparison or anywhere else. These guesses are additive; they must not replace the historical comparison or abstract agent-impression corner.
+This bottom-left section is synthesized at image-generation time from the actual prediction evidence above; it is not based on dedicated favorite-book/movie/game questions and should not be treated as research data. Reserve the bottom-left visual slot for a compact "Agent Guesses" chip grid, ideally 2x2 when all four guesses are supported. Use this category order: Book Guess, Movie/Show Guess, Game/Play Pattern, AI Optimism. Try to include Book Guess and Movie/Show Guess alongside Game/Play Pattern and AI Optimism when the evidence supports even a loose taste-vibe inference, but frame them as playful guesses rather than facts. Use at most one item per category, so there is never a duplicate book, movie/show, game/play, or AI Optimism guess. Use compact chips with precise icons: book, cinema/message screen, board-game/Go stones, and flower/sunrise for AI Optimism. These must be clearly framed as playful guesses, not facts. For AI Optimism, use actual AI-futures predicted response rows or broader prediction themes, especially optimism/flourishing questions; do not rely on old standalone optimism guess rows. If evidence is weak for a category, omit that chip entirely instead of showing unavailable text or inventing a confident specific answer. Do not repeat Agent Guesses under Agent Comparison, the abstract agent-impression corner, or anywhere else. These guesses are additive; they must not replace the historical comparison or abstract agent-impression corner.
 Supporting evidence for optional playful guesses:
 - Use the Most Important, High-Confidence, Cautious, Agent-about-user, and style evidence already provided in this prompt.
-- Do not use stored favorite/book/movie/game/p(bloom) answer rows as source data; those rows are not part of the current research question set.
+- Do not use stored favorite/book/movie/game answer rows as source data; those rows are not part of the current research question set.
 
 Answer rendering rules: use the supplied "answer format" on each prediction row. Only rows with answer format "binary choice" may render Agree, Unsure, or Disagree as large rounded choice pills/buttons. Never render Agree/Unsure/Disagree pills for rating scale, multichoice selection, or freeform text rows. For rating scale rows, show the numeric value with scale context like "7/10". For multichoice selection rows, show the selected option text as text or option chips, never as Agree/Unsure/Disagree. For freeform rows, show the short text answer in quotes or a compact text chip.
 
-Binary answer styling: for binary choice prediction rows only, render Agree / Unsure / Disagree as large rounded choice pills/buttons on a dark navy background: Agree is green with white text, Unsure is bright yellow with dark navy text, and Disagree is red with white text. The pills should feel like primary response controls, not small tags.
+Binary answer styling: for binary choice prediction rows only, render exactly one selected answer pill, matching the supplied predicted answer. If the prediction is Agree, show only the green Agree pill; if Unsure, show only the yellow Unsure pill; if Disagree, show only the red Disagree pill. Never show all three Agree/Unsure/Disagree options in a row, and never show the unselected choices. Use large rounded choice pills/buttons on a dark navy background: Agree is green with white text, Unsure is bright yellow with dark navy text, and Disagree is red with white text. The selected pill should feel like a primary response control, not a small tag.
 
 6. Agent Comparison
-Compare the principal to a historical figure or fictional/book character only if it feels supported by the predicted human responses or the agent-about-user evidence; otherwise write "N/A". Prefer historically accurate deep cuts when supported by the evidence: recognizable but less generic comparisons are better than defaulting to Benjamin Franklin, Leonardo da Vinci, or other obvious polymath icons. Make this a calm wide strip with a stylized illustrated rendition or portrait silhouette of that figure/character, the comparison name, and one brief description line of no more than 10 words explaining the fit. Do not include Agent Guesses in this section. Do not add the old trio of comparison evidence icons, artifact tiles, or extra proof objects beside the historical figure.
+Compare the principal to a historical figure or fictional/book character only if it feels supported by the predicted human responses or the agent-about-user evidence; if unsupported, omit the comparison card instead of showing unavailable text. Prefer historically accurate deep cuts when supported by the evidence: recognizable but less generic comparisons are better than defaulting to Benjamin Franklin, Leonardo da Vinci, or other obvious polymath icons. Make this a calm wide strip with a stylized illustrated rendition or portrait silhouette of that figure/character, the comparison name, and one brief description line of no more than 10 words explaining the fit. Do not include Agent Guesses in this section. Do not add the old trio of comparison evidence icons, artifact tiles, or extra proof objects beside the historical figure.
 
 7. Abstract Agent Impression
 In the space that would otherwise hold comparison evidence icons, add one abstract artistic corner showing what the agent thinks of the principal. This should be a non-literal visual metaphor derived from the archetype, strongest predictions, memory signals, and aesthetic preference: examples include a botanical circuit-village, careful map lines around a warm signal, a privacy lock woven into roots, a field-note constellation, or a civic dashboard becoming a garden. It must not be another portrait, fake person, robot, trophy wall, random symbols, or decorative filler. Do not label this corner with extra text unless one tiny section label is needed for clarity.
@@ -2166,7 +2204,22 @@ export async function generateAgentOnlyWrappedImage({
   if (!materialized.ok) return materialized;
   const snapshot = materialized.snapshot;
   const state = await loadAnswerState({ env, sessionSlug: slug, windowId: snapshot.windowId, telegramUserId });
+  const coverage = agentOnlyResponseCoverage(snapshot, state);
   const predictions = wrappedPredictionRows(snapshot, state);
+  if (!coverage.allStatementsCovered) {
+    return {
+      ok: false,
+      status: 409,
+      reason: 'agent_only_wrapped_incomplete_predictions',
+      window_id: snapshot.windowId,
+      statement_count: coverage.statementCount,
+      agent_prediction_count: coverage.agentPredictionCount,
+      agent_response_count: coverage.agentResponseCount,
+      privacy_skip_count: coverage.privacySkipCount,
+      all_statements_predicted: coverage.allStatementsPredicted,
+      all_statements_covered: coverage.allStatementsCovered,
+    };
+  }
   if (!predictions.length) {
     return { ok: false, status: 409, reason: 'agent_only_wrapped_no_predictions', window_id: snapshot.windowId };
   }
@@ -2250,6 +2303,12 @@ export async function generateAgentOnlyWrappedImage({
     ok: true,
     window_id: snapshot.windowId,
     mode: imageMode,
+    statement_count: coverage.statementCount,
+    agent_prediction_count: coverage.agentPredictionCount,
+    agent_response_count: coverage.agentResponseCount,
+    privacy_skip_count: coverage.privacySkipCount,
+    all_statements_predicted: coverage.allStatementsPredicted,
+    all_statements_covered: coverage.allStatementsCovered,
     model,
     size,
     quality,

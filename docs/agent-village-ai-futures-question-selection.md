@@ -19,7 +19,7 @@ Use a smaller subset for launch; this document is meant to make selection easy.
 | AI5 | binary | By 2032, embodied skills like craft, care, and physical presence will carry more status than cognitive work. | Agree / Unsure / Disagree | Good labor/status futures question; visually interesting for Wrapped. |
 | AI6 | binary | AI will make small, high-trust communities more important, not less. | Agree / Unsure / Disagree | Connects AI futures to Edge / village themes without being agent-specific. |
 | AI7 | binary | I am more worried about AI concentrating power than about AI becoming uncontrollable. | Agree / Unsure / Disagree | Distinguishes political-economy risk from alignment/control risk. |
-| AI8 | rating | How optimistic am I that AI will broadly improve human flourishing over the next decade? | 1 = very pessimistic, 2, 3, 4, 5 = very optimistic | Good p(bloom)-adjacent aggregate and Wrapped signal. |
+| AI8 | rating | How optimistic am I that AI will broadly improve human flourishing over the next decade? | 1 = very pessimistic, 2, 3, 4, 5 = very optimistic | Good AI Optimism-adjacent aggregate and Wrapped signal. |
 | AI9 | multichoice | Which area is AI most likely to transform first in a way ordinary people notice? | Work / Education / Healthcare / Entertainment / Relationships / Government / Scientific discovery / N/A | Broad, concrete, aggregate-friendly. |
 | AI10 | multichoice | What worries me most about AI over the next decade? | Loss of control / Concentrated power / Job displacement / Misinformation / Social isolation / Cultural homogenization / Surveillance / N/A | Risk taxonomy; useful for reports and segmentation. |
 
@@ -79,7 +79,7 @@ Use these if we want richer report segmentation:
 5. AI5 — embodied skills/status shift.
 6. AI6 — small high-trust communities.
 7. AI7 — concentrated power vs uncontrollability.
-8. AI8 — AI p(bloom) / flourishing optimism.
+8. AI8 — AI Optimism / flourishing optimism.
 9. AI9 — first ordinary-people transformation area.
 10. AI10 — biggest worry taxonomy.
 11. AI14 — open-source AI safety.
@@ -111,7 +111,7 @@ Use these if we want richer report segmentation:
 - Good for **Most Important To You** if highly allocated: AI1, AI7, AI10,
   AI14, AG4.
 - Good for **Agent Core Insight** themes: AI5, AI6, AI8, AI17, AG1.
-- Good for **Agent Guesses / p(bloom)**: AI8.
+- Good for **Agent Guesses / AI Optimism**: AI8.
 - Good for **political compass** axes:
   - Safety-first ↔ Acceleration-first: AI1, AI2.
   - Open-source commons ↔ Controlled deployment: AI3, AI14.

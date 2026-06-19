@@ -60,7 +60,7 @@ Expand the current 50-question set to ~60 questions by selecting the best additi
 - **Too obvious**: Questions where this crowd will overwhelmingly agree (e.g., "AI agents will be useful").
 - **Generic lifestyle**: Questions like "do you exercise" or "do you cook at home" — keep only the most viral ones (cat vs dog, morning person are already in).
 - **Open-ended freeform except when targeted**: Generic "describe X in one sentence" is weak. Keep freeform only for A1 (one-liner description) and A2 (what don't you know).
-- **Image-gen-time synthesis**: Archetype selection, historical comparisons, taste guesses (book/movie/music), p(bloom) — these are handled by a smarter model at Wrapped image generation time, not stored as questions.
+- **Image-gen-time synthesis**: Archetype selection, historical comparisons, taste guesses (book/movie/music), and AI Optimism — these are handled by a smarter model at Wrapped image generation time, not stored as questions.
 
 ## Schema
 

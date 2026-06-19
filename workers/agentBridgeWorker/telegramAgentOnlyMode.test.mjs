@@ -176,6 +176,8 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
     windowId: 'w-2026-06-15',
     evalTypesByQuestionId: {
       ceq_archetype: 'bucket',
+      ceq_unknown: 'wrapped_generation',
+      ceq_historical: 'wrapped_generation',
     },
     statements: [
       {
@@ -196,6 +198,11 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
       {
         statement_id: 'ceq_book_followup',
         text: 'Agent guess: what is my favorite book if you have a stronger signal?',
+        answer_schema: { kind: 'text', maxChars: 280 },
+      },
+      {
+        statement_id: 'ceq_book_label',
+        text: 'Book Guess: what book vibe fits me?',
         answer_schema: { kind: 'text', maxChars: 280 },
       },
       {
@@ -229,9 +236,25 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
         answer_schema: { kind: 'multichoice', options: ['Find relevant people', 'Coordinate plans', 'Summarize conversations'], minSelections: 1 },
       },
       {
-        statement_id: 'ceq_pbloom',
-        text: 'What is my p(bloom) for a flourishing future after this year?',
+        statement_id: 'ceq_none_na',
+        text: 'Which AI future would I most want to help bring about?',
+        answer_schema: {
+          kind: 'multichoice',
+          options: ['Personal agency and capability', 'Care, education, and flourishing', 'None of these / N/A'],
+          minSelections: 1,
+          maxSelections: 1,
+          selectionMode: 'single',
+        },
+      },
+      {
+        statement_id: 'ceq_ai_optimism',
+        text: 'What is my AI Optimism score?',
         answer_schema: { kind: 'choice', values: [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100] },
+      },
+      {
+        statement_id: 'ceq_flourish_optimism',
+        text: 'How optimistic am I that AI will broadly improve human flourishing over the next decade?',
+        answer_schema: { kind: 'choice', values: [1, 2, 3, 4, 5] },
       },
       {
         statement_id: 'ceq_archetype',
@@ -244,6 +267,16 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
           selectionMode: 'single',
         },
       },
+      {
+        statement_id: 'ceq_unknown',
+        text: 'What important thing do you not know about this principal that would most change your predictions? Use N/A if unsupported.',
+        answer_schema: { kind: 'text', maxChars: 280 },
+      },
+      {
+        statement_id: 'ceq_historical',
+        text: 'Which historical figure or fictional character is the best comparison for this principal, and why? Use N/A if unsupported.',
+        answer_schema: { kind: 'text', maxChars: 280 },
+      },
     ],
   };
   const state = {
@@ -252,12 +285,17 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
       ceq_info: { agent: { answer: { value: 'unsure' }, confidence: 41 } },
       ceq_book: { agent: { answer: { text: 'The Diamond Age' }, confidence: 52 } },
       ceq_book_followup: { agent: { answer: { text: 'Neuromancer' }, confidence: 70 } },
+      ceq_book_label: { agent: { answer: { text: 'Cybernetic field guide' }, confidence: 77 } },
       ceq_movie: { agent: { answer: { text: 'Her' }, confidence: 58 } },
       ceq_game: { agent: { answer: { text: 'Go' }, confidence: 55 } },
       ceq_rating: { agent: { answer: { value: 7 }, confidence: 88 } },
       ceq_multi: { agent: { answer: { values: ['Find relevant people', 'Coordinate plans'] }, confidence: 90 } },
-      ceq_pbloom: { agent: { answer: { value: 80 }, confidence: 63 } },
+      ceq_none_na: { agent: { answer: { values: ['None of these / N/A'] }, confidence: 100 } },
+      ceq_ai_optimism: { agent: { answer: { value: 80 }, confidence: 63 } },
+      ceq_flourish_optimism: { agent: { answer: { value: 4 }, confidence: 63 } },
       ceq_archetype: { agent: { answer: { values: ['privacy-first coordination builder'] }, confidence: 99 } },
+      ceq_unknown: { agent: { answer: { text: 'N/A' }, confidence: 100 } },
+      ceq_historical: { agent: { answer: { text: 'N/A' }, confidence: 100 } },
     },
   };
   const prompt = buildAgentOnlyWrappedImagePrompt({
@@ -269,9 +307,12 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
         ceq_trust: 20,
         ceq_movie: 30,
         ceq_book_followup: 25,
+        ceq_book_label: 40,
+        ceq_none_na: 50,
         ceq_unanswered_guess: 90,
         ceq_lowered: -100,
         ceq_archetype: 100,
+        ceq_unknown: 80,
       },
     },
     quadraticVoteState: { mode: 'quadratic', votes: { ceq_info: 4 } },
@@ -296,21 +337,29 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.match(prompt, /do not show predicted answers, answer pills, Agree\/Unsure\/Disagree, ratings, selected options, confidence, or token math/);
   assert.match(prompt, /Do not replace prompts with theme summaries/);
   assert.doesNotMatch(prompt, /Question only: "Which archetype best describes this principal/);
+  assert.doesNotMatch(prompt, /Question only: "What important thing do you not know about this principal/);
   assert.match(prompt, /Agree is green with white text/);
   assert.match(prompt, /Unsure is bright yellow with dark navy text/);
   assert.match(prompt, /Disagree is red with white text/);
+  assert.match(prompt, /Prediction Evidence Pool for synthesis only/);
+  assert.match(prompt, /Do not render it as its own visible table/);
   assert.match(prompt, /I would trust my agent to schedule meetings while I sleep/);
   assert.match(prompt, /High-Confidence Reads/);
   assert.match(prompt, /Cautious Reads/);
   assert.match(prompt, /predicted human response rows/);
   assert.match(prompt, /Agent-about-user evidence for sections 1, 6, and 7 only/);
   assert.match(prompt, /Analysis prompt: "Which archetype best describes this principal/);
+  assert.doesNotMatch(prompt, /Analysis prompt: "What important thing do you not know about this principal/);
   assert.match(prompt, /Question: "/);
   assert.match(prompt, /Predicted answer/);
   assert.match(prompt, /answer format: binary choice; prediction: Agree; confidence: 92%/);
   assert.match(prompt, /answer format: multichoice selection; prediction: Find relevant people, Coordinate plans; confidence: 90%/);
   assert.match(prompt, /answer format: rating scale; prediction: 7\/10; confidence: 88%/);
   assert.doesNotMatch(prompt, /answer format: multichoice selection; prediction: privacy-first coordination builder; confidence: 99%/);
+  assert.doesNotMatch(prompt, /Which AI future would I most want to help bring about/);
+  assert.doesNotMatch(prompt, /None of these \/ N\/A/);
+  assert.doesNotMatch(prompt, /answer format: freeform text; prediction: N\/A; confidence: 100%/);
+  assert.doesNotMatch(prompt, /Use N\/A if unsupported/);
   assert.match(prompt, /7\/10/);
   assert.doesNotMatch(prompt, /confidence: 88\/100/);
   assert.doesNotMatch(prompt, /prediction: 7; confidence/);
@@ -319,21 +368,38 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.match(prompt, /Do not use the phrase "your agent's take"/);
   assert.match(prompt, /Do not render detached rating labels/);
   assert.match(prompt, /Agent Guesses/);
-  assert.match(prompt, /p\(bloom\)/);
+  assert.match(prompt, /Reserve the bottom-left visual slot for a compact "Agent Guesses" chip grid/);
+  assert.match(prompt, /ideally 2x2 when all four guesses are supported/);
+  assert.match(prompt, /Use this category order: Book Guess, Movie\/Show Guess, Game\/Play Pattern, AI Optimism/);
+  assert.match(prompt, /Try to include Book Guess and Movie\/Show Guess alongside Game\/Play Pattern and AI Optimism/);
+  assert.match(prompt, /Book Guess/);
+  assert.match(prompt, /Movie\/Show Guess/);
+  assert.match(prompt, /Game\/Play Pattern/);
+  assert.match(prompt, /AI Optimism/);
   assert.match(prompt, /synthesized at image-generation time from the actual prediction evidence/);
-  assert.match(prompt, /not based on dedicated favorite-book\/movie\/game\/p\(bloom\) questions/);
-  assert.match(prompt, /Do not use stored favorite\/book\/movie\/game\/p\(bloom\) answer rows as source data/);
-  assert.match(prompt, /flower for p\(bloom\)/);
-  assert.match(prompt, /Do not repeat Agent Guesses under Agent Comparison or anywhere else/);
+  assert.match(prompt, /not based on dedicated favorite-book\/movie\/game questions/);
+  assert.match(prompt, /For AI Optimism, use actual AI-futures predicted response rows/);
+  assert.match(prompt, /Do not use stored favorite\/book\/movie\/game answer rows as source data/);
+  assert.match(prompt, /flower\/sunrise for AI Optimism/);
+  assert.match(prompt, /omit that chip entirely instead of showing unavailable text/);
+  assert.match(prompt, /Do not repeat Agent Guesses under Agent Comparison, the abstract agent-impression corner, or anywhere else/);
   assert.match(prompt, /Do not include Agent Guesses in this section/);
   assert.match(prompt, /favorite book/);
-  assert.doesNotMatch(prompt, /answer format: rating scale; prediction: 80\/100; confidence: 63%/);
+  assert.match(prompt, /How optimistic am I that AI will broadly improve human flourishing over the next decade/);
+  assert.match(prompt, /answer format: rating scale; prediction: 4\/5; confidence: 63%/);
+  assert.doesNotMatch(prompt, /What is my AI Optimism score/);
+  assert.doesNotMatch(prompt, /prediction: 80\/100/);
   assert.doesNotMatch(prompt, /prediction: Neuromancer/);
+  assert.doesNotMatch(prompt, /Book Guess: what book vibe fits me/);
+  assert.doesNotMatch(prompt, /prediction: Cybernetic field guide/);
   assert.doesNotMatch(prompt, /prediction: Her/);
   assert.doesNotMatch(prompt, /prediction: Go\b/);
   assert.doesNotMatch(prompt, /The Diamond Age/);
   assert.doesNotMatch(prompt, /impossible pet/);
   assert.doesNotMatch(prompt, /post publicly without review/);
+  assert.match(prompt, /No visible unavailable rows/);
+  assert.match(prompt, /Never show all three Agree\/Unsure\/Disagree options in a row/);
+  assert.match(prompt, /render exactly one selected answer pill/);
   assert.match(prompt, /stylized illustrated rendition or portrait silhouette/);
   assert.match(prompt, /one brief description line of no more than 10 words/);
   assert.match(prompt, /Do not add the old trio of comparison evidence icons/);
@@ -390,17 +456,21 @@ test('wrapped image prompt supports Agent Norms Compass mode around the most-imp
   assert.match(prompt, /lay "AGENT" and "VILLAGE" side-by-side/);
   assert.match(prompt, /most-important question/);
   assert.match(prompt, /historical figures or fictional\/book characters/);
+  assert.match(prompt, /Principal placement rule/);
+  assert.match(prompt, /meaningful non-center coordinate/);
+  assert.match(prompt, /Never put the principal directly on the axis crossing or exact center/);
+  assert.match(prompt, /omit the principal marker rather than centering it/);
   assert.match(prompt, /I would rather my agent be too conservative with privacy/);
   assert.match(prompt, /Agent guesses/);
   assert.doesNotMatch(prompt, /Most Important To You/);
 });
 
-test('current Wrapped question bank excludes image-only taste and p(bloom) guess prompts', () => {
+test('current Wrapped question bank excludes image-only taste and old optimism guess prompts', () => {
   const questionBank = JSON.parse(readFileSync(new URL('../../docs/agent-village-wrapped-questions-current.json', import.meta.url), 'utf8'));
   assert.equal(questionBank.length, 60);
   const serialized = JSON.stringify(questionBank);
   assert.doesNotMatch(serialized, /Agent guess:/i);
-  assert.doesNotMatch(serialized, /favorite book|favorite movie|movie or TV show|favorite game|p\(bloom\)/i);
+  assert.doesNotMatch(serialized, /favorite book|favorite movie|movie or TV show|favorite game|p\(bloom\)|AI Optimism score/i);
   assert.equal(questionBank.some((question) => question.id === 'R1'), true);
   assert.equal(questionBank.some((question) => question.id === 'R4'), true);
 });
@@ -531,7 +601,7 @@ test('active window sync updates current eval types without changing questions',
     sessionSlug: 'alpha',
     patch: {
       enabledQuestionIds: ids,
-      evalTypesByQuestionId: { [ids[0]]: 'gold' },
+      evalTypesByQuestionId: { [ids[0]]: 'gold', [ids[1]]: 'wrapped_generation' },
     },
     createdAt: '2026-06-12T16:00:00.000Z',
   });
@@ -546,6 +616,7 @@ test('active window sync updates current eval types without changing questions',
   assert.equal(synced.addedStatementCount, 0);
   assert.equal(synced.snapshot.statements.length, ids.length);
   assert.equal(synced.snapshot.evalTypesByQuestionId[ids[0]], 'gold');
+  assert.equal(synced.snapshot.evalTypesByQuestionId[ids[1]], 'wrapped_generation');
 
   await saveAgentOnlyModeConfig({
     env: testEnv,

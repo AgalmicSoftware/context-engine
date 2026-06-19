@@ -177,7 +177,10 @@ Prefer the returned `image_url`: render, attach, or link that HTTPS PNG. If
 `image_url` is absent, decode the returned `image_base64` as a PNG and render or
 display it when the host supports images. If needed, write the decoded PNG bytes
 to a temporary local file and attach or show that file. Never print raw
-`image_base64` or the full image prompt. Do not say the Wrapped image is ready
+`image_base64` or the full image prompt. If the endpoint returns
+`agent_only_wrapped_incomplete_predictions` or `all_statements_covered: false`,
+re-fetch statements, resubmit predictions or privacy skips once, then call the
+image endpoint again before presenting the image. Do not say the Wrapped image is ready
 until you have actually displayed, attached, or linked the PNG. If the image
 endpoint fails or the host cannot display/link the image, report the exact
 endpoint reason in one short sentence and ask whether to retry; do not silently
@@ -186,10 +189,11 @@ wants the optional Agent Norms Compass meme. Only if they say yes, call the same
 endpoint with `"mode": "political_compass"` and display or link that second
 image.
 
-Playful favorite-book/movie/game/p(bloom) guesses in the Wrapped poster are
+Playful book/movie/game/AI Optimism guesses in the Wrapped poster are
 image-time synthesis from the real prediction evidence, not dedicated research
-question rows. If the principal opted out of playful guesses, the poster should
-omit them or mark them `N/A`.
+question rows. The poster reserves the bottom-left visual slot for these chips
+when evidence supports them. If the principal opted out of playful guesses, the
+poster should omit them.
 
 Before beginning a run, call `/telegram/agent/api/skill-version`. If the worker
 reports a newer skill than this v41 header, refresh this skill and reread the

@@ -1566,6 +1566,30 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   assert.equal(staleVotesResponse.status, 409);
   assert.equal(staleVotes.reason, 'window_mismatch');
 
+  const wrappedEmptyResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/agent-only/wrapped-image?sessionSlug=alpha', {
+      method: 'POST',
+      token: agentOnlyToken.token,
+      body: {
+        window_id: 'w-2026-06-12',
+        createdAt: '2026-06-12T15:06:30.000Z',
+      },
+    }),
+    env,
+    fetchImpl: async () => {
+      throw new Error('OpenAI must not be called before any statement is covered');
+    },
+  });
+  const wrappedEmpty = await jsonBody(wrappedEmptyResponse);
+  assert.equal(wrappedEmptyResponse.status, 409);
+  assert.equal(wrappedEmpty.reason, 'agent_only_wrapped_incomplete_predictions');
+  assert.equal(wrappedEmpty.statement_count, 5);
+  assert.equal(wrappedEmpty.agent_prediction_count, 0);
+  assert.equal(wrappedEmpty.agent_response_count, 0);
+  assert.equal(wrappedEmpty.privacy_skip_count, 0);
+  assert.equal(wrappedEmpty.all_statements_predicted, false);
+  assert.equal(wrappedEmpty.all_statements_covered, false);
+
   const answersResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/agent-only/answers/bulk?sessionSlug=alpha', {
       method: 'POST',
@@ -1587,6 +1611,72 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   const answers = await jsonBody(answersResponse);
   assert.equal(answersResponse.status, 200);
   assert.equal(answers.accepted, 1);
+
+  env.AGENT_BRIDGE_OPENAI_API_KEY = 'sk-bridge-openai';
+  const wrappedIncompleteResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/agent-only/wrapped-image?sessionSlug=alpha', {
+      method: 'POST',
+      token: agentOnlyToken.token,
+      body: {
+        window_id: 'w-2026-06-12',
+        createdAt: '2026-06-12T15:08:00.000Z',
+      },
+    }),
+    env,
+    fetchImpl: async () => {
+      throw new Error('OpenAI must not be called before every statement is covered');
+    },
+  });
+  const wrappedIncomplete = await jsonBody(wrappedIncompleteResponse);
+  assert.equal(wrappedIncompleteResponse.status, 409);
+  assert.equal(wrappedIncomplete.reason, 'agent_only_wrapped_incomplete_predictions');
+  assert.equal(wrappedIncomplete.statement_count, 5);
+  assert.equal(wrappedIncomplete.agent_prediction_count, 1);
+  assert.equal(wrappedIncomplete.agent_response_count, 1);
+  assert.equal(wrappedIncomplete.privacy_skip_count, 0);
+  assert.equal(wrappedIncomplete.all_statements_predicted, false);
+  assert.equal(wrappedIncomplete.all_statements_covered, false);
+  delete env.AGENT_BRIDGE_OPENAI_API_KEY;
+
+  const remainingAnswersResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/agent-only/answers/bulk?sessionSlug=alpha', {
+      method: 'POST',
+      token: agentOnlyToken.token,
+      body: {
+        window_id: 'w-2026-06-12',
+        createdAt: '2026-06-12T15:07:30.000Z',
+        request_id: 'route-answers-2',
+        agent_metadata: { model: 'unit-model', scaffold_version: 'unit-scaffold' },
+        answers: [
+          {
+            statement_id: questionIds[1],
+            answer: { text: 'Use concise coordination updates.' },
+            confidence: 70,
+          },
+          {
+            statement_id: questionIds[2],
+            answer: { value: 8 },
+            confidence: 72,
+          },
+          {
+            statement_id: questionIds[3],
+            answer: { values: ['One'] },
+            confidence: 74,
+          },
+          {
+            statement_id: lateQuestion.questionId,
+            skipped: true,
+            skip_reason: 'privacy_protective',
+          },
+        ],
+      },
+    }),
+    env,
+  });
+  const remainingAnswers = await jsonBody(remainingAnswersResponse);
+  assert.equal(remainingAnswersResponse.status, 200);
+  assert.equal(remainingAnswers.accepted, 4);
+  assert.equal(remainingAnswers.skipsRecorded, 1);
 
   const wrappedMissingKeyResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/agent-only/wrapped-image?sessionSlug=alpha', {
@@ -1649,6 +1739,18 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   assert.equal(wrapped.ok, true);
   assert.equal(wrapped.window_id, 'w-2026-06-12');
   assert.equal(wrapped.mode, 'wrapped');
+  assert.equal(Number.isInteger(wrapped.statement_count), true);
+  assert.equal(Number.isInteger(wrapped.agent_prediction_count), true);
+  assert.equal(Number.isInteger(wrapped.agent_response_count), true);
+  assert.equal(Number.isInteger(wrapped.privacy_skip_count), true);
+  assert.equal(typeof wrapped.all_statements_predicted, 'boolean');
+  assert.equal(typeof wrapped.all_statements_covered, 'boolean');
+  assert.equal(wrapped.statement_count, 5);
+  assert.equal(wrapped.agent_prediction_count, 4);
+  assert.equal(wrapped.agent_response_count, 5);
+  assert.equal(wrapped.privacy_skip_count, 1);
+  assert.equal(wrapped.all_statements_predicted, false);
+  assert.equal(wrapped.all_statements_covered, true);
   assert.equal(wrapped.model, 'gpt-image-2');
   assert.equal(wrapped.size, '2048x1152');
   assert.equal(wrapped.reference_image, 'agent-village-logo-reference.png');

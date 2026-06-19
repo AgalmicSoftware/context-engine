@@ -102,22 +102,25 @@ uncertainty refers to. Do not show detached shorthand like "Serendipity 3/5"
 without the actual question prompt. If a shortened prompt would be ambiguous,
 show the full prompt even if the row is tighter, especially for claims like
 "A mostly AI-written information environment could be healthier than today's
-mostly human-written one." If no low-confidence data exists, write "N/A - agent
-reported uniformly high confidence."
+mostly human-written one." If no low-confidence data exists, omit this section
+rather than rendering an unavailable row.
 
 5. Agent Guesses
 This is synthesized at image-generation time from the real answer set, not from
-dedicated favorite-book/movie/game/p(bloom) questions. If supported by the
-evidence, include a compact strip of playful low-stakes guesses such as favorite
-book or book vibe, movie/show, game/play pattern, and p(bloom). These should be
+dedicated favorite-book/movie/game questions. If supported by the evidence,
+include a compact strip of playful low-stakes guesses such as Book Guess or book
+vibe, Movie/Show Guess, Game/Play Pattern, and AI Optimism. These should be
 clearly framed as guesses, not facts. Show at most one item per category, so the
-same favorite-book/movie/game/p(bloom) guess cannot appear twice. Use a flower
-icon for p(bloom). If evidence is weak for a category, show N/A rather than a
-false specific answer. This section is the only place Agent Guesses should
-appear; do not repeat guesses under Agent Comparison.
+same book/movie/game/AI Optimism guess cannot appear twice. Use a flower or
+sunrise icon for AI Optimism. For AI Optimism, use actual AI-futures predicted
+response rows or broader prediction themes. If evidence is weak for a category,
+omit that chip rather than showing N/A or a false specific answer. This section
+is the only place Agent Guesses should appear; do not repeat guesses under Agent
+Comparison.
 
 6. Memory Signals Used
-Only show supported, non-sensitive signals. Use "N/A" when unknown:
+Only show supported, non-sensitive signals. Omit unknown signals instead of
+rendering "N/A" or other unavailable placeholders:
 - Events attended
 - Most-used model
 - Non-default skills/tools tried
@@ -302,9 +305,10 @@ of binary, rating, multichoice, and freeform questions.
 
 ### E. Wrapped Boundaries And Extra Norms
 
-Playful favorite-book/movie/game/p(bloom) guesses are not stored as questions.
-The image-generation prompt may synthesize them from the real answer set and
-must label them as guesses. The question bank keeps only consent/boundary and
+Playful favorite-book/movie/game guesses are not stored as questions. The
+image-generation prompt may synthesize them from the real answer set and must
+label them as guesses. AI Optimism may be inferred from AI-futures answers and
+broader prediction themes. The question bank keeps only consent/boundary and
 research-grade items.
 
 31. **(binary, predicted human answer)** "I would enjoy seeing a playful public guess from my agent, as long as it is clearly labeled as a guess."
@@ -328,9 +332,9 @@ research-grade items.
     - Wrapped: humility/trust motif.
     - Report: tolerance for uncertainty vs entertainment.
 
-37. **(multichoice: books / films or TV / games or puzzles / music / historical figures / no playful guesses, predicted human answer)** "Which kind of playful guess would I be most comfortable seeing in my Agent Village Wrapped?"
-    - Wrapped: chooses the safest guess lane.
-    - Report: preference distribution for social-share content.
+37. **(binary, predicted human answer)** "I would enjoy one clearly-labeled playful guess in my Agent Village Wrapped if it is grounded in real evidence."
+    - Wrapped: consent signal for playful image-time synthesis.
+    - Report: preference distribution for social-share interpretation.
 
 ### F. Political Compass Meme Mode
 
@@ -385,17 +389,17 @@ with an `N/A` path. These are candidates, not uploaded questions.
     - Wrapped: concrete delegation boundary.
     - Report: financial autonomy threshold.
 
-48. **(freeform, agent-about-user analysis)** "Agent guess: what song, album, or artist would this principal play for a friend? Answer `N/A` if unsupported."
-    - Wrapped: playful taste card.
-    - Report: qualitative culture map; not calibration-critical.
+48. **(binary, predicted human answer)** "I would rather the Wrapped omit a funny guess than make one from weak evidence."
+    - Wrapped: guardrail for image-time playful synthesis.
+    - Report: tolerance for entertainment vs evidence.
 
-49. **(freeform, agent-about-user analysis)** "Agent guess: what historical figure or fictional character would this principal enjoy being compared to? Answer `N/A` if unsupported."
-    - Wrapped: comparison prompt.
-    - Report: shareability and archetype clustering.
+49. **(multichoice: direct conversation / repeated memory signal / explicit profile field / multiple answered questions pointing the same way / no playful guesses, predicted human answer)** "What kind of evidence would make a playful Wrapped guess feel acceptable?"
+    - Wrapped: evidence threshold for image-time guesses.
+    - Report: trust boundary for agent interpretation.
 
-50. **(multichoice: favorite book / favorite movie or show / favorite game or puzzle / favorite music / favorite food / no favorite-stuff guesses / N/A, predicted human answer)** "Which favorite-stuff guess would I be most comfortable having my agent make publicly?"
-    - Wrapped: preference gate for Agent Guesses.
-    - Report: what kinds of playful guesses participants welcome.
+50. **(binary, predicted human answer)** "A shareable agent report should be allowed to be a little playful as long as it is clearly labeled as interpretation."
+    - Wrapped: memeability vs formality signal.
+    - Report: public-share comfort.
 
 51. **(freeform, agent-about-user analysis)** "What one question should the principal answer themselves to verify whether your model of them is right? Use a short non-sensitive question."
     - Wrapped: review CTA.

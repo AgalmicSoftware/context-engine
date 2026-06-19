@@ -94,7 +94,7 @@ must answer `N/A` when unsupported rather than hallucinating.
 
 - **Most likely disagreement**: 1, 4, 7, 13, 17, 21, 22, 24, 27, 31, 36, 38, 59, 60.
 - **Best research/report items**: 16, 20, 21-32, 33, 39, 49, 51, 52, 57-60.
-- **Wrapped-only playful guesses**: favorite book/movie/game/p(bloom) are synthesized by the image prompt from the real answer set, not stored as questions.
+- **Wrapped-only playful guesses**: favorite book/movie/game/AI Optimism are synthesized by the image prompt from the real answer set, not stored as questions.
 - **Best Wrapped image items**: 35, 49-60.
 - **Best calibration items**: 1-8, 13-18, 41-48.
 - **Highest redundancy risk removed**: repeated consent gates, duplicate historical-comparison prompts, multiple "which theme should Wrapped show" prompts, and direct implementation/meta questions.
