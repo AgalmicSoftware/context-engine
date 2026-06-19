@@ -2576,53 +2576,50 @@ class OnePageSession extends Component<any, any> {
                 className={`${styles.sectionHeader} ${styles.documentsSectionHeader}`.trim()}
                 data-testid='ce-demo-documents-toggle'
               >
-                <span className={styles.documentsSectionHeaderMain}>
-                  {this.state.showDocuments ? (
-                    <FontAwesomeIcon icon={faCaretUp} className={styles.sectionToggleIcon} />
-                  ) : (
-                    <FontAwesomeIcon icon={faCaretDown} className={styles.sectionToggleIcon} />
-                  )}
-                  <span className={`${styles.sectionHeaderText} ${styles.documentsSectionHeaderText}`.trim()}>
-                    <span className={styles.documentsSectionHeaderTitleRow}>
-                      <span className={styles.sectionHeaderTitle}>Context</span>
-                      {this.state.showDocuments && (
-                        <span className={`${styles.sectionHeaderMeta} ${styles.documentsSectionHeaderMeta}`.trim()}>
-                          <div
-                            className={`${styles.tooltip} ${styles.sectionHeaderTooltip}`}
-                            onClick={(e: any) => e.stopPropagation()}
-                          >
-                            <FontAwesomeIcon icon={faQuestionCircle} />
-                            <span className={styles.tooltiptext}>
-                              {documentsSectionTooltip}
-                            </span>
-                          </div>
-                          <a
-                            href={DEMO_CORPUS_GITHUB_URL}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={styles.sectionHeaderLink}
-                            onClick={(e: any) => e.stopPropagation()}
-                          >
-                            <FontAwesomeIcon icon={faExternalLinkAlt} />
-                            <span>GitHub</span>
-                          </a>
-                          <button
-                            type="button"
-                            className={`${styles.sectionHeaderLink} ${styles.sectionHeaderLinkButton}`.trim()}
-                            onClick={this.handleLoadFullCorpusClick}
-                            disabled={disableLoadFullCorpusButton}
-                            data-testid='ce-demo-documents-load-full-corpus'
-                          >
-                            <FontAwesomeIcon icon={faDownload} />
-                            <span>{loadFullCorpusButtonLabel}</span>
-                          </button>
-                        </span>
-                      )}
+                {this.state.showDocuments ? (
+                  <FontAwesomeIcon icon={faCaretUp} className={styles.sectionToggleIcon} />
+                ) : (
+                  <FontAwesomeIcon icon={faCaretDown} className={styles.sectionToggleIcon} />
+                )}
+                {renderSectionHeading('Context', 'View')}
+                {this.state.showDocuments && (
+                  <div
+                    className={`${styles.tooltip} ${styles.sectionHeaderTooltip}`}
+                    onClick={(e: any) => e.stopPropagation()}
+                  >
+                    <FontAwesomeIcon icon={faQuestionCircle} />
+                    <span className={styles.tooltiptext}>
+                      {documentsSectionTooltip}
                     </span>
-                    <span className={styles.sectionHeaderSubtitle}>View</span>
-                  </span>
-                </span>
+                  </div>
+                )}
               </h2>
+              {this.state.showDocuments && (
+                <div className={styles.sectionHeaderActionsScroller}>
+                  <div className={styles.sectionHeaderActions}>
+                    <a
+                      href={DEMO_CORPUS_GITHUB_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={styles.sectionHeaderActionButton}
+                      onClick={(e: any) => e.stopPropagation()}
+                    >
+                      <FontAwesomeIcon icon={faExternalLinkAlt} />
+                      <span>GitHub</span>
+                    </a>
+                    <button
+                      type="button"
+                      className={styles.sectionHeaderActionButton}
+                      onClick={this.handleLoadFullCorpusClick}
+                      disabled={disableLoadFullCorpusButton}
+                      data-testid='ce-demo-documents-load-full-corpus'
+                    >
+                      <FontAwesomeIcon icon={faDownload} />
+                      <span>{loadFullCorpusButtonLabel}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
               {this.state.showDocuments && (
                 <div className={styles.miniSectionContent}>

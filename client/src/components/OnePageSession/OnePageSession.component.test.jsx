@@ -318,7 +318,7 @@ describe('OnePageSession view gating', () => {
     expect(titleContainer).not.toHaveClass(styles.titleContainerWithPileSubmitRail);
   });
 
-  it('applies pile submit rail title offsets only on pile top-rail breakpoints', () => {
+  it('keeps phone pile titles unshifted while preserving top-rail title offsets elsewhere', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
     const phoneRailBlock = extractMediaBlock(
       scss,
@@ -344,7 +344,8 @@ describe('OnePageSession view gating', () => {
     expect(scss).toContain('.brandingSectionWithPileSubmitRail');
     expect(scss).toContain('.titleContainerWithPileSubmitRail');
     expect(phoneRailBlock).toContain('.titleContainerWithPileSubmitRail');
-    expect(phoneRailBlock).toContain('transform: translateY(-40px);');
+    expect(phoneRailBlock).toContain('transform: none;');
+    expect(phoneRailBlock).not.toContain('transform: translateY(-40px);');
     expect(desktopRailBlock).toContain('.titleContainerWithPileSubmitRail');
     expect(desktopRailBlock).toContain('transform: translateY(-40px);');
     expect(widescreenRailBlock).toContain('.titleContainerWithPileSubmitRail');
@@ -608,8 +609,14 @@ describe('OnePageSession view gating', () => {
 
     expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
     const contextHeader = screen.getByTestId('ce-demo-documents-toggle');
-    expect(within(contextHeader).getByText('Context')).toHaveClass(styles.sectionHeaderTitle);
-    expect(within(contextHeader).getByText('View')).toHaveClass(styles.sectionHeaderSubtitle);
+    const contextTitle = within(contextHeader).getByText('Context');
+    const contextSubtitle = within(contextHeader).getByText('View');
+    const contextTextWrap = contextTitle.closest(`.${styles.sectionHeaderText}`);
+
+    expect(contextTitle).toHaveClass(styles.sectionHeaderTitle);
+    expect(contextSubtitle).toHaveClass(styles.sectionHeaderSubtitle);
+    expect(contextTextWrap).toBeTruthy();
+    expect(contextTextWrap.parentElement).toBe(contextHeader);
   });
 
   it('keeps section-card headers inline through 767px without pulling full phone layout onto tablets', () => {
@@ -649,26 +656,10 @@ describe('OnePageSession view gating', () => {
     expect(phoneBlock).toContain('color: rgba(255, 255, 255, 0.15);');
     expect(phoneBlock).toContain('.sectionHeader {');
     expect(phoneBlock).toContain('align-items: center;');
-    expect(phoneBlock).toContain('.documentsSectionHeaderMeta .sectionHeaderTooltip > svg {');
-    expect(phoneBlock).toContain('opacity: 0.6;');
-    expect(phoneBlock).toContain('.documentsSectionHeaderText {');
-    expect(phoneBlock).toContain('grid-template-areas:');
-    expect(phoneBlock).toContain('"title subtitle"');
-    expect(phoneBlock).toContain('"actions actions";');
-    expect(phoneBlock).not.toMatch(/\.documentsSectionHeaderText > \.sectionHeaderSubtitle\s*\{[^}]*font-size:/);
-    expect(phoneBlock).toContain('.documentsSectionHeaderTitleRow {');
-    expect(phoneBlock).toContain('display: contents;');
-    expect(phoneBlock).toContain('.documentsSectionHeaderMain .sectionToggleIcon {');
-    expect(phoneBlock).toContain('margin-right: 0;');
-    expect(phoneBlock).toContain('grid-area: actions;');
-    expect(phoneBlock).toContain('justify-content: flex-end;');
-    expect(phoneBlock).toContain('flex-wrap: wrap;');
-    expect(phoneBlock).toContain('box-sizing: border-box;');
-    expect(phoneBlock).toContain('padding-right: 10px;');
-    expect(phoneBlock).toContain('.documentsSectionHeaderMeta .sectionHeaderTooltip {');
-    expect(phoneBlock).toContain('justify-content: center;');
-    expect(phoneBlock).toContain('min-height: 44px;');
-    expect(phoneBlock).toContain('min-width: 44px;');
+    expect(phoneBlock).not.toContain('.documentsSectionHeaderText');
+    expect(phoneBlock).not.toContain('.documentsSectionHeaderTitleRow');
+    expect(phoneBlock).not.toContain('.documentsSectionHeaderMain');
+    expect(phoneBlock).not.toContain('.documentsSectionHeaderMeta');
     expect(phoneBlock).toContain('.pileHeaderRow {');
     expect(phoneBlock).toContain('flex-wrap: nowrap;');
     expect(phoneBlock).toContain('.pileHeaderTitleWrap {');
@@ -685,26 +676,10 @@ describe('OnePageSession view gating', () => {
     expect(smallTabletBlock).toContain('font-size: 1.2em;');
     expect(smallTabletBlock).toContain('font-weight: inherit;');
     expect(smallTabletBlock).toContain('color: rgba(255, 255, 255, 0.15);');
-    expect(smallTabletBlock).toContain('.documentsSectionHeaderText {');
-    expect(smallTabletBlock).toContain('grid-template-areas:');
-    expect(smallTabletBlock).toContain('"title subtitle"');
-    expect(smallTabletBlock).toContain('"actions actions";');
-    expect(smallTabletBlock).not.toMatch(/\.documentsSectionHeaderText > \.sectionHeaderSubtitle\s*\{[^}]*font-size:/);
-    expect(smallTabletBlock).toContain('.documentsSectionHeaderTitleRow {');
-    expect(smallTabletBlock).toContain('display: contents;');
-    expect(smallTabletBlock).toContain('.documentsSectionHeaderMain .sectionToggleIcon {');
-    expect(smallTabletBlock).toContain('margin-right: 0;');
-    expect(smallTabletBlock).toContain('grid-area: actions;');
-    expect(smallTabletBlock).toContain('justify-content: flex-end;');
-    expect(smallTabletBlock).toContain('flex-wrap: wrap;');
-    expect(smallTabletBlock).toContain('box-sizing: border-box;');
-    expect(smallTabletBlock).toContain('padding-right: 10px;');
-    expect(smallTabletBlock).toContain('.documentsSectionHeaderMeta .sectionHeaderTooltip {');
-    expect(smallTabletBlock).toContain('justify-content: center;');
-    expect(smallTabletBlock).toContain('min-height: 44px;');
-    expect(smallTabletBlock).toContain('min-width: 44px;');
-    expect(smallTabletBlock).toContain('.documentsSectionHeaderMeta .sectionHeaderTooltip > svg {');
-    expect(smallTabletBlock).toContain('opacity: 0.6;');
+    expect(smallTabletBlock).not.toContain('.documentsSectionHeaderText');
+    expect(smallTabletBlock).not.toContain('.documentsSectionHeaderTitleRow');
+    expect(smallTabletBlock).not.toContain('.documentsSectionHeaderMain');
+    expect(smallTabletBlock).not.toContain('.documentsSectionHeaderMeta');
     expect(smallTabletBlock).toContain('.pileHeaderRow {');
     expect(smallTabletBlock).toContain('flex-wrap: nowrap;');
     expect(smallTabletBlock).toContain('.pileHeaderTitleWrap {');

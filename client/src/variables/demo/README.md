@@ -57,6 +57,8 @@ The main consumers of this folder are:
 
 `demo_sessions.json` keeps `demo-1` as a temporary display/question compatibility seed until the Cloudflare-backed demo session replaces the Arweave/on-chain preload path. Worker URLs, faucet sponsorship, and gate authority must stay in the live SessionRegistry plus Worker KV config, not in this fixture. Remove the preloaded question IDs when the pure Cloudflare demo session ships.
 
+When `demo-1` resolves from the live registry, the main session route applies this fixture only as a display overlay for temporary demo fields such as featured SBTs and seeded question compatibility. Registry-backed operational fields still win: `corsWorkerUrl`, sponsored flags, contract addresses, block windows, and resource gates must be updated through the admin wallet. For answer submissions, the live registry must expose an open `arweave`/`responses` gate and a truthy `sponsored_arweave` field after saving an Arweave JWK in the worker admin flow.
+
 ## Conceptual Data Pipeline
 
 This is the logical relationship between the core demo fixtures. It describes how the datasets build on each other; it is not an automated build graph by itself.
