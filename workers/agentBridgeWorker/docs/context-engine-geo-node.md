@@ -89,7 +89,7 @@ If the user says yes, treats the link/button as yes, or otherwise approves:
    not print raw image prompts, base64 payloads, confidences, rationales, or
    private memory. After the image, link the user to the Context Engine Telegram
    bot to review or edit predictions and ask whether they want the optional
-   political compass meme.
+   Agent Norms Compass meme.
 8. Do not use the ordinary `/questions`, draft, direct answer, question vote, or
    question creation flow for Agent Village Wrapped unless the user explicitly
    asks for regular Context Engine outside this mode.

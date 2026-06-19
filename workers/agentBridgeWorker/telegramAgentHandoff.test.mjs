@@ -1652,6 +1652,9 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   assert.equal(wrapped.size, '2048x1152');
   assert.equal(wrapped.reference_image, 'agent-village-logo-reference.png');
   assert.equal(wrapped.image_base64, Buffer.from('fake-png').toString('base64'));
+  assert.equal(wrapped.image_saved, true);
+  assert.match(wrapped.image_id, /^\d{13}-[0-9a-f]{8}$/);
+  assert.match(wrapped.image_prompt_hash, /^sha256:[0-9a-f]{32}$/);
   assert.equal(openAiRequestForm.get('model'), 'gpt-image-2');
   assert.equal(openAiRequestForm.get('output_format'), 'png');
   const logoReference = openAiRequestForm.get('image');
@@ -1667,6 +1670,23 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   assert.match(wrappedPrompt, /contextengine\.xyz/);
   assert.doesNotMatch(wrappedPrompt, /Review or edit your agent's responses in Context Engine/);
   assert.doesNotMatch(wrappedPrompt, /What Your Agent Upvoted/);
+
+  const imageExportResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/agent-only/export?sessionSlug=alpha&view=images&format=jsonl', {
+      token: 'agent-test-token',
+    }),
+    env,
+  });
+  const imageExportText = await imageExportResponse.text();
+  assert.equal(imageExportResponse.status, 200);
+  const imageRows = imageExportText.trim().split('\n').filter(Boolean).map((line) => JSON.parse(line));
+  assert.equal(imageRows.length, 1);
+  assert.equal(imageRows[0].image_id, wrapped.image_id);
+  assert.equal(imageRows[0].mode, 'wrapped');
+  assert.equal(imageRows[0].image_base64, Buffer.from('fake-png').toString('base64'));
+  assert.equal(imageRows[0].prompt_hash, wrapped.image_prompt_hash);
+  assert.equal(imageRows[0].principal_id.startsWith('cep_'), true);
+  assert.equal(JSON.stringify(imageRows).includes('telegramUserId'), false);
 
   const metricsResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/admin/agent-only/export?sessionSlug=alpha&view=answers&format=jsonl', {

@@ -1581,6 +1581,7 @@ async function buildMiniAppAgentOnlyState({
   const flaggedQuestionKeys = (Array.isArray(review.flaggedQuestionIds) ? review.flaggedQuestionIds : [])
     .map((questionId) => questionKeyById.get(questionId))
     .filter(Boolean);
+  const predictionQuestionIds = Object.keys(review.predictionsByQuestionId || {});
   const humanVoteNets = {};
   Object.entries(review.humanVote?.nets || {}).forEach(([questionId, value]) => {
     const questionKey = questionKeyById.get(questionId);
@@ -1596,6 +1597,13 @@ async function buildMiniAppAgentOnlyState({
       budget: 100,
     },
     showAgentResponses,
+    counts: {
+      flaggedQuestions: Array.isArray(review.flaggedQuestionIds) ? review.flaggedQuestionIds.length : 0,
+      loadedFlaggedQuestions: flaggedQuestionKeys.length,
+      predictions: predictionQuestionIds.length,
+      loadedPredictions: predictionQuestionIds.filter((questionId) => questionKeyById.has(questionId)).length,
+      loadedQuestions: Array.isArray(questions) ? questions.length : 0,
+    },
   };
   if (showAgentResponses) {
     const predictions = {};
@@ -7037,6 +7045,28 @@ function telegramMiniAppHtml() {
       font-weight: 800;
       color: var(--text);
     }
+    .loadingProgress {
+      width: min(72vw, 340px);
+      height: 10px;
+      overflow: hidden;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      background: rgba(255, 255, 255, 0.08);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    }
+    .loadingProgressBar {
+      width: var(--progress, 18%);
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--accent), var(--ok));
+      transition: width 260ms ease;
+    }
+    .loadingHint {
+      max-width: min(78vw, 420px);
+      font-size: 13px;
+      line-height: 1.35;
+      color: var(--muted);
+    }
     .inlineSpinner {
       width: 18px;
       height: 18px;
@@ -7157,7 +7187,12 @@ function telegramMiniAppHtml() {
           </div>
         </div>
       </section>
-      <div class="status loadingStatus" id="status"><img class="loadingGif" src="/telegram/mini-app/loading.gif" alt="" aria-hidden="true"><span>Loading...</span></div>
+      <div class="status loadingStatus" id="status">
+        <img class="loadingGif" src="/telegram/mini-app/loading.gif" alt="" aria-hidden="true">
+        <span>Loading questions...</span>
+        <div class="loadingProgress" aria-hidden="true"><div class="loadingProgressBar" style="--progress: 18%"></div></div>
+        <div class="loadingHint">Opening the session and checking agent predictions.</div>
+      </div>
       <section class="adminPanel" id="adminPanel" aria-label="Admin actions">
         <div class="resultsHeader">
           <div class="sectionTitle">Admin Actions</div>
@@ -8240,6 +8275,32 @@ function telegramMiniAppHtml() {
     const setStatus = (message, kind = '') => {
       el.status.className = 'status ' + kind;
       el.status.textContent = message || '';
+    };
+    const setLoadingProgress = (message, percent = 18, hint = '') => {
+      el.status.className = 'status loadingStatus';
+      el.status.innerHTML = '';
+      const image = document.createElement('img');
+      image.className = 'loadingGif';
+      image.src = '/telegram/mini-app/loading.gif';
+      image.alt = '';
+      image.setAttribute('aria-hidden', 'true');
+      const label = document.createElement('span');
+      label.textContent = message || 'Loading questions...';
+      const track = document.createElement('div');
+      track.className = 'loadingProgress';
+      track.setAttribute('aria-hidden', 'true');
+      const bar = document.createElement('div');
+      bar.className = 'loadingProgressBar';
+      const boundedPercent = Math.max(8, Math.min(96, Number(percent) || 18));
+      bar.style.setProperty('--progress', boundedPercent + '%');
+      track.appendChild(bar);
+      const note = document.createElement('div');
+      note.className = 'loadingHint';
+      note.textContent = hint || 'Opening the session and checking agent predictions.';
+      el.status.appendChild(image);
+      el.status.appendChild(label);
+      el.status.appendChild(track);
+      el.status.appendChild(note);
     };
     function shouldRetryQuestions(data) {
       if (data?.sessionPicker?.required === true) return false;
@@ -11794,6 +11855,19 @@ function telegramMiniAppHtml() {
     async function load({ retry = false } = {}) {
       let response;
       let body;
+      if (!state.loadedOnce) {
+        setLoadingProgress(
+          retry ? 'Still loading questions...' : 'Loading questions...',
+          retry ? 34 : 22,
+          'Opening the session and checking agent predictions.'
+        );
+      } else if (state.data?.hasMoreQuestions === true) {
+        setLoadingProgress(
+          'Loading more questions...',
+          58,
+          'Keeping your current answers while fetching the next batch.'
+        );
+      }
       try {
         const stateUrl = new URL('/telegram/mini-app/api/state', location.origin);
         stateUrl.searchParams.set('launch', launch);
@@ -11813,6 +11887,9 @@ function telegramMiniAppHtml() {
         setStatus(userFacingErrorMessage(body, 'Could not load Mini App.'), 'error');
         clearQuestionRetry();
         return;
+      }
+      if (!state.loadedOnce) {
+        setLoadingProgress('Preparing questions...', 78, 'Applying saved answers, drafts, and agent prediction badges.');
       }
       const wasLoadedOnce = state.loadedOnce;
       state.data = body;

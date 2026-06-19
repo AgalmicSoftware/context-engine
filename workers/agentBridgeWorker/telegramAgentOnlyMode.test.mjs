@@ -173,6 +173,9 @@ test('start payload pins path-only endpoints and instruction size', () => {
 test('wrapped image prompt uses importance wording and suppresses decorative text', () => {
   const snapshot = {
     windowId: 'w-2026-06-15',
+    evalTypesByQuestionId: {
+      ceq_archetype: 'bucket',
+    },
     statements: [
       {
         statement_id: 'ceq_trust',
@@ -200,6 +203,11 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
         answer_schema: { kind: 'text', maxChars: 280 },
       },
       {
+        statement_id: 'ceq_game',
+        text: 'Agent guess: what game, puzzle, sport, or play pattern best fits me?',
+        answer_schema: { kind: 'text', maxChars: 280 },
+      },
+      {
         statement_id: 'ceq_unanswered_guess',
         text: 'Agent guess: which impossible pet would I choose?',
         answer_schema: { kind: 'text', maxChars: 280 },
@@ -224,6 +232,17 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
         text: 'What is my p(bloom) for a flourishing future after this year?',
         answer_schema: { kind: 'choice', values: [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100] },
       },
+      {
+        statement_id: 'ceq_archetype',
+        text: 'Which archetype best describes this principal?',
+        answer_schema: {
+          kind: 'multichoice',
+          options: ['privacy-first coordination builder', 'frontier researcher'],
+          minSelections: 1,
+          maxSelections: 1,
+          selectionMode: 'single',
+        },
+      },
     ],
   };
   const state = {
@@ -232,10 +251,12 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
       ceq_info: { agent: { answer: { value: 'unsure' }, confidence: 41 } },
       ceq_book: { agent: { answer: { text: 'The Diamond Age' }, confidence: 52 } },
       ceq_book_followup: { agent: { answer: { text: 'Neuromancer' }, confidence: 70 } },
-      ceq_movie: { agent: { answer: { text: 'Unsupported' }, confidence: 12 } },
+      ceq_movie: { agent: { answer: { text: 'Her' }, confidence: 58 } },
+      ceq_game: { agent: { answer: { text: 'Go' }, confidence: 55 } },
       ceq_rating: { agent: { answer: { value: 7 }, confidence: 88 } },
       ceq_multi: { agent: { answer: { values: ['Find relevant people', 'Coordinate plans'] }, confidence: 90 } },
       ceq_pbloom: { agent: { answer: { value: 80 }, confidence: 63 } },
+      ceq_archetype: { agent: { answer: { values: ['privacy-first coordination builder'] }, confidence: 99 } },
     },
   };
   const prompt = buildAgentOnlyWrappedImagePrompt({
@@ -249,6 +270,7 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
         ceq_book_followup: 25,
         ceq_unanswered_guess: 90,
         ceq_lowered: -100,
+        ceq_archetype: 100,
       },
     },
     quadraticVoteState: { mode: 'quadratic', votes: { ceq_info: 4 } },
@@ -272,17 +294,22 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.match(prompt, /This section is questions only: do not show predicted answers/);
   assert.match(prompt, /do not show predicted answers, answer pills, Agree\/Unsure\/Disagree, ratings, selected options, confidence, or token math/);
   assert.match(prompt, /Do not replace prompts with theme summaries/);
+  assert.doesNotMatch(prompt, /Question only: "Which archetype best describes this principal/);
   assert.match(prompt, /Agree is green with white text/);
   assert.match(prompt, /Unsure is bright yellow with dark navy text/);
   assert.match(prompt, /Disagree is red with white text/);
   assert.match(prompt, /I would trust my agent to schedule meetings while I sleep/);
   assert.match(prompt, /High-Confidence Reads/);
   assert.match(prompt, /Cautious Reads/);
+  assert.match(prompt, /predicted human response rows/);
+  assert.match(prompt, /Agent-about-user evidence for sections 1, 6, and 7 only/);
+  assert.match(prompt, /Analysis prompt: "Which archetype best describes this principal/);
   assert.match(prompt, /Question: "/);
   assert.match(prompt, /Predicted answer/);
   assert.match(prompt, /answer format: binary choice; prediction: Agree; confidence: 92%/);
   assert.match(prompt, /answer format: multichoice selection; prediction: Find relevant people, Coordinate plans; confidence: 90%/);
   assert.match(prompt, /answer format: rating scale; prediction: 7\/10; confidence: 88%/);
+  assert.doesNotMatch(prompt, /answer format: multichoice selection; prediction: privacy-first coordination builder; confidence: 99%/);
   assert.match(prompt, /7\/10/);
   assert.doesNotMatch(prompt, /confidence: 88\/100/);
   assert.doesNotMatch(prompt, /prediction: 7; confidence/);
@@ -298,8 +325,9 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.match(prompt, /Do not include Agent Guesses in this section/);
   assert.match(prompt, /favorite book/);
   assert.match(prompt, /Neuromancer/);
+  assert.match(prompt, /Her/);
+  assert.match(prompt, /Go/);
   assert.doesNotMatch(prompt, /The Diamond Age/);
-  assert.doesNotMatch(prompt, /Agent guess: what is my favorite movie/);
   assert.doesNotMatch(prompt, /impossible pet/);
   assert.doesNotMatch(prompt, /post publicly without review/);
   assert.match(prompt, /stylized illustrated rendition or portrait silhouette/);
@@ -318,7 +346,7 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.doesNotMatch(prompt, /What Your Agent Upvoted/);
 });
 
-test('wrapped image prompt supports political compass mode around the most-important question', () => {
+test('wrapped image prompt supports Agent Norms Compass mode around the most-important question', () => {
   const snapshot = {
     windowId: 'w-2026-06-15',
     statements: [
@@ -347,7 +375,10 @@ test('wrapped image prompt supports political compass mode around the most-impor
     quadraticVoteState: { mode: 'quadratic', votes: {} },
     mode: 'political_compass',
   });
-  assert.match(prompt, /political compass meme/);
+  assert.match(prompt, /Agent Village Norms Compass poster/);
+  assert.match(prompt, /2x2 strategy map/);
+  assert.match(prompt, /Humans approve high-stakes actions/);
+  assert.doesNotMatch(prompt, /political compass/i);
   assert.match(prompt, /compact top-left wordmark/);
   assert.match(prompt, /Where your agent thinks you land/);
   assert.match(prompt, /attached Agent Village logo image as the style reference/);

@@ -204,6 +204,8 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /class="headerMain"/);
   assert.match(html, /class="questionHeaderRow"[\s\S]*<div class="meta" id="meta"><span>Questions:<\/span><span class="inlineSpinner" aria-label="Loading questions"><\/span><\/div>[\s\S]*id="showFilter"[\s\S]*id="showAddQuestion"/);
   assert.match(html, /\.inlineSpinner \{[\s\S]*animation: ceSpin 0\.8s linear infinite;/);
+  assert.match(html, /class="loadingProgress"/);
+  assert.match(html, /setLoadingProgress/);
   assert.equal(html.includes('id="headerSessionList"'), false);
   assert.equal(html.includes('sessionHeaderRow'), false);
   assert.equal(html.includes('sessionHeaderText'), false);
@@ -1945,6 +1947,13 @@ test('Mini App exposes agent-only sidecar state, human votes, confirm, and edit-
   assert.deepEqual(state.agentOnly.flaggedQuestionKeys, [questionKey]);
   assert.equal(state.agentOnly.windowId, 'w-2026-06-12');
   assert.equal(state.agentOnly.predictions[questionKey].valueLabel, 'Agree');
+  assert.deepEqual(state.agentOnly.counts, {
+    flaggedQuestions: 1,
+    loadedFlaggedQuestions: 1,
+    predictions: 1,
+    loadedPredictions: 1,
+    loadedQuestions: 1,
+  });
   assert.equal(JSON.stringify(state.agentOnly).includes('confidence'), false);
 
   await saveTelegramAgentSettingsPatch({

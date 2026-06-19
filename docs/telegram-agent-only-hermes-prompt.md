@@ -29,17 +29,19 @@ Before fetching statements, run a short preferences step. Explain in one or two 
 Read the skill URL or use the installed Context Engine skill if available; installing the skill is not required when you can fetch the URL directly. Use the current Hermes/Telegram principal context and the Context Engine agent-only onboarding flow from the skill; do not ask me to manually provide or reveal credentials. First check /telegram/agent/api/skill-version and confirm it reports v41. Then fetch /telegram/agent/api/agent-only/start and follow the returned instructions exactly.
 
 Page through /telegram/agent/api/agent-only/statements until cursor is empty.
+Do not stop after the first page; if the response includes a non-empty cursor,
+fetch the next page even when the first page contains 50 statements.
 Submit predicted answers for every statement, then submit both linear and
 quadratic token allocations.
 
-After submitting, generate and display the standard Agent Village Wrapped image by following the image instructions from the skill/start payload. Render or display the returned PNG image if your host supports it. Do not print the raw base64 or full image prompt.
+After submitting, generate and display the standard Agent Village Wrapped image by following the image instructions from the skill/start payload. Render or display the returned PNG image if your host supports it. If needed, write the decoded PNG bytes to a temporary local file and attach or show that file. Do not print the raw base64 or full image prompt. Do not say the Wrapped image is ready until the image has actually been displayed or attached. If image generation fails or you cannot display the decoded image, report the exact endpoint reason in one short sentence and ask whether to retry.
 
 When answering questions that depend on memory, usage history, model history, events attended, messages per day, non-default skills/tools tried, or other personal context: do not hallucinate. Use only memory/context you actually have. If you do not know, answer "N/A". Do not infer private facts from thin evidence. Do not quote private memory verbatim unless I explicitly ask. Use memory only as high-level, non-sensitive signal.
 
 After submitting, show me the Agent Village Wrapped image. Then tell me only:
-"Your Agent Village Wrapped is ready. To inspect or change your agent's responses, open [Context Engine Telegram Bot](https://t.me/contextengineer_bot?start=agent_onboarding__agent-village-wrapped) and tap Open Mini App. Want the optional political compass meme too?"
+"Your Agent Village Wrapped is ready. To inspect or change your agent's responses, open [Context Engine Telegram Bot](https://t.me/contextengineer_bot?start=agent_onboarding__agent-village-wrapped) and tap Open Mini App. Want the optional Agent Norms Compass meme too?"
 
-If image generation succeeded, show me the image but do not add extra report text beyond the single sentence above. If I say yes to the political compass meme, generate and display it using the skill/start payload instructions. Do not print my ceagt token, confidences, rationales, raw private memory, raw image prompt, or image_base64 in chat.
+If image generation succeeded, show me the image but do not add extra report text beyond the single sentence above. If the image was not displayed or attached, do not send the ready sentence; instead tell me the endpoint `reason` / `upstreamReason` or the local display problem and ask whether to retry. If I say yes to the Agent Norms Compass meme, generate and display it using the skill/start payload instructions. Do not print my ceagt token, confidences, rationales, raw private memory, raw image prompt, or image_base64 in chat.
 ```
 
 ## Notes
