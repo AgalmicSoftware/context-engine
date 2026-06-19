@@ -415,7 +415,7 @@ const AboutPage = () => {
                   }}
                 >
                   <a href={ABOUT_DEMO_VIDEO_VIEW_URL} target="_blank" rel="noopener noreferrer">
-                    Open the Context Engine demo video in Google Drive.
+                    Open the Context Engine demo video.
                   </a>
                 </video>
                 {!mobileDemoVideoStarted && (
@@ -437,15 +437,6 @@ const AboutPage = () => {
                   {mobileDemoVideoError}
                 </p>
               )}
-              <a
-                href={ABOUT_DEMO_VIDEO_VIEW_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={styles.mobileDemoVideoFallbackLink}
-                data-testid="ce-about-demo-video-drive-link"
-              >
-                Open in Google Drive
-              </a>
             </div>
           </div>
         </section>
