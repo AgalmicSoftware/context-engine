@@ -82,10 +82,10 @@ answer pills, dividers, and small decorative marks should feel personalized, not
 template-identical. Prefer open spacing and a few meaningful dividers over
 boxed-in cards, heavy borders, table clutter, and excess separator lines.
 
-Use plain concrete language. Do not invent undefined acronyms or jargon such as
-"triple-v" unless that exact term appears in the evidence. Prefer immediately
-understandable wording such as "asks first, explains its reasoning, and protects
-private context."
+Use plain concrete language. Do not invent undefined acronyms, jargon, or new
+technical-sounding slogans unless the exact phrase appears in the evidence.
+Prefer immediately understandable wording such as "asks first, explains its
+reasoning, and protects private context."
 
 Most Important To You
 Label this as: "Questions your agent thought you would care about most."

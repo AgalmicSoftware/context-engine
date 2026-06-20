@@ -342,7 +342,9 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.match(prompt, /tall phone card or portrait story panel/);
   assert.match(prompt, /rather than a wide landscape banner/);
   assert.match(prompt, /Use plain concrete language/);
-  assert.match(prompt, /Never write phrases like "triple-v"/);
+  assert.match(prompt, /Do not invent undefined acronyms/);
+  assert.match(prompt, /do not create new technical-sounding slogans/);
+  assert.doesNotMatch(prompt, /triple-v/i);
   assert.match(prompt, /ask first, explain their reasoning, and protect private context/);
   assert.match(prompt, /Show exactly 3 actual question prompts/);
   assert.match(prompt, /Question only: "I would trust my agent to schedule meetings while I sleep/);
