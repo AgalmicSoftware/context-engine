@@ -322,6 +322,8 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.match(source, /statement ids, frozen prompts/);
   assert.match(source, /EdgeOS Read Permission: Yes/);
   assert.match(source, /Do not interrupt the run with a separate EdgeOS permission or\s+preference question/);
+  assert.match(source, /Do not submit a flat\s+default confidence batch such as 85 for every answer/);
+  assert.match(source, /scan the batch for repeated default values and adjust\s+item by item/);
   assert.match(source, /ordinary onboarding section is not required for Agent Village Wrapped/);
   assert.match(source, /Trusted Geo \/ Hermes Invite Onboarding/);
   assert.ok(source.indexOf('## Agent Only Mode (agent_only_mode)') < source.indexOf('## Trusted Geo / Hermes Invite Onboarding'));

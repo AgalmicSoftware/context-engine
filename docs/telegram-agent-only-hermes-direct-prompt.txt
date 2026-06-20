@@ -1,3 +1,41 @@
+Forwardable message, EdgeOS profile allowed:
+
+Use the attached Context Engine Agent Village Wrapped prompt file.
+
+Run Agent Village Wrapped for my Telegram principal.
+
+Use the prompt as written, with these settings already answered; do not ask a
+separate permission or preference question:
+
+Run Now: Yes
+EdgeOS Read Permission: Yes
+Standard Wrapped Image: Yes
+
+You may use my EdgeOS profile as high-level, non-sensitive context. Do not
+quote private profile or memory text. Do not print credentials, raw image_base64,
+raw image prompt, confidences, or rationales.
+
+---
+
+Forwardable message, EdgeOS profile not allowed:
+
+Use the attached Context Engine Agent Village Wrapped prompt file.
+
+Run Agent Village Wrapped for my Telegram principal.
+
+Use the prompt as written, with these settings already answered; do not ask a
+separate permission or preference question:
+
+Run Now: Yes
+EdgeOS Read Permission: No
+Standard Wrapped Image: Yes
+
+Do not use EdgeOS profile, memory, interests, calendar, private profile data, or
+other personal memory. Do not print credentials, raw image_base64, raw image
+prompt, confidences, or rationales.
+
+---
+
 Use the Context Engine Telegram agent handoff skill:
 https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=41
 
@@ -11,13 +49,14 @@ gemini-3.5-flash run. If the balance is below $2.00, or cannot be checked
 safely, stop and say exactly: "You need to add more credit before I can run
 Agent Village Wrapped." Do not fetch statements or submit answers first.
 
-Before fetching statements, ask a short preference check: this is Context Engine
-research on whether agents can predict their principals, may take about 10
-minutes, and produces a shareable Agent Village Wrapped image. Ask whether to
-run now and whether you may use my EdgeOS profile as high-level, non-sensitive
-context. I can reply "yes" to continue with defaults: standard Wrapped image +
-EdgeOS profile access. If I decline EdgeOS, do not use profile data. Never quote
-private profile or memory text. Wait for my answer.
+Before fetching statements, ask a short preference check only if the forwarded
+message did not already include Run Now and EdgeOS Read Permission settings.
+This is Context Engine research on whether agents can predict their principals,
+may take about 10 minutes, and produces a shareable Agent Village Wrapped image.
+Ask whether to run now and whether you may use my EdgeOS profile as high-level,
+non-sensitive context. I can reply "yes" to continue with defaults: standard
+Wrapped image + EdgeOS profile access. If I decline EdgeOS, do not use profile
+data. Never quote private profile or memory text. Wait for my answer.
 
 Read the skill URL directly or use the installed Context Engine skill if
 available. Installing the skill is not required when you can fetch the URL
@@ -42,11 +81,15 @@ quadratic token allocations. Treat this as a fresh run: use new request_id
 values for each answer-batch POST and for both vote submissions, and reuse a
 request_id only when retrying the exact same failed request.
 
-Use calibrated confidence values. Do not set the same confidence for every
-answer unless every answer genuinely has the same probability. Use lower
-confidence for guesses, questions with missing context, and usage/history-style
-questions where evidence is thin. Use higher confidence only when you have
-specific support.
+Use calibrated confidence values. Confidence means your probability that the
+principal would give the same answer, not how strongly you endorse it. Use
+90-100 only for direct memory/profile evidence or a stable preference observed
+repeatedly; 70-89 for a supported inference; 40-69 for weak, mixed, transient,
+or population-prior-only evidence; below 40 for mostly guessed answers. Do not
+submit a flat default like 85 across a batch; after drafting, scan for repeated
+confidence values and adjust item by item. Use lower confidence for guesses,
+questions with missing context, and usage/history-style questions where
+evidence is thin. Use higher confidence only when you have specific support.
 
 After submitting, generate and display the standard Agent Village Wrapped image
 using the skill/start image instructions. Prefer image_url; otherwise decode

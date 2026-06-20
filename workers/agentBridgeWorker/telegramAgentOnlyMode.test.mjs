@@ -163,10 +163,13 @@ test('start payload pins path-only endpoints and instruction size', () => {
   assert.match(payload.instructions, /Agent Village Wrapped image/);
   assert.match(payload.instructions, /wrappedImageEndpoint/);
   assert.match(payload.instructions, /mode "political_compass"/);
-  assert.match(payload.instructions, /render or display the image/);
+  assert.match(payload.instructions, /decode image_base64 as image\/png and display it/);
   assert.match(payload.instructions, /fresh run id/);
   assert.match(payload.instructions, /unique request_id values/);
   assert.match(payload.instructions, /each answer-batch POST/);
+  assert.match(payload.instructions, /Calibrate before posting/);
+  assert.match(payload.instructions, /Do not use a repeated default like 85 across a batch/);
+  assert.match(payload.instructions, /scan for flat confidence/);
   assert.match(payload.instructions, /To inspect or change your agent's responses/);
   assert.doesNotMatch(payload.instructions, /Review or edit your agent's responses in Context Engine Telegram Bot/);
   assert.ok(agentOnlyInstructionWordCount(AGENT_ONLY_INSTRUCTIONS) >= 400);

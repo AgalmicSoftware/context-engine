@@ -44,6 +44,14 @@ quadratic token allocations. Treat this as a fresh run: use new request_id
 values for each answer-batch POST and for both vote submissions, and reuse a
 request_id only when retrying the exact same failed request.
 
+Use calibrated confidence values. Confidence means your probability that the
+principal would give the same answer, not how strongly you endorse it. Use
+90-100 only for direct memory/profile evidence or a stable preference observed
+repeatedly; 70-89 for a supported inference; 40-69 for weak, mixed, transient,
+or population-prior-only evidence; below 40 for mostly guessed answers. Do not
+submit a flat default like 85 across a batch; after drafting, scan for repeated
+confidence values and adjust item by item.
+
 After submitting, generate and display the standard Agent Village Wrapped image
 using the skill/start image instructions. Prefer `image_url`; otherwise decode
 `image_base64` to PNG and display or attach it. If the endpoint returns
