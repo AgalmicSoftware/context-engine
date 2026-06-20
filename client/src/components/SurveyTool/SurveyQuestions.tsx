@@ -497,6 +497,8 @@ import {
   normalizeTransientSubmitFeedbackDurationMs,
 } from './surveyQuestionSubmitFeedback.js';
 import {
+  resolveSurveyQuestionsSubmitPendingStats,
+  resolveSubmitEffectiveDraftSlug,
   runSurveyQuestionsSubmitController,
   runSurveyQuestionsSubmitFailureController,
   runSurveyQuestionsSubmitSuccessController,
@@ -9830,15 +9832,15 @@ export interface SurveyQuestions {
     return encState;
   };
 
-  buildSubmitContextSnapshot = () => {
-    const singleQuestionMode = !!this.props.singleQuestionMode;
-    const isStandalone = !!this.props.isStandalone;
-    const surveyIndex = singleQuestionMode || isStandalone ? 0 : (this.props.surveyIndex || 0);
-    const effectiveDraftSlug = normalizeSessionSlugValue(
-      this._getEffectiveDraftSlug
-        ? this._getEffectiveDraftSlug()
-        : resolveEffectiveSlug(this.props)
-    );
+const buildSubmitContextSnapshot = () => {
+    const singleQuestionMode: any = !!propsRef.current.singleQuestionMode;
+    const isStandalone: any = !!propsRef.current.isStandalone;
+    const surveyIndex: any = singleQuestionMode || isStandalone ? 0 : (propsRef.current.surveyIndex || 0);
+    const effectiveDraftSlug: any = resolveSubmitEffectiveDraftSlug({
+      draftSlug: inst._getEffectiveDraftSlug ? inst._getEffectiveDraftSlug() : '',
+      routeSlug: resolveEffectiveSlug(propsRef.current),
+      normalizeSlug: normalizeSessionSlugValue,
+    });
 
     return {
       props: this.props,

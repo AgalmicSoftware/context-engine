@@ -66,8 +66,9 @@ export const resolveSubmitEffectiveDraftSlug = ({
   routeSlug?: unknown;
   normalizeSlug?: ((value: unknown) => string) | null;
 } = {}): string => {
-  const normalizeValue =
-    typeof normalizeSlug === 'function' ? normalizeSlug : (value: unknown) => String(value ?? '').trim();
+  const normalizeValue = typeof normalizeSlug === 'function'
+    ? normalizeSlug
+    : (value: unknown) => String(value ?? '').trim();
   return normalizeValue(draftSlug) || normalizeValue(routeSlug);
 };
 
