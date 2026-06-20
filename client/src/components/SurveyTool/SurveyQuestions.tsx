@@ -576,6 +576,8 @@ declare global {
   }
 }
 
+type SurveyQuestionsRecord = Record<string, any>;
+
 export interface SurveyQuestions {
   setState: (...args: any[]) => any;
   _emptySubmitTimer: any;
@@ -4774,8 +4776,11 @@ async function fetchQuestionPool() {
     const shouldUseTemporaryDemoQuestionPool = temporaryDemoQuestionIds.length > 0;
     if (shouldUseTemporaryDemoQuestionPool) {
       if (temporaryDemoFixtureSlug) effectiveSlug = temporaryDemoFixtureSlug;
-      const currentQuestionsCache = ensureQuestionsNet(readQuestionsCache(effectiveSlug) || {}, netIdStr);
-      const questionsNet = currentQuestionsCache[netIdStr];
+      const currentQuestionsCache = ensureQuestionsNet(
+        readQuestionsCache(effectiveSlug) || {},
+        netIdStr
+      ) as SurveyQuestionsRecord;
+      const questionsNet = currentQuestionsCache[netIdStr] as SurveyQuestionsRecord;
       if (!questionsNet.questions || typeof questionsNet.questions !== 'object') questionsNet.questions = {};
       temporaryDemoFixtureQuestions.forEach((question) => {
         const qid = normalizeQuestionIdKey(question?.id);
@@ -4874,10 +4879,10 @@ async function fetchQuestionPool() {
         questionResponses: {},
         questionResponsesLatestBlock: 0,
       };
-      const networkQuestions = questionsNet.questions || {};
+      const networkQuestions = (questionsNet.questions || {}) as SurveyQuestionsRecord;
 
       const questionPool = expectedQuestionIds
-        .map((qid) => {
+        .map((qid: string) => {
           const qData = networkQuestions[qid];
           if (isPendingQuestionMetadataPlaceholder(qData)) return null;
           if (qData) return { ...qData, id: qData.id.toLowerCase() };
@@ -4889,10 +4894,10 @@ async function fetchQuestionPool() {
         .filter(Boolean);
       const loadedQuestionIds = new Set(
         questionPool
-          .map((question) => normalizeQuestionIdKey(question?.id))
+          .map((question: any) => normalizeQuestionIdKey(question?.id))
           .filter(Boolean)
       );
-      const pendingQuestionIds = expectedQuestionIds.filter((qid) => !loadedQuestionIds.has(qid));
+      const pendingQuestionIds = expectedQuestionIds.filter((qid: string) => !loadedQuestionIds.has(qid));
 
       const nextQuestionPoolSig = buildQuestionIdScopeSignature(questionPool);
       const snapshotSig = JSON.stringify({

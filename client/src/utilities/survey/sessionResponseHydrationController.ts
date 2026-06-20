@@ -1472,11 +1472,13 @@ export const createSessionResponseHydrationController = (
         toBlock: number;
         advanceWatermark: boolean;
       }): Promise<{
+        completedWithoutPartialData: boolean;
         processedWindowToBlock: number;
         responseRowsMerged: number;
       }> => {
         let processedWindowToBlock = fromBlock - 1;
         let responseRowsMerged = 0;
+        let sawPartialData = false;
         await responseHydrationContractScripts.getQuestionResponsesChunkedWithCallback(
           'none',
           fromBlock,
@@ -1494,6 +1496,7 @@ export const createSessionResponseHydrationController = (
             chunkToBlock: number,
             extra: CacheRecord = {}
           ) => {
+            sawPartialData = true;
             const completedBlock = Number(chunkToBlock) || 0;
             processedWindowToBlock = Math.max(processedWindowToBlock, completedBlock);
             responseRowsMerged += handlePartialData(partialAgg, chunkToBlock, extra, { advanceWatermark });
@@ -1502,10 +1505,14 @@ export const createSessionResponseHydrationController = (
           { forceArweaveFetch }
         );
 
+        if (!sawPartialData) {
+          processedWindowToBlock = Math.max(processedWindowToBlock, toBlock);
+        }
         flushResponsePartialWrites({ force: true });
         await Promise.allSettled(pendingPersistenceWrites);
 
         return {
+          completedWithoutPartialData: !sawPartialData,
           processedWindowToBlock,
           responseRowsMerged,
         };
@@ -1571,6 +1578,9 @@ export const createSessionResponseHydrationController = (
             advanceWatermark: true,
           });
           windowProcessedToBlock = result.processedWindowToBlock;
+          if (result.completedWithoutPartialData) {
+            processedToBlock = Math.max(processedToBlock, windowProcessedToBlock);
+          }
           if (result.responseRowsMerged > 0) {
             publishPartialResponseData();
           }

@@ -151,6 +151,7 @@ import {
   getSessionNetwork as _getSessionNetwork,
   type MainSiteSessionConfigLike,
 } from '../../utilities/session/mainSiteSessionConfig.js';
+import type { SessionConfigLike } from '../shellTypes';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
   resolveMainSiteExplicitSessionSlugFromPath,
@@ -5841,7 +5842,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
       ? resolveMainSiteQuestionRouteSessionContext({
         search: searchStr,
         isCacheManagerReady: this.state.isCacheManagerReady,
-        getSessionConfigBySlug: (slug: string) => this.getDisplaySessionCfg(slug),
+        getSessionConfigBySlug: (slug: string) => this.getDisplaySessionCfg(slug) as SessionConfigLike | null,
         formatSessionId: sessionRegistryUtils.formatSessionId,
         resolveSessionConfigById: (sessionId: string | number) => sessionRegistryStore.getSessionConfigById(sessionId),
       })
@@ -6051,7 +6052,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     const questionRouteSession = resolveMainSiteQuestionRouteSessionContext({
       search: searchStr,
       isCacheManagerReady: this.state.isCacheManagerReady,
-      getSessionConfigBySlug: (slug: string) => this.getDisplaySessionCfg(slug),
+      getSessionConfigBySlug: (slug: string) => this.getDisplaySessionCfg(slug) as SessionConfigLike | null,
       formatSessionId: sessionRegistryUtils.formatSessionId,
       resolveSessionConfigById: (sessionId: string | number) => sessionRegistryStore.getSessionConfigById(sessionId),
     });

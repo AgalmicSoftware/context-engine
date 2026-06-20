@@ -489,7 +489,7 @@ describe('createSessionResponseHydrationController', () => {
         questions: {},
         questionResponses: {},
         questionResponsesMeta: {},
-        questionResponsesLatestBlock: 9,
+        questionResponsesLatestBlock: 12,
         pendingQuestionMetadata: {},
         arweaveTxCache: {},
         arweaveTxFailureCache: {},
@@ -677,6 +677,31 @@ describe('createSessionResponseHydrationController', () => {
       ).toBe(20015);
     });
 
+    it('advances the response watermark when a completed scan emits no partial data callback', async () => {
+      contractScripts.getRelevantBlockWindowForFilter.mockResolvedValueOnce({
+        fromBlock: 10,
+        toBlock: 12,
+      });
+      contractScripts.getQuestionResponsesChunkedWithCallback.mockImplementationOnce(
+        async () => {
+          // Some reader implementations resolve an empty window without invoking
+          // the partial-data callback. The controller still owns the scan watermark.
+        }
+      );
+      const host = createMockHost();
+      const controller = createSessionResponseHydrationController(host);
+
+      await controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG);
+
+      expect(resolvePersistedQuestionResponsesWatermark).toHaveBeenCalledWith({
+        floorBlock: 9,
+        processedToBlock: 12,
+      });
+      expect(
+        host.getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID]?.questionResponsesLatestBlock
+      ).toBe(12);
+    });
+
     it('scans the first historical response window before recent prefetch', async () => {
       contractScripts.getRelevantBlockWindowForFilter.mockResolvedValueOnce({
         fromBlock: 10,
@@ -824,7 +849,7 @@ describe('createSessionResponseHydrationController', () => {
           [RESPONDER_LOWER]: 'chunk-two',
         },
       });
-      expect(storedQuestionsCache?.[NETWORK_ID]?.questionResponsesLatestBlock).toBe(11);
+      expect(storedQuestionsCache?.[NETWORK_ID]?.questionResponsesLatestBlock).toBe(12);
       expect(storedUserCache?.[RESPONDER_LOWER]?.[NETWORK_ID]?.data?.questionResponses).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
