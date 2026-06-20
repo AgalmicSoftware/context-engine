@@ -7546,6 +7546,7 @@ function telegramMiniAppHtml() {
     const POPULAR_QUESTION_LIMIT_MAX = 50;
     const POPULAR_QUESTION_LIMIT_STEP = 2;
     const FAST_INITIAL_QUESTION_LIMIT = ${DEFAULT_MINI_APP_FAST_INITIAL_QUESTION_LIMIT};
+    const MAX_QUESTION_LIMIT = ${MAX_MINI_APP_QUESTION_LIMIT};
     const QUESTION_TAG_LIMIT = 10;
     const QUESTION_TAG_FILTER_COLLAPSED_LIMIT = 5;
     const state = {
@@ -11998,15 +11999,15 @@ function telegramMiniAppHtml() {
         clearQuestionRetry();
         setStatus('');
       }
-      const willAutoExpand = !wasLoadedOnce && shouldAutoExpandQuestions(body);
+      const willAutoExpand = shouldAutoExpandQuestions(body);
       state.questionsLoading = false;
       state.loadingMoreQuestions = false;
       state.backgroundQuestionLoadPending = willAutoExpand;
       render();
       state.loadedOnce = true;
       if (willAutoExpand) {
-        state.questionLimit = Number(body.pageSize || 50) || 50;
-        setTimeout(() => load(), 0);
+        state.questionLimit = nextQuestionLimit(body);
+        setTimeout(() => load(), wasLoadedOnce ? 80 : 0);
       }
       if (state.aiSearchQuery) scheduleAiSearch(0);
     }
@@ -12022,8 +12023,14 @@ function telegramMiniAppHtml() {
     }
     function shouldAutoExpandQuestions(data) {
       const loaded = Number(data?.loadedQuestionLimit || data?.loadedQuestionCount || 0) || 0;
+      return data?.hasMoreQuestions === true && loaded > 0 && loaded < MAX_QUESTION_LIMIT;
+    }
+    function nextQuestionLimit(data) {
+      const loadedLimit = Number(data?.loadedQuestionLimit || 0) || 0;
+      const loadedCount = Number(data?.loadedQuestionCount || 0) || 0;
       const pageSize = Number(data?.pageSize || 50) || 50;
-      return data?.hasMoreQuestions === true && loaded > 0 && loaded < pageSize;
+      const current = Math.max(loadedLimit, loadedCount, Number(state.questionLimit || 0) || 0);
+      return Math.min(MAX_QUESTION_LIMIT, Math.max(current + 1, current + pageSize));
     }
     el.continueSessions.onclick = () => {
       if (!state.selectedSessionSlugs.size) return;
