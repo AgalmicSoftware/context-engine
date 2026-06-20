@@ -473,6 +473,7 @@ import {
 } from './surveyQuestionSubmitFeedback.js';
 import {
   resolveSurveyQuestionsSubmitPendingStats,
+  resolveSubmitEffectiveDraftSlug,
   runSurveyQuestionsSubmitController,
   runSurveyQuestionsSubmitFailureController,
   resolveSurveyQuestionsSubmittedResponseUrl,
@@ -7504,11 +7505,11 @@ const buildSubmitContextSnapshot = () => {
     const singleQuestionMode: any = !!propsRef.current.singleQuestionMode;
     const isStandalone: any = !!propsRef.current.isStandalone;
     const surveyIndex: any = singleQuestionMode || isStandalone ? 0 : (propsRef.current.surveyIndex || 0);
-    const effectiveDraftSlug: any = normalizeSessionSlugValue(
-      inst._getEffectiveDraftSlug
-        ? inst._getEffectiveDraftSlug()
-        : resolveEffectiveSlug(propsRef.current)
-    );
+    const effectiveDraftSlug: any = resolveSubmitEffectiveDraftSlug({
+      draftSlug: inst._getEffectiveDraftSlug ? inst._getEffectiveDraftSlug() : '',
+      routeSlug: resolveEffectiveSlug(propsRef.current),
+      normalizeSlug: normalizeSessionSlugValue,
+    });
 
     return {
       props: propsRef.current,

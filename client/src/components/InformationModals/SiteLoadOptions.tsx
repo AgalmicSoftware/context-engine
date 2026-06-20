@@ -164,7 +164,7 @@ class SiteLoadOptions extends Component<SiteLoadOptionsProps, SiteLoadOptionsSta
       <div className={styles.metricsDetailsButtons}>
 
 
-        <button className={buildClassName([styles.closeModalButton, 'close'])} aria-label="Close" data-dismiss="modal" type="button" onClick={this.toggleMetricsDetails}>
+        <button className={buildClassName([styles.closeModalButton, 'close'])} aria-label="Close" type="button" onClick={this.toggleMetricsDetails}>
                 <FontAwesomeIcon icon={closeMetricsDetailsIcon} className={styles.closeModalIcon}  />
         </button>
 
@@ -193,7 +193,6 @@ class SiteLoadOptions extends Component<SiteLoadOptionsProps, SiteLoadOptionsSta
             className={buildClassName([styles.closeModalButton, 'close'])}
             data-testid="ce-site-load-close-sidebar"
             aria-label="Close"
-            data-dismiss="modal"
             type="button"
             onClick={this.closeBetaSidebar}
           >
