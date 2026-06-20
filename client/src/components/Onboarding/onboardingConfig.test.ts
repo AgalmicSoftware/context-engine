@@ -79,15 +79,26 @@ describe('readColdLoadOnboardingState', () => {
     });
   });
 
-  it('does not auto-open after the first visit has already been recorded', () => {
+  it('keeps direct session welcome slides eligible until onboarding is explicitly completed', () => {
     const storage = createStorageMock({
       [FIRST_VISIT_STORAGE_KEY]: 'true',
     });
 
     expect(readColdLoadOnboardingState(storage, '/session/demo')).toEqual({
       firstVisit: false,
-      shouldStartOnboarding: false,
+      shouldStartOnboarding: true,
     });
     expect(storage.setItem).toHaveBeenCalledWith(FIRST_VISIT_STORAGE_KEY, 'false');
+  });
+
+  it('does not auto-open on non-session routes after first visit has already been recorded', () => {
+    const storage = createStorageMock({
+      [FIRST_VISIT_STORAGE_KEY]: 'true',
+    });
+
+    expect(readColdLoadOnboardingState(storage, '/about')).toEqual({
+      firstVisit: false,
+      shouldStartOnboarding: false,
+    });
   });
 });
