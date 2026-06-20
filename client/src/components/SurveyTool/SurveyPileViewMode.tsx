@@ -37,6 +37,7 @@ import GatedPromptNotice from './GatedPromptNotice';
 import MultichoiceQuestionInput from './MultichoiceQuestionInput';
 import QuestionDecryptControl from './QuestionDecryptControl';
 import QuestionCardLinks from './QuestionCardLinks';
+import { extractSingleQuestionOptionsFromCandidate } from './singleQuestionResponseHelpers.js';
 import SurveyAudioFieldInput from './SurveyAudioFieldInput';
 import SurveyQuestionsFullQuestionSliderSection from './SurveyQuestionsFullQuestionSliderSection';
 import {
@@ -51,6 +52,7 @@ import {
   buildPileShowLongLoadingPatch,
   buildPileSubmissionCompletePatch,
   buildPileSubmitTempTextPatch,
+  resolveEarlyVisiblePileQuestions,
   shouldPreferPileGatedEmptyState,
 } from './surveyPileViewState.js';
 import {
@@ -466,6 +468,11 @@ import {
   type SurveyQuestionsProps,
   type SurveyQuestionsState,
 } from './surveyQuestionsTypes.js';
+import {
+  appendMissingAuthoritativePoolQuestions,
+  filterQuestionsByAuthoritativePool,
+  resolveAuthoritativeQuestionPoolScope,
+} from './surveyAuthoritativeQuestionPool';
 
 import { SurveyQuestions } from './SurveyQuestions';
 
@@ -653,6 +660,7 @@ const attachPileViewRuntimeEngine = (engine: PileViewModeEngine): PileViewModeEn
   }
   Object.assign(engine, {
         buildWarmPileSeedState: (...args: any[]) => (buildWarmPileSeedState as any)(engine, ...args),
+        getQuestionOptionsForInput: (...args: any[]) => (getQuestionOptionsForInput as any)(...args),
         buildQuestionOptionsDigest: (...args: any[]) => (buildQuestionOptionsDigest as any)(engine, ...args),
         getPileLoadingScanDisplay: (...args: any[]) => (getPileLoadingScanDisplay as any)(engine, ...args),
         getQuestionObjectSignature: (...args: any[]) => (getQuestionObjectSignature as any)(engine, ...args),
@@ -760,6 +768,17 @@ function buildWarmPileSeedState(engine: PileViewModeEngine, propsIn: any = engin
           });
         });
       });
+      const authoritativeQuestionPoolScope = resolveAuthoritativeQuestionPoolScope(
+        propsIn.questionPool,
+        slug,
+      );
+      const scopedQuestions = authoritativeQuestionPoolScope
+        ? appendMissingAuthoritativePoolQuestions(
+            filterQuestionsByAuthoritativePool(allQuestions, authoritativeQuestionPoolScope),
+            authoritativeQuestionPoolScope,
+            getBlockedQuestionIdsSet(slug),
+          )
+        : allQuestions;
 
       const responseCounts: Record<string, number> = {};
       for (const qId in allResponses) {
@@ -777,7 +796,7 @@ function buildWarmPileSeedState(engine: PileViewModeEngine, propsIn: any = engin
       const unanswered: PileQuestionRecord[] = [];
       const answered: PileQuestionRecord[] = [];
 
-      for (const q of allQuestions) {
+      for (const q of scopedQuestions) {
         const idL = q.id?.toLowerCase?.();
         if (!idL) continue;
         if (hlSet.has(idL)) {
@@ -816,6 +835,23 @@ function buildWarmPileSeedState(engine: PileViewModeEngine, propsIn: any = engin
       return null;
     }
   }
+
+const getQuestionOptionsForInput = (question: any): string[] => {
+    const labels = extractSingleQuestionOptionsFromCandidate(question);
+    if (labels.length > 0) return labels;
+    return Array.isArray(question?.options) ? question.options.map((option: any) => String(option)) : [];
+  };
+
+const normalizePileQuestionInputType = (question: any): string => {
+    const type = String(question?.type || '').trim().toLowerCase();
+    if (type === 'poll' && getQuestionOptionsForInput(question).length > 0) return 'multichoice';
+    return type;
+  };
+
+const isPollSingleSelectQuestion = (question: any): boolean => {
+    if (String(question?.type || '').trim().toLowerCase() !== 'poll') return false;
+    return question?.singleSelect !== false && question?.singleChoice !== false;
+  };
 
 const buildQuestionOptionsDigest = (engine: PileViewModeEngine, options: any) => {
     if (!Array.isArray(options) || options.length === 0) return '0:0';
@@ -894,7 +930,7 @@ const getQuestionObjectSignature = (engine: PileViewModeEngine, question: any) =
       String(question.prompt || ''),
       question.promptDecrypted ? '1' : '0',
       String(resolvePayloadStorageRef(question)?.id || question.arweaveTxId || ''),
-      engine.buildQuestionOptionsDigest(Array.isArray(question.options) ? question.options : []),
+      engine.buildQuestionOptionsDigest(engine.getQuestionOptionsForInput(question)),
     ].join('|');
     try {
       engine._questionObjectSignatureCache.set(question, sig);
@@ -1522,12 +1558,27 @@ const handleNext = (engine: PileViewModeEngine) => {
       engine._persistTimer = null;
       engine.persistDraft();
     }
-    engine.setState((prev: any) => ({
-      activePileIndex: Math.min(
-        prev.activePileIndex + 1,
-        prev.pileQuestions.length - 1
-      ),
-    }), () => {
+    engine.setState((prev: any, props: any = engine.props) => {
+      const fallbackQuestionPool = (
+        Array.isArray(prev.questionPool) && prev.questionPool.length > 0
+      )
+        ? prev.questionPool
+        : (Array.isArray(props.questionPool) ? props.questionPool : []);
+      const isFilterActive =
+        !!prev.isFilterActive ||
+        isSurveyToolFilterStateActive(prev.filterState);
+      const navigableQuestions = resolveEarlyVisiblePileQuestions({
+        pileQuestions: prev.pileQuestions,
+        questionPool: fallbackQuestionPool,
+        isFilterActive,
+      });
+      return {
+        activePileIndex: Math.min(
+          Number(prev.activePileIndex || 0) + 1,
+          Math.max(navigableQuestions.length - 1, 0)
+        ),
+      };
+    }, () => {
       engine.ensureVisiblePileResponseState();
     });
     engine.triggerNavFade();
@@ -1770,7 +1821,7 @@ const loadAndSortQuestions = async (engine: PileViewModeEngine) => {
     try {
       const {
         allResponses: rawAllResponses,
-        allQuestions,
+        allQuestions: rawAllQuestions,
         highlightedQuestionIds: hlSet,
         pendingMetadataCount,
       } = await loadPileScopeCacheSnapshot({
@@ -1784,6 +1835,17 @@ const loadAndSortQuestions = async (engine: PileViewModeEngine) => {
         normalizeQuestionIdKey,
       });
       const allResponses = rawAllResponses as PileQuestionResponsesMap;
+      const authoritativeQuestionPoolScope = resolveAuthoritativeQuestionPoolScope(
+        engine.props.questionPool,
+        slug,
+      );
+      const allQuestions = authoritativeQuestionPoolScope
+        ? appendMissingAuthoritativePoolQuestions(
+            filterQuestionsByAuthoritativePool(rawAllQuestions, authoritativeQuestionPoolScope),
+            authoritativeQuestionPoolScope,
+            getBlockedQuestionIdsSet(slug),
+          )
+        : rawAllQuestions;
       // Read path only: avoid write-on-read feedback loops via questionsCacheNonce.
       if (requestEpoch !== engine._loadAndSortQuestionsEpoch) return;
       const hasPendingMetadataRetries = pendingMetadataCount > 0;
@@ -2303,7 +2365,7 @@ const renderPileResponseInput = (engine: PileViewModeEngine, {
       );
     }
 
-    switch (question.type) {
+    switch (normalizePileQuestionInputType(question)) {
       case 'binary':
         return (
           <BinaryChoiceInput
@@ -2316,8 +2378,8 @@ const renderPileResponseInput = (engine: PileViewModeEngine, {
         );
 
       case 'multichoice': {
-        const options = Array.isArray(question.options) ? question.options : [];
-        const isSingleSelect = isSingleSelectMultichoice(question);
+        const options = engine.getQuestionOptionsForInput(question);
+        const isSingleSelect = isSingleSelectMultichoice(question) || isPollSingleSelectQuestion(question);
         const selectedValues = normalizeMultichoiceValue(answer.value);
         return (
           <MultichoiceQuestionInput
@@ -2653,7 +2715,7 @@ const renderActiveQuestion = (engine: PileViewModeEngine, question: any) => {
 const renderPileViewMode = (engine: PileViewModeEngine) => {
     bumpSurveyPerfCounter('renderCount');
     const {
-      pileQuestions,
+      pileQuestions: statePileQuestions,
       activePileIndex,
       loading,
       showCreate,
@@ -2663,12 +2725,17 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
       showHologramAssistant,
       showListeningPanel,
     } = engine.state;
+    const fallbackQuestionPool = (
+      Array.isArray(engine.state.questionPool) && engine.state.questionPool.length > 0
+    )
+      ? engine.state.questionPool
+      : (Array.isArray(engine.props.questionPool) ? engine.props.questionPool : []);
 
     const hiddenMaskSource = (
       Array.isArray(engine.state.allQuestionsForFilter) && engine.state.allQuestionsForFilter.length > 0
     )
       ? engine.state.allQuestionsForFilter
-      : (Array.isArray(engine.state.questionPool) ? engine.state.questionPool : []);
+      : fallbackQuestionPool;
     const { hiddenMaskedQuestionIds } = engine.getMemoizedMaskedQuestionVisibility(hiddenMaskSource, false);
 
     const slug = resolveEffectiveSlug(engine.props);
@@ -2688,12 +2755,23 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
     const isFilterActive =
       !!engine.state.isFilterActive ||
       isSurveyToolFilterStateActive(engine.state.filterState);
-    const hasFilterBaseQuestions = Array.isArray(engine.state.allQuestionsForFilter) &&
-      engine.state.allQuestionsForFilter.length > 0;
+    const pileQuestions = resolveEarlyVisiblePileQuestions({
+      pileQuestions: statePileQuestions,
+      questionPool: fallbackQuestionPool,
+      isFilterActive,
+    });
+    const effectiveActivePileIndex = Math.min(
+      Math.max(0, Number(activePileIndex || 0)),
+      Math.max(pileQuestions.length - 1, 0)
+    );
+    const hasFilterBaseQuestions = (
+      Array.isArray(engine.state.allQuestionsForFilter) &&
+      engine.state.allQuestionsForFilter.length > 0
+    ) || fallbackQuestionPool.length > 0;
     const hasSessionQuestionGate = engine.hasRestrictedSessionQuestionGate(engine.props);
     const pileWorkspaceViewState = buildPileWorkspaceViewState({
       pileQuestions,
-      activePileIndex,
+      activePileIndex: effectiveActivePileIndex,
       loading,
       hiddenMaskedQuestionIds,
       hasHiddenGatedQuestions: !!engine.state.hasHiddenGatedQuestions,
@@ -2807,7 +2885,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
               showLongLoading,
               loadingElapsedSec: engine.state.loadingElapsedSec,
               pileQuestions,
-              activePileIndex,
+              activePileIndex: effectiveActivePileIndex,
               renderActiveQuestion: engine.renderActiveQuestion,
               hasTerminalScanError,
               scanErrorMessage,
@@ -2875,7 +2953,9 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
         <QuestionFilter
           filterModalOpen={filterModalOpen}
           toggleFilterModal={engine.toggleFilterModal}
-          questions={engine.state.allQuestionsForFilter}
+          questions={Array.isArray(engine.state.allQuestionsForFilter) && engine.state.allQuestionsForFilter.length > 0
+            ? engine.state.allQuestionsForFilter
+            : fallbackQuestionPool}
           questionResponses={engine.getPileFilterQuestionResponses()}
           onFilter={engine.handleFilter}
           onFilterActivityChange={engine.handlePileFilterActivityChange}

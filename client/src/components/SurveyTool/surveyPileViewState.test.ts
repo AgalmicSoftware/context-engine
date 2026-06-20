@@ -11,6 +11,7 @@ import {
   buildNoPendingPileSubmitFeedbackPlan,
   buildPileSubmitRailViewState,
   buildPileSubmitViewState,
+  resolveEarlyVisiblePileQuestions,
   shouldPreferPileGatedEmptyState,
 } from './surveyPileViewState.js';
 
@@ -26,6 +27,31 @@ describe('surveyPileViewState', () => {
     expect(buildPileFilterActivePatch('active')).toEqual({ isFilterActive: true });
     expect(buildPileSubmissionCompletePatch(1)).toEqual({ submissionComplete: true });
     expect(buildPileSubmissionCompletePatch('')).toEqual({ submissionComplete: false });
+  });
+
+  it('uses questionPool as the early visible pile source until the sorted pile catches up', () => {
+    const earlyQuestion = { id: 'q1', prompt: 'Early question' };
+
+    expect(resolveEarlyVisiblePileQuestions({
+      pileQuestions: [],
+      questionPool: [
+        earlyQuestion,
+        { id: 'q2', prompt: '[encrypted]', promptDecrypted: false },
+      ],
+      isFilterActive: false,
+    })).toEqual([earlyQuestion]);
+
+    expect(resolveEarlyVisiblePileQuestions({
+      pileQuestions: [{ id: 'pile-q', prompt: 'Sorted pile question' }],
+      questionPool: [earlyQuestion],
+      isFilterActive: false,
+    })).toEqual([{ id: 'pile-q', prompt: 'Sorted pile question' }]);
+
+    expect(resolveEarlyVisiblePileQuestions({
+      pileQuestions: [],
+      questionPool: [earlyQuestion],
+      isFilterActive: true,
+    })).toEqual([]);
   });
 
   it('builds the pile submit success-badge presentation state', () => {

@@ -327,6 +327,10 @@ export const hasQuestionDecryption = (question: unknown): question is QuestionPa
   return !!(payload.promptDecrypted || payload.optionsDecrypted || payload.tagsDecrypted);
 };
 
+const hasNonEmptyQuestionOptions = (question: QuestionPayload | null | undefined): boolean => (
+  Array.isArray(question?.options) && question.options.length > 0
+);
+
 export const pickBetterQuestionPayload = (
   existingQuestion: QuestionPayload | null | undefined,
   incomingQuestion: QuestionPayload | null | undefined
@@ -351,7 +355,16 @@ export const pickBetterQuestionPayload = (
     return incomingQuestion;
   }
 
-  return { ...existingQuestion, ...incomingQuestion };
+  const merged = { ...existingQuestion, ...incomingQuestion };
+  const mergedType = toLowerString(incomingQuestion.type ?? existingQuestion.type);
+  if (
+    (mergedType === 'multichoice' || mergedType === 'poll') &&
+    hasNonEmptyQuestionOptions(existingQuestion) &&
+    !hasNonEmptyQuestionOptions(incomingQuestion)
+  ) {
+    merged.options = existingQuestion.options;
+  }
+  return merged;
 };
 
 export const litReady = (litHooks: LitHooks): boolean => !!(litHooks && typeof litHooks.getKey === 'function');

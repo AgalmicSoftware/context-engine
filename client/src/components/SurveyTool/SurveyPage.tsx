@@ -34,6 +34,7 @@ type SurveyPageProps = {
   scanForSurveyGroup?: unknown;
   questionResponsesNonce?: number;
   questionScanProgress?: unknown;
+  questionPool?: unknown[];
   refreshSurveyResponsesByID?: SurveyPageCallback;
   refreshQuestionMetadata?: SurveyPageCallback;
   refreshQuestionResponses?: SurveyPageCallback;
@@ -107,6 +108,7 @@ class SurveyComponent extends Component<SurveyPageProps> {
               /* ---- reactivity nonce ---- */
               questionResponsesNonce={this.props.questionResponsesNonce}
               questionScanProgress={this.props.questionScanProgress}
+              questionPool={this.props.questionPool}
 
               /* ---- refresh callbacks ---- */
               refreshSurveyResponsesByID={this.props.refreshSurveyResponsesByID}

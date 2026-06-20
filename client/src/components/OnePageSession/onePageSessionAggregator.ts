@@ -120,6 +120,12 @@ const hasVisibleQuestionMetadataForAggregator = (
   return true;
 };
 
+const isDemoPolisFixtureResponse = (response: any = null) => (
+  !!response &&
+  typeof response === 'object' &&
+  response.source === 'demo-polis-data'
+);
+
 export const computeAggregatorQuestionMetadataSignature = (questions: any = {}) => {
   if (!questions || typeof questions !== 'object') return '0:0';
   const qids = Object.keys(questions).sort();
@@ -180,6 +186,7 @@ export function buildAggregatorFromLocalCache(networkObj: any, opts: any = {}) {
         parsed = null;
       }
       if (!parsed) return;
+      if (isDemoPolisFixtureResponse(parsed)) return;
 
       const isBinary = parsed?.type === 'binary';
       const ans = parsed?.answer;

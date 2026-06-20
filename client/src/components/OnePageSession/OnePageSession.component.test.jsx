@@ -14,6 +14,7 @@ import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
+import { getPolisDemoQuestionPool } from '../SurveyTool/surveyPolisDemoQuestionPool';
 
 const mockSurveyPage = jest.fn();
 const mockPolisReport = jest.fn();
@@ -243,6 +244,22 @@ describe('OnePageSession view gating', () => {
     expect(screen.queryByTestId('survey-page-full')).not.toBeInTheDocument();
   });
 
+  it('does not crash when the route hydrates before a network object is available', async () => {
+    const { rerender } = render(<OnePageSession {...buildProps()} network={null} />);
+
+    expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
+
+    rerender(
+      <OnePageSession
+        {...buildProps()}
+        network={null}
+        questionResponsesNonce={1}
+      />
+    );
+
+    expect(screen.getByTestId('survey-page-pile')).toBeInTheDocument();
+  });
+
   it('shows a Telegram-only notice instead of the web session UI', async () => {
     render(<OnePageSession
       {...buildProps()}
@@ -414,6 +431,414 @@ describe('OnePageSession view gating', () => {
     expect(polisCalls[polisCalls.length - 1]?.demoDataBySlug).toBe(customEdgeData);
     expect(polisCalls[polisCalls.length - 1]?.questionScanProgress).toBe(progress);
   });
+
+  it('passes the built-in demo display slug to the embedded report', async () => {
+    render(
+      <OnePageSession
+        {...buildProps()}
+        slug="demo"
+        questionSessionSlug="demo"
+        sessionConfig={{
+          ...buildProps().sessionConfig,
+          slug: 'demo',
+          sessionName: 'Context Engine',
+          networkChainId: 11155420,
+        }}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('polis-report')).toBeInTheDocument();
+    });
+
+    const polisCalls = mockPolisReport.mock.calls.map((args) => args[0]).filter(Boolean);
+    expect(polisCalls[polisCalls.length - 1]).toEqual(expect.objectContaining({
+      sessionSlug: 'demo',
+      demoDataFirstLoad: true,
+    }));
+  });
+
+  it('does not pass generated demo Polis responses as live embedded report rows', async () => {
+    render(
+      <OnePageSession
+        {...buildProps()}
+        slug="demo"
+        questionSessionSlug="demo"
+        sessionConfig={{
+          ...buildProps().sessionConfig,
+          slug: 'demo',
+          sessionName: 'Context Engine',
+          networkChainId: 11155420,
+        }}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('polis-report')).toBeInTheDocument();
+    });
+
+    const polisCalls = mockPolisReport.mock.calls.map((args) => args[0]).filter(Boolean);
+    const latestReportProps = polisCalls[polisCalls.length - 1] || {};
+    const questionResponses = latestReportProps.questionResponses || {};
+
+    expect(latestReportProps).toEqual(expect.objectContaining({
+      sessionSlug: 'demo',
+      demoDataFirstLoad: true,
+    }));
+    expect(questionResponses).toEqual({});
+  });
+
+  it('builds built-in demo live report responses only from the demo source bucket', async () => {
+    jest.useFakeTimers();
+    const priorUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    window.history.replaceState({}, '', '/session/demo');
+    const demoQuestion = getPolisDemoQuestionPool()[0];
+    expect(demoQuestion?.id).toBeTruthy();
+    jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
+    jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['demo']);
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace, slug) => {
+      if (namespace !== 'questionsCache') return {};
+      if (slug === '') {
+        return {
+          '84532': {
+            questions: {
+              qforeign: {
+                id: 'qforeign',
+                prompt: 'Foreign default-bucket prompt',
+                type: 'binary',
+              },
+            },
+            questionResponses: {
+              qforeign: {
+                '0xforeign': {
+                  type: 'binary',
+                  answer: { value: 'yes', encrypted: false },
+                },
+              },
+            },
+          },
+        };
+      }
+      if (slug === 'demo') {
+        return {
+          '84532': {
+            questions: {
+              [demoQuestion.id]: {
+                id: demoQuestion.id,
+                prompt: 'Live canonical demo prompt',
+                type: 'binary',
+              },
+              qpolluted: {
+                id: 'qpolluted',
+                prompt: 'Polluted cache prompt without a demo binding',
+                type: 'binary',
+              },
+            },
+            questionResponses: {
+              [demoQuestion.id]: {
+                '0xabc': {
+                  type: 'binary',
+                  answer: { value: 'yes', encrypted: false },
+                },
+              },
+              qpolluted: {
+                '0xpolluted': {
+                  type: 'binary',
+                  answer: { value: 'no', encrypted: false },
+                },
+              },
+            },
+          },
+        };
+      }
+      return {};
+    });
+
+    try {
+      render(
+        <OnePageSession
+          {...buildProps()}
+          slug="demo"
+          questionSessionSlug=""
+          isQuestionCacheReady={true}
+          network={{ id: 84532, name: 'Base Sepolia' }}
+          sessionConfig={{
+            ...buildProps().sessionConfig,
+            slug: '',
+            sessionName: 'Context Engine',
+            networkChainId: 84532,
+          }}
+        />
+      );
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+      await act(async () => {
+        jest.advanceTimersByTime(150);
+      });
+
+      await waitFor(() => {
+        const polisCalls = mockPolisReport.mock.calls.map((args) => args[0]).filter(Boolean);
+        const latestReportProps = polisCalls[polisCalls.length - 1] || {};
+        expect(latestReportProps).toEqual(expect.objectContaining({
+          sessionSlug: 'demo',
+          demoDataFirstLoad: true,
+        }));
+        expect(latestReportProps.questionResponses).toEqual({
+          [demoQuestion.id]: [
+            expect.objectContaining({
+              responder: '0xabc',
+              questionId: demoQuestion.id,
+            }),
+          ],
+        });
+        expect(JSON.stringify(latestReportProps.questionResponses)).not.toContain('qforeign');
+        expect(JSON.stringify(latestReportProps.questionResponses)).not.toContain('0xforeign');
+        expect(JSON.stringify(latestReportProps.questionResponses)).not.toContain('qpolluted');
+        expect(JSON.stringify(latestReportProps.questionResponses)).not.toContain('0xpolluted');
+      });
+    } finally {
+      window.history.replaceState({}, '', priorUrl || '/');
+    }
+  });
+
+  it('keeps /session/demo report responses wired to the canonical source when the route source is demo', async () => {
+    jest.useFakeTimers();
+    const priorUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    window.history.replaceState({}, '', '/session/demo');
+    const demoQuestion = getPolisDemoQuestionPool()[0];
+    expect(demoQuestion?.id).toBeTruthy();
+
+    jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
+    jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['demo']);
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace, slug) => {
+      if (namespace !== 'questionsCache') return {};
+      if (slug === '') {
+        return {
+          '84532': {
+            questions: {},
+            questionResponses: {},
+          },
+        };
+      }
+      if (slug === 'demo') {
+        return {
+          '84532': {
+            questions: {},
+            questionResponses: {
+              [demoQuestion.id]: {
+                '0xabc': {
+                  type: 'binary',
+                  answer: { value: 'yes', encrypted: false },
+                },
+              },
+            },
+          },
+        };
+      }
+      return {};
+    });
+
+    try {
+      render(
+        <OnePageSession
+          {...buildProps()}
+          slug="demo"
+          questionSessionSlug="demo"
+          isQuestionCacheReady={true}
+          network={{ id: 84532, name: 'Base Sepolia' }}
+          sessionConfig={{
+            ...buildProps().sessionConfig,
+            slug: 'demo',
+            sessionName: 'Context Engine',
+            networkChainId: 84532,
+          }}
+        />
+      );
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+      await act(async () => {
+        jest.advanceTimersByTime(150);
+      });
+
+      await waitFor(() => {
+        const polisCalls = mockPolisReport.mock.calls.map((args) => args[0]).filter(Boolean);
+        const latestReportProps = polisCalls[polisCalls.length - 1] || {};
+        expect(latestReportProps.questionResponses).toEqual({
+          [demoQuestion.id]: [
+            expect.objectContaining({
+              responder: '0xabc',
+              questionId: demoQuestion.id,
+            }),
+          ],
+        });
+      });
+    } finally {
+      window.history.replaceState({}, '', priorUrl || '/');
+    }
+  });
+
+  it('uses built-in demo question metadata when live demo responses arrive before cached question metadata', async () => {
+    jest.useFakeTimers();
+    const priorUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    window.history.replaceState({}, '', '/session/demo');
+    const demoQuestion = getPolisDemoQuestionPool()[0];
+    expect(demoQuestion?.id).toBeTruthy();
+
+    jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
+    jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['demo']);
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace, slug) => {
+      if (namespace !== 'questionsCache') return {};
+      if (slug === '') {
+        return {
+          '84532': {
+            questions: {},
+            questionResponses: {},
+          },
+        };
+      }
+      if (slug === 'demo') {
+        return {
+          '84532': {
+            questions: {},
+            questionResponses: {
+              [demoQuestion.id]: {
+                '0xdef': {
+                  type: 'binary',
+                  answer: { value: 'no', encrypted: false },
+                },
+              },
+            },
+          },
+        };
+      }
+      return {};
+    });
+
+    try {
+      render(
+        <OnePageSession
+          {...buildProps()}
+          slug="demo"
+          questionSessionSlug=""
+          isQuestionCacheReady={true}
+          network={{ id: 84532, name: 'Base Sepolia' }}
+          sessionConfig={{
+            ...buildProps().sessionConfig,
+            slug: '',
+            sessionName: 'Context Engine',
+            networkChainId: 84532,
+          }}
+        />
+      );
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+      await act(async () => {
+        jest.advanceTimersByTime(150);
+      });
+
+      await waitFor(() => {
+        const polisCalls = mockPolisReport.mock.calls.map((args) => args[0]).filter(Boolean);
+        const latestReportProps = polisCalls[polisCalls.length - 1] || {};
+        expect(latestReportProps.questionResponses).toEqual({
+          [demoQuestion.id]: [
+            expect.objectContaining({
+              responder: '0xdef',
+              questionId: demoQuestion.id,
+            }),
+          ],
+        });
+      });
+    } finally {
+      window.history.replaceState({}, '', priorUrl || '/');
+    }
+  });
+
+  it('builds live demo report responses before question metadata hydration completes', async () => {
+    jest.useFakeTimers();
+    const priorUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    window.history.replaceState({}, '', '/session/demo');
+    const demoQuestion = getPolisDemoQuestionPool()[0];
+    expect(demoQuestion?.id).toBeTruthy();
+
+    jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
+    jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['demo']);
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace, slug) => {
+      if (namespace !== 'questionsCache') return {};
+      if (slug === '') {
+        return {
+          '84532': {
+            questions: {},
+            questionResponses: {},
+          },
+        };
+      }
+      if (slug === 'demo') {
+        return {
+          '84532': {
+            questions: {},
+            questionResponses: {
+              [demoQuestion.id]: {
+                '0xprehydrate': {
+                  type: 'binary',
+                  answer: { value: 'yes', encrypted: false },
+                },
+              },
+            },
+          },
+        };
+      }
+      return {};
+    });
+
+    try {
+      render(
+        <OnePageSession
+          {...buildProps()}
+          slug="demo"
+          questionSessionSlug="demo"
+          isQuestionCacheReady={false}
+          isResponsesCacheReady={false}
+          questionScanProgress={{
+            phase: 'hydrate',
+            discoveredQuestions: 42,
+            hydratedQuestions: 0,
+          }}
+          network={{ id: 84532, name: 'Base Sepolia' }}
+          sessionConfig={{
+            ...buildProps().sessionConfig,
+            slug: 'demo',
+            sessionName: 'Context Engine',
+            networkChainId: 84532,
+          }}
+        />
+      );
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+      await act(async () => {
+        jest.advanceTimersByTime(150);
+      });
+
+      await waitFor(() => {
+        const polisCalls = mockPolisReport.mock.calls.map((args) => args[0]).filter(Boolean);
+        const latestReportProps = polisCalls[polisCalls.length - 1] || {};
+        expect(latestReportProps.questionResponses).toEqual({
+          [demoQuestion.id]: [
+            expect.objectContaining({
+              responder: '0xprehydrate',
+              questionId: demoQuestion.id,
+            }),
+          ],
+        });
+      });
+    } finally {
+      window.history.replaceState({}, '', priorUrl || '/');
+    }
+  });
+
 
   it('uses shared session-universe discovery when bootstrapping embedded groups', () => {
     const ensureLightSbtUniverse = jest.fn(() => Promise.resolve());
@@ -725,6 +1150,182 @@ describe('OnePageSession view gating', () => {
     const sbtPropsAfterToggle = mockSBTsPage.mock.calls.map((args) => args[0]).filter(Boolean);
     expect(sbtPropsAfterToggle[sbtPropsAfterToggle.length - 1]?.showCreateGroupAboveFeatured).toBe(true);
     expect(sbtPropsAfterToggle[sbtPropsAfterToggle.length - 1]?.showCreateGroupExternal).toBe(true);
+  });
+
+  it('passes the canonical Polis demo questions to both /session/demo question surfaces', async () => {
+    const demoSessionConfig = {
+      ...buildProps().sessionConfig,
+      slug: '',
+      sessionName: 'Context Engine',
+      networkChainId: 11155420,
+    };
+
+    const { rerender } = render(
+      <OnePageSession
+        {...buildProps()}
+        slug="demo"
+        questionSessionSlug=""
+        sessionConfig={demoSessionConfig}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('survey-page-pile')).toBeInTheDocument();
+    });
+
+    const pileProps = mockSurveyPage.mock.calls
+      .map((args) => args[0])
+      .filter((props) => props?.minifiedMode === 'pile')
+      .pop();
+    expect(pileProps?.sessionSlug).toBe('demo');
+    expect(pileProps?.questionPool).toHaveLength(42);
+    expect(pileProps?.questionPool?.[0]).toEqual(expect.objectContaining({
+      source: 'demo-polis-data',
+      sessionSlug: 'demo',
+      sessionSlugExplicit: true,
+    }));
+
+    rerender(
+      <OnePageSession
+        {...buildProps()}
+        slug="demo"
+        questionSessionSlug=""
+        routeQuestionsOpen={true}
+        sessionConfig={demoSessionConfig}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('survey-page-full')).toBeInTheDocument();
+    });
+
+    const fullProps = mockSurveyPage.mock.calls
+      .map((args) => args[0])
+      .filter((props) => props?.miniMode === true)
+      .pop();
+    expect(fullProps?.sessionSlug).toBe('demo');
+    expect(fullProps?.questionPool).toHaveLength(42);
+  });
+
+  it('uses the display slug for embedded groups on the built-in demo route', async () => {
+    const demoSessionConfig = {
+      ...buildProps().sessionConfig,
+      slug: '',
+      sessionName: 'Context Engine',
+      networkChainId: 11155420,
+    };
+    render(
+      <OnePageSession
+        {...buildProps()}
+        slug="demo"
+        questionSessionSlug=""
+        sessionConfig={demoSessionConfig}
+      />
+    );
+
+    fireEvent.click(screen.getByText(t('sbts')));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('sbts-page')).toBeInTheDocument();
+    });
+
+    const latestSbtProps = mockSBTsPage.mock.calls.map((args) => args[0]).filter(Boolean).pop();
+    expect(latestSbtProps?.sessionSlug).toBe('demo');
+    expect(latestSbtProps?.requireExplicitAutoFeatureSessionSlug).toBe(true);
+    expect(latestSbtProps?.sessionConfig).toEqual(expect.objectContaining({
+      slug: 'demo',
+      autoFeatureSBTsBySessionSlug: true,
+    }));
+  });
+
+  it('keeps /session/demo on the canonical fixture when routed source slug is demo', async () => {
+    const priorUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    window.history.replaceState({}, '', '/session/demo');
+    const demoSessionConfig = {
+      ...buildProps().sessionConfig,
+      slug: 'demo',
+      sessionName: 'Context Engine',
+      networkChainId: 11155420,
+    };
+
+    try {
+      render(
+        <OnePageSession
+          {...buildProps()}
+          slug="demo"
+          questionSessionSlug="demo"
+          sessionConfig={demoSessionConfig}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('survey-page-pile')).toBeInTheDocument();
+      });
+
+      const pileProps = mockSurveyPage.mock.calls
+        .map((args) => args[0])
+        .filter((props) => props?.minifiedMode === 'pile')
+        .pop();
+      expect(pileProps?.sessionSlug).toBe('demo');
+      expect(pileProps?.questionPool).toHaveLength(42);
+
+      fireEvent.click(screen.getByText(t('sbts')));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('sbts-page')).toBeInTheDocument();
+      });
+
+      const latestSbtProps = mockSBTsPage.mock.calls.map((args) => args[0]).filter(Boolean).pop();
+      expect(latestSbtProps?.sessionSlug).toBe('demo');
+      expect(latestSbtProps?.requireExplicitAutoFeatureSessionSlug).toBe(true);
+      expect(latestSbtProps?.sessionConfig).toEqual(expect.objectContaining({
+        slug: 'demo',
+        autoFeatureSBTsBySessionSlug: true,
+      }));
+    } finally {
+      window.history.replaceState({}, '', priorUrl || '/');
+    }
+  });
+
+  it('passes canonical Polis demo questions to direct /session/demo/questions route renders', async () => {
+    const priorUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    window.history.replaceState({}, '', '/session/demo/questions');
+    const demoSessionConfig = {
+      ...buildProps().sessionConfig,
+      slug: 'demo',
+      sessionName: 'Context Engine',
+      networkChainId: 11155420,
+    };
+
+    try {
+      render(
+        <OnePageSession
+          {...buildProps()}
+          slug="demo"
+          questionSessionSlug="demo"
+          routeQuestionsOpen={true}
+          sessionConfig={demoSessionConfig}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('survey-page-full')).toBeInTheDocument();
+      });
+
+      const fullProps = mockSurveyPage.mock.calls
+        .map((args) => args[0])
+        .filter((props) => props?.miniMode === true)
+        .pop();
+      expect(fullProps?.sessionSlug).toBe('demo');
+      expect(fullProps?.questionPool).toHaveLength(42);
+      expect(fullProps?.questionPool?.[0]).toEqual(expect.objectContaining({
+        source: 'demo-polis-data',
+        sessionSlug: 'demo',
+        sessionSlugExplicit: true,
+      }));
+    } finally {
+      window.history.replaceState({}, '', priorUrl || '/');
+    }
   });
 
 });

@@ -193,6 +193,63 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(treeHasDataTestId(tree, 'pile-gated-notice')).toBe(true);
   });
 
+  it('forwards fallback question pools into pile mode', async () => {
+    const questionPool = [{ id: 'demo-q1', prompt: 'Canonical demo question' }];
+    renderPile({
+      questionPool,
+      cacheHasLoaded: false,
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: false,
+      isSBTCacheReady: false,
+      isSurveyCacheReady: false,
+    });
+
+    expect(await screen.findByText('Canonical demo question')).toBeInTheDocument();
+  });
+
+  it('renders option-bearing poll aliases as pile multichoice inputs', async () => {
+    renderPile({
+      questionPool: [{
+        id: 'poll-q1',
+        type: 'poll',
+        prompt: 'Which capability matters most?',
+        choices: [
+          { label: 'Cross-site graph' },
+          { text: 'Session memory' },
+        ],
+      }],
+      cacheHasLoaded: false,
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: false,
+      isSBTCacheReady: false,
+      isSurveyCacheReady: false,
+    });
+
+    expect(await screen.findByText('Which capability matters most?')).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Cross-site graph' })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Session memory' })).toBeInTheDocument();
+  });
+
+  it('advances pile navigation while early questionPool questions are visible', async () => {
+    renderPile({
+      questionPool: [
+        { id: 'demo-q1', prompt: 'First canonical question' },
+        { id: 'demo-q2', prompt: 'Second canonical question' },
+      ],
+      cacheHasLoaded: false,
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: false,
+      isSBTCacheReady: false,
+      isSurveyCacheReady: false,
+    });
+
+    expect(await screen.findByText('First canonical question')).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('Next Question'));
+
+    expect(await screen.findByText('Second canonical question')).toBeInTheDocument();
+    expect(screen.getByText('2 / 2')).toBeInTheDocument();
+  });
+
   it('renders triple trailing arrows inside the pile submit button', () => {
     const tree = renderPileInteractionSurface(buildSurfaceProps());
     const submitButton = findElement(
@@ -699,6 +756,22 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(findNodeByClassName(controlsNode?.props?.children, 'miniSpinnerWrapper')).toBeNull();
     expect(findNodeByClassName(actionsNode?.props?.children, 'miniSpinnerWrapper')).toBeNull();
     expect(findNodeByClassName(navNode?.props?.children, 'miniSpinnerWrapper')).toBeNull();
+  });
+
+  it('renders early questionPool questions while background cache work keeps the mini spinner active', () => {
+    const earlyQuestion = { id: 'early-q1', type: 'freeform', prompt: 'Early visible question' };
+    const { container } = renderPile({
+      cacheHasLoaded: false,
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: false,
+      isSBTCacheReady: false,
+      isSurveyCacheReady: false,
+      questionPool: [earlyQuestion],
+    });
+
+    expect(screen.getByText('Early visible question')).toBeInTheDocument();
+    expect(container.querySelector('.pileLoadingProgressList')).toBeNull();
+    expect(container.querySelector('.pileCardActive')).not.toBeNull();
   });
 
   it('passes the delayed pile-entry mode toggle prop into the pile create panel', async () => {

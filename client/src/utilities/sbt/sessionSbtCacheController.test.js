@@ -825,6 +825,241 @@ describe('createSessionSbtCacheController', () => {
       );
     });
 
+    it('uses display alias chain/config for light discovery while writing to the alias cache bucket', async () => {
+      const demoSbt = '0x00000000000000000000000000000000000000d1';
+      const displayCfg = {
+        slug: 'demo',
+        networkChainId: 11155420,
+        ignored_SBTs_LIST: [],
+        featured_SBTs_LIST: [],
+      };
+      const host = createMockHost({
+        activeSlug: 'demo',
+        currentPath: '/session/demo',
+        getSessionChainId: jest.fn((slug) => (slug === 'demo' ? '11155420' : '')),
+        getSessionCfg: jest.fn((slug) => (slug === 'demo' ? displayCfg : null)),
+      });
+      const controller = createSessionSbtCacheController(host);
+
+      contractScripts.getAllSbtAddressesCached.mockResolvedValueOnce([demoSbt]);
+
+      await controller.ensureLightSbtDiscovery('demo', {
+        force: true,
+        forceScopeSlug: 'demo',
+      });
+
+      expect(host.getSessionChainId).toHaveBeenCalledWith('demo');
+      expect(host.getSessionCfg).toHaveBeenCalledWith('demo');
+      expect(contractScripts.getRelevantBlockWindowForFilter).toHaveBeenCalledWith(expect.objectContaining({
+        slug: 'demo',
+        networkChainId: 11155420,
+        __ignoreSessionScanScope: true,
+      }));
+      expect(contractScripts.getAllSbtAddressesCached).toHaveBeenCalledWith(
+        'none',
+        expect.objectContaining({
+          slug: 'demo',
+          networkChainId: 11155420,
+          __ignoreSessionScanScope: true,
+        }),
+        expect.objectContaining({
+          force: true,
+          fromBlock: 10,
+          toBlock: 12,
+          onProgress: expect.any(Function),
+          onDiscoveredAddresses: expect.any(Function),
+        })
+      );
+      expect(host.getStored('sbtCache', 'demo')).toEqual(expect.objectContaining({
+        11155420: expect.objectContaining({
+          lastBlock: 12,
+          sbtList: expect.objectContaining({
+            [demoSbt.toLowerCase()]: expect.objectContaining({
+              sbtAddress: demoSbt,
+              slug: 'demo',
+              sessionSlug: 'demo',
+              sessionSlugExplicit: false,
+              sbtInfo: expect.objectContaining({
+                name: 'Mock SBT',
+                sessionSlug: 'demo',
+                sessionSlugExplicit: false,
+              }),
+            }),
+          }),
+        }),
+      }));
+    });
+
+    it('preserves explicit SBT metadata session bindings during light discovery', async () => {
+      const sbtAddress = '0x0000000000000000000000000000000000000e01';
+      const explicitMetadata = createCompleteSbtMetadata({
+        name: 'Explicit Alpha SBT',
+        sessionSlug: 'alpha',
+        sessionSlugExplicit: true,
+      });
+      const host = createMockHost({
+        initialStorage: {
+          sbtCache: {
+            alpha: {
+              11155420: {
+                lastBlock: 12,
+                sbtList: {
+                  [sbtAddress.toLowerCase()]: {
+                    sbtAddress,
+                    sbtInfo: {
+                      name: 'Needs Hydration',
+                    },
+                    blockNumber: 12,
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+      const controller = createSessionSbtCacheController(host);
+
+      contractScripts.getSbtMetadata.mockResolvedValueOnce(explicitMetadata);
+      contractScripts.getAllSbtAddressesCached.mockResolvedValueOnce([]);
+
+      await controller.ensureLightSbtDiscovery('alpha');
+
+      expect(host.getStored('sbtCache', 'alpha')).toEqual(expect.objectContaining({
+        11155420: expect.objectContaining({
+          sbtList: expect.objectContaining({
+            [sbtAddress.toLowerCase()]: expect.objectContaining({
+              sessionSlug: 'alpha',
+              sessionSlugExplicit: true,
+              sbtInfo: expect.objectContaining({
+                name: 'Explicit Alpha SBT',
+                sessionSlug: 'alpha',
+                sessionSlugExplicit: true,
+              }),
+            }),
+          }),
+        }),
+      }));
+    });
+
+    it('downgrades stale cache-scoped explicit flags when hydrated metadata is inferred', async () => {
+      const sbtAddress = '0x0000000000000000000000000000000000000e02';
+      const staleMetadata = createCompleteSbtMetadata({
+        name: 'Stale Bucket-Promoted SBT',
+        sessionSlug: 'alpha',
+        sessionSlugExplicit: true,
+      });
+      delete staleMetadata.tokenUriMetadataFetched;
+      const hydratedMetadata = createCompleteSbtMetadata({
+        name: 'Hydrated Inferred SBT',
+        image: 'ar://image-tx',
+        sessionSlug: 'alpha',
+        sessionSlugExplicit: false,
+        tokenUriMetadataFetched: true,
+      });
+      const host = createMockHost({
+        initialStorage: {
+          sbtCache: {
+            alpha: {
+              11155420: {
+                lastBlock: 12,
+                sbtList: {
+                  [sbtAddress.toLowerCase()]: {
+                    sbtAddress,
+                    sessionSlug: 'alpha',
+                    sessionSlugExplicit: true,
+                    sbtInfo: staleMetadata,
+                    blockNumber: 12,
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+      const controller = createSessionSbtCacheController(host);
+
+      contractScripts.getSbtMetadata.mockResolvedValueOnce(hydratedMetadata);
+      contractScripts.getAllSbtAddressesCached.mockResolvedValueOnce([]);
+
+      await controller.ensureLightSbtDiscovery('alpha');
+
+      expect(host.getStored('sbtCache', 'alpha')).toEqual(expect.objectContaining({
+        11155420: expect.objectContaining({
+          sbtList: expect.objectContaining({
+            [sbtAddress.toLowerCase()]: expect.objectContaining({
+              sessionSlug: 'alpha',
+              sessionSlugExplicit: false,
+              sbtInfo: expect.objectContaining({
+                name: 'Hydrated Inferred SBT',
+                sessionSlug: 'alpha',
+                sessionSlugExplicit: false,
+                tokenUriMetadataFetched: true,
+              }),
+            }),
+          }),
+        }),
+      }));
+    });
+
+    it('rehydrates core-only cached SBT metadata so list cards recover tokenURI image and description fields', async () => {
+      const sbtAddress = '0x00000000000000000000000000000000000000a1';
+      const cachedCoreOnly = createCompleteSbtMetadata({
+        name: 'Cached Core Only',
+      });
+      delete cachedCoreOnly.description;
+      delete cachedCoreOnly.image;
+      delete cachedCoreOnly.tokenUriMetadataFetched;
+      const hydratedMetadata = createCompleteSbtMetadata({
+        name: 'Hydrated SBT',
+        description: 'Visible list description',
+        image: 'ar://image-tx',
+        tokenUriMetadataFetched: true,
+      });
+      const host = createMockHost({
+        initialStorage: {
+          sbtCache: {
+            alpha: {
+              11155420: {
+                lastBlock: 12,
+                sbtList: {
+                  [sbtAddress.toLowerCase()]: {
+                    sbtAddress,
+                    sbtInfo: cachedCoreOnly,
+                    blockNumber: 12,
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+      const controller = createSessionSbtCacheController(host);
+
+      contractScripts.getSbtMetadata.mockResolvedValueOnce(hydratedMetadata);
+      contractScripts.getAllSbtAddressesCached.mockResolvedValueOnce([]);
+
+      await controller.ensureLightSbtDiscovery('alpha');
+
+      expect(contractScripts.getSbtMetadata).toHaveBeenCalledWith('none', sbtAddress, 'alpha');
+      expect(contractScripts.getAllSbtAddressesCached).not.toHaveBeenCalled();
+      expect(host.getStored('sbtCache', 'alpha')).toEqual(expect.objectContaining({
+        11155420: expect.objectContaining({
+          sbtList: expect.objectContaining({
+            [sbtAddress.toLowerCase()]: expect.objectContaining({
+              blockNumber: 12,
+              sbtInfo: expect.objectContaining({
+                description: 'Visible list description',
+                image: 'ar://image-tx',
+                tokenUriMetadataFetched: true,
+                sessionSlug: 'alpha',
+                sessionSlugExplicit: false,
+              }),
+            }),
+          }),
+        }),
+      }));
+    });
+
     it('deduplicates concurrent light discovery calls for the same in-flight key', async () => {
       const host = createMockHost();
       const controller = createSessionSbtCacheController(host);
