@@ -34,6 +34,7 @@ type SurveyPageProps = {
   scanForSurveyGroup?: unknown;
   questionResponsesNonce?: number;
   questionScanProgress?: unknown;
+  questionPool?: unknown[];
   refreshSurveyResponsesByID?: SurveyPageCallback;
   refreshQuestionMetadata?: SurveyPageCallback;
   refreshQuestionResponses?: SurveyPageCallback;

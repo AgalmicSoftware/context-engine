@@ -257,42 +257,6 @@ describe('PolisReport cache read options', () => {
     expect(JSON.stringify(computePolisConversationMath.mock.calls)).not.toContain('qFixture');
   });
 
-  it('excludes foreign-session real rows from built-in demo live report calculations', async () => {
-    const mixedQuestionResponses = {
-      qDemo: [
-        {
-          responder: '0xdemo',
-          questionId: 'qDemo',
-          response: JSON.stringify({
-            type: 'binary',
-            sessionSlug: 'demo',
-            prompt: 'Shared demo prompt',
-            answer: { value: 'Agree', encrypted: false },
-          }),
-        },
-        {
-          responder: '0xforeign',
-          questionId: 'qDemo',
-          response: JSON.stringify({
-            type: 'binary',
-            sessionSlug: 'test-2',
-            prompt: 'Shared demo prompt',
-            answer: { value: 'Disagree', encrypted: false },
-          }),
-        },
-      ],
-    };
-
-    const result = buildRatingMatrixFromRealData(mixedQuestionResponses, { sessionSlug: 'demo' });
-
-    expect(result.matrix).toEqual([[1]]);
-    expect(result.promptsMap).toEqual({ qDemo: 'Shared demo prompt' });
-    expect(result.questions).toEqual(['qDemo']);
-    expect(result.responders).toEqual(['0xdemo']);
-    expect(JSON.stringify(result)).not.toContain('0xforeign');
-    expect(JSON.stringify(result)).not.toContain('test-2');
-  });
-
   it('reads question and sbt caches with clone disabled during filter application', () => {
     const out = applyFilterStateToAggregator(
       { q1: [] },
@@ -726,6 +690,34 @@ describe('PolisReport demo data defaults', () => {
 
     expect(container.querySelector('.settingsRow')).toHaveClass('pdfIgnore');
     expect(screen.getByTestId(E2E_TESTIDS.POLIS_DEMO_DATA_TOGGLE)).toBeChecked();
+  });
+
+  it('lets the built-in demo session toggle from fixture data to live responses', async () => {
+    render(
+      <PolisReport
+        {...baseReportProps}
+        slug="demo"
+        questionResponses={seededQuestionResponses}
+        demoDataFirstLoad={true}
+        isQuestionCacheReady={true}
+        isResponsesCacheReady={true}
+      />
+    );
+
+    openSettingsRow();
+
+    const demoToggle = screen.getByTestId(E2E_TESTIDS.POLIS_DEMO_DATA_TOGGLE);
+    expect(demoToggle).toBeChecked();
+    expect(demoToggle).not.toBeDisabled();
+
+    fireEvent.click(demoToggle);
+
+    expect(demoToggle).not.toBeChecked();
+    await waitFor(() => {
+      expect(screen.queryByText('None (Demo Data Active)')).not.toBeInTheDocument();
+      expect(screen.queryByText('No non-encrypted binary responses found, or no Demo data loaded.')).not.toBeInTheDocument();
+      expect(screen.getByText('Summary and Statistics')).toBeInTheDocument();
+    });
   });
 
   it('includes the participants list in the global collapse and expand controls', async () => {

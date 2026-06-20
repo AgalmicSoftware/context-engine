@@ -222,6 +222,50 @@ describe('SurveySelector question toggle', () => {
     expect(treeHasText(questionToggle, 'Loading...')).toBe(true);
   });
 
+  it('uses fallback question-pool counts while question cache bootstrap is still pending', () => {
+    const subject = new SurveySelector({
+      autoOpenResults: false,
+      filterState: {},
+      isQuestionCacheReady: false,
+      isSurveyCacheReady: true,
+      singleQuestionMode: false,
+      network: { id: 11155420 },
+      activeSessionSlug: 'demo',
+      sessionSlug: '',
+      questionPool: [
+        { id: 'demo-q1', prompt: 'Demo prompt 1' },
+        { id: 'demo-q2', prompt: 'Demo prompt 2' },
+      ],
+    });
+    syncClassSetState(subject);
+    subject.getParsedQuestionsCacheForRender = jest.fn(() => ({}));
+    subject.state = {
+      ...subject.state,
+      loading: false,
+      viewMode: 'questions',
+      filteredQuestionCount: 0,
+      encryptedQuestionCount: 0,
+      showLongLoading: false,
+      selectorDropdownOpen: false,
+    };
+
+    subject.handleFilteredQuestionCountUpdate(2, 0);
+
+    const tree = subject.render();
+    const questionToggle = findElement(
+      tree,
+      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_QUESTIONS_TOGGLE
+    );
+    const questionToggleCount = findElement(
+      questionToggle,
+      (element) => nodeHasClassName(element, styles.questionSelectorCount)
+    );
+
+    expect(questionToggle).toBeTruthy();
+    expect(treeHasText(questionToggle, 'Loading...')).toBe(false);
+    expect(renderToStaticMarkup(questionToggleCount)).toContain('(2)');
+  });
+
   it('keeps the open questions dropdown row aligned to the sticky count and encrypted badge while loading', () => {
     const subject = new SurveySelector({
       autoOpenResults: false,

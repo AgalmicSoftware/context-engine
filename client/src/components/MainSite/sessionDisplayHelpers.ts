@@ -39,6 +39,19 @@ const getDemoConfig = (
   return isUnknownRecord(cfg) ? cfg : {};
 };
 
+const hasAuthoritativeSessionIdentity = (sessionConfig: unknown): boolean => {
+  const cfg = isUnknownRecord(sessionConfig) ? sessionConfig : {};
+  const registry = isUnknownRecord(cfg.__registry) ? cfg.__registry : {};
+  return !!(
+    cfg.sessionId ||
+    cfg.sessionIdHex ||
+    cfg.metadataURI ||
+    registry.sessionId ||
+    registry.sessionIdHex ||
+    registry.metadataURI
+  );
+};
+
 export const hasEncryptedSessionField = (
   sessionConfig: unknown,
   field: string
@@ -78,7 +91,9 @@ export const getSessionInfoForGroup = (
   if (override !== undefined && override !== null) return override as string;
   if (opts.hasEncryptedSessionField(sessionConfig, 'sessionInfo')) return 'Encrypted';
 
-  const fallbackCfg = getDemoConfig(resolvedSlug, opts.getDemoSessionConfigBySlug);
+  const fallbackCfg = hasAuthoritativeSessionIdentity(sessionConfig)
+    ? {}
+    : getDemoConfig(resolvedSlug, opts.getDemoSessionConfigBySlug);
   return (
     cfg.sessionInfo ||
     cfg.info ||
@@ -101,7 +116,9 @@ export const getSessionNameForGroup = (
   if (override !== undefined && override !== null) return override as string;
   if (opts.hasEncryptedSessionField(sessionConfig, 'sessionName')) return 'Encrypted';
 
-  const fallbackCfg = getDemoConfig(resolvedSlug, opts.getDemoSessionConfigBySlug);
+  const fallbackCfg = hasAuthoritativeSessionIdentity(sessionConfig)
+    ? {}
+    : getDemoConfig(resolvedSlug, opts.getDemoSessionConfigBySlug);
   return (
     cfg.sessionName ||
     cfg.name ||
@@ -136,7 +153,9 @@ export const getSessionHeaderForGroup = (
     return opts.normalizeArweaveUrl(headerValue as string, HEADER_NORMALIZE_OPTS);
   }
 
-  const fallbackCfg = getDemoConfig(resolvedSlug, opts.getDemoSessionConfigBySlug);
+  const fallbackCfg = hasAuthoritativeSessionIdentity(sessionConfig)
+    ? {}
+    : getDemoConfig(resolvedSlug, opts.getDemoSessionConfigBySlug);
   return opts.normalizeArweaveUrl(
     (fallbackCfg?.sessionHeaderImg ||
       fallbackCfg?.sessionHeader ||

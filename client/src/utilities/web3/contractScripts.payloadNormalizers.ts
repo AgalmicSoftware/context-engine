@@ -26,6 +26,51 @@ export const coerceStringArray = (value: unknown): string[] => {
   return [];
 };
 
+const readOptionLabel = (value: unknown): string => {
+  if (typeof value === 'string') return value.trim();
+  if (value == null) return '';
+  if (typeof value !== 'object') return String(value).trim();
+  const record = value as AnyRecord;
+  return String(
+    record.label ??
+    record.text ??
+    record.name ??
+    record.value ??
+    record.id ??
+    ''
+  ).trim();
+};
+
+export const coerceQuestionOptionLabels = (value: unknown): string[] => {
+  let rawOptions: unknown[] = [];
+  if (Array.isArray(value)) {
+    rawOptions = value;
+  } else if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+      try {
+        return coerceQuestionOptionLabels(JSON.parse(trimmed));
+      } catch (err) {
+        contractsLog.debug('coerceQuestionOptionLabels error:', err);
+      }
+    }
+    rawOptions = [trimmed];
+  } else if (value && typeof value === 'object') {
+    rawOptions = Object.values(value as AnyRecord);
+  }
+
+  const seen = new Set<string>();
+  return rawOptions
+    .map(readOptionLabel)
+    .filter(Boolean)
+    .filter((label) => {
+      if (seen.has(label)) return false;
+      seen.add(label);
+      return true;
+    });
+};
+
 export const normalizeConvictionImportance = <T extends AnyRecord | null | undefined>(
   responseJson: T
 ): T => {
@@ -51,5 +96,24 @@ export const normalizeQuestionFlags = (questionData: AnyRecord | null | undefine
     questionData.singleSelect = !!questionData.oneSelectionOnly;
   } else if (questionData.singleSelect !== undefined) {
     questionData.singleSelect = !!questionData.singleSelect;
+  }
+
+  const existingOptions = coerceQuestionOptionLabels(questionData.options);
+  const optionAliases = (
+    existingOptions.length > 0
+      ? questionData.options
+      : questionData.choices ??
+        questionData.answers ??
+        questionData.choiceOptions ??
+        questionData.config?.options ??
+        questionData.config?.choices ??
+        questionData.payload?.options ??
+        questionData.data?.options ??
+        questionData.optionsMap ??
+        questionData.options_by_id
+  );
+  const normalizedOptions = coerceQuestionOptionLabels(optionAliases);
+  if (normalizedOptions.length > 0) {
+    questionData.options = normalizedOptions;
   }
 };

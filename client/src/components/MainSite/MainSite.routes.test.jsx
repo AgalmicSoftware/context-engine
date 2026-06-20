@@ -13,6 +13,7 @@ import {
 import { sessionRegistryStore } from '../../utilities/web3/sessionRegistry.js';
 import { FIRST_VISIT_STORAGE_KEY } from '../Onboarding/onboardingConfig.js';
 import { FIRST_VISIT_ROOT_REDIRECT_CONSUMED_STORAGE_KEY } from './sessionFallbackRedirect.js';
+import { getPolisDemoQuestionPool } from '../SurveyTool/surveyPolisDemoQuestionPool';
 
 const mockAdminPage = jest.fn(() => null);
 const mockSponsorPage = jest.fn(() => null);
@@ -582,6 +583,81 @@ describe('MainSite route render smoke', () => {
     restoreSessionScanGlobals();
     window.history.replaceState({}, '', '/');
     window.sessionStorage.clear();
+  });
+
+  it('seeds built-in demo questions into canonical live-result buckets without scanning blocks', () => {
+    const subject = createSubject({
+      path: '/session/demo',
+      activeSessionSlug: 'demo',
+      sessionConfig: {
+        slug: 'demo',
+        sessionName: 'Context Engine',
+        networkChainId: 11155420,
+      },
+    });
+    const cacheStore = {};
+    subject.DG = {
+      read: jest.fn((name, slug) => cacheStore[`${name}:${slug}`] || null),
+      write: jest.fn((name, slug, value) => {
+        cacheStore[`${name}:${slug}`] = value;
+      }),
+      remove: jest.fn(),
+    };
+    subject.getDisplaySessionChainId = jest.fn(() => 11155420);
+    subject.setReadinessStateIfChanged = jest.fn((patch) => {
+      subject.state = { ...subject.state, ...(patch || {}) };
+    });
+    subject.checkAllCachesReady = jest.fn();
+
+    const demoQuestions = getPolisDemoQuestionPool();
+    const firstQuestion = demoQuestions[0];
+    expect(firstQuestion?.id).toBeTruthy();
+
+    expect(subject.seedBuiltInDemoQuestionCache()).toBe(true);
+
+    const generalQuestions =
+      cacheStore['questionsCache:']?.['11155420']?.questions || {};
+    const scopedQuestions =
+      cacheStore['questionsCache:demo']?.['11155420']?.questions || {};
+    expect(Object.keys(generalQuestions)).toHaveLength(demoQuestions.length);
+    expect(Object.keys(scopedQuestions)).toHaveLength(demoQuestions.length);
+    expect(generalQuestions[firstQuestion.id]).toEqual(expect.objectContaining({
+      id: firstQuestion.id,
+      prompt: firstQuestion.prompt,
+      sessionSlug: '',
+    }));
+    expect(scopedQuestions[firstQuestion.id]).toEqual(expect.objectContaining({
+      id: firstQuestion.id,
+      prompt: firstQuestion.prompt,
+      sessionSlug: 'demo',
+    }));
+    expect(subject.setReadinessStateIfChanged).toHaveBeenCalledWith(
+      expect.objectContaining({
+        isQuestionCacheReady: true,
+        questionScanProgress: null,
+      }),
+      expect.any(Function)
+    );
+  });
+
+  it('short-circuits built-in demo question initialization to the canonical seed', async () => {
+    const subject = createSubject({
+      path: '/session/demo',
+      activeSessionSlug: 'demo',
+      sessionConfig: {
+        slug: 'demo',
+        sessionName: 'Context Engine',
+        networkChainId: 11155420,
+      },
+    });
+    subject.isBuiltInDemoSessionRoutePath = jest.fn(() => true);
+    subject.seedBuiltInDemoQuestionCache = jest.fn(() => true);
+    subject._questionCacheController.initializeQuestionCacheForGroup = jest.fn();
+
+    await subject.initializeQuestionCacheForGroup('demo');
+
+    expect(subject.seedBuiltInDemoQuestionCache).toHaveBeenCalledTimes(1);
+    expect(subject._questionCacheController.initializeQuestionCacheForGroup).not.toHaveBeenCalled();
   });
 
   it('renders the wizard root for /new, canonicalizes the alias, and forwards query params', async () => {
@@ -1347,8 +1423,9 @@ describe('MainSite route render smoke', () => {
       sessionConfig: null,
     });
     getDemoSessionConfigBySlug.mockImplementation((slug) => (
-      slug === 'demo' ? demoConfig : null
+      slug === 'demo' || slug === '' ? demoConfig : null
     ));
+    subject.resolveSessionPathSlug = jest.fn();
 
     render(subject.render());
 
@@ -1356,11 +1433,57 @@ describe('MainSite route render smoke', () => {
     expect(await screen.findByTestId('mock-one-page-demo')).toHaveAttribute('data-session-slug', 'demo');
     expect(screen.getByTestId('mock-one-page-demo')).toHaveAttribute('data-question-session-slug', '');
     const latestProps = mockOnePageSession.mock.calls[mockOnePageSession.mock.calls.length - 1][0] || {};
-    latestProps.refreshQuestionResponses(['q1']);
-    latestProps.refreshSurveyResponsesByID('survey-1');
+    await latestProps.refreshQuestionMetadata({ reason: 'test' });
+    await latestProps.refreshQuestionResponses(['q1']);
+    await latestProps.refreshSurveyResponsesByID('survey-1');
+    expect(subject.refreshQuestionMetadataForGroup).toHaveBeenCalledWith('', { reason: 'test' });
+    expect(subject.refreshQuestionMetadataForGroup).toHaveBeenCalledWith('demo', { reason: 'test' });
     expect(subject.refreshQuestionResponses).toHaveBeenCalledWith(['q1'], { slug: '' });
+    expect(subject.refreshQuestionResponses).toHaveBeenCalledWith(['q1'], { slug: 'demo' });
     expect(subject.refreshSurveyResponsesByIDForGroup).toHaveBeenCalledWith('', 'survey-1');
+    expect(subject.refreshSurveyResponsesByIDForGroup).toHaveBeenCalledWith('demo', 'survey-1');
+    expect(subject.resolveSessionPathSlug).toHaveBeenCalledWith('demo');
     expect(getDemoSessionConfigBySlug).toHaveBeenCalledWith('demo', { allowDemoFallback: true });
+  });
+
+  it('uses registry-backed /session/demo metadata instead of the placeholder display fallback', async () => {
+    const registryConfig = buildSessionConfig({
+      slug: 'demo',
+      sessionName: 'demo',
+      sessionInfo: 'Registry demo session info',
+      sessionHeader: 'https://example.com/registry-demo-session.png',
+      networkChainId: 11155420,
+      __registry: {
+        registryChainId: 11155420,
+        sessionIdHex: '0xe2910e4d8ca642b0b952a20f1bcdf8be',
+        metadataURI: 'ar://U95-Z7iN8UmWXWuqz_Zk_OwFiqqgjHmubhFuQ1XHG1U',
+      },
+    });
+    const placeholderConfig = buildSessionConfig({
+      slug: '',
+      sessionName: 'Context Engine',
+      sessionInfo: 'Default demo session info',
+      __registry: undefined,
+    });
+    seedSessionRegistryCache(registryConfig);
+    const subject = createSubject({
+      path: '/session/demo',
+      activeSessionSlug: 'demo',
+      sessionConfig: null,
+    });
+    getDemoSessionConfigBySlug.mockImplementation((slug) => (
+      slug === 'demo' ? placeholderConfig : null
+    ));
+    subject.resolveSessionPathSlug = jest.fn();
+
+    render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_ROOT)).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-one-page-demo')).toHaveAttribute('data-session-name', 'demo');
+    expect(screen.getByTestId('mock-one-page-demo')).toHaveAttribute('data-session-info', 'Registry demo session info');
+    expect(screen.getByTestId('mock-one-page-demo')).toHaveAttribute('data-session-slug', 'demo');
+    expect(screen.getByTestId('mock-one-page-demo')).toHaveAttribute('data-question-session-slug', 'demo');
+    expect(subject.resolveSessionPathSlug).not.toHaveBeenCalled();
   });
 
   it('uses the default bucket for /session/demo cache bootstrap when only display fallback exists', () => {
@@ -1375,10 +1498,33 @@ describe('MainSite route render smoke', () => {
       sessionConfig: null,
     });
     getDemoSessionConfigBySlug.mockImplementation((slug) => (
-      slug === 'demo' ? demoConfig : null
+      slug === 'demo' || slug === '' ? demoConfig : null
     ));
 
     expect(subject.getActiveSessionSourceSlug()).toBe('');
+  });
+
+  it('renders /session/demo from default fallback metadata when no registry session exists', async () => {
+    const demoConfig = buildSessionConfig({
+      slug: '',
+      sessionName: 'Context Engine',
+      __registry: undefined,
+    });
+    const subject = createSubject({
+      path: '/session/demo',
+      activeSessionSlug: 'demo',
+      sessionConfig: null,
+    });
+    getDemoSessionConfigBySlug.mockImplementation((slug) => (
+      slug === '' ? demoConfig : null
+    ));
+
+    render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_ROOT)).toBeInTheDocument();
+    expect(screen.getByTestId('mock-one-page-demo')).toHaveAttribute('data-question-session-slug', '');
+    expect(getDemoSessionConfigBySlug).toHaveBeenCalledWith('demo', { allowDemoFallback: true });
+    expect(getDemoSessionConfigBySlug).toHaveBeenCalledWith('', { allowDemoFallback: true });
   });
 
   it('initializes session-route caches when only display fallback metadata provides the network', async () => {

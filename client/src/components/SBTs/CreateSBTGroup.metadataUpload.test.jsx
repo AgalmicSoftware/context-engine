@@ -115,6 +115,7 @@ describe('CreateSBTGroup metadata and deferred upload helpers', () => {
       documentIDHashes: ['hash-a', 'hash-b'],
       documentURLs: [],
       sessionSlug: 'test',
+      sessionSlugExplicit: true,
       encryptedFields: {
         name: '[encrypted]',
         description: '[encrypted]',

@@ -530,41 +530,6 @@ describe('SBTsPage auto-feature flag', () => {
     expect(screen.queryByTestId('mock-sbt-page')).not.toBeInTheDocument();
   });
 
-  it('keeps configured featured cards when strict embedded auto-feature filtering is enabled', () => {
-    const contractScripts = jest.requireMock('../../utilities/web3/contractScripts.js');
-    const configuredAddress = '0x000000000000000000000000000000000000d001';
-    contractScripts.getSessionConfigBySlug.mockImplementation((slug) => (
-      String(slug || '') === 'demo-1' ? { slug: 'demo-1' } : null
-    ));
-    contractScripts.getSessionConfigBySlugOrDefault.mockReturnValue({ slug: '' });
-    peekCacheSync.mockReturnValue({});
-
-    render(
-      <SBTsPage
-        sbtCacheRevision={0}
-        provider="wagmi"
-        network={{ id: 11155420, name: 'OP Sepolia' }}
-        account=""
-        loginComplete={false}
-        toggleLoginModal={jest.fn()}
-        isSBTCacheReady={false}
-        defaultFeaturedSBTs={[configuredAddress]}
-        sessionSlug="demo-1"
-        sessionConfig={{ slug: 'demo-1', autoFeatureSBTsBySessionSlug: false }}
-        miniaturized={true}
-        hideMiniActionRow={true}
-        preferCacheBackedFeaturedCards={true}
-        requireExplicitAutoFeatureSessionSlug={true}
-      />
-    );
-
-    expect(screen.getByTestId('embedded-featured-spinner')).toBeInTheDocument();
-    expect(screen.getAllByTestId('mock-sbt-page')).toHaveLength(1);
-    const latestProps = mockSBTPage.mock.calls[mockSBTPage.mock.calls.length - 1][0];
-    expect(latestProps.SBTAddress).toBe(configuredAddress);
-    expect(latestProps.sessionSlug).toBe('demo-1');
-  });
-
   it('does not auto-feature session matches when the flag is disabled', () => {
     peekCacheSync.mockReturnValue({
       '84532': {

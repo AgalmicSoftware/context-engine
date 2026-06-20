@@ -154,6 +154,48 @@ describe('questionRouting helper regressions', () => {
     expect(picked).toBe(fetched);
   });
 
+  it('preserves multichoice options when a later cache payload has no options', () => {
+    const cached = {
+      id: 'q1',
+      type: 'multichoice',
+      prompt: 'Which capability matters most?',
+      options: ['Cross-site graph', 'Session memory'],
+    };
+    const promptOnlyRefresh = {
+      id: 'q1',
+      type: 'multichoice',
+      prompt: 'Which capability matters most?',
+      options: [],
+      arweaveTxId: 'tx1',
+    };
+
+    expect(pickBetterQuestionPayload(cached, promptOnlyRefresh)).toEqual({
+      ...promptOnlyRefresh,
+      options: ['Cross-site graph', 'Session memory'],
+    });
+  });
+
+  it('preserves poll alias options when a later cache payload has no options', () => {
+    const cached = {
+      id: 'q1',
+      type: 'poll',
+      prompt: 'Which capability matters most?',
+      options: ['Cross-site graph', 'Session memory'],
+    };
+    const promptOnlyRefresh = {
+      id: 'q1',
+      type: 'poll',
+      prompt: 'Which capability matters most?',
+      options: [],
+      arweaveTxId: 'tx1',
+    };
+
+    expect(pickBetterQuestionPayload(cached, promptOnlyRefresh)).toEqual({
+      ...promptOnlyRefresh,
+      options: ['Cross-site graph', 'Session memory'],
+    });
+  });
+
   it('labels masked prompts by payload access mode instead of surfacing the raw mask', () => {
     expect(resolveQuestionPayloadDisplayState({
       id: 'q-public',

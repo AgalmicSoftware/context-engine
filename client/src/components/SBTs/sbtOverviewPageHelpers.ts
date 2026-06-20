@@ -98,6 +98,9 @@ type ResolveSBTsPageInitialCreateGroupSessionSlugArgs = {
   sessionConfig?: SBTsPageSessionConfigLike | null;
   sessionSlug?: unknown;
 };
+type ResolveSBTsPageFeaturedSbtSessionSlugOptions = {
+  requireExplicitSessionSlug?: unknown;
+};
 type BuildSBTsPageInitialStateArgs = ResolveSBTsPageInitialCreateGroupSessionSlugArgs & {
   hasCachedCreateSbtForm?: SBTsPageCreateFormCacheChecker | null;
 };
@@ -361,10 +364,30 @@ export const hasSBTsPageAuthoritativeSessionSlug = (obj: unknown): boolean => {
   return obj.sessionSlugExplicit === true || !hasExplicitFlag;
 };
 
-export const resolveSBTsPageFeaturedSbtSessionSlug = (sbt: unknown): string => {
+export const hasSBTsPageExplicitSessionSlug = (obj: unknown): boolean => (
+  hasSBTsPageOwn(obj, 'sessionSlug') &&
+  (obj as SBTsPageUnknownRecord).sessionSlugExplicit === true
+);
+
+export const resolveSBTsPageFeaturedSbtSessionSlug = (
+  sbt: unknown,
+  {
+    requireExplicitSessionSlug = false,
+  }: ResolveSBTsPageFeaturedSbtSessionSlugOptions = {}
+): string | null => {
   const sbtRecord = asSBTsPageFeaturedSbt(sbt);
-  if (!sbtRecord) return '';
+  if (!sbtRecord) return null;
   const info = asSBTsPageFeaturedSbt(sbtRecord.sbtInfo) || {};
+
+  if (requireExplicitSessionSlug) {
+    if (hasSBTsPageExplicitSessionSlug(info)) {
+      return normalizeSessionSlug(info?.sessionSlug || '');
+    }
+    if (hasSBTsPageExplicitSessionSlug(sbtRecord)) {
+      return normalizeSessionSlug(sbtRecord?.sessionSlug || '');
+    }
+    return null;
+  }
 
   if (hasSBTsPageAuthoritativeSessionSlug(info)) {
     return normalizeSessionSlug(info?.sessionSlug || '');
@@ -379,7 +402,7 @@ export const resolveSBTsPageFeaturedSbtSessionSlug = (sbt: unknown): string => {
     return normalizeSessionSlug(legacyRaw);
   }
 
-  return '';
+  return null;
 };
 
 export const normalizeSBTsPageFeaturedEntries = (

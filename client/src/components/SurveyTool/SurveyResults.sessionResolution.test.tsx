@@ -10,6 +10,7 @@ import {
   resolveSurveyResultsSessionContext,
 } from './surveyResultsSessionResolution';
 import { renderSurveyResults } from './surveyResultsTestHarness';
+import { getPolisDemoQuestionPool } from './surveyPolisDemoQuestionPool';
 
 const cacheScripts: any = cacheScriptsModule;
 const sessionScanScope: any = sessionScanScopeModule;
@@ -275,6 +276,12 @@ const rerenderHarness = async (
 
 const getLatestQuestionFilterProps = (): Record<string, any> => {
   const calls = mockQuestionFilter.mock.calls;
+  expect(calls.length).toBeGreaterThan(0);
+  return calls[calls.length - 1][0];
+};
+
+const getLatestPolisReportProps = (): Record<string, any> => {
+  const calls = mockPolisReport.mock.calls;
   expect(calls.length).toBeGreaterThan(0);
   return calls[calls.length - 1][0];
 };
@@ -563,6 +570,187 @@ describe('SurveyResults session resolution', () => {
     expectPromptAbsent('Wrong session question');
     expectPromptAbsent('Legacy leaked question');
     expectQuestionResponseCounts(1, 1);
+  });
+
+  it('keeps empty built-in demo raw results from inflating with fixture responses', async () => {
+    const demoQuestion = getPolisDemoQuestionPool()[0];
+    expect(demoQuestion?.id).toBeTruthy();
+    const priorUrl = window.location.href;
+    window.history.replaceState({}, '', '/questions/results?session=demo');
+    try {
+      seedCacheEnvironment({
+        questionsBySlug: {
+          demo: buildQuestionCache({
+            questions: {
+              [demoQuestion.id]: {
+                ...demoQuestion,
+                id: demoQuestion.id,
+                prompt: demoQuestion.prompt,
+                type: 'binary',
+                sessionSlug: 'demo',
+                sessionSlugExplicit: true,
+                source: 'demo-polis-data',
+              },
+            },
+            questionResponses: {
+              [demoQuestion.id]: {
+                'demo-participant-1': {
+                  type: 'binary',
+                  questionId: demoQuestion.id,
+                  questionID: demoQuestion.id,
+                  prompt: demoQuestion.prompt,
+                  answer: { value: 'Agree', encrypted: false },
+                  source: 'demo-polis-data',
+                },
+              },
+            },
+          }),
+        },
+      });
+      jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
+      jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['demo']);
+
+      renderQuestionResults({
+        sessionSlug: 'demo',
+        activeSessionSlug: 'demo',
+        sessionSlugPinned: true,
+        isOpen: true,
+        viewMode: 'questions',
+      }, '/questions/results?session=demo');
+
+      await waitFor(() => {
+        const text = getFilterSummaryText();
+        expect(text).toMatch(/Questions:\s*0/);
+        expect(text).toMatch(/Responses:\s*0/);
+      });
+      const latestFilterProps = getLatestQuestionFilterProps();
+      expect(Object.keys(latestFilterProps.questions || {})).toHaveLength(0);
+      expect(Object.keys(latestFilterProps.questionResponses || {})).toHaveLength(0);
+
+      fireEvent.click(screen.getByTestId('ce-surveyresults-demo-view-report'));
+      await waitFor(() => {
+        const reportProps = getLatestPolisReportProps();
+        expect(Object.keys(reportProps.questionResponses || {})).toHaveLength(0);
+      });
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+
+  it('hydrates live built-in demo question responses from the canonical source bucket', async () => {
+    const demoQuestion = getPolisDemoQuestionPool()[0];
+    expect(demoQuestion?.id).toBeTruthy();
+    seedCacheEnvironment({
+      questionsBySlug: {
+        '': buildQuestionCache({
+          questions: {},
+          questionResponses: {
+            [demoQuestion.id]: {
+              [RESPONDER_ONE]: {
+                type: 'binary',
+                questionId: demoQuestion.id,
+                answer: { value: 'Agree', encrypted: false },
+              },
+            },
+          },
+        }),
+        demo: buildQuestionCache(),
+      },
+    });
+    jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
+    jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['demo']);
+
+    renderQuestionResults({
+      sessionSlug: 'demo',
+      activeSessionSlug: 'demo',
+      preventUrlChange: false,
+      sessionSlugPinned: true,
+      isOpen: true,
+      viewMode: 'questions',
+    }, '/questions/results?session=demo');
+
+    await waitFor(() => {
+      expectQuestionResponseCounts(1, 1);
+    });
+    const latestFilterProps = getLatestQuestionFilterProps();
+    expect(latestFilterProps.questions).toEqual([
+      expect.objectContaining({
+        id: demoQuestion.id,
+        prompt: demoQuestion.prompt,
+      }),
+    ]);
+    expect(latestFilterProps.questionResponses?.[demoQuestion.id]).toEqual({
+      [RESPONDER_ONE]: expect.objectContaining({
+        answer: { value: 'Agree', encrypted: false },
+      }),
+    });
+  });
+
+  it('uses built-in demo metadata for live responses when on-chain question metadata is still pending', async () => {
+    const demoQuestion = getPolisDemoQuestionPool()[0];
+    expect(demoQuestion?.id).toBeTruthy();
+    seedCacheEnvironment({
+      questionsBySlug: {
+        demo: buildQuestionCache({
+          questions: {
+            [demoQuestion.id]: {
+              id: demoQuestion.id,
+              prompt: '[encrypted]',
+              type: 'binary',
+              __ceQuestionMetadataPending: true,
+            },
+          },
+          questionResponses: {
+            [demoQuestion.id]: {
+              [RESPONDER_ONE]: {
+                type: 'binary',
+                questionId: demoQuestion.id,
+                prompt: demoQuestion.prompt,
+                answer: { value: 'Agree', encrypted: false },
+              },
+            },
+          },
+        }),
+      },
+    });
+    jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
+    jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['demo']);
+
+    renderQuestionResults({
+      sessionSlug: 'demo',
+      activeSessionSlug: 'demo',
+      preventUrlChange: false,
+      sessionSlugPinned: true,
+      isOpen: true,
+      viewMode: 'questions',
+    }, '/questions/results?session=demo');
+
+    await waitFor(() => {
+      expectQuestionResponseCounts(1, 1);
+    });
+    const latestFilterProps = getLatestQuestionFilterProps();
+    expect(latestFilterProps.questions).toEqual([
+      expect.objectContaining({
+        id: demoQuestion.id,
+        prompt: demoQuestion.prompt,
+      }),
+    ]);
+
+    fireEvent.click(screen.getByTestId('ce-surveyresults-demo-view-report'));
+    await waitFor(() => {
+      const reportProps = getLatestPolisReportProps();
+      const reportRows = reportProps.questionResponses?.[demoQuestion.id] || [];
+      expect(reportRows).toHaveLength(1);
+      expect(reportRows[0]).toEqual(expect.objectContaining({
+        responder: RESPONDER_ONE,
+        questionId: demoQuestion.id,
+      }));
+      const parsedResponse = JSON.parse(String(reportRows[0].response || '{}'));
+      expect(parsedResponse).toEqual(expect.objectContaining({
+        prompt: demoQuestion.prompt,
+        answer: { value: 'Agree', encrypted: false },
+      }));
+    });
   });
 
   it('keeps embedded pinned session results on legacy bucket-backed questions while excluding explicit cross-session leaks', async () => {

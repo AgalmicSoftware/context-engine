@@ -248,6 +248,7 @@ import {
   type SurveyResultsScopedQuestionNetworkData,
   type SurveyResultsScopedQuestionNetworkMemo,
 } from './surveyResultsQuestionNetworkReadController';
+import { getPolisDemoQuestionPool } from './surveyPolisDemoQuestionPool.js';
 import {
   runSurveyResultsBrowserDownload,
   runSurveyResultsExportController,
@@ -1333,16 +1334,20 @@ function getScopedQuestionNetworkDataSync(
       requireAuthoritativeBinding,
       viewMode,
       ports: {
-        readQuestionBucket: (slug, networkId) => resolveNetBucketReadOnly(
-          peekCacheSync('questionsCache', slug, { clone: false }) || {},
-          networkId,
-          {
-            questionsLatestBlock: 0,
-            questions: {},
-            questionResponses: {},
-            questionResponsesLatestBlock: 0,
-          }
-        ) as SurveyResultsQuestionBucketRecord,
+        readQuestionBucket: (slug, networkId) => applyBuiltInDemoQuestionMetadataFallbackToBucket(
+          resolveNetBucketReadOnly(
+            peekCacheSync('questionsCache', slug, { clone: false }) || {},
+            networkId,
+            {
+              questionsLatestBlock: 0,
+              questions: {},
+              questionResponses: {},
+              questionResponsesLatestBlock: 0,
+            }
+          ) as SurveyResultsQuestionBucketRecord,
+          slug,
+          viewMode
+        ),
       },
     });
     if (!controllerResult.memoHit && controllerResult.memo) {
@@ -1363,21 +1368,30 @@ async function getScopedQuestionNetworkData(
       questionReadSlugs,
       requireAuthoritativeBinding,
       ports: {
-        peekQuestionBucket: (slug, networkId) => resolveNetBucketReadOnly(
-          peekCacheSync('questionsCache', slug, { clone: false }) || {},
-          networkId,
-          {}
-        ) as SurveyResultsQuestionBucketRecord,
-        readQuestionBucket: async (slug, networkId) => resolveNetBucketReadOnly(
-          (await readCache('questionsCache', slug)) || {},
-          networkId,
-          {
-            questionsLatestBlock: 0,
-            questions: {},
-            questionResponses: {},
-            questionResponsesLatestBlock: 0,
-          }
-        ) as SurveyResultsQuestionBucketRecord,
+        peekQuestionBucket: (slug, networkId) => {
+          const bucket = resolveNetBucketReadOnly(
+            peekCacheSync('questionsCache', slug, { clone: false }) || {},
+            networkId,
+            {}
+          ) as SurveyResultsQuestionBucketRecord;
+          return Object.keys(bucket || {}).length > 0
+            ? applyBuiltInDemoQuestionMetadataFallbackToBucket(bucket, slug, viewMode)
+            : bucket;
+        },
+        readQuestionBucket: async (slug, networkId) => applyBuiltInDemoQuestionMetadataFallbackToBucket(
+          resolveNetBucketReadOnly(
+            (await readCache('questionsCache', slug)) || {},
+            networkId,
+            {
+              questionsLatestBlock: 0,
+              questions: {},
+              questionResponses: {},
+              questionResponsesLatestBlock: 0,
+            }
+          ) as SurveyResultsQuestionBucketRecord,
+          slug,
+          viewMode
+        ),
       },
     });
     return controllerResult.result;
@@ -1605,10 +1619,92 @@ const handleFilterActivityChange = (isActive: unknown): void => {
     setState(asSurveyResultsStatePatch(buildSurveyResultsFilterActivePatch(isActive)));
   };
 
-  getIsDemoQuestionResultsContext = (): boolean => (
-    String(this.state.viewMode || '').trim().toLowerCase() === 'questions' &&
-    isDemoSessionSlug(this.getEffectiveSlug())
+const getIsDemoQuestionResultsContext = (
+    viewMode: unknown = stateRef.current.viewMode || propsRef.current.viewMode || 'questions'
+  ): boolean => (
+    String(viewMode || '').trim().toLowerCase() === 'questions' &&
+    isDemoSessionSlug(getEffectiveSlug())
   );
+
+const hasQuestionResponseEntries = (bucket: SurveyResultsQuestionBucketRecord | null | undefined): boolean => {
+    const questionResponses = bucket?.questionResponses;
+    if (!questionResponses || typeof questionResponses !== 'object') return false;
+    return Object.values(questionResponses).some((responderMap) => (
+      !!responderMap &&
+      typeof responderMap === 'object' &&
+      Object.values(responderMap as Record<string, unknown>).some((responseData) => (
+        !isDemoPolisFixtureResponse(parseResponse(responseData))
+      ))
+    ));
+  };
+
+const isBuiltInDemoPendingQuestionMetadataPlaceholder = (
+    question: SurveyResultsQuestionRecord | null | undefined
+  ): boolean => (
+    !!question && question.__ceQuestionMetadataPending === true
+  );
+
+const buildBuiltInDemoQuestionFallbackMap = (
+    bucket: SurveyResultsQuestionBucketRecord | null | undefined,
+    bucketSlug: unknown = ''
+  ): Record<string, SurveyResultsQuestionRecord> => {
+    const normalizedBucketSlug = normalizeSessionSlug(bucketSlug || '');
+    const existingQuestions = bucket?.questions && typeof bucket.questions === 'object'
+      ? bucket.questions
+      : {};
+    const responseQuestionIds = new Set<string>();
+    Object.entries(bucket?.questionResponses || {}).forEach(([qid, responderMap]) => {
+      const questionId = String(qid || '').trim().toLowerCase();
+      if (!questionId || !responderMap || typeof responderMap !== 'object') return;
+      const hasLiveResponse = Object.values(responderMap as Record<string, unknown>).some((responseData) => (
+        !isDemoPolisFixtureResponse(parseResponse(responseData))
+      ));
+      if (hasLiveResponse) responseQuestionIds.add(questionId);
+    });
+    const out: Record<string, SurveyResultsQuestionRecord> = {};
+    getPolisDemoQuestionPool().forEach((entry) => {
+      const questionId = String(entry?.id || '').trim().toLowerCase();
+      if (!questionId) return;
+      if (!responseQuestionIds.has(questionId)) return;
+      const existingQuestion = existingQuestions[questionId] as SurveyResultsQuestionRecord | undefined;
+      if (
+        Object.prototype.hasOwnProperty.call(existingQuestions, questionId) &&
+        !isBuiltInDemoPendingQuestionMetadataPlaceholder(existingQuestion)
+      ) {
+        return;
+      }
+      out[questionId] = {
+        ...entry,
+        creator: '',
+        id: questionId,
+        sessionSlug: normalizedBucketSlug,
+        sessionSlugExplicit: true,
+        tags: Array.isArray(entry.tags) ? entry.tags : [],
+      };
+    });
+    return out;
+  };
+
+const applyBuiltInDemoQuestionMetadataFallbackToBucket = (
+    bucket: SurveyResultsQuestionBucketRecord | null | undefined,
+    bucketSlug: unknown = '',
+    viewMode: unknown = stateRef.current.viewMode || propsRef.current.viewMode || 'questions'
+  ): SurveyResultsQuestionBucketRecord => {
+    const sourceBucket = bucket && typeof bucket === 'object'
+      ? bucket
+      : {};
+    if (!getIsDemoQuestionResultsContext(viewMode)) return sourceBucket;
+    if (!hasQuestionResponseEntries(sourceBucket)) return sourceBucket;
+    const fallbackQuestions = buildBuiltInDemoQuestionFallbackMap(sourceBucket, bucketSlug);
+    if (Object.keys(fallbackQuestions).length === 0) return sourceBucket;
+    return {
+      ...sourceBucket,
+      questions: {
+        ...(sourceBucket.questions || {}),
+        ...fallbackQuestions,
+      },
+    };
+  };
 
 const handleDemoResultsViewSelect = (nextView: unknown = 'report'): void => {
     setState(asSurveyResultsStateUpdater((prevState) => buildSurveyResultsDemoViewSelectPatch({
@@ -2012,6 +2108,43 @@ try {
 }
 };
 
+const isDemoPolisFixtureResponse = (responseData: unknown): boolean => (
+  !!responseData &&
+  typeof responseData === 'object' &&
+  (responseData as SurveyResultsRecord).source === 'demo-polis-data'
+);
+
+const filterLiveQuestionResponses = (
+  questionResponses: SurveyResultsQuestionResponsesByQuestion = {}
+): SurveyResultsQuestionResponsesByQuestion => {
+  const out: SurveyResultsQuestionResponsesByQuestion = {};
+  Object.entries(questionResponses || {}).forEach(([qId, responderMap]) => {
+    const questionId = String(qId || '').trim().toLowerCase();
+    if (!questionId || !responderMap || typeof responderMap !== 'object') return;
+    const kept: SurveyResultsQuestionResponsesByResponder = {};
+    Object.entries(responderMap).forEach(([responder, responseData]) => {
+      if (isDemoPolisFixtureResponse(parseResponse(responseData))) return;
+      kept[responder] = responseData;
+    });
+    if (Object.keys(kept).length > 0) out[questionId] = kept;
+  });
+  return out;
+};
+
+const filterLiveQuestionMetadata = (
+  questions: Record<string, SurveyResultsQuestionRecord> = {},
+  liveQuestionIds: Set<string> = new Set()
+): Record<string, SurveyResultsQuestionRecord> => {
+  const out: Record<string, SurveyResultsQuestionRecord> = {};
+  Object.entries(questions || {}).forEach(([qId, question]) => {
+    const questionId = String(qId || question?.id || '').trim().toLowerCase();
+    if (!questionId) return;
+    if (question?.source === 'demo-polis-data' && !liveQuestionIds.has(questionId)) return;
+    out[questionId] = question;
+  });
+  return out;
+};
+
 const getNetworkQuestionsForCurrentContext = (
   _identity?: SurveyResultsQuestionMetadataReadIdentity
 ): Record<string, SurveyResultsQuestionRecord> => {
@@ -2197,9 +2330,9 @@ async function fetchQuestionModeResponses(): Promise<void> {
 const netIdStr = String(propsRef.current.network?.id ?? propsRef.current.networkChainId ?? '');
 if (!netIdStr) return;
 const questionNetCache = await getScopedQuestionNetworkData('questions') as SurveyResultsScopedQuestionNetworkData;
-		const allQuestions = questionNetCache?.questions || {};
-
-		const partialQR: SurveyResultsQuestionResponsesByQuestion = questionNetCache?.questionResponses || {};
+	const partialQR: SurveyResultsQuestionResponsesByQuestion = filterLiveQuestionResponses(questionNetCache?.questionResponses || {});
+  const liveQuestionIds = new Set(Object.keys(partialQR).map((qid) => String(qid || '').trim().toLowerCase()));
+	const allQuestions = filterLiveQuestionMetadata(questionNetCache?.questions || {}, liveQuestionIds);
 	const aggregatorMap: Record<string, unknown> = {};
 
 	Object.keys(partialQR).forEach((qId) => {
@@ -2210,6 +2343,7 @@ const questionNetCache = await getScopedQuestionNetworkData('questions') as Surv
   Object.keys(respondersMap).forEach((rAddr) => {
     const rData = respondersMap[rAddr];
     const parsed = parseResponse(rData) as SurveyResultsRecord | null;
+    if (isDemoPolisFixtureResponse(parsed)) return;
     if (parsed) {
       // store as array downstream; collect as array here
       if (!Array.isArray(aggregatorMap[lowerQ])) {

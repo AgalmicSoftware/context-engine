@@ -72,6 +72,7 @@ type FeaturedListArgs = {
   baseFeaturedList?: unknown;
   effectiveSessionSlug?: unknown;
   autoFeature?: unknown;
+  requireExplicitSessionSlug?: unknown;
   isSBTCacheReady?: unknown;
   isAllSessionsMode?: boolean;
   progressBySlug?: Record<string, FeaturedProgressLike | unknown>;
@@ -80,6 +81,7 @@ type FeaturedEntriesArgs = {
   baseFeaturedList?: unknown;
   effectiveSessionSlug?: unknown;
   effectiveSessionAutoFeature?: unknown;
+  requireExplicitAutoFeatureSessionSlug?: unknown;
   isSBTCacheReady?: unknown;
   isAllSessionsMode?: boolean;
   includeListScopeSessions?: boolean;
@@ -113,6 +115,7 @@ type SBTsPageProps = UnknownRecord & {
   hideMiniActionRow?: boolean;
   showCreateGroupAboveFeatured?: boolean;
   preferCacheBackedFeaturedCards?: boolean;
+  requireExplicitAutoFeatureSessionSlug?: boolean;
   miniaturized?: boolean;
   refreshSbtData?: unknown;
   onRequestSbtCacheRefresh?: unknown;
@@ -151,6 +154,29 @@ const getDisplaySessionLists = (slugIn: unknown = '') => (
     slugIn,
   })
 );
+
+const getFeaturedSbtName = (sbt: FeaturedSbtLike | null | undefined): string => {
+  const info = isRecord(sbt?.sbtInfo) ? sbt.sbtInfo : {};
+  return String(
+    info.name ||
+    info.title ||
+    sbt?.name ||
+    ''
+  ).trim();
+};
+
+const isDemoAutomationFixtureSbt = (
+  sbt: FeaturedSbtLike | null | undefined,
+  sessionSlug: unknown = ''
+): boolean => {
+  if (normalizeSessionSlug(sessionSlug || '') !== 'demo') return false;
+  const name = getFeaturedSbtName(sbt);
+  if (!name) return false;
+  return (
+    /\b(?:AI Gate|AI Gated Decrypt|AI Doc Library|AI Doc Filetypes|BrowserUse) Test SBT\b/i.test(name) ||
+    /\[(?:e2e-|20\d{6}-\d{6}-(?:response-smoke|anyall|gated|survey|doc))/i.test(name)
+  );
+};
 
 export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
   _featuredListMemo: MemoBucket<string>;
@@ -197,7 +223,6 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     baseFeaturedList,
     effectiveSessionSlug,
     autoFeature,
-    baseFeaturedListIsConfigured = false,
     requireExplicitSessionSlug = false,
     isSBTCacheReady,
     isAllSessionsMode = false,
@@ -208,7 +233,6 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     const key = [
       sessionSlugTarget,
       autoFeature ? '1' : '0',
-      baseFeaturedListIsConfigured ? '1' : '0',
       requireExplicitSessionSlug ? '1' : '0',
       isSBTCacheReady ? '1' : '0',
       isAllSessionsMode ? '1' : '0',
@@ -221,12 +245,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     }
 
     let next = baseList;
-    if (
-      requireExplicitSessionSlug &&
-      !baseFeaturedListIsConfigured &&
-      sessionSlugTarget &&
-      !isAllSessionsMode
-    ) {
+    if (requireExplicitSessionSlug && sessionSlugTarget && !isAllSessionsMode) {
       try {
         const cache = peekCacheSync('sbtCache', String(effectiveSessionSlug || ''), { clone: false });
         const explicitAddressSet = new Set<string>();
@@ -352,7 +371,6 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
         baseFeaturedList: featuredForSlug,
         effectiveSessionSlug: slug,
         autoFeature: autoFeatureForSlug,
-        baseFeaturedListIsConfigured: true,
         requireExplicitSessionSlug: requireExplicitAutoFeatureSessionSlug,
         isSBTCacheReady,
         isAllSessionsMode,
@@ -453,7 +471,24 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     const groupFromRef   = referrerSlug ? getDisplaySessionConfig(referrerSlug) : null;
     const activeGroup    = groupFromUrl || groupFromProp || groupFromRedux || groupFromRef || getDisplaySessionConfig('');
 
-    const canonicalSlug = normalizeSessionSlug(activeGroup?.slug || ''); // '' means general
+    const explicitSourceSlug = normalizeSessionSlug(
+      effectiveUrlSlug ||
+      propSlugLike ||
+      this.props.activeSessionSlug ||
+      referrerSlug ||
+      ''
+    );
+    const explicitSourceMatched = !!(
+      (effectiveUrlSlug && groupFromUrl) ||
+      (propSlugLike && groupFromProp) ||
+      (this.props.activeSessionSlug && groupFromRedux) ||
+      (referrerSlug && groupFromRef)
+    );
+    const canonicalSlugFromConfig = normalizeSessionSlug(activeGroup?.slug || '');
+    const canonicalSlug = (
+      canonicalSlugFromConfig ||
+      (explicitSourceMatched ? explicitSourceSlug : '')
+    ); // '' means general
     const urlHasNoSlug  = onSbtsRoute && effectiveUrlSlug === undefined && !isCreateRoute;
 
     // Canonicalize (silent) if we are on /sbts and have a non-empty slug to show

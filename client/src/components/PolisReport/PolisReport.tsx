@@ -765,8 +765,7 @@ export function applyFilterStateToAggregator(
         if (answer.encrypted) continue;
 
         if (topBy === 'responses') {
-          const v = answer.value;
-          if (v === 'Agree' || v === 'Disagree' || v === 'Unsure') {
+          if (normalizePolisBinaryVote(answer.value) !== null) {
             score += 1;
           }
         } else {
@@ -957,7 +956,6 @@ function buildRatingMatrixFromRealData(realQR: PolisQuestionResponses | UnknownR
     for (const r of arr) {
       const parsed = safeJsonParse(r?.response);
       if (isPolisDemoFixturePayload(parsed)) continue;
-      if (!isPolisRealRowAllowedForSession(r, parsed, sessionSlug)) continue;
       if (parsed && typeof parsed === 'object' && parsed.type) {
         firstType = parsed.type;
         firstPrompt = parsed.prompt || '(No prompt)';
@@ -1017,14 +1015,11 @@ function buildRatingMatrixFromRealData(realQR: PolisQuestionResponses | UnknownR
     for (const r of arr) {
       const parsed = safeJsonParse(r?.response);
       if (!parsed || parsed.type !== 'binary') continue;
+      if (isPolisDemoFixturePayload(parsed)) continue;
       const answer = asRecord(parsed.answer);
       if (answer.encrypted) continue;
 
-      const ans = answer.value;
-      let val: PolisVote = null;
-      if (ans === 'Agree') val = 1;
-      else if (ans === 'Disagree') val = -1;
-      else if (ans === 'Unsure') val = 0;
+      const val: PolisVote = normalizePolisBinaryVote(answer.value);
 
       const pIdx = participantIndexMap[String(r?.responder || '').toLowerCase()];
       if (pIdx !== undefined) {
@@ -1361,6 +1356,7 @@ export default function PolisReport({
 
   // Toggling between demo data or real data
   const [useDemoData, setUseDemoData] = useState<boolean>(() => autoUseDemoData);
+  const effectiveUseDemoData = useDemoData;
   const scopedQuestionScanProgress = useMemo(() => {
     if (!questionScanProgress) return null;
     return doesQuestionProgressMatchSlug(String(questionScanProgress.slug || ''), reportProgressSlug)
@@ -1373,7 +1369,7 @@ export default function PolisReport({
   );
   const autoUseDemoDataSignatureRef = useRef<string>(`${activeReportSlug}|${autoUseDemoData ? '1' : '0'}`);
   const precomputedDemoClusterState = useMemo<PrecomputedDemoClusterState | null>(() => {
-    if (!useDemoData) return null;
+    if (!effectiveUseDemoData) return null;
     return buildPrecomputedDemoClusterState(activeDemoData);
   }, [activeDemoData, effectiveUseDemoData]);
 
@@ -1591,7 +1587,7 @@ export default function PolisReport({
   const shouldUsePrecomputedDemoClusters = !!(
     precomputedDemoClusterState
     && isDemoSessionSlug(activeReportSlug)
-    && useDemoData
+    && effectiveUseDemoData
     && activeDemoData === DEFAULT_POLIS_DEMO_DATA
     && embeddingChoice === 'POLIS'
     && manualClusterCountValue === null
@@ -1691,7 +1687,7 @@ export default function PolisReport({
     activeClusterCount,
     activeRepQuestions,
     embeddingChoice,
-    useDemoData,
+    useDemoData: effectiveUseDemoData,
     questionResponsesNonce,
     questionPrompts,
     allQuestions,
@@ -1700,7 +1696,7 @@ export default function PolisReport({
     activeClusterCount,
     activeRepQuestions,
     embeddingChoice,
-    useDemoData,
+    effectiveUseDemoData,
     questionResponsesNonce,
     questionPrompts,
     allQuestions,
@@ -3453,8 +3449,10 @@ export default function PolisReport({
               <input
                 type="checkbox"
                 data-testid={E2E_TESTIDS.POLIS_DEMO_DATA_TOGGLE}
-                checked={useDemoData}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUseDemoData(e.target.checked)}
+                checked={effectiveUseDemoData}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                  setUseDemoData(e.target.checked);
+                }}
                 className={styles.demoToggleCheckbox}
               />
               Demo Data
