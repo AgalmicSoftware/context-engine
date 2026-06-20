@@ -65,6 +65,24 @@ describe('sbtListSessionBindingHelpers', () => {
       isListModeScopeEnabled: true,
       resolveConcreteSessionBindingSlug: () => 'beta',
     })).toBe('beta');
+    expect(resolveSbtListItemSessionSlug({
+      slug: 'demo',
+      sbtInfo: { name: 'Discovered Demo SBT' },
+    }, {
+      allSessionsMode: true,
+      isListModeScopeEnabled: true,
+      resolveConcreteSessionBindingSlug: () => null,
+    })).toBe(SBT_LIST_NO_SESSION_UNIVERSE_SLUG);
+    expect(resolveSbtListItemSessionSlug({
+      sessionSlug: '',
+      sessionSlugExplicit: true,
+      slug: 'demo',
+      sbtInfo: { name: 'Explicit No Session SBT' },
+    }, {
+      allSessionsMode: true,
+      isListModeScopeEnabled: true,
+      resolveConcreteSessionBindingSlug: () => null,
+    })).toBe(SBT_LIST_NO_SESSION_UNIVERSE_SLUG);
     expect(resolveSbtListItemSessionSlug({}, {
       allSessionsMode: false,
       listSlug: 'fallback',

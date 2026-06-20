@@ -384,13 +384,11 @@ describe('SBTPage metadata display', () => {
     expect(sbtImage.props.src).toBe(defaultSbtImage);
   });
 
-  it('falls back to the next Arweave gateway when the preferred image URL fails', () => {
+  it('falls back to the default badge when the preferred Arweave image URL fails', () => {
     const txId = 'DqYBh1qm9GvaTOGkF5R7abnLoB3OPiXNNBcTsYPtlRc';
-    const canonicalArweaveGateway = 'https://arweave.net'; // intentional: real URL - tests allowlist enforcement
-    const preferredGateway = 'https://ar-io.dev'; // intentional: real URL - verifies production gateway fallback order
+    const preferredGateway = 'https://arweave.net'; // intentional: real URL - verifies production gateway fallback order
     const arIoSubdomainGateway = 'https://b2tadb22u32gxwsm4gsbpfd3ng44xia5zy7cltjuc4j3da7nsulq.ar-io.dev'; // intentional: real URL - verifies AR.IO subdomain parsing
     globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
-    globalThis.CE_ARWEAVE_AR_IO_URL = preferredGateway;
     const subject = createSubject({
       SBTAddress: '0x00000000000000000000000000000000000000a1',
     });
@@ -427,7 +425,7 @@ describe('SBTPage metadata display', () => {
     );
 
     expect(sbtImage).toBeTruthy();
-    expect(sbtImage.props.src).toBe(`${canonicalArweaveGateway}/${txId}`);
+    expect(sbtImage.props.src).toBe(defaultSbtImage);
   });
 
   it('returns N/A for zero/invalid actor addresses', () => {

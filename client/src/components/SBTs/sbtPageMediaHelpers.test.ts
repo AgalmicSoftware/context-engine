@@ -142,7 +142,7 @@ describe('sbtPageMediaHelpers', () => {
     });
   });
 
-  it('falls back to the default image after the AR.IO-only image candidate fails', () => {
+  it('falls back to the default image after the preferred Arweave image candidate fails', () => {
     const txId = 'DqYBh1qm9GvaTOGkF5R7abnLoB3OPiXNNBcTsYPtlRc';
     arweaveGlobals.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
     arweaveGlobals.CE_ARWEAVE_AR_IO_URL = 'https://ar-io.dev';

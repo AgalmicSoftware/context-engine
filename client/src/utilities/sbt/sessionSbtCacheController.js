@@ -66,32 +66,84 @@ export const createSessionSbtCacheController = (host = {}) => {
     }
     if (typeof cb === 'function') cb();
   };
-  const dgRead = (...args) => (typeof host.dgRead === 'function' ? host.dgRead(...args) : null);
-  const dgWrite = (...args) => (typeof host.dgWrite === 'function' ? host.dgWrite(...args) : null);
-  const writeSbtCache = (sessionSlug, value) => {
-    const envelope = buildSessionSbtCacheWriteEnvelope({ sessionSlug, value });
-    return dgWrite(envelope.cacheName, envelope.sessionSlug, envelope.value);
-  };
-  const getActiveSessionSlug = () =>
-    String(typeof host.getActiveSessionSlug === 'function' ? host.getActiveSessionSlug() || '' : '');
-  const getSessionCfg = (slug) => (typeof host.getSessionCfg === 'function' ? host.getSessionCfg(slug) : null);
-  const getSessionBlockWindowRef = (slugIn) => {
-    const slug = normalizeSessionSlug(slugIn || '');
-    const cfg = getSessionCfg(slug);
-    if (!cfg || typeof cfg !== 'object') return slug;
-    // Regression guard: chain scans need the resolved display/registry merge;
-    // reducing it back to a slug drops demo block limits in strict mode.
+  const dgRead = (...args) => (
+    typeof host.dgRead === 'function' ? host.dgRead(...args) : null
+  );
+  const dgWrite = (...args) => (
+    typeof host.dgWrite === 'function' ? host.dgWrite(...args) : null
+  );
+  const getActiveSessionSlug = () => String(
+    typeof host.getActiveSessionSlug === 'function' ? host.getActiveSessionSlug() || '' : ''
+  );
+  const getSessionCfg = (slug) => (
+    typeof host.getSessionCfg === 'function' ? host.getSessionCfg(slug) : null
+  );
+  const getSessionChainId = (slug) => (
+    typeof host.getSessionChainId === 'function' ? host.getSessionChainId(slug) : null
+  );
+  const readSbtSessionBindingSource = (source = null) => {
+    if (!source || typeof source !== 'object') return null;
+    if (!Object.prototype.hasOwnProperty.call(source, 'sessionSlug')) return null;
+    const hasExplicitFlag = Object.prototype.hasOwnProperty.call(source, 'sessionSlugExplicit');
+    const explicit = hasExplicitFlag ? source.sessionSlugExplicit === true : true;
     return {
-      ...cfg,
-      slug: normalizeSessionSlug(cfg.slug || slug),
-      ...(cfg.blockLimits && typeof cfg.blockLimits === 'object' ? { blockLimits: { ...cfg.blockLimits } } : {}),
+      slug: normalizeSessionSlug(source.sessionSlug || ''),
+      explicit,
+      hasExplicitFlag,
     };
   };
-  const getSessionChainId = (slug) =>
-    typeof host.getSessionChainId === 'function' ? host.getSessionChainId(slug) : null;
-  const getSessionScanScope = () =>
-    String(typeof host.getSessionScanScope === 'function' ? host.getSessionScanScope() || '' : '');
-  const getSessionScanScopeContext = (scope) =>
+  const withSessionScopedSbtCacheBinding = (entry = {}, slugIn = '') => {
+    const normalizedSlug = normalizeSessionSlug(slugIn || '');
+    const record = entry && typeof entry === 'object' ? entry : {};
+    const info = record.sbtInfo && typeof record.sbtInfo === 'object' ? record.sbtInfo : null;
+    const infoBinding = readSbtSessionBindingSource(info);
+    const recordBinding = readSbtSessionBindingSource(record);
+    let bindingSlug = normalizedSlug;
+    let bindingExplicit = false;
+    let includeExplicitFlag = true;
+
+    if (infoBinding?.explicit) {
+      bindingSlug = infoBinding.slug;
+      bindingExplicit = true;
+      includeExplicitFlag = infoBinding.hasExplicitFlag;
+    } else if (infoBinding?.hasExplicitFlag) {
+      // Fresh metadata that explicitly says the binding is inferred must win over
+      // stale cache records that previously promoted bucket membership to explicit.
+      bindingSlug = normalizedSlug;
+      bindingExplicit = false;
+      includeExplicitFlag = true;
+    } else if (recordBinding?.explicit) {
+      bindingSlug = recordBinding.slug;
+      bindingExplicit = true;
+      includeExplicitFlag = recordBinding.hasExplicitFlag;
+    }
+
+    const sessionBindingPatch = bindingExplicit
+      ? {
+        sessionSlug: bindingSlug,
+        ...(includeExplicitFlag ? { sessionSlugExplicit: true } : {}),
+      }
+      : {
+        sessionSlug: bindingSlug,
+        sessionSlugExplicit: false,
+      };
+
+    return {
+      ...record,
+      slug: normalizedSlug,
+      ...sessionBindingPatch,
+      sbtInfo: info
+        ? {
+          ...info,
+          ...sessionBindingPatch,
+        }
+        : record.sbtInfo,
+    };
+  };
+  const getSessionScanScope = () => String(
+    typeof host.getSessionScanScope === 'function' ? host.getSessionScanScope() || '' : ''
+  );
+  const getSessionScanScopeContext = (scope) => (
     typeof host.getSessionScanScopeContext === 'function'
       ? host.getSessionScanScopeContext(scope)
       : { scope: String(scope || ''), list: [] };
@@ -281,7 +333,34 @@ export const createSessionSbtCacheController = (host = {}) => {
         let netCache = cache[networkID];
 
         const scannedUpTo = Number(netCache.lastBlock) || 0;
-        const needsHydration = (info) => needsSbtListMetadataHydration(info, hasCoreSbtMetadata);
+        const hasListVisibleTokenUriMetadata = (info) => {
+          if (!info || typeof info !== 'object') return false;
+          if (info.tokenUriMetadataFetched === true) return true;
+          const hasText = (value) => value !== undefined && value !== null && String(value).trim() !== '';
+          const hasItems = (value) => Array.isArray(value) && value.length > 0;
+          const encryptedFields = info.encryptedFields && typeof info.encryptedFields === 'object'
+            ? info.encryptedFields
+            : {};
+          return (
+            hasText(info.description) ||
+            hasText(info.image) ||
+            hasText(info.descriptionEncrypted) ||
+            hasText(info.encryptedDescription) ||
+            hasText(info.imageEncrypted) ||
+            hasText(info.encryptedImage) ||
+            hasText(encryptedFields.description) ||
+            hasText(encryptedFields.image) ||
+            hasItems(info.tags) ||
+            hasItems(info.documentURLs) ||
+            hasItems(info.documentUrls) ||
+            hasItems(info.docURLs) ||
+            hasItems(info.documents)
+          );
+        };
+
+        const needsHydration = (info) => {
+          return !hasCoreSbtMetadata(info) || !hasListVisibleTokenUriMetadata(info);
+        };
 
         const existingHydrationTargets = Object.entries(netCache.sbtList || {})
           .map(([addrLower, entry]) => String(entry?.sbtAddress || addrLower || '').trim())
@@ -428,18 +507,13 @@ export const createSessionSbtCacheController = (host = {}) => {
                   unresolvedHydrationAddressSet.delete(lower);
                 }
 
-                netCache.sbtList[lower] = hydrateSbtActivityCacheEntry(
-                  withSessionScopedSbtCacheBinding(
-                    {
-                      ...freshExisting,
-                      sbtAddress: addr,
-                      sbtInfo: storedInfo,
-                      slug,
-                      blockNumber: refreshed ? baseTo : freshExisting.blockNumber || 0,
-                    },
-                    slug,
-                  ),
-                );
+                netCache.sbtList[lower] = withSessionScopedSbtCacheBinding({
+                  ...freshExisting,
+                  sbtAddress: addr,
+                  sbtInfo: sbtInfo || freshExisting.sbtInfo || null,
+                  slug,
+                  blockNumber: refreshed ? baseTo : (freshExisting.blockNumber || 0),
+                }, slug);
               }
 
               await writeSbtCache(slug, cache);
@@ -495,10 +569,20 @@ export const createSessionSbtCacheController = (host = {}) => {
               onProgress: (progress) => {
                 const totalBlocks = Number(progress?.totalBlocks || 0);
                 const scannedBlocks = Number(progress?.scannedBlocks || 0);
-                const ratio = totalBlocks > 0 ? Math.max(0, Math.min(1, scannedBlocks / totalBlocks)) : 1;
-                updateLightDiscoveryProgress(Math.floor(ratio * SBT_LIGHT_DISCOVERY_SCAN_UNITS));
-                const percent = totalBlocks > 0 ? Math.max(0, Math.min(100, Math.floor(ratio * 100))) : 100;
-                if (percent === 100 || lastLoggedDiscoveryPercent < 0 || percent >= lastLoggedDiscoveryPercent + 10) {
+                const ratio = totalBlocks > 0
+                  ? Math.max(0, Math.min(1, scannedBlocks / totalBlocks))
+                  : 1;
+                updateLightDiscoveryProgress(
+                  Math.floor(ratio * SBT_LIGHT_DISCOVERY_SCAN_UNITS)
+                );
+                const percent = totalBlocks > 0
+                  ? Math.max(0, Math.min(100, Math.floor(ratio * 100)))
+                  : 100;
+                if (
+                  percent === 100 ||
+                  lastLoggedDiscoveryPercent < 0 ||
+                  percent >= (lastLoggedDiscoveryPercent + 10)
+                ) {
                   lastLoggedDiscoveryPercent = percent;
                   emitMainSiteSbtDebug('info', '[ensureLightSbtDiscovery] discovery progress', {
                     slug,
@@ -516,7 +600,11 @@ export const createSessionSbtCacheController = (host = {}) => {
                 enqueueHydrationAddresses(addresses);
               },
             };
-            addrs = await contractScripts.getAllSbtAddressesCached('none', discoveryGroupRef, discoveryOptions);
+            addrs = await contractScripts.getAllSbtAddressesCached(
+              'none',
+              discoveryGroupRef,
+              discoveryOptions
+            );
             emitMainSiteSbtDebug('info', '[ensureLightSbtDiscovery] discovered raw SBT universe', {
               slug,
               networkID,

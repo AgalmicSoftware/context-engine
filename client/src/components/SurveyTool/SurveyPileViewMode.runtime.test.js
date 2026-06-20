@@ -214,23 +214,21 @@ describe('SurveyPileViewMode runtime surface', () => {
       isSBTCacheReady: false,
       isSurveyCacheReady: false,
     });
-    const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
-    const visibleList = [{ id: 'q1', type: 'freeform', prompt: 'Q1' }];
 
     expect(await screen.findByText('Canonical demo question')).toBeInTheDocument();
   });
 
   it('renders option-bearing poll aliases as pile multichoice inputs', async () => {
     renderPile({
-      questionPool: [
-        {
-          id: 'poll-q1',
-          type: 'poll',
-          prompt: 'Which capability matters most?',
-          choices: [{ label: 'Cross-site graph' }, { text: 'Session memory' }],
-        },
-      ],
+      questionPool: [{
+        id: 'poll-q1',
+        type: 'poll',
+        prompt: 'Which capability matters most?',
+        choices: [
+          { label: 'Cross-site graph' },
+          { text: 'Session memory' },
+        ],
+      }],
       cacheHasLoaded: false,
       isQuestionCacheReady: true,
       isResponsesCacheReady: false,
@@ -1059,8 +1057,6 @@ describe('SurveyPileViewMode runtime surface', () => {
       isSurveyCacheReady: false,
       questionPool: [earlyQuestion],
     });
-    const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
 
     expect(screen.getByText('Early visible question')).toBeInTheDocument();
     expect(container.querySelector('.pileLoadingProgressList')).toBeNull();

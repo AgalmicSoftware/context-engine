@@ -113,13 +113,10 @@ class SurveyComponent extends Component<SurveyPageProps> {
             refreshQuestionMetadata={this.props.refreshQuestionMetadata}
             refreshQuestionResponses={this.props.refreshQuestionResponses}
 
-            /* ---- org/session customisation ---- */
-            defaultTags={this.props.defaultTags}
-            defaultFilterState={this.props.defaultFilterState}
-            sessionInfo={this.props.sessionInfo}
-            sessionName={this.props.sessionName}
-            defaultFeaturedSBTs={this.props.defaultFeaturedSBTs}
-            onViewAllClick={this.props.onViewAllClick}
+              /* ---- reactivity nonce ---- */
+              questionResponsesNonce={this.props.questionResponsesNonce}
+              questionScanProgress={this.props.questionScanProgress}
+              questionPool={this.props.questionPool}
 
             hideEmbeddedDebugUi={this.props.hideEmbeddedDebugUi}
             onResultsModalClose={this.props.onResultsModalClose}

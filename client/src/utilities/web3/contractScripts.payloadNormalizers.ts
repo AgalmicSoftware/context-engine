@@ -33,8 +33,15 @@ const readOptionLabel = (value: unknown): string => {
   if (typeof value === 'string') return value.trim();
   if (value == null) return '';
   if (typeof value !== 'object') return String(value).trim();
-  const record = asPayloadRecord(value) || {};
-  return String(record.label ?? record.text ?? record.name ?? record.value ?? record.id ?? '').trim();
+  const record = value as AnyRecord;
+  return String(
+    record.label ??
+    record.text ??
+    record.name ??
+    record.value ??
+    record.id ??
+    ''
+  ).trim();
 };
 
 export const coerceQuestionOptionLabels = (value: unknown): string[] => {
@@ -53,7 +60,7 @@ export const coerceQuestionOptionLabels = (value: unknown): string[] => {
     }
     rawOptions = [trimmed];
   } else if (value && typeof value === 'object') {
-    rawOptions = Object.values(value as PayloadRecord);
+    rawOptions = Object.values(value as AnyRecord);
   }
 
   const seen = new Set<string>();
@@ -67,7 +74,9 @@ export const coerceQuestionOptionLabels = (value: unknown): string[] => {
     });
 };
 
-export const normalizeConvictionImportance = <T extends PayloadRecord | null | undefined>(responseJson: T): T => {
+export const normalizeConvictionImportance = <T extends AnyRecord | null | undefined>(
+  responseJson: T
+): T => {
   if (!responseJson || typeof responseJson !== 'object') return responseJson;
   const normalize = (obj: PayloadRecord | null | undefined): void => {
     if (!obj || typeof obj !== 'object') return;
@@ -93,21 +102,19 @@ export const normalizeQuestionFlags = (questionData: PayloadRecord | null | unde
   }
 
   const existingOptions = coerceQuestionOptionLabels(questionData.options);
-  const config = asPayloadRecord(questionData.config);
-  const payload = asPayloadRecord(questionData.payload);
-  const data = asPayloadRecord(questionData.data);
-  const optionAliases =
+  const optionAliases = (
     existingOptions.length > 0
       ? questionData.options
-      : (questionData.choices ??
+      : questionData.choices ??
         questionData.answers ??
         questionData.choiceOptions ??
-        config?.options ??
-        config?.choices ??
-        payload?.options ??
-        data?.options ??
+        questionData.config?.options ??
+        questionData.config?.choices ??
+        questionData.payload?.options ??
+        questionData.data?.options ??
         questionData.optionsMap ??
-        questionData.options_by_id);
+        questionData.options_by_id
+  );
   const normalizedOptions = coerceQuestionOptionLabels(optionAliases);
   if (normalizedOptions.length > 0) {
     questionData.options = normalizedOptions;

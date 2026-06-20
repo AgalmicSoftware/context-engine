@@ -108,4 +108,43 @@ describe('sbtListRenderBucketHelpers', () => {
     expect(getSessionListsForSlug).toHaveBeenNthCalledWith(1, 'alpha');
     expect(getSessionListsForSlug).toHaveBeenNthCalledWith(2, 'beta');
   });
+
+  it('keeps list-mode cache items scoped by discovery slug in the selected session bucket', () => {
+    const demoAddress = '0x0000000000000000000000000000000000000d01';
+
+    const buckets = buildSbtListRenderBuckets({
+      allSessionsMode: true,
+      excludePasswordLocked: false,
+      getSessionListsForSlug: () => ({
+        featured_SBTs_LIST: [],
+        ignored_SBTs_LIST: [],
+      }),
+      isListModeScopeEnabled: true,
+      isMintingLive: (sbt) => sbt.sbtInfo?.mintingEndTime === 0,
+      isPasswordLocked: () => false,
+      listSlug: 'demo',
+      resolveSbtSessionSlug: (sbt) => resolveSbtListItemSessionSlug(sbt, {
+        allSessionsMode: true,
+        isListModeScopeEnabled: true,
+      }),
+      sbtList: [
+        {
+          sbtAddress: demoAddress,
+          slug: 'demo',
+          sessionSlug: 'demo',
+          sessionSlugExplicit: true,
+          sbtInfo: {
+            name: 'Discovered Demo SBT',
+            mintingEndTime: 0,
+            sessionSlug: 'demo',
+            sessionSlugExplicit: true,
+          },
+        },
+      ],
+      sectionSessionSlugs: ['demo'],
+    });
+
+    expect(buckets.mintingLiveList.map((sbt) => sbt.sbtAddress)).toEqual([demoAddress]);
+    expect(buckets.baseFilteredList.map((sbt) => sbt.sbtAddress)).toEqual([demoAddress]);
+  });
 });

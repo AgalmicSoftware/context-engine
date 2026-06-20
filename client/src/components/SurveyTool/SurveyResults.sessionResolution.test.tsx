@@ -29,8 +29,12 @@ import * as contractScriptsModule from '../../utilities/web3/contractScripts.js'
 import * as sbtDisplayNameUtils from '../../utilities/sbt/sbtDisplayNames.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import * as sessionScanScopeModule from '../../utilities/session/sessionScanScope.js';
-import { resolveSurveyResultsQuestionReadScope } from './surveyResultsSessionResolution.js';
-import { sbtBasePath } from '../../utilities/ui/terminology.js';
+import {
+  resolveSurveyResultsQuestionReadScope,
+  resolveSurveyResultsSessionContext,
+} from './surveyResultsSessionResolution';
+import { renderSurveyResults } from './surveyResultsTestHarness';
+import { getPolisDemoQuestionPool } from './surveyPolisDemoQuestionPool';
 
 type TreeNode = any;
 type TreePredicate = (node: TreeNode) => boolean;
@@ -131,10 +135,116 @@ const findElement = (node: TreeNode, predicate: TreePredicate): TreeNode | null 
       }
       continue;
     }
-    if (typeof current !== 'object') continue;
-    if (predicate(current)) return current;
-    const children = current?.props?.children;
-    if (children !== undefined) stack.push(children);
+    if (namespace === 'questionsCache') {
+      return lookupSlug(questionsBySlug, slug, {});
+    }
+    if (namespace === 'surveysCache') {
+      return lookupSlug(surveysBySlug, slug, {});
+    }
+    return null;
+  });
+  jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(undefined);
+  jest.spyOn(cacheScripts, 'listNamespaceEntriesSync').mockImplementation((namespace: any) => {
+    if (namespace !== 'surveysCache') return [];
+    return Object.keys(surveysBySlug).map((slug) => ({
+      slug,
+      value: surveysBySlug[slug],
+    }));
+  });
+  unsubscribeCacheUpdates = jest.fn();
+  cacheUpdateListener = null;
+  jest.spyOn(cacheScripts, 'subscribeCacheUpdates').mockImplementation((listener: any) => {
+    cacheUpdateListener = listener;
+    return unsubscribeCacheUpdates;
+  });
+  jest.spyOn(contractScriptsDefault as any, 'getLatestBlockNumber').mockResolvedValue(0);
+};
+
+const renderQuestionResults = (
+  props: Record<string, any> = {},
+  route = '/questions/results'
+) => renderSurveyResults({
+  isOpen: true,
+  isQuestionCacheReady: true,
+  isResponsesCacheReady: true,
+  isSBTCacheReady: true,
+  network: { id: Number(NETWORK_ID) },
+  networkChainId: Number(NETWORK_ID),
+  preventUrlChange: true,
+  provider: {},
+  viewMode: 'questions',
+  ...props,
+}, { route });
+
+const renderSurveyModeResults = (
+  props: Record<string, any> = {},
+  route = '/'
+) => renderSurveyResults({
+  isOpen: true,
+  isQuestionCacheReady: true,
+  isResponsesCacheReady: true,
+  isSBTCacheReady: true,
+  isSurveyCacheReady: true,
+  network: { id: Number(NETWORK_ID) },
+  networkChainId: Number(NETWORK_ID),
+  preventUrlChange: true,
+  provider: {},
+  viewMode: 'survey',
+  ...props,
+}, { route });
+
+const waitForPrompt = async (prompt: string): Promise<void> => {
+  await waitFor(() => {
+    expect(screen.getAllByText(prompt).length).toBeGreaterThan(0);
+  });
+};
+
+const expectPromptAbsent = (prompt: string): void => {
+  expect(screen.queryAllByText(prompt)).toHaveLength(0);
+};
+
+const getFilterSummaryText = (): string => (
+  document.querySelector('[class*="filterSummaryText"]')?.textContent || ''
+);
+
+const expectQuestionResponseCounts = (questions: number, responses: number): void => {
+  const text = getFilterSummaryText();
+  expect(text).toMatch(new RegExp(`Questions:\\s*${questions}`));
+  expect(text).toMatch(new RegExp(`Responses:\\s*${responses}`));
+};
+
+const rerenderHarness = async (
+  view: ReturnType<typeof renderQuestionResults>,
+  props: Record<string, any>
+): Promise<void> => {
+  await act(async () => {
+    view.rerenderSurveyResults(props);
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+};
+
+const getLatestQuestionFilterProps = (): Record<string, any> => {
+  const calls = mockQuestionFilter.mock.calls;
+  expect(calls.length).toBeGreaterThan(0);
+  return calls[calls.length - 1][0];
+};
+
+const getLatestPolisReportProps = (): Record<string, any> => {
+  const calls = mockPolisReport.mock.calls;
+  expect(calls.length).toBeGreaterThan(0);
+  return calls[calls.length - 1][0];
+};
+
+const collectSurveyLinks = (): string[] => (
+  Array.from(document.querySelectorAll('a[href^="/survey/"]'))
+    .map((link) => link.getAttribute('href') || '')
+);
+
+const switchToIndividualsView = async (): Promise<void> => {
+  const viewSwitch = screen.queryAllByRole('switch', { name: VIEW_MODE_SWITCH_NAME })[0];
+  if (viewSwitch?.getAttribute('aria-checked') === 'true') {
+    fireEvent.click(viewSwitch);
   }
   return null;
 };
@@ -471,6 +581,187 @@ describe('SurveyResults session resolution', () => {
     } finally {
       window.history.replaceState({}, '', priorUrl);
     }
+  });
+
+  it('keeps empty built-in demo raw results from inflating with fixture responses', async () => {
+    const demoQuestion = getPolisDemoQuestionPool()[0];
+    expect(demoQuestion?.id).toBeTruthy();
+    const priorUrl = window.location.href;
+    window.history.replaceState({}, '', '/questions/results?session=demo');
+    try {
+      seedCacheEnvironment({
+        questionsBySlug: {
+          demo: buildQuestionCache({
+            questions: {
+              [demoQuestion.id]: {
+                ...demoQuestion,
+                id: demoQuestion.id,
+                prompt: demoQuestion.prompt,
+                type: 'binary',
+                sessionSlug: 'demo',
+                sessionSlugExplicit: true,
+                source: 'demo-polis-data',
+              },
+            },
+            questionResponses: {
+              [demoQuestion.id]: {
+                'demo-participant-1': {
+                  type: 'binary',
+                  questionId: demoQuestion.id,
+                  questionID: demoQuestion.id,
+                  prompt: demoQuestion.prompt,
+                  answer: { value: 'Agree', encrypted: false },
+                  source: 'demo-polis-data',
+                },
+              },
+            },
+          }),
+        },
+      });
+      jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
+      jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['demo']);
+
+      renderQuestionResults({
+        sessionSlug: 'demo',
+        activeSessionSlug: 'demo',
+        sessionSlugPinned: true,
+        isOpen: true,
+        viewMode: 'questions',
+      }, '/questions/results?session=demo');
+
+      await waitFor(() => {
+        const text = getFilterSummaryText();
+        expect(text).toMatch(/Questions:\s*0/);
+        expect(text).toMatch(/Responses:\s*0/);
+      });
+      const latestFilterProps = getLatestQuestionFilterProps();
+      expect(Object.keys(latestFilterProps.questions || {})).toHaveLength(0);
+      expect(Object.keys(latestFilterProps.questionResponses || {})).toHaveLength(0);
+
+      fireEvent.click(screen.getByTestId('ce-surveyresults-demo-view-report'));
+      await waitFor(() => {
+        const reportProps = getLatestPolisReportProps();
+        expect(Object.keys(reportProps.questionResponses || {})).toHaveLength(0);
+      });
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+
+  it('hydrates live built-in demo question responses from the canonical source bucket', async () => {
+    const demoQuestion = getPolisDemoQuestionPool()[0];
+    expect(demoQuestion?.id).toBeTruthy();
+    seedCacheEnvironment({
+      questionsBySlug: {
+        '': buildQuestionCache({
+          questions: {},
+          questionResponses: {
+            [demoQuestion.id]: {
+              [RESPONDER_ONE]: {
+                type: 'binary',
+                questionId: demoQuestion.id,
+                answer: { value: 'Agree', encrypted: false },
+              },
+            },
+          },
+        }),
+        demo: buildQuestionCache(),
+      },
+    });
+    jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
+    jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['demo']);
+
+    renderQuestionResults({
+      sessionSlug: 'demo',
+      activeSessionSlug: 'demo',
+      preventUrlChange: false,
+      sessionSlugPinned: true,
+      isOpen: true,
+      viewMode: 'questions',
+    }, '/questions/results?session=demo');
+
+    await waitFor(() => {
+      expectQuestionResponseCounts(1, 1);
+    });
+    const latestFilterProps = getLatestQuestionFilterProps();
+    expect(latestFilterProps.questions).toEqual([
+      expect.objectContaining({
+        id: demoQuestion.id,
+        prompt: demoQuestion.prompt,
+      }),
+    ]);
+    expect(latestFilterProps.questionResponses?.[demoQuestion.id]).toEqual({
+      [RESPONDER_ONE]: expect.objectContaining({
+        answer: { value: 'Agree', encrypted: false },
+      }),
+    });
+  });
+
+  it('uses built-in demo metadata for live responses when on-chain question metadata is still pending', async () => {
+    const demoQuestion = getPolisDemoQuestionPool()[0];
+    expect(demoQuestion?.id).toBeTruthy();
+    seedCacheEnvironment({
+      questionsBySlug: {
+        demo: buildQuestionCache({
+          questions: {
+            [demoQuestion.id]: {
+              id: demoQuestion.id,
+              prompt: '[encrypted]',
+              type: 'binary',
+              __ceQuestionMetadataPending: true,
+            },
+          },
+          questionResponses: {
+            [demoQuestion.id]: {
+              [RESPONDER_ONE]: {
+                type: 'binary',
+                questionId: demoQuestion.id,
+                prompt: demoQuestion.prompt,
+                answer: { value: 'Agree', encrypted: false },
+              },
+            },
+          },
+        }),
+      },
+    });
+    jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
+    jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['demo']);
+
+    renderQuestionResults({
+      sessionSlug: 'demo',
+      activeSessionSlug: 'demo',
+      preventUrlChange: false,
+      sessionSlugPinned: true,
+      isOpen: true,
+      viewMode: 'questions',
+    }, '/questions/results?session=demo');
+
+    await waitFor(() => {
+      expectQuestionResponseCounts(1, 1);
+    });
+    const latestFilterProps = getLatestQuestionFilterProps();
+    expect(latestFilterProps.questions).toEqual([
+      expect.objectContaining({
+        id: demoQuestion.id,
+        prompt: demoQuestion.prompt,
+      }),
+    ]);
+
+    fireEvent.click(screen.getByTestId('ce-surveyresults-demo-view-report'));
+    await waitFor(() => {
+      const reportProps = getLatestPolisReportProps();
+      const reportRows = reportProps.questionResponses?.[demoQuestion.id] || [];
+      expect(reportRows).toHaveLength(1);
+      expect(reportRows[0]).toEqual(expect.objectContaining({
+        responder: RESPONDER_ONE,
+        questionId: demoQuestion.id,
+      }));
+      const parsedResponse = JSON.parse(String(reportRows[0].response || '{}'));
+      expect(parsedResponse).toEqual(expect.objectContaining({
+        prompt: demoQuestion.prompt,
+        answer: { value: 'Agree', encrypted: false },
+      }));
+    });
   });
 
   it('keeps embedded pinned session results on legacy bucket-backed questions while excluding explicit cross-session leaks', async () => {

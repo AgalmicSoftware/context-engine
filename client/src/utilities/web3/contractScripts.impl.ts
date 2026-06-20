@@ -635,7 +635,15 @@ const { recordTerminalArweaveInvalidFailure, downloadArweaveTextForGroup } = cre
   buildArweaveDebugContext: buildArweaveDebugContext as any,
 });
 
-const resolveStorageSessionSlug = (groupKeyOrCfg, cfg = null) => {
+const SBT_TOKENURI_METADATA_GATEWAYS = Object.freeze([
+  'https://arweave.net',
+  'https://gateway.irys.xyz',
+  'https://g8way.io',
+  'https://permagate.io',
+  'https://ar-io.dev',
+]);
+
+const resolveStorageSessionSlug = (groupKeyOrCfg: any, cfg: any = null) => {
   const fromCfg = normalizeSessionSlug(cfg?.slug || cfg?.sessionSlug || '');
   if (fromCfg) return fromCfg;
   if (typeof groupKeyOrCfg === 'string') return normalizeSessionSlug(groupKeyOrCfg);
@@ -2786,6 +2794,14 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
               responder: responderLower,
               id: idB32,
             }),
+            // Response reports should not be held hostage by the ar.io-only
+            // troubleshooting path. The on-chain pointer is immutable, so the
+            // regular gateway fanout is safe and prevents a single ar.io outage
+            // from making live response rows disappear.
+            directToArIo: false,
+            gatewayTimeoutMs: Number.isFinite(Number(opts?.arweaveGatewayTimeoutMs))
+              ? Number(opts.arweaveGatewayTimeoutMs)
+              : 4500,
             forceRetry: forceArweaveFetch,
             cacheBypass: forceArweaveFetch,
             bypassFailureCache: forceArweaveFetch,
@@ -3885,9 +3901,9 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
                 txId: tokenUriArweaveTxId,
                 groupKeyOrCfg,
                 arweaveOpts: {
-                  bypassFailureCache: true,
                   directToArIo: false,
-                  gateways: ARWEAVE_DEFAULT_GATEWAY_CANDIDATES,
+                  gateways: SBT_TOKENURI_METADATA_GATEWAYS,
+                  bypassFailureCache: true,
                   shortCircuitNotFound: true,
                   retries: 0,
                   gatewayTimeoutMs: Math.max(1000, SBT_TOKENURI_METADATA_TIMEOUT_MS - 500),
@@ -3922,6 +3938,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
             tokenUriMetadataTask.then((result) => {
               if (!tokenUriMetadataTimedOut && Object.keys(tokenUriOut).length > 0) {
                 Object.assign(out, tokenUriOut);
+                out.tokenUriMetadataFetched = true;
               }
               return result;
             }),
@@ -3940,6 +3957,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
           );
 
           if (!tokenUriMetadataTimedOut && json && typeof json === 'object') {
+            out.tokenUriMetadataFetched = true;
             const MASKED_SBT_FIELD_VALUE = '[encrypted]';
             const hasJsonField = (fieldKey) => Object.prototype.hasOwnProperty.call(json, fieldKey);
             const encryptedFields = isObj(json.encryptedFields) ? json.encryptedFields : null;
@@ -4041,6 +4059,8 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
               json.created_block
             );
             if (creationBlock !== undefined) out.creationBlock = creationBlock;
+          } else if (!tokenUriMetadataTimedOut) {
+            out.tokenUriMetadataFetched = true;
           }
         } catch (_) {}
       }

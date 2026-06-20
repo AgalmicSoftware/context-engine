@@ -388,7 +388,7 @@ describe('OnePageSession results routing', () => {
       });
 
       expect(scrollSpy).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
-      expect(window.location.pathname).toBe('/questions/results');
+      expect(window.location.pathname).toBe('/session/edge/questions/results');
       expect(window.location.search).toBe('?session=edge');
       expect(getFullCalls().slice(-2).map((props) => props.autoOpenResults)).toEqual([false, true]);
 
@@ -413,7 +413,7 @@ describe('OnePageSession results routing', () => {
       });
 
       expect(getFullCalls().slice(-2).map((props) => props.autoOpenResults)).toEqual([false, true]);
-      expect(window.location.pathname).toBe('/questions/results');
+      expect(window.location.pathname).toBe('/session/edge/questions/results');
       expect(window.location.search).toBe('?session=edge');
     } finally {
       window.HTMLElement.prototype.scrollIntoView = originalScrollIntoView;
@@ -454,7 +454,7 @@ describe('OnePageSession results routing', () => {
       await waitFor(() => {
         expect(screen.getByTestId('survey-page-full')).toBeInTheDocument();
       });
-      expect(window.location.pathname).toBe('/ce/questions/results');
+      expect(window.location.pathname).toBe('/ce/session/edge/questions/results');
       expect(window.location.search).toBe('?session=edge');
 
       act(() => {
@@ -514,7 +514,7 @@ describe('OnePageSession results routing', () => {
     try {
       window.history.replaceState({}, '', '/');
       const debateView = await openFullResults({ sessionSlug: 'DEBATE' });
-      expect(window.location.pathname).toBe('/questions/results');
+      expect(window.location.pathname).toBe('/session/DEBATE/questions/results');
       expect(window.location.search).toBe('?session=DEBATE');
       debateView.unmount();
 

@@ -104,7 +104,9 @@ const collectTreeText = (node: TestTreeNode): string => {
   return collectTreeText(node.props.children);
 };
 
-const treeTextIncludes = (node: TestTreeNode, text: string): boolean => collectTreeText(node).includes(text);
+const treeTextIncludes = (node: TestTreeNode, text: string): boolean => (
+  collectTreeText(node).includes(text)
+);
 
 const getElementChildren = (node: TestTreeNode): TestElementNode[] => {
   if (!isElementNode(node)) return [];
@@ -276,19 +278,17 @@ describe('surveyPileInteractionSurface', () => {
     const loadingSubhead = findNodeByClassName(tree, 'pileLoadingSubhead');
     const progressList = findNodeByClassName(tree, 'pileLoadingProgressList');
     const progressFillCount = countElements(tree, (node) => nodeHasClassName(node, 'pileLoadingProgressFill'));
-    const progressFill = findElement(tree, (node) =>
-      nodeHasClassName(node, 'pileLoadingProgressFill'),
-    ) as TestElementNode | null;
+    const progressFill = findElement(tree, (node) => (
+      nodeHasClassName(node, 'pileLoadingProgressFill')
+    )) as TestElementNode | null;
 
     expect(treeTextIncludes(loadingHeadline, 'Loading... 12s')).toBe(true);
     expect(treeHasText(loadingSubhead, 'Loading Metadata (3 / 5)')).toBe(true);
     expect(progressList).toBeNull();
     expect(progressFillCount).toBe(1);
-    expect(progressFill?.props?.style).toEqual(
-      expect.objectContaining({
-        width: '60%',
-      }),
-    );
+    expect(progressFill?.props?.style).toEqual(expect.objectContaining({
+      width: '60%',
+    }));
     expect(treeHasText(tree, 'Session')).toBe(false);
     expect(treeHasText(tree, 'Groups')).toBe(false);
     expect(treeHasText(tree, 'Questions')).toBe(false);
@@ -314,10 +314,9 @@ describe('surveyPileInteractionSurface', () => {
 
     const progressList = findNodeByClassName(tree, 'pileLoadingProgressList');
     const progressFillCount = countElements(tree, (node) => nodeHasClassName(node, 'pileLoadingProgressFill'));
-    const activeRowCount = countElements(
-      tree,
-      (node) => isElementNode(node) && node.props['data-progress-status'] === 'active',
-    );
+    const activeRowCount = countElements(tree, (node) => (
+      isElementNode(node) && node.props['data-progress-status'] === 'active'
+    ));
 
     expect(treeTextIncludes(tree, 'Loading... 101s')).toBe(true);
     expect(progressList).toBeNull();

@@ -266,7 +266,7 @@ import {
   writeQuestionsCache,
   writeSurveysCache,
   bumpSurveyPerfCounter,
-} from './surveyToolUtils';
+} from './surveyToolUtils.js';
 import {
   appendMissingAuthoritativePoolQuestions,
   filterQuestionsByAuthoritativePool,
@@ -1964,7 +1964,9 @@ export class QuestionsDashboard extends Component<any, any> {
       );
     } else if (questions.length === 0 && Array.isArray(this.props.questionPool)) {
       this.props.questionPool.forEach((entry: QuestionsDashboardQuestionRow) => {
-        const questionIdRaw = entry && entry.id != null && String(entry.id) !== '' ? entry.id : null;
+        const questionIdRaw = (entry && entry.id != null && String(entry.id) !== '')
+          ? entry.id
+          : null;
         if (!questionIdRaw) return;
         const questionIdLower = String(questionIdRaw).toLowerCase();
         if (BLOCKED_QUESTION_IDS_SET.has(questionIdLower)) return;

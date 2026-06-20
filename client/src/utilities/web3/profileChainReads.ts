@@ -171,13 +171,17 @@ type GetUserSBTsMinimalMethod = ((
   MemoizedFields<SbtListItem[]>;
 
 type ContractProfileDeps = {
-  resolveSession: (groupKeyOrCfg: GroupKeyOrCfg) => unknown;
+  resolveSession: (groupKeyOrCfg: GroupKeyOrCfg) => any;
   getReadProviderForGroup: (
     groupKeyOrCfg: GroupKeyOrCfg,
-    opts?: { contractKey?: string; skipGlobalPreferred?: boolean },
-  ) => ContractReadProvider;
-  CUSTOM_SBT_ABI: ethers.ContractInterface;
-  callWithRetry: <T>(operation: () => Promise<T>, operationName: string, context?: ContractProfileRecord) => Promise<T>;
+    opts?: { contractKey?: string; skipGlobalPreferred?: boolean }
+  ) => any;
+  CUSTOM_SBT_ABI: any;
+  callWithRetry: <T>(
+    operation: () => Promise<T>,
+    operationName: string,
+    context?: Record<string, unknown>
+  ) => Promise<T>;
   rpcLog: (...args: unknown[]) => void;
   isNonexistentTokenError: (error: unknown) => boolean;
   contractsLog: ContractsLogger;

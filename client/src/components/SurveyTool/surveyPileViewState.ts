@@ -1,6 +1,9 @@
 import type { ReactNode } from 'react';
 
-import { isQuestionPromptMasked, shouldShowPileFullLoadingState } from './surveyToolViewState.js';
+import {
+  isQuestionPromptMasked,
+  shouldShowPileFullLoadingState,
+} from './surveyToolViewState.js';
 
 export const NO_PENDING_PILE_SUBMIT_TEXT = 'No new or changed responses';
 
@@ -98,9 +101,10 @@ export const resolveEarlyVisiblePileQuestions = ({
 
   const normalizedQuestionPool = Array.isArray(questionPool) ? questionPool : [];
   if (normalizedQuestionPool.length === 0) return normalizedPileQuestions;
-  return normalizedQuestionPool.filter(
-    (question) => question?.id != null && !isQuestionPromptMasked(question as Record<string, unknown> | null),
-  );
+  return normalizedQuestionPool.filter((question) => (
+    question?.id != null &&
+    !isQuestionPromptMasked(question as Record<string, unknown> | null)
+  ));
 };
 
 export const shouldPreferPileGatedEmptyState = ({

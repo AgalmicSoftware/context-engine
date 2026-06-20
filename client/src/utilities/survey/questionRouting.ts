@@ -321,8 +321,9 @@ export const hasQuestionDecryption = (question: unknown): question is QuestionPa
   return !!(payload.promptDecrypted || payload.optionsDecrypted || payload.tagsDecrypted);
 };
 
-const hasNonEmptyQuestionOptions = (question: QuestionPayload | null | undefined): boolean =>
-  Array.isArray(question?.options) && question.options.length > 0;
+const hasNonEmptyQuestionOptions = (question: QuestionPayload | null | undefined): boolean => (
+  Array.isArray(question?.options) && question.options.length > 0
+);
 
 export const pickBetterQuestionPayload = (
   existingQuestion: QuestionPayload | null | undefined,

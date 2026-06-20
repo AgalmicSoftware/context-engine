@@ -638,7 +638,7 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
     expect(arweaveSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('leaves SBT tokenURI preflight policy to the arweave resolver', async () => {
+  it('uses gateway fanout for display-critical SBT tokenURI metadata', async () => {
     const rawTxId = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
     const stub = baseContractStub(rawTxId);
     stub.name.mockResolvedValue('Gateway First SBT');

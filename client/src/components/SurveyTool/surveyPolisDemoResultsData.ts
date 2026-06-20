@@ -9,8 +9,9 @@ import { buildPolisDemoQuestionPool } from './surveyPolisDemoQuestionPool.js';
 
 type UnknownRecord = Record<string, unknown>;
 
-const isRecord = (value: unknown): value is UnknownRecord =>
-  !!value && typeof value === 'object' && !Array.isArray(value);
+const isRecord = (value: unknown): value is UnknownRecord => (
+  !!value && typeof value === 'object' && !Array.isArray(value)
+);
 
 const readString = (value: unknown = ''): string => String(value || '').trim();
 
@@ -19,9 +20,13 @@ const readNumber = (value: unknown, fallback = 0): number => {
   return Number.isFinite(next) ? next : fallback;
 };
 
-const normalizeQuestionId = (value: unknown = ''): string => readString(value).toLowerCase();
+const normalizeQuestionId = (value: unknown = ''): string => (
+  readString(value).toLowerCase()
+);
 
-const normalizeResponderId = (value: unknown = ''): string => readString(value).toLowerCase();
+const normalizeResponderId = (value: unknown = ''): string => (
+  readString(value).toLowerCase()
+);
 
 const resolvePolisVoteAnswer = (vote: unknown): string | null => {
   if (vote === 1 || vote === '1') return 'Agree';
@@ -32,12 +37,15 @@ const resolvePolisVoteAnswer = (vote: unknown): string | null => {
 
 export const buildPolisDemoSurveyResultsNetworkData = (
   source: unknown = demoPolisData,
-  { sessionSlug = 'demo' }: { sessionSlug?: unknown } = {},
+  { sessionSlug = 'demo' }: { sessionSlug?: unknown } = {}
 ): SurveyResultsScopedQuestionNetworkData => {
   const normalizedSessionSlug = normalizeSessionSlug(sessionSlug || 'demo') || 'demo';
-  const comments = isRecord(source) && Array.isArray(source.comments) ? source.comments.filter(isRecord) : [];
-  const participantsVotes =
-    isRecord(source) && Array.isArray(source.participantsVotes) ? source.participantsVotes.filter(isRecord) : [];
+  const comments = isRecord(source) && Array.isArray(source.comments)
+    ? source.comments.filter(isRecord)
+    : [];
+  const participantsVotes = isRecord(source) && Array.isArray(source.participantsVotes)
+    ? source.participantsVotes.filter(isRecord)
+    : [];
   const questionPool = buildPolisDemoQuestionPool(source, {
     sessionSlug: normalizedSessionSlug,
   });
@@ -71,7 +79,7 @@ export const buildPolisDemoSurveyResultsNetworkData = (
 
   participantsVotes.forEach((participant, participantIndex) => {
     const responder = normalizeResponderId(
-      participant.participant || participant.address || participant.xid || `demo-participant-${participantIndex + 1}`,
+      participant.participant || participant.address || participant.xid || `demo-participant-${participantIndex + 1}`
     );
     if (!responder) return;
     const votes = isRecord(participant.votes) ? participant.votes : {};
@@ -119,7 +127,7 @@ export const buildPolisDemoSurveyResultsNetworkData = (
 
 export const buildPolisDemoSurveyResultsAggregatorData = (
   source: unknown = demoPolisData,
-  { sessionSlug = 'demo' }: { sessionSlug?: unknown } = {},
+  { sessionSlug = 'demo' }: { sessionSlug?: unknown } = {}
 ): Record<string, Array<{ responder: string; questionId: string; response: string }>> => {
   const networkData = buildPolisDemoSurveyResultsNetworkData(source, { sessionSlug });
   const out: Record<string, Array<{ responder: string; questionId: string; response: string }>> = {};

@@ -55,22 +55,85 @@ import {
   resolveSBTsPageReferrerSessionSlug as resolveReferrerSessionSlug,
   resolveSBTsPageCacheFeaturedCardLinkStyle as resolveCacheFeaturedCardLinkStyle,
 } from './sbtOverviewPageHelpers';
-import type {
-  CacheBackedFeaturedCard,
-  FeaturedCacheCardsArgs,
-  FeaturedEntriesArgs,
-  FeaturedEntry,
-  FeaturedListArgs,
-  FeaturedProgressLike,
-  FeaturedRenderEntry,
-  FeaturedSbtLike,
-  FeaturedSbtMetadataLike,
-  MemoBucket,
-  SBTSessionConfigLike,
-  SBTsPageProps,
-  SBTsPageState,
-  UnknownRecord,
-} from './SBTsPage.types';
+type FeaturedEntry = {
+  address: string;
+  sessionSlug: string;
+};
+type CacheBackedFeaturedCard = {
+  address: string;
+  sessionSlug: string;
+  sbt: FeaturedSbtLike & { sbtInfo: FeaturedSbtMetadataLike };
+};
+type FeaturedRenderEntry =
+  | { kind: 'cache'; entry: CacheBackedFeaturedCard }
+  | { kind: 'fallback'; entry: FeaturedEntry };
+type MemoBucket<T> = {
+  key: string;
+  result: T[];
+};
+
+type FeaturedListArgs = {
+  baseFeaturedList?: unknown;
+  effectiveSessionSlug?: unknown;
+  autoFeature?: unknown;
+  requireExplicitSessionSlug?: unknown;
+  isSBTCacheReady?: unknown;
+  isAllSessionsMode?: boolean;
+  progressBySlug?: Record<string, FeaturedProgressLike | unknown>;
+};
+type FeaturedEntriesArgs = {
+  baseFeaturedList?: unknown;
+  effectiveSessionSlug?: unknown;
+  effectiveSessionAutoFeature?: unknown;
+  requireExplicitAutoFeatureSessionSlug?: unknown;
+  isSBTCacheReady?: unknown;
+  isAllSessionsMode?: boolean;
+  includeListScopeSessions?: boolean;
+  listScopeSessionSlugs?: unknown;
+  progressBySlug?: Record<string, FeaturedProgressLike | unknown>;
+};
+type FeaturedCacheCardsArgs = {
+  featuredEntries?: unknown;
+  isSBTCacheReady?: unknown;
+  progressBySlug?: Record<string, FeaturedProgressLike | unknown>;
+};
+
+type SBTsPageProps = UnknownRecord & {
+  sessionSlug?: string | null;
+  sessionConfig?: SBTSessionConfigLike | null;
+  activeSessionSlug?: string | null;
+  sessionName?: string;
+  sessionInfo?: string;
+  provider?: unknown;
+  network?: unknown;
+  account?: unknown;
+  litHooks?: unknown;
+  loginComplete?: boolean;
+  toggleLoginModal?: unknown;
+  isSBTCacheReady?: boolean;
+  sbtCacheRevision?: number | string | null;
+  defaultSbtTags?: unknown;
+  defaultFeaturedSBTs?: unknown[];
+  onCreateGroupToggleExternal?: () => void;
+  showCreateGroupExternal?: boolean;
+  hideMiniActionRow?: boolean;
+  showCreateGroupAboveFeatured?: boolean;
+  preferCacheBackedFeaturedCards?: boolean;
+  requireExplicitAutoFeatureSessionSlug?: boolean;
+  miniaturized?: boolean;
+  refreshSbtData?: unknown;
+  onRequestSbtCacheRefresh?: unknown;
+  latestBlockNumber?: unknown;
+  sbtScanProgressBySlug?: Record<string, FeaturedProgressLike | unknown>;
+  sbtRealtimeCoverageBySlug?: unknown;
+  ensureLightSbtDiscovery?: unknown;
+  ensureLightSbtUniverse?: unknown;
+  refreshSessionUniverseRegistryCache?: unknown;
+};
+type SBTsPageState = {
+  showSBTsList: boolean;
+  showCreateGroup: boolean;
+};
 
 const SBTsListComponent = SBTsList as React.ComponentType<Record<string, unknown>>;
 const CreateGroupComponent = CreateGroup as React.ComponentType<Record<string, unknown>>;
@@ -100,6 +163,29 @@ const getFeaturedSbtName = (sbt: FeaturedSbtLike | null | undefined): string => 
 };
 
 const isDemoAutomationFixtureSbt = (sbt: FeaturedSbtLike | null | undefined, sessionSlug: unknown = ''): boolean => {
+  if (normalizeSessionSlug(sessionSlug || '') !== 'demo') return false;
+  const name = getFeaturedSbtName(sbt);
+  if (!name) return false;
+  return (
+    /\b(?:AI Gate|AI Gated Decrypt|AI Doc Library|AI Doc Filetypes|BrowserUse) Test SBT\b/i.test(name) ||
+    /\[(?:e2e-|20\d{6}-\d{6}-(?:response-smoke|anyall|gated|survey|doc))/i.test(name)
+  );
+};
+
+const getFeaturedSbtName = (sbt: FeaturedSbtLike | null | undefined): string => {
+  const info = isRecord(sbt?.sbtInfo) ? sbt.sbtInfo : {};
+  return String(
+    info.name ||
+    info.title ||
+    sbt?.name ||
+    ''
+  ).trim();
+};
+
+const isDemoAutomationFixtureSbt = (
+  sbt: FeaturedSbtLike | null | undefined,
+  sessionSlug: unknown = ''
+): boolean => {
   if (normalizeSessionSlug(sessionSlug || '') !== 'demo') return false;
   const name = getFeaturedSbtName(sbt);
   if (!name) return false;
@@ -160,7 +246,6 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     baseFeaturedList,
     effectiveSessionSlug,
     autoFeature,
-    baseFeaturedListIsConfigured = false,
     requireExplicitSessionSlug = false,
     isSBTCacheReady,
     isAllSessionsMode = false,
@@ -171,7 +256,6 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     const key = [
       sessionSlugTarget,
       autoFeature ? '1' : '0',
-      baseFeaturedListIsConfigured ? '1' : '0',
       requireExplicitSessionSlug ? '1' : '0',
       isSBTCacheReady ? '1' : '0',
       isAllSessionsMode ? '1' : '0',
@@ -184,7 +268,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     }
 
     let next = baseList;
-    if (requireExplicitSessionSlug && !baseFeaturedListIsConfigured && sessionSlugTarget && !isAllSessionsMode) {
+    if (requireExplicitSessionSlug && sessionSlugTarget && !isAllSessionsMode) {
       try {
         const cache = peekCacheSync('sbtCache', String(effectiveSessionSlug || ''), { clone: false });
         const explicitAddressSet = new Set<string>();
@@ -201,23 +285,15 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
                 requireExplicitSessionSlug: true,
               });
               if (sbtSessionSlug !== sessionSlugTarget) return;
-              explicitAddressSet.add(
-                String(sbt.sbtAddress || '')
-                  .trim()
-                  .toLowerCase(),
-              );
+              explicitAddressSet.add(String(sbt.sbtAddress || '').trim().toLowerCase());
             });
           });
         }
-        next = baseList.filter((addr) =>
-          explicitAddressSet.has(
-            String(addr || '')
-              .trim()
-              .toLowerCase(),
-          ),
-        );
+        next = baseList.filter((addr) => (
+          explicitAddressSet.has(String(addr || '').trim().toLowerCase())
+        ));
       } catch (e) {
-        sbtLog.warn('[SBTsPage] Strict featured filter failed:', e);
+        sbtLog.warn("[SBTsPage] Strict featured filter failed:", e);
         next = [];
       }
     }
@@ -321,7 +397,6 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
         baseFeaturedList: featuredForSlug,
         effectiveSessionSlug: slug,
         autoFeature: autoFeatureForSlug,
-        baseFeaturedListIsConfigured: true,
         requireExplicitSessionSlug: requireExplicitAutoFeatureSessionSlug,
         isSBTCacheReady,
         isAllSessionsMode,
@@ -490,7 +565,11 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
       getDisplaySessionConfig('');
 
     const explicitSourceSlug = normalizeSessionSlug(
-      effectiveUrlSlug || propSlugLike || this.props.activeSessionSlug || referrerSlug || '',
+      effectiveUrlSlug ||
+      propSlugLike ||
+      this.props.activeSessionSlug ||
+      referrerSlug ||
+      ''
     );
     const explicitSourceMatched = !!(
       (effectiveUrlSlug && groupFromUrl) ||
@@ -499,8 +578,11 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
       (referrerSlug && groupFromRef)
     );
     const canonicalSlugFromConfig = normalizeSessionSlug(activeGroup?.slug || '');
-    const canonicalSlug = canonicalSlugFromConfig || (explicitSourceMatched ? explicitSourceSlug : ''); // '' means general
-    const urlHasNoSlug = onSbtsRoute && effectiveUrlSlug === undefined && !isCreateRoute;
+    const canonicalSlug = (
+      canonicalSlugFromConfig ||
+      (explicitSourceMatched ? explicitSourceSlug : '')
+    ); // '' means general
+    const urlHasNoSlug  = onSbtsRoute && effectiveUrlSlug === undefined && !isCreateRoute;
 
     // Canonicalize (silent) if we are on /sbts and have a non-empty slug to show
     if (!isCreateRoute && urlHasNoSlug && canonicalSlug) {

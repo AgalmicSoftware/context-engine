@@ -197,7 +197,73 @@ describe('PolisReport cache read options', () => {
         slug="legacy-live"
         questionResponses={legacyQuestionResponses}
         demoDataFirstLoad={false}
-      />,
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByText('No non-encrypted binary responses found, or no Demo data loaded.')).not.toBeInTheDocument();
+      expect(computePolisConversationMath).toHaveBeenCalledWith(
+        [[1, -1, 0]],
+        expect.objectContaining({ qLegacy: 'Legacy prompt' }),
+        ['qLegacy'],
+        expect.objectContaining({ randomSeed: 42 })
+      );
+    });
+  });
+
+  it('excludes seeded demo fixture rows from real report calculations', async () => {
+    const mixedQuestionResponses = {
+      qFixture: [
+        {
+          responder: 'demo-participant-1',
+          questionId: 'qFixture',
+          response: JSON.stringify({
+            type: 'binary',
+            prompt: 'Fixture prompt',
+            source: 'demo-polis-data',
+            answer: { value: 'Agree', encrypted: false },
+          }),
+        },
+      ],
+      qLive: [
+        {
+          responder: '0xlive',
+          questionId: 'qLive',
+          response: JSON.stringify({
+            type: 'binary',
+            prompt: 'Live prompt',
+            answer: { value: 'Disagree', encrypted: false },
+          }),
+        },
+      ],
+    };
+
+    render(
+      <PolisReport
+        {...baseReportProps}
+        slug="edge-live"
+        questionResponses={mixedQuestionResponses}
+        demoDataFirstLoad={false}
+      />
+    );
+
+    await waitFor(() => {
+      expect(computePolisConversationMath).toHaveBeenCalledWith(
+        [[-1]],
+        expect.objectContaining({ qLive: 'Live prompt' }),
+        ['qLive'],
+        expect.objectContaining({ randomSeed: 42 })
+      );
+    });
+    expect(JSON.stringify(computePolisConversationMath.mock.calls)).not.toContain('qFixture');
+  });
+
+  it('reads question and sbt caches with clone disabled during filter application', () => {
+    const out = applyFilterStateToAggregator(
+      { q1: [] },
+      { id: 84532 },
+      {},
+      'edge'
     );
 
     await waitFor(() => {
@@ -505,7 +571,7 @@ describe('PolisReport cache read options', () => {
           scannedBlocks: 3182031,
           remainingBlocks: 0,
         }}
-      />,
+      />
     );
 
     expect(screen.queryByLabelText('Loading report')).not.toBeInTheDocument();
@@ -776,6 +842,34 @@ describe('PolisReport demo data defaults', () => {
 
     expect(container.querySelector('.settingsRow')).toHaveClass('pdfIgnore');
     expect(screen.getByTestId(E2E_TESTIDS.POLIS_DEMO_DATA_TOGGLE)).toBeChecked();
+  });
+
+  it('lets the built-in demo session toggle from fixture data to live responses', async () => {
+    render(
+      <PolisReport
+        {...baseReportProps}
+        slug="demo"
+        questionResponses={seededQuestionResponses}
+        demoDataFirstLoad={true}
+        isQuestionCacheReady={true}
+        isResponsesCacheReady={true}
+      />
+    );
+
+    openSettingsRow();
+
+    const demoToggle = screen.getByTestId(E2E_TESTIDS.POLIS_DEMO_DATA_TOGGLE);
+    expect(demoToggle).toBeChecked();
+    expect(demoToggle).not.toBeDisabled();
+
+    fireEvent.click(demoToggle);
+
+    expect(demoToggle).not.toBeChecked();
+    await waitFor(() => {
+      expect(screen.queryByText('None (Demo Data Active)')).not.toBeInTheDocument();
+      expect(screen.queryByText('No non-encrypted binary responses found, or no Demo data loaded.')).not.toBeInTheDocument();
+      expect(screen.getByText('Summary and Statistics')).toBeInTheDocument();
+    });
   });
 
   it('includes the participants list in the global collapse and expand controls', async () => {
