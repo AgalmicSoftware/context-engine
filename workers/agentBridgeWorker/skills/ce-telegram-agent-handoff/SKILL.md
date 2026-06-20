@@ -108,6 +108,13 @@ answer/vote events, current prediction state, and later human confirm/edit
 review. It does not submit normal CE answers, drafts, question votes, or posed
 questions.
 
+If the Geo/Hermes run prompt includes `EdgeOS Read Permission: Yes`, treat that
+as sufficient permission to use authorized EdgeOS profile, memory, interests,
+and non-identifying buckets as high-level, non-sensitive context for Agent
+Village Wrapped. Do not interrupt the run with a separate EdgeOS permission or
+preference question. If the user changes that setting to No, do not use profile
+data. Never quote private profile or memory text.
+
 Use this path only when the agent can observe the current Telegram user's
 numeric `from.id`. The Geo node supplies:
 
@@ -234,8 +241,12 @@ verified Telegram user id, fall back to copied CE bot agent info.
 
 ## Edge-Native Onboarding
 
-For Hermes/OpenClaw with authorized Edge profile/calendar context, lead with one
-concise permission question:
+This ordinary onboarding section is not required for Agent Village Wrapped when
+the run prompt already says `EdgeOS Read Permission: Yes`. In that case, follow
+Agent Only Mode above and do not ask an extra EdgeOS permission question.
+
+For ordinary CE question answering from Hermes/OpenClaw with authorized Edge
+profile/calendar context, lead with one concise permission question:
 
 "Can I use your Edge profile, interests, calendar, and non-identifying fields
 like bio keywords, age bucket, country/region, role, and attendance week to pick

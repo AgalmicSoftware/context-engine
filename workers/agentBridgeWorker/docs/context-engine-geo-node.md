@@ -61,10 +61,17 @@ future agent negotiation.
 
 ## Agent-Facing Bootstrap Instructions
 
-When a Telegram-native Hermes or Edge agent surfaces this node, ask the user:
-"Run Agent Village Wrapped?"
+When a Telegram-native Hermes or Edge agent surfaces this node, use these
+defaults unless the user explicitly changes them before launch:
 
-If the user says yes, treats the link/button as yes, or otherwise approves:
+- EdgeOS Read Permission: Yes.
+- Standard Agent Village Wrapped image: Yes.
+- Optional Agent Norms Compass meme: ask after the Wrapped image.
+
+Treat "run Agent Village Wrapped", clicking the node/link, or equivalent user
+intent as approval to continue with these defaults.
+
+Then:
 
 1. Fetch or load the cached Markdown skill at `contextEngine.skillUrl`. It is the
    source of truth for Agent Only Mode, token handling, prediction submission,
@@ -77,10 +84,12 @@ If the user says yes, treats the link/button as yes, or otherwise approves:
    described in the skill, with request body field `"mode": "agent_only"`.
 4. Store the returned `ceagt_...` token only in private auth context. Never
    print, mask, summarize, recap, log, or show it in chat.
-5. Ask only the concise preference and consent questions required by the skill.
-   If the user says "yes" or "accept all", use authorized EdgeOS profile,
-   memory, interests, and non-identifying buckets to improve predictions, but
-   answer unavailable usage-style questions as `N/A` rather than hallucinating.
+5. Do not ask an extra EdgeOS permission question when this node or the
+   run prompt already says `EdgeOS Read Permission: Yes`. Use authorized
+   EdgeOS profile, memory, interests, and non-identifying buckets only as
+   high-level, non-sensitive context to improve predictions. If the user
+   changes that setting to No, do not use profile data. Answer unavailable
+   usage-style questions as `N/A` rather than hallucinating.
 6. Fetch `/telegram/agent/api/agent-only/start` from `contextEngine.worker` and
    follow the returned instructions exactly. Page through statements, submit
    predicted answers for every current statement, submit both token allocation
