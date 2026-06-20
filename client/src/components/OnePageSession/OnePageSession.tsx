@@ -2272,7 +2272,6 @@ class OnePageSession extends Component<any, any> {
       ? {
           ...resolvedSessionConfig,
           slug: embeddedGroupsSessionSlug,
-          autoFeatureSBTsBySessionSlug: true,
         }
       : resolvedSessionConfig;
     const resultsViewMode = isDemoSlug ? this.state.resultsViewMode : 'polis';

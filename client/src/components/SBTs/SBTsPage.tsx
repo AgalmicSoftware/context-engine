@@ -72,6 +72,7 @@ type FeaturedListArgs = {
   baseFeaturedList?: unknown;
   effectiveSessionSlug?: unknown;
   autoFeature?: unknown;
+  baseFeaturedListIsConfigured?: unknown;
   requireExplicitSessionSlug?: unknown;
   isSBTCacheReady?: unknown;
   isAllSessionsMode?: boolean;
@@ -223,6 +224,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     baseFeaturedList,
     effectiveSessionSlug,
     autoFeature,
+    baseFeaturedListIsConfigured = false,
     requireExplicitSessionSlug = false,
     isSBTCacheReady,
     isAllSessionsMode = false,
@@ -233,6 +235,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     const key = [
       sessionSlugTarget,
       autoFeature ? '1' : '0',
+      baseFeaturedListIsConfigured ? '1' : '0',
       requireExplicitSessionSlug ? '1' : '0',
       isSBTCacheReady ? '1' : '0',
       isAllSessionsMode ? '1' : '0',
@@ -245,7 +248,12 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     }
 
     let next = baseList;
-    if (requireExplicitSessionSlug && sessionSlugTarget && !isAllSessionsMode) {
+    if (
+      requireExplicitSessionSlug &&
+      !baseFeaturedListIsConfigured &&
+      sessionSlugTarget &&
+      !isAllSessionsMode
+    ) {
       try {
         const cache = peekCacheSync('sbtCache', String(effectiveSessionSlug || ''), { clone: false });
         const explicitAddressSet = new Set<string>();
@@ -371,6 +379,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
         baseFeaturedList: featuredForSlug,
         effectiveSessionSlug: slug,
         autoFeature: autoFeatureForSlug,
+        baseFeaturedListIsConfigured: true,
         requireExplicitSessionSlug: requireExplicitAutoFeatureSessionSlug,
         isSBTCacheReady,
         isAllSessionsMode,
@@ -618,9 +627,16 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
       return true;
     });
     const hasFeaturedCards = featuredRenderEntries.length > 0;
-    // Keep previously discovered cards visible while a route-local scan is active, but
-    // avoid showing a "not ready yet" spinner once we already have cards to render.
-    const showFeaturedCornerSpinner = hasFeaturedCards && featuredScanActive;
+    const featuredCardsNeedHydration = hasFeaturedCards && (
+      featuredScanActive ||
+      (
+        isSBTCacheReady !== true &&
+        cacheBackedFeaturedCards.length < actualFeaturedEntries.length
+      )
+    );
+    // Keep configured or discovered cards visible while metadata hydrates, but avoid
+    // extra loading chrome once every featured card has complete cached metadata.
+    const showFeaturedCornerSpinner = featuredCardsNeedHydration;
     const showFeaturedColdStartSpinner = !hasFeaturedCards && (!isSBTCacheReady || featuredScanActive);
     const renderCreateGroupPanel = () => (
       <CreateGroupComponent
