@@ -5,9 +5,6 @@ Use the attached Context Engine Agent Village Wrapped prompt.
 Run Agent Village Wrapped for my Telegram principal.
 
 EdgeOS Read Permission: Yes
-Standard Wrapped Image: Yes
-
-Do not ask another permission or preference question.
 
 ---
 
@@ -18,9 +15,6 @@ Use the attached Context Engine Agent Village Wrapped prompt.
 Run Agent Village Wrapped for my Telegram principal.
 
 EdgeOS Read Permission: No
-Standard Wrapped Image: Yes
-
-Do not ask another permission or preference question.
 
 ---
 
