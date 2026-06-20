@@ -23,8 +23,8 @@ important."
 The image endpoint supports two intended modes:
 
 - **Standard Wrapped**: the shareable poster with a combined Agent Core
-  Insight/Agent Impression hero, Most Important To You, High-Confidence Reads,
-  Cautious Reads, and one bottom row containing Agent Guesses plus Agent
+  Insight/Agent Impression hero, Most Important To You, High-Confidence
+  Predictions, Cautious Predictions, and one bottom row containing Agent Guesses plus Agent
   Comparison.
 - **Agent Norms Compass**: a quadrant-style map that uses the top
   importance-ranked question as the focal issue. For now, read Charlie's
@@ -72,15 +72,20 @@ They should be visibly larger than body copy, with clear hierarchy and enough
 spacing between sections.
 
 Agent Core Insight + Agent Impression
-This should be the largest content block. Combine the core insight and abstract
-agent-impression visual into one hero section. It should include both a bold
-archetype/memeable sentence and a large abstract artistic representation of what
-the agent thinks of the principal. Carry the same visual identity through the
-whole poster: palette, texture, icon language, map motif, borders, and small
-decorative marks should feel personalized, not template-identical.
+This should be the largest content block, but shaped like a tall phone card or
+portrait story panel rather than a wide landscape banner. Combine the core
+insight and abstract agent-impression visual into one hero section. It should
+include both a bold archetype/memeable sentence and a large abstract artistic
+representation of what the agent thinks of the principal. Carry the same visual
+identity through the whole poster: palette, texture, icon language, map motif,
+answer pills, dividers, and small decorative marks should feel personalized, not
+template-identical. Prefer open spacing and a few meaningful dividers over
+boxed-in cards, heavy borders, table clutter, and excess separator lines.
 
 Use plain concrete language. Do not invent undefined acronyms or jargon such as
-"triple-v" unless that exact term appears in the evidence.
+"triple-v" unless that exact term appears in the evidence. Prefer immediately
+understandable wording such as "asks first, explains its reasoning, and protects
+private context."
 
 Most Important To You
 Label this as: "Questions your agent thought you would care about most."
@@ -91,7 +96,7 @@ view, not a claim that any answer was boosted. It must show questions only:
 never show predicted answers, Agree/Unsure/Disagree pills, ratings, selected
 options, confidence, or token math in this section.
 
-High-Confidence Reads
+High-Confidence Predictions
 Show 3 concise predicted answers the agent made on the principal's behalf when
 at least 3 are available; otherwise show every available high-confidence
 prediction. Use explicit column headers: Question, Predicted answer, Confidence.
@@ -104,7 +109,7 @@ Disagree red with white text. For rating answers, show scale context such as
 7/10. For multichoice answers, show the selected option text as text or option
 chips, never as Agree/Unsure/Disagree. For freeform answers, show compact text.
 
-Cautious Reads
+Cautious Predictions
 Show the lowest-confidence eligible predictions from this run when at least 3
 are available. They may still be high-confidence in absolute terms; keep the
 real percentage and do not imply the agent was very unsure. Include the answer
