@@ -632,27 +632,12 @@ export class SurveyQuestions extends Component {
     this.handleDecryptEdit = this.handleDecryptEdit.bind(this);
   }
 
-  // Auto-decrypt sweep control: blocks automatic decryption for providers that require
-  // user-facing signature popups (MetaMask, Porto passkey dialogs). Each decrypt operation
-  // triggers a wallet interaction, which is disruptive when done automatically.
-  //
-  // Per-provider rationale:
-  // - wagmi (MetaMask): Blocked - each decrypt requires a MetaMask popup. Keep blocked.
-  // - porto: Blocked - passkey prompts still interrupt flow. Consider enabling when
-  //   session keys or account abstraction (AA) allow frictionless auto-signing.
-  // - web3auth: Allowed (not blocked) - server-side key custody typically avoids popups,
-  //   though prompts may still occur on session expiry or certain config changes.
-  //
-  // Future: When session keys / AA are available for wagmi/porto, this can be relaxed
-  // to allow auto-decrypt without popups. Keep this path and comments for that transition.
-  isAutoDecryptBlocked = () => {
-    try {
-      const kind = cryptoUtils.getProviderKind(this.props.provider);
-      return kind === 'wagmi' || kind === 'porto';
-    } catch (_) {
-      return false;
-    }
-  };
+type SurveyQuestionsRecord = Record<string, any>;
+
+export interface SurveyQuestions {
+  setState: (...args: any[]) => any;
+  _emptySubmitTimer: any;
+}
 
 
   _persistTimer = null;
@@ -5641,8 +5626,11 @@ export class SurveyQuestions extends Component {
     const shouldUseTemporaryDemoQuestionPool = temporaryDemoQuestionIds.length > 0;
     if (shouldUseTemporaryDemoQuestionPool) {
       if (temporaryDemoFixtureSlug) effectiveSlug = temporaryDemoFixtureSlug;
-      const currentQuestionsCache = ensureQuestionsNet(readQuestionsCache(effectiveSlug) || {}, netIdStr);
-      const questionsNet = currentQuestionsCache[netIdStr];
+      const currentQuestionsCache = ensureQuestionsNet(
+        readQuestionsCache(effectiveSlug) || {},
+        netIdStr
+      ) as SurveyQuestionsRecord;
+      const questionsNet = currentQuestionsCache[netIdStr] as SurveyQuestionsRecord;
       if (!questionsNet.questions || typeof questionsNet.questions !== 'object') questionsNet.questions = {};
       temporaryDemoFixtureQuestions.forEach((question) => {
         const qid = normalizeQuestionIdKey(question?.id);
@@ -5741,10 +5729,10 @@ export class SurveyQuestions extends Component {
         questionResponses: {},
         questionResponsesLatestBlock: 0,
       };
-      const networkQuestions = questionsNet.questions || {};
+      const networkQuestions = (questionsNet.questions || {}) as SurveyQuestionsRecord;
 
       const questionPool = expectedQuestionIds
-        .map((qid) => {
+        .map((qid: string) => {
           const qData = networkQuestions[qid];
           if (isPendingQuestionMetadataPlaceholder(qData)) return null;
           if (qData) return { ...qData, id: qData.id.toLowerCase() };
@@ -5756,10 +5744,10 @@ export class SurveyQuestions extends Component {
         .filter(Boolean);
       const loadedQuestionIds = new Set(
         questionPool
-          .map((question) => normalizeQuestionIdKey(question?.id))
+          .map((question: any) => normalizeQuestionIdKey(question?.id))
           .filter(Boolean)
       );
-      const pendingQuestionIds = expectedQuestionIds.filter((qid) => !loadedQuestionIds.has(qid));
+      const pendingQuestionIds = expectedQuestionIds.filter((qid: string) => !loadedQuestionIds.has(qid));
 
       const nextQuestionPoolSig = buildQuestionIdScopeSignature(questionPool);
       const snapshotSig = JSON.stringify({

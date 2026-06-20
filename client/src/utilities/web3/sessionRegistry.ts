@@ -1269,7 +1269,7 @@ const mergeSessionFieldsIntoCachedConfig = ({
   const sessionIdHex = normalizeSessionIdHex(session?.sessionIdHex || session?.sessionId || registryMeta.sessionIdHex);
   const sessionId = formatSessionId(sessionIdHex);
   const networkChainId = Number(session?.chainId || base.networkChainId || registryMeta.chainId || 0) || null;
-  const config = {
+  const config: AnyRecord = {
     ...base,
     slug: normalizeSlug(session?.slug || base.slug),
     ...(sessionId ? { sessionId } : {}),
@@ -1277,8 +1277,8 @@ const mergeSessionFieldsIntoCachedConfig = ({
   };
 
   const resolvedChainId = Number(networkChainId || 0) || 0;
-  const chainContractsRaw = resolvedChainId ? getSessionContractsForChain(resolvedChainId) : {};
-  const chainContracts = REGISTRY_CONTRACT_DEFAULT_KEYS.reduce((acc, key) => {
+  const chainContractsRaw: AnyRecord = resolvedChainId ? getSessionContractsForChain(resolvedChainId) : {};
+  const chainContracts = REGISTRY_CONTRACT_DEFAULT_KEYS.reduce<AnyRecord>((acc, key) => {
     const value = toStr(chainContractsRaw?.[key]).trim();
     if (!value) return acc;
     acc[key] = { address: value, chainId: resolvedChainId };
@@ -1569,7 +1569,7 @@ export const refreshSessionRegistryFieldsCache = async ({
   providerLike,
   fieldKeys,
   bootstrapRpc,
-} = {}) => {
+}: AnyRecord = {}) => {
   const registrySlug = toRegistrySlug(slug || '');
   const existingConfig = sessionRegistryStore.getSessionConfig(registrySlug);
   const existingRegistry = existingConfig?.__registry && typeof existingConfig.__registry === 'object'

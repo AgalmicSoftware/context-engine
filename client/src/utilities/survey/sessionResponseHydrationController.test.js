@@ -716,20 +716,18 @@ describe('createSessionResponseHydrationController', () => {
 
       const stored = host.getStored('questionsCache', SESSION_SLUG);
 
-      expect(stored?.[NETWORK_ID]).toEqual(
-        expect.objectContaining({
-          questionsLatestBlock: 9,
-          questionsDiscoveryCheckpointBlock: 9,
-          questions: {},
-          questionResponses: {},
-          questionResponsesMeta: {},
-          questionResponsesLatestBlock: 12,
-          pendingQuestionMetadata: {},
-          arweaveTxCache: {},
-          arweaveTxFailureCache: {},
-          questionHydrationMeta: {},
-        }),
-      );
+      expect(stored?.[NETWORK_ID]).toEqual(expect.objectContaining({
+        questionsLatestBlock: 9,
+        questionsDiscoveryCheckpointBlock: 9,
+        questions: {},
+        questionResponses: {},
+        questionResponsesMeta: {},
+        questionResponsesLatestBlock: 12,
+        pendingQuestionMetadata: {},
+        arweaveTxCache: {},
+        arweaveTxFailureCache: {},
+        questionHydrationMeta: {},
+      }));
       expect(ensureQuestionArweaveCacheBranches).toHaveBeenCalled();
     });
 
@@ -910,6 +908,31 @@ describe('createSessionResponseHydrationController', () => {
       expect(
         host.getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID]?.questionResponsesLatestBlock
       ).toBe(20015);
+    });
+
+    it('advances the response watermark when a completed scan emits no partial data callback', async () => {
+      contractScripts.getRelevantBlockWindowForFilter.mockResolvedValueOnce({
+        fromBlock: 10,
+        toBlock: 12,
+      });
+      contractScripts.getQuestionResponsesChunkedWithCallback.mockImplementationOnce(
+        async () => {
+          // Some reader implementations resolve an empty window without invoking
+          // the partial-data callback. The controller still owns the scan watermark.
+        }
+      );
+      const host = createMockHost();
+      const controller = createSessionResponseHydrationController(host);
+
+      await controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG);
+
+      expect(resolvePersistedQuestionResponsesWatermark).toHaveBeenCalledWith({
+        floorBlock: 9,
+        processedToBlock: 12,
+      });
+      expect(
+        host.getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID]?.questionResponsesLatestBlock
+      ).toBe(12);
     });
 
     it('scans the first historical response window before recent prefetch', async () => {

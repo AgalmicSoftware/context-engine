@@ -31,7 +31,7 @@ describe('contractScripts payload normalizers', () => {
       two: { id: 'two' },
     })).toEqual(['One', 'two']);
 
-    expect(coerceQuestionOptionLabels('[\"A\",\"B\"]')).toEqual(['A', 'B']);
+    expect(coerceQuestionOptionLabels('["A","B"]')).toEqual(['A', 'B']);
   });
 
   it('mirrors conviction and importance fields without overwriting existing values', () => {
