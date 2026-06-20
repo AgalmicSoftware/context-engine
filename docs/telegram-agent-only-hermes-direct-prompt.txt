@@ -1,38 +1,26 @@
 Forwardable message, EdgeOS profile allowed:
 
-Use the attached Context Engine Agent Village Wrapped prompt file.
+Use the attached Context Engine Agent Village Wrapped prompt.
 
 Run Agent Village Wrapped for my Telegram principal.
 
-Use the prompt as written, with these settings already answered; do not ask a
-separate permission or preference question:
-
-Run Now: Yes
 EdgeOS Read Permission: Yes
 Standard Wrapped Image: Yes
 
-You may use my EdgeOS profile as high-level, non-sensitive context. Do not
-quote private profile or memory text. Do not print credentials, raw image_base64,
-raw image prompt, confidences, or rationales.
+Do not ask another permission or preference question.
 
 ---
 
 Forwardable message, EdgeOS profile not allowed:
 
-Use the attached Context Engine Agent Village Wrapped prompt file.
+Use the attached Context Engine Agent Village Wrapped prompt.
 
 Run Agent Village Wrapped for my Telegram principal.
 
-Use the prompt as written, with these settings already answered; do not ask a
-separate permission or preference question:
-
-Run Now: Yes
 EdgeOS Read Permission: No
 Standard Wrapped Image: Yes
 
-Do not use EdgeOS profile, memory, interests, calendar, private profile data, or
-other personal memory. Do not print credentials, raw image_base64, raw image
-prompt, confidences, or rationales.
+Do not ask another permission or preference question.
 
 ---
 
@@ -50,7 +38,8 @@ safely, stop and say exactly: "You need to add more credit before I can run
 Agent Village Wrapped." Do not fetch statements or submit answers first.
 
 Before fetching statements, ask a short preference check only if the forwarded
-message did not already include Run Now and EdgeOS Read Permission settings.
+message did not already ask to run Agent Village Wrapped and include an EdgeOS
+Read Permission setting.
 This is Context Engine research on whether agents can predict their principals,
 may take about 10 minutes, and produces a shareable Agent Village Wrapped image.
 Ask whether to run now and whether you may use my EdgeOS profile as high-level,
