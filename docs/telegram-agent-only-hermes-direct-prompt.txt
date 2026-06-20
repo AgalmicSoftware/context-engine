@@ -25,6 +25,16 @@ Run Agent Village Wrapped for my Telegram principal.
 
 Worker origin: https://ce-agent-bridge-worker.agalmic.workers.dev
 
+Setup tool budget. Do not do discovery. This file is the canonical run prompt
+and the worker URL above is the canonical Context Engine endpoint. Do not search
+Geo, Index Network, local skill indexes, local Context Engine reference docs,
+API pitfall docs, or `*context-engine*` files. Allowed local lookups are only:
+Hermes/OpenRouter balance; EdgeOS profile/memory if EdgeOS Read Permission is
+Yes; and an existing Context Engine credential or invite token if needed for the
+exact API calls below. Do not run `hermes --help`, workspace validation,
+reference sweeps, or setup summaries. Spend tool calls on execution, not
+preparation.
+
 Before starting, check my Hermes/OpenRouter balance through a normal balance
 surface already available to you. Minimum: $2.00 for the default
 gemini-3.5-flash run. If the balance is below $2.00, or cannot be checked
@@ -40,14 +50,19 @@ permission, preference, EdgeOS, research, or confirmation question. If the
 EdgeOS line is missing, default to No and continue. Never quote private profile
 or memory text.
 
-Read the skill URL above directly. Do not search Geo, Index Network, or local
-skill indexes to discover Context Engine instructions; this file and the skill
-URL are canonical. Installing the skill is not required when you can fetch the
-URL directly. Use the current Hermes/Telegram principal context and the Context
-Engine agent-only onboarding flow from the skill; do not ask me to manually
-provide or reveal credentials. First check /telegram/agent/api/skill-version and
-verify it reports v41 silently. Then fetch /telegram/agent/api/agent-only/start
-and follow the returned instructions exactly.
+Run order after the balance check:
+1. GET /telegram/agent/api/skill-version from the worker and verify v41 silently.
+2. Use an existing private Context Engine credential if it already has
+   `agent_autofill`; otherwise perform only the trusted invite onboarding path
+   from the skill with `"mode": "agent_only"`.
+3. GET /telegram/agent/api/agent-only/start.
+4. GET /telegram/agent/api/agent-only/statements and continue the actual run.
+
+Read the skill URL above directly only for the agent-only onboarding/start
+details. Installing the skill is not required when you can fetch the URL
+directly. Use the current Hermes/Telegram principal context; do not ask me to
+manually provide or reveal credentials. If a setup search is not required for
+one of the four exact steps above, skip it.
 
 Use Context Engine agent_only_mode only. Do not run ordinary CE onboarding,
 normal /questions, draft setup, auto-upvote setup, digest setup, or normal
