@@ -192,7 +192,15 @@ export const resolveSurveyResultsQuestionReadScope = ({
     }
   }
 
-  const questionReadSlugs = dedupeSessionSlugs([baseSlug, ...extraQuestionReadSlugs]);
+  const includeBuiltInDemoCanonicalSource = (
+    String(viewMode || '').trim().toLowerCase() === 'questions' &&
+    baseSlug === 'demo'
+  );
+  const questionReadSlugs = dedupeSessionSlugs([
+    baseSlug,
+    ...(includeBuiltInDemoCanonicalSource ? [''] : []),
+    ...extraQuestionReadSlugs,
+  ]);
 
   return {
     baseSlug,

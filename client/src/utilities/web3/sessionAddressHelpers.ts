@@ -7,6 +7,7 @@
  */
 import { resolveDemoSessionBySlug } from './sessionConfigResolvers.js';
 import { resolveSessionContractRef } from '../session/sessionNaming.js';
+import { getSessionContractsForChain } from '../../variables/chains.js';
 
 type AnyRecord = Record<string, any>;
 type ContractRef = {
@@ -47,17 +48,25 @@ function getSessionAddresses(cfg: AnyRecord | null | undefined): Record<string, 
   const declared = (cfg && cfg.contracts) || {};
   const fallbackContracts = (fallbackCfg && fallbackCfg.contracts) || {};
   const fallbackChainId = Number(cfg?.networkChainId || fallbackCfg?.networkChainId || 0) || undefined;
+  const chainDefaultContracts: AnyRecord = fallbackChainId
+    ? ((getSessionContractsForChain(fallbackChainId) || {}) as AnyRecord)
+    : {};
 
   // 1) Copy all contract keys with per-field fallback to demo session config.
-  const keys = new Set([...Object.keys(fallbackContracts), ...Object.keys(declared)]);
+  const keys = new Set([
+    ...Object.keys(chainDefaultContracts || {}),
+    ...Object.keys(fallbackContracts),
+    ...Object.keys(declared),
+  ]);
   keys.forEach((key) => {
     const primary = normalizeContractRef(declared[key]);
     const secondary = normalizeContractRef(fallbackContracts[key]);
-    const address = primary.address || secondary.address || '';
+    const tertiary = normalizeContractRef((chainDefaultContracts || {})[key]);
+    const address = primary.address || secondary.address || tertiary.address || '';
     if (address) {
       out[key] = {
         address,
-        chainId: Number(primary.chainId || secondary.chainId || fallbackChainId || 0) || undefined,
+        chainId: Number(primary.chainId || secondary.chainId || tertiary.chainId || fallbackChainId || 0) || undefined,
       };
     }
   });
@@ -68,11 +77,14 @@ function getSessionAddresses(cfg: AnyRecord | null | undefined): Record<string, 
     if (out[contractKey]?.address) return;
     const fromCfg = resolveSessionContractRef({ sessionConfig: cfg, contractKey });
     const fromFallback = resolveSessionContractRef({ sessionConfig: fallbackCfg, contractKey });
-    const address = String(fromCfg.address || fromFallback.address || '').trim();
+    const fromChainDefault = normalizeContractRef((chainDefaultContracts || {})[contractKey]);
+    const address = String(fromCfg.address || fromFallback.address || fromChainDefault.address || '').trim();
     if (!address) return;
     out[contractKey] = {
       address,
-      chainId: Number(fromCfg.chainId || fromFallback.chainId || fallbackChainId || 0) || undefined,
+      chainId: Number(
+        fromCfg.chainId || fromFallback.chainId || fromChainDefault.chainId || fallbackChainId || 0
+      ) || undefined,
     };
   });
 

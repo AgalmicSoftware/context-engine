@@ -892,7 +892,7 @@ export function computePolisPcaBundle(ratingMatrix = [], options = {}) {
 
 export function computePolisStats(ratingMatrix = []) {
   const [nComments, nParticipants] = matrixShape(ratingMatrix);
-  const participantVotes = countVotesPerParticipant(ratingMatrix, isBinaryVote);
+  const participantVotes = countVotesPerParticipant(ratingMatrix, isCountedVote);
   const totalVotes = participantVotes.reduce((sum, count) => sum + count, 0);
   const voters = participantVotes.filter((count) => count > 0).length;
   return {

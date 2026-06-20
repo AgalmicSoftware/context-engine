@@ -296,6 +296,73 @@ describe('surveyResultsQuestionNetworkReadController', () => {
     });
   });
 
+  it('keeps response-derived live metadata for an authoritative pinned session route', () => {
+    const readQuestionBucket = jest.fn(() => ({
+      questionsLatestBlock: 23,
+      questionResponsesLatestBlock: 24,
+      questions: {
+        qlive: {
+          id: 'qlive',
+          prompt: 'Live response-backed prompt',
+          sessionSlug: 'demo',
+          sessionSlugExplicit: true,
+          source: 'response-payload',
+          __ceQuestionMetadataFromResponse: true,
+        },
+        qbucket: {
+          id: 'qbucket',
+          prompt: 'Bucket-inferred prompt',
+          sessionSlug: 'demo',
+          sessionSlugExplicit: false,
+          source: 'response-payload',
+          __ceQuestionMetadataFromResponse: true,
+        },
+        qforeign: {
+          id: 'qforeign',
+          prompt: 'Foreign prompt',
+          sessionSlug: 'edge',
+          sessionSlugExplicit: true,
+          source: 'response-payload',
+          __ceQuestionMetadataFromResponse: true,
+        },
+      },
+      questionResponses: {
+        qlive: {
+          '0xAAA': { answer: { value: 'Agree' } },
+        },
+        qbucket: {
+          '0xBBB': { answer: { value: 'Unsure' } },
+        },
+        qforeign: {
+          '0xCCC': { answer: { value: 'Disagree' } },
+        },
+      },
+    }));
+
+    const result = runSurveyResultsQuestionNetworkReadController({
+      netIdStr: 11155420,
+      questionReadSlugs: ['demo'],
+      ports: {
+        readQuestionBucket,
+      },
+      requireAuthoritativeBinding: true,
+      viewMode: 'questions',
+    });
+
+    expect(result.result.questions).toEqual({
+      qlive: expect.objectContaining({
+        prompt: 'Live response-backed prompt',
+        sessionSlug: 'demo',
+        sessionSlugExplicit: true,
+      }),
+    });
+    expect(result.result.questionResponses).toEqual({
+      qlive: {
+        '0xAAA': { answer: { value: 'Agree' } },
+      },
+    });
+  });
+
   it('uses the async read port only when the injected peek port misses', async () => {
     const peekBucket = {
       questionsLatestBlock: 20,

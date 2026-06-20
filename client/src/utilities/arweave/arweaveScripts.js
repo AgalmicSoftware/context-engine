@@ -1347,7 +1347,7 @@ const resolveDownloadGatewaysForContext = (opts = {}, debugContext = null) => {
     ? normalizeGatewayList(opts.gateways)
     : [];
   if (configuredGateways.length) return configuredGateways;
-  return getDefaultArweaveGateways();
+  return getDefaultArweaveGateways(opts);
 };
 
 const resolveDirectToArIoForContext = (opts = {}, debugContext = null) => {

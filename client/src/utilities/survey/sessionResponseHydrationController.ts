@@ -6,6 +6,10 @@ import {
   ensureQuestionArweaveCacheBranches,
   mergeQuestionArweaveCacheBranches,
 } from '../arweave/arweaveRetryHelpers.js';
+import {
+  DEFAULT_SESSION_SCAN_MAX_BLOCK_RANGE,
+  readSessionScanMaxBlockRange,
+} from '../session/sessionScanScope.js';
 import { resolvePersistedQuestionResponsesWatermark } from './questionResponsesWatermark.js';
 import { shouldFlushCoalescedRun } from '../../components/MainSite/progressHelpers.js';
 
@@ -120,6 +124,12 @@ interface PartialResponseAggregateRow extends CacheRecord {
 
 type PartialResponseAggregate = Record<string, PartialResponseAggregateRow[]>;
 
+interface HandlePartialResponseDataOptions {
+  advanceWatermark?: boolean;
+}
+
+const RECENT_RESPONSE_PREFETCH_WINDOW_COUNT = 12;
+
 interface ResponseHydrationContractScripts {
   getRelevantBlockWindowForFilter: (
     slug: string
@@ -202,6 +212,12 @@ const toRecord = (value: unknown): CacheRecord => (
   isRecord(value) ? value : {}
 );
 
+const readString = (value: unknown = ''): string => String(value || '').trim();
+
+const normalizeSessionIdentity = (value: unknown = ''): string => (
+  normalizeSessionSlug(readString(value))
+);
+
 const isPendingQuestionMetadataPlaceholder = (value: unknown): boolean => (
   isRecord(value) && value.__ceQuestionMetadataPending === true
 );
@@ -210,10 +226,100 @@ const hasHydratedQuestionMetadata = (value: unknown): boolean => (
   isRecord(value) && !isPendingQuestionMetadataPlaceholder(value)
 );
 
+const readRecordFromResponsePayload = (value: unknown): CacheRecord | null => {
+  if (isRecord(value)) return value;
+  if (typeof value !== 'string') return null;
+  try {
+    const parsed = JSON.parse(value);
+    return isRecord(parsed) ? parsed : null;
+  } catch (_: unknown) {
+    return null;
+  }
+};
+
+const firstNonEmptyString = (...values: unknown[]): string => {
+  for (const value of values) {
+    const next = readString(value);
+    if (next) return next;
+  }
+  return '';
+};
+
+const buildQuestionMetadataFromResponsePayload = (
+  questionId: string,
+  responseValue: unknown,
+  slug: unknown
+): CacheRecord | null => {
+  const response = readRecordFromResponsePayload(responseValue);
+  if (!response) return null;
+
+  const nestedQuestion = isRecord(response.question) ? response.question : {};
+  const nestedMetadata = isRecord(response.metadata) ? response.metadata : {};
+  const nestedMeta = isRecord(response.meta) ? response.meta : {};
+  const answer = isRecord(response.answer) ? response.answer : {};
+  const prompt = firstNonEmptyString(
+    response.prompt,
+    response.questionPrompt,
+    response.questionText,
+    response.statement,
+    typeof response.question === 'string' ? response.question : '',
+    nestedQuestion.prompt,
+    nestedQuestion.text,
+    nestedQuestion.questionText,
+    nestedMetadata.prompt,
+    nestedMeta.prompt
+  );
+  if (!prompt) return null;
+
+  const responseType = firstNonEmptyString(
+    response.type,
+    response.questionType,
+    response.kind,
+    nestedQuestion.type,
+    nestedQuestion.questionType,
+    nestedMetadata.type,
+    nestedMeta.type
+  ).toLowerCase();
+  const inferredBinaryType = readString(answer.value) ? 'binary' : '';
+  const questionType = responseType || inferredBinaryType || 'binary';
+  const payloadSessionSlug = normalizeSessionIdentity(firstNonEmptyString(
+    response.sessionSlug,
+    response.slug,
+    nestedQuestion.sessionSlug,
+    nestedMetadata.sessionSlug,
+    nestedMeta.sessionSlug
+  ));
+  const hasScopedBucketSlug = slug !== undefined && slug !== null;
+  const bucketSessionSlug = normalizeSessionIdentity(slug);
+  const resolvedSessionSlug = hasScopedBucketSlug
+    ? bucketSessionSlug
+    : payloadSessionSlug;
+
+  return {
+    id: questionId,
+    questionId,
+    questionID: questionId,
+    prompt,
+    question: prompt,
+    text: prompt,
+    type: questionType,
+    questionType,
+    ...(hasScopedBucketSlug || payloadSessionSlug
+      ? {
+          sessionSlug: resolvedSessionSlug,
+          sessionSlugExplicit: true,
+        }
+      : {}),
+    source: 'response-payload',
+    __ceQuestionMetadataFromResponse: true,
+  };
+};
+
 const seedPendingQuestionMetadataFromResponse = (
   net: QuestionCacheNetworkNode,
   qid: unknown,
-  _slug: unknown
+  slug: unknown,
+  responseValue: unknown = null
 ): boolean => {
   const questionId = String(qid || '').trim().toLowerCase();
   if (!questionId || !net || typeof net !== 'object') return false;
@@ -225,6 +331,15 @@ const seedPendingQuestionMetadataFromResponse = (
 
   const existingQuestion = net.questions[questionId];
   if (hasHydratedQuestionMetadata(existingQuestion)) return false;
+
+  const responseBackedMetadata = buildQuestionMetadataFromResponsePayload(questionId, responseValue, slug);
+  if (responseBackedMetadata) {
+    net.questions[questionId] = responseBackedMetadata;
+    if (net.pendingQuestionMetadata[questionId]) {
+      delete net.pendingQuestionMetadata[questionId];
+    }
+    return true;
+  }
 
   let changed = false;
   if (!net.pendingQuestionMetadata[questionId]) {
@@ -240,6 +355,152 @@ const seedPendingQuestionMetadataFromResponse = (
 
   return changed;
 };
+
+const addSessionIdentityCandidate = (target: Set<string>, value: unknown): void => {
+  const raw = readString(value);
+  if (!raw) return;
+  target.add(raw.toLowerCase());
+  const normalized = normalizeSessionIdentity(raw);
+  if (normalized) target.add(normalized);
+};
+
+const collectSessionIdentityCandidates = (value: unknown, target: Set<string> = new Set()): Set<string> => {
+  if (!isRecord(value)) return target;
+  addSessionIdentityCandidate(target, value.sessionSlug);
+  addSessionIdentityCandidate(target, value.slug);
+  addSessionIdentityCandidate(target, value.sessionName);
+  addSessionIdentityCandidate(target, value.groupName);
+  addSessionIdentityCandidate(target, value.group);
+
+  [
+    value.metadata,
+    value.meta,
+    value.session,
+    value.sessionMetadata,
+    value.context,
+  ].forEach((nested) => {
+    if (typeof nested === 'string') {
+      addSessionIdentityCandidate(target, nested);
+      return;
+    }
+    if (isRecord(nested)) {
+      collectSessionIdentityCandidates(nested, target);
+    }
+  });
+
+  return target;
+};
+
+const tryParseResponseRecord = (value: unknown): CacheRecord | null => {
+  if (isRecord(value)) return value;
+  if (typeof value !== 'string') return null;
+  const raw = value.trim();
+  if (!raw || raw[0] !== '{') return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return isRecord(parsed) ? parsed : null;
+  } catch (_) {
+    return null;
+  }
+};
+
+const buildAllowedResponseSessionIdentities = (slug: string): Set<string> => {
+  const allowed = new Set<string>();
+  addSessionIdentityCandidate(allowed, slug);
+
+  const normalizedSlug = normalizeSessionIdentity(slug);
+  const scriptsAny = contractScripts as unknown as Record<string, unknown>;
+
+  const addConfigIdentities = (cfg: unknown): void => {
+    if (!isRecord(cfg)) return;
+    addSessionIdentityCandidate(allowed, cfg.slug);
+    addSessionIdentityCandidate(allowed, cfg.sessionSlug);
+    addSessionIdentityCandidate(allowed, cfg.sessionName);
+    addSessionIdentityCandidate(allowed, cfg.name);
+    addSessionIdentityCandidate(allowed, cfg.title);
+  };
+
+  const readSessionConfig = scriptsAny.getSessionConfigBySlug as ((slug: string) => unknown) | undefined;
+  if (typeof readSessionConfig === 'function') {
+    try {
+      addConfigIdentities(readSessionConfig(normalizedSlug || slug));
+    } catch (_) {
+      // Optional compatibility resolvers are best-effort only.
+    }
+  }
+
+  const readDemoConfig = scriptsAny.getDemoSessionConfigBySlug as (
+    (slug: string, opts?: { allowDemoFallback?: boolean }) => unknown
+  ) | undefined;
+  if (typeof readDemoConfig === 'function') {
+    try {
+      addConfigIdentities(readDemoConfig(normalizedSlug || slug));
+      if (normalizedSlug === '' || normalizedSlug === 'demo') {
+        addConfigIdentities(readDemoConfig('', { allowDemoFallback: true }));
+      }
+    } catch (_) {
+      // Optional compatibility resolvers are best-effort only.
+    }
+  }
+
+  // Historical demo responses may have used the display name before sessionSlug
+  // was consistently injected into single-question response payloads.
+  if (normalizedSlug === '' || normalizedSlug === 'demo') {
+    addSessionIdentityCandidate(allowed, 'demo');
+    addSessionIdentityCandidate(allowed, 'Context Engine');
+  }
+
+  return allowed;
+};
+
+const shouldKeepResponseForSession = (
+  row: PartialResponseAggregateRow,
+  slug: string,
+  allowedIdentities: Set<string>
+): boolean => {
+  const explicitCandidates = new Set<string>();
+  collectSessionIdentityCandidates(row, explicitCandidates);
+  const responseRecord = tryParseResponseRecord(row?.response);
+  if (responseRecord) {
+    collectSessionIdentityCandidates(responseRecord, explicitCandidates);
+  }
+
+  if (explicitCandidates.size === 0) return true;
+  for (const candidate of explicitCandidates) {
+    if (allowedIdentities.has(candidate)) return true;
+    const normalized = normalizeSessionIdentity(candidate);
+    if (normalized && allowedIdentities.has(normalized)) return true;
+  }
+  mainSiteLog.debug('Skipping response payload for non-matching session identity', {
+    slug,
+    candidates: Array.from(explicitCandidates),
+  });
+  return false;
+};
+
+const filterPartialResponseAggregateForSession = (
+  partialAgg: PartialResponseAggregate,
+  slug: string
+): PartialResponseAggregate => {
+  const allowedIdentities = buildAllowedResponseSessionIdentities(slug);
+  const scoped: PartialResponseAggregate = {};
+  Object.keys(partialAgg || {}).forEach((qId) => {
+    const rows = Array.isArray(partialAgg[qId]) ? partialAgg[qId] : [];
+    const kept = rows.filter((row) => shouldKeepResponseForSession(
+      row,
+      slug,
+      allowedIdentities
+    ));
+    if (kept.length) scoped[qId] = kept;
+  });
+  return scoped;
+};
+
+const countPartialResponseRows = (partialAgg: PartialResponseAggregate): number => (
+  Object.values(partialAgg || {}).reduce((sum, rows) => (
+    sum + (Array.isArray(rows) ? rows.length : 0)
+  ), 0)
+);
 
 const createEmptyQuestionCacheNetworkNode = (initialLastBlockQR: number): QuestionCacheNetworkNode => ({
   questionsLatestBlock: initialLastBlockQR,
@@ -509,6 +770,9 @@ export const createSessionResponseHydrationController = (
       if (lastProcessedQRBlock < floorBlock) lastProcessedQRBlock = floorBlock;
 
       const latestBlock = baseTo;
+      const responseScanMaxBlockRange = readSessionScanMaxBlockRange(
+        DEFAULT_SESSION_SCAN_MAX_BLOCK_RANGE
+      );
 
       if (lastProcessedQRBlock >= latestBlock) {
         mainSiteLog.log('No new question responses to fetch: already up-to-date.');
@@ -1028,8 +1292,14 @@ export const createSessionResponseHydrationController = (
       const handlePartialData = (
         partialAgg: PartialResponseAggregate,
         chunkToBlock: number,
-        extra: CacheRecord = {}
-      ): void => {
+        extra: CacheRecord = {},
+        options: HandlePartialResponseDataOptions = {}
+      ): number => {
+        const shouldAdvanceWatermark = options.advanceWatermark !== false;
+        const scopedPartialAgg = filterPartialResponseAggregateForSession(partialAgg, slug);
+        const partialResponseCount = countPartialResponseRows(scopedPartialAgg);
+        if (!shouldAdvanceWatermark && partialResponseCount === 0) return 0;
+
         // Rebase the local pending snapshot onto fresh persisted state to avoid stale overwrites.
         const persistedQuestionsCache = (dgRead('questionsCache', slug) || {}) as QuestionCache;
         const fresh = mergeFreshQuestionsCacheIntoPendingSnapshot(
@@ -1074,12 +1344,12 @@ export const createSessionResponseHydrationController = (
         };
 
         // Merge partialAgg deterministically
-        Object.keys(partialAgg).forEach((qId) => {
-          seedPendingQuestionMetadataFromResponse(freshNet, qId, slug);
+        Object.keys(scopedPartialAgg).forEach((qId) => {
           if (!currentQR[qId]) currentQR[qId] = {};
           if (!metaQR[qId]) metaQR[qId] = {};
 
-          partialAgg[qId].forEach((respObj) => {
+          scopedPartialAgg[qId].forEach((respObj) => {
+            seedPendingQuestionMetadataFromResponse(freshNet, qId, slug, respObj?.response);
             const responderKey = String(respObj.responder || '').toLowerCase();
 
             const bn = Number(respObj.blockNumber ?? extra.chunkToBlock ?? chunkToBlock ?? 0);
@@ -1147,23 +1417,27 @@ export const createSessionResponseHydrationController = (
           });
         });
 
-        // Optimistically advance chunk watermark; final clamp uses processedToBlock.
-        const prevWatermark = Number(
-          (fresh[networkID] as QuestionCacheNetworkNode).questionResponsesLatestBlock
-        ) || 0;
         const thisChunkTo = Number(chunkToBlock) || 0;
-        (fresh[networkID] as QuestionCacheNetworkNode).questionResponsesLatestBlock = Math.max(
-          prevWatermark,
-          thisChunkTo
-        );
+        if (shouldAdvanceWatermark) {
+          // Optimistically advance chunk watermark; final clamp uses processedToBlock.
+          const prevWatermark = Number(
+            (fresh[networkID] as QuestionCacheNetworkNode).questionResponsesLatestBlock
+          ) || 0;
+          (fresh[networkID] as QuestionCacheNetworkNode).questionResponsesLatestBlock = Math.max(
+            prevWatermark,
+            thisChunkTo
+          );
+        }
 
         pendingResponseChunkCount += 1;
         hasPendingQuestionsCacheWrite = true;
         pendingQuestionsCacheSnapshot = fresh;
-        pendingQuestionsCacheWatermark = Math.max(
-          Number(pendingQuestionsCacheWatermark || 0),
-          thisChunkTo
-        );
+        if (shouldAdvanceWatermark) {
+          pendingQuestionsCacheWatermark = Math.max(
+            Number(pendingQuestionsCacheWatermark || 0),
+            thisChunkTo
+          );
+        }
 
         // Write user cache
         if (userCacheModified) {
@@ -1175,21 +1449,143 @@ export const createSessionResponseHydrationController = (
           responseUserCache = userCache;
           questionsCache = fresh;
         }
+
+        return partialResponseCount;
       };
 
-      try {
+      const publishPartialResponseData = (): void => {
+        if (suppressUiState) {
+          queueLocalRevisionUpdate({ needsQuestionResponsesNonce: true });
+          return;
+        }
+        setResponseState((prev) => ({
+          questionResponsesNonce: Number(prev.questionResponsesNonce || 0) + 1,
+        }));
+      };
+
+      const scanResponseWindow = async ({
+        fromBlock,
+        toBlock,
+        advanceWatermark,
+      }: {
+        fromBlock: number;
+        toBlock: number;
+        advanceWatermark: boolean;
+      }): Promise<{
+        processedWindowToBlock: number;
+        responseRowsMerged: number;
+      }> => {
+        let processedWindowToBlock = fromBlock - 1;
+        let responseRowsMerged = 0;
         await responseHydrationContractScripts.getQuestionResponsesChunkedWithCallback(
           'none',
-          lastProcessedQRBlock + 1,
-          latestBlock,
-          handleProgress,
-          handlePartialData,
+          fromBlock,
+          toBlock,
+          (info: {
+            chunkFrom: number;
+            chunkTo: number;
+            chunkEventCount: number;
+            overallEventCount: number;
+          }) => {
+            handleProgress(info);
+          },
+          (
+            partialAgg: PartialResponseAggregate,
+            chunkToBlock: number,
+            extra: CacheRecord = {}
+          ) => {
+            const completedBlock = Number(chunkToBlock) || 0;
+            processedWindowToBlock = Math.max(processedWindowToBlock, completedBlock);
+            responseRowsMerged += handlePartialData(partialAgg, chunkToBlock, extra, { advanceWatermark });
+          },
           slug,
           { forceArweaveFetch }
         );
-      } catch (e: unknown) {
-        mainSiteLog.error('getQuestionResponsesChunkedWithCallback failed:', e);
-        // DO NOT mark complete; we’ll leave the watermark where we truly got to (processedToBlock)
+
+        flushResponsePartialWrites({ force: true });
+        await Promise.allSettled(pendingPersistenceWrites);
+
+        return {
+          processedWindowToBlock,
+          responseRowsMerged,
+        };
+      };
+
+      const firstHistoricalResponseBlock = lastProcessedQRBlock + 1;
+      const recentPrefetchBlockSpan = responseScanMaxBlockRange * RECENT_RESPONSE_PREFETCH_WINDOW_COUNT;
+      const recentPrefetchFrom = Math.max(
+        firstHistoricalResponseBlock,
+        latestBlock - recentPrefetchBlockSpan + 1
+      );
+      let nextResponseScanFrom = lastProcessedQRBlock + 1;
+      let ranRecentPrefetch = false;
+      const runRecentResponsePrefetch = async (): Promise<void> => {
+        if (ranRecentPrefetch) return;
+        ranRecentPrefetch = true;
+        if (
+          recentPrefetchFrom <= nextResponseScanFrom ||
+          responseScanMaxBlockRange <= 0
+        ) {
+          return;
+        }
+        let recentWindowFrom = recentPrefetchFrom;
+        while (
+          recentWindowFrom <= latestBlock &&
+          !_destroyed &&
+          isMounted()
+        ) {
+          const recentWindowTo = Math.min(
+            latestBlock,
+            recentWindowFrom + responseScanMaxBlockRange - 1
+          );
+          try {
+            const { responseRowsMerged } = await scanResponseWindow({
+              fromBlock: recentWindowFrom,
+              toBlock: recentWindowTo,
+              advanceWatermark: false,
+            });
+            if (responseRowsMerged > 0) {
+              publishPartialResponseData();
+            }
+          } catch (e: unknown) {
+            mainSiteLog.warn('recent response prefetch failed; continuing historical scan', e);
+            break;
+          }
+          recentWindowFrom = recentWindowTo + 1;
+        }
+      };
+      while (
+        nextResponseScanFrom <= latestBlock &&
+        !_destroyed &&
+        isMounted()
+      ) {
+        const responseScanTo = Math.min(
+          latestBlock,
+          nextResponseScanFrom + responseScanMaxBlockRange - 1
+        );
+        let windowProcessedToBlock = nextResponseScanFrom - 1;
+        try {
+          const result = await scanResponseWindow({
+            fromBlock: nextResponseScanFrom,
+            toBlock: responseScanTo,
+            advanceWatermark: true,
+          });
+          windowProcessedToBlock = result.processedWindowToBlock;
+          if (result.responseRowsMerged > 0) {
+            publishPartialResponseData();
+          }
+        } catch (e: unknown) {
+          mainSiteLog.error('getQuestionResponsesChunkedWithCallback failed:', e);
+          // DO NOT mark complete; we’ll leave the watermark where we truly got to (processedToBlock)
+          break;
+        }
+
+        if (windowProcessedToBlock < nextResponseScanFrom) {
+          break;
+        }
+
+        nextResponseScanFrom = windowProcessedToBlock + 1;
+        await runRecentResponsePrefetch();
       }
 
       flushResponsePartialWrites({ force: true });
@@ -1382,7 +1778,7 @@ export const createSessionResponseHydrationController = (
         let userCacheUpdated = false;
 
         nextByQid.forEach((response, qId) => {
-          seedPendingQuestionMetadataFromResponse(net, qId, slug);
+          seedPendingQuestionMetadataFromResponse(net, qId, slug, response);
           if (!net.questionResponses[qId] || typeof net.questionResponses[qId] !== 'object') {
             net.questionResponses[qId] = {};
           }

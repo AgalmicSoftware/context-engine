@@ -137,6 +137,7 @@ import FooterRaw from "../Footer/Footer";
 import LazyFallbackRaw from "../Shared/LazyFallback";
 import DevE2eNavRaw from "../E2E/DevE2eNav";
 import RouteErrorBoundaryRaw from '../ErrorBoundary/RouteErrorBoundary';
+import { getPolisDemoQuestionPool } from '../SurveyTool/surveyPolisDemoQuestionPool';
 
 import { createLogger } from 'utilities/logging.js';
 import {
@@ -658,6 +659,21 @@ type MainSiteProfileScanControllerBootstrap = SessionProfileScanController & {
 const isMainSiteRecord = (value: unknown): value is Record<string, unknown> => (
   value !== null && typeof value === 'object'
 );
+
+const hasMainSiteRegistryIdentity = (
+  sessionConfig: MainSiteSessionConfigLike | null | undefined
+): boolean => {
+  if (!isMainSiteRecord(sessionConfig)) return false;
+  const registry = isMainSiteRecord(sessionConfig.__registry) ? sessionConfig.__registry : {};
+  return !!(
+    sessionConfig.sessionId ||
+    sessionConfig.sessionIdHex ||
+    sessionConfig.metadataURI ||
+    registry.sessionId ||
+    registry.sessionIdHex ||
+    registry.metadataURI
+  );
+};
 
 const isMainSitePresent = <T,>(value: T | null | undefined): value is T => (
   value !== null && value !== undefined
@@ -1362,9 +1378,16 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     const normalized = normalizeSessionSlug(slugIn ?? '');
     const strictCfg = this.getSessionCfg(normalized);
     if (strictCfg) return strictCfg;
-    return (
+    const demoCfg = (
       getDemoSessionConfigBySlug(normalized, { allowDemoFallback: true }) as MainSiteSessionConfigLike | null
     ) || null;
+    if (demoCfg) return demoCfg;
+    if (normalized === 'demo') {
+      return (
+        getDemoSessionConfigBySlug('', { allowDemoFallback: true }) as MainSiteSessionConfigLike | null
+      ) || null;
+    }
+    return null;
   };
 
   getDisplaySessionChainId = (slugIn: unknown): number | null => {
@@ -1867,6 +1890,50 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     }
     this.DG.write('questionsCache', slug, questionsCache);
     return true;
+  };
+
+  isBuiltInDemoSessionRoutePath = (pathIn: unknown = ''): boolean => {
+    const routePath = this.getEffectiveRoutePath(String(pathIn || this.getCurrentPathname() || ''));
+    return routePath === '/session/demo' || routePath.startsWith('/session/demo/');
+  };
+
+  seedBuiltInDemoQuestionCache = (): boolean => {
+    const questionPool = getPolisDemoQuestionPool();
+    if (!Array.isArray(questionPool) || questionPool.length === 0) return false;
+
+    const networkID = String(
+      this.getDisplaySessionChainId('demo') ||
+      this.getSessionChainId('demo') ||
+      this.getSessionChainId('') ||
+      DEFAULT_CHAIN_ID ||
+      ''
+    );
+    if (!networkID) return false;
+
+    const targetSlugs = ['', 'demo'];
+    let wroteAny = false;
+    targetSlugs.forEach((slug) => {
+      questionPool.forEach((question) => {
+        const questionId = String(question?.id || '').trim().toLowerCase();
+        if (!questionId) return;
+        const didWrite = this.writeQuestionMetadataToCache(
+          slug,
+          questionId,
+          question as MetadataRecord,
+          networkID,
+          { enforceScopedIsolation: false }
+        );
+        wroteAny = wroteAny || didWrite;
+      });
+    });
+
+    if (wroteAny) {
+      this.setReadinessStateIfChanged({
+        isQuestionCacheReady: true,
+        questionScanProgress: null,
+      }, this.checkAllCachesReady);
+    }
+    return wroteAny;
   };
 
   findGroupSlugForSurvey = (surveyID: string | null | undefined): string => {
@@ -3839,9 +3906,9 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
 
     // Cache busting (versioned; slug-scoped)
     try {
-      // Demo session question data was resubmitted with tighter block limits. Force a one-time
-      // refresh of derived caches so stale broad-scan question/response data cannot survive.
-      const CURRENT_CACHE_VERSION = '2026-06-18-demo-session-worker-cache-bust-v2';
+      // Demo question data and OP Sepolia SBT log-provider inputs both changed.
+      // Force a one-time refresh so stale derived caches cannot survive the sync.
+      const CURRENT_CACHE_VERSION = '2026-06-19-demo-session-and-sbt-cache-sync-v1';
       const VERSION_KEY = 'appCacheVersion';
       const storedVersion = localStorage.getItem(VERSION_KEY);
       if (storedVersion !== CURRENT_CACHE_VERSION) {
@@ -3919,6 +3986,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
       pathname === '/questions/' ||
       pathname.startsWith('/question/') ||
       pathname.startsWith('/questions/results');
+    const isBuiltInDemoSessionRoute = this.isBuiltInDemoSessionRoutePath(pathname);
     mainSiteLog.log(isDemoPath ? "Initializing caches (demo prioritized order)..." : "Initializing caches sequentially...");
 
 
@@ -4057,7 +4125,11 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
         }
       } else if (isDemoPath) {
         // Demo prioritized: Questions -> (SBT partial) -> listeners -> Responses -> Surveys
-        await this.initializeQuestionCache();
+        if (isBuiltInDemoSessionRoute) {
+          this.seedBuiltInDemoQuestionCache();
+        } else {
+          await this.initializeQuestionCache();
+        }
         mainSiteLog.log("Question cache initialized (demo priority).");
 
         // Very light partial pass so group names/icons render fast
@@ -4363,6 +4435,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
             this.isSbtListRoutePath(currPath) ||
             currPath.startsWith('/sbt/') ||
             currPath.startsWith('/group/');
+          const isBuiltInDemoSessionRoute = this.isBuiltInDemoSessionRoutePath(currPath);
 
           const sessionNet = this.getInitializableSessionNetwork(nextActiveSlug, currPath);
           if (sessionNet && sessionNet.id) {
@@ -4402,7 +4475,11 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
               }
             } else {
               // Demo prioritized: Questions -> (SBT partial) -> listeners -> Responses -> Surveys
-              await this.initializeQuestionCacheWithGeneralBackfill(nextActiveSlug);
+              if (isBuiltInDemoSessionRoute) {
+                this.seedBuiltInDemoQuestionCache();
+              } else {
+                await this.initializeQuestionCacheWithGeneralBackfill(nextActiveSlug);
+              }
               if (!isCacheReinitRunActive()) return;
 
               await this.initializeSbtCacheWithGeneralBackfill(nextActiveSlug, { mode: 'partial' });
@@ -4801,7 +4878,17 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
   };
 
   initializeQuestionCacheForGroup: SessionQuestionCacheController['initializeQuestionCacheForGroup'] =
-    (...args) => this._questionCacheController.initializeQuestionCacheForGroup(...args);
+    async (slug, opts) => {
+      const normalizedSlug = normalizeSessionSlug(slug || '');
+      if (
+        this.isBuiltInDemoSessionRoutePath() &&
+        (normalizedSlug === 'demo' || normalizedSlug === '')
+      ) {
+        this.seedBuiltInDemoQuestionCache();
+        return;
+      }
+      return this._questionCacheController.initializeQuestionCacheForGroup(slug, opts);
+    };
 
   fetchQuestionResponsesChunked = async () => {
     return this.fetchQuestionResponsesChunkedWithGeneralBackfill(this.getActiveSessionSourceSlug());
@@ -5749,15 +5836,37 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
 
     // Note: Specific survey ID routes are intercepted above.
     // This block now primarily handles /surveys (list) and /questions (list).
-    const slugStatus = this._sessionPathResolver.getSlugStatus(String(defaultSlug || ''));
+    const isQuestionsListRoute = fullPath.startsWith('/questions');
+    const initialQuestionRouteSession = isQuestionsListRoute
+      ? resolveMainSiteQuestionRouteSessionContext({
+        search: searchStr,
+        isCacheManagerReady: this.state.isCacheManagerReady,
+        getSessionConfigBySlug: (slug: string) => this.getDisplaySessionCfg(slug),
+        formatSessionId: sessionRegistryUtils.formatSessionId,
+        resolveSessionConfigById: (sessionId: string | number) => sessionRegistryStore.getSessionConfigById(sessionId),
+      })
+      : null;
+    const inheritedNetworkWaitSlug = (
+      isQuestionsListRoute &&
+      initialQuestionRouteSession?.sessionSlugPinned
+        ? initialQuestionRouteSession.sessionSlug
+        : defaultSlug
+    );
+    const inheritedNetworkWaitCfg = inheritedNetworkWaitSlug === defaultSlug
+      ? defaultSessionCfg
+      : this.getDisplaySessionCfg(inheritedNetworkWaitSlug);
+    const inheritedNetworkWaitChainId = inheritedNetworkWaitSlug === defaultSlug
+      ? defaultSessionChainId
+      : this.getDisplaySessionChainId(inheritedNetworkWaitSlug);
+    const slugStatus = this._sessionPathResolver.getSlugStatus(String(inheritedNetworkWaitSlug || ''));
     const shouldWaitForInheritedSessionNetwork = (
-      !!defaultSlug &&
-      !defaultSessionChainId &&
-      !defaultSessionCfg?.networkChainId &&
+      !!inheritedNetworkWaitSlug &&
+      !inheritedNetworkWaitChainId &&
+      !inheritedNetworkWaitCfg?.networkChainId &&
       (!slugStatus.hasAttempted || slugStatus.isPending)
     );
     if (shouldWaitForInheritedSessionNetwork) {
-      this.resolveSessionPathSlug(defaultSlug);
+      this.resolveSessionPathSlug(inheritedNetworkWaitSlug);
       return (
         <LazyFallback label={fullPath.startsWith('/questions') ? 'Loading Questions...' : 'Loading Surveys...'} />
       );
@@ -5786,16 +5895,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     const pageRootTestId = fullPath.startsWith('/questions')
       ? E2E_TESTIDS.PAGE_QUESTIONS_ROOT
       : E2E_TESTIDS.PAGE_SURVEYS_ROOT;
-    const isQuestionsListRoute = fullPath.startsWith('/questions');
-    const questionRouteSession = isQuestionsListRoute
-      ? resolveMainSiteQuestionRouteSessionContext({
-        search: searchStr,
-        isCacheManagerReady: this.state.isCacheManagerReady,
-        getSessionConfigBySlug,
-        formatSessionId: sessionRegistryUtils.formatSessionId,
-        resolveSessionConfigById: (sessionId: string | number) => sessionRegistryStore.getSessionConfigById(sessionId),
-      })
-      : {
+    const questionRouteSession = initialQuestionRouteSession || {
         sessionSlug: null,
         sessionId: null,
         sessionSlugKnown: false,
@@ -5819,21 +5919,75 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     const effectivePageNetwork = isQuestionsListRoute
       ? this.getDisplaySessionNetwork(effectivePageSlug)
       : defaultSessionNetwork;
+    const strictQuestionRouteSessionCfg = (
+      isQuestionsListRoute && questionRouteSession.sessionSlugPinned && effectivePageSlug
+        ? this.getSessionCfg(effectivePageSlug)
+        : null
+    );
+    const strictQuestionRouteChainId = (
+      isQuestionsListRoute && questionRouteSession.sessionSlugPinned && effectivePageSlug
+        ? this.getSessionChainId(effectivePageSlug)
+        : null
+    );
+    const shouldResolvePinnedQuestionRouteSession = !!(
+      isQuestionsListRoute &&
+      questionRouteSession.sessionSlugPinned &&
+      effectivePageSlug &&
+      effectivePageSessionCfg &&
+      (!strictQuestionRouteSessionCfg || !strictQuestionRouteChainId) &&
+      !hasMainSiteRegistryIdentity(effectivePageSessionCfg)
+    );
+    if (shouldResolvePinnedQuestionRouteSession) {
+      const slugStatus = this._sessionPathResolver.getSlugStatus(String(effectivePageSlug || ''));
+      const recentError = !!(
+        slugStatus.lastErrorTs &&
+        (Date.now() - slugStatus.lastErrorTs) < 2 * 60 * 1000
+      );
+      const keepResolving = recentError && slugStatus.retryCount > 0;
+      this.resolveSessionPathSlug(effectivePageSlug!);
+      if (!slugStatus.hasAttempted || slugStatus.isPending || keepResolving) {
+        return <LazyFallback label="Loading Questions..." />;
+      }
+    }
+    const shouldRefreshBuiltInDemoQuestionSources = (
+      isQuestionsListRoute &&
+      questionRouteSession.sessionSlugPinned &&
+      normalizeSessionSlug(effectivePageSlug || '') === 'demo'
+    );
     const pageRefreshSurveyResponsesByID = (
       isQuestionsListRoute && questionRouteSession.sessionSlugPinned
-        ? ((id: string) => this.refreshSurveyResponsesByIDForGroup(effectivePageSlug!, id))
+        ? ((id: string) => {
+          const primary = this.refreshSurveyResponsesByIDForGroup(effectivePageSlug!, id);
+          if (!shouldRefreshBuiltInDemoQuestionSources) return primary;
+          return Promise.all([
+            Promise.resolve(primary),
+            Promise.resolve(this.refreshSurveyResponsesByIDForGroup('', id)),
+          ]).then(() => undefined);
+        })
         : this.refreshSurveyResponsesByID
     );
     const pageRefreshQuestionMetadata = (
       isQuestionsListRoute && questionRouteSession.sessionSlugPinned
-        ? ((opts = {}) => this.refreshQuestionMetadataForGroup(effectivePageSlug!, opts))
+        ? ((opts = {}) => {
+          const primary = this.refreshQuestionMetadataForGroup(effectivePageSlug!, opts);
+          if (!shouldRefreshBuiltInDemoQuestionSources) return primary;
+          return Promise.all([
+            Promise.resolve(primary),
+            Promise.resolve(this.refreshQuestionMetadataForGroup('', opts)),
+          ]).then(() => undefined);
+        })
         : this.refreshQuestionMetadata
     );
     const pageRefreshQuestionResponses = (
       isQuestionsListRoute && questionRouteSession.sessionSlugPinned
-        ? ((questionIds?: string[] | null, opts: RefreshQuestionResponsesOptions = {}) => (
-          this.refreshQuestionResponses(questionIds, { ...(opts || {}), slug: effectivePageSlug ?? undefined })
-        ))
+        ? ((questionIds?: string[] | null, opts: RefreshQuestionResponsesOptions = {}) => {
+          const primary = this.refreshQuestionResponses(questionIds, { ...(opts || {}), slug: effectivePageSlug ?? undefined });
+          if (!shouldRefreshBuiltInDemoQuestionSources) return primary;
+          return Promise.all([
+            Promise.resolve(primary),
+            Promise.resolve(this.refreshQuestionResponses(questionIds, { ...(opts || {}), slug: '' })),
+          ]).then(() => undefined);
+        })
         : this.refreshQuestionResponses
     );
     const pageRefreshSbtData = (
@@ -5897,7 +6051,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     const questionRouteSession = resolveMainSiteQuestionRouteSessionContext({
       search: searchStr,
       isCacheManagerReady: this.state.isCacheManagerReady,
-      getSessionConfigBySlug,
+      getSessionConfigBySlug: (slug: string) => this.getDisplaySessionCfg(slug),
       formatSessionId: sessionRegistryUtils.formatSessionId,
       resolveSessionConfigById: (sessionId: string | number) => sessionRegistryStore.getSessionConfigById(sessionId),
     });
@@ -6006,7 +6160,11 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
         sessionRegistryStore.getSessionConfig(slug) || getSessionConfigBySlug(slug)
       ),
       resolveDisplaySessionConfigBySlug: (slug: string) => (
-        getDemoSessionConfigBySlug(slug, { allowDemoFallback: true })
+        getDemoSessionConfigBySlug(slug, { allowDemoFallback: true }) || (
+          normalizeSessionSlug(slug) === 'demo'
+            ? getDemoSessionConfigBySlug('', { allowDemoFallback: true })
+            : null
+        )
       ),
       resolveSessionSlugFromPathToken: (sessionToken: string) => (
         sessionToken
@@ -6114,6 +6272,25 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
       return <div>Session not found.</div>;
     }
 
+    const sessionConfigSlug = normalizeSessionSlug(sessionConfig.slug || '');
+    const sessionRegistryInfo = (
+      sessionConfig.__registry &&
+      typeof sessionConfig.__registry === 'object'
+        ? sessionConfig.__registry
+        : {}
+    );
+    const sessionConfigHasRegistryIdentity = !!(
+      sessionConfig.sessionId ||
+      sessionConfig.sessionIdHex ||
+      sessionConfig.metadataURI ||
+      sessionRegistryInfo.sessionId ||
+      sessionRegistryInfo.sessionIdHex ||
+      sessionRegistryInfo.metadataURI
+    );
+    if (slug && sessionConfigSlug !== slug && !sessionConfigHasRegistryIdentity) {
+      this.resolveSessionPathSlug(slug);
+    }
+
     if (isDocsRoute) {
       const resolvedSlug = normalizeSessionSlug(sessionConfig.slug || slug);
       const sessionNetwork = this.getSessionNetwork(resolvedSlug) || defaultSessionNetwork;
@@ -6148,6 +6325,39 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
       sessionSlug: slug,
       sessionConfig,
     });
+    const sessionRouteDisplaySlug = normalizeSessionSlug(sessionConfig.slug || slug);
+    const shouldRefreshBuiltInDemoLiveBucket = (
+      normalizeSessionSlug(sessionTokenRaw) === 'demo' &&
+      sessionRouteDisplaySlug === 'demo' &&
+      sessionRouteSourceSlug === ''
+    );
+    const refreshSessionRouteSurveyResponsesByID = (id: string) => {
+      const primary = this.refreshSurveyResponsesByIDForGroup(sessionRouteSourceSlug, id);
+      if (!shouldRefreshBuiltInDemoLiveBucket) return primary;
+      return Promise.all([
+        Promise.resolve(primary),
+        Promise.resolve(this.refreshSurveyResponsesByIDForGroup('demo', id)),
+      ]).then(() => undefined);
+    };
+    const refreshSessionRouteQuestionMetadata = (opts = {}) => {
+      const primary = this.refreshQuestionMetadataForGroup(sessionRouteSourceSlug, opts);
+      if (!shouldRefreshBuiltInDemoLiveBucket) return primary;
+      return Promise.all([
+        Promise.resolve(primary),
+        Promise.resolve(this.refreshQuestionMetadataForGroup('demo', opts)),
+      ]).then(() => undefined);
+    };
+    const refreshSessionRouteQuestionResponses = (
+      questionIds?: string[] | null,
+      opts: RefreshQuestionResponsesOptions = {}
+    ) => {
+      const primary = this.refreshQuestionResponses(questionIds, { ...(opts || {}), slug: sessionRouteSourceSlug });
+      if (!shouldRefreshBuiltInDemoLiveBucket) return primary;
+      return Promise.all([
+        Promise.resolve(primary),
+        Promise.resolve(this.refreshQuestionResponses(questionIds, { ...(opts || {}), slug: 'demo' })),
+      ]).then(() => undefined);
+    };
     const resolvedSessionInfo = this.getSessionInfoForGroup(sessionConfig, sessionConfig?.slug || slug);
     const resolvedSessionName = this.getSessionNameForGroup(sessionConfig, sessionConfig?.slug || slug);
     const resolvedSessionHeader = this.getSessionHeaderForGroup(sessionConfig, sessionConfig?.slug || slug);
@@ -6177,11 +6387,9 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
               network={defaultSessionNetwork}
               {...loginViewProps}
               {...sessionCacheViewProps}
-              refreshSurveyResponsesByID={(id: string) => this.refreshSurveyResponsesByIDForGroup(sessionRouteSourceSlug, id)}
-              refreshQuestionMetadata={(opts = {}) => this.refreshQuestionMetadataForGroup(sessionRouteSourceSlug, opts)}
-              refreshQuestionResponses={(questionIds?: string[] | null, opts: RefreshQuestionResponsesOptions = {}) =>
-                this.refreshQuestionResponses(questionIds, { ...(opts || {}), slug: sessionRouteSourceSlug })
-              }
+              refreshSurveyResponsesByID={refreshSessionRouteSurveyResponsesByID}
+              refreshQuestionMetadata={refreshSessionRouteQuestionMetadata}
+              refreshQuestionResponses={refreshSessionRouteQuestionResponses}
               questionSessionSlug={sessionRouteSourceSlug}
               refreshSbtData={this.refreshSbtData}
               ensureLightSbtDiscovery={this.ensureLightSbtDiscovery}
@@ -6449,8 +6657,17 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
   refreshEncryptedQuestionPayloadsForGroup: RefreshEncryptedQuestionPayloadsForGroupFn = (slug, opts) =>
     this._questionCacheController.refreshEncryptedQuestionPayloadsForGroup(slug, opts);
 
-  refreshQuestionMetadataForGroup: RefreshQuestionMetadataForGroupFn = (slug, opts) =>
-    this._questionCacheController.refreshQuestionMetadataForGroup(slug, opts);
+  refreshQuestionMetadataForGroup: RefreshQuestionMetadataForGroupFn = async (slug, opts) => {
+    const normalizedSlug = normalizeSessionSlug(slug || '');
+    if (
+      this.isBuiltInDemoSessionRoutePath() &&
+      (normalizedSlug === 'demo' || normalizedSlug === '')
+    ) {
+      this.seedBuiltInDemoQuestionCache();
+      return;
+    }
+    return this._questionCacheController.refreshQuestionMetadataForGroup(slug, opts);
+  };
 
   refreshQuestionResponses: RefreshQuestionResponsesFn = (questionIds, opts) =>
     this._responseHydrationController.refreshQuestionResponses(questionIds, opts);

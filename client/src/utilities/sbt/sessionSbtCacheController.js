@@ -75,6 +75,65 @@ export const createSessionSbtCacheController = (host = {}) => {
   const getSessionChainId = (slug) => (
     typeof host.getSessionChainId === 'function' ? host.getSessionChainId(slug) : null
   );
+  const readSbtSessionBindingSource = (source = null) => {
+    if (!source || typeof source !== 'object') return null;
+    if (!Object.prototype.hasOwnProperty.call(source, 'sessionSlug')) return null;
+    const hasExplicitFlag = Object.prototype.hasOwnProperty.call(source, 'sessionSlugExplicit');
+    const explicit = hasExplicitFlag ? source.sessionSlugExplicit === true : true;
+    return {
+      slug: normalizeSessionSlug(source.sessionSlug || ''),
+      explicit,
+      hasExplicitFlag,
+    };
+  };
+  const withSessionScopedSbtCacheBinding = (entry = {}, slugIn = '') => {
+    const normalizedSlug = normalizeSessionSlug(slugIn || '');
+    const record = entry && typeof entry === 'object' ? entry : {};
+    const info = record.sbtInfo && typeof record.sbtInfo === 'object' ? record.sbtInfo : null;
+    const infoBinding = readSbtSessionBindingSource(info);
+    const recordBinding = readSbtSessionBindingSource(record);
+    let bindingSlug = normalizedSlug;
+    let bindingExplicit = false;
+    let includeExplicitFlag = true;
+
+    if (infoBinding?.explicit) {
+      bindingSlug = infoBinding.slug;
+      bindingExplicit = true;
+      includeExplicitFlag = infoBinding.hasExplicitFlag;
+    } else if (infoBinding?.hasExplicitFlag) {
+      // Fresh metadata that explicitly says the binding is inferred must win over
+      // stale cache records that previously promoted bucket membership to explicit.
+      bindingSlug = normalizedSlug;
+      bindingExplicit = false;
+      includeExplicitFlag = true;
+    } else if (recordBinding?.explicit) {
+      bindingSlug = recordBinding.slug;
+      bindingExplicit = true;
+      includeExplicitFlag = recordBinding.hasExplicitFlag;
+    }
+
+    const sessionBindingPatch = bindingExplicit
+      ? {
+        sessionSlug: bindingSlug,
+        ...(includeExplicitFlag ? { sessionSlugExplicit: true } : {}),
+      }
+      : {
+        sessionSlug: bindingSlug,
+        sessionSlugExplicit: false,
+      };
+
+    return {
+      ...record,
+      slug: normalizedSlug,
+      ...sessionBindingPatch,
+      sbtInfo: info
+        ? {
+          ...info,
+          ...sessionBindingPatch,
+        }
+        : record.sbtInfo,
+    };
+  };
   const getSessionScanScope = () => String(
     typeof host.getSessionScanScope === 'function' ? host.getSessionScanScope() || '' : ''
   );
@@ -276,7 +335,45 @@ export const createSessionSbtCacheController = (host = {}) => {
         let netCache = cache[networkID];
 
         const scannedUpTo = Number(netCache.lastBlock) || 0;
-        if (!opts.force && scannedUpTo >= baseTo) {
+        const hasListVisibleTokenUriMetadata = (info) => {
+          if (!info || typeof info !== 'object') return false;
+          if (info.tokenUriMetadataFetched === true) return true;
+          const hasText = (value) => value !== undefined && value !== null && String(value).trim() !== '';
+          const hasItems = (value) => Array.isArray(value) && value.length > 0;
+          const encryptedFields = info.encryptedFields && typeof info.encryptedFields === 'object'
+            ? info.encryptedFields
+            : {};
+          return (
+            hasText(info.description) ||
+            hasText(info.image) ||
+            hasText(info.descriptionEncrypted) ||
+            hasText(info.encryptedDescription) ||
+            hasText(info.imageEncrypted) ||
+            hasText(info.encryptedImage) ||
+            hasText(encryptedFields.description) ||
+            hasText(encryptedFields.image) ||
+            hasItems(info.tags) ||
+            hasItems(info.documentURLs) ||
+            hasItems(info.documentUrls) ||
+            hasItems(info.docURLs) ||
+            hasItems(info.documents)
+          );
+        };
+
+        const needsHydration = (info) => {
+          return !hasCoreSbtMetadata(info) || !hasListVisibleTokenUriMetadata(info);
+        };
+
+        const existingHydrationTargets = Object.entries(netCache.sbtList || {})
+          .map(([addrLower, entry]) => String(entry?.sbtAddress || addrLower || '').trim())
+          .filter((addr) => {
+            if (!addr) return false;
+            if (ignoredSet.has(addr.toLowerCase())) return false;
+            const existingEntry = netCache.sbtList?.[addr.toLowerCase()] || null;
+            return needsHydration(existingEntry?.sbtInfo || null);
+          });
+        const skipDiscoveryScan = !opts.force && scannedUpTo >= baseTo && existingHydrationTargets.length > 0;
+        if (!opts.force && scannedUpTo >= baseTo && existingHydrationTargets.length <= 0) {
           emitMainSiteSbtDebug('info', '[ensureLightSbtDiscovery] skipped (already at watermark)', {
             slug,
             networkID,
@@ -320,10 +417,6 @@ export const createSessionSbtCacheController = (host = {}) => {
           latestBlock: baseTo,
         });
 
-        const needsHydration = (info) => {
-          return !hasCoreSbtMetadata(info);
-        };
-
         const normalizeEnd = (info) => {
           if (!info) return info;
           if (info.mintingEndTime == null) return info;
@@ -333,14 +426,6 @@ export const createSessionSbtCacheController = (host = {}) => {
           return info;
         };
 
-        const existingHydrationTargets = Object.entries(netCache.sbtList || {})
-          .map(([addrLower, entry]) => String(entry?.sbtAddress || addrLower || '').trim())
-          .filter((addr) => {
-            if (!addr) return false;
-            if (ignoredSet.has(addr.toLowerCase())) return false;
-            const existingEntry = netCache.sbtList?.[addr.toLowerCase()] || null;
-            return needsHydration(existingEntry?.sbtInfo || null);
-          });
         let addrs = [];
         let lastLoggedDiscoveryPercent = -1;
         let discoveryComplete = false;
@@ -418,13 +503,13 @@ export const createSessionSbtCacheController = (host = {}) => {
               for (const { addr, lower, sbtInfo, refreshed } of results) {
                 const freshExisting = netCache.sbtList[lower] || {};
 
-                netCache.sbtList[lower] = {
+                netCache.sbtList[lower] = withSessionScopedSbtCacheBinding({
                   ...freshExisting,
                   sbtAddress: addr,
                   sbtInfo: sbtInfo || freshExisting.sbtInfo || null,
                   slug,
                   blockNumber: refreshed ? baseTo : (freshExisting.blockNumber || 0),
-                };
+                }, slug);
               }
 
               await dgWrite('sbtCache', slug, cache);
@@ -464,54 +549,64 @@ export const createSessionSbtCacheController = (host = {}) => {
         enqueueHydrationAddresses(existingHydrationTargets);
 
         try {
-          const discoveryOptions = {
-            ...(opts.force === true ? { force: true } : {}),
-            fromBlock: discoveryFromBlock,
-            toBlock: baseTo,
-            onProgress: (progress) => {
-              const totalBlocks = Number(progress?.totalBlocks || 0);
-              const scannedBlocks = Number(progress?.scannedBlocks || 0);
-              const ratio = totalBlocks > 0
-                ? Math.max(0, Math.min(1, scannedBlocks / totalBlocks))
-                : 1;
-              updateLightDiscoveryProgress(
-                Math.floor(ratio * SBT_LIGHT_DISCOVERY_SCAN_UNITS)
-              );
-              const percent = totalBlocks > 0
-                ? Math.max(0, Math.min(100, Math.floor(ratio * 100)))
-                : 100;
-              if (
-                percent === 100 ||
-                lastLoggedDiscoveryPercent < 0 ||
-                percent >= (lastLoggedDiscoveryPercent + 10)
-              ) {
-                lastLoggedDiscoveryPercent = percent;
-                emitMainSiteSbtDebug('info', '[ensureLightSbtDiscovery] discovery progress', {
-                  slug,
-                  networkID,
-                  scannedBlocks,
-                  totalBlocks,
-                  percent,
-                  scanFrom: progress?.scanFrom ?? null,
-                  scanTo: progress?.scanTo ?? null,
-                  lastScannedBlock: progress?.lastScannedBlock ?? null,
-                });
-              }
-            },
-            onDiscoveredAddresses: ({ addresses = [] }) => {
-              enqueueHydrationAddresses(addresses);
-            },
-          };
-          addrs = await contractScripts.getAllSbtAddressesCached(
-            'none',
-            discoveryGroupRef,
-            discoveryOptions
-          );
-          emitMainSiteSbtDebug('info', '[ensureLightSbtDiscovery] discovered raw SBT universe', {
-            slug,
-            networkID,
-            addressCount: Array.isArray(addrs) ? addrs.length : 0,
-          });
+          if (skipDiscoveryScan) {
+            emitMainSiteSbtDebug('info', '[ensureLightSbtDiscovery] skipped log scan; rehydrating cached metadata', {
+              slug,
+              networkID,
+              existingHydrationTargetCount: existingHydrationTargets.length,
+              scannedUpTo,
+              baseTo,
+            });
+          } else {
+            const discoveryOptions = {
+              ...(opts.force === true ? { force: true } : {}),
+              fromBlock: discoveryFromBlock,
+              toBlock: baseTo,
+              onProgress: (progress) => {
+                const totalBlocks = Number(progress?.totalBlocks || 0);
+                const scannedBlocks = Number(progress?.scannedBlocks || 0);
+                const ratio = totalBlocks > 0
+                  ? Math.max(0, Math.min(1, scannedBlocks / totalBlocks))
+                  : 1;
+                updateLightDiscoveryProgress(
+                  Math.floor(ratio * SBT_LIGHT_DISCOVERY_SCAN_UNITS)
+                );
+                const percent = totalBlocks > 0
+                  ? Math.max(0, Math.min(100, Math.floor(ratio * 100)))
+                  : 100;
+                if (
+                  percent === 100 ||
+                  lastLoggedDiscoveryPercent < 0 ||
+                  percent >= (lastLoggedDiscoveryPercent + 10)
+                ) {
+                  lastLoggedDiscoveryPercent = percent;
+                  emitMainSiteSbtDebug('info', '[ensureLightSbtDiscovery] discovery progress', {
+                    slug,
+                    networkID,
+                    scannedBlocks,
+                    totalBlocks,
+                    percent,
+                    scanFrom: progress?.scanFrom ?? null,
+                    scanTo: progress?.scanTo ?? null,
+                    lastScannedBlock: progress?.lastScannedBlock ?? null,
+                  });
+                }
+              },
+              onDiscoveredAddresses: ({ addresses = [] }) => {
+                enqueueHydrationAddresses(addresses);
+              },
+            };
+            addrs = await contractScripts.getAllSbtAddressesCached(
+              'none',
+              discoveryGroupRef,
+              discoveryOptions
+            );
+            emitMainSiteSbtDebug('info', '[ensureLightSbtDiscovery] discovered raw SBT universe', {
+              slug,
+              networkID,
+              addressCount: Array.isArray(addrs) ? addrs.length : 0,
+            });
+          }
           updateLightDiscoveryProgress(SBT_LIGHT_DISCOVERY_SCAN_UNITS, true);
         } catch (discErr) {
           mainSiteLog.error('[ensureLightSbtDiscovery] discovery failed:', discErr);

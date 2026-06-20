@@ -97,6 +97,18 @@ const treeHasText = (node: TestTreeNode, text: string): boolean => {
   return treeHasText(node.props.children, text);
 };
 
+const collectTreeText = (node: TestTreeNode): string => {
+  if (node == null) return '';
+  if (Array.isArray(node)) return node.map(collectTreeText).join('');
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  if (!isElementNode(node)) return '';
+  return collectTreeText(node.props.children);
+};
+
+const treeTextIncludes = (node: TestTreeNode, text: string): boolean => (
+  collectTreeText(node).includes(text)
+);
+
 const getElementChildren = (node: TestTreeNode): TestElementNode[] => {
   if (!isElementNode(node)) return [];
   const children = node.props.children;
@@ -263,20 +275,57 @@ describe('surveyPileInteractionSurface', () => {
 
     const loadingHeadline = findNodeByClassName(tree, 'pileLoadingHeadline');
     const loadingSubhead = findNodeByClassName(tree, 'pileLoadingSubhead');
-    const progressMeta = findNodeByClassName(tree, 'pileLoadingProgressMeta');
-    const progressFill = findNodeByClassName(tree, 'pileLoadingProgressFill');
+    const progressList = findNodeByClassName(tree, 'pileLoadingProgressList');
+    const progressFillCount = countElements(tree, (node) => nodeHasClassName(node, 'pileLoadingProgressFill'));
+    const progressFill = findElement(tree, (node) => (
+      nodeHasClassName(node, 'pileLoadingProgressFill')
+    )) as TestElementNode | null;
 
-    expect(loadingHeadline?.props?.children).toEqual(expect.arrayContaining([
-      'Loading... ',
-      12,
-      's',
-    ]));
-    expect(loadingSubhead?.props?.children).toBe('Loading Metadata (3 / 5)');
-    expect(treeHasText(progressMeta, '2 items left')).toBe(true);
-    expect(treeHasText(progressMeta, '3 / 5')).toBe(true);
+    expect(treeTextIncludes(loadingHeadline, 'Loading... 12s')).toBe(true);
+    expect(treeHasText(loadingSubhead, 'Loading Metadata (3 / 5)')).toBe(true);
+    expect(progressList).toBeNull();
+    expect(progressFillCount).toBe(1);
     expect(progressFill?.props?.style).toEqual(expect.objectContaining({
       width: '60%',
     }));
+    expect(treeHasText(tree, 'Session')).toBe(false);
+    expect(treeHasText(tree, 'Groups')).toBe(false);
+    expect(treeHasText(tree, 'Questions')).toBe(false);
+    expect(treeHasText(tree, 'Responses')).toBe(false);
+  });
+
+  it('keeps the dev-style timer-only loading copy when scan and hydration counters are unavailable', () => {
+    const tree = renderPileInteractionSurface({
+      ...buildBaseProps(),
+      pileQuestions: [],
+      isStillLoading: true,
+      loadingElapsedSec: 101,
+      isHydrating: false,
+      hydrateDone: 0,
+      hydrateDiscovered: 0,
+      scanTotalBlocks: 0,
+      pileScanDisplay: {
+        metaLeftText: '',
+        metaRightText: '',
+      },
+      scanPercent: 0,
+    });
+
+    const progressList = findNodeByClassName(tree, 'pileLoadingProgressList');
+    const progressFillCount = countElements(tree, (node) => nodeHasClassName(node, 'pileLoadingProgressFill'));
+    const activeRowCount = countElements(tree, (node) => (
+      isElementNode(node) && node.props['data-progress-status'] === 'active'
+    ));
+
+    expect(treeTextIncludes(tree, 'Loading... 101s')).toBe(true);
+    expect(progressList).toBeNull();
+    expect(progressFillCount).toBe(0);
+    expect(activeRowCount).toBe(0);
+    expect(treeHasText(tree, 'Session')).toBe(false);
+    expect(treeHasText(tree, 'Groups')).toBe(false);
+    expect(treeHasText(tree, 'Questions')).toBe(false);
+    expect(treeHasText(tree, 'Responses')).toBe(false);
+    expect(treeHasText(tree, 'Loading session data')).toBe(false);
   });
 
   it('renders a windowed pile deck with controls stacked under the cards', () => {

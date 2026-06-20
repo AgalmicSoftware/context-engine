@@ -252,6 +252,11 @@ import {
   writeSurveysCache,
   bumpSurveyPerfCounter,
 } from './surveyToolUtils.js';
+import {
+  appendMissingAuthoritativePoolQuestions,
+  filterQuestionsByAuthoritativePool,
+  resolveAuthoritativeQuestionPoolScope,
+} from './surveyAuthoritativeQuestionPool';
 
 export const SURVEY_SELECTOR_ACTIVE_FILTER_COLOR = '#11c4dcff';
 
@@ -1163,7 +1168,8 @@ export class SurveySelector extends Component<any, any> {
 
   handleFilteredQuestionCountUpdate = (count: unknown, encryptedCount: unknown): void => {
     // Keep UI stable while cache warms or if a transient 0 arrives.
-    if (!this.props.isQuestionCacheReady) return;
+    const hasFallbackQuestionPool = Array.isArray(this.props.questionPool) && this.props.questionPool.length > 0;
+    if (!this.props.isQuestionCacheReady && !hasFallbackQuestionPool) return;
     this.commitQuestionCountState(count, encryptedCount, {
       rememberStable: true,
       ignoreTransientZero: true,
@@ -1328,7 +1334,8 @@ export class SurveySelector extends Component<any, any> {
     // Read from cache mirror once per render (group-aware)
     const { slug, networkID } = this.getQuestionCountContext();
     const parsedQuestionsCache = this.getParsedQuestionsCacheForRender(slug, networkID);
-    const questionSelectorLoading = !this.props.isQuestionCacheReady || loading;
+    const hasFallbackQuestionPool = Array.isArray(this.props.questionPool) && this.props.questionPool.length > 0;
+    const questionSelectorLoading = (!this.props.isQuestionCacheReady && !hasFallbackQuestionPool) || loading;
     const questionSelectorCounts = this.getDisplayedQuestionCounts({
       loadingActive: questionSelectorLoading,
       count: filteredQuestionCount,
@@ -1719,6 +1726,7 @@ export class SurveySelector extends Component<any, any> {
             filterState={this.state.filterState}
             questionsCacheNonce={this.props.questionsCacheNonce}
             questionResponsesNonce={this.props.questionResponsesNonce}
+            questionPool={this.props.questionPool}
             isQuestionCacheReady={this.props.isQuestionCacheReady}
             isResponsesCacheReady={this.props.isResponsesCacheReady}
             isSurveyCacheReady={this.props.isSurveyCacheReady}
@@ -1776,6 +1784,7 @@ export class QuestionsDashboard extends Component<any, any> {
       this.props.isQuestionCacheReady;
     const nonceTick = prevProps.questionsCacheNonce !== this.props.questionsCacheNonce;
     const responsesNonceTick = prevProps.questionResponsesNonce !== this.props.questionResponsesNonce;
+    const fallbackQuestionPoolChanged = prevProps.questionPool !== this.props.questionPool;
     const progressSlug = normalizeQuestionProgressSlug(resolveEffectiveSlug(this.props));
     const pickScopedQuestionProgress = (progressIn: unknown): QuestionsDashboardProgress | null => {
       if (!progressIn || typeof progressIn !== 'object') return null;
@@ -1807,11 +1816,12 @@ export class QuestionsDashboard extends Component<any, any> {
       cacheReadyTick ||
       nonceTick ||
       responsesNonceTick ||
+      fallbackQuestionPoolChanged ||
       progressHydrationTick ||
       progressCompletedTick
     ) {
       this.loadQuestions({
-        resetFilteredQuestions: sessionChanged || networkChanged,
+        resetFilteredQuestions: sessionChanged || networkChanged || fallbackQuestionPoolChanged,
       });
     }
   }
@@ -1941,6 +1951,37 @@ export class QuestionsDashboard extends Component<any, any> {
       }
     }
     mergeQuestionResponses(questionResponses, extraQuestionResponses);
+
+    const authoritativeQuestionPoolScope = resolveAuthoritativeQuestionPoolScope(
+      this.props.questionPool,
+      effectiveSlug,
+    );
+    if (authoritativeQuestionPoolScope) {
+      questions = filterQuestionsByAuthoritativePool(questions, authoritativeQuestionPoolScope);
+      questions = appendMissingAuthoritativePoolQuestions(
+        questions,
+        authoritativeQuestionPoolScope,
+        BLOCKED_QUESTION_IDS_SET,
+      );
+    } else if (questions.length === 0 && Array.isArray(this.props.questionPool)) {
+      this.props.questionPool.forEach((entry: QuestionsDashboardQuestionRow) => {
+        const questionIdRaw = (entry && entry.id != null && String(entry.id) !== '')
+          ? entry.id
+          : null;
+        if (!questionIdRaw) return;
+        const questionIdLower = String(questionIdRaw).toLowerCase();
+        if (BLOCKED_QUESTION_IDS_SET.has(questionIdLower)) return;
+        if (seenQuestionIds.has(questionIdLower)) return;
+        seenQuestionIds.add(questionIdLower);
+        questions.push({
+          creator: '',
+          tags: [],
+          ...entry,
+          id: questionIdRaw,
+          sessionSlug: effectiveSlug,
+        });
+      });
+    }
 
     questions = this.applyDefaultTagsFilter(questions);
     const encryptedQuestionCount = questions.filter(

@@ -116,6 +116,7 @@ type SurveyToolProps = {
   isSurveyCacheReady?: boolean;
   isSBTCacheReady?: boolean;
   questionScanProgress?: unknown;
+  questionPool?: unknown[];
   questionResponsesNonce?: number;
   sessionInfo?: unknown;
   sessionName?: string;
@@ -399,6 +400,7 @@ const renderSurveyToolContent = ({
         isSBTCacheReady={props.isSBTCacheReady}
         networkLatestBlock={props.networkLatestBlock}
         questionScanProgress={props.questionScanProgress}
+        questionPool={props.questionPool}
         questionResponsesNonce={props.questionResponsesNonce}
         questionsCacheNonce={questionsCacheNonce}
         ensureQuestionCached={ensureQuestionCached}

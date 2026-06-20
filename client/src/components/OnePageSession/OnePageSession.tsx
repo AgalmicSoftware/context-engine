@@ -29,6 +29,12 @@ import LazyFallback from '../Shared/LazyFallback';
 import contractScripts, { getAllSessionSlugs } from '../../utilities/web3/contractScripts.js';
 
 import { resolveEffectiveSlug, normalizeSurveyToolFilterState } from '../SurveyTool/surveyToolUtils.js';
+import { resolvePolisDemoQuestionPool } from '../SurveyTool/surveyPolisDemoQuestionPool.js';
+import {
+  isQuestionAllowedByAuthoritativePool,
+  normalizeAuthoritativeQuestionPoolId,
+  resolveAuthoritativeQuestionPoolScope,
+} from '../SurveyTool/surveyAuthoritativeQuestionPool';
 import { serializeFilterState, deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
 import { createLogger } from 'utilities/logging.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -39,6 +45,7 @@ import {
 } from '../../utilities/cache/cacheScripts.js';
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
+import { lazyWithRetry } from '../../utilities/ui/lazyImportRetry.js';
 import { hasCachedCreateSbtForm as hasCachedCreateSbtFormCache } from '../../utilities/sbt/sbtCreateFormCache.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
@@ -59,7 +66,7 @@ const MemoSurveyPage = React.memo((props: any) => <SurveyPage {...props} />);
 const SBTsPage = React.lazy(() => import('../SBTs/SBTsPage'));
 const PolisReport = React.lazy(() => import('../PolisReport/PolisReport'));
 const DebateMap = React.lazy(() => import('../DebateMap/DebateMap'));
-const CorpusViewer = React.lazy(() => import('../DemoViews/CorpusViewer'));
+const CorpusViewer = lazyWithRetry(() => import('../DemoViews/CorpusViewer'));
 const RiskMatrix = React.lazy(() => import('../MainContent/RiskMatrix'));
 const DemoAnalysisWorkspace = React.lazy(() => import('../DemoViews/DemoAnalysis/DemoAnalysisWorkspace'));
 
@@ -185,6 +192,112 @@ const resolveOnePageSessionSurveySlug = (props: any = '') => {
   return normalizeOnePageSessionSlug(props.slug || '');
 };
 
+const getUniqueAggregatorCandidateSlugs = (...slugs: any[]) => {
+  const seen = new Set<string>();
+  return slugs
+    .map((value) => normalizeOnePageSessionSlug(value))
+    .filter((value) => {
+      const key = value || '__general__';
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+};
+
+const shouldUseBuiltInDemoAggregatorFallback = (displaySlug: any = '', questionSourceSlug: any = '') => {
+  const normalizedDisplaySlug = normalizeOnePageSessionSlug(displaySlug);
+  const normalizedQuestionSourceSlug = normalizeOnePageSessionSlug(questionSourceSlug);
+  return normalizedDisplaySlug === 'demo' && (
+    normalizedQuestionSourceSlug === '' ||
+    normalizedQuestionSourceSlug === 'demo'
+  );
+};
+
+const buildAggregatorFallbackQuestions = (questionPool: any[] = [], sessionSlug: any = '') => {
+  const out: Record<string, any> = {};
+  const normalizedSessionSlug = normalizeOnePageSessionSlug(sessionSlug);
+  (Array.isArray(questionPool) ? questionPool : []).forEach((entry: any) => {
+    const questionId = String(entry?.id || '').trim();
+    if (!questionId) return;
+    out[questionId.toLowerCase()] = {
+      creator: '',
+      tags: [],
+      ...entry,
+      id: questionId,
+      sessionSlug: normalizedSessionSlug,
+      sessionSlugExplicit: true,
+    };
+  });
+  return out;
+};
+
+const scopeAggregatorNetworkNodeToQuestionPool = (
+  networkNode: any = {},
+  fallbackQuestions: Record<string, any> = {},
+  sessionSlug: any = '',
+) => {
+  const fallbackQuestionPool = Object.values(fallbackQuestions || {});
+  const scope = resolveAuthoritativeQuestionPoolScope(fallbackQuestionPool, sessionSlug);
+  if (!scope) return networkNode;
+
+  const nextQuestions: Record<string, any> = {};
+  const sourceQuestions = networkNode?.questions || {};
+  Object.keys(sourceQuestions).forEach((qid) => {
+    const question = sourceQuestions[qid];
+    if (!isQuestionAllowedByAuthoritativePool(question, qid, scope)) return;
+    const questionId = String(question?.id || qid || '').trim();
+    if (!questionId) return;
+    nextQuestions[questionId.toLowerCase()] = {
+      ...question,
+      id: questionId,
+    };
+  });
+  Object.keys(fallbackQuestions || {}).forEach((qid) => {
+    const questionId = normalizeAuthoritativeQuestionPoolId(qid);
+    if (!questionId || nextQuestions[questionId]) return;
+    nextQuestions[questionId] = fallbackQuestions[qid];
+  });
+
+  const nextQuestionResponses: Record<string, any> = {};
+  const sourceQuestionResponses = networkNode?.questionResponses || {};
+  Object.keys(sourceQuestionResponses).forEach((qid) => {
+    const questionId = normalizeAuthoritativeQuestionPoolId(qid);
+    if (!questionId || !nextQuestions[questionId]) return;
+    nextQuestionResponses[qid] = sourceQuestionResponses[qid];
+  });
+
+  return {
+    ...networkNode,
+    questions: nextQuestions,
+    questionResponses: nextQuestionResponses,
+  };
+};
+
+const mergeAggregatorResultRows = (target: Record<string, any[]> = {}, source: any = {}) => {
+  const nextTarget = target && typeof target === 'object' ? target : {};
+  if (!source || typeof source !== 'object') return nextTarget;
+
+  Object.keys(source).forEach((qid) => {
+    const rows = Array.isArray(source[qid]) ? source[qid] : [];
+    if (rows.length === 0) {
+      if (!nextTarget[qid]) nextTarget[qid] = [];
+      return;
+    }
+    nextTarget[qid] = Array.isArray(nextTarget[qid]) ? nextTarget[qid] : [];
+    const seenRows = new Set(
+      nextTarget[qid].map((row: any) => `${row?.responder || ''}|${row?.response || ''}`)
+    );
+    rows.forEach((row: any) => {
+      const key = `${row?.responder || ''}|${row?.response || ''}`;
+      if (seenRows.has(key)) return;
+      seenRows.add(key);
+      nextTarget[qid].push(row);
+    });
+  });
+
+  return nextTarget;
+};
+
 const resolveOnePageSessionRouteUiState = (props: any = {}) => {
   const autoOpenResults = props.routeAutoOpenResults === true;
   const showQuestions = autoOpenResults || props.routeQuestionsOpen === true;
@@ -217,6 +330,14 @@ const buildOnePageSessionCanonicalBaseUrl = (props: any = {}) => {
     const slug = resolveEffectiveSlug(props);
     return `${buildOnePageSessionPublicRoute(`/session${slug ? `/${slug}` : ''}`)}${slug ? `?session=${encodeURIComponent(slug)}` : ''}`;
   }
+};
+
+const buildOnePageSessionRawResultsRoute = (props: any = {}) => {
+  const slug = resolveEffectiveSlug(props);
+  const path = slug
+    ? `/session/${slug}/questions/results`
+    : '/questions/results';
+  return buildOnePageSessionPublicRoute(path);
 };
 
 // Group helpers (for cross-group cache lookups)
@@ -466,10 +587,12 @@ class OnePageSession extends Component<any, any> {
   buildAggregatorInputSignature(propsIn: any = this.props, stateIn: any = this.state) {
     const props = propsIn || {};
     const state = stateIn || {};
-    const slug = resolveEffectiveSlug(props);
+    const displaySlug = resolveEffectiveSlug(props);
+    const questionCacheSlug = resolveOnePageSessionSurveySlug(props);
     const netId = props.network?.id ?? props.networkChainId ?? '';
     return [
-      String(slug || ''),
+      String(displaySlug || ''),
+      String(questionCacheSlug || ''),
       String(netId || ''),
       state.showResults ? 1 : 0,
       props.isQuestionCacheReady ? 1 : 0,
@@ -649,7 +772,7 @@ class OnePageSession extends Component<any, any> {
     const aggregatorInvalidated = (
       slugChanged ||
       (this.props.isQuestionCacheReady && !prevProps.isQuestionCacheReady) ||
-      (this.props.network.id !== prevProps.network.id) ||
+      ((this.props.network?.id ?? null) !== (prevProps.network?.id ?? null)) ||
       prevProps.questionResponsesNonce !== this.props.questionResponsesNonce ||
       (
         prevProps.isResponsesCacheReady !== this.props.isResponsesCacheReady &&
@@ -813,47 +936,90 @@ class OnePageSession extends Component<any, any> {
       this.setState({ aggregatorData: nextMap });
     };
 
-    const slug = resolveEffectiveSlug(this.props);
+    const displaySlug = resolveEffectiveSlug(this.props);
+    const questionSourceSlug = resolveOnePageSessionSurveySlug(this.props);
     const netIdVal = this.props.network?.id ?? this.props.networkChainId ?? 0;
+    const useBuiltInDemoFallback = shouldUseBuiltInDemoAggregatorFallback(displaySlug, questionSourceSlug);
+    const canBuildFromLocalCache = (
+      netIdVal != null &&
+      (this.props.isQuestionCacheReady || useBuiltInDemoFallback)
+    );
 
-    if (this.props.isQuestionCacheReady && netIdVal != null) {
+    if (canBuildFromLocalCache) {
       const netIdStr = String(netIdVal);
       try {
-        let qCache = peekCacheSync('questionsCache', slug, { clone: false }) || {};
-        if (!qCache || typeof qCache !== 'object') qCache = {};
-        if (Object.keys(qCache).length === 0) {
-          applyAggregatorData({}, '0:0:0', `${slug}|${netIdStr}|empty-cache`);
+        const candidateSlugs = useBuiltInDemoFallback
+          ? getUniqueAggregatorCandidateSlugs(displaySlug)
+          : [normalizeOnePageSessionSlug(questionSourceSlug)];
+        const demoQuestionPool = useBuiltInDemoFallback
+          ? resolvePolisDemoQuestionPool({
+              displaySlug,
+              sourceSlug: questionSourceSlug,
+            })
+          : [];
+        const aggregateMap: Record<string, any[]> = {};
+        const sourceSigParts: string[] = [];
+        let sawCandidateCache = false;
+        let sawNetworkCache = false;
+
+        for (const slug of candidateSlugs) {
+          let qCache = peekCacheSync('questionsCache', slug, { clone: false }) || {};
+          if (!qCache || typeof qCache !== 'object') qCache = {};
+          if (Object.keys(qCache).length === 0) {
+            sourceSigParts.push(`${slug || '__general__'}:empty-cache`);
+            continue;
+          }
+          sawCandidateCache = true;
+
+          if (!qCache[netIdStr]) {
+            sourceSigParts.push(`${slug || '__general__'}:missing-net`);
+            continue;
+          }
+          sawNetworkCache = true;
+
+          const fallbackQuestions = buildAggregatorFallbackQuestions(demoQuestionPool, slug);
+          const networkNode = qCache[netIdStr] || {};
+          const networkNodeForAggregation = useBuiltInDemoFallback
+            ? scopeAggregatorNetworkNodeToQuestionPool(networkNode, fallbackQuestions, slug)
+            : networkNode;
+
+          sourceSigParts.push([
+            slug || '__general__',
+            computeAggregatorSourceSnapshotSignature(networkNodeForAggregation.questionResponses || {}),
+            computeAggregatorQuestionMetadataSignature(networkNodeForAggregation.questions || {}),
+          ].join(':'));
+
+          const { map, dirty } = buildAggregatorFromLocalCache(networkNodeForAggregation, {
+            parseMemo: this._aggregatorResponseParseMemo,
+            sessionSlug: slug,
+          });
+          mergeAggregatorResultRows(aggregateMap, map);
+          if (dirty) { void writeCache('questionsCache', slug, qCache); }
+        }
+
+        if (!sawCandidateCache) {
+          applyAggregatorData({}, '0:0:0', `${displaySlug}|${questionSourceSlug}|${netIdStr}|empty-cache`);
           return;
         }
 
-        if (!qCache[netIdStr]) {
-          applyAggregatorData({}, '0:0:0', `${slug}|${netIdStr}|missing-net`);
+        if (!sawNetworkCache) {
+          applyAggregatorData({}, '0:0:0', `${displaySlug}|${questionSourceSlug}|${netIdStr}|missing-net`);
           return;
         }
 
-        const sourceSig = [
-          computeAggregatorSourceSnapshotSignature(qCache[netIdStr]?.questionResponses || {}),
-          computeAggregatorQuestionMetadataSignature(qCache[netIdStr]?.questions || {}),
-        ].join('|');
-        const sourceSigKey = `${slug}|${netIdStr}|${sourceSig}`;
+        const sourceSigKey = `${displaySlug}|${questionSourceSlug}|${netIdStr}|${sourceSigParts.join('|')}`;
         if (sourceSigKey === this._aggregatorSourceSigKey) {
           bumpPerfCounter('aggregatorSourceSkips');
           return;
         }
-
-        const { map, dirty, signature } = buildAggregatorFromLocalCache(qCache[netIdStr], {
-          parseMemo: this._aggregatorResponseParseMemo,
-          sessionSlug: slug,
-        });
-        if (dirty) { void writeCache('questionsCache', slug, qCache); }
-        applyAggregatorData(map, signature, sourceSigKey);
+        applyAggregatorData(aggregateMap, computeAggregatorDataSignature(aggregateMap), sourceSigKey);
       } catch (err) {
         demoLog.error("Error building aggregator in OnePageSession:", err);
-        applyAggregatorData({}, '0:0:0', `${slug}|${netIdStr}|error`);
+        applyAggregatorData({}, '0:0:0', `${displaySlug}|${questionSourceSlug}|${netIdStr}|error`);
       }
     } else {
       const netIdStr = String(netIdVal || '');
-      applyAggregatorData({}, '0:0:0', `${slug}|${netIdStr}|not-ready`);
+      applyAggregatorData({}, '0:0:0', `${displaySlug}|${questionSourceSlug}|${netIdStr}|not-ready`);
     }
   });
 
@@ -1788,13 +1954,12 @@ class OnePageSession extends Component<any, any> {
     };
 
     const slug = resolveEffectiveSlug(this.props); // keep group in URL
-    const path = '/questions/results';
 
     this.setState({ showQuestions: true, autoOpenResults: false }, () => {
       scrollQuestionsIntoView();
       try {
         const nextUrl = new URL(window.location.href);
-        nextUrl.pathname = buildOnePageSessionPublicRoute(path);
+        nextUrl.pathname = buildOnePageSessionRawResultsRoute(this.props);
         nextUrl.searchParams.delete('sessionSlug');
         nextUrl.searchParams.delete('s');
         if (slug) {
@@ -2066,7 +2231,6 @@ class OnePageSession extends Component<any, any> {
       sessionConfig: incomingSessionConfig,
       polisDemoDataBySlug,
     } = this.props;
-    const surveySessionSlug = resolveOnePageSessionSurveySlug(this.props);
     const resolvedSessionConfig = this.getResolvedSessionConfig({
       slug,
       sessionName,
@@ -2083,8 +2247,34 @@ class OnePageSession extends Component<any, any> {
       null;
     const scopedLitHooks = this.resolveScopedLitHooks(resolvedSessionConfig);
     const effectiveSlug = resolveEffectiveSlug(this.props) || slug;
+    const surveySessionSlug = resolveOnePageSessionSurveySlug({
+      ...this.props,
+      sessionConfig: resolvedSessionConfig,
+    });
     // Only show demo-specific result surfaces on configured public demo sessions.
     const isDemoSlug = isDemoSessionSlug(effectiveSlug);
+    const displaySessionSlug = normalizeOnePageSessionSlug(effectiveSlug || slug);
+    const demoQuestionPool = resolvePolisDemoQuestionPool({
+      displaySlug: displaySessionSlug,
+      sourceSlug: surveySessionSlug,
+    });
+    const scopedDemoQuestionPool = demoQuestionPool.length > 0
+      ? demoQuestionPool.map((entry: any) => ({
+          ...entry,
+          sessionSlug: displaySessionSlug,
+          sessionSlugExplicit: true,
+        }))
+      : [];
+    const sharedQuestionPool = scopedDemoQuestionPool.length > 0 ? scopedDemoQuestionPool : undefined;
+    const embeddedQuestionSessionSlug = sharedQuestionPool ? displaySessionSlug : surveySessionSlug;
+    const embeddedGroupsSessionSlug = displaySessionSlug || surveySessionSlug;
+    const embeddedGroupsSessionConfig = isDemoSlug
+      ? {
+          ...resolvedSessionConfig,
+          slug: embeddedGroupsSessionSlug,
+          autoFeatureSBTsBySessionSlug: true,
+        }
+      : resolvedSessionConfig;
     const resultsViewMode = isDemoSlug ? this.state.resultsViewMode : 'polis';
     const resultsViewOptions = [
       { key: 'polis', label: 'Report', icon: '🧾' },
@@ -2409,7 +2599,8 @@ class OnePageSession extends Component<any, any> {
                 sessionSlugPinned={true}
                 preventUrlChange={true}
                 /* per-demo passthroughs */
-                sessionSlug={surveySessionSlug}
+                sessionSlug={embeddedQuestionSessionSlug}
+                questionPool={sharedQuestionPool}
                 sessionConfig={resolvedSessionConfig}
                 contracts={contracts}
                 blockLimits={blockLimits}
@@ -2461,7 +2652,8 @@ class OnePageSession extends Component<any, any> {
                 preventUrlChange={true}
                 onResultsModalClose={this.handleResultsModalClose}
                 /* per-demo passthroughs */
-                sessionSlug={surveySessionSlug}
+                sessionSlug={embeddedQuestionSessionSlug}
+                questionPool={sharedQuestionPool}
                 sessionConfig={resolvedSessionConfig}
                 contracts={contracts}
                 blockLimits={blockLimits}
@@ -2528,7 +2720,7 @@ class OnePageSession extends Component<any, any> {
               <div className={styles.miniSectionContent}>
                 <Suspense fallback={<LazyFallback label="Loading..." minHeight="20vh" />}>
                   <SBTsPage
-                    key={`sbtspage:${slug || 'general'}`}
+                    key={`sbtspage:${embeddedGroupsSessionSlug || 'general'}`}
                     provider={this.props.provider}
                     network={this.props.network}
                     account={this.props.account}
@@ -2546,14 +2738,15 @@ class OnePageSession extends Component<any, any> {
                     showCreateGroupExternal={this.state.showEmbeddedCreateGroup}
                     onCreateGroupToggleExternal={this.toggleEmbeddedCreateGroup}
                     preferCacheBackedFeaturedCards={true}
+                    requireExplicitAutoFeatureSessionSlug={true}
                     refreshSbtData={this.props.refreshSbtData}
                     /* per-demo passthroughs */
-                    sessionSlug={slug}
+                    sessionSlug={embeddedGroupsSessionSlug}
                     contracts={contracts}
                     blockLimits={blockLimits}
                     networkChainId={networkChainId}
                     /* Pass sessionConfig including the autoFeature flag so SBTsPage can read it */
-                    sessionConfig={resolvedSessionConfig}
+                    sessionConfig={embeddedGroupsSessionConfig}
                     sbtScanProgressBySlug={this.props.sbtScanProgressBySlug}
                     sbtRealtimeCoverageBySlug={this.props.sbtRealtimeCoverageBySlug}
                     ensureLightSbtDiscovery={this.props.ensureLightSbtDiscovery}
@@ -2726,7 +2919,8 @@ class OnePageSession extends Component<any, any> {
                         questionScanProgress={this.props.questionScanProgress}
                         questionResponsesNonce={this.props.questionResponsesNonce}
                         /* per-demo passthroughs */
-                        sessionSlug={slug}
+                        sessionSlug={displaySessionSlug}
+                        demoDataFirstLoad={isDemoSlug}
                         demoDataBySlug={resolvedPolisDemoDataBySlug}
                         contracts={contracts}
                         blockLimits={blockLimits}

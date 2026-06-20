@@ -89,4 +89,17 @@ describe('rpcProviders PATH fallback logging', () => {
 
     performSpy.mockRestore();
   });
+
+  it('honors skipGlobalPreferred for historical log scans', () => {
+    const provider = getReadProviderForGroup(buildGroupCfg(), {
+      contractKey: 'sbtFactory',
+      skipGlobalPreferred: true,
+    });
+    const urls = (provider?.providerConfigs || [])
+      .map((entry) => entry?.provider?.connection?.url)
+      .filter(Boolean);
+
+    expect(urls[0]).not.toBe(PATH_DEFAULT_OP_SEPOLIA);
+    expect(urls).not.toContain(PATH_DEFAULT_OP_SEPOLIA);
+  });
 });
