@@ -280,10 +280,15 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /--question-card-shadow: 7px 7px 14px var\(--pile-shadow-dark\);/);
   assert.match(html, /\.questionStack \{[\s\S]*gap: 18px;[\s\S]*min-width: 0;[\s\S]*max-width: 100%;[\s\S]*overflow-x: hidden;[\s\S]*padding: 2px 0 8px;/);
   assert.match(html, /\.loadMoreQuestions/);
+  assert.match(html, /\.questionLoadingRow \{[\s\S]*justify-self: center;[\s\S]*display: inline-flex;/);
+  assert.match(html, /Loading the rest in the background\.\.\./);
+  assert.match(html, /Loading more questions\.\.\./);
   assert.match(html, /function loadMoreQuestions\(\)/);
   assert.match(html, /stateUrl\.searchParams\.set\('questionLimit', String\(state\.questionLimit\)\);/);
-  assert.match(html, /const FAST_INITIAL_QUESTION_LIMIT = 5;/);
+  assert.match(html, /const FAST_INITIAL_QUESTION_LIMIT = 1;/);
   assert.match(html, /questionLimit: FAST_INITIAL_QUESTION_LIMIT,/);
+  assert.match(html, /loadingMoreQuestions: false,/);
+  assert.match(html, /backgroundQuestionLoadPending: false,/);
   assert.match(html, /function shouldAutoExpandQuestions\(data\)/);
   assert.match(html, /setTimeout\(\(\) => load\(\), 0\);/);
   assert.match(html, /state\.questionLimit = FAST_INITIAL_QUESTION_LIMIT;/);
@@ -1071,21 +1076,39 @@ test('Mini App question state defaults to 50 questions and supports loading more
   };
 
   const fastInitial = await __test__telegramMiniApp.buildMiniAppState({
-    request: new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}&sessions=alpha&questionLimit=5`),
+    request: new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}&sessions=alpha&questionLimit=1`),
     env,
   });
   assert.equal(fastInitial.ok, true);
   assert.equal(fastInitial.pageSize, 50);
   assert.equal(fastInitial.questionCount, 55);
-  assert.equal(fastInitial.loadedQuestionCount, 5);
-  assert.equal(fastInitial.loadedQuestionLimit, 5);
+  assert.equal(fastInitial.loadedQuestionCount, 1);
+  assert.equal(fastInitial.loadedQuestionLimit, 1);
   assert.equal(fastInitial.hasMoreQuestions, true);
-  assert.equal(fastInitial.questions.length, 5);
+  assert.deepEqual(fastInitial.deferredPanels, ['groups', 'admin']);
+  assert.equal(fastInitial.admin.available, false);
+  assert.equal(fastInitial.admin.reason, 'deferred_fast_initial_load');
+  assert.equal(fastInitial.questions.length, 1);
   const fastActionCount = Array.from(kv.store.values())
     .map((value) => JSON.parse(value))
     .filter((record) => record?.miniAppQuestionAction === true)
     .length;
-  assert.equal(fastActionCount, 5);
+  assert.equal(fastActionCount, 1);
+
+  const oneQuestionEnv = {
+    ...env,
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify(questions.slice(0, 1)),
+  };
+  const oneQuestionInitial = await __test__telegramMiniApp.buildMiniAppState({
+    request: new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}&sessions=alpha&questionLimit=1`),
+    env: oneQuestionEnv,
+  });
+  assert.equal(oneQuestionInitial.ok, true);
+  assert.equal(oneQuestionInitial.questionCount, 1);
+  assert.equal(oneQuestionInitial.loadedQuestionCount, 1);
+  assert.equal(oneQuestionInitial.hasMoreQuestions, false);
+  assert.deepEqual(oneQuestionInitial.deferredPanels, []);
+  assert.notEqual(oneQuestionInitial.admin.reason, 'deferred_fast_initial_load');
 
   const initial = await __test__telegramMiniApp.buildMiniAppState({
     request: new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}&sessions=alpha`),

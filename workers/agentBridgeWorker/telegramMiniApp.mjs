@@ -134,7 +134,7 @@ import {
 
 const DEFAULT_MINI_APP_AUTH_MAX_AGE_SECONDS = 24 * 60 * 60;
 const DEFAULT_MINI_APP_PAGE_SIZE = 50;
-const DEFAULT_MINI_APP_FAST_INITIAL_QUESTION_LIMIT = 5;
+const DEFAULT_MINI_APP_FAST_INITIAL_QUESTION_LIMIT = 1;
 const MAX_MINI_APP_QUESTION_LIMIT = 500;
 const QUESTION_ACTION_TTL_SECONDS = 30 * 60;
 const AGENT_REQUEST_KV_PREFIX = 'telegram:agent-request:';
@@ -1850,6 +1850,10 @@ async function buildMiniAppState({
   const allQuestionEntries = seriesSourceEntries.length
     ? seriesSourceEntries.filter((entry) => !skippedLaunchQuestionIds.has(lower(readQuestionId(entry.question))))
     : sourceQuestionEntries;
+  const fastInitialStateLoad = !seriesSourceEntries.length
+    && requestedQuestionLimit <= DEFAULT_MINI_APP_FAST_INITIAL_QUESTION_LIMIT
+    && allQuestionEntries.length > requestedQuestionLimit
+    && requestedQuestionLimit < pageSize;
   const questionEntries = seriesSourceEntries.length
     ? allQuestionEntries
     : pagedMiniAppQuestionEntries(allQuestionEntries, requestedQuestionLimit, launchQuestionId);
@@ -1925,21 +1929,25 @@ async function buildMiniAppState({
     createdAt,
   });
   const primaryResolved = resolveSessionInvocation(policy, sessionSlug);
-  const groups = primaryResolved.ok
-    ? await loadTelegramLightweightGroups({
-      env,
-      session: primaryResolved.session,
-      telegramUserId: auth.user?.telegramUserId,
-    })
-    : emptyMiniAppGroupState(sessionSlug);
-  const admin = primaryResolved.ok
-    ? await buildMiniAppAdminState({
-      env,
-      auth,
-      session: primaryResolved.session,
-      createdAt,
-    })
-    : emptyMiniAppAdminState(sessionSlug, primaryResolved.reason || 'session_not_available');
+  const groups = fastInitialStateLoad
+    ? emptyMiniAppGroupState(sessionSlug)
+    : (primaryResolved.ok
+      ? await loadTelegramLightweightGroups({
+        env,
+        session: primaryResolved.session,
+        telegramUserId: auth.user?.telegramUserId,
+      })
+      : emptyMiniAppGroupState(sessionSlug));
+  const admin = fastInitialStateLoad
+    ? emptyMiniAppAdminState(sessionSlug, 'deferred_fast_initial_load')
+    : (primaryResolved.ok
+      ? await buildMiniAppAdminState({
+        env,
+        auth,
+        session: primaryResolved.session,
+        createdAt,
+      })
+      : emptyMiniAppAdminState(sessionSlug, primaryResolved.reason || 'session_not_available'));
   const selectedSessionTitles = effectiveSelectedSessionSlugs.map((slug) => (
     linkedSessions.find((session) => session.sessionSlug === slug)?.sessionName || slug
   ));
@@ -1990,6 +1998,7 @@ async function buildMiniAppState({
     loadedQuestionCount: questions.length,
     loadedQuestionLimit: requestedQuestionLimit,
     hasMoreQuestions: allQuestionEntries.length > questions.length,
+    deferredPanels: fastInitialStateLoad ? ['groups', 'admin'] : [],
     availableQuestionCount,
     unavailableQuestionCount,
     lockedQuestionCount,
@@ -6654,6 +6663,20 @@ function telegramMiniAppHtml() {
       padding: 2px 0 8px;
     }
     .loadMoreQuestions { justify-self: center; min-width: min(100%, 280px); }
+    .questionLoadingRow {
+      justify-self: center;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      min-width: min(100%, 280px);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 10px 14px;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.07);
+      font-size: 13px;
+    }
     .questionVotes {
       display: grid;
       grid-template-columns: 30px minmax(28px, auto) 30px;
@@ -7623,6 +7646,9 @@ function telegramMiniAppHtml() {
       sessionsPanelOpen: false,
       questionLimit: FAST_INITIAL_QUESTION_LIMIT,
       loadedOnce: false,
+      questionsLoading: false,
+      loadingMoreQuestions: false,
+      backgroundQuestionLoadPending: false,
     };
     const el = {
       meta: document.getElementById('meta'),
@@ -8607,7 +8633,21 @@ function telegramMiniAppHtml() {
       });
       updateFooterControls();
       scrollHighlightedQuestionIntoView();
-      if (state.data?.hasMoreQuestions === true) {
+      const isLoadingMore = state.loadingMoreQuestions === true || state.backgroundQuestionLoadPending === true;
+      if (isLoadingMore) {
+        const loading = document.createElement('div');
+        loading.className = 'questionLoadingRow';
+        const spinner = document.createElement('span');
+        spinner.className = 'inlineSpinner';
+        spinner.setAttribute('aria-label', 'Loading more questions');
+        const label = document.createElement('span');
+        label.textContent = state.backgroundQuestionLoadPending
+          ? 'Loading the rest in the background...'
+          : 'Loading more questions...';
+        loading.append(spinner, label);
+        el.questionStack.appendChild(loading);
+      }
+      if (state.data?.hasMoreQuestions === true && !isLoadingMore) {
         const loadMore = document.createElement('button');
         loadMore.type = 'button';
         loadMore.className = 'secondary loadMoreQuestions';
@@ -11855,18 +11895,21 @@ function telegramMiniAppHtml() {
     async function load({ retry = false } = {}) {
       let response;
       let body;
+      const backgroundLoad = state.loadedOnce && state.data?.hasMoreQuestions === true;
       if (!state.loadedOnce) {
+        state.questionsLoading = true;
+        state.loadingMoreQuestions = false;
+        state.backgroundQuestionLoadPending = false;
         setLoadingProgress(
           retry ? 'Still loading questions...' : 'Loading questions...',
           retry ? 34 : 22,
           'Opening the session and checking agent predictions.'
         );
-      } else if (state.data?.hasMoreQuestions === true) {
-        setLoadingProgress(
-          'Loading more questions...',
-          58,
-          'Keeping your current answers while fetching the next batch.'
-        );
+      } else if (backgroundLoad) {
+        state.questionsLoading = true;
+        state.loadingMoreQuestions = true;
+        state.backgroundQuestionLoadPending = false;
+        renderQuestionStack();
       }
       try {
         const stateUrl = new URL('/telegram/mini-app/api/state', location.origin);
@@ -11879,11 +11922,19 @@ function telegramMiniAppHtml() {
         });
         body = await response.json().catch(() => ({}));
       } catch (error) {
+        state.questionsLoading = false;
+        state.loadingMoreQuestions = false;
+        state.backgroundQuestionLoadPending = false;
+        if (state.loadedOnce) renderQuestionStack();
         setStatus('Could not load Mini App. Retrying...', 'error');
         scheduleQuestionRetry();
         return;
       }
       if (!response.ok || !body.ok) {
+        state.questionsLoading = false;
+        state.loadingMoreQuestions = false;
+        state.backgroundQuestionLoadPending = false;
+        if (state.loadedOnce) renderQuestionStack();
         setStatus(userFacingErrorMessage(body, 'Could not load Mini App.'), 'error');
         clearQuestionRetry();
         return;
@@ -11947,18 +11998,26 @@ function telegramMiniAppHtml() {
         clearQuestionRetry();
         setStatus('');
       }
+      const willAutoExpand = !wasLoadedOnce && shouldAutoExpandQuestions(body);
+      state.questionsLoading = false;
+      state.loadingMoreQuestions = false;
+      state.backgroundQuestionLoadPending = willAutoExpand;
       render();
       state.loadedOnce = true;
-      if (!wasLoadedOnce && shouldAutoExpandQuestions(body)) {
+      if (willAutoExpand) {
         state.questionLimit = Number(body.pageSize || 50) || 50;
         setTimeout(() => load(), 0);
       }
       if (state.aiSearchQuery) scheduleAiSearch(0);
     }
     function loadMoreQuestions() {
+      if (state.loadingMoreQuestions === true) return;
       const current = Number(state.data?.loadedQuestionLimit || state.questionLimit || state.data?.loadedQuestionCount || state.data?.pageSize || 0);
       const increment = Number(state.data?.pageSize || 50) || 50;
       state.questionLimit = current + increment;
+      state.loadingMoreQuestions = true;
+      state.backgroundQuestionLoadPending = false;
+      renderQuestionStack();
       load();
     }
     function shouldAutoExpandQuestions(data) {
