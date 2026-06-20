@@ -321,7 +321,9 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.match(source, /future interactive CE report views/);
   assert.match(source, /statement ids, frozen prompts/);
   assert.match(source, /EdgeOS Read Permission: Yes/);
-  assert.match(source, /Do not interrupt the run with a separate EdgeOS permission or\s+preference question/);
+  assert.match(source, /treat that as the principal's consent to run now/);
+  assert.match(source, /Do not\s+interrupt the run with a separate run, EdgeOS permission, preference, research,\s+or confirmation question/);
+  assert.match(source, /If the setting is absent,\s+default to No and continue/);
   assert.match(source, /Do not submit a flat\s+default confidence batch such as 85 for every answer/);
   assert.match(source, /scan the batch for repeated default values and adjust\s+item by item/);
   assert.match(source, /ordinary onboarding section is not required for Agent Village Wrapped/);
