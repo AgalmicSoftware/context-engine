@@ -482,6 +482,12 @@ test('wrapped image prompt supports Agent Norms Compass mode around the most-imp
   assert.match(prompt, /meaningful non-center coordinate/);
   assert.match(prompt, /Never put the principal directly on the axis crossing or exact center/);
   assert.match(prompt, /omit the principal marker rather than centering it/);
+  assert.match(prompt, /Coordinate sanity rule/);
+  assert.match(prompt, /upward means more human approval\/review/);
+  assert.match(prompt, /downward means broader agent latitude/);
+  assert.match(prompt, /too conservative with privacy/);
+  assert.match(prompt, /should move the principal left and\/or upward, not downward/);
+  assert.match(prompt, /if the chips say privacy\/review-first, the marker must not sit in the broad-latitude lower half/);
   assert.match(prompt, /I would rather my agent be too conservative with privacy/);
   assert.match(prompt, /Agent guesses/);
   assert.doesNotMatch(prompt, /Most Important To You/);
