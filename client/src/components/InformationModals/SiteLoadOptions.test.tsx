@@ -102,10 +102,12 @@ describe('SiteLoadOptions', () => {
   });
 
   it('removes the unused email updates UI and still lets the sidebar collapse', () => {
-    render(<SidebarHarness arrowIndex={0} />);
+    const { container } = render(<SidebarHarness arrowIndex={0} />);
 
     expect(screen.queryByText(/Get updates/i)).not.toBeInTheDocument();
     expect(screen.getByTestId('ce-site-load-sidebar')).toHaveClass('welcomeSlideSidebar');
+    expect(screen.getByTestId('ce-site-load-close-sidebar')).not.toHaveAttribute('data-dismiss');
+    expect(container.querySelectorAll('[data-dismiss="modal"]')).toHaveLength(0);
 
     fireEvent.click(screen.getByTestId('ce-site-load-close-sidebar'));
 
