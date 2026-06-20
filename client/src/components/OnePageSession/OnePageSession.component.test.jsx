@@ -1158,6 +1158,7 @@ describe('OnePageSession view gating', () => {
       slug: '',
       sessionName: 'Context Engine',
       networkChainId: 11155420,
+      autoFeatureSBTsBySessionSlug: false,
     };
 
     const { rerender } = render(
@@ -1234,7 +1235,44 @@ describe('OnePageSession view gating', () => {
     expect(latestSbtProps?.requireExplicitAutoFeatureSessionSlug).toBe(true);
     expect(latestSbtProps?.sessionConfig).toEqual(expect.objectContaining({
       slug: 'demo',
-      autoFeatureSBTsBySessionSlug: true,
+    }));
+    expect(latestSbtProps?.sessionConfig?.autoFeatureSBTsBySessionSlug).not.toBe(true);
+  });
+
+  it('preserves demo-1 embedded groups featured list and auto-feature policy', async () => {
+    const featuredSbt = '0x29563ff3aCC8AFb220D810F8022218095e25C1f6';
+    const demoSessionConfig = {
+      ...buildProps().sessionConfig,
+      slug: 'demo-1',
+      sessionName: 'Demo Session',
+      networkChainId: 11155420,
+      defaultFeaturedSBTs: [featuredSbt],
+      autoFeatureSBTsBySessionSlug: false,
+    };
+
+    render(
+      <OnePageSession
+        {...buildProps()}
+        slug="demo-1"
+        questionSessionSlug="demo-1"
+        defaultFeaturedSBTs={[featuredSbt]}
+        sessionConfig={demoSessionConfig}
+      />
+    );
+
+    fireEvent.click(screen.getByText(t('sbts')));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('sbts-page')).toBeInTheDocument();
+    });
+
+    const latestSbtProps = mockSBTsPage.mock.calls.map((args) => args[0]).filter(Boolean).pop();
+    expect(latestSbtProps?.sessionSlug).toBe('demo-1');
+    expect(latestSbtProps?.defaultFeaturedSBTs).toEqual([featuredSbt]);
+    expect(latestSbtProps?.requireExplicitAutoFeatureSessionSlug).toBe(true);
+    expect(latestSbtProps?.sessionConfig).toEqual(expect.objectContaining({
+      slug: 'demo-1',
+      autoFeatureSBTsBySessionSlug: false,
     }));
   });
 
@@ -1246,6 +1284,7 @@ describe('OnePageSession view gating', () => {
       slug: 'demo',
       sessionName: 'Context Engine',
       networkChainId: 11155420,
+      autoFeatureSBTsBySessionSlug: false,
     };
 
     try {
@@ -1280,7 +1319,7 @@ describe('OnePageSession view gating', () => {
       expect(latestSbtProps?.requireExplicitAutoFeatureSessionSlug).toBe(true);
       expect(latestSbtProps?.sessionConfig).toEqual(expect.objectContaining({
         slug: 'demo',
-        autoFeatureSBTsBySessionSlug: true,
+        autoFeatureSBTsBySessionSlug: false,
       }));
     } finally {
       window.history.replaceState({}, '', priorUrl || '/');
