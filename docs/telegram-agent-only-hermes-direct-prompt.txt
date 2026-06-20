@@ -2,7 +2,7 @@ Forwardable message, EdgeOS profile allowed:
 
 Use the attached Context Engine Agent Village Wrapped prompt.
 
-Run Agent Village Wrapped for my Telegram principal.
+Run Agent Village Wrapped for me.
 
 EdgeOS Read Permission: Yes
 
@@ -12,7 +12,7 @@ Forwardable message, EdgeOS profile not allowed:
 
 Use the attached Context Engine Agent Village Wrapped prompt.
 
-Run Agent Village Wrapped for my Telegram principal.
+Run Agent Village Wrapped for me.
 
 EdgeOS Read Permission: No
 
