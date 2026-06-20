@@ -37,7 +37,6 @@ export const readColdLoadOnboardingState = (storage: OnboardingStorage, pathname
   return {
     firstVisit,
     shouldStartOnboarding:
-      firstVisit &&
       storage.getItem(ONBOARDING_COMPLETE_STORAGE_KEY) == null &&
       shouldAutoOpenColdLoadOnboarding(storage, pathname),
   };
