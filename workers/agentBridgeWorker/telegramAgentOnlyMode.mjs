@@ -70,7 +70,7 @@ Step 3, allocate both token balances. You have two independent 100-token balance
 
 Step 4, Agent Village Wrapped image. After Step 3 succeeds, use the wrappedImageEndpoint path from the start payload. POST to it with the same authorization credential and JSON body { "window_id": "<window_id>", "mode": "wrapped", "format": "json" }. If the endpoint returns agent_only_wrapped_incomplete_predictions or all_statements_covered false, re-fetch statements, resubmit predictions or privacy skips once, then call the wrapped image endpoint again; do not present a partial image response. Prefer image_url when present: render, attach, or link that HTTPS PNG URL. If image_url is absent, decode image_base64 as image/png and render or display the image if your host supports it; if needed, write the decoded PNG bytes to a temporary local file and attach or show that file. Do not print raw image_base64 or the full image prompt. The image must be shown automatically before the final chat message. Do not say the Wrapped image is ready until you have actually displayed, attached, or linked the PNG. If the image endpoint fails or your host cannot display or link the image, report the exact endpoint reason in one short sentence and ask whether to retry; do not silently continue. After showing the standard Wrapped image, ask whether the principal wants the optional Agent Norms Compass meme; only if they say yes, POST the same endpoint with mode "political_compass" and display or link that image too.
 
-Metadata. Every POST must include agent_metadata with model, scaffold_version, and agent_initialized_at if known. Use request_id when retrying; replaying the same request_id is idempotent within a window.
+Metadata. Every POST must include agent_metadata with model, scaffold_version, and agent_initialized_at if known. For each new user-requested run, create a fresh run id and use unique request_id values for each answer-batch POST and for both vote submissions. Reuse a request_id only when retrying the exact same failed request; replaying the same request_id is idempotent within a window.
 
 Errors and retries. On validation errors, fix the listed rows and resend. On window_mismatch, re-fetch statements because a new window opened, then redo the run for the new window_id. If your cached skill version is older than /telegram/agent/api/skill-version, refresh the skill before continuing.
 
@@ -2013,15 +2013,22 @@ function buildAgentOnlyPoliticalCompassPrompt({
   agentGuessLines = '',
   focalQuestion = '',
   styleLine = '',
+  safetyRetry = false,
 } = {}) {
   const focal = wrappedDisplayText(focalQuestion, 150) || 'No most-important question was available.';
-  return `Create a wide 16:9 Agent Village Norms Compass poster${styleLine ? `, with this extra style hint: ${styleLine}` : ''}.
+  const title = safetyRetry ? 'Agent Village Norms Map' : 'Agent Village Norms Compass poster';
+  const framing = safetyRetry
+    ? 'Use neutral product-research language. Do not mention politics, elections, parties, ideology, polarization, persuasion, or culture-war labels.'
+    : 'Use neutral norms language rather than partisan, election, ideology, or culture-war framing.';
+  return `Create a wide 16:9 ${title}${styleLine ? `, with this extra style hint: ${styleLine}` : ''}.
 
 Logo reference: use the attached Agent Village logo image as the style reference for the wordmark. Preserve its core typography: "AGENT" is heavy uppercase block sans, "VILLAGE" is elegant high-contrast serif with a dramatic flowing calligraphic V. Do not copy the logo's stacked layout into the poster; lay "AGENT" and "VILLAGE" side-by-side in a compact top-left wordmark. Put subtitle "Where your agent thinks you land" on the same top row to create vertical space.
 
 Use the agent's most-important question as the focal issue for the map: "${focal}". Treat this as the question the principal's agent thinks they would care about most. Build two interpretable axes from that focal issue and the predictions below; examples include privacy boundary <-> proactive opportunity, human approval <-> agent latitude, local community <-> frontier acceleration, or skepticism <-> trust. Do not invent private facts.
 
-Make it look like a clean debate-atlas discussion map rather than a busy internet collage: four quadrants, crisp labeled axes, fine grid lines, soft quadrant colors, and a few discussion-node markers. Put the principal as one clear glowing marker with a short label. Put only recognizable historical figures or fictional/book characters as playful reference points on the same dimensions; do not show other users, crowds, avatars, or fake people. Prefer accurate, interesting deep-cut reference points over the most obvious names when the evidence supports them, but keep every figure recognizable enough for a viewer to understand the meme. Label each reference point with the figure/character name and one short reason tied to the axes. Keep comparisons non-defamatory and based only on the prediction themes.
+${framing}
+
+Make it look like a clean debate-atlas discussion map rather than a busy collage: four quadrants, crisp labeled axes, fine grid lines, soft quadrant colors, and a few discussion-node markers. Put the principal as one clear glowing marker with a short label. Put only recognizable historical figures or fictional/book characters as playful reference points on the same dimensions; do not show other users, crowds, avatars, or fake people. Prefer accurate, interesting deep-cut reference points over the most obvious names when the evidence supports them, but keep every figure recognizable enough for a viewer to understand the comparison. Label each reference point with the figure/character name and one short reason tied to the axes. Keep comparisons non-defamatory and based only on the prediction themes.
 
 Principal placement rule: place the principal at a meaningful non-center coordinate derived from the evidence. Never put the principal directly on the axis crossing or exact center. If the evidence is mixed, choose a slight non-center lean and label it "mixed evidence"; if evidence is too sparse to choose, omit the principal marker rather than centering it. If the strongest predictions lean privacy/review-first, move the marker left and/or upward. If they lean autonomy/opportunity, move it right and/or downward. The marker should visibly communicate the inferred stance.
 
@@ -2052,6 +2059,7 @@ export function buildAgentOnlyWrappedImagePrompt({
   quadraticVoteState = {},
   styleHint = '',
   mode = 'wrapped',
+  safetyRetry = false,
 } = {}) {
   const rawPredictions = wrappedPredictionRows(snapshot, state, { includeUnavailableGuesses: true });
   const snapshotGuessQuestionIds = wrappedGuessQuestionIdsFromSnapshot(snapshot);
@@ -2118,50 +2126,54 @@ export function buildAgentOnlyWrappedImagePrompt({
       agentGuessLines: 'Playful guesses are synthesized from prediction themes at image-generation time, not read from stored favorite/book/movie/game question rows.',
       focalQuestion: important[0]?.question || '',
       styleLine,
+      safetyRetry,
     });
     assertNoSecretShape({ prompt }, 'Agent-only wrapped image prompt must not serialize secrets.');
     return prompt;
   }
   const prompt = `Create a wide 16:9 shareable poster with a compact top-left "Agent Village" wordmark and same-row title "What your agent thinks it knows about you".
 
-Make it look like a polished social-share card, readable on mobile, with no tiny text. Custom aesthetic must vary from person to person and should be derived from the predictions below${styleLine ? `, with this extra style hint: ${styleLine}` : ''}. Choose color palette, texture, layout rhythm, icons, and visual metaphor from the inferred archetype, strongest preferences, high-confidence answers, and memory signals. Avoid making every report dark navy: use varied, shareable palettes such as dawn civic-tech, paper-and-ink field notes, bright village map, warm botanical, clean sci-fi, or civic poster colors when supported by the data. If the data suggests no stronger theme, use a premium privacy-first civic-tech visual language: airy village map, clean coordination dashboard, misty teal, cream, signal green, soft gold, and white accents. Use elegant map lines, Telegram-like message nodes, tiny lock/check icons, and a village grid, but no literal robots.
+Make it look like a polished social-share card, readable on mobile, with no tiny text. Custom aesthetic must vary from person to person and should be derived from the predictions below${styleLine ? `, with this extra style hint: ${styleLine}` : ''}. Choose one coherent visual identity from the inferred archetype, strongest preferences, high-confidence answers, and memory signals, then weave it through the whole poster: palette, texture, border style, icons, map motif, hero art, answer pills, dividers, and small decorative marks should all feel like the same person's report. Avoid making every report dark navy: use varied, shareable palettes such as dawn civic-tech, paper-and-ink field notes, bright village map, warm botanical, clean sci-fi, or civic poster colors when supported by the data. If the data suggests no stronger theme, use a premium privacy-first civic-tech visual language: airy village map, clean coordination dashboard, misty teal, cream, signal green, soft gold, and white accents. Use elegant map lines, Telegram-like message nodes, tiny lock/check icons, and a village grid, but no literal robots.
 
 Logo reference: use the attached Agent Village logo image as the style reference for the wordmark. Preserve its core typography: "AGENT" is heavy uppercase block sans, "VILLAGE" is elegant high-contrast serif with a dramatic flowing calligraphic V. Do not copy the logo's stacked layout into the poster; lay "AGENT" and "VILLAGE" side-by-side on one compact top-left line. Do not render the word "Wrapped"; the format implies it and the extra word wastes space. Put the title "What your agent thinks it knows about you" on the same top row to the right of the wordmark, large enough to read at a glance. Keep the top row short so the content area gets most of the vertical space.
 
-Layout requirements: keep the top-right area visually calm with abstract map lines only, no decorative labels, no fake annotations, no extra numbers, and no filler text. Every visible word must be part of one of the content sections below. Leave clear spacing around the top wordmark and content cards.
+Layout requirements: keep the top-right area visually calm with abstract map lines only, no decorative labels, no fake annotations, no extra numbers, and no filler text. Every visible word must be part of one of the content sections below. Leave clear spacing around the top wordmark and content cards. Do not number the visible sections; render section titles without "1.", "2.", "3.", etc.
 
 Use these content sections:
 
 Section typography: make section titles large, high-contrast, and easy to read at thumbnail size. They should be visibly larger than body copy, with clear hierarchy and enough spacing between sections.
 
-1. Agent Core Insight
-Infer a short archetype from the predicted human responses and the agent-about-user evidence below. Use one bold archetype label and one memeable sentence about what the agent thinks of the principal.
+Agent Core Insight + Agent Impression
+Make this the largest content block. Combine the old core insight and abstract agent-impression ideas into one hero section that contains both: a large abstract artistic representation of what the agent thinks of the principal, plus one bold archetype label and one memeable sentence about what the agent thinks of the principal. The visual metaphor must be integrated into the hero, not isolated as a separate section. Examples: a botanical circuit-village, careful map lines around a warm signal, a privacy lock woven into roots, a field-note constellation, or a civic dashboard becoming a garden. Do not make this another portrait, fake person, robot, trophy wall, random symbols, or decorative filler.
 
-Agent-about-user evidence for sections 1, 6, and 7 only. Do not render this as a visible table, High-Confidence Read, Cautious Read, or Most Important item:
+Use plain concrete language. Do not invent undefined acronyms, code words, or jargon such as "triple-v", "zero-knowledge negotiation", "proof over promises", or similar unless the exact phrase appears in the evidence below. Prefer a sentence a normal viewer can understand immediately.
+
+Agent-about-user evidence for the core insight and comparison only. Do not render this as a visible table, High-Confidence Read, Cautious Read, or Most Important item:
 ${agentAnalysisLines || 'No separate agent-about-user analysis rows were submitted.'}
 
 Prediction Evidence Pool for synthesis only. Use this compact list to infer themes, style, playful guesses, comparison, and abstract impression. Do not render it as its own visible table, and do not duplicate all of it visibly; the visible High-Confidence and Cautious sections are separately listed below:
 ${allPredictionEvidenceLines}
 
-2. Most Important To You
 Label this section exactly: "Questions your agent thought you would care about most"
 Show exactly 3 actual question prompts if 3 are available; otherwise show every available prompt. Lightly shorten only if absolutely necessary for fit. This section is questions only: do not show predicted answers, answer pills, Agree/Unsure/Disagree, ratings, selected options, confidence, or token math in this section. Do not replace prompts with theme summaries or category labels:
 ${importantLines}
 
-3. High-Confidence Reads
+High-Confidence Reads
 Show exactly 3 concise predicted human response rows if 3 are available; otherwise show every available predicted human response. These rows must be questions the principal could answer about their own views/preferences, not agent-about-user analysis prompts like archetype, theme, historical comparison, abstract metaphor, or favorite book/movie/game prompts. Use explicit column headers "Question", "Predicted answer", and "Confidence". Each row must include enough of the actual question prompt to explain what the answer refers to. Do not use the phrase "your agent's take":
 ${highLines}
 
-4. Cautious Reads
-Show exactly 3 concise nuanced predicted human response rows if 3 are available; otherwise show every available predicted human response. These rows must be questions the principal could answer about their own views/preferences, not agent-about-user analysis prompts like archetype, theme, historical comparison, abstract metaphor, or favorite book/movie/game prompts. Use explicit column headers "Question", "Predicted answer", and "Confidence". Each row must include enough of the actual question prompt to explain what the answer refers to, and if a shortened prompt would be ambiguous, show the full prompt even if the row becomes tighter. Do not render vague fragments like "Mostly AI-written information environment" when the full prompt is available; show the actual prompt such as "A mostly AI-written information environment could be healthier than today's mostly human-written one." Do not render detached rating labels like "Serendipity 3/5" or a bare "7" without the question context; show scale context like "7/10" when applicable. Do not use the phrase "your agent's take":
+Cautious Reads
+These are the lowest-confidence eligible predictions from this run, not necessarily objectively low confidence. If the lowest submitted confidence is still high, keep the actual percentage and do not imply the agent was very unsure. Show exactly 3 concise nuanced predicted human response rows if 3 are available; otherwise show every available predicted human response. These rows must be questions the principal could answer about their own views/preferences, not agent-about-user analysis prompts like archetype, theme, historical comparison, abstract metaphor, or favorite book/movie/game prompts. Use explicit column headers "Question", "Predicted answer", and "Confidence". Each row must include enough of the actual question prompt to explain what the answer refers to, and if a shortened prompt would be ambiguous, show the full prompt even if the row becomes tighter. Do not render vague fragments like "Mostly AI-written information environment" when the full prompt is available; show the actual prompt such as "A mostly AI-written information environment could be healthier than today's mostly human-written one." Do not render detached rating labels like "Serendipity 3/5" or a bare "7" without the question context; show scale context like "7/10" when applicable. Do not use the phrase "your agent's take":
 ${cautiousLines}
 
 Confidence display: in both High-Confidence Reads and Cautious Reads, show a clear column or small header labeled "Confidence". Render confidence values as percentages like "95%" rather than "95/100". Do not show a full confidence table, just the per-card percentage.
 
 No visible unavailable rows: do not render any visible row, chip, card, or label with "N/A", "unknown", "unsupported", "not enough context", or similar unavailable text. Omit that item instead, even if its confidence is high.
 
-5. Agent Guesses
-This bottom-left section is synthesized at image-generation time from the actual prediction evidence above; it is not based on dedicated favorite-book/movie/game questions and should not be treated as research data. Reserve the bottom-left visual slot for a compact "Agent Guesses" chip grid, ideally 2x2 when all four guesses are supported. Use this category order: Book Guess, Movie/Show Guess, Game/Play Pattern, AI Optimism. Try to include Book Guess and Movie/Show Guess alongside Game/Play Pattern and AI Optimism when the evidence supports even a loose taste-vibe inference, but frame them as playful guesses rather than facts. Use at most one item per category, so there is never a duplicate book, movie/show, game/play, or AI Optimism guess. Use compact chips with precise icons: book, cinema/message screen, board-game/Go stones, and flower/sunrise for AI Optimism. These must be clearly framed as playful guesses, not facts. For AI Optimism, use actual AI-futures predicted response rows or broader prediction themes, especially optimism/flourishing questions; do not rely on old standalone optimism guess rows. If evidence is weak for a category, omit that chip entirely instead of showing unavailable text or inventing a confident specific answer. Do not repeat Agent Guesses under Agent Comparison, the abstract agent-impression corner, or anywhere else. These guesses are additive; they must not replace the historical comparison or abstract agent-impression corner.
+Bottom row: Agent Guesses + Agent Comparison
+Put Agent Guesses and Agent Comparison together in one shared bottom row. Agent Guesses should be a compact chip grid on the left side of that row; Agent Comparison should be a calm comparison strip on the right side of that same row. Do not create a separate third bottom panel for Abstract Agent Impression, because that visual belongs inside the Agent Core Insight hero.
+
+Agent Guesses are synthesized at image-generation time from the actual prediction evidence above; they are not based on dedicated favorite-book/movie/game questions and should not be treated as research data. Use this category order: Book Guess, Movie/Show Guess, Game/Play Pattern, AI Optimism. Try to include Book Guess and Movie/Show Guess alongside Game/Play Pattern and AI Optimism when the evidence supports even a loose taste-vibe inference, but frame them as playful guesses rather than facts. Use at most one item per category, so there is never a duplicate book, movie/show, game/play, or AI Optimism guess. Use a compact chip grid, ideally 2x2 when all four guesses are supported. Use compact chips with precise icons: book, cinema/message screen, board-game/Go stones, and flower/sunrise for AI Optimism. These must be clearly framed as playful guesses, not facts. For AI Optimism, use actual AI-futures predicted response rows or broader prediction themes, especially optimism/flourishing questions; do not rely on old standalone optimism guess rows. If evidence is weak for a category, omit that chip entirely instead of showing unavailable text or inventing a confident specific answer. Do not repeat Agent Guesses under Agent Comparison or anywhere else. These guesses are additive; they must not replace the historical comparison.
 Supporting evidence for optional playful guesses:
 - Use the Most Important, High-Confidence, Cautious, Agent-about-user, and style evidence already provided in this prompt.
 - Do not use stored favorite/book/movie/game answer rows as source data; those rows are not part of the current research question set.
@@ -2170,17 +2182,92 @@ Answer rendering rules: use the supplied "answer format" on each prediction row.
 
 Binary answer styling: for binary choice prediction rows only, render exactly one selected answer pill, matching the supplied predicted answer. If the prediction is Agree, show only the green Agree pill; if Unsure, show only the yellow Unsure pill; if Disagree, show only the red Disagree pill. Never show all three Agree/Unsure/Disagree options in a row, and never show the unselected choices. Use large rounded choice pills/buttons on a dark navy background: Agree is green with white text, Unsure is bright yellow with dark navy text, and Disagree is red with white text. The selected pill should feel like a primary response control, not a small tag.
 
-6. Agent Comparison
-Compare the principal to a historical figure or fictional/book character only if it feels supported by the predicted human responses or the agent-about-user evidence; if unsupported, omit the comparison card instead of showing unavailable text. Prefer historically accurate deep cuts when supported by the evidence: recognizable but less generic comparisons are better than defaulting to Benjamin Franklin, Leonardo da Vinci, or other obvious polymath icons. Make this a calm wide strip with a stylized illustrated rendition or portrait silhouette of that figure/character, the comparison name, and one brief description line of no more than 10 words explaining the fit. Do not include Agent Guesses in this section. Do not add the old trio of comparison evidence icons, artifact tiles, or extra proof objects beside the historical figure.
+Agent Comparison: compare the principal to a historical figure or fictional/book character only if it feels supported by the predicted human responses or the agent-about-user evidence; if unsupported, omit the comparison card instead of showing unavailable text. Prefer historically accurate deep cuts when supported by the evidence: recognizable but less generic comparisons are better than defaulting to Benjamin Franklin, Leonardo da Vinci, or other obvious polymath icons. Make this a calm strip with a stylized illustrated rendition or portrait silhouette of that figure/character, the comparison name, and one brief description line of no more than 10 words explaining the fit. Do not include Agent Guesses in this section. Do not add the old trio of comparison evidence icons, artifact tiles, or extra proof objects beside the historical figure.
 
-7. Abstract Agent Impression
-In the space that would otherwise hold comparison evidence icons, add one abstract artistic corner showing what the agent thinks of the principal. This should be a non-literal visual metaphor derived from the archetype, strongest predictions, memory signals, and aesthetic preference: examples include a botanical circuit-village, careful map lines around a warm signal, a privacy lock woven into roots, a field-note constellation, or a civic dashboard becoming a garden. It must not be another portrait, fake person, robot, trophy wall, random symbols, or decorative filler. Do not label this corner with extra text unless one tiny section label is needed for clarity.
-
-Footer: remove the review/edit sentence entirely. Put only a small low-contrast but readable "contextengine.xyz" link in the bottom-right corner; it should be subtle, not barely invisible.
+Footer: remove the review/edit sentence entirely and do not reserve a dedicated bottom footer row. Put only a small low-contrast but readable "contextengine.xyz" link tucked into the bottom-right corner; it should blend with the design, not be barely invisible.
 
 Do not show access credentials, raw Telegram ids, confidence tables, rationales, privacy skip counts, linear/quadratic allocation mechanics, decorative text, lorem ipsum, fake UI labels, or random numbers. Keep the graphic memeable, premium, and screenshot-friendly. Make all major text legible and avoid overcrowding.`;
   assertNoSecretShape({ prompt }, 'Agent-only wrapped image prompt must not serialize secrets.');
   return prompt;
+}
+
+function buildOpenAiWrappedImageFormData({
+  model = '',
+  prompt = '',
+  size = '',
+  quality = '',
+  referenceBytes = new Uint8Array(),
+} = {}) {
+  const referenceBlob = new Blob([referenceBytes], { type: AGENT_VILLAGE_LOGO_REFERENCE_CONTENT_TYPE });
+  const requestBody = new FormData();
+  requestBody.append('model', model);
+  requestBody.append('prompt', prompt);
+  requestBody.append('size', size);
+  requestBody.append('quality', quality);
+  requestBody.append('output_format', 'png');
+  requestBody.append('background', 'opaque');
+  requestBody.append('n', '1');
+  requestBody.append('image', referenceBlob, AGENT_VILLAGE_LOGO_REFERENCE_FILENAME);
+  assertNoSecretShape({
+    model,
+    prompt,
+    size,
+    quality,
+    output_format: 'png',
+    background: 'opaque',
+    n: 1,
+    referenceImageFilename: AGENT_VILLAGE_LOGO_REFERENCE_FILENAME,
+    referenceImageBytes: referenceBytes.byteLength,
+  }, 'OpenAI wrapped image request must not serialize secrets.');
+  return requestBody;
+}
+
+async function requestOpenAiWrappedImage({
+  fetchImpl = fetch,
+  targetUrl = '',
+  openAiKey = '',
+  model = '',
+  prompt = '',
+  size = '',
+  quality = '',
+  referenceBytes = new Uint8Array(),
+} = {}) {
+  const requestBody = buildOpenAiWrappedImageFormData({
+    model,
+    prompt,
+    size,
+    quality,
+    referenceBytes,
+  });
+  const response = await fetchImpl(targetUrl, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${openAiKey}`,
+    },
+    body: requestBody,
+  });
+  const responseText = await response.text().catch(() => '');
+  const parsed = safeJsonParse(responseText, null);
+  if (!response.ok) {
+    return {
+      ok: false,
+      status: 502,
+      reason: 'openai_image_generation_failed',
+      upstreamStatus: response.status,
+      upstreamReason: wrappedDisplayText(parsed?.error?.message || parsed?.error || responseText || response.statusText, 240),
+    };
+  }
+  const imageBase64 = safeString(parsed?.data?.[0]?.b64_json);
+  if (!imageBase64) {
+    return { ok: false, status: 502, reason: 'openai_image_generation_missing_image' };
+  }
+  return { ok: true, imageBase64 };
+}
+
+function shouldRetryWrappedImageWithSaferPrompt(result = {}) {
+  const rawText = lower(`${result.reason || ''} ${result.upstreamReason || ''} ${result.upstreamStatus || ''}`);
+  const text = rawText.replace(/[^a-z0-9]+/g, ' ');
+  return /\bsafety\b|\bpolicy\b|\breject|\bmoderation\b|\bcontent\b|\bfiltered\b/.test(text);
 }
 
 export async function generateAgentOnlyWrappedImage({
@@ -2228,7 +2315,7 @@ export async function generateAgentOnlyWrappedImage({
   const linearVoteState = await loadVoteState({ env, sessionSlug: slug, windowId: snapshot.windowId, telegramUserId, mode: 'linear' });
   const quadraticVoteState = await loadVoteState({ env, sessionSlug: slug, windowId: snapshot.windowId, telegramUserId, mode: 'quadratic' });
   const imageMode = normalizeWrappedImageMode(body.mode || body.image_mode || body.imageMode || body.view);
-  const prompt = buildAgentOnlyWrappedImagePrompt({
+  let prompt = buildAgentOnlyWrappedImagePrompt({
     snapshot,
     state,
     linearVoteState,
@@ -2241,49 +2328,47 @@ export async function generateAgentOnlyWrappedImage({
   const quality = normalizeWrappedImageQuality(body.quality || env.AGENT_BRIDGE_AGENT_WRAPPED_IMAGE_QUALITY);
   const targetUrl = safeString(env.AGENT_BRIDGE_OPENAI_IMAGE_URL) || DEFAULT_OPENAI_IMAGE_EDIT_URL;
   const referenceBytes = base64ToUint8Array(AGENT_VILLAGE_LOGO_REFERENCE_BASE64);
-  const referenceBlob = new Blob([referenceBytes], { type: AGENT_VILLAGE_LOGO_REFERENCE_CONTENT_TYPE });
-  const requestBody = new FormData();
-  requestBody.append('model', model);
-  requestBody.append('prompt', prompt);
-  requestBody.append('size', size);
-  requestBody.append('quality', quality);
-  requestBody.append('output_format', 'png');
-  requestBody.append('background', 'opaque');
-  requestBody.append('n', '1');
-  requestBody.append('image', referenceBlob, AGENT_VILLAGE_LOGO_REFERENCE_FILENAME);
-  assertNoSecretShape({
+  let imageResult = await requestOpenAiWrappedImage({
+    fetchImpl,
+    targetUrl,
+    openAiKey,
     model,
     prompt,
     size,
     quality,
-    output_format: 'png',
-    background: 'opaque',
-    n: 1,
-    referenceImageFilename: AGENT_VILLAGE_LOGO_REFERENCE_FILENAME,
-    referenceImageBytes: referenceBytes.byteLength,
-  }, 'OpenAI wrapped image request must not serialize secrets.');
-  const response = await fetchImpl(targetUrl, {
-    method: 'POST',
-    headers: {
-      authorization: `Bearer ${openAiKey}`,
-    },
-    body: requestBody,
+    referenceBytes,
   });
-  const responseText = await response.text().catch(() => '');
-  const parsed = safeJsonParse(responseText, null);
-  if (!response.ok) {
-    return {
-      ok: false,
-      status: 502,
-      reason: 'openai_image_generation_failed',
-      upstreamStatus: response.status,
-      upstreamReason: wrappedDisplayText(parsed?.error?.message || parsed?.error || responseText || response.statusText, 240),
-    };
+  let imageSafetyRetried = false;
+  if (
+    !imageResult.ok &&
+    imageMode === 'political_compass' &&
+    shouldRetryWrappedImageWithSaferPrompt(imageResult)
+  ) {
+    prompt = buildAgentOnlyWrappedImagePrompt({
+      snapshot,
+      state,
+      linearVoteState,
+      quadraticVoteState,
+      styleHint: '',
+      mode: imageMode,
+      safetyRetry: true,
+    });
+    imageSafetyRetried = true;
+    imageResult = await requestOpenAiWrappedImage({
+      fetchImpl,
+      targetUrl,
+      openAiKey,
+      model,
+      prompt,
+      size,
+      quality,
+      referenceBytes,
+    });
   }
-  const imageBase64 = safeString(parsed?.data?.[0]?.b64_json);
-  if (!imageBase64) {
-    return { ok: false, status: 502, reason: 'openai_image_generation_missing_image' };
+  if (!imageResult.ok) {
+    return imageResult;
   }
+  const imageBase64 = imageResult.imageBase64;
   const savedImage = await saveAgentOnlyWrappedImage({
     env,
     sessionSlug: slug,
@@ -2315,6 +2400,7 @@ export async function generateAgentOnlyWrappedImage({
     reference_image: AGENT_VILLAGE_LOGO_REFERENCE_FILENAME,
     image_content_type: 'image/png',
     image_base64: imageBase64,
+    image_safety_retried: imageSafetyRetried,
     image_saved: savedImage.ok === true,
     ...(savedImage.ok ? {
       image_id: savedImage.imageId,

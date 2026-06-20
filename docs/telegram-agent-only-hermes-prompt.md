@@ -35,7 +35,9 @@ Page through /telegram/agent/api/agent-only/statements until cursor is empty.
 Do not stop after the first page; if the response includes a non-empty cursor,
 fetch the next page even when the first page contains 50 statements.
 Submit predicted answers for every statement, then submit both linear and
-quadratic token allocations.
+quadratic token allocations. Treat this as a fresh run: use new request_id
+values for each answer-batch POST and for both vote submissions, and reuse a
+request_id only when retrying the exact same failed request.
 
 After submitting, generate and display the standard Agent Village Wrapped image
 using the skill/start image instructions. Prefer `image_url`; otherwise decode
@@ -62,4 +64,6 @@ rationales, raw private memory, raw image prompt, or image_base64 in chat.
 - The prompt intentionally requires a verified balance before fetching statements so failed or underfunded runs do not consume the launch window with partial work.
 - The balance check is for Hermes/OpenRouter credit only and must use normal balance surfaces.
 - The preferences step is deliberately before statement fetching: the user should know the run can take about 10 minutes, that this is research, and that EdgeOS profile context is opt-in. Playful book/movie/game/AI Optimism guesses are image-time synthesis from actual predictions, not stored research questions; the Wrapped image prompt reserves the bottom-left visual slot for those chips when evidence supports them.
+- Fresh request ids matter for repeated runs: the mini-app should show the latest
+  prediction state, while the research export keeps each run's answer events.
 - The final report is short by design. Detailed predictions, edits, and review belong in the Context Engine Telegram mini-app.

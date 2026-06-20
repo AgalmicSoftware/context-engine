@@ -164,6 +164,9 @@ test('start payload pins path-only endpoints and instruction size', () => {
   assert.match(payload.instructions, /wrappedImageEndpoint/);
   assert.match(payload.instructions, /mode "political_compass"/);
   assert.match(payload.instructions, /render or display the image/);
+  assert.match(payload.instructions, /fresh run id/);
+  assert.match(payload.instructions, /unique request_id values/);
+  assert.match(payload.instructions, /each answer-batch POST/);
   assert.match(payload.instructions, /To inspect or change your agent's responses/);
   assert.doesNotMatch(payload.instructions, /Review or edit your agent's responses in Context Engine Telegram Bot/);
   assert.ok(agentOnlyInstructionWordCount(AGENT_ONLY_INSTRUCTIONS) >= 400);
@@ -317,7 +320,7 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
     },
     quadraticVoteState: { mode: 'quadratic', votes: { ceq_info: 4 } },
   });
-  assert.match(prompt, /Most Important To You/);
+  assert.match(prompt, /Do not number the visible sections/);
   assert.match(prompt, /Questions your agent thought you would care about most/);
   assert.match(prompt, /Show exactly 3 actual question prompts/);
   assert.match(prompt, /compact top-left "Agent Village" wordmark/);
@@ -330,7 +333,12 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.match(prompt, /content area gets most of the vertical space/);
   assert.match(prompt, /varied, shareable palettes/);
   assert.match(prompt, /Custom aesthetic must vary from person to person/);
+  assert.match(prompt, /weave it through the whole poster/);
   assert.match(prompt, /Section typography: make section titles large/);
+  assert.match(prompt, /Agent Core Insight \+ Agent Impression/);
+  assert.match(prompt, /Make this the largest content block/);
+  assert.match(prompt, /Use plain concrete language/);
+  assert.match(prompt, /triple-v/);
   assert.match(prompt, /Show exactly 3 actual question prompts/);
   assert.match(prompt, /Question only: "I would trust my agent to schedule meetings while I sleep/);
   assert.match(prompt, /This section is questions only: do not show predicted answers/);
@@ -346,8 +354,10 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.match(prompt, /I would trust my agent to schedule meetings while I sleep/);
   assert.match(prompt, /High-Confidence Reads/);
   assert.match(prompt, /Cautious Reads/);
+  assert.match(prompt, /lowest-confidence eligible predictions from this run/);
+  assert.match(prompt, /not necessarily objectively low confidence/);
   assert.match(prompt, /predicted human response rows/);
-  assert.match(prompt, /Agent-about-user evidence for sections 1, 6, and 7 only/);
+  assert.match(prompt, /Agent-about-user evidence for the core insight and comparison only/);
   assert.match(prompt, /Analysis prompt: "Which archetype best describes this principal/);
   assert.doesNotMatch(prompt, /Analysis prompt: "What important thing do you not know about this principal/);
   assert.match(prompt, /Question: "/);
@@ -368,7 +378,9 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.match(prompt, /Do not use the phrase "your agent's take"/);
   assert.match(prompt, /Do not render detached rating labels/);
   assert.match(prompt, /Agent Guesses/);
-  assert.match(prompt, /Reserve the bottom-left visual slot for a compact "Agent Guesses" chip grid/);
+  assert.match(prompt, /Bottom row: Agent Guesses \+ Agent Comparison/);
+  assert.match(prompt, /Put Agent Guesses and Agent Comparison together in one shared bottom row/);
+  assert.match(prompt, /Do not create a separate third bottom panel for Abstract Agent Impression/);
   assert.match(prompt, /ideally 2x2 when all four guesses are supported/);
   assert.match(prompt, /Use this category order: Book Guess, Movie\/Show Guess, Game\/Play Pattern, AI Optimism/);
   assert.match(prompt, /Try to include Book Guess and Movie\/Show Guess alongside Game\/Play Pattern and AI Optimism/);
@@ -382,7 +394,7 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.match(prompt, /Do not use stored favorite\/book\/movie\/game answer rows as source data/);
   assert.match(prompt, /flower\/sunrise for AI Optimism/);
   assert.match(prompt, /omit that chip entirely instead of showing unavailable text/);
-  assert.match(prompt, /Do not repeat Agent Guesses under Agent Comparison, the abstract agent-impression corner, or anywhere else/);
+  assert.match(prompt, /Do not repeat Agent Guesses under Agent Comparison or anywhere else/);
   assert.match(prompt, /Do not include Agent Guesses in this section/);
   assert.match(prompt, /favorite book/);
   assert.match(prompt, /How optimistic am I that AI will broadly improve human flourishing over the next decade/);
@@ -403,7 +415,6 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.match(prompt, /stylized illustrated rendition or portrait silhouette/);
   assert.match(prompt, /one brief description line of no more than 10 words/);
   assert.match(prompt, /Do not add the old trio of comparison evidence icons/);
-  assert.match(prompt, /Abstract Agent Impression/);
   assert.match(prompt, /botanical circuit-village/);
   assert.match(prompt, /privacy lock woven into roots/);
   assert.doesNotMatch(prompt, /private correspondence/);
@@ -411,9 +422,12 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.doesNotMatch(prompt, /public repair norm/);
   assert.doesNotMatch(prompt, /exactly 3 precise evidence artifacts/);
   assert.match(prompt, /contextengine\.xyz/);
-  assert.match(prompt, /subtle, not barely invisible/);
+  assert.match(prompt, /do not reserve a dedicated bottom footer row/);
+  assert.match(prompt, /blend with the design/);
   assert.doesNotMatch(prompt, /Review or edit your agent's responses in Context Engine/);
   assert.doesNotMatch(prompt, /What Your Agent Upvoted/);
+  assert.doesNotMatch(prompt, /\n1\. Agent Core Insight/);
+  assert.doesNotMatch(prompt, /\n7\. Abstract Agent Impression/);
 });
 
 test('wrapped image prompt supports Agent Norms Compass mode around the most-important question', () => {
@@ -449,6 +463,7 @@ test('wrapped image prompt supports Agent Norms Compass mode around the most-imp
   assert.match(prompt, /2x2 strategy map/);
   assert.match(prompt, /Humans approve high-stakes actions/);
   assert.doesNotMatch(prompt, /political compass/i);
+  assert.match(prompt, /rather than partisan, election, ideology, or culture-war framing/);
   assert.match(prompt, /compact top-left wordmark/);
   assert.match(prompt, /Where your agent thinks you land/);
   assert.match(prompt, /attached Agent Village logo image as the style reference/);
@@ -463,6 +478,34 @@ test('wrapped image prompt supports Agent Norms Compass mode around the most-imp
   assert.match(prompt, /I would rather my agent be too conservative with privacy/);
   assert.match(prompt, /Agent guesses/);
   assert.doesNotMatch(prompt, /Most Important To You/);
+});
+
+test('wrapped image prompt has a neutral safety retry variant for compass mode', () => {
+  const snapshot = {
+    windowId: 'w-2026-06-15',
+    statements: [{
+      statement_id: 'ceq_privacy',
+      text: 'I would rather my agent be too conservative with privacy than too proactive with opportunities.',
+      answer_schema: { kind: 'choice', values: ['agree', 'unsure', 'disagree'] },
+    }],
+  };
+  const state = {
+    byStatement: {
+      ceq_privacy: { agent: { answer: { value: 'agree' }, confidence: 88 } },
+    },
+  };
+  const prompt = buildAgentOnlyWrappedImagePrompt({
+    snapshot,
+    state,
+    linearVoteState: { mode: 'linear', votes: { ceq_privacy: 30 } },
+    quadraticVoteState: { mode: 'quadratic', votes: {} },
+    mode: 'political_compass',
+    safetyRetry: true,
+  });
+  assert.match(prompt, /Agent Village Norms Map/);
+  assert.match(prompt, /neutral product-research language/);
+  assert.doesNotMatch(prompt, /Norms Compass poster/);
+  assert.doesNotMatch(prompt, /political compass/i);
 });
 
 test('current Wrapped question bank excludes image-only taste and old optimism guess prompts', () => {
@@ -1542,6 +1585,28 @@ test('answer bulk validates rows, writes sidecar events/state, and replays idemp
     format: 'jsonl',
   });
   assert.equal(rerunAnswers.body.split('\n').filter(Boolean).length, 5);
+  const identicalFreshRun = await submitAgentOnlyAnswersBulk({
+    env: testEnv,
+    sessionSlug: 'alpha',
+    telegramUserId: '1001',
+    now: '2026-06-12T15:12:00.000Z',
+    body: {
+      ...base,
+      request_id: 'answers-rerun-identical-fresh-run',
+      answers: [{ statement_id: ids[0], answer: { value: 'disagree' }, confidence: 42 }],
+    },
+  });
+  assert.equal(identicalFreshRun.ok, true);
+  assert.equal(identicalFreshRun.replay, false);
+  const identicalFreshRunAnswers = await exportAgentOnlyData({
+    env: testEnv,
+    sessionSlug: 'alpha',
+    view: 'answers',
+    format: 'jsonl',
+  });
+  const identicalFreshRunRows = identicalFreshRunAnswers.body.split('\n').filter(Boolean).map((line) => JSON.parse(line));
+  assert.equal(identicalFreshRunRows.length, 6);
+  assert.equal(identicalFreshRunRows.some((row) => row.request_id === 'answers-rerun-identical-fresh-run'), true);
   const rerunCalibration = await exportAgentOnlyData({
     env: testEnv,
     sessionSlug: 'alpha',

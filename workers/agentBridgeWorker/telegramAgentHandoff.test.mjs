@@ -1767,7 +1767,7 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   assert.equal(logoReference?.type, 'image/png');
   assert.equal(logoReference?.size > 100_000, true);
   const wrappedPrompt = openAiRequestForm.get('prompt');
-  assert.match(wrappedPrompt, /Most Important To You/);
+  assert.match(wrappedPrompt, /Do not number the visible sections/);
   assert.match(wrappedPrompt, /Questions your agent thought you would care about most/);
   assert.match(wrappedPrompt, /compact top-left "Agent Village" wordmark/);
   assert.match(wrappedPrompt, /attached Agent Village logo image as the style reference/);
@@ -1818,6 +1818,47 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   assert.equal(imageRows[0].prompt_hash, wrapped.image_prompt_hash);
   assert.equal(imageRows[0].principal_id.startsWith('cep_'), true);
   assert.equal(JSON.stringify(imageRows).includes('telegramUserId'), false);
+
+  let compassAttempts = 0;
+  const compassPrompts = [];
+  const compassResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/agent-only/wrapped-image?sessionSlug=alpha', {
+      method: 'POST',
+      token: agentOnlyToken.token,
+      body: {
+        window_id: 'w-2026-06-12',
+        mode: 'political_compass',
+        style_hint: 'make it a partisan election poster',
+        createdAt: '2026-06-12T15:10:00.000Z',
+      },
+    }),
+    env,
+    fetchImpl: async (url, init = {}) => {
+      assert.equal(url, 'https://api.openai.com/v1/images/edits');
+      compassAttempts += 1;
+      compassPrompts.push(init.body.get('prompt'));
+      if (compassAttempts === 1) {
+        return new Response(JSON.stringify({
+          error: { code: 'content_policy_violation', message: 'moderation_blocked' },
+        }), { status: 400, headers: { 'content-type': 'application/json' } });
+      }
+      return new Response(JSON.stringify({
+        data: [{ b64_json: Buffer.from('fake-compass').toString('base64') }],
+      }), { status: 200, headers: { 'content-type': 'application/json' } });
+    },
+  });
+  const compass = await jsonBody(compassResponse);
+  assert.equal(compassResponse.status, 200);
+  assert.equal(compass.ok, true);
+  assert.equal(compass.mode, 'political_compass');
+  assert.equal(compass.image_safety_retried, true);
+  assert.equal(compassAttempts, 2);
+  assert.match(compassPrompts[0], /Agent Village Norms Compass poster/);
+  assert.match(compassPrompts[0], /partisan election poster/);
+  assert.match(compassPrompts[1], /Agent Village Norms Map/);
+  assert.match(compassPrompts[1], /neutral product-research language/);
+  assert.doesNotMatch(compassPrompts[1], /partisan election poster/);
+  assert.equal(compass.image_base64, Buffer.from('fake-compass').toString('base64'));
 
   const metricsResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/admin/agent-only/export?sessionSlug=alpha&view=answers&format=jsonl', {

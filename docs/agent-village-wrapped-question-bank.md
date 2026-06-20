@@ -22,13 +22,14 @@ important."
 
 The image endpoint supports two intended modes:
 
-- **Standard Wrapped**: the shareable poster with Agent Core Insight, Most
-  Important To You, High-Confidence Reads, Cautious Reads, optional Agent
-  Guesses, and Agent Comparison.
-- **Political compass meme**: a quadrant-style meme that uses the top
+- **Standard Wrapped**: the shareable poster with a combined Agent Core
+  Insight/Agent Impression hero, Most Important To You, High-Confidence Reads,
+  Cautious Reads, and one bottom row containing Agent Guesses plus Agent
+  Comparison.
+- **Agent Norms Compass**: a quadrant-style map that uses the top
   importance-ranked question as the focal issue. For now, read Charlie's
   "most ____ question" shorthand as **most important / most defining question**.
-  The compass should place the principal against playful historical or
+  The map should place the principal against playful historical or
   fictional/book-character reference points, with evidence chips from the
   agent's predictions. It must stay non-defamatory and avoid fake private facts.
 
@@ -64,16 +65,24 @@ Agent Village Wrapped content.
 Core insight one-liner:
 "Your agent thinks you're a privacy-first coordination builder: you trust agents most when they protect context, broker high-signal intros, and strengthen offline communities."
 
-Main sections:
+Main sections. Do not render visible section numbers like "1." or "2.":
 
 Make section titles large, high-contrast, and easy to read at thumbnail size.
 They should be visibly larger than body copy, with clear hierarchy and enough
 spacing between sections.
 
-1. Agent Core Insight
-Show a bold archetype and one memeable sentence about what the agent thinks of the principal.
+Agent Core Insight + Agent Impression
+This should be the largest content block. Combine the core insight and abstract
+agent-impression visual into one hero section. It should include both a bold
+archetype/memeable sentence and a large abstract artistic representation of what
+the agent thinks of the principal. Carry the same visual identity through the
+whole poster: palette, texture, icon language, map motif, borders, and small
+decorative marks should feel personalized, not template-identical.
 
-2. Most Important To You
+Use plain concrete language. Do not invent undefined acronyms or jargon such as
+"triple-v" unless that exact term appears in the evidence.
+
+Most Important To You
 Label this as: "Questions your agent thought you would care about most."
 Show exactly 3 actual question prompts when at least 3 are available, lightly
 shortened only when needed for fit, not theme summaries or raw vote math. This
@@ -82,7 +91,7 @@ view, not a claim that any answer was boosted. It must show questions only:
 never show predicted answers, Agree/Unsure/Disagree pills, ratings, selected
 options, confidence, or token math in this section.
 
-3. High-Confidence Reads
+High-Confidence Reads
 Show 3 concise predicted answers the agent made on the principal's behalf when
 at least 3 are available; otherwise show every available high-confidence
 prediction. Use explicit column headers: Question, Predicted answer, Confidence.
@@ -95,17 +104,22 @@ Disagree red with white text. For rating answers, show scale context such as
 7/10. For multichoice answers, show the selected option text as text or option
 chips, never as Agree/Unsure/Disagree. For freeform answers, show compact text.
 
-4. Cautious Reads
-Show 3 predicted answers the agent was least confident about when at least 3 are
-available. Include the answer and enough question context to make clear what the
-uncertainty refers to. Do not show detached shorthand like "Serendipity 3/5"
-without the actual question prompt. If a shortened prompt would be ambiguous,
-show the full prompt even if the row is tighter, especially for claims like
-"A mostly AI-written information environment could be healthier than today's
-mostly human-written one." If no low-confidence data exists, omit this section
-rather than rendering an unavailable row.
+Cautious Reads
+Show the lowest-confidence eligible predictions from this run when at least 3
+are available. They may still be high-confidence in absolute terms; keep the
+real percentage and do not imply the agent was very unsure. Include the answer
+and enough question context to make clear what the uncertainty refers to. Do not
+show detached shorthand like "Serendipity 3/5" without the actual question
+prompt. If a shortened prompt would be ambiguous, show the full prompt even if
+the row is tighter, especially for claims like "A mostly AI-written information
+environment could be healthier than today's mostly human-written one." If no
+eligible data exists, omit this section rather than rendering an unavailable
+row.
 
-5. Agent Guesses
+Bottom Row: Agent Guesses + Agent Comparison
+Put Agent Guesses and Agent Comparison together in one shared bottom row.
+
+Agent Guesses
 This is synthesized at image-generation time from the real answer set, not from
 dedicated favorite-book/movie/game questions. If supported by the evidence,
 include a compact strip of playful low-stakes guesses such as Book Guess or book
@@ -118,36 +132,18 @@ omit that chip rather than showing N/A or a false specific answer. This section
 is the only place Agent Guesses should appear; do not repeat guesses under Agent
 Comparison.
 
-6. Memory Signals Used
-Only show supported, non-sensitive signals. Omit unknown signals instead of
-rendering "N/A" or other unavailable placeholders:
-- Events attended
-- Most-used model
-- Non-default skills/tools tried
-- Approx messages per day
-- Recurring interests or use patterns
-
-7. Agent Comparison
+Agent Comparison
 Compare the principal to a historical figure or fictional/book character in a
-wide strip. Include a stylized illustrated rendition or portrait silhouette of
+strip on the same bottom row. Include a stylized illustrated rendition or portrait silhouette of
 the figure/character, the comparison name, and one brief description line of no
 more than 10 words. Prefer historically accurate deep cuts when supported, but
 keep the comparison recognizable. Do not include Agent Guesses in this section.
 Do not add the old trio of comparison evidence icons, artifact tiles, or proof
 objects beside the historical figure. Keep it playful and non-defamatory.
 
-8. Abstract Agent Impression
-In the space that used to hold comparison evidence icons, include an abstract
-artistic corner showing what the agent thinks of the principal. This should be a
-non-literal visual metaphor derived from the archetype, strongest predictions,
-memory signals, and aesthetic preference: botanical circuit-village, careful map
-lines around a warm signal, a privacy lock woven into roots, field-note
-constellation, or civic dashboard becoming a garden. It must not be another
-portrait, fake person, robot, trophy wall, random symbols, or decorative filler.
-
 Footer:
-Only a small, low-contrast but readable "contextengine.xyz" link in the
-bottom-right corner.
+Only a small, low-contrast but readable "contextengine.xyz" link tucked into the
+bottom-right corner. Do not reserve a whole footer row for it.
 
 Do not show access credentials, raw Telegram ids, private memory quotes, confidence
 tables, rationales, privacy skip counts, decorative text, fake UI labels, or
