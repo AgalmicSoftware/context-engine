@@ -164,6 +164,7 @@ test('start payload pins path-only endpoints and instruction size', () => {
   assert.match(payload.instructions, /wrappedImageEndpoint/);
   assert.match(payload.instructions, /mode "political_compass"/);
   assert.match(payload.instructions, /decode image_base64 as image\/png and display it/);
+  assert.match(payload.instructions, /Do not inspect, critique, describe, or summarize the poster/);
   assert.match(payload.instructions, /fresh run id/);
   assert.match(payload.instructions, /unique request_id values/);
   assert.match(payload.instructions, /each answer-batch POST/);

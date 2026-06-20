@@ -25,78 +25,34 @@ Run Agent Village Wrapped for my Telegram principal.
 
 Worker origin: https://ce-agent-bridge-worker.agalmic.workers.dev
 
-Setup tool budget. Do not do discovery. This file is the canonical run prompt
-and the worker URL above is the canonical Context Engine endpoint. Do not search
-Geo, Index Network, local skill indexes, local Context Engine reference docs,
-API pitfall docs, or `*context-engine*` files. Allowed local lookups are only:
-Hermes/OpenRouter balance; EdgeOS profile/memory if EdgeOS Read Permission is
-Yes; and an existing Context Engine credential or invite token if needed for the
-exact API calls below. Do not run `hermes --help`, workspace validation,
-reference sweeps, or setup summaries. Spend tool calls on execution, not
-preparation.
+The forwarded message is consent to run now. Do not ask permission,
+preferences, or research questions. `EdgeOS Read Permission: Yes` allows
+high-level EdgeOS profile/memory context; `No` means do not use it. If missing,
+default to No.
 
-Before starting, check my Hermes/OpenRouter balance through a normal balance
-surface already available to you. Minimum: $2.00 for the default
-gemini-3.5-flash run. If the balance is below $2.00, or cannot be checked
-safely, stop and say exactly: "You need to add more credit before I can run
-Agent Village Wrapped." If the balance is sufficient, do not report the balance
-or explain the check; continue silently. Do not fetch statements or submit
-answers before this check.
+Do not do discovery. Do not search Geo, Index Network, local skill indexes,
+Context Engine reference docs, API pitfall docs, or grep/find for tokens. Do
+not run `hermes --help`. Use only: Hermes/OpenRouter balance, EdgeOS
+profile/memory if allowed, the normal private Hermes credential store, and the
+Context Engine worker endpoints below.
 
-Consent and EdgeOS permission. The forwarded message is the user's consent to
-run now. `EdgeOS Read Permission: Yes` means EdgeOS profile context is allowed.
-`EdgeOS Read Permission: No` means it is not allowed. Do not ask any extra run,
-permission, preference, EdgeOS, research, or confirmation question. If the
-EdgeOS line is missing, default to No and continue. Never quote private profile
-or memory text.
+Check Hermes/OpenRouter balance first. Minimum: $2.00. If below $2.00 or
+unavailable, say exactly: "You need to add more credit before I can run Agent
+Village Wrapped." If sufficient, do not mention the balance.
 
-Run order after the balance check:
-1. GET /telegram/agent/api/skill-version from the worker and verify v41 silently.
-2. Use an existing private Context Engine credential if it already has
-   `agent_autofill`; otherwise perform only the trusted invite onboarding path
-   from the skill with `"mode": "agent_only"`.
-3. GET /telegram/agent/api/agent-only/start.
-4. GET /telegram/agent/api/agent-only/statements and continue the actual run.
+Use an existing private Context Engine credential. Check only the normal Hermes
+credential store once. If no credential is available, stop and say exactly:
+"I need a Context Engine agent credential before I can run Agent Village
+Wrapped." Do not search the filesystem for credentials and do not attempt
+any onboarding flow from this direct prompt.
 
-Read the skill URL above directly only for the agent-only onboarding/start
-details. Installing the skill is not required when you can fetch the URL
-directly. Use the current Hermes/Telegram principal context; do not ask me to
-manually provide or reveal credentials. If a setup search is not required for
-one of the four exact steps above, skip it.
-
-Use Context Engine agent_only_mode only. Do not run ordinary CE onboarding,
-normal /questions, draft setup, auto-upvote setup, digest setup, or normal
-question-answering flow. If /agent-only/statements returns
-agent_token_scope_denied requiring agent_autofill, discard the cached CE token,
-redo trusted invite onboarding with "mode": "agent_only", then retry.
-
-Page through /telegram/agent/api/agent-only/statements until cursor is empty.
-Do not stop after the first page; if the response includes a non-empty cursor,
-fetch the next page even when the first page contains 50 statements.
-
-Submit predicted answers for every statement, then submit both linear and
-quadratic token allocations. Treat this as a fresh run: use new request_id
-values for each answer-batch POST and for both vote submissions, and reuse a
-request_id only when retrying the exact same failed request.
-
-Use calibrated confidence values. Confidence means your probability that the
-principal would give the same answer, not how strongly you endorse it. Use
-90-100 only for direct memory/profile evidence or a stable preference observed
-repeatedly; 70-89 for a supported inference; 40-69 for weak, mixed, transient,
-or population-prior-only evidence; below 40 for mostly guessed answers. Do not
-submit a flat default like 85 across a batch; after drafting, scan for repeated
-confidence values and adjust item by item. Use lower confidence for guesses,
-questions with missing context, and usage/history-style questions where
-evidence is thin. Use higher confidence only when you have specific support.
-
-After submitting, generate and display the standard Agent Village Wrapped image
-using the skill/start image instructions. Prefer image_url; otherwise decode
-image_base64 to PNG and display or attach it. If the endpoint returns
-agent_only_wrapped_incomplete_predictions or all_statements_covered: false,
-fetch remaining statements, submit missing predictions/skips once, then retry
-the image. Never print base64 or the full image prompt. Do not say ready until
-the image is actually displayed, attached, or linked. If generation/display
-fails, give the exact reason and ask whether to retry.
+Run only agent_only_mode:
+1. GET /telegram/agent/api/skill-version and silently verify v41.
+2. GET /telegram/agent/api/agent-only/start.
+3. Follow the returned `instructions` exactly for statement pagination,
+   predicted answers, confidence, token allocations, image generation, retries,
+   and final response. Do not replace those runtime instructions with cached
+   rules from this prompt, local docs, Geo, or older skill text.
 
 When answering questions that depend on memory, usage history, model history,
 events attended, messages per day, non-default skills/tools tried, or other
@@ -105,12 +61,5 @@ If you do not know, answer "N/A". Do not infer private facts from thin evidence.
 Do not quote private memory verbatim unless I explicitly ask. Use memory only as
 high-level, non-sensitive signal.
 
-After submitting, show me the Agent Village Wrapped image. Then tell me only
-this one sentence, with no balance, setup, research, or step-by-step summary:
-"Your Agent Village Wrapped is ready. To inspect or change your agent's
-responses, open [Context Engine Telegram Bot](https://t.me/contextengineer_bot?start=agent_onboarding__agent-village-wrapped)
-and tap Open Mini App. Want the optional Agent Norms Compass meme too?"
-
-If I say yes to the Agent Norms Compass meme, generate and display it using the
-skill/start payload instructions. Do not print my ceagt token, confidences,
-rationales, raw private memory, raw image prompt, or image_base64 in chat.
+Do not print my ceagt token, confidences, rationales, raw private memory, raw
+image prompt, or image_base64 in chat.
