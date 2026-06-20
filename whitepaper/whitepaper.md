@@ -157,7 +157,7 @@ Context Engine represents a step toward a world of automated debate and coalitio
 
 A longer-term goal is cryptographic diplomacy: incentive-compatible programmatic treaties, enforced by an incorruptible arbiter (Griffith, 2019). In that setting, policy commitments, monitoring rights, and negotiated constraints could be specified and audited with less reliance on unverifiable trust.
 
-Programmable cryptography seems like an underexplored toolkit for AI safety and alignment efforts (0xPARC, 2023). Storytelling still matters, but here it is treated as an interface for scenario comparison: groups can make futures legible, contestable, and connected back to present-day choices.
+Programmable cryptography seems like an underexplored toolkit for AI safety and alignment efforts (0xPARC, 2023). Storytelling is another area that seems underexplored in current AI alignment efforts – Context Engine is intended to help various groups define, debate, and analyze visions of possible futures, and connect them directly to present-day choices.
 
 Context Engine recognizes and builds on the pioneering work of those involved with RadicalxChange, Pol.is, vTaiwan, g0v, TalkToTheCity, Loophole, the Plurality Book, 0xPARC, Zuzalu, Edge City, MetaGov, PCARE, and many other related efforts. The author also gratefully acknowledges the AI programming assistance that finally made this effort tractable.
 

@@ -126,7 +126,7 @@
   color: rgba(255, 255, 255, 0.72);
   text-transform: uppercase;
   letter-spacing: 0;
-  font-size: clamp(4.25rem, 5.4vw, 6.8rem);
+  font-size: clamp(4.75rem, 6.2vw, 7.6rem);
   line-height: 0.95;
 }
 
@@ -253,11 +253,11 @@
 .bulletList {
   margin: 0;
   padding-left: 1.25rem;
-  font-size: clamp(1.15rem, 1.45vw, 1.6rem);
+  font-size: clamp(1.35rem, 1.9vw, 2.05rem);
   align-self: center;
   display: flex;
   flex-direction: column;
-  gap: clamp(12px, 1.25vh, 22px);
+  gap: clamp(14px, 1.45vh, 26px);
   color: var(--ce-color-white);
   max-width: 100%;
 }
@@ -270,8 +270,8 @@
   margin-top: 0;
   margin-bottom: 0;
   padding: 6px 10px;
-  font-size: 1.25em;
-  line-height: 1.12;
+  font-size: 1.32em;
+  line-height: 1.14;
   color: var(--ce-color-white);
 }
 
@@ -402,7 +402,11 @@
   .panel {
     --modal-panel-pad-x: 14px;
     --modal-panel-pad-top: 18px;
-    --modal-panel-pad-bottom: 70px;
+    --modal-panel-pad-bottom: 158px;
+  }
+
+  .onboardingTitle {
+    font-size: clamp(3.4rem, 8.4vw, 5.4rem);
   }
 
   .onboardingWalkthrough {
@@ -413,14 +417,21 @@
   }
 
   .onboardingControls {
-    position: static;
-    align-self: stretch;
-    width: 100%;
+    position: absolute;
+    top: auto;
+    right: calc(-1 * var(--modal-panel-pad-x));
+    bottom: calc(-1 * var(--modal-panel-pad-bottom));
+    left: calc(-1 * var(--modal-panel-pad-x));
+    transform: none;
+    z-index: 3;
+    width: auto;
     min-width: 0;
-    min-height: 84px;
-    height: 84px;
+    min-height: 76px;
+    height: 76px;
     gap: 0;
     grid-template-rows: none;
+    overflow: hidden;
+    background: transparent;
   }
 
   .onboardingControlsDualArrow {
@@ -456,8 +467,12 @@
   .takeSurveyButton {
     width: 100%;
     font-size: 1.1em;
-    background: rgba(0, 0, 0, 0.46);
-    color: rgba(255, 255, 255, 0.82);
+    background: rgba(139, 183, 150, 0.42);
+    color: rgba(16, 43, 35, 0.82);
+  }
+
+  .skipButton {
+    bottom: 98px;
   }
 
   .takeSurveyIcon {
@@ -477,7 +492,9 @@
   }
 
   .panel {
-    padding: 16px 10px 64px;
+    --modal-panel-pad-x: 10px;
+    --modal-panel-pad-bottom: 138px;
+    padding: 16px 10px var(--modal-panel-pad-bottom);
   }
 
   .panelFrame {
@@ -486,15 +503,22 @@
   }
 
   .skipButton {
-    bottom: 12px;
+    bottom: 82px;
     left: 50%;
     height: 46px;
     padding: 0 18px;
     font-size: 0.9rem;
   }
 
+  .onboardingControls {
+    bottom: calc(-1 * var(--modal-panel-pad-bottom));
+    min-height: 62px;
+    height: 62px;
+  }
+
   .onboardingTitle {
-    font-size: 2rem;
+    font-size: clamp(3rem, 11vw, 4.6rem);
+    line-height: 0.95;
   }
 
   .deck {
@@ -527,13 +551,15 @@
   }
 
   .bulletList {
-    font-size: 1rem;
+    font-size: clamp(1.35rem, 5.4vw, 2.05rem);
     padding-left: 1rem;
+    gap: clamp(9px, 1.6vh, 16px);
   }
 
   .bulletText {
-    padding: 8px;
-    font-size: 1em;
+    padding: 7px 8px;
+    font-size: 1.08em;
+    line-height: 1.15;
   }
 
   .mediaImageIntro {

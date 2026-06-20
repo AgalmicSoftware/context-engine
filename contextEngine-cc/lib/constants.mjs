@@ -16,7 +16,7 @@ export const REGISTRY_ABI = readJsonFile('../../client/src/contractsABI/SESSION_
 
 // Client defaults now live in appConfig.js. CE-CC keeps a broader default scope ("all")
 // for terminal session discovery, but it still mirrors the client slug list default.
-const CLIENT_DEFAULT_SESSION_SCAN_SLUGS = Object.freeze(['demo']);
+const CLIENT_DEFAULT_SESSION_SCAN_SLUGS = Object.freeze(['demo-1']);
 const VALID_SCOPES = new Set(['all', 'active', 'general', 'list']);
 // CE-CC defaults to 'all' even though the SPA default is "list" — the client's restrictive
 // scan config is for browser performance, while the local server should show all registry sessions.

@@ -1,9 +1,8 @@
 # @file netlify.toml
-[[headers]]
-  for = "/*"
-  [headers.values]
-    Cross-Origin-Opener-Policy = "same-origin-allow-popups"
-    Cross-Origin-Embedder-Policy = "unsafe-none"
+[[redirects]]
+  from = "/demo/dacc"
+  to = "/about"
+  status = 301
 
 [[redirects]]
   from = "/*"

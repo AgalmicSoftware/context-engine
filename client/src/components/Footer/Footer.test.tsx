@@ -91,4 +91,9 @@ describe('Footer', () => {
       expect(footerStylesheet).toMatch(breakpointRule);
     });
   });
+
+  it('uses larger footer text in the full-screen layout', () => {
+    expect(footerStylesheet).toMatch(/@media \(min-width:\s*1367px\)\s*{[\s\S]*?\.footer\s*{[\s\S]*?\.copyright\s*{[\s\S]*?font-size:\s*1\.18rem;/);
+    expect(footerStylesheet).toMatch(/@media \(min-width:\s*1367px\)\s*{[\s\S]*?\.footerLink\s*{[\s\S]*?font-size:\s*1\.14rem;/);
+  });
 });

@@ -5,6 +5,7 @@ import { createPileViewRuntimeStrategy } from './SurveyPileViewMode';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as sbtDisplayNameUtils from '../../utilities/sbt/sbtDisplayNames.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
 
 const SESSION_SBT = '0x1111111111111111111111111111111111111111';
@@ -181,9 +182,12 @@ describe('SurveyPileViewMode gated empty states', () => {
 
     expect(await screen.findByTestId(E2E_TESTIDS.SURVEY_LOCKED_BANNER)).toBeInTheDocument();
     expect(screen.getByText(`This session's questions are ${t('gatedLower')}`)).toBeInTheDocument();
-    expect(screen.getByText(
-      `${t('sbt')} required: VIP SBT. Connect an eligible ${t('walletLower')} that satisfies the ${t('gateLower')} requirements below, then decrypt to view the questions.`
-    )).toBeInTheDocument();
+    const expectedRequirementText = `${t('sbt')} required: VIP SBT. Connect an eligible ${t('walletLower')} that satisfies the ${t('gateLower')} requirements below, then decrypt to view the questions.`;
+    expect(screen.getByText((_, element) => (
+      typeof element?.className === 'string' &&
+      element.className.includes('lockedQuestionsSubtext') &&
+      element.textContent?.replace(/\s+/g, ' ').trim() === expectedRequirementText
+    ))).toBeInTheDocument();
     expect(screen.queryByText('VIP Gate')).toBeNull();
     expect(screen.getByText(/VIP SBT/)).toBeInTheDocument();
     expect(screen.queryByText('Retry decrypt')).toBeNull();
@@ -193,5 +197,9 @@ describe('SurveyPileViewMode gated empty states', () => {
 
     expect(screen.getByText('VIP Gate')).toBeInTheDocument();
     expect(screen.getAllByText(/VIP SBT/).length).toBeGreaterThan(0);
+    const expectedSbtHref = buildSbtDetailPath(gateSbt, 'edge');
+    screen.getAllByRole('link', { name: /VIP SBT/i }).forEach((link) => {
+      expect(link).toHaveAttribute('href', expectedSbtHref);
+    });
   });
 });

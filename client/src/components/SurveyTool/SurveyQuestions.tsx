@@ -39,6 +39,7 @@ import SurveyQuestionsLockedQuestionsPanel from './SurveyQuestionsLockedQuestion
 import SurveyQuestionsJsonTree from './SurveyQuestionsJsonTree';
 import SurveyQuestionsRouteSurface from './SurveyQuestionsRouteSurface';
 import SurveyQuestionsSurveyAnswersView from './SurveyQuestionsSurveyAnswersView';
+import { isPendingQuestionMetadataPlaceholder } from './surveyQuestionMetadataPlaceholders.js';
 import {
   processRatingEnvelopesForSubmit,
   type RatingEnvelopeDeps,
@@ -123,6 +124,7 @@ import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
 import { buildResponseGatePolicy } from '../../utilities/crypto/litGatePolicy.js';
 import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
+import { getTemporaryDemoSessionQuestionFixtures } from '../../utilities/session/demoSessionQuestionFixtures.js';
 import { buildQuestionDecryptContextForSession } from '../../utilities/session/sessionQuestionDecryption.js';
 import {
   buildQuestionRoutePath,
@@ -4714,7 +4716,7 @@ async function fetchQuestionPool() {
       ? resolveSlugForIds({ surveyId: propsRef.current.surveyId, props: propsRef.current, network: propsRef.current.network })
       : resolveEffectiveSlug(propsRef.current);
     const questionReadContext: any = resolveQuestionReadCacheContext(propsRef.current, slug);
-    const effectiveSlug: any = questionReadContext.sessionSlug || slug;
+    let effectiveSlug: any = questionReadContext.sessionSlug || slug;
     const netIdStr: any = questionReadContext.networkIdStr;
     if (!netIdStr) {
       surveyLog.error("SurveyQuestions: fetchQuestionPool – network.id undefined");
@@ -4743,6 +4745,68 @@ async function fetchQuestionPool() {
       }
     }
     if (!surveyData) { surveyData = surveyDataFromCache; }
+
+    // Temporary demo-1 compatibility: render fixture questions synchronously while
+    // the durable Cloudflare-backed demo session is still pending.
+    const temporaryDemoSessionConfig = propsRef.current.sessionConfig || {};
+    const temporaryDemoSlugCandidates = [
+      effectiveSlug,
+      questionReadContext.sessionSlug,
+      slug,
+      propsRef.current.sessionSlug,
+      propsRef.current.activeSessionSlug,
+    ];
+    let temporaryDemoFixtureSlug: any = '';
+    let temporaryDemoFixtureQuestions: any[] = [];
+    for (const candidateSlug of temporaryDemoSlugCandidates) {
+      const candidateQuestions = getTemporaryDemoSessionQuestionFixtures(
+        candidateSlug,
+        temporaryDemoSessionConfig
+      );
+      if (!candidateQuestions.length) continue;
+      temporaryDemoFixtureSlug = normalizeSessionSlugValue(candidateSlug);
+      temporaryDemoFixtureQuestions = candidateQuestions;
+      break;
+    }
+    const temporaryDemoQuestionIds = temporaryDemoFixtureQuestions
+      .map((question) => normalizeQuestionIdKey(question?.id))
+      .filter(Boolean);
+    const shouldUseTemporaryDemoQuestionPool = temporaryDemoQuestionIds.length > 0;
+    if (shouldUseTemporaryDemoQuestionPool) {
+      if (temporaryDemoFixtureSlug) effectiveSlug = temporaryDemoFixtureSlug;
+      const currentQuestionsCache = ensureQuestionsNet(readQuestionsCache(effectiveSlug) || {}, netIdStr);
+      const questionsNet = currentQuestionsCache[netIdStr];
+      if (!questionsNet.questions || typeof questionsNet.questions !== 'object') questionsNet.questions = {};
+      temporaryDemoFixtureQuestions.forEach((question) => {
+        const qid = normalizeQuestionIdKey(question?.id);
+        if (!qid) return;
+        questionsNet.questions[qid] = {
+          ...question,
+          id: qid,
+        };
+        if (questionsNet.pendingQuestionMetadata && typeof questionsNet.pendingQuestionMetadata === 'object') {
+          delete questionsNet.pendingQuestionMetadata[qid];
+        }
+      });
+      writeQuestionsCache(effectiveSlug, currentQuestionsCache);
+
+      surveyData = {
+        ...(surveyData || surveyDataFromCache || {}),
+        id: surveyIdLower,
+        surveyID: surveyIdLower,
+        title: surveyData?.title || surveyDataFromCache?.title || propsRef.current.surveyTitle || 'Demo Session',
+        sessionName: surveyData?.sessionName || surveyDataFromCache?.sessionName || propsRef.current.sessionName || effectiveSlug,
+        questionIDs: temporaryDemoQuestionIds,
+        temporaryDemoSeed: true,
+      };
+
+      const currentSurveysCache = ensureSurveysNet(readSurveysCache(effectiveSlug) || {}, netIdStr);
+      if (!currentSurveysCache[netIdStr].surveys || typeof currentSurveysCache[netIdStr].surveys !== 'object') {
+        currentSurveysCache[netIdStr].surveys = {};
+      }
+      currentSurveysCache[netIdStr].surveys[surveyIdLower] = surveyData;
+      writeSurveysCache(effectiveSlug, currentSurveysCache);
+    }
 
     if (!surveyData || !Array.isArray(surveyData.questionIDs) || surveyData.questionIDs.length === 0) {
       try {
@@ -4783,12 +4847,124 @@ async function fetchQuestionPool() {
       .map((qid: any) => normalizeQuestionIdKey(qid))
       .filter((qid: any) => qid && !blockedQuestionIds.has(qid));
 
+    if (shouldUseTemporaryDemoQuestionPool) {
+      const fixtureQuestionById = new Map();
+      temporaryDemoFixtureQuestions.forEach((question) => {
+        const qid = normalizeQuestionIdKey(question?.id);
+        if (!qid || fixtureQuestionById.has(qid)) return;
+        fixtureQuestionById.set(qid, { ...question, id: qid });
+      });
+      const questionPool = expectedQuestionIds
+        .map((qid: any) => fixtureQuestionById.get(qid))
+        .filter(Boolean);
+      setState({
+        questionPool,
+        questionPoolExpectedIds: expectedQuestionIds,
+        questionPoolPendingIds: expectedQuestionIds.filter((qid: any) => !fixtureQuestionById.has(qid)),
+      });
+      return;
+    }
+
+    let lastPublishedQuestionPoolSnapshotSig = '';
+    const publishQuestionPoolFromCache = ({ warnMissing = false } = {}) => {
+      const questionsCacheFromStorage = readQuestionsCache(effectiveSlug) || {};
+      const questionsNet = questionsCacheFromStorage[netIdStr] || {
+        questionsLatestBlock: 0,
+        questions: {},
+        questionResponses: {},
+        questionResponsesLatestBlock: 0,
+      };
+      const networkQuestions = questionsNet.questions || {};
+
+      const questionPool = expectedQuestionIds
+        .map((qid) => {
+          const qData = networkQuestions[qid];
+          if (isPendingQuestionMetadataPlaceholder(qData)) return null;
+          if (qData) return { ...qData, id: qData.id.toLowerCase() };
+          if (warnMissing) {
+            surveyLog.warn(`SurveyQuestions: Question data for ID ${qid} not found in cache after ensureQuestionCached.`);
+          }
+          return null;
+        })
+        .filter(Boolean);
+      const loadedQuestionIds = new Set(
+        questionPool
+          .map((question) => normalizeQuestionIdKey(question?.id))
+          .filter(Boolean)
+      );
+      const pendingQuestionIds = expectedQuestionIds.filter((qid) => !loadedQuestionIds.has(qid));
+
+      const nextQuestionPoolSig = buildQuestionIdScopeSignature(questionPool);
+      const snapshotSig = JSON.stringify({
+        expectedQuestionIds,
+        pendingQuestionIds,
+        questionPool,
+      });
+      if (snapshotSig === lastPublishedQuestionPoolSnapshotSig) return;
+      lastPublishedQuestionPoolSnapshotSig = snapshotSig;
+      setState((prev: any) => {
+        const prevQuestionPool = Array.isArray(prev?.questionPool) ? prev.questionPool : [];
+        const prevExpectedQuestionIds = Array.isArray(prev?.questionPoolExpectedIds)
+          ? prev.questionPoolExpectedIds
+          : [];
+        const prevPendingQuestionIds = Array.isArray(prev?.questionPoolPendingIds)
+          ? prev.questionPoolPendingIds
+          : [];
+        const prevQuestionPoolById = new Map();
+        prevQuestionPool.forEach((entry: any) => {
+          const key = normalizeQuestionIdKey(entry?.id);
+          if (!key || prevQuestionPoolById.has(key)) return;
+          prevQuestionPoolById.set(key, entry);
+        });
+
+        const mergedQuestionPool = questionPool.map((entry: any) => {
+          const key = normalizeQuestionIdKey(entry?.id);
+          if (!key) return entry;
+          const existing = prevQuestionPoolById.get(key);
+          if (!existing) return entry;
+          const picked = pickBetterQuestionPayload(existing, entry) || entry;
+          if (picked === existing) return existing;
+          const normalized = { ...picked, id: key };
+          return areQuestionPayloadsEquivalent(existing, normalized) ? existing : normalized;
+        });
+
+        const prevQuestionPoolSig = buildQuestionIdScopeSignature(prevQuestionPool);
+        const expectedIdsUnchanged =
+          prevExpectedQuestionIds.length === expectedQuestionIds.length &&
+          prevExpectedQuestionIds.every((qid: any, index: any) => qid === expectedQuestionIds[index]);
+        const pendingIdsUnchanged =
+          prevPendingQuestionIds.length === pendingQuestionIds.length &&
+          prevPendingQuestionIds.every((qid: any, index: any) => qid === pendingQuestionIds[index]);
+        if (prevQuestionPoolSig === nextQuestionPoolSig) {
+          const hasSemanticChange =
+            prevQuestionPool.length !== mergedQuestionPool.length ||
+            prevQuestionPool.some((entry: any, idx: any) => entry !== mergedQuestionPool[idx]);
+          if (!hasSemanticChange && expectedIdsUnchanged && pendingIdsUnchanged) {
+            bumpSurveyPerfCounter('noopSkipCount');
+            return null;
+          }
+        }
+        return {
+          questionPool: mergedQuestionPool,
+          questionPoolExpectedIds: expectedQuestionIds,
+          questionPoolPendingIds: pendingQuestionIds,
+        };
+      });
+    };
+
+    publishQuestionPoolFromCache();
+
     // Pass sessionName context to ensureQuestionCached so it knows where to look.
-    // Do not let one failed question fetch abort the entire direct /survey/:id pool load.
+    // Publish after each settled hydration so a survey can render as soon as the
+    // first question metadata lands instead of waiting for the full batch.
     const cacheHydrationResults: any = await Promise.allSettled(
       surveyData.questionIDs.map(async (qid: any) => {
-        await propsRef.current.ensureQuestionCached(qid, { sessionName: surveyData.sessionName });
-        return qid;
+        try {
+          await propsRef.current.ensureQuestionCached(qid, { sessionName: surveyData.sessionName });
+          return qid;
+        } finally {
+          publishQuestionPoolFromCache();
+        }
       })
     );
     const failedQuestionHydrations: any = cacheHydrationResults.filter((result: any) => result.status === 'rejected');
@@ -4798,41 +4974,7 @@ async function fetchQuestionPool() {
         failedQuestionHydrations.map((result: any) => result.reason?.message || result.reason || 'unknown error')
       );
     }
-
-    let questionsCacheFromStorage: any = readQuestionsCache(effectiveSlug) || {};
-    const questionsNet: any = questionsCacheFromStorage[netIdStr] || {
-      questionsLatestBlock: 0,
-      questions: {},
-      questionResponses: {},
-      questionResponsesLatestBlock: 0,
-    };
-    const networkQuestions: any = questionsNet.questions || {};
-
-    const questionPool: any = expectedQuestionIds
-      .map((qid: any) => {
-        const qData: any = networkQuestions[qid];
-        if (qData) return { ...qData, id: qData.id.toLowerCase() };
-        surveyLog.warn(`SurveyQuestions: Question data for ID ${qid} not found in cache after ensureQuestionCached.`);
-        return null;
-      })
-      .filter(Boolean);
-    const loadedQuestionIds: any = new Set(
-      questionPool
-        .map((question: any) => normalizeQuestionIdKey(question?.id))
-        .filter(Boolean)
-    );
-    const pendingQuestionIds: any = expectedQuestionIds.filter((qid: any) => !loadedQuestionIds.has(qid));
-
-    setState((prev: any) => buildFetchedQuestionPoolState(prev, {
-      areQuestionPayloadsEquivalent,
-      buildQuestionIdScopeSignature,
-      expectedQuestionIds,
-      normalizeQuestionIdKey,
-      onNoop: () => bumpSurveyPerfCounter('noopSkipCount'),
-      pendingQuestionIds,
-      pickBetterQuestionPayload: pickBetterQuestionPayload as any,
-      questionPool,
-    }));
+    publishQuestionPoolFromCache({ warnMissing: true });
 	  }
 
 const loadQuestionFromCache = async (questionId: any) => {

@@ -1,10 +1,15 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
+import * as bootRecovery from '../../bootRecovery.js';
 import AppErrorBoundary from './AppErrorBoundary';
 import RouteErrorBoundary from './RouteErrorBoundary';
 
 const Thrower = () => {
   throw new Error('Kaboom');
+};
+
+const StaleChunkThrower = () => {
+  throw new TypeError("'text/html' is not a valid JavaScript MIME type.");
 };
 
 describe('Error boundaries', () => {
@@ -44,5 +49,21 @@ describe('Error boundaries', () => {
       'href',
       'https://github.com/AgalmicSoftware/context-engine/issues/new'
     );
+  });
+
+  it('asks route-level fallback to recover stale deployed chunks', () => {
+    const recoverSpy = jest
+      .spyOn(bootRecovery, 'recoverFromStaleChunkLoadError')
+      .mockReturnValue(true);
+
+    render(
+      <RouteErrorBoundary>
+        <StaleChunkThrower />
+      </RouteErrorBoundary>
+    );
+
+    expect(recoverSpy).toHaveBeenCalledWith(expect.any(TypeError));
+
+    recoverSpy.mockRestore();
   });
 });

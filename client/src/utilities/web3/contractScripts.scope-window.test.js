@@ -49,6 +49,14 @@ describe('contractScripts.getRelevantBlockWindowForFilter scope windows', () => 
     expect(latestBlockSpy).toHaveBeenCalledTimes(1);
   });
 
+  it('uses configured blockLimits.start for demo session windows', async () => {
+    const cfg = makeGroupCfg('demo-1', 44967477);
+    const windowForSlug = await contractScripts.getRelevantBlockWindowForFilter(cfg);
+
+    expect(windowForSlug).toEqual({ fromBlock: 44967477, toBlock: 50000000 });
+    expect(latestBlockSpy).toHaveBeenCalledTimes(1);
+  });
+
   it('blocks non-active non-general slug in general scope', async () => {
     localStorage.setItem('ce:sessionScanScope', 'general');
     window.history.replaceState({}, '', '/session/test-112');

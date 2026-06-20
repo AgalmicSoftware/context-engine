@@ -11,7 +11,13 @@ jest.mock('../HooksHOC/withWagmiBridge', () => ({
 }));
 
 jest.mock('components/UserPage/UserPage', () => (props) => (
-  <div data-testid="mock-user-page" data-view-address={props.viewAddress || ''} />
+  <div
+    data-testid="mock-user-page"
+    data-view-address={props.viewAddress || ''}
+    data-active-session-slug={props.activeSessionSlug || ''}
+    data-network-chain-id={props.networkChainId || ''}
+    data-session-config-chain-id={props.sessionConfig?.networkChainId || ''}
+  />
 ));
 
 jest.mock('../Shared/CETooltip', () => ({
@@ -904,8 +910,14 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
   });
 
   it('renders logged-in controls and disconnects wagmi users from the modal', async () => {
+    getSessionConfigBySlugOrDefault.mockImplementation((slug) => (
+      slug === 'demo-1'
+        ? { slug: 'demo-1', sessionName: 'Demo Session', networkChainId: 11155420 }
+        : {}
+    ));
     const props = buildProps({
       account: WAGMI_ADDRESS,
+      activeSessionSlug: 'demo-1',
       loginComplete: true,
       provider: 'wagmi',
       wagmiDisconnect: jest.fn().mockResolvedValue(undefined),
@@ -919,6 +931,9 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     expect(profileShell).toBeTruthy();
     expect(screen.getByTestId('mock-user-page')).toHaveAttribute('data-view-address', WAGMI_ADDRESS);
+    expect(screen.getByTestId('mock-user-page')).toHaveAttribute('data-active-session-slug', 'demo-1');
+    expect(screen.getByTestId('mock-user-page')).toHaveAttribute('data-network-chain-id', '11155420');
+    expect(screen.getByTestId('mock-user-page')).toHaveAttribute('data-session-config-chain-id', '11155420');
     expect(screen.getByRole('button', { name: /bookmarks/i })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /disconnect/i }));

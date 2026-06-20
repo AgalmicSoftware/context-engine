@@ -739,7 +739,7 @@ describe('SurveyResults sync status display', () => {
 });
 
 describe('SurveyResults demo results views', () => {
-  it('shows the demo results switcher only for demo question results', async () => {
+  it('shows the demo results switcher only for configured demo question results', async () => {
     seedCacheEnvironment();
     const view = renderQuestionResults({ sessionSlug: 'edge', activeSessionSlug: 'edge' });
     await waitFor(() => {
@@ -759,6 +759,15 @@ describe('SurveyResults demo results views', () => {
     expect(within(demoNav).getByText('Risk Matrix')).toBeInTheDocument();
     const syncNode = document.querySelector('[class*="syncStatusContainer"]') as HTMLElement;
     expect(syncNode.compareDocumentPosition(demoNav) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    await act(async () => {
+      view.rerenderSurveyResults({ sessionSlug: 'demo-1', activeSessionSlug: 'demo-1' });
+      await Promise.resolve();
+    });
+
+    const demoOneNav = await screen.findByTestId('ce-surveyresults-demo-view-nav');
+    expect(within(demoOneNav).getByText('Report')).toBeInTheDocument();
+    expect(within(demoOneNav).getByText('Breakdown')).toBeInTheDocument();
   });
 
   it('switches the demo modal surface from the top bar buttons and maps report to Polis', async () => {

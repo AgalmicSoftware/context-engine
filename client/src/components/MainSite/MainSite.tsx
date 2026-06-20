@@ -55,6 +55,7 @@ import {
   readSessionScanScope,
   readSessionScanSlugs,
 } from '../../utilities/session/sessionScanScope.js';
+import { getPrimaryDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
 import { derivePrimarySessionSlugFromList } from '../../utilities/session/globalSessionState.js';
 import {
   createInitialProfileScanReport,
@@ -131,6 +132,7 @@ import NavbarRaw from "../Navbar/Navbar";
 import MainAreaTabsRaw from "../MainContent/MainAreaTabs";
 import RightSideRaw from '../RightSidebar/RightSide';
 import OnboardingOverlayRaw from '../Onboarding/OnboardingOverlay';
+import { FIRST_VISIT_STORAGE_KEY } from '../Onboarding/onboardingConfig.js';
 import FooterRaw from "../Footer/Footer";
 import LazyFallbackRaw from "../Shared/LazyFallback";
 import DevE2eNavRaw from "../E2E/DevE2eNav";
@@ -157,6 +159,7 @@ import {
   resolveMainSiteRouteSessionIdHint,
   resolveMainSiteRouteSessionSlugHint,
   resolveMainSiteSessionRouteContext,
+  resolveMainSiteSessionRouteSourceSlug,
   resolveMainSiteSessionSlugFromProps,
   resolveMainSiteSessionSlugFromPathToken,
 } from './routeSessionResolution.js';
@@ -234,13 +237,15 @@ import {
   type SessionPathResolverController,
 } from './sessionPathResolverController.js';
 import {
+  consumeOneTimeFirstVisitRootRedirect as consumeOneTimeFirstVisitRootRedirectFn,
   consumeSessionFallbackRedirect as consumeSessionFallbackRedirectFn,
-  getFirstVisitRootRedirectTarget as getFirstVisitRootRedirectTargetFn,
   getSessionFallbackPreferredTarget as getSessionFallbackPreferredTargetFn,
   getSessionFallbackRedirectStorageKey as getSessionFallbackRedirectStorageKeyFn,
   getSessionFallbackScopeSlugs as getSessionFallbackScopeSlugsFn,
+  getTemporaryInitialLoadAboutRedirectTarget as getTemporaryInitialLoadAboutRedirectTargetFn,
   hasConsumedSessionFallbackRedirect as hasConsumedSessionFallbackRedirectFn,
   isFirstVisitRootRedirectEnabled as isFirstVisitRootRedirectEnabledFn,
+  shouldForceOneTimeFirstVisitRootRedirect as shouldForceOneTimeFirstVisitRootRedirectFn,
   type SessionFallbackRedirectTarget,
 } from './sessionFallbackRedirect.js';
 import {
@@ -820,8 +825,8 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     ),
     dgKey: (name: unknown, slug: unknown) => this.DG.key(name as string, slug as string),
     getActiveSessionSlug: () => this.getActiveSessionSlug(),
-    getSessionCfg: (slug: string) => this.getSessionCfg(slug),
-    getSessionChainId: (slug: string) => this.getSessionChainId(slug),
+    getSessionCfg: (slug: string) => this.getCacheSessionCfg(slug),
+    getSessionChainId: (slug: string) => this.getCacheSessionChainId(slug),
     getSessionScanScope: () => this.getSessionScanScope(),
     getSessionScanScopeContext: (scope?: string) => this.getSessionScanScopeContext(scope),
     getAccount: () => (this.props?.account || ''),
@@ -871,8 +876,8 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     dgRead: (name: string, slug: string) => this.readDgRecord(name, slug),
     dgWrite: (name: string, slug: string, value: Record<string, unknown>) => this.DG.write(name, slug, value),
     getActiveSessionSlug: () => this.getActiveSessionSlug(),
-    getSessionCfg: (slug: string) => this.getSessionCfg(slug),
-    getSessionChainId: (slug: string) => this.getSessionChainId(slug),
+    getSessionCfg: (slug: string) => this.getCacheSessionCfg(slug),
+    getSessionChainId: (slug: string) => this.getCacheSessionChainId(slug),
     getAccount: () => this.props.account,
     getCurrentPath: () => this.props?.path || (typeof window !== 'undefined' ? window.location.pathname : '') || '',
     shouldSkipSessionScanForSlug: (slug: string, op: string, scopeCtx?: unknown) => (
@@ -917,8 +922,8 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     dgRead: (name: string, slug: string, opts?: Record<string, unknown>) => this.readDgRecord(name, slug, opts),
     dgWrite: (name: string, slug: string, value: Record<string, unknown>) => this.DG.write(name, slug, value),
     getActiveSessionSlug: () => this.getActiveSessionSlug(),
-    getSessionCfg: (slug: string) => this.getSessionCfg(slug),
-    getSessionChainId: (slug: string) => this.getSessionChainId(slug),
+    getSessionCfg: (slug: string) => this.getCacheSessionCfg(slug),
+    getSessionChainId: (slug: string) => this.getCacheSessionChainId(slug),
     getSessionScanScope: () => this.getSessionScanScope(),
     getAccount: () => this.props.account,
     getProviderLike: () => this.props.provider,
@@ -958,7 +963,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     dgRead: (name: string, slug: string) => this.readDgRecord(name, slug),
     dgWrite: (name: string, slug: string, value: Record<string, unknown>) => this.DG.write(name, slug, value),
     getActiveSessionSlug: () => this.getActiveSessionSlug(),
-    getSessionChainId: (slug: string) => this.getSessionChainId(slug),
+    getSessionChainId: (slug: string) => this.getCacheSessionChainId(slug),
     getAccount: () => this.props.account,
     scanScopeNoop: (slug: string, op: string, onSkipped?: () => void) => this.scanScopeNoop(slug, op, onSkipped),
     setReadinessStateIfChanged: (nextState: Record<string, unknown> | null | undefined, cb?: () => void) => (
@@ -1005,6 +1010,8 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
   _cacheUpdateUnsubscribe: (() => void) | null = null;
   _userPriorityPromise: Promise<MainSiteProfileScanReport | null> | null = null;
   _userPriorityTarget: string | null = null;
+  _aboutDemoSessionPreloadSlug = '';
+  _aboutDemoSessionPreloadPromise: Promise<void> | null = null;
   _sessionFallbackRedirectPath = '';
   _lastProcessedQuestionIdFromPath = '';
   _lastProcessedQuestionSlugFromPath: string | null = null;
@@ -1080,9 +1087,37 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED,
   });
 
-  getFirstVisitRootRedirectTarget = () => getFirstVisitRootRedirectTargetFn({
-    isFirstVisitRootRedirectEnabled: this.isFirstVisitRootRedirectEnabled,
-  });
+  getTemporaryInitialLoadAboutRedirectTarget = (pathIn: unknown = '') => (
+    getTemporaryInitialLoadAboutRedirectTargetFn({
+      isFirstVisitRootRedirectEnabled: this.isFirstVisitRootRedirectEnabled,
+      normalizeRoutePath: (value: unknown) => this.normalizeRoutePath(String(value || '')),
+      normalizeSessionSlug,
+      pathIn,
+    })
+  );
+
+  getFirstVisitRootRedirectStorage = (): Storage | null => {
+    if (typeof window === 'undefined') return null;
+
+    try {
+      return window.localStorage;
+    } catch (_) {
+      try {
+        return window.sessionStorage;
+      } catch (__) {
+        return null;
+      }
+    }
+  };
+
+  shouldForceOneTimeFirstVisitRootRedirect = () => shouldForceOneTimeFirstVisitRootRedirectFn(
+    this.getFirstVisitRootRedirectStorage()
+  );
+
+  consumeOneTimeFirstVisitRootRedirect = () => consumeOneTimeFirstVisitRootRedirectFn(
+    this.getFirstVisitRootRedirectStorage(),
+    { firstVisitStorageKey: FIRST_VISIT_STORAGE_KEY }
+  );
 
   getSessionFallbackRedirectStorageKey = (slugIn: unknown = '') => (
     getSessionFallbackRedirectStorageKeyFn(slugIn, {
@@ -1341,6 +1376,16 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     return Number.isFinite(chainId) && chainId > 0 ? chainId : null;
   };
 
+  getCacheSessionCfg = (slugIn: unknown): MainSiteSessionConfigLike | null => {
+    const normalized = normalizeSessionSlug(slugIn ?? '');
+    return this.getSessionCfg(normalized) || this.getDisplaySessionCfg(normalized);
+  };
+
+  getCacheSessionChainId = (slugIn: unknown): number | null => {
+    const normalized = normalizeSessionSlug(slugIn ?? '');
+    return this.getSessionChainId(normalized) || this.getDisplaySessionChainId(normalized);
+  };
+
   getDisplaySessionNetwork = (slugIn: unknown) => {
     const normalized = normalizeSessionSlug(slugIn ?? '');
     const strictNetwork = this.getSessionNetwork(normalized);
@@ -1358,6 +1403,78 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
       blockExplorers: { default: { name: '', url: '' } },
       unsupported: false,
     };
+  };
+
+  getInitializableSessionNetwork = (slugIn: unknown, pathIn: unknown = '') => {
+    const normalized = normalizeSessionSlug(slugIn ?? '');
+    const strictNetwork = this.getSessionNetwork(normalized);
+    if (strictNetwork?.id) return strictNetwork;
+    const path = this.getEffectiveRoutePath(
+      String(pathIn || '') ||
+      (typeof window !== 'undefined' ? window.location.pathname : '') ||
+      this.props.path ||
+      ''
+    );
+    if (!path.startsWith('/session/')) return strictNetwork;
+    return this.getDisplaySessionNetwork(normalized);
+  };
+
+  isAboutRoutePath = (pathIn: unknown = ''): boolean => {
+    const path = this.getEffectiveRoutePath(
+      String(pathIn || '') ||
+      (typeof window !== 'undefined' ? window.location.pathname : '') ||
+      this.props.path ||
+      ''
+    );
+    return path === '/about' || path === '/about/';
+  };
+
+  preloadAboutDemoSessionData = (pathIn: unknown = ''): Promise<void> | null => {
+    if (!this.isAboutRoutePath(pathIn)) return null;
+
+    const slug = normalizeSessionSlug(getPrimaryDemoSessionSlug());
+    if (!slug) return null;
+
+    const sessionNet = this.getDisplaySessionNetwork(slug);
+    if (!sessionNet?.id) return null;
+
+    if (
+      this._aboutDemoSessionPreloadSlug === slug &&
+      this._aboutDemoSessionPreloadPromise
+    ) {
+      return this._aboutDemoSessionPreloadPromise;
+    }
+
+    const run = (async () => {
+      mainSiteLog.log('[About] Preloading public demo session data', { slug });
+      const questionPreload = this.initializeQuestionCacheForGroup(slug, { background: true });
+      const responsePreload = questionPreload.then(() => (
+        this.fetchQuestionResponsesChunkedForGroup(slug, { background: true })
+      ));
+      const preloadResults = await Promise.allSettled([
+        questionPreload,
+        responsePreload,
+        this.initializeSurveyCacheForGroup(slug, { background: true }),
+        this.initializeSbtCacheForGroup(slug, { mode: 'partial', background: true }),
+      ]);
+      const firstRejected = preloadResults.find((result) => result.status === 'rejected');
+      if (firstRejected?.status === 'rejected') {
+        throw firstRejected.reason;
+      }
+    })().catch((err: unknown) => {
+      mainSiteLog.warn('[About] Demo session preload failed', {
+        slug,
+        error: readMainSiteErrorMessage(err),
+      });
+    }).finally(() => {
+      if (this._aboutDemoSessionPreloadPromise === run) {
+        this._aboutDemoSessionPreloadPromise = null;
+      }
+    });
+
+    this._aboutDemoSessionPreloadSlug = slug;
+    this._aboutDemoSessionPreloadPromise = run;
+    return run;
   };
 
   handleSessionRegistryCacheUpdated = () => {
@@ -1380,6 +1497,26 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
   getActiveSessionSlug = () => (
     this.getSessionSlugFromState() || this.getInitialGroupSlugFromPath()
   );
+
+  getActiveSessionSourceSlug = () => {
+    const path = this.getEffectiveRoutePath(
+      (typeof window !== 'undefined' ? window.location.pathname : '') || this.props.path || ''
+    );
+    const sessionTokenRaw = this.getSessionTokenFromPath(path);
+    if (!sessionTokenRaw) return this.getActiveSessionSlug();
+
+    const sessionSlug = this.resolveSessionSlugFromPathToken(sessionTokenRaw, { allowAsyncResolve: false }) || '';
+    const strictConfig = (
+      sessionRegistryStore.getSessionConfig(sessionSlug) ||
+      getSessionConfigBySlug(sessionSlug)
+    );
+    const displayConfig = strictConfig || getDemoSessionConfigBySlug(sessionSlug, { allowDemoFallback: true });
+    return resolveMainSiteSessionRouteSourceSlug({
+      sessionTokenRaw,
+      sessionSlug,
+      sessionConfig: displayConfig,
+    });
+  };
 
   getBootstrapActiveSessionSlug = (pathIn = '', searchIn = ''): string => {
     const path = this.getEffectiveRoutePath(
@@ -1491,7 +1628,12 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     const nextPath = this.normalizeRoutePath(strippedPath);
     const search = window.location.search || '';
     const hash = window.location.hash || '';
-    window.history.replaceState({}, '', buildPublicUrl(nextPath, search, hash));
+    const nextUrl = buildPublicUrl(nextPath, search, hash);
+    if (/^\/demo\/dacc\/?$/i.test(strippedPath) && typeof window.location.replace === 'function') {
+      window.location.replace(nextUrl);
+      return true;
+    }
+    window.history.replaceState({}, '', nextUrl);
     return true;
   };
 
@@ -3569,25 +3711,31 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
       startCeRuntimeStats();
     }
     this.redirectLegacyDemoPath();
-    let didRedirectFirstVisitRoot = false;
-    if (this.props.firstVisit && typeof window !== 'undefined') {
+    let didRedirectInitialLoadToAbout = false;
+    if (typeof window !== 'undefined') {
       const currentPath = window.location.pathname || this.props.path || '';
-      const firstVisitRedirectTarget = this.getFirstVisitRootRedirectTarget();
+      const aboutRedirectTarget = this.getTemporaryInitialLoadAboutRedirectTarget(currentPath);
+      const shouldRedirectForPersistedCache = aboutRedirectTarget?.requiresPersistedCache
+        ? !!(
+          aboutRedirectTarget.cacheSlug &&
+          await this.hasPersistedManagedCacheData(aboutRedirectTarget.cacheSlug)
+        )
+        : true;
       if (
-        firstVisitRedirectTarget?.path &&
-        this.isGeneralRoutePath(currentPath) &&
-        this.normalizeRoutePath(currentPath) === '/'
+        aboutRedirectTarget?.path &&
+        shouldRedirectForPersistedCache &&
+        this.normalizeRoutePath(currentPath) !== aboutRedirectTarget.path
       ) {
         window.history.replaceState(
           {},
           '',
           buildPublicUrl(
-            firstVisitRedirectTarget.path,
+            aboutRedirectTarget.path,
             window.location.search || '',
             window.location.hash || ''
           )
         );
-        didRedirectFirstVisitRoot = true;
+        didRedirectInitialLoadToAbout = true;
       }
     }
     this._mounted = true;
@@ -3598,7 +3746,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
       );
     }
     const mountPathRaw = (
-      didRedirectFirstVisitRoot && typeof window !== 'undefined'
+      didRedirectInitialLoadToAbout && typeof window !== 'undefined'
         ? window.location.pathname
         : this.getCurrentPathname()
     ) || '';
@@ -3691,9 +3839,9 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
 
     // Cache busting (versioned; slug-scoped)
     try {
-      // The Arweave reliability rollout changed precheck/cooldown semantics. Force a one-time
-      // refresh of derived caches so stale display-blocking failure entries cannot survive.
-      const CURRENT_CACHE_VERSION = '2026-04-30-client-refresh-cache-bust-v2';
+      // Demo session question data was resubmitted with tighter block limits. Force a one-time
+      // refresh of derived caches so stale broad-scan question/response data cannot survive.
+      const CURRENT_CACHE_VERSION = '2026-06-18-demo-session-worker-cache-bust-v2';
       const VERSION_KEY = 'appCacheVersion';
       const storedVersion = localStorage.getItem(VERSION_KEY);
       if (storedVersion !== CURRENT_CACHE_VERSION) {
@@ -3761,6 +3909,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     } catch (e) { mainSiteLog.warn('MainSite: cleanup', e); }
 
     const pathname = this.getEffectiveRoutePath(this.getCurrentPathname());
+    this.preloadAboutDemoSessionData(pathname);
     const isDemoPath = pathname.startsWith('/session/');
     const sbtAddressFromPath = this.getSbtAddressFromPath(pathname);
     const isSbtDetailRoute = !!sbtAddressFromPath;
@@ -3773,7 +3922,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     mainSiteLog.log(isDemoPath ? "Initializing caches (demo prioritized order)..." : "Initializing caches sequentially...");
 
 
-    const sessionNet = this.getSessionNetwork(slug);
+    const sessionNet = this.getInitializableSessionNetwork(slug, pathname);
     mainSiteLog.log("session network (derived):", sessionNet);
     if (sessionNet && sessionNet.id) {
       if (isSbtDetailRoute) {
@@ -4215,7 +4364,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
             currPath.startsWith('/sbt/') ||
             currPath.startsWith('/group/');
 
-          const sessionNet = this.getSessionNetwork(nextActiveSlug);
+          const sessionNet = this.getInitializableSessionNetwork(nextActiveSlug, currPath);
           if (sessionNet && sessionNet.id) {
             if (isSbtRoute) {
               // SBT-first when landing on /sbts or /sbt/:address
@@ -4312,6 +4461,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
 
     // Check for deep link scan if path changed
     if (currPath !== prevPath) {
+      this.preloadAboutDemoSessionData(currPath);
       this.handleDeepLinkScan();
     }
   }
@@ -4391,10 +4541,10 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     });
 
     const slug = this.getActiveSessionSlug();
-    const sessionNet = this.getSessionNetwork(slug);
+    const pathname = this.getCurrentPathname();
+    const sessionNet = this.getInitializableSessionNetwork(slug, pathname);
     if (!isCacheReinitRunActive()) return;
 
-    const pathname = this.getCurrentPathname();
     const search = (typeof window !== 'undefined' ? window.location.search : '') || '';
     const sbtAddressFromPath = this.getSbtAddressFromPath(pathname);
     const isSbtDetailRoute = !!sbtAddressFromPath;
@@ -4621,7 +4771,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     (...args) => this._sbtCacheController.onSbtTransferDetectedForGroup(...args);
 
   initializeSurveyCache = async () => {
-    return this.initializeSurveyCacheWithGeneralBackfill(this.getActiveSessionSlug());
+    return this.initializeSurveyCacheWithGeneralBackfill(this.getActiveSessionSourceSlug());
   };
 
   initializeSurveyCacheWithGeneralBackfill = async (slugIn: unknown) => {
@@ -4638,7 +4788,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
 
 
   initializeQuestionCache = async () => {
-    return this.initializeQuestionCacheWithGeneralBackfill(this.getActiveSessionSlug());
+    return this.initializeQuestionCacheWithGeneralBackfill(this.getActiveSessionSourceSlug());
   };
 
   initializeQuestionCacheWithGeneralBackfill = async (slugIn: unknown) => {
@@ -4654,7 +4804,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     (...args) => this._questionCacheController.initializeQuestionCacheForGroup(...args);
 
   fetchQuestionResponsesChunked = async () => {
-    return this.fetchQuestionResponsesChunkedWithGeneralBackfill(this.getActiveSessionSlug());
+    return this.fetchQuestionResponsesChunkedWithGeneralBackfill(this.getActiveSessionSourceSlug());
   };
 
   fetchQuestionResponsesChunkedWithGeneralBackfill = async (slugIn: unknown) => {
@@ -5993,6 +6143,11 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
       return <div />;
     }
 
+    const sessionRouteSourceSlug = resolveMainSiteSessionRouteSourceSlug({
+      sessionTokenRaw,
+      sessionSlug: slug,
+      sessionConfig,
+    });
     const resolvedSessionInfo = this.getSessionInfoForGroup(sessionConfig, sessionConfig?.slug || slug);
     const resolvedSessionName = this.getSessionNameForGroup(sessionConfig, sessionConfig?.slug || slug);
     const resolvedSessionHeader = this.getSessionHeaderForGroup(sessionConfig, sessionConfig?.slug || slug);
@@ -6022,9 +6177,12 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
               network={defaultSessionNetwork}
               {...loginViewProps}
               {...sessionCacheViewProps}
-              refreshSurveyResponsesByID={this.refreshSurveyResponsesByID}
-              refreshQuestionMetadata={this.refreshQuestionMetadata}
-              refreshQuestionResponses={this.refreshQuestionResponses}
+              refreshSurveyResponsesByID={(id: string) => this.refreshSurveyResponsesByIDForGroup(sessionRouteSourceSlug, id)}
+              refreshQuestionMetadata={(opts = {}) => this.refreshQuestionMetadataForGroup(sessionRouteSourceSlug, opts)}
+              refreshQuestionResponses={(questionIds?: string[] | null, opts: RefreshQuestionResponsesOptions = {}) =>
+                this.refreshQuestionResponses(questionIds, { ...(opts || {}), slug: sessionRouteSourceSlug })
+              }
+              questionSessionSlug={sessionRouteSourceSlug}
               refreshSbtData={this.refreshSbtData}
               ensureLightSbtDiscovery={this.ensureLightSbtDiscovery}
               ensureLightSbtUniverse={this.ensureLightSbtUniverse}
@@ -6280,7 +6438,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     this._surveyCacheController.refreshSurveyResponsesByIDForGroup(slug, surveyID);
 
   refreshQuestionMetadata = async (opts = {}): Promise<void> =>
-    this.refreshQuestionMetadataForGroup(this.getActiveSessionSlug(), opts);
+    this.refreshQuestionMetadataForGroup(this.getActiveSessionSourceSlug(), opts);
 
   hasMaskedQuestionPayloadInCache: HasMaskedQuestionPayloadInCacheFn = (slug) =>
     this._questionCacheController.hasMaskedQuestionPayloadInCache(slug);

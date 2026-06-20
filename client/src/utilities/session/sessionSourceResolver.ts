@@ -22,6 +22,9 @@ const findDemoSessionConfigBySlug = (slugIn: unknown = ''): SessionConfigLike | 
   const slug = canonicalizeSessionSlug(slugIn);
   if (!isObj(DEMO_SESSION_MAP)) return null;
   if (!slug) return isObj(DEMO_SESSION_MAP.general) ? DEMO_SESSION_MAP.general : null;
+  if (String(slugIn || '').trim().toLowerCase() === 'demo') {
+    return isObj(DEMO_SESSION_MAP.general) ? DEMO_SESSION_MAP.general : null;
+  }
 
   const byKey = DEMO_SESSION_MAP[slug];
   if (isObj(byKey) && canonicalizeSessionSlug(byKey.slug || slug) === slug) {

@@ -113,6 +113,7 @@ export const resolveEffectiveSlug = (props: SurveyToolScopeProps = {}): string =
     pathname: (typeof window !== 'undefined' && window.location && window.location.pathname) || '',
     activeSessionSlug: props.activeSessionSlug as string | null | undefined,
     sessionSlug: props.sessionSlug as string | null | undefined,
+    sessionSlugPinned: props.sessionSlugPinned === true,
   })
 );
 

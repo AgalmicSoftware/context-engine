@@ -670,6 +670,7 @@ describe('SBTsPage auto-feature flag', () => {
               sessionSlug: 'alpha',
               name: 'Warm Cache Group',
               description: 'Cached before readiness flips.',
+              image: 'https://example.test/warm-cache-group.png',
             },
           },
         },
@@ -700,6 +701,55 @@ describe('SBTsPage auto-feature flag', () => {
     expect(screen.queryByTestId('mock-sbt-page')).not.toBeInTheDocument();
   });
 
+  it('falls back to mini SBT readers when cached featured metadata is missing its image', () => {
+    const contractScripts = jest.requireMock('../../utilities/web3/contractScripts.js');
+    const featuredAddress = '0x00000000000000000000000000000000000000b2';
+    contractScripts.getSessionConfigBySlug.mockImplementation((slug) => (
+      String(slug || '') === 'alpha' ? { slug: 'alpha' } : null
+    ));
+    contractScripts.getSessionConfigBySlugOrDefault.mockReturnValue({ slug: '' });
+    peekCacheSync.mockReturnValue({
+      '84532': {
+        sbtList: {
+          [featuredAddress.toLowerCase()]: {
+            sbtAddress: featuredAddress,
+            sbtInfo: {
+              sessionSlug: 'alpha',
+              name: 'Partial Cache Group',
+              description: 'Discovered before tokenURI metadata hydrated.',
+            },
+          },
+        },
+      },
+    });
+
+    render(
+      <SBTsPage
+        sbtCacheRevision={0}
+        provider="wagmi"
+        network={{ id: 84532, name: 'Base Sepolia' }}
+        account=""
+        loginComplete={false}
+        toggleLoginModal={jest.fn()}
+        isSBTCacheReady={false}
+        defaultFeaturedSBTs={[featuredAddress]}
+        sessionSlug="alpha"
+        miniaturized={true}
+        hideMiniActionRow={true}
+        preferCacheBackedFeaturedCards={true}
+      />
+    );
+
+    expect(screen.queryByTestId(`cache-featured-sbt-link-${featuredAddress.toLowerCase()}`)).not.toBeInTheDocument();
+    expect(screen.getAllByTestId('mock-sbt-page')).toHaveLength(1);
+    expect(mockSBTPage.mock.calls[mockSBTPage.mock.calls.length - 1][0]).toEqual(
+      expect.objectContaining({
+        SBTAddress: featuredAddress,
+        sessionSlug: 'alpha',
+      })
+    );
+  });
+
   it('hides cache-backed featured card addresses in plain mode', () => {
     const featuredAddress = '0x00000000000000000000000000000000000000b3';
     mockIsCryptoMode.mockReturnValue(false);
@@ -713,6 +763,7 @@ describe('SBTsPage auto-feature flag', () => {
             sbtInfo: {
               sessionSlug: 'alpha',
               name: 'Plain Mode Group',
+              image: 'https://example.test/plain-mode-group.png',
             },
           },
         },
@@ -754,6 +805,7 @@ describe('SBTsPage auto-feature flag', () => {
             sbtInfo: {
               sessionSlug: 'alpha',
               name: 'Crypto Mode Group',
+              image: 'https://example.test/crypto-mode-group.png',
             },
           },
         },
@@ -792,6 +844,7 @@ describe('SBTsPage auto-feature flag', () => {
             sbtInfo: {
               sessionSlug: 'alpha',
               name: 'Ended Group',
+              image: 'https://example.test/ended-group.png',
               mintingEndTime: 1,
             },
           },
@@ -833,6 +886,7 @@ describe('SBTsPage auto-feature flag', () => {
               title: '',
               symbol: '',
               contractName: '',
+              image: 'https://example.test/unnamed-group.png',
             },
           },
         },
@@ -884,6 +938,7 @@ describe('SBTsPage auto-feature flag', () => {
               sessionSlug: 'alpha',
               name: 'Progressive Cache Group',
               description: 'Discovered mid-scan.',
+              image: 'https://example.test/progressive-cache-group.png',
             },
           },
         },

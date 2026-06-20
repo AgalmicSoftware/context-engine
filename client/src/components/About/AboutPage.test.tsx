@@ -11,6 +11,9 @@ import AboutPage, {
 
 const mutableEnv = process.env as Record<string, string | undefined>;
 const ORIGINAL_PUBLIC_URL = process.env.PUBLIC_URL;
+const ABOUT_DEMO_VIDEO_EMBED_URL = 'https://drive.google.com/file/d/1nss6RZnF4yFwMFE6kjSW3ESi3ImpMcnf/preview';
+const ABOUT_DEMO_VIDEO_MEDIA_URL = '/about-demo.mp4';
+const ABOUT_DEMO_VIDEO_THUMBNAIL_URL = 'https://drive.google.com/thumbnail?id=1nss6RZnF4yFwMFE6kjSW3ESi3ImpMcnf&sz=w1000';
 
 beforeEach(() => {
   if (typeof ORIGINAL_PUBLIC_URL === 'undefined') {
@@ -34,10 +37,13 @@ describe('AboutPage', () => {
     const hero = screen.getByTestId('ce-about-hero');
     const demoLink = within(hero).getByRole('link', { name: /^Demo$/i });
     const newSessionLink = within(hero).getByRole('link', { name: /New Session/i });
+    const desktopDemoVideo = within(hero).getByTestId('ce-about-demo-video-desktop');
+    const mobileDemoVideo = within(hero).getByTestId('ce-about-demo-video-mobile');
+    const mobileVideoPlayer = within(hero).getByTestId('ce-about-demo-video-player');
 
     expect(hero).toBeInTheDocument();
     expect(within(hero).getByText(
-      'An open-source toolkit for deliberation, sensemaking, and negotiation (for humans and ai agents)'
+      'An open-source toolkit for deliberation, sensemaking, and negotiation (for humans and AI agents)'
     )).toBeVisible();
     expect(demoLink).toHaveAttribute(
       'href',
@@ -61,6 +67,56 @@ describe('AboutPage', () => {
       'href',
       'mailto:contextengine@protonmail.com'
     );
+    expect(desktopDemoVideo.tagName.toLowerCase()).toBe('iframe');
+    expect(desktopDemoVideo).toHaveAttribute('src', ABOUT_DEMO_VIDEO_EMBED_URL);
+    expect(desktopDemoVideo).toHaveAttribute('title', 'Context Engine demo video');
+    expect(mobileDemoVideo).toBeInTheDocument();
+    expect(mobileVideoPlayer.tagName.toLowerCase()).toBe('video');
+    expect(mobileVideoPlayer).toHaveAttribute('controls');
+    expect(mobileVideoPlayer).toHaveAttribute('playsinline');
+    expect(mobileVideoPlayer).toHaveAttribute('preload', 'none');
+    expect(mobileVideoPlayer).toHaveAttribute('poster', ABOUT_DEMO_VIDEO_THUMBNAIL_URL);
+    expect(mobileVideoPlayer).toHaveAttribute('src', ABOUT_DEMO_VIDEO_MEDIA_URL);
+    expect(within(hero).getByRole('button', { name: /play context engine demo video/i })).toBeInTheDocument();
+    expect(within(hero).queryByTestId('ce-about-demo-video-open')).not.toBeInTheDocument();
+  });
+
+  it('starts the mobile demo video inline without opening a modal', async () => {
+    const loadMock = jest.spyOn(window.HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
+    const playMock = jest.spyOn(window.HTMLMediaElement.prototype, 'play').mockResolvedValue();
+
+    try {
+      renderAboutPage();
+
+      const hero = screen.getByTestId('ce-about-hero');
+      const videoPlayer = within(hero).getByTestId('ce-about-demo-video-player');
+      const inlinePlayButton = within(hero).getByRole('button', { name: /play context engine demo video/i });
+
+      expect(videoPlayer.tagName.toLowerCase()).toBe('video');
+      expect(videoPlayer).toHaveAttribute('controls');
+      expect(videoPlayer).toHaveAttribute('playsinline');
+      expect(videoPlayer).toHaveAttribute('preload', 'none');
+      expect(videoPlayer).toHaveAttribute('poster', ABOUT_DEMO_VIDEO_THUMBNAIL_URL);
+      expect(videoPlayer).toHaveAttribute('src', ABOUT_DEMO_VIDEO_MEDIA_URL);
+      expect(inlinePlayButton).toBeVisible();
+      expect(within(hero).queryByTestId('ce-about-demo-video-drive-link')).not.toBeInTheDocument();
+      expect(within(hero).queryByRole('link', { name: /google drive/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+      fireEvent.click(inlinePlayButton);
+
+      await waitFor(() => {
+        expect(loadMock).toHaveBeenCalledTimes(1);
+        expect(playMock).toHaveBeenCalledTimes(1);
+      });
+      await waitFor(() => {
+        expect(within(hero).queryByRole('button', { name: /play context engine demo video/i })).not.toBeInTheDocument();
+      });
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    } finally {
+      playMock.mockRestore();
+      loadMock.mockRestore();
+    }
   });
 
   it('uses the first concrete list-scoped session for the demo CTA when list scope is active', () => {
@@ -264,11 +320,11 @@ describe('AboutPage', () => {
     ]);
   });
 
-  it('falls back to the legacy demo route when list scope has no concrete session slug', () => {
+  it('uses the configured public demo route when list scope has no concrete session slug', () => {
     expect(getAboutDemoSessionPath({
       selectedSessionScope: 'list',
       selectedSessionSlugs: ['general'],
-    } as any)).toBe('/session/demo');
+    } as any)).toBe('/session/demo-1');
   });
 
   it.each([
@@ -301,12 +357,6 @@ describe('AboutPage', () => {
       /edge patagonia, sponsored by protocol labs/i,
       /prototype tools for resilient technology, coordination, and governance in live community settings/i,
       null,
-    ],
-    [
-      'ce-about-recognition-loophole',
-      /loophole is a useful way to stress-test rules and reason about policy proposals/i,
-      /context engine uses it to enrich the debate atlas with concrete loophole, overreach, and patch-comparison cases people can inspect and debate/i,
-      'https://github.com/brendanhogan/loophole',
     ],
   ])('shows product-facing recognition modal copy in the %s recognition modal', async (
     testId: string,
@@ -348,10 +398,12 @@ describe('AboutPage', () => {
     expect(scss).toMatch(/\.heroPrimaryButton\s*{[\s\S]*?font-size:\s*1\.14rem;[\s\S]*?font-weight:\s*700;/);
   });
 
-  it('keeps mobile recognition rows aligned and stacks the use-case grid on small screens', () => {
+  it('keeps mobile recognition rows aligned and keeps use-case buttons responsive', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'AboutPage.module.scss'), 'utf8');
 
-    expect(scss).toMatch(/@media \(max-width:\s*640px\)\s*{[\s\S]*?\.useCaseGrid\s*{[\s\S]*?grid-template-columns:\s*1fr;/);
+    expect(scss).toMatch(/@media \(min-width:\s*641px\) and \(max-width:\s*1023px\)\s*{[\s\S]*?\.useCaseGrid\s*{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/);
+    expect(scss).toMatch(/@media \(min-width:\s*520px\) and \(max-width:\s*640px\)\s*{[\s\S]*?\.useCaseGrid\s*{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/);
+    expect(scss).toMatch(/@media \(max-width:\s*519px\)\s*{[\s\S]*?\.useCaseGrid\s*{[\s\S]*?grid-template-columns:\s*1fr;/);
     expect(scss).toMatch(/@media \(max-width:\s*640px\)\s*{[\s\S]*?\.useCaseDetailRow\s*{[\s\S]*?flex-direction:\s*column;/);
     expect(scss).toMatch(/@media \(max-width:\s*640px\)\s*{[\s\S]*?\.toggleHeaderAside\s*{[\s\S]*?margin-left:\s*auto;/);
     expect(scss).toMatch(/@media \(max-width:\s*640px\)\s*{[\s\S]*?\.recognitionSummary\s*{[\s\S]*?display:\s*none;/);
@@ -359,5 +411,16 @@ describe('AboutPage', () => {
     expect(scss).toMatch(/@media \(max-width:\s*640px\)\s*{[\s\S]*?\.recognitionStrip\s*{[\s\S]*?flex-direction:\s*column;[\s\S]*?align-items:\s*stretch;/);
     expect(scss).toMatch(/@media \(max-width:\s*640px\)\s*{[\s\S]*?\.recognitionItem\s*{[\s\S]*?grid-template-columns:\s*46px minmax\(0,\s*1fr\);/);
     expect(scss).toMatch(/\.recognitionModalLogo\.recognitionLogoRxc\s*{[\s\S]*?background:\s*linear-gradient/);
+    expect(scss).toMatch(/\.mobileDemoVideo\s*{[\s\S]*?display:\s*none;/);
+    expect(scss).toMatch(/\.mobileDemoVideoPlayer\s*{[\s\S]*?object-fit:\s*contain;/);
+    expect(scss).toMatch(/\.mobileDemoVideoPlayButton\s*{[\s\S]*?touch-action:\s*manipulation;/);
+    expect(scss).toMatch(/@media \(max-width:\s*1023px\)\s*{[\s\S]*?\.hero\s*{[\s\S]*?grid-template-columns:\s*1fr;/);
+    expect(scss).toMatch(/@media \(max-width:\s*1023px\)\s*{[\s\S]*?\.heroVideo\s*{[\s\S]*?width:\s*min\(620px,\s*100%\);[\s\S]*?order:\s*-1;/);
+    expect(scss).toMatch(/@media \(min-width:\s*641px\) and \(max-width:\s*1023px\)\s*{[\s\S]*?\.mainTitle\s*{[\s\S]*?font-size:\s*clamp\(3rem,\s*7vw,\s*4\.4rem\);/);
+    expect(scss).toMatch(/@media \(min-width:\s*641px\) and \(max-width:\s*1023px\)\s*{[\s\S]*?\.tagline\s*{[\s\S]*?font-size:\s*clamp\(1\.45rem,\s*3\.4vw,\s*1\.85rem\);/);
+    expect(scss).toMatch(/@media \(min-width:\s*641px\) and \(max-width:\s*1023px\)\s*{[\s\S]*?\.heroPrimaryButton\s*{[\s\S]*?font-size:\s*1\.52rem;/);
+    expect(scss).toMatch(/@media \(max-width:\s*640px\)\s*{[\s\S]*?\.demoVideo\s*{[\s\S]*?display:\s*none;/);
+    expect(scss).toMatch(/@media \(max-width:\s*640px\)\s*{[\s\S]*?\.mobileDemoVideo\s*{[\s\S]*?display:\s*grid;/);
+    expect(scss).toMatch(/@media \(max-width:\s*640px\)\s*{[\s\S]*?\.mobileDemoVideoPlayer\s*{[\s\S]*?min-height:\s*clamp\(220px,\s*62vw,\s*300px\);/);
   });
 });

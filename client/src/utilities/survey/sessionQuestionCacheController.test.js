@@ -38,6 +38,11 @@ jest.mock('../session/sessionScanScope.js', () => ({
   resolveValidatedSessionScanWindow: jest.fn(),
 }));
 
+jest.mock('../session/demoSessionQuestionFixtures.js', () => ({
+  __esModule: true,
+  getTemporaryDemoSessionQuestionFixtures: jest.fn(() => []),
+}));
+
 jest.mock('../crypto/litProtocol.js', () => ({
   __esModule: true,
   getGlobalLitHooks: jest.fn(),
@@ -84,6 +89,9 @@ const {
   readSessionScanMaxBlockRange,
   resolveValidatedSessionScanWindow,
 } = require('../session/sessionScanScope.js');
+const {
+  getTemporaryDemoSessionQuestionFixtures,
+} = require('../session/demoSessionQuestionFixtures.js');
 const { getGlobalLitHooks } = require('../crypto/litProtocol.js');
 const {
   buildQuestionDecryptContextForSession,
@@ -367,6 +375,7 @@ describe('createSessionQuestionCacheController', () => {
     shouldClearQuestionProgressInFinalize.mockImplementation(() => false);
     shouldCommitThrottledProgress.mockImplementation(({ force }) => !!force);
     shouldFlushCoalescedRun.mockImplementation(({ force }) => !!force);
+    getTemporaryDemoSessionQuestionFixtures.mockReturnValue([]);
     isMaskedQuestionPayload.mockImplementation((question) => (
       !!question?.masked ||
       String(question?.prompt || '') === '[encrypted]' ||
@@ -607,6 +616,119 @@ describe('createSessionQuestionCacheController', () => {
       });
     });
 
+    it('publishes temporary demo fixtures before block window resolution settles', async () => {
+      const windowDeferred = createDeferred();
+      const host = createMockHost({
+        activeSlug: 'demo-1',
+        sessionCfg: {
+          networkChainId: NETWORK_ID,
+          blockLimits: { start: 44967477, end: null },
+          demoCompatibilitySeed: { temporary: true },
+        },
+      });
+      const controller = createSessionQuestionCacheController(host);
+
+      getTemporaryDemoSessionQuestionFixtures.mockReturnValue([
+        {
+          id: '0xABCDEF',
+          type: 'binary',
+          prompt: 'Fixture prompt',
+          sessionSlug: 'demo-1',
+          temporaryDemoSeed: true,
+        },
+      ]);
+      contractScripts.getRelevantBlockWindowForFilter.mockReturnValueOnce(windowDeferred.promise);
+
+      const initPromise = controller.initializeQuestionCacheForGroup('demo-1');
+      await flushMicrotasks(6);
+
+      expect(contractScripts.getRelevantBlockWindowForFilter).toHaveBeenCalledWith('demo-1');
+      expect(host.getStored('questionsCache', 'demo-1')?.[NETWORK_ID]?.questions?.['0xabcdef'])
+        .toMatchObject({
+          id: '0xabcdef',
+          prompt: 'Fixture prompt',
+          sessionSlug: 'demo-1',
+          temporaryDemoSeed: true,
+        });
+      expect(host.getStateSnapshot()).toMatchObject({
+        isQuestionCacheReady: true,
+        questionResponsesNonce: 1,
+      });
+
+      windowDeferred.resolve({
+        fromBlock: 44967477,
+        toBlock: 44967476,
+      });
+      await initPromise;
+      controller.destroy();
+    });
+
+    it('publishes temporary demo fixtures before chain discovery settles', async () => {
+      const discoveryDeferred = createDeferred();
+      const host = createMockHost({
+        activeSlug: 'demo-1',
+        sessionCfg: {
+          networkChainId: NETWORK_ID,
+          blockLimits: { start: 44967477, end: null },
+          demoCompatibilitySeed: { temporary: true },
+        },
+      });
+      const controller = createSessionQuestionCacheController(host);
+
+      getTemporaryDemoSessionQuestionFixtures.mockReturnValue([
+        {
+          id: '0xABCDEF',
+          type: 'binary',
+          prompt: 'Fixture prompt',
+          sessionSlug: 'demo-1',
+          temporaryDemoSeed: true,
+        },
+      ]);
+      contractScripts.getRelevantBlockWindowForFilter.mockResolvedValueOnce({
+        fromBlock: 44967477,
+        toBlock: 44967477,
+      });
+      resolveValidatedSessionScanWindow.mockReturnValueOnce({
+        ok: true,
+        fromBlock: 44967477,
+        toBlock: 44967477,
+        requestedToBlock: 44967477,
+        requestedRangeBlocks: 1,
+        maxBlockRange: DEFAULT_SESSION_SCAN_MAX_BLOCK_RANGE,
+        wasCapped: false,
+      });
+      contractScripts.getAllQuestionIDsChunkedWithCallback.mockReturnValueOnce(
+        discoveryDeferred.promise
+      );
+
+      const initPromise = controller.initializeQuestionCacheForGroup('demo-1');
+      await flushMicrotasks(10);
+
+      expect(getTemporaryDemoSessionQuestionFixtures).toHaveBeenCalledWith(
+        'demo-1',
+        expect.objectContaining({
+          demoCompatibilitySeed: { temporary: true },
+        })
+      );
+      expect(host.getStored('questionsCache', 'demo-1')?.[NETWORK_ID]?.questions?.['0xabcdef'])
+        .toMatchObject({
+          id: '0xabcdef',
+          prompt: 'Fixture prompt',
+          sessionSlug: 'demo-1',
+          temporaryDemoSeed: true,
+        });
+      expect(host.getStored('questionsCache', 'demo-1')?.[NETWORK_ID]?.pendingQuestionMetadata?.['0xabcdef'])
+        .toBeUndefined();
+      expect(host.getStateSnapshot()).toMatchObject({
+        isQuestionCacheReady: true,
+        questionResponsesNonce: 1,
+      });
+
+      discoveryDeferred.resolve([]);
+      await initPromise;
+      controller.destroy();
+    });
+
     it('persists discovered question IDs as pending before slow metadata hydration completes', async () => {
       const host = createMockHost();
       const controller = createSessionQuestionCacheController(host);
@@ -647,6 +769,69 @@ describe('createSessionQuestionCacheController', () => {
       });
     });
 
+    it('publishes the first hydrated question before the rest of the metadata batch settles', async () => {
+      const host = createMockHost();
+      const controller = createSessionQuestionCacheController(host);
+      const firstMetadata = createDeferred();
+      const secondMetadata = createDeferred();
+
+      contractScripts.fetchUserSubmittedQuestionIDs.mockResolvedValue([
+        { questionId: 'Q1', creationBlock: 11 },
+        { questionId: 'Q2', creationBlock: 12 },
+      ]);
+      contractScripts.getQuestionDataById.mockImplementation((_mode, qId) => {
+        if (qId === 'q1') return firstMetadata.promise;
+        if (qId === 'q2') return secondMetadata.promise;
+        return Promise.resolve(null);
+      });
+
+      let initSettled = false;
+      const initPromise = controller.initializeQuestionCacheForGroup(SESSION_SLUG);
+      initPromise.finally(() => {
+        initSettled = true;
+      });
+
+      await flushMicrotasks(10);
+
+      firstMetadata.resolve({
+        creator: '0xCreatorA',
+        prompt: 'First prompt',
+      });
+      await flushMicrotasks(12);
+
+      const storedDuringBatch = host.getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID];
+      expect(storedDuringBatch?.questions?.q1).toMatchObject({
+        id: 'q1',
+        creator: '0xCreatorA',
+        prompt: 'First prompt',
+      });
+      expect(storedDuringBatch?.questions?.q2).toBeUndefined();
+      expect(storedDuringBatch?.pendingQuestionMetadata?.q1).toBeUndefined();
+      expect(storedDuringBatch?.pendingQuestionMetadata?.q2).toMatchObject({
+        state: 'discovered',
+      });
+      expect(host.getStateSnapshot()).toMatchObject({
+        isQuestionCacheReady: true,
+        questionResponsesNonce: 1,
+      });
+      expect(initSettled).toBe(false);
+
+      secondMetadata.resolve({
+        creator: '0xCreatorB',
+        prompt: 'Second prompt',
+      });
+      await initPromise;
+
+      const storedAfterBatch = host.getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID];
+      expect(storedAfterBatch?.questions?.q2).toMatchObject({
+        id: 'q2',
+        creator: '0xCreatorB',
+        prompt: 'Second prompt',
+      });
+
+      controller.destroy();
+    });
+
     it('handles question metadata fetch failure by marking the question pending', async () => {
       const nowRef = { value: 1000 };
       jest.spyOn(Date, 'now').mockImplementation(() => nowRef.value);
@@ -677,7 +862,7 @@ describe('createSessionQuestionCacheController', () => {
         __ceQuestionMetadataPending: true,
       });
       expect(host.getStateSnapshot()).toMatchObject({
-        isQuestionCacheReady: true,
+        isQuestionCacheReady: false,
       });
 
       controller.destroy();

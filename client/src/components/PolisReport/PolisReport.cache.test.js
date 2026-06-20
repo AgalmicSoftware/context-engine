@@ -517,6 +517,9 @@ describe('PolisReport cache read options', () => {
 describe('PolisReport demo data defaults', () => {
   it('auto-enables demo data for configured demo slugs', () => {
     expect(shouldAutoEnablePolisDemoData({ slug: 'demo' })).toBe(true);
+    expect(shouldAutoEnablePolisDemoData({ slug: 'demo-1' })).toBe(true);
+    expect(shouldAutoEnablePolisDemoData({ slug: 'demo-3' })).toBe(true);
+    expect(shouldAutoEnablePolisDemoData({ slug: 'demo-2' })).toBe(true);
     expect(shouldAutoEnablePolisDemoData({ slug: 'edge' })).toBe(false);
     expect(shouldAutoEnablePolisDemoData({ slug: 'edge', demoDataFirstLoad: true })).toBe(false);
     expect(shouldAutoEnablePolisDemoData({
@@ -531,10 +534,29 @@ describe('PolisReport demo data defaults', () => {
     })).toBe(true);
   });
 
+  it('maps demo session slugs to the shared Context demo corpus fixture', () => {
+    expect(getPolisDemoDatasetForSlug('demo-1', { allowFallback: false })).toBe(
+      getPolisDemoDatasetForSlug('demo', { allowFallback: false })
+    );
+    expect(getPolisDemoDatasetForSlug('demo-3', { allowFallback: false })).toBe(
+      getPolisDemoDatasetForSlug('demo', { allowFallback: false })
+    );
+    expect(getPolisDemoDatasetForSlug('demo-2', { allowFallback: false })).toBe(
+      getPolisDemoDatasetForSlug('demo', { allowFallback: false })
+    );
+  });
+
   it('shows the demo data toggle as enabled by default for the demo slug', () => {
     const { container } = render(<PolisReport {...baseReportProps} slug="demo" />);
 
     openSettingsRow();
+
+    expect(container.querySelector('.settingsRow')).toHaveClass('pdfIgnore');
+    expect(screen.getByTestId(E2E_TESTIDS.POLIS_DEMO_DATA_TOGGLE)).toBeChecked();
+  });
+
+  it('shows the demo data toggle as enabled by default for demo-1', () => {
+    const { container } = render(<PolisReport {...baseReportProps} slug="demo-1" />);
 
     expect(container.querySelector('.settingsRow')).toHaveClass('pdfIgnore');
     expect(screen.getByTestId(E2E_TESTIDS.POLIS_DEMO_DATA_TOGGLE)).toBeChecked();

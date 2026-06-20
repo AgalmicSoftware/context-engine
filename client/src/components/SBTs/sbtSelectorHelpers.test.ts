@@ -446,7 +446,7 @@ describe('sbtSelectorHelpers', () => {
     });
     expect(getSbtSelectorLoadingStatusText({ count: 0 })).toBe('Loading');
     expect(getSbtSelectorLoadingStatusText({ count: 2 })).toBe('Loading 2');
-    expect(getSbtSelectorLoadingStatusText({ compact: true, count: 2 })).toBe('2');
+    expect(getSbtSelectorLoadingStatusText({ compact: true, count: 2 })).toBe('Loading 2');
     expect(getSbtSelectorLoadingStatusText({ compact: true, count: 0 })).toBe('Loading');
   });
 

@@ -948,6 +948,20 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   color: rgba(29, 39, 66, 0.76);
 }
 
+.lockedSbtInlineLink {
+  color: #1f315f;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 0.18s ease, text-decoration-color 0.18s ease;
+
+  &:hover,
+  &:focus {
+    color: #3158b9;
+    text-decoration-color: #3158b9;
+  }
+}
+
 .lockedQuestionsAction {
   display: inline-flex;
   align-items: center;
@@ -1159,6 +1173,16 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 .lockedQuestionsBannerOnDark .lockedQuestionsSubtext {
   color: rgba(229, 235, 255, 0.78);
+}
+
+.lockedQuestionsBannerOnDark .lockedSbtInlineLink {
+  color: #89ffd0;
+
+  &:hover,
+  &:focus {
+    color: #b3ffe2;
+    text-decoration-color: #b3ffe2;
+  }
 }
 
 .lockedQuestionsBannerOnDark .lockedQuestionsDecryptButton {
@@ -3904,7 +3928,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 }
 
-@media (min-width: 481px) and (max-width: 768px) {
+@media (max-width: 768px) {
   .pileControls {
     align-items: center;
     width: 100%;
@@ -4032,17 +4056,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 @media (max-width: 480px) {
   .pileControls {
-    position: static;
-    transform: none;
-    flex-direction: row;
-    flex-wrap: wrap;
-    width: 100%;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 35px;
-    padding: 0 10px;
-    gap: 18px 12px;
-    max-height: none;
+    gap: 10px;
+    padding: 0 6px;
   }
 
   .miniSpinnerWrapper {
@@ -4053,58 +4068,15 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     top: 14px;
   }
 
-  .pileActions {
-    flex-direction: row;
-    gap: 16px;
-    order: 1;
-    padding: 0;
-  }
-
-  .pileActionButtonGroup {
-    flex-direction: row;
-    gap: 16px;
+  .pileFooter {
+    flex: 1 1 190px;
+    gap: 8px;
+    margin-right: 0;
   }
 
   .pileNav {
-    flex-direction: row;
-    gap: 12px;
-    order: 2;
-    margin-left: auto;
-    padding: 6px 16px;
-    border-radius: 50px;
-    min-width: auto;
-  }
-
-  .pileFooter {
-    position: absolute;
-    top: -52px;
-    right: 20px;
-    left: 10px;
-    flex: 0 0 auto;
-    width: auto;
-    justify-content: center;
-    min-height: 0;
-    gap: 10px;
-    transform: none;
-  }
-
-  .pileFooter .pileSubmitButton {
-    flex: 1 1 auto;
-    width: auto;
-    max-width: none;
-    min-height: 54px;
-    padding: 11px 18px;
-    font-size: 1rem;
-    border-radius: var(--ce-radius-16);
-  }
-
-  .pileFooter .pileIconButton,
-  .pileFooter .pileSubmitLink {
-    position: static;
-    top: auto;
-    left: auto;
-    transform: none;
-    flex: 0 0 auto;
+    gap: 8px;
+    padding: 6px 4px;
   }
 
   .pileNavArrow {
@@ -4407,7 +4379,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   font-size: 1.35rem;
 }
 
-@media (min-width: 769px), (max-width: 480px) {
+@media (min-width: 769px) {
   .pileSubmitButtonTrail {
     display: inline-flex;
   }
@@ -4480,12 +4452,14 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 @media (max-width: 480px) {
   .pileFooter .pileSubmitButton {
-    --pile-submit-button-radius: var(--ce-radius-16);
+    --pile-submit-button-radius: var(--ce-radius-8);
     width: 100%;
     max-width: none;
-    min-height: 54px;
-    padding: 11px 18px;
-    border-radius: var(--ce-radius-16);
+    min-width: 150px;
+    min-height: 0;
+    padding: 12px 18px;
+    font-size: 1rem;
+    border-radius: var(--ce-radius-8);
   }
 
   .pileSubmitSuccessBadge {

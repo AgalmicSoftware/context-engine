@@ -35,6 +35,7 @@ describe('surveyPileQuestionFlow', () => {
       questions: [
         { id: 'q1', prompt: '[encrypted]', promptDecrypted: false },
         { id: 'q2', prompt: 'Visible question', promptDecrypted: true },
+        { id: 'qpending', prompt: '[encrypted]', __ceQuestionMetadataPending: true },
       ],
     })).toEqual({
       hiddenQuestions: [{ id: 'q1', prompt: '[encrypted]', promptDecrypted: false }],
@@ -49,6 +50,7 @@ describe('surveyPileQuestionFlow', () => {
         { id: 'q1', prompt: 'Q1' },
         { id: 'q2', prompt: '[encrypted]', promptDecrypted: false },
         { id: 'q3', prompt: 'Q3' },
+        { id: 'qpending', prompt: '[encrypted]', __ceQuestionMetadataPending: true },
       ],
       questionResponses: {
         q1: { '0xabc': { answer: { value: 'yes' } } },

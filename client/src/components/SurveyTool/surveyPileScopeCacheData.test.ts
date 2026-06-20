@@ -15,6 +15,11 @@ describe('surveyPileScopeCacheData', () => {
               q1: { id: 'q1', prompt: 'Edge one', creator: '0x111', tags: ['edge'] },
               qdup: { id: 'qdup', prompt: 'Edge duplicate', creator: '0x222' },
               qblocked: { id: 'qblocked', prompt: 'Blocked edge question' },
+              qpending: {
+                id: 'qpending',
+                prompt: '[encrypted]',
+                __ceQuestionMetadataPending: true,
+              },
             },
             questionResponses: {
               q1: {

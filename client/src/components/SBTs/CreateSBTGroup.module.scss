@@ -57,6 +57,13 @@ $placeholder-color: rgba(255, 255, 255, 0.5);
     gap: 14px;
     margin-bottom: 20px;
 
+    .titleCluster {
+      display: inline-flex;
+      align-items: center;
+      gap: 14px;
+      min-width: 0;
+    }
+
     .clearFormButton {
       margin-left: auto;
       background: linear-gradient(180deg, rgba(255, 131, 131, 0.12), rgba(255, 131, 131, 0.08));
@@ -94,10 +101,19 @@ $placeholder-color: rgba(255, 255, 255, 0.5);
     font-size: clamp(1.8rem, 3.2vw, 2.35rem);
     font-weight: 700;
     color: $clickable-color !important;
-    margin-bottom: 0;
+    margin: 0;
     font-family: var(--ce-font-mono);
     letter-spacing: 0.03em;
     text-shadow: 0 10px 24px rgba(77, 255, 164, 0.16);
+  }
+
+  .createGroupTitleTooltip {
+    flex: 0 0 auto;
+    width: 1.12em;
+    height: 1.12em;
+    margin-left: 0;
+    color: $clickable-color !important;
+    font-size: clamp(1.9rem, 4.7vw, 2.45rem);
   }
 
   /* --- Updated Input Styles (UserPage / CompareAddresses Aesthetic) --- */
@@ -1726,6 +1742,10 @@ $placeholder-color: rgba(255, 255, 255, 0.5);
       flex-direction: column;
       align-items: stretch;
 
+      .titleCluster {
+        align-self: flex-start;
+      }
+
       .clearFormButton {
         margin-left: 0;
         align-self: flex-end;
@@ -1824,7 +1844,11 @@ $placeholder-color: rgba(255, 255, 255, 0.5);
     .createGroupTitle {
       font-size: clamp(1.4rem, 8vw, 1.95rem);
       line-height: 1.05;
-      padding-right: 44px;
+      padding-right: 0;
+    }
+
+    .createGroupTitleTooltip {
+      font-size: clamp(1.9rem, 9vw, 2.35rem);
     }
 
     .headerContainer {

@@ -42,6 +42,7 @@ import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 import { hasCachedCreateSbtForm as hasCachedCreateSbtFormCache } from '../../utilities/sbt/sbtCreateFormCache.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
+import { isDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
 import { isCryptoMode, sbtsListPath, t } from '../../utilities/ui/terminology.js';
 import { PUBLIC_AI_DISCOURSE_CORPUS_URL } from '../../variables/publicRepoMetadata.js';
 import { resolveMainSiteLitSessionConfig } from '../MainSite/litSessionConfig.js';
@@ -168,6 +169,20 @@ const serializeOnePageSessionFilterState = (value: any = {}) => (
 const normalizeOnePageSessionSlug = (value: any = '') => {
   const normalized = String(value || '').trim().toLowerCase();
   return normalized === 'general' ? '' : normalized;
+};
+
+const hasOwn = (value: any, key: string) => (
+  !!value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, key)
+);
+
+const resolveOnePageSessionSurveySlug = (props: any = '') => {
+  if (hasOwn(props, 'questionSessionSlug')) {
+    return normalizeOnePageSessionSlug(props.questionSessionSlug);
+  }
+  if (hasOwn(props.sessionConfig, 'slug')) {
+    return normalizeOnePageSessionSlug(props.sessionConfig.slug);
+  }
+  return normalizeOnePageSessionSlug(props.slug || '');
 };
 
 const resolveOnePageSessionRouteUiState = (props: any = {}) => {
@@ -2051,6 +2066,7 @@ class OnePageSession extends Component<any, any> {
       sessionConfig: incomingSessionConfig,
       polisDemoDataBySlug,
     } = this.props;
+    const surveySessionSlug = resolveOnePageSessionSurveySlug(this.props);
     const resolvedSessionConfig = this.getResolvedSessionConfig({
       slug,
       sessionName,
@@ -2067,8 +2083,8 @@ class OnePageSession extends Component<any, any> {
       null;
     const scopedLitHooks = this.resolveScopedLitHooks(resolvedSessionConfig);
     const effectiveSlug = resolveEffectiveSlug(this.props) || slug;
-    // Only show DebateHUD/CorpusViewer on the generic demo session.
-    const isDemoSlug = effectiveSlug === 'demo';
+    // Only show demo-specific result surfaces on configured public demo sessions.
+    const isDemoSlug = isDemoSessionSlug(effectiveSlug);
     const resultsViewMode = isDemoSlug ? this.state.resultsViewMode : 'polis';
     const resultsViewOptions = [
       { key: 'polis', label: 'Report', icon: '🧾' },
@@ -2393,7 +2409,7 @@ class OnePageSession extends Component<any, any> {
                 sessionSlugPinned={true}
                 preventUrlChange={true}
                 /* per-demo passthroughs */
-                sessionSlug={slug}
+                sessionSlug={surveySessionSlug}
                 sessionConfig={resolvedSessionConfig}
                 contracts={contracts}
                 blockLimits={blockLimits}
@@ -2445,7 +2461,7 @@ class OnePageSession extends Component<any, any> {
                 preventUrlChange={true}
                 onResultsModalClose={this.handleResultsModalClose}
                 /* per-demo passthroughs */
-                sessionSlug={slug}
+                sessionSlug={surveySessionSlug}
                 sessionConfig={resolvedSessionConfig}
                 contracts={contracts}
                 blockLimits={blockLimits}
@@ -2560,53 +2576,50 @@ class OnePageSession extends Component<any, any> {
                 className={`${styles.sectionHeader} ${styles.documentsSectionHeader}`.trim()}
                 data-testid='ce-demo-documents-toggle'
               >
-                <span className={styles.documentsSectionHeaderMain}>
-                  {this.state.showDocuments ? (
-                    <FontAwesomeIcon icon={faCaretUp} className={styles.sectionToggleIcon} />
-                  ) : (
-                    <FontAwesomeIcon icon={faCaretDown} className={styles.sectionToggleIcon} />
-                  )}
-                  <span className={`${styles.sectionHeaderText} ${styles.documentsSectionHeaderText}`.trim()}>
-                    <span className={styles.documentsSectionHeaderTitleRow}>
-                      <span className={styles.sectionHeaderTitle}>Context</span>
-                      {this.state.showDocuments && (
-                        <span className={`${styles.sectionHeaderMeta} ${styles.documentsSectionHeaderMeta}`.trim()}>
-                          <div
-                            className={`${styles.tooltip} ${styles.sectionHeaderTooltip}`}
-                            onClick={(e: any) => e.stopPropagation()}
-                          >
-                            <FontAwesomeIcon icon={faQuestionCircle} />
-                            <span className={styles.tooltiptext}>
-                              {documentsSectionTooltip}
-                            </span>
-                          </div>
-                          <a
-                            href={DEMO_CORPUS_GITHUB_URL}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={styles.sectionHeaderLink}
-                            onClick={(e: any) => e.stopPropagation()}
-                          >
-                            <FontAwesomeIcon icon={faExternalLinkAlt} />
-                            <span>GitHub</span>
-                          </a>
-                          <button
-                            type="button"
-                            className={`${styles.sectionHeaderLink} ${styles.sectionHeaderLinkButton}`.trim()}
-                            onClick={this.handleLoadFullCorpusClick}
-                            disabled={disableLoadFullCorpusButton}
-                            data-testid='ce-demo-documents-load-full-corpus'
-                          >
-                            <FontAwesomeIcon icon={faDownload} />
-                            <span>{loadFullCorpusButtonLabel}</span>
-                          </button>
-                        </span>
-                      )}
+                {this.state.showDocuments ? (
+                  <FontAwesomeIcon icon={faCaretUp} className={styles.sectionToggleIcon} />
+                ) : (
+                  <FontAwesomeIcon icon={faCaretDown} className={styles.sectionToggleIcon} />
+                )}
+                {renderSectionHeading('Context', 'View')}
+                {this.state.showDocuments && (
+                  <div
+                    className={`${styles.tooltip} ${styles.sectionHeaderTooltip}`}
+                    onClick={(e: any) => e.stopPropagation()}
+                  >
+                    <FontAwesomeIcon icon={faQuestionCircle} />
+                    <span className={styles.tooltiptext}>
+                      {documentsSectionTooltip}
                     </span>
-                    <span className={styles.sectionHeaderSubtitle}>View</span>
-                  </span>
-                </span>
+                  </div>
+                )}
               </h2>
+              {this.state.showDocuments && (
+                <div className={styles.sectionHeaderActionsScroller}>
+                  <div className={styles.sectionHeaderActions}>
+                    <a
+                      href={DEMO_CORPUS_GITHUB_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={styles.sectionHeaderActionButton}
+                      onClick={(e: any) => e.stopPropagation()}
+                    >
+                      <FontAwesomeIcon icon={faExternalLinkAlt} />
+                      <span>GitHub</span>
+                    </a>
+                    <button
+                      type="button"
+                      className={styles.sectionHeaderActionButton}
+                      onClick={this.handleLoadFullCorpusClick}
+                      disabled={disableLoadFullCorpusButton}
+                      data-testid='ce-demo-documents-load-full-corpus'
+                    >
+                      <FontAwesomeIcon icon={faDownload} />
+                      <span>{loadFullCorpusButtonLabel}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
               {this.state.showDocuments && (
                 <div className={styles.miniSectionContent}>

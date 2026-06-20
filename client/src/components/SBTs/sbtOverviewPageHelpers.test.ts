@@ -85,7 +85,7 @@ describe('sbtOverviewPageHelpers', () => {
     const txId = 'b'.repeat(43);
 
     expect(normalizeSBTsPageFeaturedCardImageUrl('ipfs://asset/path')).toBe('https://ipfs.io/ipfs/asset/path');
-    expect(normalizeSBTsPageFeaturedCardImageUrl(txId)).toMatch(/^https?:\/\//);
+    expect(normalizeSBTsPageFeaturedCardImageUrl(txId)).toBe(`https://arweave.net/${txId}`);
     expect(normalizeSBTsPageFeaturedCardImageUrl('')).toBe('');
   });
 
