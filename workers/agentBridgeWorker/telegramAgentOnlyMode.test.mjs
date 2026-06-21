@@ -163,8 +163,10 @@ test('start payload pins path-only endpoints and instruction size', () => {
   assert.match(payload.instructions, /Agent Village Wrapped image/);
   assert.match(payload.instructions, /wrappedImageEndpoint/);
   assert.match(payload.instructions, /mode "political_compass"/);
-  assert.match(payload.instructions, /decode image_base64 as image\/png and display it/);
-  assert.match(payload.instructions, /Do not inspect, critique, describe, or summarize the poster/);
+  assert.match(payload.instructions, /!\[Agent Village Wrapped\]\(<image_url>\)/);
+  assert.match(payload.instructions, /Do not call vision, image-analysis, or QA tools/);
+  assert.match(payload.instructions, /Do not inspect, critique, describe, summarize, or list poster contents/);
+  assert.match(payload.instructions, /A text statement that the image is ready is not enough/);
   assert.match(payload.instructions, /fresh run id/);
   assert.match(payload.instructions, /unique request_id values/);
   assert.match(payload.instructions, /each answer-batch POST/);

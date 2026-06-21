@@ -12,7 +12,7 @@ separate EdgeOS permission question when the prompt includes explicit defaults.
 Use the Context Engine Telegram agent handoff skill:
 https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=41
 
-Run Agent Village Wrapped for my Telegram principal.
+Run Agent Village Wrapped for me.
 
 Worker origin: https://ce-agent-bridge-worker.agalmic.workers.dev
 
@@ -54,6 +54,11 @@ Run only agent_only_mode:
    predicted answers, confidence, token allocations, image generation, retries,
    and final response. Do not replace those runtime instructions with cached
    rules from this prompt, local docs, Geo, or older skill text.
+
+Image delivery is mandatory. If the wrapped-image endpoint returns `image_url`,
+show it as an image attachment or Markdown image immediately. Do not run
+vision/image-analysis/QA tools on it. Do not describe or summarize the poster.
+A text-only "ready" message is not a completed run.
 
 When answering questions that depend on memory, usage history, model history, events attended, messages per day, non-default skills/tools tried, or other personal context: do not hallucinate. Use only memory/context you actually have. If you do not know, answer "N/A". Do not infer private facts from thin evidence. Do not quote private memory verbatim unless I explicitly ask. Use memory only as high-level, non-sensitive signal.
 
