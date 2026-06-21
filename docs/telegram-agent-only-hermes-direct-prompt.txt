@@ -30,21 +30,27 @@ preferences, or research questions. `EdgeOS Read Permission: Yes` allows
 high-level EdgeOS profile/memory context; `No` means do not use it. If missing,
 default to No.
 
-Do not do discovery. Do not search Geo, Index Network, local skill indexes,
-Context Engine reference docs, API pitfall docs, or grep/find for tokens. Do
-not run `hermes --help`. Use only: Hermes/OpenRouter balance, EdgeOS
-profile/memory if allowed, the normal private Hermes credential store, and the
-Context Engine worker endpoints below.
+Do not do setup discovery. Do not search Geo, Index Network, local skill
+indexes, Context Engine reference docs, API pitfall docs, or files for
+credentials/tokens/env/config. Do not use search_files, find, grep, sqlite, or
+filesystem scans for `ceagt`, token, credential, auth, .env, or config. Do not
+run `hermes --help`. Use only: the normal Hermes/OpenRouter balance surface,
+EdgeOS profile/memory if allowed, the current Telegram/Hermes principal context,
+the Context Engine skill URL above, and the Context Engine worker endpoints
+below.
 
 Check Hermes/OpenRouter balance first. Minimum: $2.00. If below $2.00 or
 unavailable, say exactly: "You need to add more credit before I can run Agent
 Village Wrapped." If sufficient, do not mention the balance.
 
-Use an existing private Context Engine credential. Check only the normal Hermes
-credential store once. If no credential is available, stop and say exactly:
-"I need a Context Engine agent credential before I can run Agent Village
-Wrapped." Do not search the filesystem for credentials and do not attempt
-any onboarding flow from this direct prompt.
+Credential/onboarding: if an active Context Engine agent-only credential is
+already available in the current Hermes auth/session context, use it privately.
+Otherwise use the Context Engine agent-only onboarding flow described in the
+skill URL above with the current Telegram/Hermes principal context. Do not ask
+me to paste a token, do not print any token, and do not search files for one. If
+neither an active credential nor agent-only onboarding from the current Telegram
+context is available, stop and say exactly: "I need a Context Engine agent
+credential before I can run Agent Village Wrapped."
 
 Run only agent_only_mode:
 1. GET /telegram/agent/api/skill-version and silently verify v41.
