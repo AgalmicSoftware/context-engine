@@ -169,6 +169,9 @@ test('start payload pins path-only endpoints and instruction size', () => {
   assert.match(payload.instructions, /unique request_id values/);
   assert.match(payload.instructions, /each answer-batch POST/);
   assert.match(payload.instructions, /Calibrate before posting/);
+  assert.match(payload.instructions, /90-95 only for direct memory\/profile evidence/);
+  assert.match(payload.instructions, /Use 100 only when you have an exact prior answer/);
+  assert.match(payload.instructions, /otherwise cap confidence at 95/);
   assert.match(payload.instructions, /Do not use a repeated default like 85 across a batch/);
   assert.match(payload.instructions, /scan for flat confidence/);
   assert.match(payload.instructions, /To inspect or change your agent's responses/);
@@ -390,9 +393,12 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.match(prompt, /Question: "A mostly AI-written information environment could be healthier than today's mostly human-written one\."/);
   assert.match(prompt, /Do not use the phrase "your agent's take"/);
   assert.match(prompt, /Do not render detached rating labels/);
+  assert.match(prompt, /Use the whole canvas/);
+  assert.match(prompt, /avoid large blank zones/);
   assert.match(prompt, /Agent Guesses/);
   assert.match(prompt, /Bottom row: Agent Guesses \+ Agent Comparison/);
-  assert.match(prompt, /Put Agent Guesses and Agent Comparison together in one shared bottom row/);
+  assert.match(prompt, /one continuous full-width bottom band/);
+  assert.match(prompt, /Keep them aligned to the same baseline and visual height/);
   assert.match(prompt, /Do not create a separate third bottom panel for Abstract Agent Impression/);
   assert.match(prompt, /ideally 2x2 when all four guesses are supported/);
   assert.match(prompt, /Use this category order: Book Guess, Movie\/Show Guess, Game\/Play Pattern, AI Optimism/);

@@ -23,25 +23,29 @@ default to No.
 
 Do not do setup discovery. Do not search Geo, Index Network, local skill
 indexes, Context Engine reference docs, API pitfall docs, or files for
-credentials/tokens/env/config. Do not use search_files, find, grep, sqlite, or
-filesystem scans for `ceagt`, token, credential, auth, .env, or config. Do not
-run `hermes --help`. Use only: the normal Hermes/OpenRouter balance surface,
-EdgeOS profile/memory if allowed, the current Telegram/Hermes principal context,
-the Context Engine skill URL above, and the Context Engine worker endpoints
-below.
+credentials/tokens/env/config. Do not use search_files, find, grep, sqlite, cat,
+or filesystem scans for `ceagt`, token, credential, auth, .env, config, or API
+keys. Do not run `hermes --help`. Use only: an already-exposed Hermes/OpenRouter
+balance command or UI surface, EdgeOS profile/memory if allowed, the current
+Telegram/Hermes principal context, the Context Engine skill URL above, and the
+Context Engine worker endpoints below.
 
-Check Hermes/OpenRouter balance first. Minimum: $2.00. If below $2.00 or
-unavailable, say exactly: "You need to add more credit before I can run Agent
-Village Wrapped." If sufficient, do not mention the balance.
+Check Hermes/OpenRouter balance first only through an already-exposed Hermes
+balance command or UI surface. Do not read config files, env files, auth files,
+or API keys to check balance. Minimum: $2.00. If the exposed balance is below
+$2.00, say exactly: "You need to add more credit before I can run Agent Village
+Wrapped." If no balance surface is immediately available without reading files,
+skip the balance check silently and continue.
 
 Credential/onboarding: if an active Context Engine agent-only credential is
 already available in the current Hermes auth/session context, use it privately.
 Otherwise use the Context Engine agent-only onboarding flow described in the
-skill URL above with the current Telegram/Hermes principal context. Do not ask
-me to paste a token, do not print any token, and do not search files for one. If
-neither an active credential nor agent-only onboarding from the current Telegram
-context is available, stop and say exactly: "I need a Context Engine agent
-credential before I can run Agent Village Wrapped."
+skill URL above only if the required inviteToken and Telegram principal context
+are already present in the current message/session context. Do not ask me to
+paste a token, do not print any token, and do not search files for one. If
+neither an active credential nor a complete in-context agent-only onboarding
+payload is available, stop immediately and say exactly: "I need a Context
+Engine agent credential before I can run Agent Village Wrapped."
 
 Run only agent_only_mode:
 1. GET /telegram/agent/api/skill-version and silently verify v41.
@@ -60,8 +64,7 @@ image prompt, or image_base64 in chat.
 ## Notes
 
 - The `$2.00` minimum is tied to the default `gemini-3.5-flash` run. If Hermes changes the default model or exposes a model-specific estimator, update the threshold text here.
-- The prompt intentionally requires a verified balance before fetching statements so failed or underfunded runs do not consume the launch window with partial work.
-- The balance check is for Hermes/OpenRouter credit only and must use normal balance surfaces.
+- The balance check is for Hermes/OpenRouter credit only. It must use an already-exposed balance surface, never config/env/API-key file reads.
 - The preference defaults are deliberately before statement fetching: the user should know the run can take about 10 minutes, that this is research, and that EdgeOS profile context is enabled by default but easy to override. Playful book/movie/game/AI Optimism guesses are image-time synthesis from actual predictions, not stored research questions; the Wrapped image prompt reserves the bottom-left visual slot for those chips when evidence supports them.
 - Fresh request ids matter for repeated runs: the mini-app should show the latest
   prediction state, while the research export keeps each run's answer events.
