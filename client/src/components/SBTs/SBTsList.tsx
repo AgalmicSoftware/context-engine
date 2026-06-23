@@ -232,8 +232,11 @@ type SbtListInitDeps = {
 type SbtListFetchSBTs = (
   forceRefresh?: boolean,
   showLoadingIndicator?: boolean,
-  slugOverride?: unknown
-) => Promise<void>;
+  slugOverride?: unknown,
+  options?: {
+    markSessionLoading?: boolean;
+  }
+) => Promise<boolean>;
 type SbtListChipProgressMeta = SbtListChipProgressVisibilityMeta;
 type SbtListChipProgressMetaBySlug = Record<string, SbtListChipProgressMeta | undefined>;
 type SbtListGroupPasswordMap = Record<string, boolean | undefined>;
@@ -997,6 +1000,26 @@ const SBTsList = ({
     );
   }, []);
 
+  const getDisplaySessionChainId = useCallback((slugIn: unknown): string => {
+    const slug = normalizeSessionSlug(slugIn || '');
+    if (isSbtListSyntheticNoSessionSlug(slug)) return '';
+    try {
+      const chainId = getSessionChainId(slug);
+      if (chainId) return String(chainId);
+    } catch (_) {}
+    const cfg = getDisplaySessionConfig(slug);
+    const fallbackChainId = Number(
+      cfg?.networkChainId ||
+      cfg?.chainId ||
+      (isRecord(cfg?.contracts) && (
+        (isRecord(cfg.contracts.sbtFactory) && cfg.contracts.sbtFactory.chainId) ||
+        (isRecord(cfg.contracts.surveys) && cfg.contracts.surveys.chainId)
+      )) ||
+      0
+    ) || 0;
+    return fallbackChainId ? String(fallbackChainId) : '';
+  }, [getDisplaySessionConfig]);
+
   const labelForSessionSlug = useCallback((slugIn: unknown): string => {
     const normalized = normalizeSessionSlug(slugIn || '');
     if (isSbtListSyntheticNoSessionSlug(normalized)) return 'No Session';
@@ -1029,23 +1052,36 @@ const SBTsList = ({
   const deriveGroupNetKey = useCallback((slugIn: unknown): string => {
     const slug = normalizeSessionSlug(slugIn || '');
     if (isSbtListSyntheticNoSessionSlug(slug)) return '';
-    try {
-      const chainId = getSessionChainId(slug);
-      return chainId != null ? String(chainId) : '';
-    } catch (_) {
-      return '';
-    }
-  }, []);
+    return getDisplaySessionChainId(slug);
+  }, [getDisplaySessionChainId]);
 
   const deriveCacheNetKeyForSlug = useCallback((slugIn: unknown): string => {
     const slug = normalizeSessionSlug(slugIn || '');
     if (isSbtListSyntheticNoSessionSlug(slug)) return '';
-    try {
-      const chainId = getSessionChainId(slug);
-      if (chainId) return String(chainId);
-    } catch (e) { sbtLog.warn('SBTsList: fallback', e); }
+    const displayChainId = getDisplaySessionChainId(slug);
+    if (displayChainId) return displayChainId;
     return String(network?.id || '');
-  }, [network?.id]);
+  }, [getDisplaySessionChainId, network?.id]);
+
+  const getCacheReadSlugsForTarget = useCallback((slugIn: unknown): string[] => {
+    const slug = normalizeSessionSlug(slugIn || '');
+    if (isSbtListSyntheticNoSessionSlug(slug)) return [];
+    const slugs: string[] = [slug];
+    if (slug) {
+      const displayConfig = getDisplaySessionConfig(slug);
+      const hasCanonicalConfigSlug = (
+        isRecord(displayConfig) &&
+        Object.prototype.hasOwnProperty.call(displayConfig, 'slug')
+      );
+      const canonicalConfigSlug = hasCanonicalConfigSlug
+        ? normalizeSessionSlug(displayConfig.slug ?? '')
+        : slug;
+      if (hasCanonicalConfigSlug && canonicalConfigSlug !== slug) {
+        slugs.push(canonicalConfigSlug);
+      }
+    }
+    return dedupeNormalizedSbtListSlugs(slugs);
+  }, [getDisplaySessionConfig]);
 
   const formatBlockCount = useCallback((value: unknown): string => {
     const n = Number(value);
@@ -1145,6 +1181,37 @@ const SBTsList = ({
       resolveConcreteSessionBindingSlug,
     });
   }, [allSessionsMode, isListModeScopeEnabled, listSlug, resolveConcreteSessionBindingSlug]);
+
+  const coerceAliasCacheItemsForTarget = useCallback((
+    items: unknown = [],
+    targetSlugIn: unknown = '',
+    readSlugIn: unknown = ''
+  ): SbtListItem[] => {
+    const rawItems = Array.isArray(items) ? items as SbtListItem[] : [];
+    const targetSlug = normalizeSessionSlug(targetSlugIn || '');
+    const readSlug = normalizeSessionSlug(readSlugIn || '');
+    if (!targetSlug || readSlug === targetSlug) return rawItems;
+
+    const out: SbtListItem[] = [];
+    rawItems.forEach((item) => {
+      const concreteBindingSlug = resolveConcreteSessionBindingSlug(item);
+      if (concreteBindingSlug != null && concreteBindingSlug !== targetSlug) return;
+      const sbtInfo = isRecord(item?.sbtInfo) ? item.sbtInfo : {};
+      out.push({
+        ...item,
+        __sourceSessionSlug: targetSlug,
+        slug: targetSlug,
+        sessionSlug: targetSlug,
+        sessionSlugExplicit: true,
+        sbtInfo: {
+          ...sbtInfo,
+          sessionSlug: targetSlug,
+          sessionSlugExplicit: true,
+        },
+      });
+    });
+    return out;
+  }, [resolveConcreteSessionBindingSlug]);
 
   const collectLinkedScopedSbtEntries = useCallback((
     targetSlugs: unknown = [],
@@ -1637,45 +1704,57 @@ const SBTsList = ({
 
     targets.forEach((slug) => {
       if (isSbtListSyntheticNoSessionSlug(slug)) return;
-      const netKey = deriveCacheNetKeyForSlug(slug);
-      if (!netKey) return;
+      const hydrated: SbtListItem[] = [];
+      const meta: SbtCacheMetaSnapshot = { lastBlock: 0, sbtCount: 0 };
+      getCacheReadSlugsForTarget(slug).forEach((readSlug) => {
+        const netKey = deriveCacheNetKeyForSlug(readSlug);
+        if (!netKey) return;
 
-      let cache: unknown = null;
-      try {
-        cache = peekCacheSync('sbtCache', slug, { clone: false });
-      } catch (_) {
-        cache = null;
-      }
-      if (!isRecord(cache)) return;
+        let cache: unknown = null;
+        try {
+          cache = peekCacheSync('sbtCache', readSlug, { clone: false });
+        } catch (_) {
+          cache = null;
+        }
+        if (!isRecord(cache)) return;
 
-      const cacheReadPlan = buildSbtListCacheReadPlan({
-        netKey,
-        rawCache: cache,
-        targetSlug: slug,
+        const cacheReadPlan = buildSbtListCacheReadPlan({
+          netKey,
+          rawCache: cache,
+          targetSlug: readSlug,
+        });
+        const nextItems = coerceAliasCacheItemsForTarget(cacheReadPlan.hydrated, slug, readSlug);
+        hydrated.push(...nextItems);
+        meta.lastBlock = Math.max(Number(meta.lastBlock || 0), Number(cacheReadPlan.meta.lastBlock || 0));
+        meta.sbtCount += nextItems.length;
       });
-      const hydrated = cacheReadPlan.hydrated;
       if (!hydrated.length) return;
 
-      updateSessionCacheMeta(slug, cacheReadPlan.meta);
+      updateSessionCacheMeta(slug, meta);
 
       primed = true;
       setSbtListBySlug((prev) => {
         const existing = Array.isArray(prev[slug]) ? prev[slug] : [];
-        if (areSbtListArraysEqual(existing, hydrated)) return prev;
-        return { ...prev, [slug]: hydrated };
+        const merged = mergeSbtListsByAddress(hydrated);
+        if (areSbtListArraysEqual(existing, merged)) return prev;
+        return { ...prev, [slug]: merged };
       });
       setSessionHasLoadedOnceBySlug((prev) => (
         prev[slug] ? prev : { ...prev, [slug]: true }
       ));
       setSessionLoadStateBySlug((prev) => {
-        if (prev[slug] === 'loading') return prev;
         if (prev[slug] === 'loaded') return prev;
         return { ...prev, [slug]: 'loaded' };
       });
     });
 
     return primed;
-  }, [deriveCacheNetKeyForSlug, updateSessionCacheMeta]);
+  }, [
+    coerceAliasCacheItemsForTarget,
+    deriveCacheNetKeyForSlug,
+    getCacheReadSlugsForTarget,
+    updateSessionCacheMeta,
+  ]);
 
   // Effect: initial data fetch + polling setup / teardown
   useEffect(() => {
@@ -1739,21 +1818,41 @@ const SBTsList = ({
         }
 
         try {
-          // Let MainSite own tokenURI hydration during light discovery
+          const runFetchSBTs = fetchSBTsRef.current;
+          const initialCacheReadPromise = typeof runFetchSBTs === 'function'
+            ? Promise.all(targets.map((slug: string) => runFetchSBTs(false, false, slug)))
+            : Promise.resolve([]);
+
+          // Let MainSite own tokenURI hydration during light discovery, but do not
+          // block the first cache read on a long scan. Cached groups should paint
+          // as soon as the local cache is available.
           const runLightDiscovery = ensureLightSbtDiscoveryRef.current;
-          if (shouldShowLoaderForThisRun && typeof runLightDiscovery === 'function') {
-            await Promise.all(targets.map(async (slug: string) => {
+          const lightDiscoveryTargets = dedupeNormalizedSbtListSlugs(
+            targets.flatMap((slug) => getCacheReadSlugsForTarget(slug))
+          );
+          const lightDiscoveryPromise = shouldShowLoaderForThisRun && typeof runLightDiscovery === 'function'
+            ? Promise.all(lightDiscoveryTargets.map(async (slug: string) => {
               try {
                 await runLightDiscovery(
                   slug,
                   allSessionsMode ? { force: true, forceScopeSlug: slug } : undefined
                 );
               } catch (e) { sbtLog.warn('SBTsList: fallback', e); }
-            }));
+            }))
+            : Promise.resolve([]);
+
+          const initialCacheReadResults = await initialCacheReadPromise;
+          const hasFetchedCachedCards = initialCacheReadResults.some(Boolean);
+          if (hasFetchedCachedCards) {
+            initialLoadCompletedRef.current = true;
+            if (shouldShowLoaderForThisRun && isMounted.current) setLoading(false);
           }
-          const runFetchSBTs = fetchSBTsRef.current;
+
+          await lightDiscoveryPromise;
           if (typeof runFetchSBTs === 'function') {
-            await Promise.all(targets.map((slug: string) => runFetchSBTs(false, false, slug)));
+            void Promise.all(targets.map((slug: string) => (
+              runFetchSBTs(false, false, slug, { markSessionLoading: false })
+            ))).catch((e: unknown) => { sbtLog.warn('SBTsList: fallback', e); });
           }
         } finally {
           if (shouldShowLoaderForThisRun && isMounted.current) setLoading(false);
@@ -1786,12 +1885,12 @@ const SBTsList = ({
     sbtCacheRevision,
     displayedSessionUniverseSlugs,
     displayedSessionUniverseSlugsNormalized,
+    getCacheReadSlugsForTarget,
     primeSbtCardsFromSyncCache,
     sessionUniverseRegistryPending,
   ]);
 
   useEffect(() => {
-    if (!loading) return;
     const targets = dedupeNormalizedSbtListSlugs(fetchSessionSlugs);
     if (!targets.length) return;
     const liveProgressBySlug = (
@@ -1809,7 +1908,7 @@ const SBTsList = ({
     if (!hasPrimedCachedCards) return;
 
     initialLoadCompletedRef.current = true;
-    if (isMounted.current) {
+    if (loading && isMounted.current) {
       setLoading(false);
     }
   }, [
@@ -1874,62 +1973,91 @@ const SBTsList = ({
   const fetchSBTs = useCallback(async (
     forceRefresh: boolean = false,
     showLoadingIndicator: boolean = true,
-    slugOverride: unknown = null
-  ): Promise<void> => {
+    slugOverride: unknown = null,
+    options: { markSessionLoading?: boolean } = {}
+  ): Promise<boolean> => {
+    const markSessionLoading = options?.markSessionLoading !== false;
     const targetSlug = normalizeSessionSlug(slugOverride != null ? slugOverride : listSlug);
-    if (isSbtListSyntheticNoSessionSlug(targetSlug)) return;
-    if (!isMounted.current) return;
+    if (isSbtListSyntheticNoSessionSlug(targetSlug)) return false;
+    if (!isMounted.current) return false;
 
     if (forceRefresh && onRequestSbtCacheRefresh) {
       if (showLoadingIndicator) setLoading(true);
       // Reset group-password map when forcing a hard refresh (network-scoped)
       setGroupPasswordMap({});
       onRequestSbtCacheRefresh();
-      return;
+      return false;
     }
 
     const runId = Number(sessionFetchRunBySlugRef.current[targetSlug] || 0) + 1;
     sessionFetchRunBySlugRef.current[targetSlug] = runId;
-    setSessionLoadStateBySlug((prev) => {
-      if (prev[targetSlug] === 'loading') return prev;
-      return { ...prev, [targetSlug]: 'loading' };
-    });
+    if (markSessionLoading) {
+      setSessionLoadStateBySlug((prev) => {
+        if (prev[targetSlug] === 'loading') return prev;
+        return { ...prev, [targetSlug]: 'loading' };
+      });
+    }
 
     try {
-      // Use group chain ID for cache lookups (not wallet network)
-      const netKey = deriveCacheNetKeyForSlug(targetSlug);
+      const cacheReadSlugs = getCacheReadSlugsForTarget(targetSlug);
+      const cacheReadTargets = cacheReadSlugs
+        .map((readSlug) => ({ readSlug, netKey: deriveCacheNetKeyForSlug(readSlug) }))
+        .filter(({ netKey }) => !!netKey);
 
-      if (!netKey) {
-        if (sessionFetchRunBySlugRef.current[targetSlug] === runId) {
+      if (!cacheReadTargets.length) {
+        if (markSessionLoading && sessionFetchRunBySlugRef.current[targetSlug] === runId) {
           setSessionLoadStateBySlug((prev) => ({ ...prev, [targetSlug]: 'error' }));
           setSessionHasLoadedOnceBySlug((prev) => (
             prev[targetSlug] ? prev : { ...prev, [targetSlug]: true }
           ));
         }
-        return;
+        return false;
       }
 
       const hasLoadedBefore = !!sessionHasLoadedOnceRef.current[targetSlug];
       const currentForSlug = Array.isArray(sbtListBySlugRef.current[targetSlug])
         ? sbtListBySlugRef.current[targetSlug]
         : [];
-      const currentGlobalCacheRaw = await readCache('sbtCache', targetSlug);
-      const cacheReadPlan = buildSbtListCacheReadPlan({
-        currentItems: currentForSlug,
-        forceRefresh,
-        hasLoadedBefore,
-        netKey,
-        rawCache: currentGlobalCacheRaw,
-        targetSlug,
+      const readPlans = await Promise.all(cacheReadTargets.map(async ({ readSlug, netKey }) => {
+        const currentGlobalCacheRaw = await readCache('sbtCache', readSlug);
+        const cacheReadPlan = buildSbtListCacheReadPlan({
+          currentItems: readSlug === targetSlug ? currentForSlug : [],
+          forceRefresh,
+          hasLoadedBefore: readSlug === targetSlug ? hasLoadedBefore : false,
+          netKey,
+          rawCache: currentGlobalCacheRaw,
+          targetSlug: readSlug,
+        });
+        return {
+          ...cacheReadPlan,
+          hydrated: coerceAliasCacheItemsForTarget(cacheReadPlan.hydrated, targetSlug, readSlug),
+          passwordFlagItems: coerceAliasCacheItemsForTarget(cacheReadPlan.passwordFlagItems, targetSlug, readSlug),
+          readSlug,
+        };
+      }));
+      const hydrated = mergeSbtListsByAddress(readPlans.flatMap((plan) => plan.hydrated));
+      const passwordFlagItems = mergeSbtListsByAddress(readPlans.flatMap((plan) => plan.passwordFlagItems));
+      const shouldKeepExistingCards = readPlans.some((plan) => plan.shouldKeepExistingCards);
+      const latestForSlug = Array.isArray(sbtListBySlugRef.current[targetSlug])
+        ? sbtListBySlugRef.current[targetSlug]
+        : [];
+      const shouldKeepLatestExistingCards = (
+        hydrated.length === 0 &&
+        !forceRefresh &&
+        latestForSlug.length > 0
+      );
+      const shouldApplyCards = hydrated.length > 0 || (!shouldKeepExistingCards && !shouldKeepLatestExistingCards);
+      const shouldEnsurePasswordFlags = passwordFlagItems.length > 0;
+      updateSessionCacheMeta(targetSlug, {
+        lastBlock: Math.max(...readPlans.map((plan) => Number(plan.meta.lastBlock || 0)), 0),
+        sbtCount: hydrated.length,
       });
-      const hydrated = cacheReadPlan.hydrated;
-      updateSessionCacheMeta(targetSlug, cacheReadPlan.meta);
 
       if (sessionFetchRunBySlugRef.current[targetSlug] !== runId || !isMounted.current) {
-        return;
+        return false;
       }
 
-      if (cacheReadPlan.shouldApplyCards) {
+      if (shouldApplyCards) {
         setSbtListBySlug((prev) => {
           const existing = Array.isArray(prev[targetSlug]) ? prev[targetSlug] : [];
           if (areSbtListArraysEqual(existing, hydrated)) return prev;
@@ -1937,22 +2065,24 @@ const SBTsList = ({
         });
       }
 
-      if (cacheReadPlan.shouldEnsurePasswordFlags) {
+      if (shouldEnsurePasswordFlags) {
         // PASSWORD-LOCK FLAGS WITH CORRECT SLUG CONTEXT
-        await ensureGroupPasswordFlags(cacheReadPlan.passwordFlagItems);
+        await ensureGroupPasswordFlags(passwordFlagItems);
       }
       setSessionLoadStateBySlug((prev) => ({ ...prev, [targetSlug]: 'loaded' }));
       setSessionHasLoadedOnceBySlug((prev) => (
         prev[targetSlug] ? prev : { ...prev, [targetSlug]: true }
       ));
+      return hydrated.length > 0 || shouldKeepExistingCards || shouldKeepLatestExistingCards;
     } catch (error) {
       sbtLog.error("Error reading SBTs from cache:", error);
-      if (sessionFetchRunBySlugRef.current[targetSlug] === runId) {
+      if (markSessionLoading && sessionFetchRunBySlugRef.current[targetSlug] === runId) {
         setSessionLoadStateBySlug((prev) => ({ ...prev, [targetSlug]: 'error' }));
         setSessionHasLoadedOnceBySlug((prev) => (
           prev[targetSlug] ? prev : { ...prev, [targetSlug]: true }
         ));
       }
+      return false;
     } finally {
       if (!forceRefresh) {
         // Initial-load state should complete after a finished attempt,
@@ -1964,6 +2094,8 @@ const SBTsList = ({
   }, [
     deriveCacheNetKeyForSlug,
     ensureGroupPasswordFlags,
+    getCacheReadSlugsForTarget,
+    coerceAliasCacheItemsForTarget,
     listSlug,
     onRequestSbtCacheRefresh,
     updateSessionCacheMeta,

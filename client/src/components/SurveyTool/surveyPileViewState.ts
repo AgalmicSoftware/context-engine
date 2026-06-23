@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+
 import {
   isQuestionPromptMasked,
   shouldShowPileFullLoadingState,
@@ -50,6 +52,12 @@ export type PileWorkspaceViewState = {
   showMiniBackgroundSpinner: boolean;
 };
 
+export type EarlyVisiblePileQuestion = {
+  id: string | number;
+  prompt?: ReactNode;
+  promptDecrypted?: boolean;
+};
+
 export const buildPileLoadingElapsedPatch = (loadingElapsedSec: unknown) => ({
   loadingElapsedSec: Number(loadingElapsedSec || 0),
 });
@@ -77,6 +85,27 @@ export const buildPileFilterActivePatch = (isFilterActive: unknown) => ({
 export const buildPileSubmissionCompletePatch = (submissionComplete: unknown) => ({
   submissionComplete: !!submissionComplete,
 });
+
+export const resolveEarlyVisiblePileQuestions = ({
+  pileQuestions = [],
+  questionPool = [],
+  isFilterActive = false,
+}: {
+  pileQuestions?: EarlyVisiblePileQuestion[] | null;
+  questionPool?: EarlyVisiblePileQuestion[] | null;
+  isFilterActive?: boolean;
+} = {}): EarlyVisiblePileQuestion[] => {
+  const normalizedPileQuestions = Array.isArray(pileQuestions) ? pileQuestions : [];
+  if (normalizedPileQuestions.length > 0) return normalizedPileQuestions;
+  if (isFilterActive) return normalizedPileQuestions;
+
+  const normalizedQuestionPool = Array.isArray(questionPool) ? questionPool : [];
+  if (normalizedQuestionPool.length === 0) return normalizedPileQuestions;
+  return normalizedQuestionPool.filter((question) => (
+    question?.id != null &&
+    !isQuestionPromptMasked(question as Record<string, unknown> | null)
+  ));
+};
 
 export const shouldPreferPileGatedEmptyState = ({
   hasConcreteHiddenQuestions = false,

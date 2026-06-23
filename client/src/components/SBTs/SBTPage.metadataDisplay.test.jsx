@@ -544,13 +544,12 @@ describe('SBTPage metadata display', () => {
     expect(sbtImage.props.src).toBe(defaultSbtImage);
   });
 
-  it('falls back to the next Arweave gateway when the preferred image URL fails', () => {
+  it('falls back through Arweave gateways before the default badge', () => {
     const txId = 'DqYBh1qm9GvaTOGkF5R7abnLoB3OPiXNNBcTsYPtlRc';
-    const canonicalArweaveGateway = 'https://arweave.net'; // intentional: real URL - tests allowlist enforcement
-    const preferredGateway = 'https://ar-io.dev'; // intentional: real URL - verifies production gateway fallback order
+    const preferredGateway = 'https://arweave.net'; // intentional: real URL - verifies production gateway fallback order
+    const fallbackGateway = 'https://gateway.irys.xyz'; // intentional: real URL - verifies production gateway fallback order
     const arIoSubdomainGateway = 'https://b2tadb22u32gxwsm4gsbpfd3ng44xia5zy7cltjuc4j3da7nsulq.ar-io.dev'; // intentional: real URL - verifies AR.IO subdomain parsing
     globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
-    globalThis.CE_ARWEAVE_AR_IO_URL = preferredGateway;
     const subject = createSubject({
       SBTAddress: '0x00000000000000000000000000000000000000a1',
     });
@@ -576,9 +575,11 @@ describe('SBTPage metadata display', () => {
     expect(firstAttempt.src).toBe(`${preferredGateway}/${txId}`);
 
     subject.handleDisplayImageError(firstAttempt);
-    subject.handleDisplayImageError(firstAttempt);
+    const secondAttempt = getDisplayImageRenderState(subject.state.sbtInfo, subject.state, defaultSbtImage);
+    expect(secondAttempt.src).toBe(`${fallbackGateway}/${txId}`);
+    subject.handleDisplayImageError(secondAttempt);
 
-    expect(subject.state.displayImageFallbackIndex).toBe(1);
+    expect(subject.state.displayImageFallbackIndex).toBe(2);
 
     const tree = subject.render();
     const sbtImage = findElementInTree(
@@ -587,7 +588,7 @@ describe('SBTPage metadata display', () => {
     );
 
     expect(sbtImage).toBeTruthy();
-    expect(sbtImage.props.src).toBe(`${canonicalArweaveGateway}/${txId}`);
+    expect(sbtImage.props.src).toBe(defaultSbtImage);
   });
 
   it('returns N/A for zero/invalid actor addresses', () => {

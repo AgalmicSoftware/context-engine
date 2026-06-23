@@ -42,7 +42,7 @@ describe('litProtocol access control helpers', () => {
     ]);
   });
 
-  it('falls back to sepolia for wallet-only access control on OP Sepolia', () => {
+  it('keeps OP Sepolia for wallet-only access control', () => {
     const litProtocol = loadLitProtocol();
 
     expect(litProtocol.buildWalletAddressAccessControlConditions({
@@ -52,7 +52,7 @@ describe('litProtocol access control helpers', () => {
       {
         contractAddress: '',
         standardContractType: '',
-        chain: 'sepolia',
+        chain: 'optimismSepolia',
         method: '',
         parameters: [':userAddress'],
         returnValueTest: {

@@ -24,7 +24,7 @@ Repo-level scripts, CI, and the client package target Node `^20.19.0` or `>=22.1
 Install Foundry as well if you plan to run the root test gate (`npm test`), since it includes Solidity suites via `forge test`. Setup instructions live in [docs/local-chain.md](docs/local-chain.md).
 
 If you need public client environment overrides, use [`client/.env.example`](client/.env.example). Root-level script and E2E variables are documented in [`.env.example`](.env.example).
-OP Sepolia is the active/default OSS chain. Base Sepolia remains supported for legacy/dev compatibility, but only use chain `84532` when the workflow you are testing explicitly targets it or depends on its deployed addresses.
+OP Sepolia is the active/default OSS chain. Base Sepolia should continue to work for legacy/dev compatibility, but it is best-effort rather than actively supported; only use chain `84532` when the workflow you are testing explicitly targets it or depends on its deployed addresses.
 Worker, Arweave, and on-chain E2E flows may also require a funded test wallet, an Arweave JWK, and Cloudflare credentials depending on the path under test.
 
 ## Running Tests

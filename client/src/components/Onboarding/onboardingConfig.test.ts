@@ -36,12 +36,57 @@ describe('readColdLoadOnboardingState', () => {
     });
   });
 
+  it('auto-opens cold-load onboarding by default on configured demo session links', () => {
+    const storage = createStorageMock();
+
+    expect(readColdLoadOnboardingState(storage, '/session/demo-1')).toEqual({
+      firstVisit: true,
+      shouldStartOnboarding: true,
+    });
+  });
+
+  it('does not auto-open cold-load onboarding on registry session links', () => {
+    const storage = createStorageMock();
+
+    expect(readColdLoadOnboardingState(storage, '/session/e2e-custom-20260623-113657')).toEqual({
+      firstVisit: true,
+      shouldStartOnboarding: false,
+    });
+  });
+
+  it('does not auto-open cold-load onboarding on nested registry session links', () => {
+    const storage = createStorageMock();
+
+    expect(readColdLoadOnboardingState(storage, '/session/e2e-custom-20260623-113657/questions')).toEqual({
+      firstVisit: true,
+      shouldStartOnboarding: false,
+    });
+  });
+
   it('auto-opens cold-load onboarding on the base session route too', () => {
     const storage = createStorageMock();
 
     expect(readColdLoadOnboardingState(storage, '/session')).toEqual({
       firstVisit: true,
       shouldStartOnboarding: true,
+    });
+  });
+
+  it('does not auto-open cold-load onboarding on the session wizard route', () => {
+    const storage = createStorageMock();
+
+    expect(readColdLoadOnboardingState(storage, '/session/new')).toEqual({
+      firstVisit: true,
+      shouldStartOnboarding: false,
+    });
+  });
+
+  it('does not auto-open cold-load onboarding on nested session wizard routes', () => {
+    const storage = createStorageMock();
+
+    expect(readColdLoadOnboardingState(storage, '/session/new/')).toEqual({
+      firstVisit: true,
+      shouldStartOnboarding: false,
     });
   });
 
@@ -79,15 +124,26 @@ describe('readColdLoadOnboardingState', () => {
     });
   });
 
-  it('does not auto-open after the first visit has already been recorded', () => {
+  it('keeps direct session welcome slides eligible until onboarding is explicitly completed', () => {
     const storage = createStorageMock({
       [FIRST_VISIT_STORAGE_KEY]: 'true',
     });
 
     expect(readColdLoadOnboardingState(storage, '/session/demo')).toEqual({
       firstVisit: false,
-      shouldStartOnboarding: false,
+      shouldStartOnboarding: true,
     });
     expect(storage.setItem).toHaveBeenCalledWith(FIRST_VISIT_STORAGE_KEY, 'false');
+  });
+
+  it('does not auto-open on non-session routes after first visit has already been recorded', () => {
+    const storage = createStorageMock({
+      [FIRST_VISIT_STORAGE_KEY]: 'true',
+    });
+
+    expect(readColdLoadOnboardingState(storage, '/about')).toEqual({
+      firstVisit: false,
+      shouldStartOnboarding: false,
+    });
   });
 });

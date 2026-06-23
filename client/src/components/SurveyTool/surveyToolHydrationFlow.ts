@@ -2460,7 +2460,7 @@ export const buildSubmissionGroupContext = ({
   normalizedIds.forEach((questionId) => {
     const resolvedSlug = normalizeValue(
       slugByQuestionId instanceof Map ? slugByQuestionId.get(questionId) : ''
-    );
+    ) || normalizeValue(fallbackSlug);
     normalizedSlugByQuestionId.set(questionId, resolvedSlug);
     if (seenSlugs.has(resolvedSlug)) return;
     seenSlugs.add(resolvedSlug);

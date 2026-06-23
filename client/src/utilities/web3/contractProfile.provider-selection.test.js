@@ -86,6 +86,7 @@ describe('contractProfile session-aware provider selection', () => {
     expect(result).toEqual([]);
     expect(deps.getReadProviderForGroup).toHaveBeenCalledWith(GROUP_CFG, {
       contractKey: 'sbtFactory',
+      skipGlobalPreferred: true,
     });
     expect(methods.getRelevantBlockWindowForFilter).toHaveBeenCalledWith(GROUP_CFG, {
       contractKey: 'sbtFactory',

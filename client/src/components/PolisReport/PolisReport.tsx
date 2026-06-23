@@ -311,6 +311,31 @@ function safeJsonParse(str: unknown): UnknownRecord | null {
   }
 }
 
+const isPolisDemoFixturePayload = (value: UnknownRecord | null | undefined): boolean => (
+  !!value && value.source === 'demo-polis-data'
+);
+
+export function normalizePolisBinaryVote(value: unknown): ConcretePolisVote | null {
+  if (value === 1) return 1;
+  if (value === -1) return -1;
+  if (value === 0) return 0;
+  if (value === true) return 1;
+  if (value === false) return -1;
+
+  const normalized = String(value ?? '').trim().toLowerCase();
+  if (!normalized) return null;
+  if (normalized === 'agree' || normalized === 'yes' || normalized === 'y' || normalized === 'true' || normalized === '1') {
+    return 1;
+  }
+  if (normalized === 'disagree' || normalized === 'no' || normalized === 'n' || normalized === 'false' || normalized === '-1') {
+    return -1;
+  }
+  if (normalized === 'unsure' || normalized === 'unknown' || normalized === 'maybe' || normalized === 'neutral' || normalized === '0') {
+    return 0;
+  }
+  return null;
+}
+
 const DEFAULT_POLIS_DEMO_DATA = demoData;
 const DEFAULT_EXPLORATORY_CLUSTER_COUNT = 3;
 const POLIS_DEMO_CLUSTER_ANALYSIS_VERSION = 2;
@@ -733,14 +758,14 @@ export function applyFilterStateToAggregator(
       for (const r of arr) {
         const parsed = safeJsonParse(r?.response);
         if (!parsed) continue;
+        if (isPolisDemoFixturePayload(parsed)) continue;
         // We only consider binary answers here to align with rating-matrix & spec
         if (parsed.type !== 'binary') continue;
         const answer = asRecord(parsed.answer);
         if (answer.encrypted) continue;
 
         if (topBy === 'responses') {
-          const v = answer.value;
-          if (v === 'Agree' || v === 'Disagree' || v === 'Unsure') {
+          if (normalizePolisBinaryVote(answer.value) !== null) {
             score += 1;
           }
         } else {
@@ -907,7 +932,9 @@ function PolisQuestionHoverCard({
  * Build rating matrix from real or from the included demo
  *
  * We only consider question responses of type 'binary'.
- *   That means we only parse if r.response has { type: 'binary' } and answer { value: 'Agree' | 'Disagree' | 'Unsure' }
+ *   That means we only parse if r.response has { type: 'binary' } and
+ *   answer { value: 'Agree' | 'Disagree' | 'Unsure' }, including
+ *   legacy yes/no/0/1 encodings from older response payloads.
  ***************************************************************/
 function buildRatingMatrixFromRealData(realQR: PolisQuestionResponses | UnknownRecord): RatingMatrixBuildResult {
   if (!realQR || typeof realQR !== 'object') {
@@ -927,6 +954,7 @@ function buildRatingMatrixFromRealData(realQR: PolisQuestionResponses | UnknownR
     let firstPrompt: unknown = null;
     for (const r of arr) {
       const parsed = safeJsonParse(r?.response);
+      if (isPolisDemoFixturePayload(parsed)) continue;
       if (parsed && typeof parsed === 'object' && parsed.type) {
         firstType = parsed.type;
         firstPrompt = parsed.prompt || '(No prompt)';
@@ -983,14 +1011,11 @@ function buildRatingMatrixFromRealData(realQR: PolisQuestionResponses | UnknownR
     for (const r of arr) {
       const parsed = safeJsonParse(r?.response);
       if (!parsed || parsed.type !== 'binary') continue;
+      if (isPolisDemoFixturePayload(parsed)) continue;
       const answer = asRecord(parsed.answer);
       if (answer.encrypted) continue;
 
-      const ans = answer.value;
-      let val: PolisVote = null;
-      if (ans === 'Agree') val = 1;
-      else if (ans === 'Disagree') val = -1;
-      else if (ans === 'Unsure') val = 0;
+      const val: PolisVote = normalizePolisBinaryVote(answer.value);
 
       const pIdx = participantIndexMap[String(r?.responder || '').toLowerCase()];
       if (pIdx !== undefined) {
@@ -1327,6 +1352,7 @@ export default function PolisReport({
 
   // Toggling between demo data or real data
   const [useDemoData, setUseDemoData] = useState<boolean>(() => autoUseDemoData);
+  const effectiveUseDemoData = useDemoData;
   const scopedQuestionScanProgress = useMemo(() => {
     if (!questionScanProgress) return null;
     return doesQuestionProgressMatchSlug(String(questionScanProgress.slug || ''), reportProgressSlug)
@@ -1339,9 +1365,9 @@ export default function PolisReport({
   );
   const autoUseDemoDataSignatureRef = useRef<string>(`${activeReportSlug}|${autoUseDemoData ? '1' : '0'}`);
   const precomputedDemoClusterState = useMemo<PrecomputedDemoClusterState | null>(() => {
-    if (!useDemoData) return null;
+    if (!effectiveUseDemoData) return null;
     return buildPrecomputedDemoClusterState(activeDemoData);
-  }, [activeDemoData, useDemoData]);
+  }, [activeDemoData, effectiveUseDemoData]);
 
   // For cluster assignments
   const [clusterCount, setClusterCount] = useState<number>(0);
@@ -1557,7 +1583,7 @@ export default function PolisReport({
   const shouldUsePrecomputedDemoClusters = !!(
     precomputedDemoClusterState
     && isDemoSessionSlug(activeReportSlug)
-    && useDemoData
+    && effectiveUseDemoData
     && activeDemoData === DEFAULT_POLIS_DEMO_DATA
     && embeddingChoice === 'POLIS'
     && manualClusterCountValue === null
@@ -1657,7 +1683,7 @@ export default function PolisReport({
     activeClusterCount,
     activeRepQuestions,
     embeddingChoice,
-    useDemoData,
+    useDemoData: effectiveUseDemoData,
     questionResponsesNonce,
     questionPrompts,
     allQuestions,
@@ -1666,7 +1692,7 @@ export default function PolisReport({
     activeClusterCount,
     activeRepQuestions,
     embeddingChoice,
-    useDemoData,
+    effectiveUseDemoData,
     questionResponsesNonce,
     questionPrompts,
     allQuestions,
@@ -1789,7 +1815,7 @@ export default function PolisReport({
     setErrorMessage(null);
     let buildResult: RatingMatrixBuildResult;
     try {
-      if (!useDemoData) {
+      if (!effectiveUseDemoData) {
         // Apply the upstream filterState BEFORE building the matrix
         const filteredAgg = applyFilterStateToAggregator(
           questionResponses,
@@ -1828,7 +1854,7 @@ export default function PolisReport({
     } catch (e: unknown) {
       setErrorMessage(`Error building rating matrix: ${getErrorMessage(e)}`);
     }
-  }, [questionResponses, useDemoData, filterState, network, questionResponsesNonce, activeReportSlug, activeDemoData]);
+  }, [questionResponses, effectiveUseDemoData, filterState, network, questionResponsesNonce, activeReportSlug, activeDemoData]);
 
   useEffect(() => {
     if (!shouldUsePrecomputedDemoClusters) return;
@@ -2812,7 +2838,7 @@ export default function PolisReport({
       const centerX = w / 2;
       const centerY = h / 2;
 
-      const isDemoLike = useDemoData || onePageDemo || demoMode;
+      const isDemoLike = effectiveUseDemoData || onePageDemo || demoMode;
 
       return (
         <div className={styles.graphItem}>
@@ -3208,7 +3234,7 @@ export default function PolisReport({
    * Render Filter Info (from filterState) - Comprehensive Version
    ***************************************************************/
   function renderActiveFilters() {
-    if (useDemoData) {
+    if (effectiveUseDemoData) {
       return <span>None (Demo Data Active)</span>;
     }
 
@@ -3307,8 +3333,6 @@ export default function PolisReport({
    ***************************************************************/
   // When Demo Data is active, bypass cache readiness gates so the report renders deterministically.
   const hasRenderableReport = !!stats;
-  const isRefreshing = (!useDemoData && (!isQuestionCacheReady || !isResponsesCacheReady));
-  const isLoading = isRefreshing && !hasRenderableReport;
   const isModernStyle = reportStyle === 'modern';
   const isDarkStyle = reportStyle === 'dark';
   const sessionInfoText = typeof resolvedSessionInfo === 'string'
@@ -3318,6 +3342,14 @@ export default function PolisReport({
   const hydrateDone = Math.max(0, Number(scopedQuestionScanProgress?.hydratedQuestions || 0));
   const isHydratingLoading = scopedQuestionScanProgress?.phase === 'hydrate';
   const hasHydrateProgressDetails = isHydratingLoading && hydrateDiscovered > 0;
+  const hasCompletedScopedBlockScan = scopedQuestionScanProgress?.phase === 'scan'
+    && loadingScanProgress.requestedTotalBlocks > 0
+    && loadingScanProgress.remainingBlocks === 0
+    && loadingScanProgress.percentComplete >= 100;
+  const isRefreshing = !effectiveUseDemoData
+    && !hasCompletedScopedBlockScan
+    && (!isQuestionCacheReady || !isResponsesCacheReady);
+  const isLoading = isRefreshing && !hasRenderableReport;
   const showLoadingProgress = isLoading && (
     loadingScanProgress.requestedTotalBlocks > 0 ||
     isHydratingLoading
@@ -3413,8 +3445,10 @@ export default function PolisReport({
               <input
                 type="checkbox"
                 data-testid={E2E_TESTIDS.POLIS_DEMO_DATA_TOGGLE}
-                checked={useDemoData}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUseDemoData(e.target.checked)}
+                checked={effectiveUseDemoData}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                  setUseDemoData(e.target.checked);
+                }}
                 className={styles.demoToggleCheckbox}
               />
               Demo Data

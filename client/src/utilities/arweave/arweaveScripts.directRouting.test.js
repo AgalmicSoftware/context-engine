@@ -229,6 +229,42 @@ describe('arweaveScripts.downloadDataFromArweave direct routing', () => {
     expect(calledUrls.some((url) => url.includes('/raw/default-gateway-fanout'))).toBe(false);
   });
 
+  it('honors per-call gateway fanout when app-wide direct-to-AR.IO mode is enabled', async () => {
+    globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
+    globalThis.CE_ARWEAVE_AR_IO_URL = TEST_AR_IO_GATEWAY;
+    globalThis.CE_ARWEAVE_GATEWAYS = [TEST_ARWEAVE_GATEWAY, TEST_IRYS_GATEWAY];
+    global.fetch
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        text: async () => '',
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: async () => '{"ok":"gateway-fanout-hit"}',
+        headers: { get: () => 'application/json' },
+      });
+
+    const text = await arweaveScripts.downloadDataFromArweave('response-gateway-fanout', {
+      directToArIo: false,
+      retries: 0,
+      bypassCache: true,
+      disableExistencePrecheck: true,
+      debugContext: { category: 'question_response_payload' },
+    });
+
+    expect(text).toBe('{"ok":"gateway-fanout-hit"}');
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    const calledUrls = global.fetch.mock.calls.map((call) => String(call?.[0] || ''));
+    expect(calledUrls[0]).toContain(TEST_AR_IO_GATEWAY);
+    expect(calledUrls[0]).toContain('/response-gateway-fanout');
+    expect(calledUrls[0]).not.toContain('/raw/response-gateway-fanout');
+    expect(calledUrls[1]).toContain(TEST_ARWEAVE_GATEWAY);
+    expect(calledUrls[1]).toContain('/response-gateway-fanout');
+    expect(calledUrls[1]).not.toContain(TEST_IRYS_GATEWAY);
+  });
+
   it('skips /raw and /tx-data probes while staying on AR.IO in direct-to-AR.IO mode', async () => {
     globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
     globalThis.CE_ARWEAVE_AR_IO_URL = TEST_AR_IO_GATEWAY;

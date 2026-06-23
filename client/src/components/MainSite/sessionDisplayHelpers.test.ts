@@ -86,6 +86,18 @@ describe('sessionDisplayHelpers', () => {
         allowDemoFallback: true,
       });
     });
+
+    it('does not mask missing registry metadata with demo fallback fields', () => {
+      const opts = createTextOpts({}, {
+        description: 'Demo description',
+      });
+
+      expect(getSessionInfoForGroup({
+        slug: 'alpha',
+        __registry: { sessionIdHex: '0xabc' },
+      }, 'alpha', opts)).toBe('');
+      expect(opts.getDemoSessionConfigBySlug).not.toHaveBeenCalled();
+    });
   });
 
   describe('getSessionNameForGroup', () => {
@@ -128,6 +140,18 @@ describe('sessionDisplayHelpers', () => {
         allowDemoFallback: true,
       });
     });
+
+    it('does not mask missing registry title metadata with demo fallback fields', () => {
+      const opts = createTextOpts({}, {
+        title: 'Demo title',
+      });
+
+      expect(getSessionNameForGroup({
+        slug: 'alpha',
+        __registry: { metadataURI: 'ar://metadata' },
+      }, 'alpha', opts)).toBe('');
+      expect(opts.getDemoSessionConfigBySlug).not.toHaveBeenCalled();
+    });
   });
 
   describe('getSessionHeaderForGroup', () => {
@@ -166,6 +190,18 @@ describe('sessionDisplayHelpers', () => {
       expect(opts.normalizeArweaveUrl).toHaveBeenLastCalledWith(' ar://demo-header ', {
         contextLabel: 'session_header_image',
       });
+    });
+
+    it('does not mask missing registry header metadata with a demo fallback image', () => {
+      const opts = createHeaderOpts({}, {
+        sessionHeader: ' ar://demo-header ',
+      });
+
+      expect(getSessionHeaderForGroup({
+        slug: 'alpha',
+        sessionId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+      }, 'alpha', opts)).toBe('normalized:');
+      expect(opts.getDemoSessionConfigBySlug).not.toHaveBeenCalled();
     });
   });
 });

@@ -5,6 +5,8 @@ const SESSION_RPC_URL = 'https://session-specific.example/rpc';
 const CROSS_CHAIN_SESSION_RPC_URL = 'https://session-cross-chain.example/rpc';
 const NESTED_OTHER_CHAIN_RPC_URL = 'https://session-nested-other-chain.example/rpc';
 const PATH_DEFAULT_BASE_SEPOLIA = 'https://base-sepolia-testnet.api.pocket.network';
+const PATH_DEFAULT_OP_SEPOLIA = 'https://op-sepolia-testnet.api.pocket.network';
+const ARCHIVE_OP_SEPOLIA_RPC = 'https://optimism-sepolia.gateway.tenderly.co';
 
 const buildGroupCfg = (rpc = {}, overrides = {}) => {
   const base = {
@@ -271,5 +273,58 @@ describe('contractScripts getReadProviderForGroup', () => {
       }));
       expect(urls[0]).toBe(SESSION_RPC_URL);
     });
+  });
+
+  it('skips global PATH defaults for archive-safe survey reads', () => {
+    const cfg = buildGroupCfg({}, {
+      networkChainId: 11155420,
+      contracts: {
+        surveys: {
+          address: '0x00000000000000000000000000000000000000ab',
+          chainId: 11155420,
+        },
+      },
+    });
+
+    const provider = getReadProviderForGroup(cfg, {
+      contractKey: 'surveys',
+      skipGlobalPathDefaults: true,
+      providerLabel: 'surveys-archive',
+    });
+    const urls = Array.isArray(provider?.providerConfigs)
+      ? provider.providerConfigs.map((entry) => entry?.provider?.connection?.url).filter(Boolean)
+      : [];
+
+    expect(provider?.__CE_RPC_META).toEqual(expect.objectContaining({
+      providerLabel: 'surveys-archive',
+      skipGlobalPreferred: true,
+    }));
+    expect(urls[0]).toBe(ARCHIVE_OP_SEPOLIA_RPC);
+    expect(urls).not.toContain(PATH_DEFAULT_OP_SEPOLIA);
+  });
+
+  it('preserves explicit session PATH overrides for archive-safe survey reads', () => {
+    const cfg = buildGroupCfg({
+      provider: 'path',
+      providers: {
+        path: {
+          rpcUrl: SESSION_RPC_URL,
+        },
+      },
+    });
+
+    const provider = getReadProviderForGroup(cfg, {
+      contractKey: 'surveys',
+      skipGlobalPathDefaults: true,
+    });
+    const urls = Array.isArray(provider?.providerConfigs)
+      ? provider.providerConfigs.map((entry) => entry?.provider?.connection?.url).filter(Boolean)
+      : [];
+
+    expect(provider?.__CE_RPC_META).toEqual(expect.objectContaining({
+      providerLabel: 'path',
+      preferredUrls: expect.arrayContaining([SESSION_RPC_URL]),
+    }));
+    expect(urls[0]).toBe(SESSION_RPC_URL);
   });
 });

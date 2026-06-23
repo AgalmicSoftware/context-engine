@@ -1,4 +1,5 @@
 import { buildSbtListRenderBuckets } from './sbtListRenderBucketHelpers';
+import { resolveSbtListItemSessionSlug } from './sbtListSessionBindingHelpers';
 import { SBT_LIST_NO_SESSION_UNIVERSE_SLUG } from './sbtListSessionUniverseHelpers';
 
 describe('sbtListRenderBucketHelpers', () => {
@@ -28,5 +29,44 @@ describe('sbtListRenderBucketHelpers', () => {
       sectionSessionSlugs: ['alpha', SBT_LIST_NO_SESSION_UNIVERSE_SLUG],
     }).displayedFeatured.map((sbt) => sbt.sbtAddress)).toEqual([featuredAddress]);
     expect(getSessionListsForSlug).not.toHaveBeenCalledWith(SBT_LIST_NO_SESSION_UNIVERSE_SLUG);
+  });
+
+  it('keeps list-mode cache items scoped by discovery slug in the selected session bucket', () => {
+    const demoAddress = '0x0000000000000000000000000000000000000d01';
+
+    const buckets = buildSbtListRenderBuckets({
+      allSessionsMode: true,
+      excludePasswordLocked: false,
+      getSessionListsForSlug: () => ({
+        featured_SBTs_LIST: [],
+        ignored_SBTs_LIST: [],
+      }),
+      isListModeScopeEnabled: true,
+      isMintingLive: (sbt) => sbt.sbtInfo?.mintingEndTime === 0,
+      isPasswordLocked: () => false,
+      listSlug: 'demo',
+      resolveSbtSessionSlug: (sbt) => resolveSbtListItemSessionSlug(sbt, {
+        allSessionsMode: true,
+        isListModeScopeEnabled: true,
+      }),
+      sbtList: [
+        {
+          sbtAddress: demoAddress,
+          slug: 'demo',
+          sessionSlug: 'demo',
+          sessionSlugExplicit: true,
+          sbtInfo: {
+            name: 'Discovered Demo SBT',
+            mintingEndTime: 0,
+            sessionSlug: 'demo',
+            sessionSlugExplicit: true,
+          },
+        },
+      ],
+      sectionSessionSlugs: ['demo'],
+    });
+
+    expect(buckets.mintingLiveList.map((sbt) => sbt.sbtAddress)).toEqual([demoAddress]);
+    expect(buckets.baseFilteredList.map((sbt) => sbt.sbtAddress)).toEqual([demoAddress]);
   });
 });

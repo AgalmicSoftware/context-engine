@@ -82,6 +82,27 @@ describe('surveyResultsAnalysisArtifactWriteController', () => {
     });
   });
 
+  it('does not write when a plan has no artifact payload even if marked write-ready', async () => {
+    const writeAnalysisArtifact = jest.fn();
+    const plan = buildPlan({
+      payload: null,
+      shouldWrite: true,
+    });
+
+    await expect(runSurveyResultsAnalysisArtifactWriteController({
+      plan,
+      ports: {
+        writeAnalysisArtifact,
+      },
+    })).resolves.toEqual({
+      attempted: false,
+      error: null,
+      ok: false,
+      target: plan.target,
+    });
+    expect(writeAnalysisArtifact).not.toHaveBeenCalled();
+  });
+
   it('captures write failures while preserving the planned target', async () => {
     const error = new Error('analysis cache write failed');
     const plan = buildPlan({

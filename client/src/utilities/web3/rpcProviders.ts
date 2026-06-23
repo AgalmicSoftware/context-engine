@@ -35,6 +35,7 @@ type SessionConfigLike = AnyRecord;
 type ReadProviderGroupOptions = {
   contractKey?: string;
   strict?: boolean;
+  skipGlobalPathDefaults?: boolean;
   [key: string]: any;
 };
 type ReadProviderResolutionOptions = {
@@ -549,7 +550,9 @@ function resolveGroupPathRpcPreference(cfg: SessionConfigLike = {}, chainId: unk
   const providerName = toLower(rpc.provider || rpc.mode || cfg?.rpcProvider || '');
   const providerIsDefault = !providerName || providerName === 'default';
   const providerIsPath = PATH_PROVIDER_KEYS.has(providerName);
-  const preferGlobal = readPreferPathRpcFlag(id);
+  const preferGlobal = cfg?.__CE_skipGlobalPathDefaults === true
+    ? false
+    : readPreferPathRpcFlag(id);
   const pathDefaultUrls = dedupeRpcUrls(getPathRpcUrl(id));
   const pathOverrideUrls = resolvePathOverrideUrls(cfg, id);
   const usingCustomPathOverrides = hasCustomPathOverrides(pathOverrideUrls, pathDefaultUrls);
@@ -1032,7 +1035,29 @@ export function getReadProviderForGroup(
     contractsLog.warn('getReadProviderForGroup: Could not resolve chainId for group', groupKeyOrCfg);
   }
 
-  const rpcPref = resolveGroupPathRpcPreference(cfg, chId);
+  let rpcPref = resolveGroupPathRpcPreference(
+    options?.skipGlobalPathDefaults === true
+      ? { ...cfg, __CE_skipGlobalPathDefaults: true }
+      : cfg,
+    chId
+  );
+  if (options?.skipGlobalPathDefaults === true && !rpcPref) {
+    rpcPref = {
+      skipGlobalPreferred: true,
+      providerLabel: toStr(options.providerLabel || '') || 'default',
+    };
+  }
+  if (options?.skipGlobalPreferred === true) {
+    rpcPref = rpcPref?.sessionRpcSource === 'root'
+      ? {
+        ...rpcPref,
+        skipGlobalPreferred: true,
+      }
+      : {
+        skipGlobalPreferred: true,
+        providerLabel: toStr(options.providerLabel || '') || 'default',
+      };
+  }
   if (shouldLog('rpc', 'log')) {
     rpcLog('PROVIDER_SELECT', {
       function: 'getReadProviderForGroup',
@@ -1042,6 +1067,7 @@ export function getReadProviderForGroup(
       contractKey: String(options?.contractKey || '').trim() || null,
       chainLabel: chId ? getChainLabelById(chId) : null,
       rpcProvider: rpcPref?.providerLabel || 'default',
+      skipGlobalPreferred: options?.skipGlobalPreferred === true,
     });
   }
 

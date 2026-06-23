@@ -75,6 +75,40 @@ describe('surveyToolSubmitPrepController', () => {
       expect(result.groups[0].qids).toContain('q1');
     });
 
+    it('does not promote self-audience fields to gate recipients during submit prep', () => {
+      const slice = makeSlice({
+        answers: {
+          q1: { value: 'yes', encrypted: true, encryptionAudience: 'self' },
+        },
+        additionalComments: {
+          q1: { value: 'private note', encrypted: true, encryptionAudience: 'self' },
+        },
+      });
+      const getEffectiveRecipientsForField = jest.fn(() => ['0xGate']);
+
+      const result = buildFieldEncryptionWorkGroups(
+        slice,
+        new Set(['q1']),
+        makeDeps({
+          resolveFieldEncryptionAudience: (field) => field.encryptionAudience || 'self',
+          getEffectiveRecipientsForField,
+        }),
+      );
+
+      expect(getEffectiveRecipientsForField).not.toHaveBeenCalled();
+      expect(result.missingRecipients).toHaveLength(0);
+      expect(result.groups).toHaveLength(1);
+      expect(result.groups[0].recipients).toEqual([]);
+      expect(result.groups[0].slice.answers.q1).toMatchObject({
+        encrypted: true,
+        encryptionAudience: 'self',
+      });
+      expect(result.groups[0].slice.additionalComments.q1).toMatchObject({
+        encrypted: true,
+        encryptionAudience: 'self',
+      });
+    });
+
     it('groups gate-encrypted answer with recipients', () => {
       const slice = makeSlice({
         answers: {

@@ -112,17 +112,21 @@ const buildToggleFieldState = (
 const buildExplicitAudienceSelectionFieldState = (
   qid: string,
   fieldKey: FieldKey,
-  normalizedAudience: string,
+  audience: string,
   gateId: string,
   slice: FieldSlice,
   deps: FieldEncryptionDeps,
 ): ResponseFieldState => {
   const currentFieldState = getFieldState(slice, qid, fieldKey, deps);
+  const rawAudience = String(audience || '').trim().toLowerCase();
+  const normalizedAudience = rawAudience === 'gate'
+    ? 'gate'
+    : deps.normalizeResponseEncryptionAudience(audience, qid);
   const normalizedGateId = normalizedAudience === 'gate'
-    ? deps.resolveFieldEncryptionGateId({
+    ? (deps.resolveFieldEncryptionGateId({
         encryptionAudience: normalizedAudience,
         encryptionGateId: gateId || '',
-      }, qid, fieldKey)
+      }, qid, fieldKey) || String(gateId || '').trim() || null)
     : null;
 
   return buildExplicitFieldState({
@@ -180,11 +184,10 @@ export const buildAnswerAudienceSelectionPlan = (
   slice: FieldSlice,
   deps: FieldEncryptionDeps,
 ): AudienceSelectionPlan => {
-  const normalizedAudience = deps.normalizeResponseEncryptionAudience(audience, qid);
   const nextAnswerState = buildExplicitAudienceSelectionFieldState(
     qid,
     'answer',
-    normalizedAudience,
+    audience,
     gateId,
     slice,
     deps,
@@ -238,12 +241,11 @@ export const buildAdditionalAudienceSelectionPlan = (
     };
   }
 
-  const normalizedAudience = deps.normalizeResponseEncryptionAudience(rawAudience, qid);
   return {
     nextAdditionalState: buildExplicitAudienceSelectionFieldState(
       qid,
       'additional',
-      normalizedAudience,
+      rawAudience,
       gateId,
       slice,
       deps,

@@ -123,6 +123,24 @@ describe('surveyToolAudienceDerivationController', () => {
       expect(normalizeAudience).toHaveBeenCalledWith('gate', 'q1');
     });
 
+    it('preserves explicit gate selections with a gate id', () => {
+      const normalizeAudience = jest.fn(() => 'self');
+
+      const result = resolveFieldEncryptionAudience(
+        { encryptionAudience: 'gate', encryptionGateId: 'questionResponses' },
+        'q1',
+        'answer',
+        {
+          normalizeAudience,
+          getDefaultAudienceForQid: () => 'self',
+          getDefaultAudience: () => 'self',
+        },
+      );
+
+      expect(result).toBe('gate');
+      expect(normalizeAudience).not.toHaveBeenCalled();
+    });
+
     it('falls back to default audience for qid when no field audience', () => {
       expect(resolveFieldEncryptionAudience({}, 'q1', 'answer', {
         normalizeAudience: () => 'x',

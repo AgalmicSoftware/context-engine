@@ -2900,6 +2900,7 @@ class CreateSBTGroup extends Component<any, any> {
       documentIDHashes: docIDHashesArray,
       documentURLs: finalDocURLs,
       sessionSlug: metadataSessionSlug,
+      sessionSlugExplicit: true,
     };
 
     if (encryptedFields && typeof encryptedFields === 'object' && Object.keys(encryptedFields).length > 0) {

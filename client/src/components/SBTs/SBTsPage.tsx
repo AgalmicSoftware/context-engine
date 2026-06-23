@@ -72,6 +72,8 @@ type FeaturedListArgs = {
   baseFeaturedList?: unknown;
   effectiveSessionSlug?: unknown;
   autoFeature?: unknown;
+  baseFeaturedListIsConfigured?: unknown;
+  requireExplicitSessionSlug?: unknown;
   isSBTCacheReady?: unknown;
   isAllSessionsMode?: boolean;
   progressBySlug?: Record<string, FeaturedProgressLike | unknown>;
@@ -80,6 +82,7 @@ type FeaturedEntriesArgs = {
   baseFeaturedList?: unknown;
   effectiveSessionSlug?: unknown;
   effectiveSessionAutoFeature?: unknown;
+  requireExplicitAutoFeatureSessionSlug?: unknown;
   isSBTCacheReady?: unknown;
   isAllSessionsMode?: boolean;
   includeListScopeSessions?: boolean;
@@ -113,6 +116,7 @@ type SBTsPageProps = UnknownRecord & {
   hideMiniActionRow?: boolean;
   showCreateGroupAboveFeatured?: boolean;
   preferCacheBackedFeaturedCards?: boolean;
+  requireExplicitAutoFeatureSessionSlug?: boolean;
   miniaturized?: boolean;
   refreshSbtData?: unknown;
   onRequestSbtCacheRefresh?: unknown;
@@ -151,6 +155,29 @@ const getDisplaySessionLists = (slugIn: unknown = '') => (
     slugIn,
   })
 );
+
+const getFeaturedSbtName = (sbt: FeaturedSbtLike | null | undefined): string => {
+  const info = isRecord(sbt?.sbtInfo) ? sbt.sbtInfo : {};
+  return String(
+    info.name ||
+    info.title ||
+    sbt?.name ||
+    ''
+  ).trim();
+};
+
+const isDemoAutomationFixtureSbt = (
+  sbt: FeaturedSbtLike | null | undefined,
+  sessionSlug: unknown = ''
+): boolean => {
+  if (normalizeSessionSlug(sessionSlug || '') !== 'demo') return false;
+  const name = getFeaturedSbtName(sbt);
+  if (!name) return false;
+  return (
+    /\b(?:AI Gate|AI Gated Decrypt|AI Doc Library|AI Doc Filetypes|BrowserUse) Test SBT\b/i.test(name) ||
+    /\[(?:e2e-|20\d{6}-\d{6}-(?:response-smoke|anyall|gated|survey|doc))/i.test(name)
+  );
+};
 
 export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
   _featuredListMemo: MemoBucket<string>;
@@ -197,6 +224,8 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     baseFeaturedList,
     effectiveSessionSlug,
     autoFeature,
+    baseFeaturedListIsConfigured = false,
+    requireExplicitSessionSlug = false,
     isSBTCacheReady,
     isAllSessionsMode = false,
     progressBySlug = {},
@@ -206,6 +235,8 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     const key = [
       sessionSlugTarget,
       autoFeature ? '1' : '0',
+      baseFeaturedListIsConfigured ? '1' : '0',
+      requireExplicitSessionSlug ? '1' : '0',
       isSBTCacheReady ? '1' : '0',
       isAllSessionsMode ? '1' : '0',
       String(Number(this.props.sbtCacheRevision || 0)),
@@ -217,6 +248,40 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     }
 
     let next = baseList;
+    if (
+      requireExplicitSessionSlug &&
+      !baseFeaturedListIsConfigured &&
+      sessionSlugTarget &&
+      !isAllSessionsMode
+    ) {
+      try {
+        const cache = peekCacheSync('sbtCache', String(effectiveSessionSlug || ''), { clone: false });
+        const explicitAddressSet = new Set<string>();
+        if (isRecord(cache)) {
+          Object.values(cache).forEach((netNode) => {
+            const netRecord = isRecord(netNode) ? netNode : null;
+            const sbtList = isRecord(netRecord?.sbtList) ? netRecord.sbtList : null;
+            if (!sbtList) return;
+            Object.values(sbtList).forEach((rawSbt) => {
+              const sbt = asFeaturedSbt(rawSbt);
+              if (!sbt?.sbtAddress) return;
+              if (isDemoAutomationFixtureSbt(sbt, sessionSlugTarget)) return;
+              const sbtSessionSlug = resolveFeaturedSbtSessionSlug(sbt, {
+                requireExplicitSessionSlug: true,
+              });
+              if (sbtSessionSlug !== sessionSlugTarget) return;
+              explicitAddressSet.add(String(sbt.sbtAddress || '').trim().toLowerCase());
+            });
+          });
+        }
+        next = baseList.filter((addr) => (
+          explicitAddressSet.has(String(addr || '').trim().toLowerCase())
+        ));
+      } catch (e) {
+        sbtLog.warn("[SBTsPage] Strict featured filter failed:", e);
+        next = [];
+      }
+    }
     if (autoFeature && !isAllSessionsMode) {
       try {
         const cache = peekCacheSync('sbtCache', String(effectiveSessionSlug || ''), { clone: false });
@@ -230,13 +295,16 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
               const sbt = asFeaturedSbt(rawSbt);
               if (!sbt?.sbtAddress) return;
               if (sbt?.sbtInfo?.unlisted || sbt?.unlisted) return;
-              const sbtSessionSlug = resolveFeaturedSbtSessionSlug(sbt);
+              if (isDemoAutomationFixtureSbt(sbt, sessionSlugTarget)) return;
+              const sbtSessionSlug = resolveFeaturedSbtSessionSlug(sbt, {
+                requireExplicitSessionSlug,
+              });
               if (sbtSessionSlug !== sessionSlugTarget) return;
               autoFeaturedAddresses.push(String(sbt.sbtAddress));
             });
           });
           if (autoFeaturedAddresses.length > 0) {
-            next = dedupeAddressListCaseInsensitive([...baseList, ...autoFeaturedAddresses]);
+            next = dedupeAddressListCaseInsensitive([...next, ...autoFeaturedAddresses]);
           }
         }
       } catch (e) {
@@ -252,6 +320,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     baseFeaturedList,
     effectiveSessionSlug,
     effectiveSessionAutoFeature,
+    requireExplicitAutoFeatureSessionSlug = false,
     isSBTCacheReady,
     isAllSessionsMode = false,
     includeListScopeSessions = false,
@@ -287,6 +356,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
       isSBTCacheReady ? '1' : '0',
       isAllSessionsMode ? '1' : '0',
       includeListScopeSessions ? '1' : '0',
+      requireExplicitAutoFeatureSessionSlug ? '1' : '0',
       String(Number(this.props.sbtCacheRevision || 0)),
       buildFeaturedProgressSignature(progressBySlug, orderedSessionSlugs),
       perSlugAutoFeatureSignatures.join('|'),
@@ -309,6 +379,8 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
         baseFeaturedList: featuredForSlug,
         effectiveSessionSlug: slug,
         autoFeature: autoFeatureForSlug,
+        baseFeaturedListIsConfigured: true,
+        requireExplicitSessionSlug: requireExplicitAutoFeatureSessionSlug,
         isSBTCacheReady,
         isAllSessionsMode,
         progressBySlug,
@@ -408,7 +480,24 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     const groupFromRef   = referrerSlug ? getDisplaySessionConfig(referrerSlug) : null;
     const activeGroup    = groupFromUrl || groupFromProp || groupFromRedux || groupFromRef || getDisplaySessionConfig('');
 
-    const canonicalSlug = normalizeSessionSlug(activeGroup?.slug || ''); // '' means general
+    const explicitSourceSlug = normalizeSessionSlug(
+      effectiveUrlSlug ||
+      propSlugLike ||
+      this.props.activeSessionSlug ||
+      referrerSlug ||
+      ''
+    );
+    const explicitSourceMatched = !!(
+      (effectiveUrlSlug && groupFromUrl) ||
+      (propSlugLike && groupFromProp) ||
+      (this.props.activeSessionSlug && groupFromRedux) ||
+      (referrerSlug && groupFromRef)
+    );
+    const canonicalSlugFromConfig = normalizeSessionSlug(activeGroup?.slug || '');
+    const canonicalSlug = (
+      canonicalSlugFromConfig ||
+      (explicitSourceMatched ? explicitSourceSlug : '')
+    ); // '' means general
     const urlHasNoSlug  = onSbtsRoute && effectiveUrlSlug === undefined && !isCreateRoute;
 
     // Canonicalize (silent) if we are on /sbts and have a non-empty slug to show
@@ -494,6 +583,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
       baseFeaturedList,
       effectiveSessionSlug,
       effectiveSessionAutoFeature,
+      requireExplicitAutoFeatureSessionSlug: this.props.requireExplicitAutoFeatureSessionSlug === true,
       isSBTCacheReady,
       isAllSessionsMode: allSessionsMode,
       includeListScopeSessions,
@@ -537,9 +627,16 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
       return true;
     });
     const hasFeaturedCards = featuredRenderEntries.length > 0;
-    // Keep previously discovered cards visible while a route-local scan is active, but
-    // avoid showing a "not ready yet" spinner once we already have cards to render.
-    const showFeaturedCornerSpinner = hasFeaturedCards && featuredScanActive;
+    const featuredCardsNeedHydration = hasFeaturedCards && (
+      featuredScanActive ||
+      (
+        isSBTCacheReady !== true &&
+        cacheBackedFeaturedCards.length < actualFeaturedEntries.length
+      )
+    );
+    // Keep configured or discovered cards visible while metadata hydrates, but avoid
+    // extra loading chrome once every featured card has complete cached metadata.
+    const showFeaturedCornerSpinner = featuredCardsNeedHydration;
     const showFeaturedColdStartSpinner = !hasFeaturedCards && (!isSBTCacheReady || featuredScanActive);
     const renderCreateGroupPanel = () => (
       <CreateGroupComponent
