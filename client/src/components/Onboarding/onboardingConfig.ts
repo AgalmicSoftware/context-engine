@@ -1,3 +1,5 @@
+import { isDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
+
 export const FIRST_VISIT_STORAGE_KEY = 'firstVisit';
 export const ONBOARDING_COMPLETE_STORAGE_KEY = 'ce_onboarding_complete';
 export const COLD_LOAD_ONBOARDING_OVERRIDE_STORAGE_KEY = 'ce:forceColdLoadWelcomeSlides';
@@ -22,7 +24,7 @@ export const isSessionColdLoadOnboardingRoute = (pathname: unknown): boolean => 
   if (!normalizedPathname.startsWith('/session/')) return false;
 
   const firstSegment = normalizedPathname.slice('/session/'.length).split('/')[0]?.toLowerCase();
-  return firstSegment !== 'new';
+  return firstSegment !== 'new' && isDemoSessionSlug(firstSegment);
 };
 
 export const shouldAutoOpenColdLoadOnboarding = (
