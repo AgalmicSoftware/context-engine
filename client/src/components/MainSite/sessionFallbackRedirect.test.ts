@@ -179,6 +179,29 @@ describe('sessionFallbackRedirect', () => {
         pathIn: '/session/demo-1',
       })).toBeNull();
     });
+
+    it('lets callers restrict session about redirects to temporary demo slugs', () => {
+      const isTemporaryInitialLoadAboutRedirectSessionSlug = jest.fn((slug: string) => slug === 'demo-1');
+
+      expect(getTemporaryInitialLoadAboutRedirectTarget({
+        isFirstVisitRootRedirectEnabled: () => true,
+        isTemporaryInitialLoadAboutRedirectSessionSlug,
+        normalizeRoutePath,
+        normalizeSessionSlug,
+        pathIn: '/session/demo-1/questions/results',
+      })).toEqual({
+        path: '/about',
+        cacheSlug: 'demo-1',
+        requiresPersistedCache: true,
+      });
+      expect(getTemporaryInitialLoadAboutRedirectTarget({
+        isFirstVisitRootRedirectEnabled: () => true,
+        isTemporaryInitialLoadAboutRedirectSessionSlug,
+        normalizeRoutePath,
+        normalizeSessionSlug,
+        pathIn: '/session/e2e-custom-20260623-113657/questions',
+      })).toBeNull();
+    });
   });
 
   describe('one-time first-visit root redirect consumption', () => {
