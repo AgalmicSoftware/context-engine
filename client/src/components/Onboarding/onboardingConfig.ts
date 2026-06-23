@@ -24,7 +24,7 @@ export const isSessionColdLoadOnboardingRoute = (pathname: unknown): boolean => 
   if (!normalizedPathname.startsWith('/session/')) return false;
 
   const firstSegment = normalizedPathname.slice('/session/'.length).split('/')[0]?.toLowerCase();
-  return firstSegment !== 'new' && isDemoSessionSlug(firstSegment);
+  return firstSegment !== 'new';
 };
 
 export const shouldAutoOpenColdLoadOnboarding = (
