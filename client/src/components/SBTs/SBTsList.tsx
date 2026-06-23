@@ -232,7 +232,10 @@ type SbtListInitDeps = {
 type SbtListFetchSBTs = (
   forceRefresh?: boolean,
   showLoadingIndicator?: boolean,
-  slugOverride?: unknown
+  slugOverride?: unknown,
+  options?: {
+    markSessionLoading?: boolean;
+  }
 ) => Promise<boolean>;
 type SbtListChipProgressMeta = SbtListChipProgressVisibilityMeta;
 type SbtListChipProgressMetaBySlug = Record<string, SbtListChipProgressMeta | undefined>;
@@ -1066,10 +1069,14 @@ const SBTsList = ({
     const slugs: string[] = [slug];
     if (slug) {
       const displayConfig = getDisplaySessionConfig(slug);
-      const canonicalConfigSlug = normalizeSessionSlug(
-        isRecord(displayConfig) ? (displayConfig.slug ?? '') : ''
+      const hasCanonicalConfigSlug = (
+        isRecord(displayConfig) &&
+        Object.prototype.hasOwnProperty.call(displayConfig, 'slug')
       );
-      if (canonicalConfigSlug !== slug) {
+      const canonicalConfigSlug = hasCanonicalConfigSlug
+        ? normalizeSessionSlug(displayConfig.slug ?? '')
+        : slug;
+      if (hasCanonicalConfigSlug && canonicalConfigSlug !== slug) {
         slugs.push(canonicalConfigSlug);
       }
     }
@@ -1736,7 +1743,6 @@ const SBTsList = ({
         prev[slug] ? prev : { ...prev, [slug]: true }
       ));
       setSessionLoadStateBySlug((prev) => {
-        if (prev[slug] === 'loading') return prev;
         if (prev[slug] === 'loaded') return prev;
         return { ...prev, [slug]: 'loaded' };
       });
@@ -1844,7 +1850,9 @@ const SBTsList = ({
 
           await lightDiscoveryPromise;
           if (typeof runFetchSBTs === 'function') {
-            await Promise.all(targets.map((slug: string) => runFetchSBTs(false, false, slug)));
+            void Promise.all(targets.map((slug: string) => (
+              runFetchSBTs(false, false, slug, { markSessionLoading: false })
+            ))).catch((e: unknown) => { sbtLog.warn('SBTsList: fallback', e); });
           }
         } finally {
           if (shouldShowLoaderForThisRun && isMounted.current) setLoading(false);
@@ -1883,7 +1891,6 @@ const SBTsList = ({
   ]);
 
   useEffect(() => {
-    if (!loading) return;
     const targets = dedupeNormalizedSbtListSlugs(fetchSessionSlugs);
     if (!targets.length) return;
     const liveProgressBySlug = (
@@ -1901,7 +1908,7 @@ const SBTsList = ({
     if (!hasPrimedCachedCards) return;
 
     initialLoadCompletedRef.current = true;
-    if (isMounted.current) {
+    if (loading && isMounted.current) {
       setLoading(false);
     }
   }, [
@@ -1966,8 +1973,10 @@ const SBTsList = ({
   const fetchSBTs = useCallback(async (
     forceRefresh: boolean = false,
     showLoadingIndicator: boolean = true,
-    slugOverride: unknown = null
+    slugOverride: unknown = null,
+    options: { markSessionLoading?: boolean } = {}
   ): Promise<boolean> => {
+    const markSessionLoading = options?.markSessionLoading !== false;
     const targetSlug = normalizeSessionSlug(slugOverride != null ? slugOverride : listSlug);
     if (isSbtListSyntheticNoSessionSlug(targetSlug)) return false;
     if (!isMounted.current) return false;
@@ -1982,10 +1991,12 @@ const SBTsList = ({
 
     const runId = Number(sessionFetchRunBySlugRef.current[targetSlug] || 0) + 1;
     sessionFetchRunBySlugRef.current[targetSlug] = runId;
-    setSessionLoadStateBySlug((prev) => {
-      if (prev[targetSlug] === 'loading') return prev;
-      return { ...prev, [targetSlug]: 'loading' };
-    });
+    if (markSessionLoading) {
+      setSessionLoadStateBySlug((prev) => {
+        if (prev[targetSlug] === 'loading') return prev;
+        return { ...prev, [targetSlug]: 'loading' };
+      });
+    }
 
     try {
       const cacheReadSlugs = getCacheReadSlugsForTarget(targetSlug);
@@ -1994,7 +2005,7 @@ const SBTsList = ({
         .filter(({ netKey }) => !!netKey);
 
       if (!cacheReadTargets.length) {
-        if (sessionFetchRunBySlugRef.current[targetSlug] === runId) {
+        if (markSessionLoading && sessionFetchRunBySlugRef.current[targetSlug] === runId) {
           setSessionLoadStateBySlug((prev) => ({ ...prev, [targetSlug]: 'error' }));
           setSessionHasLoadedOnceBySlug((prev) => (
             prev[targetSlug] ? prev : { ...prev, [targetSlug]: true }
@@ -2027,7 +2038,15 @@ const SBTsList = ({
       const hydrated = mergeSbtListsByAddress(readPlans.flatMap((plan) => plan.hydrated));
       const passwordFlagItems = mergeSbtListsByAddress(readPlans.flatMap((plan) => plan.passwordFlagItems));
       const shouldKeepExistingCards = readPlans.some((plan) => plan.shouldKeepExistingCards);
-      const shouldApplyCards = hydrated.length > 0 || !shouldKeepExistingCards;
+      const latestForSlug = Array.isArray(sbtListBySlugRef.current[targetSlug])
+        ? sbtListBySlugRef.current[targetSlug]
+        : [];
+      const shouldKeepLatestExistingCards = (
+        hydrated.length === 0 &&
+        !forceRefresh &&
+        latestForSlug.length > 0
+      );
+      const shouldApplyCards = hydrated.length > 0 || (!shouldKeepExistingCards && !shouldKeepLatestExistingCards);
       const shouldEnsurePasswordFlags = passwordFlagItems.length > 0;
       updateSessionCacheMeta(targetSlug, {
         lastBlock: Math.max(...readPlans.map((plan) => Number(plan.meta.lastBlock || 0)), 0),
@@ -2054,10 +2073,10 @@ const SBTsList = ({
       setSessionHasLoadedOnceBySlug((prev) => (
         prev[targetSlug] ? prev : { ...prev, [targetSlug]: true }
       ));
-      return hydrated.length > 0 || shouldKeepExistingCards;
+      return hydrated.length > 0 || shouldKeepExistingCards || shouldKeepLatestExistingCards;
     } catch (error) {
       sbtLog.error("Error reading SBTs from cache:", error);
-      if (sessionFetchRunBySlugRef.current[targetSlug] === runId) {
+      if (markSessionLoading && sessionFetchRunBySlugRef.current[targetSlug] === runId) {
         setSessionLoadStateBySlug((prev) => ({ ...prev, [targetSlug]: 'error' }));
         setSessionHasLoadedOnceBySlug((prev) => (
           prev[targetSlug] ? prev : { ...prev, [targetSlug]: true }
