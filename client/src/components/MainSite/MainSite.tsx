@@ -55,7 +55,7 @@ import {
   readSessionScanScope,
   readSessionScanSlugs,
 } from '../../utilities/session/sessionScanScope.js';
-import { getPrimaryDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
+import { getPrimaryDemoSessionSlug, isDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
 import { derivePrimarySessionSlugFromList } from '../../utilities/session/globalSessionState.js';
 import {
   createInitialProfileScanReport,
@@ -1107,6 +1107,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
   getTemporaryInitialLoadAboutRedirectTarget = (pathIn: unknown = '') => (
     getTemporaryInitialLoadAboutRedirectTargetFn({
       isFirstVisitRootRedirectEnabled: this.isFirstVisitRootRedirectEnabled,
+      isTemporaryInitialLoadAboutRedirectSessionSlug: (slug: string) => isDemoSessionSlug(slug),
       normalizeRoutePath: (value: unknown) => this.normalizeRoutePath(String(value || '')),
       normalizeSessionSlug,
       pathIn,
