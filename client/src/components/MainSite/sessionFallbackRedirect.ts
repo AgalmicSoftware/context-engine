@@ -160,6 +160,7 @@ export const isTemporaryInitialLoadAboutRedirectPath = (
 
 export const getTemporaryInitialLoadAboutRedirectTarget = (deps: {
   isFirstVisitRootRedirectEnabled: () => boolean;
+  isTemporaryInitialLoadAboutRedirectSessionSlug?: (slug: string) => boolean;
   normalizeRoutePath: NormalizeSessionSlugFn;
   normalizeSessionSlug: NormalizeSessionSlugFn;
   pathIn: unknown;
@@ -174,6 +175,12 @@ export const getTemporaryInitialLoadAboutRedirectTarget = (deps: {
 
   const cacheSlug = getTemporaryInitialLoadSessionCacheSlug(path, deps.normalizeSessionSlug);
   if (cacheSlug) {
+    if (
+      typeof deps.isTemporaryInitialLoadAboutRedirectSessionSlug === 'function' &&
+      !deps.isTemporaryInitialLoadAboutRedirectSessionSlug(cacheSlug)
+    ) {
+      return null;
+    }
     return {
       path: '/about',
       cacheSlug,

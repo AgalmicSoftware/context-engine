@@ -17,8 +17,12 @@ const parseStorageBoolean = (value: unknown): boolean | null => {
 };
 
 export const isSessionColdLoadOnboardingRoute = (pathname: unknown): boolean => {
-  const normalizedPathname = String(pathname || '').trim();
-  return normalizedPathname === '/session' || normalizedPathname.startsWith('/session/');
+  const normalizedPathname = String(pathname || '').trim().replace(/\/+$/, '') || '/';
+  if (normalizedPathname === '/session') return true;
+  if (!normalizedPathname.startsWith('/session/')) return false;
+
+  const firstSegment = normalizedPathname.slice('/session/'.length).split('/')[0]?.toLowerCase();
+  return firstSegment !== 'new';
 };
 
 export const shouldAutoOpenColdLoadOnboarding = (

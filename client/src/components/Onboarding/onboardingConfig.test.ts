@@ -45,6 +45,24 @@ describe('readColdLoadOnboardingState', () => {
     });
   });
 
+  it('does not auto-open cold-load onboarding on the session wizard route', () => {
+    const storage = createStorageMock();
+
+    expect(readColdLoadOnboardingState(storage, '/session/new')).toEqual({
+      firstVisit: true,
+      shouldStartOnboarding: false,
+    });
+  });
+
+  it('does not auto-open cold-load onboarding on nested session wizard routes', () => {
+    const storage = createStorageMock();
+
+    expect(readColdLoadOnboardingState(storage, '/session/new/')).toEqual({
+      firstVisit: true,
+      shouldStartOnboarding: false,
+    });
+  });
+
   it('allows explicitly disabling the cold-load onboarding for testing on session links', () => {
     const storage = createStorageMock({
       [COLD_LOAD_ONBOARDING_OVERRIDE_STORAGE_KEY]: 'false',
