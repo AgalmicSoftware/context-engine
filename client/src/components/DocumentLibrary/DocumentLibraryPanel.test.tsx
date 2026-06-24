@@ -280,9 +280,9 @@ describe('DocumentLibraryPanel photo docs and upload audience', () => {
       mode: 'any',
       hasRecipients: true,
     });
-    mockGetUnsupportedLitContractAccessControlError.mockReturnValue(
-      'Lit does not currently support OP Sepolia for SBT-gated encryption.',
-    );
+    mockGetUnsupportedLitContractAccessControlError.mockImplementation(() => {
+      throw new Error('OP Sepolia session-gate uploads should stay on the scoped Lit path.');
+    });
     const scopedSaveKey = jest.fn(async () => ({ ciphertext: 'ciphertext', dataToEncryptHash: 'hash' }));
 
     render(

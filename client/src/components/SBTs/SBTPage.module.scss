@@ -707,6 +707,14 @@ $input-border: tokens.$ce-input-border;
     min-width: 0;
   }
 
+  .modalTitleRow {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    min-width: 0;
+  }
+
   .modalTitle {
     color: var(--ce-color-white);
     font-weight: 700;
@@ -726,8 +734,45 @@ $input-border: tokens.$ce-input-border;
   .modalTitleSpinnerRow {
     display: inline-flex;
     align-items: center;
-    padding-left: 4px;
     min-height: 1.2rem;
+  }
+
+  .holdersHeaderFilter {
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
+
+    > div {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      min-width: 0;
+    }
+
+    button {
+      margin: 0 !important;
+      min-height: 40px;
+      padding: 8px 14px !important;
+      border-radius: var(--ce-radius-8) !important;
+      color: #111827 !important;
+      background: rgba(255, 255, 255, 0.94) !important;
+      border-color: rgba(77, 255, 164, 0.55) !important;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+      font-size: 0.95rem;
+      line-height: 1;
+
+      &:hover,
+      &:focus {
+        background: #ffffff !important;
+        color: #0b1736 !important;
+        border-color: $clickable-color !important;
+        box-shadow: 0 0 0 2px rgba(77, 255, 164, 0.2);
+      }
+    }
+
+    svg {
+      color: #111827;
+    }
   }
 
   .cornerSpinner {
@@ -747,6 +792,20 @@ $input-border: tokens.$ce-input-border;
 
     &:hover {
       opacity: 1;
+    }
+  }
+}
+
+@media (max-width: 640px) {
+  .modalHeader {
+    .modalTitleRow {
+      gap: 10px;
+    }
+
+    .holdersHeaderFilter button {
+      min-height: 38px;
+      padding: 7px 12px !important;
+      font-size: 0.9rem;
     }
   }
 }

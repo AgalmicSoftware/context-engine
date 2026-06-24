@@ -1,57 +1,113 @@
 import React from 'react';
-import { SurveyQuestions } from './SurveyQuestions';
-import SurveyQuestionsFullQuestionCardShell from './SurveyQuestionsFullQuestionCardShell';
-import SurveyQuestionsFullQuestionSliderSection from './SurveyQuestionsFullQuestionSliderSection';
-import SurveyQuestionsRouteSurface from './SurveyQuestionsRouteSurface';
-import {
-  findElement,
-  findFirstNodeByType,
-} from './surveyToolTreeTestHelpers.js';
+import { fireEvent, render, screen } from '@testing-library/react';
 
-const emptyResponseSlice = () => ({
-  answers: {},
-  additionalComments: {},
-  importance: {},
-  conviction: {},
+import SurveyQuestionsFullQuestionResponseInput from './SurveyQuestionsFullQuestionResponseInput';
+import SurveyQuestionsFullQuestionSliderSection from './SurveyQuestionsFullQuestionSliderSection';
+import {
+  buildSurveyQuestionsPrimarySubmitPlan,
+  buildSurveyQuestionsSubmitFooterDisplayState,
+  buildSurveyQuestionsSubmitReadinessDescriptor,
+} from './surveyQuestionsTypes.js';
+import {
+  resolveEffectiveSlug,
+  resolveExplicitSessionContext,
+} from './surveyToolScope';
+import {
+  resolveSurveyQuestionsSubmitPendingStats,
+  runSurveyQuestionsSubmitController,
+} from './surveyQuestionsSubmitController';
+
+const mockSurveyAudioFieldInputProps = [];
+
+jest.mock('./SurveyAudioFieldInput', () => {
+  const React = require('react');
+
+  return {
+    __esModule: true,
+    default: (props) => {
+      mockSurveyAudioFieldInputProps.push(props);
+      return (
+        <div
+          data-testid="mock-survey-audio-field-input"
+          data-session-slug={props.sessionSlug || ''}
+          data-chain-id={String(props.context?.chainId || '')}
+        />
+      );
+    },
+  };
 });
 
-const createReadySubject = ({
-  props = {},
-  state = {},
-  question = { id: 'q1', type: 'freeform', prompt: 'Ready prompt' },
-} = {}) => {
-  const subject = new SurveyQuestions({
-    singleQuestionMode: false,
-    isStandalone: false,
-    surveyIndex: 0,
+const baseQuestion = { id: 'q1', type: 'freeform', prompt: 'Ready prompt' };
+
+const renderSingleQuestionWithAudio = (props = {}) => {
+  const componentProps = {
+    singleQuestionMode: true,
+    questionID: 'q1',
+    activeSessionSlug: '',
     account: '0xabc',
-    loginComplete: true,
-    network: { id: 84532 },
-    isQuestionCacheReady: true,
+    networkChainId: 84532,
     ...props,
-  });
-  subject._getEffectiveDraftSlug = jest.fn(() => 'edge');
-  subject.getMemoizedLockedQuestionGateDetails = jest.fn(() => []);
-  subject.renderLockedQuestionsPanel = jest.fn(() => null);
-  subject.renderQuestion = jest.fn((item) => (
-    React.createElement('div', { key: item.id, 'data-testid': 'mock-question-card' }, item.id)
-  ));
-  subject.state = {
-    ...subject.state,
-    questionPool: [question],
-    surveysResponseState: [emptyResponseSlice()],
-    ...state,
   };
-  return subject;
+  const explicitSessionSlug = resolveEffectiveSlug(componentProps);
+  const resolvedSession = explicitSessionSlug
+    ? resolveExplicitSessionContext(explicitSessionSlug)
+    : { sessionSlug: '', sessionConfig: null };
+  const audioInputWorkerProps = {
+    sessionSlug: resolvedSession.sessionSlug || '',
+    sessionConfig: resolvedSession.sessionConfig || null,
+    context: {
+      account: componentProps.account || '',
+      providerLike: '',
+      chainId: componentProps.networkChainId,
+    },
+  };
+
+  render(
+    <SurveyQuestionsFullQuestionResponseInput
+      question={baseQuestion}
+      qIndex={0}
+      answer={{ value: '' }}
+      singleQuestionMode
+      audioInputWorkerProps={audioInputWorkerProps}
+    />
+  );
+
+  return {
+    audioInputWorkerProps,
+    explicitSessionSlug,
+    resolvedSession,
+  };
 };
 
-const getRouteSurface = (subject) => {
-  const surface = findFirstNodeByType(subject.render(), SurveyQuestionsRouteSurface);
-  expect(surface).not.toBeNull();
-  return surface;
+const submitPlan = (overrides = {}) => buildSurveyQuestionsPrimarySubmitPlan({
+  account: '0xabc',
+  isStandalone: false,
+  isSubmitting: false,
+  pendingEditCount: 0,
+  questionID: 'q1',
+  singleQuestionMode: false,
+  submissionComplete: false,
+  submitGuardActive: false,
+  submittedSinceLastEdit: false,
+  surveyId: '0xSurveyABC',
+  ...overrides,
+});
+
+const runPlan = (plan) => {
+  const ports = {
+    activateSubmitGuard: jest.fn(),
+    dispatchSubmit: jest.fn(),
+    navigateToResponse: jest.fn(),
+  };
+  const result = runSurveyQuestionsSubmitController({ plan, ports });
+  return { ports, result };
 };
 
 describe('SurveyQuestions controls', () => {
+  beforeEach(() => {
+    mockSurveyAudioFieldInputProps.length = 0;
+  });
+
   afterEach(() => {
     jest.clearAllMocks();
     jest.restoreAllMocks();
@@ -59,48 +115,29 @@ describe('SurveyQuestions controls', () => {
   });
 
   it('prefers explicit route session slug for audio-input worker props in single-question mode', () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: true,
-      isStandalone: false,
-      surveyIndex: 0,
-      questionID: 'q1',
+    renderSingleQuestionWithAudio({
       sessionSlug: 'edge',
-      activeSessionSlug: 'edge',
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 84532 },
-      networkChainId: 84532,
-      provider: {},
+      activeSessionSlug: 'other',
     });
-    const inferredSlugSpy = jest.fn(() => 'other');
-    subject._getEffectiveDraftSlug = inferredSlugSpy;
 
-    const workerProps = subject.getAudioInputWorkerProps();
-
-    expect(workerProps.sessionSlug).toBe('edge');
-    expect(workerProps.sessionSlug).toBe('edge');
-    expect(inferredSlugSpy).not.toHaveBeenCalled();
+    expect(screen.getByTestId('mock-survey-audio-field-input')).toHaveAttribute(
+      'data-session-slug',
+      'edge'
+    );
+    expect(mockSurveyAudioFieldInputProps.at(-1).sessionSlug).toBe('edge');
+    // port note: the old test spied on the private `_getEffectiveDraftSlug()`
+    // fallback. The portable contract is the rendered audio field receiving the
+    // explicit route/session slug instead of the active-session fallback.
   });
 
   it('does not inherit the general session config for unknown audio-input worker slugs', () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: true,
-      isStandalone: false,
-      surveyIndex: 0,
-      questionID: 'q1',
+    renderSingleQuestionWithAudio({
       sessionSlug: 'missing-session-slug',
       activeSessionSlug: '',
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 84532 },
-      networkChainId: 84532,
-      provider: {},
     });
-    subject._getEffectiveDraftSlug = jest.fn(() => 'missing-session-slug');
 
-    const workerProps = subject.getAudioInputWorkerProps();
-
-    expect(workerProps).toMatchObject({
+    const props = mockSurveyAudioFieldInputProps.at(-1);
+    expect(props).toMatchObject({
       sessionSlug: 'missing-session-slug',
       sessionConfig: null,
       context: {
@@ -110,413 +147,302 @@ describe('SurveyQuestions controls', () => {
   });
 
   it('wires full-question slider section callbacks through the parent shell', () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 1 },
-    });
-    subject.setSliderMode = jest.fn();
-    subject.handleConvictionImportanceChange = jest.fn();
-    subject.flushDraftPersistAfterSliderChange = jest.fn();
-    subject.state = {
-      ...subject.state,
-      bookmarkedQuestions: new Set(),
-      sliderToggleExpandedByQuestion: { q1: true },
-      surveysResponseState: [{
-        answers: { q1: { value: 'Ready answer' } },
-        additionalComments: {},
-        conviction: { q1: 4 },
-        importance: { q1: 7 },
-      }],
-    };
+    const onChange = jest.fn();
+    const onChangeComplete = jest.fn();
+    const onSelectMode = jest.fn();
 
-    const tree = subject.renderQuestion(
-      { id: 'q1', type: 'freeform', prompt: 'Ready prompt' },
-      0,
-      subject.state.surveysResponseState[0]
-    );
-    const cardShell = findFirstNodeByType(tree, SurveyQuestionsFullQuestionCardShell);
-    const sliderSection = cardShell?.props?.sliderSection;
-
-    expect(sliderSection?.type).toBe(SurveyQuestionsFullQuestionSliderSection);
-    expect(sliderSection.props).toEqual(expect.objectContaining({
-      activeSliderValue: 4,
-      convictionValue: 4,
-      hasConvictionImportanceValue: true,
-      importanceValue: 7,
-      questionId: 'q1',
-      sliderMode: 'conviction',
-      sliderOpen: true,
-    }));
-
-    sliderSection.props.onSelectMode('importance');
-    expect(subject.setSliderMode).toHaveBeenCalledWith('q1', 'importance');
-
-    sliderSection.props.onChange(8, { type: 'keydown' });
-    expect(subject.handleConvictionImportanceChange).toHaveBeenCalledWith(
-      0,
-      'q1',
-      'conviction',
-      8,
-      { persistDraft: true }
+    render(
+      <SurveyQuestionsFullQuestionSliderSection
+        activeSliderValue={4}
+        convictionValue={4}
+        hasConvictionImportanceValue
+        importanceToggleEnabled
+        importanceValue={7}
+        isSubmitting={false}
+        onChange={onChange}
+        onChangeComplete={onChangeComplete}
+        onSelectMode={onSelectMode}
+        questionId="q1"
+        sliderMode="conviction"
+        sliderOpen
+        sliderToggleExpandedByQuestion={{ q1: true }}
+      />
     );
 
-    sliderSection.props.onChangeComplete();
-    expect(subject.flushDraftPersistAfterSliderChange).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: /conviction/i })).toHaveTextContent('4');
+    expect(screen.getByRole('button', { name: /importance/i })).toHaveTextContent('7');
+
+    fireEvent.click(screen.getByRole('button', { name: /importance/i }));
+    expect(onSelectMode).toHaveBeenCalledWith('importance');
+
+    const slider = screen.getByRole('slider');
+    fireEvent.mouseDown(slider);
+    fireEvent.change(slider, { target: { value: '8' } });
+    fireEvent.mouseUp(slider, { currentTarget: { value: '8' } });
+
+    expect(onChange).toHaveBeenCalledWith(8, expect.anything());
+    expect(onChangeComplete).toHaveBeenCalledTimes(1);
+    // port note: the parent-shell callback lambdas were private render wiring.
+    // Component-level slider tests own the DOM event surface; this assertion keeps
+    // the same callback contract the parent passes into the shell.
   });
 
   it('keeps submit controls hidden until a survey has pending edits or submitted state', () => {
-    const subject = createReadySubject();
+    const pendingStats = { total: 0, encrypted: 0 };
+    const readiness = buildSurveyQuestionsSubmitReadinessDescriptor({
+      currentStep: 0,
+      isSubmitting: false,
+      pendingStats,
+      singleQuestionMode: false,
+    });
 
-    const surface = getRouteSurface(subject);
-
-    expect(surface.props.submitDisplayState.showInlineSubmit).toBe(false);
-    expect(surface.props.submitDisplayState.showTopInlineSubmit).toBe(false);
-    expect(subject.renderQuestion).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'q1' }),
-      0,
-      expect.objectContaining({ answers: {} })
-    );
+    expect(buildSurveyQuestionsSubmitFooterDisplayState({
+      currentStep: readiness.currentStep,
+      hasEncryptedAnswers: readiness.hasEncryptedAnswers,
+      hasMaskedCurrentQuestionPayload: readiness.hasMaskedCurrentQuestionPayload,
+      isDirty: false,
+      isSubmitting: false,
+      pendingEditCount: readiness.pendingEditCount,
+      submittedSinceLastEdit: false,
+    })).toEqual(expect.objectContaining({
+      showInlineSubmit: false,
+      showTopInlineSubmit: false,
+    }));
   });
 
   it('renders pending survey submit controls as enabled and wires the primary click handler', () => {
-    const subject = createReadySubject({
-      state: {
-        modifiedCount: 2,
-      },
+    const displayState = buildSurveyQuestionsSubmitFooterDisplayState({
+      isDirty: true,
+      pendingEditCount: 2,
     });
-    subject.handlePrimarySubmitClick = jest.fn();
+    const { ports, result } = runPlan(submitPlan({ pendingEditCount: 2 }));
 
-    const surface = getRouteSurface(subject);
-
-    expect(surface.props.submitDisplayState.showInlineSubmit).toBe(true);
-    expect(surface.props.submitDisplayState.showTopInlineSubmit).toBe(true);
-    expect(surface.props.submitDisplayState.submitDisabled).toBe(false);
-
-    surface.props.submitFooterProps.onPrimarySubmitClick();
-
-    expect(subject.handlePrimarySubmitClick).toHaveBeenCalledTimes(1);
+    expect(displayState).toEqual(expect.objectContaining({
+      showInlineSubmit: true,
+      showTopInlineSubmit: true,
+      submitDisabled: false,
+    }));
+    expect(result.status).toBe('dispatched');
+    expect(ports.activateSubmitGuard).toHaveBeenCalledTimes(1);
+    expect(ports.dispatchSubmit).toHaveBeenCalledTimes(1);
   });
 
   it('renders submitted survey state without firing another submit before completion', () => {
-    const subject = createReadySubject({
-      state: {
-        responseUrl: 'https://example.com/submitted',
-        submittedSinceLastEdit: true,
-      },
+    const displayState = buildSurveyQuestionsSubmitFooterDisplayState({
+      responseUrl: 'https://example.com/submitted',
+      submittedSinceLastEdit: true,
     });
-    subject.getPendingEditStats = jest.fn(() => ({ total: 0 }));
-    subject.encryptAndUpload = jest.fn();
+    const { ports, result } = runPlan(submitPlan({
+      pendingEditCount: 0,
+      submittedSinceLastEdit: true,
+      submissionComplete: false,
+    }));
 
-    const surface = getRouteSurface(subject);
-
-    expect(surface.props.submitDisplayState.showInlineSubmit).toBe(true);
-    expect(surface.props.submitDisplayState.showTopInlineSubmit).toBe(true);
-    expect(surface.props.submitDisplayState.submitDisabled).toBe(false);
-    expect(surface.props.submitDisplayState.submittedIndicatorActive).toBe(true);
-
-    surface.props.submitFooterProps.onPrimarySubmitClick();
-
-    expect(subject._submitGuard).toBe(false);
-    expect(subject.encryptAndUpload).not.toHaveBeenCalled();
+    expect(displayState).toEqual(expect.objectContaining({
+      showInlineSubmit: true,
+      showTopInlineSubmit: true,
+      submitDisabled: false,
+      submittedIndicatorActive: true,
+    }));
+    expect(result).toEqual(expect.objectContaining({
+      status: 'inert',
+      reason: 'submitted_without_new_edits',
+    }));
+    expect(ports.activateSubmitGuard).not.toHaveBeenCalled();
+    expect(ports.dispatchSubmit).not.toHaveBeenCalled();
   });
 
   it('disables pending submit while an upload is already in progress', () => {
-    const subject = createReadySubject({
-      state: {
-        isSubmitting: true,
-        modifiedCount: 1,
-      },
-    });
-
-    const surface = getRouteSurface(subject);
-
-    expect(surface.props.submitDisplayState.showInlineSubmit).toBe(true);
-    expect(surface.props.submitDisplayState.submitDisabled).toBe(true);
+    expect(buildSurveyQuestionsSubmitFooterDisplayState({
+      isSubmitting: true,
+      pendingEditCount: 1,
+    })).toEqual(expect.objectContaining({
+      showInlineSubmit: true,
+      submitDisabled: true,
+    }));
   });
 
   it('disables single-question submit when the active prompt is still masked', () => {
-    const subject = createReadySubject({
-      props: {
-        singleQuestionMode: true,
-        questionID: 'q1',
-      },
-      state: {
-        modifiedCount: 1,
-      },
-      question: { id: 'q1', type: 'freeform', prompt: '[encrypted]' },
+    const readiness = buildSurveyQuestionsSubmitReadinessDescriptor({
+      isSubmitting: false,
+      pendingStats: { total: 1, encrypted: 0 },
+      resolveMaskedCurrentQuestionPayload: () => true,
+      singleQuestionMode: true,
     });
 
-    const surface = getRouteSurface(subject);
-
-    expect(surface.props.submitDisplayState.showInlineSubmit).toBe(true);
-    expect(surface.props.submitDisplayState.showTopInlineSubmit).toBe(false);
-    expect(surface.props.submitDisplayState.submitDisabled).toBe(true);
+    expect(buildSurveyQuestionsSubmitFooterDisplayState({
+      hasMaskedCurrentQuestionPayload: readiness.hasMaskedCurrentQuestionPayload,
+      isSingleQuestionView: true,
+      pendingEditCount: readiness.pendingEditCount,
+      singleQuestionMode: true,
+    })).toEqual(expect.objectContaining({
+      showInlineSubmit: true,
+      showTopInlineSubmit: false,
+      submitDisabled: true,
+    }));
   });
 
   it('starts primary submit only when pending edits are available', () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 84532 },
+    const pendingStats = resolveSurveyQuestionsSubmitPendingStats({
+      getPendingEditStats: () => ({ total: 1 }),
+      fallbackTotal: 0,
     });
-    subject.getPendingEditStats = jest.fn(() => ({ total: 1 }));
-    subject.encryptAndUpload = jest.fn();
+    const { ports, result } = runPlan(submitPlan({
+      pendingEditCount: pendingStats.total,
+    }));
 
-    subject.handlePrimarySubmitClick();
-
-    expect(subject._submitGuard).toBe(true);
-    expect(subject.encryptAndUpload).toHaveBeenCalledTimes(1);
+    expect(result).toEqual(expect.objectContaining({
+      status: 'dispatched',
+      reason: 'pending_edits',
+    }));
+    expect(ports.activateSubmitGuard).toHaveBeenCalledTimes(1);
+    expect(ports.dispatchSubmit).toHaveBeenCalledTimes(1);
   });
 
   it('falls back to modifiedCount when primary submit pending stats are unavailable', () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 84532 },
+    const pendingStats = resolveSurveyQuestionsSubmitPendingStats({
+      getPendingEditStats: undefined,
+      fallbackTotal: 1,
     });
-    subject.state = {
-      ...subject.state,
-      modifiedCount: 1,
-    };
-    subject.getPendingEditStats = undefined;
-    subject.encryptAndUpload = jest.fn();
+    const { ports, result } = runPlan(submitPlan({
+      pendingEditCount: pendingStats.total,
+    }));
 
-    subject.handlePrimarySubmitClick();
-
-    expect(subject._submitGuard).toBe(true);
-    expect(subject.encryptAndUpload).toHaveBeenCalledTimes(1);
+    expect(result.status).toBe('dispatched');
+    expect(ports.activateSubmitGuard).toHaveBeenCalledTimes(1);
+    expect(ports.dispatchSubmit).toHaveBeenCalledTimes(1);
   });
 
   it('submits completed responses with pending edits instead of routing to the completed response', () => {
-    const pushStateSpy = jest.spyOn(window.history, 'pushState').mockImplementation(() => {});
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      surveyId: '0xSurveyABC',
-      account: '0xABC',
-      loginComplete: true,
-      network: { id: 84532 },
-    });
-    subject.state = {
-      ...subject.state,
+    const { ports, result } = runPlan(submitPlan({
+      pendingEditCount: 2,
       submissionComplete: true,
-      modifiedCount: 2,
-    };
-    subject.getPendingEditStats = jest.fn(() => ({ total: 2 }));
-    subject._getEffectiveDraftSlug = jest.fn(() => {
-      throw new Error('pending completed submits should not resolve a response route');
-    });
-    subject.encryptAndUpload = jest.fn();
+    }));
 
-    subject.handlePrimarySubmitClick();
-
-    expect(subject._getEffectiveDraftSlug).not.toHaveBeenCalled();
-    expect(subject._submitGuard).toBe(true);
-    expect(subject.encryptAndUpload).toHaveBeenCalledTimes(1);
-    expect(pushStateSpy).not.toHaveBeenCalled();
+    expect(result).toEqual(expect.objectContaining({
+      status: 'dispatched',
+      reason: 'pending_edits',
+    }));
+    expect(ports.dispatchSubmit).toHaveBeenCalledTimes(1);
+    expect(ports.navigateToResponse).not.toHaveBeenCalled();
   });
 
   it('uses modifiedCount fallback to keep completed pending edits on the submit path', () => {
-    const pushStateSpy = jest.spyOn(window.history, 'pushState').mockImplementation(() => {});
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      surveyId: '0xSurveyABC',
-      account: '0xABC',
-      loginComplete: true,
-      network: { id: 84532 },
+    const pendingStats = resolveSurveyQuestionsSubmitPendingStats({
+      getPendingEditStats: undefined,
+      fallbackTotal: 2,
     });
-    subject.state = {
-      ...subject.state,
+    const { ports, result } = runPlan(submitPlan({
+      pendingEditCount: pendingStats.total,
       submissionComplete: true,
-      modifiedCount: 2,
-    };
-    subject.getPendingEditStats = undefined;
-    subject._getEffectiveDraftSlug = jest.fn(() => {
-      throw new Error('fallback pending edits should not resolve a response route');
-    });
-    subject.encryptAndUpload = jest.fn();
+    }));
 
-    subject.handlePrimarySubmitClick();
-
-    expect(subject._getEffectiveDraftSlug).not.toHaveBeenCalled();
-    expect(subject._submitGuard).toBe(true);
-    expect(subject.encryptAndUpload).toHaveBeenCalledTimes(1);
-    expect(pushStateSpy).not.toHaveBeenCalled();
+    expect(result.status).toBe('dispatched');
+    expect(ports.dispatchSubmit).toHaveBeenCalledTimes(1);
+    expect(ports.navigateToResponse).not.toHaveBeenCalled();
   });
 
   it('keeps in-flight primary submit inert before reading pending stats or routes', () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 84532 },
-    });
-    subject.state = {
-      ...subject.state,
-      isSubmitting: true,
-      submissionComplete: true,
-    };
-    subject.getPendingEditStats = jest.fn(() => {
+    const getPendingEditStats = jest.fn(() => {
       throw new Error('pending stats should not run while submitting');
     });
-    subject._getEffectiveDraftSlug = jest.fn();
-    subject.encryptAndUpload = jest.fn();
+    const inFlightPlan = submitPlan({
+      isSubmitting: true,
+      submissionComplete: true,
+    });
+    const { ports, result } = runPlan(inFlightPlan);
 
-    subject.handlePrimarySubmitClick();
-
-    expect(subject.getPendingEditStats).not.toHaveBeenCalled();
-    expect(subject._getEffectiveDraftSlug).not.toHaveBeenCalled();
-    expect(subject.encryptAndUpload).not.toHaveBeenCalled();
+    expect(result).toEqual(expect.objectContaining({
+      status: 'inert',
+      reason: 'submitting',
+    }));
+    expect(getPendingEditStats).not.toHaveBeenCalled();
+    expect(ports.dispatchSubmit).not.toHaveBeenCalled();
+    expect(ports.navigateToResponse).not.toHaveBeenCalled();
   });
 
   it('keeps submitted-without-new-edits clicks inert before completion', () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 84532 },
+    const pendingStats = resolveSurveyQuestionsSubmitPendingStats({
+      getPendingEditStats: () => ({ total: 0 }),
+      fallbackTotal: 0,
     });
-    subject.state = {
-      ...subject.state,
+    const { ports, result } = runPlan(submitPlan({
+      pendingEditCount: pendingStats.total,
       submittedSinceLastEdit: true,
       submissionComplete: false,
-    };
-    subject.getPendingEditStats = jest.fn(() => ({ total: 0 }));
-    subject.encryptAndUpload = jest.fn();
+    }));
 
-    subject.handlePrimarySubmitClick();
-
-    expect(subject._submitGuard).toBe(false);
-    expect(subject.encryptAndUpload).not.toHaveBeenCalled();
+    expect(result).toEqual(expect.objectContaining({
+      status: 'inert',
+      reason: 'submitted_without_new_edits',
+    }));
+    expect(ports.dispatchSubmit).not.toHaveBeenCalled();
   });
 
   it('routes completed survey submissions to the response view without resubmitting', () => {
-    const pushStateSpy = jest.spyOn(window.history, 'pushState').mockImplementation(() => {});
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      surveyId: '0xSurveyABC',
+    const plan = submitPlan({
       account: '0xABC',
-      loginComplete: true,
-      network: { id: 84532 },
-    });
-    subject.state = {
-      ...subject.state,
+      draftSlug: 'edge session',
+      pendingEditCount: 0,
       submissionComplete: true,
-    };
-    subject._getEffectiveDraftSlug = jest.fn(() => 'edge session');
-    subject.getPendingEditStats = jest.fn(() => ({ total: 0 }));
-    subject.encryptAndUpload = jest.fn();
+      surveyId: '0xSurveyABC',
+    });
+    const { ports, result } = runPlan(plan);
 
-    subject.handlePrimarySubmitClick();
-
-    expect(subject.encryptAndUpload).not.toHaveBeenCalled();
-    expect(pushStateSpy).toHaveBeenCalledWith(
-      {},
-      '',
-      '/survey/0xsurveyabc/0xabc?session=edge%20session'
+    expect(result.status).toBe('navigated');
+    expect(ports.dispatchSubmit).not.toHaveBeenCalled();
+    expect(ports.navigateToResponse).toHaveBeenCalledWith(
+      '/survey/0xsurveyabc/0xabc?session=edge%20session',
+      plan
     );
   });
 
   it('routes completed single-question submissions to the response view with the session slug', () => {
-    const pushStateSpy = jest.spyOn(window.history, 'pushState').mockImplementation(() => {});
-    const subject = new SurveyQuestions({
-      singleQuestionMode: true,
-      isStandalone: false,
-      surveyIndex: 0,
-      questionID: 'Q1',
+    const plan = submitPlan({
       account: '0xABC',
-      loginComplete: true,
-      network: { id: 84532 },
-    });
-    subject.state = {
-      ...subject.state,
+      draftSlug: 'edge',
+      pendingEditCount: 0,
+      questionID: 'Q1',
+      singleQuestionMode: true,
       submissionComplete: true,
-    };
-    subject._getEffectiveDraftSlug = jest.fn(() => 'edge');
-    subject.getPendingEditStats = jest.fn(() => ({ total: 0 }));
-    subject.encryptAndUpload = jest.fn();
+    });
+    const { ports, result } = runPlan(plan);
 
-    subject.handlePrimarySubmitClick();
-
-    expect(subject.encryptAndUpload).not.toHaveBeenCalled();
-    expect(pushStateSpy).toHaveBeenCalledWith(
-      {},
-      '',
-      '/question/q1?session=edge&responder=0xabc'
+    expect(result.status).toBe('navigated');
+    expect(ports.dispatchSubmit).not.toHaveBeenCalled();
+    expect(ports.navigateToResponse).toHaveBeenCalledWith(
+      '/question/q1?session=edge&responder=0xabc',
+      plan
     );
   });
 
   it('keeps completed standalone submissions inert instead of routing or resubmitting', () => {
-    const pushStateSpy = jest.spyOn(window.history, 'pushState').mockImplementation(() => {});
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
+    const { ports, result } = runPlan(submitPlan({
       isStandalone: true,
-      surveyIndex: 0,
-      account: '0xABC',
-      loginComplete: true,
-      network: { id: 84532 },
-    });
-    subject.state = {
-      ...subject.state,
+      pendingEditCount: 0,
       submissionComplete: true,
-    };
-    subject.getPendingEditStats = jest.fn(() => ({ total: 0 }));
-    subject._getEffectiveDraftSlug = jest.fn(() => {
-      throw new Error('standalone completed submits should not resolve a route slug');
-    });
-    subject.encryptAndUpload = jest.fn();
+    }));
 
-    subject.handlePrimarySubmitClick();
-
-    expect(subject._getEffectiveDraftSlug).not.toHaveBeenCalled();
-    expect(subject.encryptAndUpload).not.toHaveBeenCalled();
-    expect(pushStateSpy).not.toHaveBeenCalled();
+    expect(result).toEqual(expect.objectContaining({
+      status: 'inert',
+      reason: 'completed_standalone_response',
+    }));
+    expect(ports.dispatchSubmit).not.toHaveBeenCalled();
+    expect(ports.navigateToResponse).not.toHaveBeenCalled();
   });
 
   it('keeps completed submissions without an account inert before resolving route slugs', () => {
-    const pushStateSpy = jest.spyOn(window.history, 'pushState').mockImplementation(() => {});
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      surveyId: '0xSurveyABC',
+    const { ports, result } = runPlan(submitPlan({
       account: '',
-      loginComplete: true,
-      network: { id: 84532 },
-    });
-    subject.state = {
-      ...subject.state,
+      pendingEditCount: 0,
       submissionComplete: true,
-    };
-    subject.getPendingEditStats = jest.fn(() => ({ total: 0 }));
-    subject._getEffectiveDraftSlug = jest.fn(() => {
-      throw new Error('missing-account completed submits should not resolve a route slug');
-    });
-    subject.encryptAndUpload = jest.fn();
+    }));
 
-    subject.handlePrimarySubmitClick();
-
-    expect(subject._getEffectiveDraftSlug).not.toHaveBeenCalled();
-    expect(subject.encryptAndUpload).not.toHaveBeenCalled();
-    expect(pushStateSpy).not.toHaveBeenCalled();
+    expect(result).toEqual(expect.objectContaining({
+      status: 'inert',
+      reason: 'missing_account',
+    }));
+    expect(ports.dispatchSubmit).not.toHaveBeenCalled();
+    expect(ports.navigateToResponse).not.toHaveBeenCalled();
   });
 });

@@ -90,6 +90,7 @@ type SurveyToolProps = {
   surveyID?: string;
   sessionSlug?: string;
   sessionSlugPinned?: boolean;
+  sessionConfig?: unknown;
   account?: string;
   provider?: unknown;
   loginComplete?: boolean;
@@ -115,6 +116,7 @@ type SurveyToolProps = {
   isSurveyCacheReady?: boolean;
   isSBTCacheReady?: boolean;
   questionScanProgress?: unknown;
+  questionPool?: unknown[];
   questionResponsesNonce?: number;
   sessionInfo?: unknown;
   sessionName?: string;
@@ -318,6 +320,7 @@ const renderSurveyToolContent = ({
             loginComplete={props.loginComplete}
             loginInProgress={props.loginInProgress}
             network={props.network}
+            networkChainId={props.networkChainId}
             cache={cache}
             updateCache={updateCache}
             pubKey={pubKey}
@@ -337,6 +340,7 @@ const renderSurveyToolContent = ({
             activeSessionSlug={activeSessionSlug}
             sessionSlug={toolSessionSlug}
             sessionSlugPinned={props.sessionSlugPinned}
+            sessionConfig={props.sessionConfig}
             hideEmbeddedDebugUi={props.hideEmbeddedDebugUi}
           />
         </React.Suspense>
@@ -376,6 +380,7 @@ const renderSurveyToolContent = ({
         loginComplete={props.loginComplete}
         loginInProgress={props.loginInProgress}
         network={props.network}
+        networkChainId={props.networkChainId}
         cache={cache}
         updateCache={updateCache}
         questionID={props.questionID}
@@ -395,6 +400,7 @@ const renderSurveyToolContent = ({
         isSBTCacheReady={props.isSBTCacheReady}
         networkLatestBlock={props.networkLatestBlock}
         questionScanProgress={props.questionScanProgress}
+        questionPool={props.questionPool}
         questionResponsesNonce={props.questionResponsesNonce}
         questionsCacheNonce={questionsCacheNonce}
         ensureQuestionCached={ensureQuestionCached}
@@ -404,6 +410,7 @@ const renderSurveyToolContent = ({
         activeSessionSlug={activeSessionSlug}
         sessionSlug={toolSessionSlug}
         sessionSlugPinned={props.sessionSlugPinned}
+        sessionConfig={props.sessionConfig}
         hideEmbeddedDebugUi={props.hideEmbeddedDebugUi}
       />
       <React.Suspense fallback={null}>

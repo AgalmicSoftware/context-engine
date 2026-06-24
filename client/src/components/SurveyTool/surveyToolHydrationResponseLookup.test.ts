@@ -754,6 +754,42 @@ describe('surveyToolHydrationResponseLookup', () => {
     expect(buildSubmissionGroupContext({
       questionIds: ['q1', 'q2'],
       slugByQuestionId: new Map([
+        ['q1', ''],
+      ]),
+      fallbackSlug: 'demo-1',
+      normalizeSlug: (value) => String(value || '').trim().toLowerCase(),
+    })).toEqual({
+      ok: true,
+      submissionGroupKey: 'demo-1',
+      sessionSlugs: ['demo-1'],
+      slugByQuestionId: new Map([
+        ['q1', 'demo-1'],
+        ['q2', 'demo-1'],
+      ]),
+    });
+
+    expect(buildSubmissionGroupContext({
+      questionIds: ['q1', 'q2'],
+      slugByQuestionId: new Map([
+        ['q1', 'alpha'],
+        ['q2', ''],
+      ]),
+      fallbackSlug: 'edge',
+      normalizeSlug: (value) => String(value || '').trim().toLowerCase(),
+    })).toEqual({
+      ok: false,
+      submissionGroupKey: '',
+      sessionSlugs: ['alpha', 'edge'],
+      slugByQuestionId: new Map([
+        ['q1', 'alpha'],
+        ['q2', 'edge'],
+      ]),
+      error: 'Cannot submit responses from multiple sessions at once. Narrow the question view to one session and try again.',
+    });
+
+    expect(buildSubmissionGroupContext({
+      questionIds: ['q1', 'q2'],
+      slugByQuestionId: new Map([
         ['q1', 'alpha'],
         ['q2', 'beta'],
       ]),

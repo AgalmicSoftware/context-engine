@@ -3,21 +3,25 @@
 ## Quick Reference
 - Barrel file: `client/src/utilities/web3/contractScripts.js`
 - Primary implementation: `client/src/utilities/web3/contractScripts.impl.ts`
+- Session registry helper: `client/src/utilities/web3/sessionRegistry.ts`
 - Split helper modules:
   - `client/src/utilities/web3/contractHelpers.ts`
   - `client/src/utilities/web3/contractEventListeners.ts`
   - `client/src/utilities/web3/contractProfile.ts`
 - Current lengths:
-  - `contractScripts.js`: **60 lines**
-  - `contractScripts.impl.ts`: **5,051 lines**
-  - `contractHelpers.ts`: **970 lines**
+  - `contractScripts.js`: **12 lines**
+  - `contractScripts.impl.ts`: **5,445 lines**
+  - `sessionRegistry.ts`: **2,392 lines**
+  - `contractHelpers.ts`: **950 lines**
   - `contractEventListeners.ts`: **454 lines**
   - `contractProfile.ts`: **1,102 lines**
 - This map intentionally avoids exact line numbers. Phase 4 TypeScript extraction and helper splits move code frequently, so name-based navigation stays more accurate than stale ranges.
+- `sessionRegistry.ts` and `contractScripts.impl.ts` typecheck without `@ts-nocheck`. The typed web3-core milestone was verified on OP Sepolia with the gate and gated-decrypt E2E suites; Lit v3 remains chain-configured and is not tied to a single testnet.
 
 ```text
 contractScripts.js  [CJS compatibility barrel for jest.spyOn]
   -> contractScripts.impl.ts  [main export object + shared helpers]
+     -> sessionRegistry.ts                 [session registry reads / cache / config]
      -> createContractHelperMethods(...)        [provider / block-window / cache helpers]
      -> createContractEventListenerMethods(...) [SBT / survey listener wiring]
      -> createContractProfileMethods(...)       [SBT universe + user activity/profile scans]
@@ -27,6 +31,7 @@ contractScripts.js  [CJS compatibility barrel for jest.spyOn]
 
 ## Navigation Rules
 - Start in `contractScripts.js` only if you need barrel-export behavior or `jest.spyOn` compatibility.
+- Start in `sessionRegistry.ts` for session registry lookups, registry cache behavior, session config normalization, or chain-aware session metadata.
 - Start in `contractHelpers.ts` for block windows, latest block/gas, read-provider behavior, or faucet helpers.
 - Start in `contractEventListeners.ts` for long-lived listener registration and cleanup.
 - Start in `contractProfile.ts` for user-profile scans, SBT universe discovery, and memoized holdings/activity views.
@@ -47,6 +52,11 @@ contractScripts.js  [CJS compatibility barrel for jest.spyOn]
 - Exposes the main survey/question read and write flows, including Arweave metadata fetch, upload, submit, and response decoding.
 - Exposes SBT factory, claim, password, invite, signature, metadata, burn, and history workflows.
 - Builds the final `contractScripts` export object and exposes `__test__contractScripts*` fixtures for targeted tests.
+
+### `sessionRegistry.ts`
+- Owns session registry reads, cache hydration, and typed normalization of registry-derived session metadata.
+- Preserves configured chain and Lit chain values when resolving sessions so OP Sepolia stays the default target while Base Sepolia remains best-effort for legacy and local development.
+- Provides the session-config surface consumed by `contractScripts.impl.ts` before provider, decrypt, worker, and contract-address decisions.
 
 ### `contractHelpers.ts`
 - Contains block, gas, and provider-cache helpers shared by the main implementation.

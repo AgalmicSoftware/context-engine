@@ -99,6 +99,60 @@ describe('SBTsPage auto-feature flag', () => {
     expect(getDemoSessionConfigBySlug).toHaveBeenCalledWith('edge', { allowDemoFallback: true });
   });
 
+  it('keeps an explicit demo alias as the cache slug when display config falls back to general', () => {
+    const contractScripts = jest.requireMock('../../utilities/web3/contractScripts.js');
+    const demoAutoAddress = '0x0000000000000000000000000000000000000d0a';
+    contractScripts.getSessionConfigBySlug.mockImplementation((slug) => (
+      String(slug || '') === '' ? { slug: '' } : null
+    ));
+    contractScripts.getSessionConfigBySlugOrDefault.mockReturnValue({ slug: '' });
+    getDemoSessionConfigBySlug.mockImplementation((slug) => (
+      String(slug || '') === 'demo'
+        ? {
+            slug: '',
+            featured_SBTs_LIST: [],
+          }
+        : null
+    ));
+    peekCacheSync.mockImplementation((cacheName, slug) => {
+      if (cacheName !== 'sbtCache' || slug !== 'demo') return null;
+      return {
+        '84532': {
+          sbtList: {
+            [demoAutoAddress.toLowerCase()]: {
+              sbtAddress: demoAutoAddress,
+              sbtInfo: {
+                sessionSlug: 'demo',
+              },
+            },
+          },
+        },
+      };
+    });
+
+    render(
+      <SBTsPage
+        sbtCacheRevision={0}
+        provider="wagmi"
+        network={{ id: 84532, name: 'Base Sepolia' }}
+        account=""
+        loginComplete={false}
+        toggleLoginModal={jest.fn()}
+        isSBTCacheReady={true}
+        defaultFeaturedSBTs={[]}
+        sessionSlug="demo"
+        sessionConfig={{ slug: 'demo', autoFeatureSBTsBySessionSlug: true }}
+      />
+    );
+
+    expect(peekCacheSync).toHaveBeenCalledWith('sbtCache', 'demo', { clone: false });
+    expect(mockSBTPage).toHaveBeenCalledWith(expect.objectContaining({
+      SBTAddress: demoAutoAddress,
+      sessionSlug: 'demo',
+    }));
+    expect(getDemoSessionConfigBySlug).toHaveBeenCalledWith('demo', { allowDemoFallback: true });
+  });
+
   it('uses explicit active session slugs when the list route rewrites to a session slug', () => {
     const contractScripts = jest.requireMock('../../utilities/web3/contractScripts.js');
     contractScripts.getSessionConfigBySlug.mockImplementation((slug) => {
@@ -254,6 +308,100 @@ describe('SBTsPage auto-feature flag', () => {
     ]);
   });
 
+  it('strict auto-feature mode only accepts explicit session bindings', () => {
+    const explicitAddress = '0x0000000000000000000000000000000000000e11';
+    const unflaggedAddress = '0x0000000000000000000000000000000000000e12';
+    const legacySlugAddress = '0x0000000000000000000000000000000000000e13';
+    const inferredAddress = '0x0000000000000000000000000000000000000e14';
+
+    peekCacheSync.mockReturnValue({
+      '84532': {
+        sbtList: {
+          [explicitAddress.toLowerCase()]: {
+            sbtAddress: explicitAddress,
+            sbtInfo: {
+              sessionSlug: 'alpha',
+              sessionSlugExplicit: true,
+            },
+          },
+          [unflaggedAddress.toLowerCase()]: {
+            sbtAddress: unflaggedAddress,
+            sbtInfo: {
+              sessionSlug: 'alpha',
+            },
+          },
+          [legacySlugAddress.toLowerCase()]: {
+            sbtAddress: legacySlugAddress,
+            sbtInfo: {
+              slug: 'alpha',
+            },
+          },
+          [inferredAddress.toLowerCase()]: {
+            sbtAddress: inferredAddress,
+            sbtInfo: {
+              sessionSlug: 'alpha',
+              sessionSlugExplicit: false,
+            },
+          },
+        },
+      },
+    });
+
+    const subject = createSubject();
+    const result = subject.getMemoizedFeaturedList({
+      baseFeaturedList: [
+        explicitAddress,
+        unflaggedAddress,
+        legacySlugAddress,
+        inferredAddress,
+      ],
+      effectiveSessionSlug: 'alpha',
+      autoFeature: true,
+      requireExplicitSessionSlug: true,
+      isSBTCacheReady: true,
+    });
+
+    expect(result).toEqual([explicitAddress]);
+  });
+
+  it('does not auto-feature demo E2E fixture SBTs in the public demo session', () => {
+    const visibleAddress = '0x0000000000000000000000000000000000000d11';
+    const fixtureAddress = '0x0000000000000000000000000000000000000d12';
+
+    peekCacheSync.mockReturnValue({
+      '84532': {
+        sbtList: {
+          [visibleAddress.toLowerCase()]: {
+            sbtAddress: visibleAddress,
+            sbtInfo: {
+              name: 'd/acc',
+              sessionSlug: 'demo',
+              sessionSlugExplicit: true,
+            },
+          },
+          [fixtureAddress.toLowerCase()]: {
+            sbtAddress: fixtureAddress,
+            sbtInfo: {
+              name: 'AI Gate Test SBT 16-May-2026-11-23-AM [e2e-default-20260516-112229] #1',
+              sessionSlug: 'demo',
+              sessionSlugExplicit: true,
+            },
+          },
+        },
+      },
+    });
+
+    const result = createSubject().getMemoizedFeaturedList({
+      baseFeaturedList: [],
+      effectiveSessionSlug: 'demo',
+      autoFeature: true,
+      requireExplicitSessionSlug: true,
+      isSBTCacheReady: true,
+    });
+
+    expect(result).toEqual([visibleAddress]);
+  });
+
   it('does not auto-feature bucket-only or inferred fallback session matches', () => {
     const inferredMatchAddress = '0x00000000000000000000000000000000000000e1';
     const bucketOnlyAddress = '0x00000000000000000000000000000000000000e2';
@@ -286,6 +434,102 @@ describe('SBTsPage auto-feature flag', () => {
     });
 
     expect(result).toEqual([]);
+
+    const generalSubject = createSubject();
+    const generalResult = generalSubject.getMemoizedFeaturedList({
+      baseFeaturedList: [],
+      effectiveSessionSlug: '',
+      autoFeature: true,
+      isSBTCacheReady: true,
+    });
+
+    expect(generalResult).toEqual([]);
+  });
+
+  it('does not render embedded featured cards from inferred session cache bindings', () => {
+    const inferredAddress = '0x00000000000000000000000000000000000000e3';
+
+    peekCacheSync.mockReturnValue({
+      '84532': {
+        sbtList: {
+          [inferredAddress.toLowerCase()]: {
+            sbtAddress: inferredAddress,
+            slug: 'alpha',
+            sessionSlug: 'alpha',
+            sessionSlugExplicit: false,
+            sbtInfo: {
+              name: 'Inferred Alpha Group',
+              sessionSlug: 'alpha',
+              sessionSlugExplicit: false,
+            },
+          },
+        },
+      },
+    });
+
+    expect(createSubject().getMemoizedFeaturedList({
+      baseFeaturedList: [],
+      effectiveSessionSlug: 'alpha',
+      autoFeature: true,
+      isSBTCacheReady: false,
+    })).toEqual([]);
+
+    render(
+      <SBTsPage
+        sbtCacheRevision={0}
+        provider="wagmi"
+        network={{ id: 84532, name: 'Base Sepolia' }}
+        account=""
+        loginComplete={false}
+        toggleLoginModal={jest.fn()}
+        isSBTCacheReady={false}
+        defaultFeaturedSBTs={[]}
+        sessionSlug="alpha"
+        sessionConfig={{ slug: 'alpha', autoFeatureSBTsBySessionSlug: true }}
+        miniaturized={true}
+        hideMiniActionRow={true}
+        preferCacheBackedFeaturedCards={true}
+      />
+    );
+
+    expect(screen.queryByText('Inferred Alpha Group')).not.toBeInTheDocument();
+    expect(screen.queryByTestId(`cache-featured-sbt-link-${inferredAddress.toLowerCase()}`)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('mock-sbt-page')).not.toBeInTheDocument();
+  });
+
+  it('keeps configured featured cards when strict embedded auto-feature filtering is enabled', () => {
+    const contractScripts = jest.requireMock('../../utilities/web3/contractScripts.js');
+    const configuredAddress = '0x000000000000000000000000000000000000d001';
+    contractScripts.getSessionConfigBySlug.mockImplementation((slug) => (
+      String(slug || '') === 'demo-1' ? { slug: 'demo-1' } : null
+    ));
+    contractScripts.getSessionConfigBySlugOrDefault.mockReturnValue({ slug: '' });
+    peekCacheSync.mockReturnValue({});
+
+    render(
+      <SBTsPage
+        sbtCacheRevision={0}
+        provider="wagmi"
+        network={{ id: 11155420, name: 'OP Sepolia' }}
+        account=""
+        loginComplete={false}
+        toggleLoginModal={jest.fn()}
+        isSBTCacheReady={false}
+        defaultFeaturedSBTs={[configuredAddress]}
+        sessionSlug="demo-1"
+        sessionConfig={{ slug: 'demo-1', autoFeatureSBTsBySessionSlug: false }}
+        miniaturized={true}
+        hideMiniActionRow={true}
+        preferCacheBackedFeaturedCards={true}
+        requireExplicitAutoFeatureSessionSlug={true}
+      />
+    );
+
+    expect(screen.getByTestId('embedded-featured-spinner')).toBeInTheDocument();
+    expect(screen.getAllByTestId('mock-sbt-page')).toHaveLength(1);
+    const latestProps = mockSBTPage.mock.calls[mockSBTPage.mock.calls.length - 1][0];
+    expect(latestProps.SBTAddress).toBe(configuredAddress);
+    expect(latestProps.sessionSlug).toBe('demo-1');
   });
 
   it('does not auto-feature session matches when the flag is disabled', () => {
@@ -650,7 +894,7 @@ describe('SBTsPage auto-feature flag', () => {
       />
     );
 
-    expect(screen.queryByTestId('embedded-featured-spinner')).not.toBeInTheDocument();
+    expect(screen.getByTestId('embedded-featured-spinner')).toBeInTheDocument();
     expect(screen.getAllByTestId('mock-sbt-page')).toHaveLength(1);
     expect(mockSBTPage.mock.calls[mockSBTPage.mock.calls.length - 1][0]).toEqual(
       expect.objectContaining({
@@ -670,6 +914,7 @@ describe('SBTsPage auto-feature flag', () => {
               sessionSlug: 'alpha',
               name: 'Warm Cache Group',
               description: 'Cached before readiness flips.',
+              image: 'https://example.test/warm-cache-group.png',
             },
           },
         },
@@ -700,6 +945,56 @@ describe('SBTsPage auto-feature flag', () => {
     expect(screen.queryByTestId('mock-sbt-page')).not.toBeInTheDocument();
   });
 
+  it('falls back to mini SBT readers when cached featured metadata is missing its image', () => {
+    const contractScripts = jest.requireMock('../../utilities/web3/contractScripts.js');
+    const featuredAddress = '0x00000000000000000000000000000000000000b2';
+    contractScripts.getSessionConfigBySlug.mockImplementation((slug) => (
+      String(slug || '') === 'alpha' ? { slug: 'alpha' } : null
+    ));
+    contractScripts.getSessionConfigBySlugOrDefault.mockReturnValue({ slug: '' });
+    peekCacheSync.mockReturnValue({
+      '84532': {
+        sbtList: {
+          [featuredAddress.toLowerCase()]: {
+            sbtAddress: featuredAddress,
+            sbtInfo: {
+              sessionSlug: 'alpha',
+              name: 'Partial Cache Group',
+              description: 'Discovered before tokenURI metadata hydrated.',
+            },
+          },
+        },
+      },
+    });
+
+    render(
+      <SBTsPage
+        sbtCacheRevision={0}
+        provider="wagmi"
+        network={{ id: 84532, name: 'Base Sepolia' }}
+        account=""
+        loginComplete={false}
+        toggleLoginModal={jest.fn()}
+        isSBTCacheReady={false}
+        defaultFeaturedSBTs={[featuredAddress]}
+        sessionSlug="alpha"
+        miniaturized={true}
+        hideMiniActionRow={true}
+        preferCacheBackedFeaturedCards={true}
+      />
+    );
+
+    expect(screen.queryByTestId(`cache-featured-sbt-link-${featuredAddress.toLowerCase()}`)).not.toBeInTheDocument();
+    expect(screen.getByTestId('embedded-featured-spinner')).toBeInTheDocument();
+    expect(screen.getAllByTestId('mock-sbt-page')).toHaveLength(1);
+    expect(mockSBTPage.mock.calls[mockSBTPage.mock.calls.length - 1][0]).toEqual(
+      expect.objectContaining({
+        SBTAddress: featuredAddress,
+        sessionSlug: 'alpha',
+      })
+    );
+  });
+
   it('hides cache-backed featured card addresses in plain mode', () => {
     const featuredAddress = '0x00000000000000000000000000000000000000b3';
     mockIsCryptoMode.mockReturnValue(false);
@@ -713,6 +1008,7 @@ describe('SBTsPage auto-feature flag', () => {
             sbtInfo: {
               sessionSlug: 'alpha',
               name: 'Plain Mode Group',
+              image: 'https://example.test/plain-mode-group.png',
             },
           },
         },
@@ -754,6 +1050,7 @@ describe('SBTsPage auto-feature flag', () => {
             sbtInfo: {
               sessionSlug: 'alpha',
               name: 'Crypto Mode Group',
+              image: 'https://example.test/crypto-mode-group.png',
             },
           },
         },
@@ -792,6 +1089,7 @@ describe('SBTsPage auto-feature flag', () => {
             sbtInfo: {
               sessionSlug: 'alpha',
               name: 'Ended Group',
+              image: 'https://example.test/ended-group.png',
               mintingEndTime: 1,
             },
           },
@@ -833,6 +1131,7 @@ describe('SBTsPage auto-feature flag', () => {
               title: '',
               symbol: '',
               contractName: '',
+              image: 'https://example.test/unnamed-group.png',
             },
           },
         },
@@ -884,6 +1183,7 @@ describe('SBTsPage auto-feature flag', () => {
               sessionSlug: 'alpha',
               name: 'Progressive Cache Group',
               description: 'Discovered mid-scan.',
+              image: 'https://example.test/progressive-cache-group.png',
             },
           },
         },

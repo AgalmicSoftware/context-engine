@@ -14,6 +14,7 @@ import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
+import { getPolisDemoQuestionPool } from '../SurveyTool/surveyPolisDemoQuestionPool';
 
 const mockSurveyPage = jest.fn();
 const mockPolisReport = jest.fn();
@@ -243,6 +244,22 @@ describe('OnePageSession view gating', () => {
     expect(screen.queryByTestId('survey-page-full')).not.toBeInTheDocument();
   });
 
+  it('does not crash when the route hydrates before a network object is available', async () => {
+    const { rerender } = render(<OnePageSession {...buildProps()} network={null} />);
+
+    expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
+
+    rerender(
+      <OnePageSession
+        {...buildProps()}
+        network={null}
+        questionResponsesNonce={1}
+      />
+    );
+
+    expect(screen.getByTestId('survey-page-pile')).toBeInTheDocument();
+  });
+
   it('shows a Telegram-only notice instead of the web session UI', async () => {
     render(<OnePageSession
       {...buildProps()}
@@ -318,7 +335,7 @@ describe('OnePageSession view gating', () => {
     expect(titleContainer).not.toHaveClass(styles.titleContainerWithPileSubmitRail);
   });
 
-  it('applies pile submit rail title offsets only on pile top-rail breakpoints', () => {
+  it('keeps phone pile titles unshifted while preserving top-rail title offsets elsewhere', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
     const phoneRailBlock = extractMediaBlock(
       scss,
@@ -344,7 +361,8 @@ describe('OnePageSession view gating', () => {
     expect(scss).toContain('.brandingSectionWithPileSubmitRail');
     expect(scss).toContain('.titleContainerWithPileSubmitRail');
     expect(phoneRailBlock).toContain('.titleContainerWithPileSubmitRail');
-    expect(phoneRailBlock).toContain('transform: translateY(-40px);');
+    expect(phoneRailBlock).toContain('transform: none;');
+    expect(phoneRailBlock).not.toContain('transform: translateY(-40px);');
     expect(desktopRailBlock).toContain('.titleContainerWithPileSubmitRail');
     expect(desktopRailBlock).toContain('transform: translateY(-40px);');
     expect(widescreenRailBlock).toContain('.titleContainerWithPileSubmitRail');
@@ -413,6 +431,414 @@ describe('OnePageSession view gating', () => {
     expect(polisCalls[polisCalls.length - 1]?.demoDataBySlug).toBe(customEdgeData);
     expect(polisCalls[polisCalls.length - 1]?.questionScanProgress).toBe(progress);
   });
+
+  it('passes the built-in demo display slug to the embedded report', async () => {
+    render(
+      <OnePageSession
+        {...buildProps()}
+        slug="demo"
+        questionSessionSlug="demo"
+        sessionConfig={{
+          ...buildProps().sessionConfig,
+          slug: 'demo',
+          sessionName: 'Context Engine',
+          networkChainId: 11155420,
+        }}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('polis-report')).toBeInTheDocument();
+    });
+
+    const polisCalls = mockPolisReport.mock.calls.map((args) => args[0]).filter(Boolean);
+    expect(polisCalls[polisCalls.length - 1]).toEqual(expect.objectContaining({
+      sessionSlug: 'demo',
+      demoDataFirstLoad: true,
+    }));
+  });
+
+  it('does not pass generated demo Polis responses as live embedded report rows', async () => {
+    render(
+      <OnePageSession
+        {...buildProps()}
+        slug="demo"
+        questionSessionSlug="demo"
+        sessionConfig={{
+          ...buildProps().sessionConfig,
+          slug: 'demo',
+          sessionName: 'Context Engine',
+          networkChainId: 11155420,
+        }}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('polis-report')).toBeInTheDocument();
+    });
+
+    const polisCalls = mockPolisReport.mock.calls.map((args) => args[0]).filter(Boolean);
+    const latestReportProps = polisCalls[polisCalls.length - 1] || {};
+    const questionResponses = latestReportProps.questionResponses || {};
+
+    expect(latestReportProps).toEqual(expect.objectContaining({
+      sessionSlug: 'demo',
+      demoDataFirstLoad: true,
+    }));
+    expect(questionResponses).toEqual({});
+  });
+
+  it('builds built-in demo live report responses only from the demo source bucket', async () => {
+    jest.useFakeTimers();
+    const priorUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    window.history.replaceState({}, '', '/session/demo');
+    const demoQuestion = getPolisDemoQuestionPool()[0];
+    expect(demoQuestion?.id).toBeTruthy();
+    jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
+    jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['demo']);
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace, slug) => {
+      if (namespace !== 'questionsCache') return {};
+      if (slug === '') {
+        return {
+          '84532': {
+            questions: {
+              qforeign: {
+                id: 'qforeign',
+                prompt: 'Foreign default-bucket prompt',
+                type: 'binary',
+              },
+            },
+            questionResponses: {
+              qforeign: {
+                '0xforeign': {
+                  type: 'binary',
+                  answer: { value: 'yes', encrypted: false },
+                },
+              },
+            },
+          },
+        };
+      }
+      if (slug === 'demo') {
+        return {
+          '84532': {
+            questions: {
+              [demoQuestion.id]: {
+                id: demoQuestion.id,
+                prompt: 'Live canonical demo prompt',
+                type: 'binary',
+              },
+              qpolluted: {
+                id: 'qpolluted',
+                prompt: 'Polluted cache prompt without a demo binding',
+                type: 'binary',
+              },
+            },
+            questionResponses: {
+              [demoQuestion.id]: {
+                '0xabc': {
+                  type: 'binary',
+                  answer: { value: 'yes', encrypted: false },
+                },
+              },
+              qpolluted: {
+                '0xpolluted': {
+                  type: 'binary',
+                  answer: { value: 'no', encrypted: false },
+                },
+              },
+            },
+          },
+        };
+      }
+      return {};
+    });
+
+    try {
+      render(
+        <OnePageSession
+          {...buildProps()}
+          slug="demo"
+          questionSessionSlug=""
+          isQuestionCacheReady={true}
+          network={{ id: 84532, name: 'Base Sepolia' }}
+          sessionConfig={{
+            ...buildProps().sessionConfig,
+            slug: '',
+            sessionName: 'Context Engine',
+            networkChainId: 84532,
+          }}
+        />
+      );
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+      await act(async () => {
+        jest.advanceTimersByTime(150);
+      });
+
+      await waitFor(() => {
+        const polisCalls = mockPolisReport.mock.calls.map((args) => args[0]).filter(Boolean);
+        const latestReportProps = polisCalls[polisCalls.length - 1] || {};
+        expect(latestReportProps).toEqual(expect.objectContaining({
+          sessionSlug: 'demo',
+          demoDataFirstLoad: true,
+        }));
+        expect(latestReportProps.questionResponses).toEqual({
+          [demoQuestion.id]: [
+            expect.objectContaining({
+              responder: '0xabc',
+              questionId: demoQuestion.id,
+            }),
+          ],
+        });
+        expect(JSON.stringify(latestReportProps.questionResponses)).not.toContain('qforeign');
+        expect(JSON.stringify(latestReportProps.questionResponses)).not.toContain('0xforeign');
+        expect(JSON.stringify(latestReportProps.questionResponses)).not.toContain('qpolluted');
+        expect(JSON.stringify(latestReportProps.questionResponses)).not.toContain('0xpolluted');
+      });
+    } finally {
+      window.history.replaceState({}, '', priorUrl || '/');
+    }
+  });
+
+  it('keeps /session/demo report responses wired to the canonical source when the route source is demo', async () => {
+    jest.useFakeTimers();
+    const priorUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    window.history.replaceState({}, '', '/session/demo');
+    const demoQuestion = getPolisDemoQuestionPool()[0];
+    expect(demoQuestion?.id).toBeTruthy();
+
+    jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
+    jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['demo']);
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace, slug) => {
+      if (namespace !== 'questionsCache') return {};
+      if (slug === '') {
+        return {
+          '84532': {
+            questions: {},
+            questionResponses: {},
+          },
+        };
+      }
+      if (slug === 'demo') {
+        return {
+          '84532': {
+            questions: {},
+            questionResponses: {
+              [demoQuestion.id]: {
+                '0xabc': {
+                  type: 'binary',
+                  answer: { value: 'yes', encrypted: false },
+                },
+              },
+            },
+          },
+        };
+      }
+      return {};
+    });
+
+    try {
+      render(
+        <OnePageSession
+          {...buildProps()}
+          slug="demo"
+          questionSessionSlug="demo"
+          isQuestionCacheReady={true}
+          network={{ id: 84532, name: 'Base Sepolia' }}
+          sessionConfig={{
+            ...buildProps().sessionConfig,
+            slug: 'demo',
+            sessionName: 'Context Engine',
+            networkChainId: 84532,
+          }}
+        />
+      );
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+      await act(async () => {
+        jest.advanceTimersByTime(150);
+      });
+
+      await waitFor(() => {
+        const polisCalls = mockPolisReport.mock.calls.map((args) => args[0]).filter(Boolean);
+        const latestReportProps = polisCalls[polisCalls.length - 1] || {};
+        expect(latestReportProps.questionResponses).toEqual({
+          [demoQuestion.id]: [
+            expect.objectContaining({
+              responder: '0xabc',
+              questionId: demoQuestion.id,
+            }),
+          ],
+        });
+      });
+    } finally {
+      window.history.replaceState({}, '', priorUrl || '/');
+    }
+  });
+
+  it('uses built-in demo question metadata when live demo responses arrive before cached question metadata', async () => {
+    jest.useFakeTimers();
+    const priorUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    window.history.replaceState({}, '', '/session/demo');
+    const demoQuestion = getPolisDemoQuestionPool()[0];
+    expect(demoQuestion?.id).toBeTruthy();
+
+    jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
+    jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['demo']);
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace, slug) => {
+      if (namespace !== 'questionsCache') return {};
+      if (slug === '') {
+        return {
+          '84532': {
+            questions: {},
+            questionResponses: {},
+          },
+        };
+      }
+      if (slug === 'demo') {
+        return {
+          '84532': {
+            questions: {},
+            questionResponses: {
+              [demoQuestion.id]: {
+                '0xdef': {
+                  type: 'binary',
+                  answer: { value: 'no', encrypted: false },
+                },
+              },
+            },
+          },
+        };
+      }
+      return {};
+    });
+
+    try {
+      render(
+        <OnePageSession
+          {...buildProps()}
+          slug="demo"
+          questionSessionSlug=""
+          isQuestionCacheReady={true}
+          network={{ id: 84532, name: 'Base Sepolia' }}
+          sessionConfig={{
+            ...buildProps().sessionConfig,
+            slug: '',
+            sessionName: 'Context Engine',
+            networkChainId: 84532,
+          }}
+        />
+      );
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+      await act(async () => {
+        jest.advanceTimersByTime(150);
+      });
+
+      await waitFor(() => {
+        const polisCalls = mockPolisReport.mock.calls.map((args) => args[0]).filter(Boolean);
+        const latestReportProps = polisCalls[polisCalls.length - 1] || {};
+        expect(latestReportProps.questionResponses).toEqual({
+          [demoQuestion.id]: [
+            expect.objectContaining({
+              responder: '0xdef',
+              questionId: demoQuestion.id,
+            }),
+          ],
+        });
+      });
+    } finally {
+      window.history.replaceState({}, '', priorUrl || '/');
+    }
+  });
+
+  it('builds live demo report responses before question metadata hydration completes', async () => {
+    jest.useFakeTimers();
+    const priorUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    window.history.replaceState({}, '', '/session/demo');
+    const demoQuestion = getPolisDemoQuestionPool()[0];
+    expect(demoQuestion?.id).toBeTruthy();
+
+    jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
+    jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['demo']);
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace, slug) => {
+      if (namespace !== 'questionsCache') return {};
+      if (slug === '') {
+        return {
+          '84532': {
+            questions: {},
+            questionResponses: {},
+          },
+        };
+      }
+      if (slug === 'demo') {
+        return {
+          '84532': {
+            questions: {},
+            questionResponses: {
+              [demoQuestion.id]: {
+                '0xprehydrate': {
+                  type: 'binary',
+                  answer: { value: 'yes', encrypted: false },
+                },
+              },
+            },
+          },
+        };
+      }
+      return {};
+    });
+
+    try {
+      render(
+        <OnePageSession
+          {...buildProps()}
+          slug="demo"
+          questionSessionSlug="demo"
+          isQuestionCacheReady={false}
+          isResponsesCacheReady={false}
+          questionScanProgress={{
+            phase: 'hydrate',
+            discoveredQuestions: 42,
+            hydratedQuestions: 0,
+          }}
+          network={{ id: 84532, name: 'Base Sepolia' }}
+          sessionConfig={{
+            ...buildProps().sessionConfig,
+            slug: 'demo',
+            sessionName: 'Context Engine',
+            networkChainId: 84532,
+          }}
+        />
+      );
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+      await act(async () => {
+        jest.advanceTimersByTime(150);
+      });
+
+      await waitFor(() => {
+        const polisCalls = mockPolisReport.mock.calls.map((args) => args[0]).filter(Boolean);
+        const latestReportProps = polisCalls[polisCalls.length - 1] || {};
+        expect(latestReportProps.questionResponses).toEqual({
+          [demoQuestion.id]: [
+            expect.objectContaining({
+              responder: '0xprehydrate',
+              questionId: demoQuestion.id,
+            }),
+          ],
+        });
+      });
+    } finally {
+      window.history.replaceState({}, '', priorUrl || '/');
+    }
+  });
+
 
   it('uses shared session-universe discovery when bootstrapping embedded groups', () => {
     const ensureLightSbtUniverse = jest.fn(() => Promise.resolve());
@@ -592,6 +1018,32 @@ describe('OnePageSession view gating', () => {
     expect(within(fullHeader).getByText('Answer or Add')).toHaveClass(styles.sectionHeaderSubtitle);
   });
 
+  it('renders the Context header title and View subtitle with the shared section header classes', async () => {
+    render(
+      <OnePageSession
+        {...buildProps()}
+        slug="demo"
+        sessionConfig={{
+          ...buildProps().sessionConfig,
+          slug: 'demo',
+          sessionName: 'Context Engine',
+          networkChainId: 11155420,
+        }}
+      />
+    );
+
+    expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
+    const contextHeader = screen.getByTestId('ce-demo-documents-toggle');
+    const contextTitle = within(contextHeader).getByText('Context');
+    const contextSubtitle = within(contextHeader).getByText('View');
+    const contextTextWrap = contextTitle.closest(`.${styles.sectionHeaderText}`);
+
+    expect(contextTitle).toHaveClass(styles.sectionHeaderTitle);
+    expect(contextSubtitle).toHaveClass(styles.sectionHeaderSubtitle);
+    expect(contextTextWrap).toBeTruthy();
+    expect(contextTextWrap.parentElement).toBe(contextHeader);
+  });
+
   it('keeps section-card headers inline through 767px without pulling full phone layout onto tablets', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
     const phoneBlock = extractMediaBlock(scss, '@media only screen and (max-width: 600px)', '.onePageDemoContainer');
@@ -629,25 +1081,10 @@ describe('OnePageSession view gating', () => {
     expect(phoneBlock).toContain('color: rgba(255, 255, 255, 0.15);');
     expect(phoneBlock).toContain('.sectionHeader {');
     expect(phoneBlock).toContain('align-items: center;');
-    expect(phoneBlock).toContain('.documentsSectionHeaderMeta .sectionHeaderTooltip > svg {');
-    expect(phoneBlock).toContain('opacity: 0.6;');
-    expect(phoneBlock).toContain('.documentsSectionHeaderText {');
-    expect(phoneBlock).toContain('grid-template-areas:');
-    expect(phoneBlock).toContain('"title subtitle"');
-    expect(phoneBlock).toContain('"actions actions";');
-    expect(phoneBlock).toContain('.documentsSectionHeaderTitleRow {');
-    expect(phoneBlock).toContain('display: contents;');
-    expect(phoneBlock).toContain('.documentsSectionHeaderMain .sectionToggleIcon {');
-    expect(phoneBlock).toContain('margin-right: 0;');
-    expect(phoneBlock).toContain('grid-area: actions;');
-    expect(phoneBlock).toContain('justify-content: flex-end;');
-    expect(phoneBlock).toContain('flex-wrap: wrap;');
-    expect(phoneBlock).toContain('box-sizing: border-box;');
-    expect(phoneBlock).toContain('padding-right: 10px;');
-    expect(phoneBlock).toContain('.documentsSectionHeaderMeta .sectionHeaderTooltip {');
-    expect(phoneBlock).toContain('justify-content: center;');
-    expect(phoneBlock).toContain('min-height: 44px;');
-    expect(phoneBlock).toContain('min-width: 44px;');
+    expect(phoneBlock).not.toContain('.documentsSectionHeaderText');
+    expect(phoneBlock).not.toContain('.documentsSectionHeaderTitleRow');
+    expect(phoneBlock).not.toContain('.documentsSectionHeaderMain');
+    expect(phoneBlock).not.toContain('.documentsSectionHeaderMeta');
     expect(phoneBlock).toContain('.pileHeaderRow {');
     expect(phoneBlock).toContain('flex-wrap: nowrap;');
     expect(phoneBlock).toContain('.pileHeaderTitleWrap {');
@@ -664,25 +1101,10 @@ describe('OnePageSession view gating', () => {
     expect(smallTabletBlock).toContain('font-size: 1.2em;');
     expect(smallTabletBlock).toContain('font-weight: inherit;');
     expect(smallTabletBlock).toContain('color: rgba(255, 255, 255, 0.15);');
-    expect(smallTabletBlock).toContain('.documentsSectionHeaderText {');
-    expect(smallTabletBlock).toContain('grid-template-areas:');
-    expect(smallTabletBlock).toContain('"title subtitle"');
-    expect(smallTabletBlock).toContain('"actions actions";');
-    expect(smallTabletBlock).toContain('.documentsSectionHeaderTitleRow {');
-    expect(smallTabletBlock).toContain('display: contents;');
-    expect(smallTabletBlock).toContain('.documentsSectionHeaderMain .sectionToggleIcon {');
-    expect(smallTabletBlock).toContain('margin-right: 0;');
-    expect(smallTabletBlock).toContain('grid-area: actions;');
-    expect(smallTabletBlock).toContain('justify-content: flex-end;');
-    expect(smallTabletBlock).toContain('flex-wrap: wrap;');
-    expect(smallTabletBlock).toContain('box-sizing: border-box;');
-    expect(smallTabletBlock).toContain('padding-right: 10px;');
-    expect(smallTabletBlock).toContain('.documentsSectionHeaderMeta .sectionHeaderTooltip {');
-    expect(smallTabletBlock).toContain('justify-content: center;');
-    expect(smallTabletBlock).toContain('min-height: 44px;');
-    expect(smallTabletBlock).toContain('min-width: 44px;');
-    expect(smallTabletBlock).toContain('.documentsSectionHeaderMeta .sectionHeaderTooltip > svg {');
-    expect(smallTabletBlock).toContain('opacity: 0.6;');
+    expect(smallTabletBlock).not.toContain('.documentsSectionHeaderText');
+    expect(smallTabletBlock).not.toContain('.documentsSectionHeaderTitleRow');
+    expect(smallTabletBlock).not.toContain('.documentsSectionHeaderMain');
+    expect(smallTabletBlock).not.toContain('.documentsSectionHeaderMeta');
     expect(smallTabletBlock).toContain('.pileHeaderRow {');
     expect(smallTabletBlock).toContain('flex-wrap: nowrap;');
     expect(smallTabletBlock).toContain('.pileHeaderTitleWrap {');
@@ -728,6 +1150,221 @@ describe('OnePageSession view gating', () => {
     const sbtPropsAfterToggle = mockSBTsPage.mock.calls.map((args) => args[0]).filter(Boolean);
     expect(sbtPropsAfterToggle[sbtPropsAfterToggle.length - 1]?.showCreateGroupAboveFeatured).toBe(true);
     expect(sbtPropsAfterToggle[sbtPropsAfterToggle.length - 1]?.showCreateGroupExternal).toBe(true);
+  });
+
+  it('passes the canonical Polis demo questions to both /session/demo question surfaces', async () => {
+    const demoSessionConfig = {
+      ...buildProps().sessionConfig,
+      slug: '',
+      sessionName: 'Context Engine',
+      networkChainId: 11155420,
+      autoFeatureSBTsBySessionSlug: false,
+    };
+
+    const { rerender } = render(
+      <OnePageSession
+        {...buildProps()}
+        slug="demo"
+        questionSessionSlug=""
+        sessionConfig={demoSessionConfig}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('survey-page-pile')).toBeInTheDocument();
+    });
+
+    const pileProps = mockSurveyPage.mock.calls
+      .map((args) => args[0])
+      .filter((props) => props?.minifiedMode === 'pile')
+      .pop();
+    expect(pileProps?.sessionSlug).toBe('demo');
+    expect(pileProps?.questionPool).toHaveLength(42);
+    expect(pileProps?.questionPool?.[0]).toEqual(expect.objectContaining({
+      source: 'demo-polis-data',
+      sessionSlug: 'demo',
+      sessionSlugExplicit: true,
+    }));
+
+    rerender(
+      <OnePageSession
+        {...buildProps()}
+        slug="demo"
+        questionSessionSlug=""
+        routeQuestionsOpen={true}
+        sessionConfig={demoSessionConfig}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('survey-page-full')).toBeInTheDocument();
+    });
+
+    const fullProps = mockSurveyPage.mock.calls
+      .map((args) => args[0])
+      .filter((props) => props?.miniMode === true)
+      .pop();
+    expect(fullProps?.sessionSlug).toBe('demo');
+    expect(fullProps?.questionPool).toHaveLength(42);
+  });
+
+  it('uses the display slug for embedded groups on the built-in demo route', async () => {
+    const demoSessionConfig = {
+      ...buildProps().sessionConfig,
+      slug: '',
+      sessionName: 'Context Engine',
+      networkChainId: 11155420,
+    };
+    render(
+      <OnePageSession
+        {...buildProps()}
+        slug="demo"
+        questionSessionSlug=""
+        sessionConfig={demoSessionConfig}
+      />
+    );
+
+    fireEvent.click(screen.getByText(t('sbts')));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('sbts-page')).toBeInTheDocument();
+    });
+
+    const latestSbtProps = mockSBTsPage.mock.calls.map((args) => args[0]).filter(Boolean).pop();
+    expect(latestSbtProps?.sessionSlug).toBe('demo');
+    expect(latestSbtProps?.requireExplicitAutoFeatureSessionSlug).toBe(true);
+    expect(latestSbtProps?.sessionConfig).toEqual(expect.objectContaining({
+      slug: 'demo',
+    }));
+    expect(latestSbtProps?.sessionConfig?.autoFeatureSBTsBySessionSlug).not.toBe(true);
+  });
+
+  it('preserves demo-1 embedded groups featured list and auto-feature policy', async () => {
+    const featuredSbt = '0x29563ff3aCC8AFb220D810F8022218095e25C1f6';
+    const demoSessionConfig = {
+      ...buildProps().sessionConfig,
+      slug: 'demo-1',
+      sessionName: 'Demo Session',
+      networkChainId: 11155420,
+      defaultFeaturedSBTs: [featuredSbt],
+      autoFeatureSBTsBySessionSlug: false,
+    };
+
+    render(
+      <OnePageSession
+        {...buildProps()}
+        slug="demo-1"
+        questionSessionSlug="demo-1"
+        defaultFeaturedSBTs={[featuredSbt]}
+        sessionConfig={demoSessionConfig}
+      />
+    );
+
+    fireEvent.click(screen.getByText(t('sbts')));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('sbts-page')).toBeInTheDocument();
+    });
+
+    const latestSbtProps = mockSBTsPage.mock.calls.map((args) => args[0]).filter(Boolean).pop();
+    expect(latestSbtProps?.sessionSlug).toBe('demo-1');
+    expect(latestSbtProps?.defaultFeaturedSBTs).toEqual([featuredSbt]);
+    expect(latestSbtProps?.requireExplicitAutoFeatureSessionSlug).toBe(true);
+    expect(latestSbtProps?.sessionConfig).toEqual(expect.objectContaining({
+      slug: 'demo-1',
+      autoFeatureSBTsBySessionSlug: false,
+    }));
+  });
+
+  it('keeps /session/demo on the canonical fixture when routed source slug is demo', async () => {
+    const priorUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    window.history.replaceState({}, '', '/session/demo');
+    const demoSessionConfig = {
+      ...buildProps().sessionConfig,
+      slug: 'demo',
+      sessionName: 'Context Engine',
+      networkChainId: 11155420,
+      autoFeatureSBTsBySessionSlug: false,
+    };
+
+    try {
+      render(
+        <OnePageSession
+          {...buildProps()}
+          slug="demo"
+          questionSessionSlug="demo"
+          sessionConfig={demoSessionConfig}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('survey-page-pile')).toBeInTheDocument();
+      });
+
+      const pileProps = mockSurveyPage.mock.calls
+        .map((args) => args[0])
+        .filter((props) => props?.minifiedMode === 'pile')
+        .pop();
+      expect(pileProps?.sessionSlug).toBe('demo');
+      expect(pileProps?.questionPool).toHaveLength(42);
+
+      fireEvent.click(screen.getByText(t('sbts')));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('sbts-page')).toBeInTheDocument();
+      });
+
+      const latestSbtProps = mockSBTsPage.mock.calls.map((args) => args[0]).filter(Boolean).pop();
+      expect(latestSbtProps?.sessionSlug).toBe('demo');
+      expect(latestSbtProps?.requireExplicitAutoFeatureSessionSlug).toBe(true);
+      expect(latestSbtProps?.sessionConfig).toEqual(expect.objectContaining({
+        slug: 'demo',
+        autoFeatureSBTsBySessionSlug: false,
+      }));
+    } finally {
+      window.history.replaceState({}, '', priorUrl || '/');
+    }
+  });
+
+  it('passes canonical Polis demo questions to direct /session/demo/questions route renders', async () => {
+    const priorUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    window.history.replaceState({}, '', '/session/demo/questions');
+    const demoSessionConfig = {
+      ...buildProps().sessionConfig,
+      slug: 'demo',
+      sessionName: 'Context Engine',
+      networkChainId: 11155420,
+    };
+
+    try {
+      render(
+        <OnePageSession
+          {...buildProps()}
+          slug="demo"
+          questionSessionSlug="demo"
+          routeQuestionsOpen={true}
+          sessionConfig={demoSessionConfig}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('survey-page-full')).toBeInTheDocument();
+      });
+
+      const fullProps = mockSurveyPage.mock.calls
+        .map((args) => args[0])
+        .filter((props) => props?.miniMode === true)
+        .pop();
+      expect(fullProps?.sessionSlug).toBe('demo');
+      expect(fullProps?.questionPool).toHaveLength(42);
+      expect(fullProps?.questionPool?.[0]).toEqual(expect.objectContaining({
+        source: 'demo-polis-data',
+        sessionSlug: 'demo',
+        sessionSlugExplicit: true,
+      }));
+    } finally {
+      window.history.replaceState({}, '', priorUrl || '/');
+    }
   });
 
 });

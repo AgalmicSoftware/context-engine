@@ -127,7 +127,7 @@ For the main Doc Library panel, encryption is based on SBT conditions:
 
 - If SessionRegistry’s `docUploads` gate has at least one SBT address:
   - upload defaults to **Locked (Encrypted)** using that gate’s SBT set (Any/All).
-  - If that gate resolves to a Lit-unsupported chain (currently OP Sepolia for contract-gated ACCs), the UI falls back away from the session gate instead of surfacing a low-level Lit validator error.
+  - Lit contract-gated access conditions use the gate’s configured EVM chain; OP Sepolia is the default E2E target, not a Lit limitation.
 - If the `docUploads` gate is empty or unavailable:
   - upload defaults to **Unlocked (Plaintext)**.
   - users can still encrypt by selecting **Custom SBT(s)** manually.
@@ -138,7 +138,7 @@ For Tool Explorer `Data -> Add` saved extra sources:
 - the audience can be `only me` or the session `docUploads` gate
 - `only me` wraps the content encryption key with the existing `self-eip712-v1` recipient, so private saves can upload and reopen with the connected wallet without Lit/Chipotle hooks
 - the session `docUploads` audience stays on the Chipotle/Lit SBT-gated recipient path
-- when the session `docUploads` gate is unavailable or Lit cannot honor that gate on the current chain, Tool Explorer falls back to `only me`
+- when the session `docUploads` gate is unavailable, Tool Explorer falls back to `only me`
 
 ## “Add URL” Link Records
 

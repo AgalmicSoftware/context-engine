@@ -1,4 +1,5 @@
 import {
+  coerceQuestionOptionLabels,
   coerceStringArray,
   normalizeConvictionImportance,
   normalizeQuestionFlags,
@@ -11,6 +12,26 @@ describe('contractScripts payload normalizers', () => {
     expect(coerceStringArray('  single-value  ')).toEqual(['single-value']);
     expect(coerceStringArray('[not-json')).toEqual(['[not-json']);
     expect(coerceStringArray(null)).toEqual([]);
+  });
+
+  it('coerces question option aliases into display labels', () => {
+    expect(coerceQuestionOptionLabels([
+      ' Alpha ',
+      { label: 'Beta' },
+      { text: 'Gamma' },
+      { name: 'Delta' },
+      { value: 'Epsilon' },
+      { id: 'zeta' },
+      '',
+      'Alpha',
+    ])).toEqual(['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'zeta']);
+
+    expect(coerceQuestionOptionLabels({
+      one: { label: 'One' },
+      two: { id: 'two' },
+    })).toEqual(['One', 'two']);
+
+    expect(coerceQuestionOptionLabels('["A","B"]')).toEqual(['A', 'B']);
   });
 
   it('mirrors conviction and importance fields without overwriting existing values', () => {
@@ -46,5 +67,31 @@ describe('contractScripts payload normalizers', () => {
 
     expect(inheritedFlag.singleSelect).toBe(true);
     expect(explicitFlag.singleSelect).toBe(true);
+  });
+
+  it('normalizes multichoice option aliases into cached question options', () => {
+    const question = {
+      type: 'multichoice',
+      choices: {
+        first: { label: 'Cross-site graph' },
+        second: { text: 'Session memory' },
+      },
+    };
+
+    normalizeQuestionFlags(question);
+
+    expect(question.options).toEqual(['Cross-site graph', 'Session memory']);
+  });
+
+  it('keeps non-empty options ahead of fallback aliases', () => {
+    const question = {
+      type: 'multichoice',
+      options: ['Canonical'],
+      choices: ['Fallback'],
+    };
+
+    normalizeQuestionFlags(question);
+
+    expect(question.options).toEqual(['Canonical']);
   });
 });

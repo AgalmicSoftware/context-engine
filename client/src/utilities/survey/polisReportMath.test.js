@@ -7,7 +7,7 @@ import {
 } from './polisReportMath';
 
 describe('computePolisStats', () => {
-  it('counts only agree and disagree votes in the summary stats', () => {
+  it('counts agree, disagree, and unsure votes in the summary stats', () => {
     const ratingMatrix = [
       [1, 0, null],
       [-1, null, 0],
@@ -16,9 +16,9 @@ describe('computePolisStats', () => {
     expect(computePolisStats(ratingMatrix)).toEqual({
       nComments: 2,
       nParticipants: 3,
-      totalVotes: 2,
-      voters: 1,
-      votesPerVoterAvg: 2,
+      totalVotes: 4,
+      voters: 3,
+      votesPerVoterAvg: 4 / 3,
     });
   });
 });

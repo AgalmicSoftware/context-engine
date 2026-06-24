@@ -56,6 +56,23 @@ describe('CreateSBTGroup render and image authoring', () => {
     expect(screen.getByRole('heading', { name: 'Add to Session' })).toBeInTheDocument();
   });
 
+  it('keeps the create title and learn-more tooltip in the same header cluster', () => {
+    const instance = makeInstance({
+      network: { id: 84532, name: 'Base Sepolia' },
+      sessionSlug: 'test',
+    });
+
+    render(instance.render());
+
+    const heading = screen.getByRole('heading', { name: 'Create' });
+    const titleCluster = heading.parentElement;
+    const titleTooltip = titleCluster?.querySelector('#learnMoreTooltip');
+
+    expect(titleCluster).toHaveClass(styles.titleCluster);
+    expect(titleTooltip).toBeInTheDocument();
+    expect(titleTooltip).toHaveClass(styles.createGroupTitleTooltip);
+  });
+
   it('auto-expands all sections in deferred deploy modal mode', () => {
     const instance = makeInstance({
       deferredDeploy: true,
@@ -569,6 +586,18 @@ describe('CreateSBTGroup render and image authoring', () => {
     expect(scss).toMatch(/@media\s*\(max-width:\s*600px\)\s*{[\s\S]*?\.addDocUrlSection\s*{[\s\S]*?>\s*\.inlineFieldLockControl\s*{[\s\S]*?order:\s*2;/);
     expect(scss).toMatch(/@media\s*\(max-width:\s*600px\)\s*{[\s\S]*?\.addDocUrlSection\s*{[\s\S]*?>\s*\.addDocUrlActionButton\s*{[\s\S]*?order:\s*3;[\s\S]*?width:\s*100%;/);
     expect(scss).toMatch(/@container\s+create-sbt-panel\s*\(max-width:\s*820px\)\s*{\s*@include\s+tokenInfoNarrowLayout;/);
+  });
+
+  it('keeps the create header tooltip large and pinned beside the title', () => {
+    const scssPath = path.join(__dirname, 'CreateSBTGroup.module.scss');
+    const scss = fs.readFileSync(scssPath, 'utf8');
+
+    expect(scss).toMatch(/\.headerContainer\s*{[\s\S]*?\.titleCluster\s*{[\s\S]*?display:\s*inline-flex;[\s\S]*?align-items:\s*center;[\s\S]*?gap:\s*14px;/);
+    expect(scss).toMatch(/\.createGroupTitle\s*{[\s\S]*?margin:\s*0;/);
+    expect(scss).toMatch(/\.createGroupTitleTooltip\s*{[\s\S]*?width:\s*1\.12em;[\s\S]*?height:\s*1\.12em;[\s\S]*?font-size:\s*clamp\(1\.9rem,\s*4\.7vw,\s*2\.45rem\);/);
+    expect(scss).toMatch(/@media\s*\(max-width:\s*900px\)\s*{[\s\S]*?\.titleCluster\s*{[\s\S]*?align-self:\s*flex-start;/);
+    expect(scss).toMatch(/@media\s*\(max-width:\s*600px\)\s*{[\s\S]*?\.createGroupTitle\s*{[\s\S]*?padding-right:\s*0;/);
+    expect(scss).toMatch(/@media\s*\(max-width:\s*600px\)\s*{[\s\S]*?\.createGroupTitleTooltip\s*{[\s\S]*?font-size:\s*clamp\(1\.9rem,\s*9vw,\s*2\.35rem\);/);
   });
 
   it('uses muted large section header titles and collapses open headers to chevrons only', () => {

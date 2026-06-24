@@ -2,6 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { t } from '../../utilities/ui/terminology.js';
 import SurveyQuestionsLockedQuestionsPanel from './SurveyQuestionsLockedQuestionsPanel';
 import styles from './SurveyTool.module.scss';
 
@@ -54,5 +55,30 @@ describe('SurveyQuestionsLockedQuestionsPanel', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SURVEY_LOCKED_BANNER_CARET));
 
     expect(onToggleDetails).toHaveBeenCalledTimes(1);
+  });
+
+  it('links required SBT names in the collapsed blocked subtitle', () => {
+    const href = '/group/0x1111111111111111111111111111111111111111?session=edge';
+    render(
+      <SurveyQuestionsLockedQuestionsPanel
+        hiddenMaskedQuestionIds={['q1']}
+        lockedGateDetails={[{
+          id: 'gate-1',
+          label: 'Session Access',
+          questionCount: 1,
+          sbts: [{
+            address: '0x1111111111111111111111111111111111111111',
+            href,
+            label: 'Participant Pass',
+          }],
+        }]}
+        subtitle={`${t('sbt')} required: Participant Pass. Connect an eligible ${t('walletLower')} to decrypt.`}
+      />
+    );
+
+    const link = screen.getByRole('link', { name: `Open ${t('sbt')} Participant Pass` });
+    expect(link).toHaveAttribute('href', href);
+    expect(screen.getByText(/Connect an eligible/)).toBeInTheDocument();
+    expect(screen.queryByText('Session Access')).not.toBeInTheDocument();
   });
 });

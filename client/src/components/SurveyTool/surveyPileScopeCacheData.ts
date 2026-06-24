@@ -1,3 +1,5 @@
+import { isPendingQuestionMetadataPlaceholder } from './surveyQuestionMetadataPlaceholders.js';
+
 type UnknownRecord = Record<string, unknown>;
 type PileScopeQuestionCacheItem = UnknownRecord & {
   id?: unknown;
@@ -110,6 +112,7 @@ export const loadPileScopeCacheSnapshot = async ({
     const blockedQuestionIds = getBlockedQuestionIdsSet(scopeSlug);
     Object.keys(networkCache.questions || {}).forEach((questionId) => {
       const question = networkCache.questions?.[questionId];
+      if (isPendingQuestionMetadataPlaceholder(question)) return;
       const normalizedQuestionId = normalizeQuestionIdKey(question?.id || questionId);
       if (!normalizedQuestionId || blockedQuestionIds.has(normalizedQuestionId)) return;
       if (seenQuestionIds.has(normalizedQuestionId)) return;

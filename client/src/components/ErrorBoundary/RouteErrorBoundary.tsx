@@ -1,5 +1,6 @@
 import React from 'react';
 import { PUBLIC_REPO_NEW_ISSUE_URL } from '../../variables/publicRepoMetadata.js';
+import { recoverFromStaleChunkLoadError } from '../../bootRecovery.js';
 
 type RouteErrorBoundaryProps = {
   children?: React.ReactNode;
@@ -29,6 +30,7 @@ class RouteErrorBoundary extends React.Component<RouteErrorBoundaryProps, RouteE
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('RouteErrorBoundary caught an error:', error, errorInfo && errorInfo.componentStack);
+    recoverFromStaleChunkLoadError(error);
   }
 
   componentDidUpdate(prevProps: RouteErrorBoundaryProps) {

@@ -10,7 +10,9 @@ import {
   sbtsListPath,
   mockGetRelevantBlockWindowForFilter,
   mockGetAllSessionEntries,
+  mockGetDemoSessionConfigBySlug,
   mockGetSessionChainId,
+  mockGetSessionConfigBySlug,
   mockSessionRegistryGetAllSessionEntries,
   mockReadSessionScanScope,
   mockReadSessionScanSlugs,
@@ -222,6 +224,239 @@ describe('SBTsList selector and initial loading status', () => {
     expect(screen.queryByText(/Loading latest block/i)).not.toBeInTheDocument();
     expect(mockGetRelevantBlockWindowForFilter).not.toHaveBeenCalled();
     expect(ensureLightSbtDiscovery).not.toHaveBeenCalled();
+  });
+
+  it('uses display session chain metadata to read demo alias SBT cache buckets', async () => {
+    const demoSbt = '0x00000000000000000000000000000000000000d1';
+    const demoCache = {
+      11155420: {
+        lastBlock: 12,
+        sbtList: {
+          [demoSbt.toLowerCase()]: {
+            sbtAddress: demoSbt,
+            slug: 'demo',
+            sbtInfo: {
+              name: 'Demo Group',
+              tokenURI: 'ar://demo',
+              mintingEndTime: 0,
+              burnAuth: 0,
+              hasPasswordMint: false,
+              maxTokens: '1',
+              admin: '0x00000000000000000000000000000000000000a1',
+              sessionSlug: 'demo',
+            },
+          },
+        },
+      },
+    };
+    const ensureLightSbtDiscovery = jest.fn().mockResolvedValue(undefined);
+
+    mockGetSessionChainId.mockImplementation((slug) => {
+      const normalized = String(slug || '').trim().toLowerCase();
+      if (normalized === 'demo') return null;
+      if (normalized === '') return 11155420;
+      return 84532;
+    });
+    mockGetSessionConfigBySlug.mockImplementation((slug) => (
+      String(slug || '').trim().toLowerCase() === 'demo'
+        ? null
+        : { sessionName: 'Alpha', blockLimits: { start: 1 } }
+    ));
+    mockGetDemoSessionConfigBySlug.mockImplementation((slug) => (
+      String(slug || '').trim().toLowerCase() === 'demo'
+        ? { slug: 'demo', sessionName: 'Demo', networkChainId: 11155420 }
+        : null
+    ));
+    mockPeekCacheSync.mockImplementation((_namespace, slug) => (
+      String(slug || '').trim().toLowerCase() === 'demo'
+        ? demoCache
+        : { 84532: { lastBlock: 0, sbtList: {} } }
+    ));
+    mockReadCache.mockImplementation(async (_namespace, slug) => (
+      String(slug || '').trim().toLowerCase() === 'demo'
+        ? demoCache
+        : { 84532: { lastBlock: 0, sbtList: {} } }
+    ));
+
+    renderSBTsList({
+      allSessionsMode: false,
+      isSBTCacheReady: false,
+      network: null,
+      sessionSlug: 'demo',
+      ensureLightSbtDiscovery,
+    });
+
+    await waitFor(() => {
+      expect(mockReadCache).toHaveBeenCalledWith('sbtCache', 'demo');
+    });
+    expect(ensureLightSbtDiscovery).not.toHaveBeenCalled();
+  });
+
+  it('renders cached demo alias groups before slow light discovery finishes', async () => {
+    const demoSbt = '0x0000000000000000000000000000000000000d42';
+    const demoCache = {
+      11155420: {
+        lastBlock: 1200,
+        sbtList: {
+          [demoSbt.toLowerCase()]: {
+            sbtAddress: demoSbt,
+            slug: 'demo',
+            sbtInfo: {
+              name: 'Cached Demo Group',
+              description: 'available from cache before live discovery finishes',
+              sessionSlug: 'demo',
+              sessionSlugExplicit: true,
+              mintingEndTime: 0,
+            },
+            mintedAddresses: [],
+            burnedAddresses: [],
+            countsLoaded: true,
+            blockNumber: 1200,
+          },
+        },
+      },
+    };
+    const pendingDiscovery = new Promise(() => {});
+    const ensureLightSbtDiscovery = jest.fn(() => pendingDiscovery);
+
+    mockReadSessionScanScope.mockReturnValue('list');
+    mockReadSessionScanSlugs.mockReturnValue(['demo']);
+    mockGetAllSessionEntries.mockReturnValue([
+      ['demo', { slug: 'demo', sessionName: 'Demo' }],
+    ]);
+    mockSessionRegistryGetAllSessionEntries.mockReturnValue([
+      ['demo', { slug: 'demo', sessionName: 'Demo' }],
+    ]);
+    mockGetSessionChainId.mockImplementation((slug) => {
+      const normalized = String(slug || '').trim().toLowerCase();
+      if (normalized === 'demo') return null;
+      if (normalized === '') return 11155420;
+      return 84532;
+    });
+    mockGetSessionConfigBySlug.mockImplementation((slug) => (
+      String(slug || '').trim().toLowerCase() === 'demo'
+        ? null
+        : { sessionName: 'Alpha', blockLimits: { start: 1 } }
+    ));
+    mockGetDemoSessionConfigBySlug.mockImplementation((slug) => (
+      String(slug || '').trim().toLowerCase() === 'demo'
+        ? {
+            slug: 'demo',
+            sessionName: 'Demo',
+            networkChainId: 11155420,
+            blockLimits: { start: 1 },
+            corsWorkerUrl: 'https://worker.example',
+          }
+        : null
+    ));
+    mockPeekCacheSync.mockReturnValue(null);
+    mockReadCache.mockImplementation(async (_namespace, slug) => (
+      String(slug || '').trim().toLowerCase() === 'demo'
+        ? demoCache
+        : { 84532: { lastBlock: 0, sbtList: {} } }
+    ));
+
+    renderSBTsList({
+      allSessionsMode: true,
+      isSBTCacheReady: false,
+      network: null,
+      sessionSlug: '',
+      ensureLightSbtDiscovery,
+    });
+
+    await waitFor(() => {
+      expect(ensureLightSbtDiscovery).toHaveBeenCalledWith(
+        'demo',
+        expect.objectContaining({ force: true, forceScopeSlug: 'demo' })
+      );
+    });
+    await waitFor(() => {
+      expect(screen.getByText('Cached Demo Group')).toBeInTheDocument();
+    });
+  });
+
+  it('uses the canonical general cache bucket for demo aliases backed by general config', async () => {
+    const generalSbt = '0x0000000000000000000000000000000000000d43';
+    const generalCache = {
+      11155420: {
+        lastBlock: 1400,
+        sbtList: {
+          [generalSbt.toLowerCase()]: {
+            sbtAddress: generalSbt,
+            sbtInfo: {
+              name: 'General Demo Group',
+              description: 'legacy general group visible through demo alias',
+              mintingEndTime: 0,
+            },
+            mintedAddresses: [],
+            burnedAddresses: [],
+            countsLoaded: true,
+            blockNumber: 1400,
+          },
+        },
+      },
+    };
+    const pendingDiscovery = new Promise(() => {});
+    const ensureLightSbtDiscovery = jest.fn(() => pendingDiscovery);
+
+    mockReadSessionScanScope.mockReturnValue('list');
+    mockReadSessionScanSlugs.mockReturnValue(['demo']);
+    mockGetAllSessionEntries.mockReturnValue([
+      ['demo', { slug: 'demo', sessionName: 'Demo' }],
+    ]);
+    mockSessionRegistryGetAllSessionEntries.mockReturnValue([
+      ['demo', { slug: 'demo', sessionName: 'Demo' }],
+    ]);
+    mockGetSessionChainId.mockImplementation((slug) => {
+      const normalized = String(slug || '').trim().toLowerCase();
+      if (normalized === 'demo') return null;
+      if (normalized === '') return 11155420;
+      return 84532;
+    });
+    mockGetSessionConfigBySlug.mockImplementation((slug) => (
+      String(slug || '').trim().toLowerCase() === 'demo'
+        ? null
+        : { sessionName: 'General', networkChainId: 11155420, blockLimits: { start: 1 } }
+    ));
+    mockGetDemoSessionConfigBySlug.mockImplementation((slug) => (
+      String(slug || '').trim().toLowerCase() === 'demo'
+        ? {
+            slug: '',
+            sessionName: 'Context Engine',
+            networkChainId: 11155420,
+            blockLimits: { start: 1 },
+            corsWorkerUrl: 'https://worker.example',
+          }
+        : null
+    ));
+    mockPeekCacheSync.mockReturnValue(null);
+    mockReadCache.mockImplementation(async (_namespace, slug) => {
+      const normalized = String(slug || '').trim().toLowerCase();
+      if (normalized === 'demo') return { 11155420: { lastBlock: 1400, sbtList: {} } };
+      if (normalized === '') return generalCache;
+      return { 84532: { lastBlock: 0, sbtList: {} } };
+    });
+
+    renderSBTsList({
+      allSessionsMode: true,
+      isSBTCacheReady: false,
+      network: null,
+      sessionSlug: '',
+      ensureLightSbtDiscovery,
+    });
+
+    await waitFor(() => {
+      expect(mockReadCache).toHaveBeenCalledWith('sbtCache', '');
+    });
+    await waitFor(() => {
+      expect(ensureLightSbtDiscovery).toHaveBeenCalledWith(
+        '',
+        expect.objectContaining({ force: true, forceScopeSlug: '' })
+      );
+    });
+    await waitFor(() => {
+      expect(screen.getByText('General Demo Group')).toBeInTheDocument();
+    });
   });
 
   it('exits initial loader when list-scope has no selectable slugs and registry is pending', async () => {

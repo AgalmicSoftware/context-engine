@@ -71,6 +71,21 @@ export type SurveyQuestionsSubmitControllerResult = {
   status: 'dispatched' | 'inert' | 'navigated' | 'unhandled';
 };
 
+export const resolveSubmitEffectiveDraftSlug = ({
+  draftSlug = '',
+  routeSlug = '',
+  normalizeSlug = null,
+}: {
+  draftSlug?: unknown;
+  routeSlug?: unknown;
+  normalizeSlug?: ((value: unknown) => string) | null;
+} = {}): string => {
+  const normalizeValue = typeof normalizeSlug === 'function'
+    ? normalizeSlug
+    : (value: unknown) => String(value ?? '').trim();
+  return normalizeValue(draftSlug) || normalizeValue(routeSlug);
+};
+
 export type RunSurveyQuestionsSubmitControllerArgs = {
   plan: SurveyQuestionsPrimarySubmitPlan;
   ports?: SurveyQuestionsSubmitControllerPorts;

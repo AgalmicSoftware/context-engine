@@ -2900,6 +2900,7 @@ class CreateSBTGroup extends Component<any, any> {
       documentIDHashes: docIDHashesArray,
       documentURLs: finalDocURLs,
       sessionSlug: metadataSessionSlug,
+      sessionSlugExplicit: true,
     };
 
     if (encryptedFields && typeof encryptedFields === 'object' && Object.keys(encryptedFields).length > 0) {
@@ -3905,8 +3906,15 @@ class CreateSBTGroup extends Component<any, any> {
     return (
       <div className={styles.createGroupExpanded} style={rootSurfaceStyle}>
         <div className={styles.headerContainer}>
-          <h1 className={styles.createGroupTitle}>{headerTitle}</h1>
-          <FontAwesomeIcon icon={faQuestionCircle} className={styles.tooltip} id="learnMoreTooltip" style={resolveCreateSbtTooltipIconStyle()} />
+          <div className={styles.titleCluster}>
+            <h1 className={styles.createGroupTitle}>{headerTitle}</h1>
+            <FontAwesomeIcon
+              icon={faQuestionCircle}
+              className={`${styles.tooltip} ${styles.createGroupTitleTooltip}`}
+              id="learnMoreTooltip"
+              style={resolveCreateSbtTooltipIconStyle()}
+            />
+          </div>
           <CETooltip placement="right" target="learnMoreTooltip" delay={{ show: 0, hide: 5000 }} className={styles.tooltipBubble}>
             {SBT_TOOLTIP_LABEL} enable groups to organize membership, roles, and permissions on-chain. <br />
             <a href="https://www.radicalxchange.org/wiki/social-identity/" target="_blank" rel="noopener noreferrer">

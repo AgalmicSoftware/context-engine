@@ -22,6 +22,7 @@ type SurveyToolSessionInput = {
   pathname?: string;
   activeSessionSlug?: string | null;
   sessionSlug?: string | null;
+  sessionSlugPinned?: boolean;
 };
 
 type SurveyToolNetworkScopedInput = {
@@ -98,7 +99,14 @@ const buildSurveyToolSessionSource = ({
   pathname,
   activeSessionSlug,
   sessionSlug,
+  sessionSlugPinned = false,
 }: SurveyToolSessionInput = {}): SurveyToolSessionSource => {
+  if (sessionSlugPinned === true) {
+    return {
+      sessionSlug: normalizeSessionSlug(sessionSlug ?? activeSessionSlug ?? ''),
+    };
+  }
+
   const routeSlug = resolveSessionSlugFromPathname(pathname);
   if (routeSlug !== null) {
     return { sessionSlug: routeSlug };

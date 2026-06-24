@@ -78,6 +78,7 @@ describe('contractScripts session resolution helpers', () => {
   it('keeps demo-only helper defaults fail-closed in on-chain mode', () => {
     expect(demoSessions.general.slug).toBe('');
     expect(getDemoSessionConfigBySlug(' GeNeRal!!! ')).toBeNull();
+    expect(getDemoSessionConfigBySlug('demo')).toBeNull();
     expect(getDemoSessionConfigBySlug('DEBATE')).toBeNull();
   });
 
@@ -88,7 +89,35 @@ describe('contractScripts session resolution helpers', () => {
         sessionName: 'Context Engine',
       })
     );
+    expect(getDemoSessionConfigBySlug('demo', { allowDemoFallback: true })).toEqual(
+      expect.objectContaining({
+        slug: '',
+        sessionName: 'Context Engine',
+      })
+    );
     expect(getDemoSessionConfigBySlug('DEBATE', { allowDemoFallback: true })).toBeNull();
+  });
+
+  it('exposes demo-1 through explicit demo fallback without weakening strict registry lookup', () => {
+    expect(getSessionConfigBySlug('demo-1')).toBeNull();
+    expect(getSessionConfigBySlugOrDefault('demo-1')).toBeNull();
+    expect(getDemoSessionConfigBySlug('demo-1', { allowDemoFallback: true })).toEqual(
+      expect.objectContaining({
+        slug: 'demo-1',
+        networkChainId: 11155420,
+        blockLimits: expect.objectContaining({ start: 44967477 }),
+        contracts: expect.objectContaining({
+          surveys: expect.objectContaining({
+            address: '0x59664B9dA510a33F2edB7E14Cf0c2749bf506B8A',
+          }),
+        }),
+        defaultFeaturedSBTs: expect.arrayContaining([
+          '0x29563ff3aCC8AFb220D810F8022218095e25C1f6',
+          '0x5d2f0207B7EB26e807C4a12f2A185928558C00b9',
+          '0xeAe3498C31302B421E19Cf30A3e87E814ae5C955',
+        ]),
+      })
+    );
   });
 
   it('does not silently demo-fallback non-general shared getters in on-chain mode', () => {

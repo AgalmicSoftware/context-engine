@@ -6,6 +6,7 @@ import {
   resolveMainSiteRouteSessionIdHint,
   resolveMainSiteRouteSessionSlugHint,
   resolveMainSiteSessionRouteContext,
+  resolveMainSiteSessionRouteSourceSlug,
   resolveMainSiteSessionSlugFromProps,
   resolveMainSiteSessionSlugFromPathToken,
 } from './routeSessionResolution.js';
@@ -309,6 +310,91 @@ describe('routeSessionResolution', () => {
 
     expect(resolveSessionConfigBySlug).toHaveBeenCalledWith('rxc');
     expect(resolveDisplaySessionConfigBySlug).toHaveBeenCalledWith('rxc');
+  });
+
+  it('fills demo display fields without replacing registry worker or gate config', () => {
+    const registryConfig = {
+      slug: 'demo-1',
+      sessionName: 'Registry Demo',
+      networkChainId: 11155420,
+      corsWorkerUrl: 'https://registry-worker.example',
+      sponsoredKeys: { arweave: true, faucet: true },
+      __registry: {
+        metadataURI: 'ar://registry-metadata',
+        gatesByResource: {
+          arweave: { lookupStatus: 'ok', sbtAddresses: [] },
+        },
+      },
+      contracts: {
+        surveys: { address: '0xregistry' },
+      },
+      blockLimits: { start: 44967477, end: null },
+    };
+    const displayConfig = {
+      slug: 'demo-1',
+      sessionName: 'Demo Session',
+      defaultFeaturedSBTs: ['0x29563ff3aCC8AFb220D810F8022218095e25C1f6'],
+      featured_SBTs_LIST: ['0x5d2f0207B7EB26e807C4a12f2A185928558C00b9'],
+      demoCompatibilitySeed: {
+        temporary: true,
+        sourceSessionSlug: 'demo',
+      },
+      corsWorkerUrl: '',
+      sponsoredKeys: {},
+      contracts: {
+        surveys: { address: '0xfixture' },
+      },
+      blockLimits: { start: 1, end: null },
+    };
+
+    const result = resolveMainSiteSessionRouteContext({
+      sessionTokenRaw: 'demo-1',
+      formatSessionId: () => null,
+      resolveSessionConfigById: () => null,
+      resolveSessionConfigBySlug: () => registryConfig,
+      resolveDisplaySessionConfigBySlug: () => displayConfig,
+      resolveSessionSlugFromPathToken: () => 'demo-1',
+    });
+
+    expect(result.sessionConfig).toMatchObject({
+      slug: 'demo-1',
+      sessionName: 'Demo Session',
+      corsWorkerUrl: 'https://registry-worker.example',
+      sponsoredKeys: { arweave: true, faucet: true },
+      __registry: registryConfig.__registry,
+      contracts: registryConfig.contracts,
+      blockLimits: registryConfig.blockLimits,
+      defaultFeaturedSBTs: ['0x29563ff3aCC8AFb220D810F8022218095e25C1f6'],
+      featured_SBTs_LIST: ['0x5d2f0207B7EB26e807C4a12f2A185928558C00b9'],
+      demoCompatibilitySeed: {
+        temporary: true,
+        sourceSessionSlug: 'demo',
+      },
+    });
+  });
+
+  it('uses the default bucket as the source slug for the built-in demo route only', () => {
+    expect(resolveMainSiteSessionRouteSourceSlug({
+      sessionTokenRaw: 'demo',
+      sessionSlug: 'demo',
+      sessionConfig: { slug: '', sessionName: 'Context Engine' },
+    })).toBe('');
+
+    expect(resolveMainSiteSessionRouteSourceSlug({
+      sessionTokenRaw: 'demo',
+      sessionSlug: 'demo',
+      sessionConfig: {
+        slug: 'demo',
+        sessionName: 'Registry Demo',
+        __registry: { sessionIdHex: '0xabc' },
+      },
+    })).toBe('demo');
+
+    expect(resolveMainSiteSessionRouteSourceSlug({
+      sessionTokenRaw: 'rxc',
+      sessionSlug: 'rxc',
+      sessionConfig: { slug: 'rxc', sessionName: 'Weyl v. Yarvin Debate' },
+    })).toBe('rxc');
   });
 
   it('resolves non-UUID tokens directly via slug normalization', () => {

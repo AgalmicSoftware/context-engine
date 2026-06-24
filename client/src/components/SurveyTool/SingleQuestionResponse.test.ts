@@ -505,6 +505,15 @@ describe('SingleQuestionResponse rating rendering', () => {
 });
 
 describe('SingleQuestionResponse encrypted answer CTA variants', () => {
+  const litEncryptedPortion = JSON.stringify({
+    v: 1,
+    cipher: 'aes-gcm-256',
+    recipients: [
+      { type: 'self-eip712-v1' },
+      { type: 'lit-sbt-v1', lit: { chain: 'optimismSepolia' } },
+    ],
+  });
+
   it('renders only the decrypt button for compact encrypted-answer CTA mode', () => {
     const subject = createSubject({
       question: { id: 'q1', type: 'freeform', prompt: 'Prompt' },
@@ -563,6 +572,34 @@ describe('SingleQuestionResponse encrypted answer CTA variants', () => {
     const markup = renderToStaticMarkup(subject.renderSinglePersonView());
     expect(markup).toContain('This answer is encrypted.');
     expect(markup).not.toContain('Decrypt Answer');
+  });
+
+  it('renders decrypt for viewed Lit-gated responses even before session gate context resolves', () => {
+    const onDecryptQuestion = jest.fn();
+    const subject = createSubject({
+      question: { id: 'q1', type: 'freeform', prompt: 'Prompt' },
+      response: {
+        answer: { value: '*', encrypted: true, encryptedPortion: litEncryptedPortion },
+        additional: { value: '', encrypted: false },
+        conviction: null,
+      },
+      isOwnResponse: false,
+      mode: 'fullscreen',
+      showImportance: false,
+      onDecryptQuestion,
+      canDecryptOtherResponses: false,
+    });
+
+    const tree = subject.renderSinglePersonView();
+    const decryptButton = findElement(tree, (node) => node?.props?.children === 'Decrypt Answer');
+
+    expect(renderToStaticMarkup(tree)).toContain('Decrypt Answer');
+    expect(decryptButton).not.toBeNull();
+    decryptButton.props.onClick();
+
+    expect(onDecryptQuestion).toHaveBeenCalledWith('q1', 'answer', expect.objectContaining({
+      answer: expect.objectContaining({ encryptedPortion: litEncryptedPortion }),
+    }));
   });
 });
 

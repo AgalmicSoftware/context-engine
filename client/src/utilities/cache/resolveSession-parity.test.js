@@ -98,6 +98,7 @@ const getMockRegistrySessions = () => {
 const mockSessionRegistryGetSessionConfig = jest.fn();
 const mockSessionRegistryReadCache = jest.fn();
 const mockSessionRegistryGetAllSessionEntries = jest.fn();
+const mockSessionRegistryRefreshSessionRegistryFieldsCache = jest.fn();
 const mockOverlayCachedSessionWorkerConfig = jest.fn();
 
 const resetResolverMockImplementations = () => {
@@ -120,6 +121,9 @@ const resetResolverMockImplementations = () => {
     Object.entries(getMockRegistrySessions()).map(([key, value]) => [key, deepClone(value)])
   ));
 
+  mockSessionRegistryRefreshSessionRegistryFieldsCache.mockReset();
+  mockSessionRegistryRefreshSessionRegistryFieldsCache.mockResolvedValue(undefined);
+
   mockOverlayCachedSessionWorkerConfig.mockReset();
   mockOverlayCachedSessionWorkerConfig.mockImplementation(({ sessionConfig }) => sessionConfig);
 };
@@ -139,6 +143,10 @@ const installResolverMocks = ({ useOnchainRegistry }) => {
         getSessionConfig: mockSessionRegistryGetSessionConfig,
         readCache: mockSessionRegistryReadCache,
         getAllSessionEntries: mockSessionRegistryGetAllSessionEntries,
+      },
+      refreshSessionRegistryFieldsCache: mockSessionRegistryRefreshSessionRegistryFieldsCache,
+      sessionRegistryUtils: {
+        refreshSessionRegistryFieldsCache: mockSessionRegistryRefreshSessionRegistryFieldsCache,
       },
     };
   });

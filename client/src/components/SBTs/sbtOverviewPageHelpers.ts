@@ -21,6 +21,10 @@ export type SBTsPageFeaturedProgressLike = SBTsPageUnknownRecord & {
 };
 export type SBTsPageFeaturedSbtMetadataLike = SBTsPageUnknownRecord & {
   image?: unknown;
+  imageEncrypted?: unknown;
+  imageLocked?: unknown;
+  encryptedImage?: unknown;
+  encryptedFields?: unknown;
   mintingEndTime?: unknown;
   hasPasswordMint?: unknown;
   sessionSlug?: unknown;
@@ -93,6 +97,9 @@ type ResolveSBTsPageInitialCreateGroupSessionSlugArgs = {
   activeSessionSlug?: unknown;
   sessionConfig?: SBTsPageSessionConfigLike | null;
   sessionSlug?: unknown;
+};
+type ResolveSBTsPageFeaturedSbtSessionSlugOptions = {
+  requireExplicitSessionSlug?: unknown;
 };
 type BuildSBTsPageInitialStateArgs = ResolveSBTsPageInitialCreateGroupSessionSlugArgs & {
   hasCachedCreateSbtForm?: SBTsPageCreateFormCacheChecker | null;
@@ -174,7 +181,25 @@ export const normalizeSBTsPageFeaturedCardImageUrl = (value: unknown): string =>
   const raw = String(value || '').trim();
   if (!raw) return '';
   if (/^ipfs:\/\//i.test(raw)) return `https://ipfs.io/ipfs/${raw.replace(/^ipfs:\/\//i, '')}`;
-  return normalizeArweaveUrl(raw, { contextLabel: 'sbt_page_featured_image' });
+  return normalizeArweaveUrl(raw, {
+    contextLabel: 'sbt_page_featured_image',
+    gateway: 'https://arweave.net',
+  });
+};
+
+export const hasSBTsPageCacheFeaturedCardImageMetadata = (infoInput: unknown): boolean => {
+  const info = asSBTsPageFeaturedSbt(infoInput) as SBTsPageFeaturedSbtMetadataLike | null;
+  if (!info) return false;
+  if (normalizeSBTsPageFeaturedCardImageUrl(info.image)) return true;
+  return (
+    info.imageLocked === true ||
+    !!info.imageEncrypted ||
+    !!info.encryptedImage ||
+    !!(
+      isSBTsPageRecord(info.encryptedFields) &&
+      info.encryptedFields.image
+    )
+  );
 };
 
 export const buildSBTsPageCacheFeaturedCardModel = ({
@@ -339,10 +364,30 @@ export const hasSBTsPageAuthoritativeSessionSlug = (obj: unknown): boolean => {
   return obj.sessionSlugExplicit === true || !hasExplicitFlag;
 };
 
-export const resolveSBTsPageFeaturedSbtSessionSlug = (sbt: unknown): string => {
+export const hasSBTsPageExplicitSessionSlug = (obj: unknown): boolean => (
+  hasSBTsPageOwn(obj, 'sessionSlug') &&
+  (obj as SBTsPageUnknownRecord).sessionSlugExplicit === true
+);
+
+export const resolveSBTsPageFeaturedSbtSessionSlug = (
+  sbt: unknown,
+  {
+    requireExplicitSessionSlug = false,
+  }: ResolveSBTsPageFeaturedSbtSessionSlugOptions = {}
+): string | null => {
   const sbtRecord = asSBTsPageFeaturedSbt(sbt);
-  if (!sbtRecord) return '';
+  if (!sbtRecord) return null;
   const info = asSBTsPageFeaturedSbt(sbtRecord.sbtInfo) || {};
+
+  if (requireExplicitSessionSlug) {
+    if (hasSBTsPageExplicitSessionSlug(info)) {
+      return normalizeSessionSlug(info?.sessionSlug || '');
+    }
+    if (hasSBTsPageExplicitSessionSlug(sbtRecord)) {
+      return normalizeSessionSlug(sbtRecord?.sessionSlug || '');
+    }
+    return null;
+  }
 
   if (hasSBTsPageAuthoritativeSessionSlug(info)) {
     return normalizeSessionSlug(info?.sessionSlug || '');
@@ -357,7 +402,7 @@ export const resolveSBTsPageFeaturedSbtSessionSlug = (sbt: unknown): string => {
     return normalizeSessionSlug(legacyRaw);
   }
 
-  return '';
+  return null;
 };
 
 export const normalizeSBTsPageFeaturedEntries = (

@@ -1,9 +1,16 @@
 import {
   buildActiveTagModalState,
+  buildAdditionalEncryptionAudienceState,
+  buildAdditionalEncryptionToggleResponseState,
+  buildAnswerEncryptionAudienceState,
+  buildAnswerEncryptionToggleResponseState,
+  buildAutoDecryptAttemptedState,
+  buildAutoDecryptToggleState,
   buildAutoDecryptDisabledState,
   buildBookmarkedQuestionsState,
   buildBulkPromptReloadingState,
   buildCanDecryptOtherResponsesState,
+  buildCommentsToggleState,
   buildClearedSurveyQuestionPoolState,
   buildCopiedQuestionsJsonState,
   buildCopiedResponseJsonState,
@@ -12,18 +19,40 @@ import {
   buildCurrentStepState,
   buildDecryptEditFailureState,
   buildDecryptEditStartState,
+  buildDecryptingByKeyState,
+  buildDisplayAnswerModeToggleState,
   buildDisplayAnswerModeState,
+  buildEditStatsState,
   buildEditingResponseModeState,
+  buildFetchedQuestionPoolState,
+  buildGateSbtNameRevisionState,
   buildHasherState,
   buildHydratingPriorResponsesState,
   buildInitialSurveyQuestionsState,
+  buildInitialStandaloneResponseState,
+  buildInitialSurveyResponseState,
   buildJsonPreviewState,
+  buildLockAudienceGateDetailsState,
+  buildLockAudienceMenuState,
+  buildLockedGateDetailsExpandedState,
   buildParsedViewAddressAnswersState,
   buildPrefillQueuedAfterCacheState,
+  buildQuestionsJsonToggleState,
+  buildQuestionPoolResponseMergeState,
+  buildRenderedQuestionPayloadPoolsState,
   buildResponseEditCompleteState,
+  buildResponseHydrationInvalidatedState,
   buildResponseLoadingResetState,
+  buildResponseJsonToggleState,
   buildShowJsonState,
+  buildSingleQuestionPlaceholderHydrationState,
+  buildSingleQuestionPoolFallbackState,
+  buildSingleQuestionReadyHydrationState,
+  buildSingleQuestionRetryLoadingState,
   buildStandaloneAuthResetState,
+  buildSurveyJsonToggleState,
+  buildSurveyResponseFetchLoadingState,
+  buildSurveyResponseMergeState,
   buildSubmitFailureState,
   buildSubmitPreparationErrorState,
   buildSubmitSuccessState,
@@ -53,7 +82,12 @@ import {
   buildSurveyQuestionsSubmitReadinessDescriptor,
   buildSurveyUserEditResponseStatePatch,
   buildSurveyQuestionPoolLoadState,
+  buildVisiblePileQuestionsAfterPromptDecryptState,
   buildViewingResponseModeState,
+  buildViewedSurveyNoResponseState,
+  buildViewedSurveyResponseState,
+  buildUserSurveyResponseFoundState,
+  buildUserSurveyResponseMissingState,
   isSurveyQuestionsMaskedPromptText,
   resolveSurveyQuestionsIconGlowClassName,
   SURVEY_QUESTIONS_SUBMISSION_ERROR_STYLE,
@@ -879,7 +913,20 @@ describe('surveyQuestionsTypes', () => {
     const decryptedPrompt = { id: 'Q2', prompt: '[encrypted]', promptDecrypted: true };
     const plainPrompt = { id: 'Q3', prompt: 'Plain prompt' };
     const anonymousMaskedPrompt = { prompt: '[encrypted]' };
+    const pendingMetadataPlaceholder = {
+      id: 'QPending',
+      prompt: '[encrypted]',
+      __ceQuestionMetadataPending: true,
+    };
     const questionPool = [
+      encryptedPrompt,
+      decryptedPrompt,
+      plainPrompt,
+      anonymousMaskedPrompt,
+      null,
+      pendingMetadataPlaceholder,
+    ];
+    const concreteQuestionPool = [
       encryptedPrompt,
       decryptedPrompt,
       plainPrompt,
@@ -893,7 +940,7 @@ describe('surveyQuestionsTypes', () => {
       questionPool,
       singleQuestionMode: false,
     })).toEqual({
-      fullQuestionPool: questionPool,
+      fullQuestionPool: concreteQuestionPool,
       visibleQuestionPool: [decryptedPrompt, plainPrompt, null],
       hiddenMaskedQuestionIds: ['q1'],
     });
@@ -901,8 +948,8 @@ describe('surveyQuestionsTypes', () => {
       questionPool,
       singleQuestionMode: true,
     })).toEqual({
-      fullQuestionPool: questionPool,
-      visibleQuestionPool: questionPool,
+      fullQuestionPool: concreteQuestionPool,
+      visibleQuestionPool: concreteQuestionPool,
       hiddenMaskedQuestionIds: [],
     });
 
@@ -943,6 +990,32 @@ describe('surveyQuestionsTypes', () => {
       shouldShowLoadingState: false,
       gatedEmptyStateReady: false,
       hasHiddenMaskedQuestions: false,
+    });
+  });
+
+  it('keeps render readiness loading when only pending metadata placeholders exist', () => {
+    const responseSlice = { answers: {} };
+    const descriptor = buildSurveyQuestionsRenderReadinessDescriptor({
+      fullQuestionPool: [],
+      hiddenMaskedQuestionIds: [],
+      isQuestionCacheReady: false,
+      questionPool: [{
+        id: 'qpending',
+        prompt: '[encrypted]',
+        __ceQuestionMetadataPending: true,
+      }],
+      singleQuestionMode: false,
+      surveyIndex: 0,
+      surveysResponseState: [responseSlice],
+      visibleQuestionPool: [],
+    });
+
+    expect(descriptor).toMatchObject({
+      currentSurveyResponseState: responseSlice,
+      questionPoolReady: false,
+      gatedEmptyStateReady: false,
+      hasHiddenMaskedQuestions: false,
+      shouldShowLoadingState: true,
     });
   });
 
@@ -1174,6 +1247,75 @@ describe('surveyQuestionsTypes', () => {
     expect(toggleShowJsonState({ showJson: true })).toEqual({
       showJson: false,
     });
+    expect(buildAutoDecryptToggleState({ autoDecryptEnabled: false })).toEqual({
+      autoDecryptEnabled: true,
+    });
+    expect(buildAutoDecryptToggleState({ autoDecryptEnabled: true })).toEqual({
+      autoDecryptEnabled: false,
+    });
+    expect(buildDisplayAnswerModeToggleState({ displayAnswerMode: false })).toEqual({
+      displayAnswerMode: true,
+      isEditing: true,
+    });
+    expect(buildDisplayAnswerModeToggleState({ displayAnswerMode: true })).toEqual({
+      displayAnswerMode: false,
+      isEditing: false,
+    });
+    expect(buildQuestionsJsonToggleState({ showQuestionsJson: false })).toEqual({
+      showQuestionsJson: true,
+    });
+    expect(buildResponseJsonToggleState({ showResponseJson: true })).toEqual({
+      showResponseJson: false,
+    });
+    expect(buildSurveyJsonToggleState({ showSurveyJson: false })).toEqual({
+      showSurveyJson: true,
+    });
+    expect(buildCommentsToggleState({ showComments: { q1: true } }, 'q1')).toEqual({
+      showComments: { q1: false },
+    });
+    expect(buildCommentsToggleState({ showComments: {} }, 'q2', true)).toEqual({
+      showComments: { q2: false },
+    });
+    expect(buildGateSbtNameRevisionState({ gateSbtNameRevision: 2 })).toEqual({
+      gateSbtNameRevision: 3,
+    });
+    expect(buildLockedGateDetailsExpandedState({ lockedGateDetailsExpanded: false })).toEqual({
+      lockedGateDetailsExpanded: true,
+    });
+    expect(buildLockAudienceGateDetailsState(
+      { lockAudienceGateDetailsByQuestion: { q1: ' gate-a ' } },
+      'q1',
+      'gate-a',
+      'gate-a',
+      (value) => String(value || '').trim().toLowerCase()
+    )).toEqual({
+      lockAudienceGateDetailsByQuestion: {},
+    });
+    expect(buildLockAudienceGateDetailsState(
+      { lockAudienceGateDetailsByQuestion: { q1: ' Gate A ' } },
+      'q1',
+      'gate-b',
+      'gate-b',
+      (value) => String(value || '').trim().toLowerCase()
+    )).toEqual({
+      lockAudienceGateDetailsByQuestion: { q1: 'gate-b' },
+    });
+    expect(buildLockAudienceMenuState(
+      { lockAudienceMenuByQuestion: {}, lockAudienceGateDetailsByQuestion: { q1: 'gate-a' } },
+      'q1',
+      null
+    )).toEqual({
+      lockAudienceMenuByQuestion: { q1: true },
+      lockAudienceGateDetailsByQuestion: { q1: 'gate-a' },
+    });
+    expect(buildLockAudienceMenuState(
+      { lockAudienceMenuByQuestion: { q1: true }, lockAudienceGateDetailsByQuestion: { q1: 'gate-a' } },
+      'q1',
+      null
+    )).toEqual({
+      lockAudienceMenuByQuestion: {},
+      lockAudienceGateDetailsByQuestion: {},
+    });
     expect(buildPrefillQueuedAfterCacheState(true)).toEqual({
       prefillQueuedAfterCache: true,
     });
@@ -1207,5 +1349,478 @@ describe('surveyQuestionsTypes', () => {
     expect(buildCopiedSurveyJsonState(1)).toEqual({
       copiedSurveyJson: true,
     });
+  });
+
+  it('builds SurveyQuestions prompt decrypt state patches', () => {
+    const deps = {
+      pickBetterQuestionPayload: (_existing, incoming) => incoming,
+      areQuestionPayloadsEquivalent: (left, right) => JSON.stringify(left) === JSON.stringify(right),
+    };
+    const renderedPatch = buildRenderedQuestionPayloadPoolsState(
+      {
+        questionPool: [{ id: 'q1', prompt: '[encrypted]' }],
+        pileQuestions: [{ id: 'q1', prompt: '[encrypted]' }, { id: 'q2', prompt: 'open' }],
+        allQuestionsForFilter: [{ id: 'q1', prompt: '[encrypted]' }],
+      },
+      'Q1',
+      { prompt: 'Decrypted prompt', promptDecrypted: true },
+      deps
+    );
+    expect(renderedPatch).toEqual({
+      questionPool: [{ id: 'q1', prompt: 'Decrypted prompt', promptDecrypted: true }],
+      pileQuestions: [
+        { id: 'q1', prompt: 'Decrypted prompt', promptDecrypted: true },
+        { id: 'q2', prompt: 'open' },
+      ],
+      allQuestionsForFilter: [{ id: 'q1', prompt: 'Decrypted prompt', promptDecrypted: true }],
+    });
+    expect(buildRenderedQuestionPayloadPoolsState(
+      { questionPool: [{ id: 'q2', prompt: 'open' }] },
+      'q1',
+      { prompt: 'unused' },
+      deps
+    )).toBeNull();
+
+    expect(buildDecryptingByKeyState({ decryptingByKey: { old: true } }, 'q1:prompt', true)).toEqual({
+      decryptingByKey: { old: true, 'q1:prompt': true },
+    });
+    expect(buildDecryptingByKeyState({ decryptingByKey: { 'q1:prompt': true } }, 'q1:prompt', false)).toEqual({
+      decryptingByKey: { 'q1:prompt': false },
+    });
+    expect(buildAutoDecryptAttemptedState({ autoDecryptAttempted: { old: true } }, 'q1:answer')).toEqual({
+      autoDecryptAttempted: { old: true, 'q1:answer': true },
+    });
+
+    const promptDeps = {
+      isFilterStateActive: () => false,
+      isMaskedPromptText: (prompt) => prompt === '[encrypted]',
+    };
+    expect(buildVisiblePileQuestionsAfterPromptDecryptState(
+      {
+        allQuestionsForFilter: [
+          { id: 'q1', prompt: 'ready', promptDecrypted: true },
+          { id: 'q2', prompt: '[encrypted]' },
+          { id: 'q3', prompt: 'open' },
+        ],
+        pileQuestions: [
+          { id: 'q1', prompt: 'ready' },
+          { id: 'q2', prompt: '[encrypted]' },
+          { id: 'q3', prompt: 'open' },
+        ],
+        activePileIndex: 2,
+        hasHiddenGatedQuestions: false,
+      },
+      promptDeps
+    )).toEqual({
+      pileQuestions: [
+        { id: 'q1', prompt: 'ready', promptDecrypted: true },
+        { id: 'q3', prompt: 'open' },
+      ],
+      hasHiddenGatedQuestions: true,
+      activePileIndex: 1,
+    });
+    expect(buildVisiblePileQuestionsAfterPromptDecryptState(
+      { allQuestionsForFilter: [{ id: 'q1', prompt: 'ready' }], isFilterActive: true },
+      promptDeps
+    )).toBeNull();
+  });
+
+  it('builds SurveyQuestions lifecycle hydration state patches', () => {
+    expect(buildResponseHydrationInvalidatedState()).toEqual({
+      isLoadingResponse: false,
+    });
+    expect(buildInitialSurveyResponseState({
+      surveysResponseState: [{ answers: { q1: 'yes' } }],
+      editBaseline: { answers: { q1: 'yes' } },
+    })).toEqual({
+      surveysResponseState: [{ answers: { q1: 'yes' } }],
+      editBaseline: { answers: { q1: 'yes' } },
+    });
+    expect(buildInitialStandaloneResponseState({
+      surveysResponseState: [{ answers: { q1: 'yes' } }],
+      editBaseline: { answers: { q1: 'yes' } },
+      jsonPreview: '{"q1":"yes"}',
+    })).toEqual({
+      surveysResponseState: [{ answers: { q1: 'yes' } }],
+      editBaseline: { answers: { q1: 'yes' } },
+      jsonPreview: '{"q1":"yes"}',
+    });
+
+    const calls = [];
+    const mergeSurveyResponseState = (currentState, questionPool, surveyIndex) => {
+      calls.push({ currentState, questionPool, surveyIndex });
+      return [{ merged: surveyIndex, currentState, questionPool }];
+    };
+    expect(buildQuestionPoolResponseMergeState(
+      {
+        surveysResponseState: [{ answers: { q1: 'draft' } }],
+        editBaseline: { answers: { q1: 'baseline' } },
+      },
+      {
+        includeQuestionPool: true,
+        mergeSurveyResponseState,
+        questionPool: [{ id: 'q1' }],
+        surveyIndex: 2,
+      }
+    )).toEqual({
+      questionPool: [{ id: 'q1' }],
+      surveysResponseState: [{
+        merged: 2,
+        currentState: [{ answers: { q1: 'draft' } }],
+        questionPool: [{ id: 'q1' }],
+      }],
+      editBaseline: {
+        merged: 0,
+        currentState: [{ answers: { q1: 'baseline' } }],
+        questionPool: [{ id: 'q1' }],
+      },
+    });
+    expect(calls).toEqual([
+      {
+        currentState: [{ answers: { q1: 'draft' } }],
+        questionPool: [{ id: 'q1' }],
+        surveyIndex: 2,
+      },
+      {
+        currentState: [{ answers: { q1: 'baseline' } }],
+        questionPool: [{ id: 'q1' }],
+        surveyIndex: 0,
+      },
+    ]);
+
+    expect(buildSurveyResponseMergeState(
+      { surveysResponseState: [{ answers: { q1: 'draft' } }] },
+      {
+        mergeSurveyResponseState,
+        questionPool: [{ id: 'q2' }],
+        surveyIndex: 3,
+      }
+    )).toEqual({
+      surveysResponseState: [{
+        merged: 3,
+        currentState: [{ answers: { q1: 'draft' } }],
+        questionPool: [{ id: 'q2' }],
+      }],
+    });
+  });
+
+  it('builds SurveyQuestions response and question-pool state patches', () => {
+    expect(buildEditStatsState({
+      encryptedModifiedCount: 1,
+      hasEncryptedChanges: true,
+      isDirty: true,
+      modifiedCount: 2,
+      shouldRelatchSubmitted: true,
+      shouldResetSubmitted: true,
+    })).toEqual({
+      modifiedCount: 2,
+      encryptedModifiedCount: 1,
+      hasEncryptedChanges: true,
+      isDirty: true,
+      submissionComplete: false,
+      submittedSinceLastEdit: true,
+    });
+
+    const poolDeps = {
+      areQuestionPayloadsEquivalent: (left, right) => JSON.stringify(left) === JSON.stringify(right),
+      buildQuestionIdScopeSignature: (pool) => (Array.isArray(pool) ? pool.map((q) => q.id).join('|') : ''),
+      normalizeQuestionIdKey: (qid) => String(qid || '').trim().toLowerCase(),
+      pickBetterQuestionPayload: (_existing, incoming) => incoming,
+    };
+    expect(buildFetchedQuestionPoolState(
+      {
+        questionPool: [{ id: 'q1', prompt: 'old' }],
+        questionPoolExpectedIds: ['q1'],
+        questionPoolPendingIds: [],
+      },
+      {
+        ...poolDeps,
+        expectedQuestionIds: ['q1'],
+        pendingQuestionIds: ['q2'],
+        questionPool: [{ id: 'Q1', prompt: 'new' }],
+      }
+    )).toEqual({
+      questionPool: [{ id: 'q1', prompt: 'new' }],
+      questionPoolExpectedIds: ['q1'],
+      questionPoolPendingIds: ['q2'],
+    });
+    const onNoop = jest.fn();
+    expect(buildFetchedQuestionPoolState(
+      {
+        questionPool: [{ id: 'q1', prompt: 'old' }],
+        questionPoolExpectedIds: ['q1'],
+        questionPoolPendingIds: [],
+      },
+      {
+        ...poolDeps,
+        onNoop,
+        pickBetterQuestionPayload: (existing) => existing,
+        expectedQuestionIds: ['q1'],
+        pendingQuestionIds: [],
+        questionPool: [{ id: 'q1', prompt: 'old' }],
+      }
+    )).toBeNull();
+    expect(onNoop).toHaveBeenCalledTimes(1);
+
+    const encryptionDeps = { marker: 'deps' };
+    const encryptionPlanInputs = [];
+    const buildEncryptionTogglePlan = jest.fn((qid, field, newEncryptedState, slice) => {
+      encryptionPlanInputs.push(JSON.parse(JSON.stringify(slice)));
+      return {
+        clearMenus: field === 'answer',
+        nextAdditionalState: field === 'answer' ? { inheritedFrom: qid } : undefined,
+        nextFieldState: { encrypted: newEncryptedState, field },
+      };
+    });
+    expect(buildAnswerEncryptionToggleResponseState(
+      {
+        lockAudienceGateDetailsByQuestion: { q1: 'gate-a' },
+        lockAudienceMenuByQuestion: { q1: true },
+        submittedSinceLastEdit: true,
+        surveysResponseState: [{ answers: {}, additionalComments: {} }],
+      },
+      {
+        buildEncryptionTogglePlan,
+        deps: encryptionDeps,
+        newEncryptedState: true,
+        questionId: 'q1',
+        surveyIndex: 0,
+      }
+    )).toMatchObject({
+      surveysResponseState: [{
+        answers: { q1: { encrypted: true, field: 'answer' } },
+        additionalComments: { q1: { inheritedFrom: 'q1' } },
+      }],
+      lockAudienceMenuByQuestion: {},
+      lockAudienceGateDetailsByQuestion: {},
+      submittedSinceLastEdit: false,
+    });
+    expect(buildEncryptionTogglePlan).toHaveBeenCalledWith(
+      'q1',
+      'answer',
+      true,
+      expect.any(Object),
+      encryptionDeps
+    );
+    expect(encryptionPlanInputs[0]).toEqual({ answers: {}, additionalComments: {} });
+
+    expect(buildAdditionalEncryptionToggleResponseState(
+      {
+        lockAudienceGateDetailsByQuestion: { q1: 'gate-a' },
+        lockAudienceMenuByQuestion: { q1: true },
+        submittedSinceLastEdit: true,
+        surveysResponseState: [{ answers: {}, additionalComments: {} }],
+      },
+      {
+        buildEncryptionTogglePlan,
+        deps: encryptionDeps,
+        newEncryptedState: false,
+        questionId: 'q1',
+        surveyIndex: 0,
+      }
+    )).toMatchObject({
+      surveysResponseState: [{
+        additionalComments: { q1: { encrypted: false, field: 'additional' } },
+      }],
+      lockAudienceMenuByQuestion: { q1: true },
+      lockAudienceGateDetailsByQuestion: { q1: 'gate-a' },
+      submittedSinceLastEdit: false,
+    });
+
+    const buildSurveyResponseStateArray = ({ prevSurveysResponseState }) => [...prevSurveysResponseState];
+    const answerAudiencePlanInputs = [];
+    const buildAnswerAudienceSelectionPlan = jest.fn((_qid, _audience, _gateId, slice) => {
+      answerAudiencePlanInputs.push(JSON.parse(JSON.stringify(slice)));
+      return {
+        nextAnswerState: { audience: 'group' },
+        nextAdditionalState: { inheritedAudience: 'group' },
+      };
+    });
+    expect(buildAnswerEncryptionAudienceState(
+      {
+        submittedSinceLastEdit: true,
+        surveysResponseState: [{ answers: {}, additionalComments: {} }],
+      },
+      {
+        audience: 'group',
+        buildAnswerAudienceSelectionPlan,
+        buildSurveyResponseStateArray,
+        deps: encryptionDeps,
+        gateId: 'gate-a',
+        questionId: 'q1',
+        surveyIndex: 0,
+      }
+    )).toEqual({
+      surveysResponseState: [{
+        answers: { q1: { audience: 'group' } },
+        additionalComments: { q1: { inheritedAudience: 'group' } },
+      }],
+      lockAudienceMenuByQuestion: {},
+      lockAudienceGateDetailsByQuestion: {},
+      submittedSinceLastEdit: false,
+    });
+    expect(buildAnswerAudienceSelectionPlan).toHaveBeenCalledWith(
+      'q1',
+      'group',
+      'gate-a',
+      expect.any(Object),
+      encryptionDeps
+    );
+    expect(answerAudiencePlanInputs[0]).toEqual({ answers: {}, additionalComments: {} });
+
+    expect(buildAdditionalEncryptionAudienceState(
+      {
+        submittedSinceLastEdit: true,
+        surveysResponseState: [{ answers: {}, additionalComments: {} }],
+      },
+      {
+        audience: 'public',
+        buildAdditionalAudienceSelectionPlan: () => ({ nextAdditionalState: { audience: 'public' } }),
+        buildSurveyResponseStateArray,
+        deps: encryptionDeps,
+        questionId: 'q1',
+        surveyIndex: 0,
+      }
+    )).toEqual({
+      surveysResponseState: [{
+        answers: {},
+        additionalComments: { q1: { audience: 'public' } },
+      }],
+      lockAudienceMenuByQuestion: {},
+      lockAudienceGateDetailsByQuestion: {},
+      submittedSinceLastEdit: false,
+    });
+  });
+
+  it('builds SurveyQuestions survey response hydration patches', () => {
+    expect(buildSurveyResponseFetchLoadingState()).toEqual({
+      isLoadingResponse: true,
+      responseLookupWarning: '',
+    });
+    expect(buildResponseHydrationInvalidatedState()).toEqual({
+      isLoadingResponse: false,
+    });
+
+    const mergeDecryptedViewedResponse = jest.fn((previous, next) => ({
+      previous,
+      next,
+      merged: true,
+    }));
+    expect(buildViewedSurveyResponseState(
+      { parsedViewAddressAnswers: { old: true } },
+      { response: 'latest' },
+      mergeDecryptedViewedResponse
+    )).toEqual({
+      viewAddressAnswers: JSON.stringify({
+        previous: { old: true },
+        next: { response: 'latest' },
+        merged: true,
+      }),
+      parsedViewAddressAnswers: {
+        previous: { old: true },
+        next: { response: 'latest' },
+        merged: true,
+      },
+      noResponse: false,
+      responseLookupWarning: '',
+    });
+    expect(mergeDecryptedViewedResponse).toHaveBeenCalledWith(
+      { old: true },
+      { response: 'latest' }
+    );
+
+    expect(buildViewedSurveyNoResponseState()).toEqual({
+      viewAddressAnswers: '',
+      parsedViewAddressAnswers: null,
+      noResponse: true,
+      responseLookupWarning: '',
+    });
+    expect(buildViewedSurveyNoResponseState(false)).toEqual({
+      viewAddressAnswers: '',
+      parsedViewAddressAnswers: null,
+      noResponse: false,
+      responseLookupWarning: '',
+    });
+    expect(buildUserSurveyResponseFoundState({
+      hasEncrypted: 1,
+      resetSubmissionComplete: true,
+      userAnswers: { responses: [] },
+    })).toEqual({
+      userHasResponse: true,
+      userResponseEncrypted: true,
+      startFresh: false,
+      userAnswers: { responses: [] },
+      submissionComplete: false,
+    });
+    expect(buildUserSurveyResponseFoundState({
+      hasEncrypted: false,
+      userAnswers: { responses: ['plain'] },
+    })).toEqual({
+      userHasResponse: true,
+      userResponseEncrypted: false,
+      startFresh: false,
+      userAnswers: { responses: ['plain'] },
+    });
+    expect(buildUserSurveyResponseMissingState()).toEqual({
+      userHasResponse: false,
+      userResponseEncrypted: false,
+      userAnswers: null,
+    });
+  });
+
+  it('builds SurveyQuestions single-question hydration patches', () => {
+    expect(buildSingleQuestionPoolFallbackState()).toEqual({
+      isLoadingResponse: false,
+      questionPool: [],
+    });
+    expect(buildSingleQuestionRetryLoadingState()).toEqual({
+      isLoadingResponse: true,
+    });
+
+    const calls = [];
+    const mergeSurveyResponseState = (currentState, questionPool, surveyIndex) => {
+      calls.push({ currentState, questionPool, surveyIndex });
+      return [{ currentState, questionPool, surveyIndex }];
+    };
+    const placeholderQuestion = { id: 'q1', prompt: '[encrypted]' };
+    expect(buildSingleQuestionPlaceholderHydrationState(
+      {},
+      { mergeSurveyResponseState, placeholderQuestion }
+    )).toEqual({
+      questionPool: [placeholderQuestion],
+      surveysResponseState: [{
+        currentState: [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
+        questionPool: [placeholderQuestion],
+        surveyIndex: 0,
+      }],
+      isLoadingResponse: false,
+      noResponse: false,
+      responseLookupWarning: '',
+    });
+
+    const questionData = { id: 'Q1', prompt: 'Ready' };
+    expect(buildSingleQuestionReadyHydrationState(
+      { surveysResponseState: [{ answers: { q1: 'draft' } }] },
+      { mergeSurveyResponseState, questionData }
+    )).toEqual({
+      questionPool: [{ id: 'Q1', prompt: 'Ready' }],
+      surveysResponseState: [{
+        currentState: [{ answers: { q1: 'draft' } }],
+        questionPool: [{ id: 'Q1', prompt: 'Ready' }],
+        surveyIndex: 0,
+      }],
+    });
+    expect(calls).toEqual([
+      {
+        currentState: [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
+        questionPool: [placeholderQuestion],
+        surveyIndex: 0,
+      },
+      {
+        currentState: [{ answers: { q1: 'draft' } }],
+        questionPool: [{ id: 'Q1', prompt: 'Ready' }],
+        surveyIndex: 0,
+      },
+    ]);
   });
 });

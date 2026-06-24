@@ -77,6 +77,9 @@ $modal-muted: rgba(22, 48, 84, 0.82);
   max-width: 100%;
   align-self: center;
   justify-self: end;
+  display: grid;
+  gap: 10px;
+  justify-items: stretch;
 }
 
 .eyebrow,
@@ -629,12 +632,107 @@ $modal-muted: rgba(22, 48, 84, 0.82);
   gap: 14px;
 }
 
-.demoVideo {
+.demoVideo,
+.mobileDemoVideoPlayer {
+  display: block;
   width: 100%;
   aspect-ratio: 16 / 9;
-  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 16px;
   background: rgba(8, 12, 26, 0.88);
+  box-shadow: 0 16px 32px rgba(5, 9, 24, 0.22);
+}
+
+.demoVideo {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.mobileDemoVideo {
+  display: none;
+  width: 100%;
+}
+
+.mobileDemoVideoPlayerWrap {
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+  background: #050816;
+}
+
+.mobileDemoVideoPlayer {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  object-fit: contain;
+  background: #050816;
+
+  &:focus-visible {
+    outline: 3px solid rgba(77, 255, 164, 0.82);
+    outline-offset: -3px;
+  }
+}
+
+.mobileDemoVideoPlayButton {
+  appearance: none;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  border: 0;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: rgba(244, 247, 255, 0.98);
+  cursor: pointer;
+  touch-action: manipulation;
+
+  &:focus-visible {
+    outline: 3px solid rgba(77, 255, 164, 0.82);
+    outline-offset: -5px;
+  }
+}
+
+.mobileDemoVideoPlayIcon {
+  width: clamp(62px, 16vw, 92px);
+  height: clamp(62px, 16vw, 92px);
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(5, 8, 22, 0.76);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 18px 34px rgba(3, 6, 18, 0.4);
+  font-size: clamp(1.45rem, 5vw, 2.2rem);
+
+  svg {
+    margin-left: 0.18em;
+  }
+}
+
+.mobileDemoVideoStatus {
+  margin: 0;
+  color: rgba(244, 247, 255, 0.78);
+  font-size: 0.86rem;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.mobileDemoVideoFallbackLink {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(77, 255, 164, 0.36);
+  background: rgba(77, 255, 164, 0.96);
+  color: #08111f;
+  font-weight: 800;
+  text-decoration: none;
+
+  &:hover,
+  &:focus-visible {
+    color: #08111f;
+    background: rgba(105, 255, 184, 1);
+    outline: none;
+  }
 }
 
 .recognitionStrip {
@@ -1036,6 +1134,75 @@ $modal-muted: rgba(22, 48, 84, 0.82);
   }
 }
 
+@media (max-width: 1023px) {
+  .hero {
+    grid-template-columns: 1fr;
+  }
+
+  .heroVideo {
+    width: min(620px, 100%);
+    justify-self: center;
+    order: -1;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 1023px) {
+  .hero {
+    gap: 26px;
+  }
+
+  .heroText {
+    gap: 24px;
+  }
+
+  .titleRow {
+    gap: 18px;
+  }
+
+  .mainTitle {
+    font-size: clamp(3rem, 7vw, 4.4rem);
+    line-height: 0.95;
+  }
+
+  .titleRepoLink {
+    width: 64px;
+    height: 64px;
+    font-size: 1.9rem;
+  }
+
+  .tagline {
+    max-width: none;
+    font-size: clamp(1.45rem, 3.4vw, 1.85rem);
+    line-height: 1.35;
+  }
+
+  .heroActions,
+  .heroLinks {
+    gap: 16px;
+  }
+
+  .heroPrimaryButton {
+    min-height: 68px;
+    padding: 0 36px;
+    font-size: 1.52rem;
+  }
+
+  .tertiaryLink {
+    min-height: 46px;
+    padding: 0 18px;
+    font-size: 1.05rem;
+  }
+
+  .useCaseGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+  }
+
+  .useCaseTile {
+    min-height: 142px;
+  }
+}
+
 @media (max-width: 640px) {
   .aboutPageContainer {
     padding: 20px 14px 40px;
@@ -1082,6 +1249,19 @@ $modal-muted: rgba(22, 48, 84, 0.82);
     order: -1;
   }
 
+  .demoVideo {
+    display: none;
+  }
+
+  .mobileDemoVideo {
+    display: grid;
+    gap: 10px;
+  }
+
+  .mobileDemoVideoPlayer {
+    min-height: clamp(220px, 62vw, 300px);
+  }
+
   .heroText {
     gap: 14px;
   }
@@ -1125,7 +1305,7 @@ $modal-muted: rgba(22, 48, 84, 0.82);
   }
 
   .useCaseGrid {
-    grid-template-columns: 1fr;
+    gap: 12px;
   }
 
   .useCaseTile {
@@ -1205,5 +1385,21 @@ $modal-muted: rgba(22, 48, 84, 0.82);
 
   .recognitionModalBody {
     padding: 1.1rem 1rem 1.2rem;
+  }
+
+  .mobileDemoVideoFallbackLink {
+    width: 100%;
+  }
+}
+
+@media (min-width: 520px) and (max-width: 640px) {
+  .useCaseGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 519px) {
+  .useCaseGrid {
+    grid-template-columns: 1fr;
   }
 }

@@ -15,6 +15,7 @@ This directory contains demo and fixture data for the Context Engine survey plat
 | [`historical_figures_merged.json`](./historical_figures_merged.json) | Consolidated superset combining data from the richer figure sources. Used for demographic computation, avatar resolution, and shared profile question lookups. |
 | [`historical_figures_tree_qs_and_votes.json`](./historical_figures_tree_qs_and_votes.json) | Debate-oriented dataset for 66 figures with tree-structured questions, in-character comments, and vote stances. Used by debate tree and political compass views. |
 | [`demo_polis_data.json`](./demo_polis_data.json) | Polis-format clustering dataset with participants, vote arrays, and group assignments. Used by the demo analysis adapter and Polis report surfaces. |
+| [`demo_1_onchain_question_ids.json`](./demo_1_onchain_question_ids.json) | Canonical OP Sepolia `QuestionsAdded` IDs for the 42 `demo-1` Context corpus questions. Used to preload fast demo metadata while keeping responses answerable on-chain. |
 | [`demo_analysis_data.json`](./demo_analysis_data.json) | Dedicated breakdown-tab analysis fixture. Uses the canonical 42 questions and seeded historical-figure personas, then expands them with deterministic synthetic responses so the breakdown view has richer comparison density without hardcoding question content in the generator. Participant rows now also carry explicit profile metadata so the UI can distinguish baseline historical personas from modeled variants. |
 | [`demo_analysis_generation_config.json`](./demo_analysis_generation_config.json) | Corpus-backed curation config for the breakdown fixture generator. Keeps vetted question-to-node mappings, selected statement overrides, and deterministic synthetic-response settings in demo data, not in the generator script. Variant profiles include labels, rationale, and confidence so modeled rows stay inspectable. |
 | [`demo_sessions.json`](./demo_sessions.json) | Demo session definitions keyed by slug with metadata and worker configuration. Used by session resolution code and worker/cors proxy tests. |
@@ -51,6 +52,12 @@ The main consumers of this folder are:
 - [`VotesOnArgumentsView.tsx`](../../components/DemoViews/DebateHUD/VotesOnArgumentsView.tsx)
 - [`CommunityTab.tsx`](../../components/CommunityTab/CommunityTab.tsx)
 - [`SimUserPage.tsx`](../../components/UserPage/SimUserPage.tsx)
+
+## Temporary Demo Session Seed
+
+`demo_sessions.json` keeps `demo-1` as a temporary display/question compatibility seed until the Cloudflare-backed demo session replaces the Arweave/on-chain preload path. Worker URLs, faucet sponsorship, and gate authority must stay in the live SessionRegistry plus Worker KV config, not in this fixture. Remove the preloaded question IDs when the pure Cloudflare demo session ships.
+
+When `demo-1` resolves from the live registry, the main session route applies this fixture only as a display overlay for temporary demo fields such as featured SBTs and seeded question compatibility. Registry-backed operational fields still win: `corsWorkerUrl`, sponsored flags, contract addresses, block windows, and resource gates must be updated through the admin wallet. For answer submissions, the live registry must expose an open `arweave`/`responses` gate and a truthy `sponsored_arweave` field after saving an Arweave JWK in the worker admin flow.
 
 ## Conceptual Data Pipeline
 

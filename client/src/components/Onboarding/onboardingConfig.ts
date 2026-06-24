@@ -1,3 +1,5 @@
+import { isDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
+
 export const FIRST_VISIT_STORAGE_KEY = 'firstVisit';
 export const ONBOARDING_COMPLETE_STORAGE_KEY = 'ce_onboarding_complete';
 export const COLD_LOAD_ONBOARDING_OVERRIDE_STORAGE_KEY = 'ce:forceColdLoadWelcomeSlides';
@@ -17,8 +19,12 @@ const parseStorageBoolean = (value: unknown): boolean | null => {
 };
 
 export const isSessionColdLoadOnboardingRoute = (pathname: unknown): boolean => {
-  const normalizedPathname = String(pathname || '').trim();
-  return normalizedPathname === '/session' || normalizedPathname.startsWith('/session/');
+  const normalizedPathname = String(pathname || '').trim().replace(/\/+$/, '') || '/';
+  if (normalizedPathname === '/session') return true;
+  if (!normalizedPathname.startsWith('/session/')) return false;
+
+  const firstSegment = normalizedPathname.slice('/session/'.length).split('/')[0]?.toLowerCase();
+  return firstSegment !== 'new' && isDemoSessionSlug(firstSegment);
 };
 
 export const shouldAutoOpenColdLoadOnboarding = (
@@ -37,7 +43,6 @@ export const readColdLoadOnboardingState = (storage: OnboardingStorage, pathname
   return {
     firstVisit,
     shouldStartOnboarding:
-      firstVisit &&
       storage.getItem(ONBOARDING_COMPLETE_STORAGE_KEY) == null &&
       shouldAutoOpenColdLoadOnboarding(storage, pathname),
   };

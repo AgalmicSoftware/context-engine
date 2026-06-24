@@ -18,6 +18,7 @@ import {
   __sessionRegistryTestUtils,
   parseSessionRegistryMetadataUri,
   registerSessionOnChain,
+  refreshSessionRegistryFieldsCache,
   setResourceGatesOnChain,
   sessionRegistryStore,
   setSessionFieldsOnChain,
@@ -365,6 +366,98 @@ describe('sessionRegistryStore worker config overlay', () => {
         corsWorkerUrl: 'https://worker-kv-cache.example',
       })],
     ]);
+  });
+});
+
+describe('refreshSessionRegistryFieldsCache', () => {
+  afterEach(() => {
+    try { localStorage.removeItem('dg:sessionRegistryCache:v1'); } catch (_) {}
+    jest.restoreAllMocks();
+  });
+
+  it('updates worker fields without clearing cached metadata or gates', async () => {
+    arweaveScripts.downloadDataFromArweave.mockClear();
+    const sessionIdHex = '0x00000000000000000000000000000033';
+    const txGasGate = {
+      lookupStatus: 'ok',
+      sbtAddresses: ['0x2222222222222222222222222222222222222222'],
+      chainId: CONFIGURED_REGISTRY_CHAIN_ID,
+      mode: 'any',
+      perMemberLimit: null,
+    };
+    upsertSessionRegistryCache({
+      config: {
+        slug: 'demo-1',
+        sessionName: 'Demo Session',
+        networkChainId: CONFIGURED_REGISTRY_CHAIN_ID,
+        __registry: {
+          registryChainId: CONFIGURED_REGISTRY_CHAIN_ID,
+          sessionIdHex,
+          gatesByResource: {
+            txGas: txGasGate,
+          },
+          fields: {
+            sponsored_faucet: '0',
+          },
+        },
+      },
+    });
+
+    jest.spyOn(ethers.providers, 'JsonRpcProvider').mockImplementation(function MockJsonRpcProvider() {
+      return { send: jest.fn() };
+    });
+    jest.spyOn(ethers.providers, 'FallbackProvider').mockImplementation(function MockFallbackProvider(configs) {
+      return configs?.[0]?.provider || { send: jest.fn() };
+    });
+    const contractMock = {
+      getSessionById: jest.fn().mockResolvedValue(null),
+      getSessionBySlug: jest.fn().mockResolvedValue([
+        'demo-1',
+        CONFIGURED_REGISTRY_CHAIN_ID,
+        'ar://metadata-tx',
+        '',
+        TEST_SIGNER_ADDRESS,
+        1,
+        2,
+        sessionIdHex,
+      ]),
+      getSessionFields: jest.fn(async (_slug, keys) => keys.map((key) => ({
+        corsWorkerUrl: 'https://demo-worker.example',
+        sponsored_faucet: 'true',
+      }[key] || ''))),
+    };
+    jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract() {
+      return contractMock;
+    });
+
+    const refreshed = await refreshSessionRegistryFieldsCache({
+      chainId: CONFIGURED_REGISTRY_CHAIN_ID,
+      slug: 'demo-1',
+    });
+
+    expect(arweaveScripts.downloadDataFromArweave).not.toHaveBeenCalled();
+    expect(contractMock.getSessionBySlug).toHaveBeenCalledWith('demo-1');
+    expect(contractMock.getSessionFields).toHaveBeenCalledWith(
+      'demo-1',
+      expect.arrayContaining(['corsWorkerUrl', 'sponsored_faucet'])
+    );
+    expect(refreshed).toEqual(expect.objectContaining({
+      slug: 'demo-1',
+      sessionName: 'Demo Session',
+      corsWorkerUrl: 'https://demo-worker.example',
+      sponsoredKeys: expect.objectContaining({
+        faucet: true,
+      }),
+    }));
+    expect(refreshed.__registry.gatesByResource.txGas).toEqual(txGasGate);
+    expect(refreshed.__registry.fields).toEqual(expect.objectContaining({
+      corsWorkerUrl: 'https://demo-worker.example',
+      sponsored_faucet: 'true',
+    }));
+    expect(sessionRegistryStore.getSessionConfig('demo-1')).toEqual(expect.objectContaining({
+      corsWorkerUrl: 'https://demo-worker.example',
+      sessionName: 'Demo Session',
+    }));
   });
 });
 

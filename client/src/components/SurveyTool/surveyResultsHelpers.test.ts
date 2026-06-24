@@ -4,6 +4,7 @@ import {
   buildSurveyResultsBookmarkedQuestionIdsPatch,
   buildSurveyResultsBookmarkedSurveyIdsPatch,
   buildSurveyResultsBooleanTogglePatch,
+  buildSurveyResultsCommittedFilterStatePatch,
   buildSurveyResultsCsvFileNamePatch,
   buildSurveyResultsDemoAtlasOpenPatch,
   buildSurveyResultsDemoAtlasNodePatch,
@@ -15,20 +16,27 @@ import {
   buildSurveyResultsFilterLoadingUpdate,
   buildSurveyResultsFilteredQuestionModeHydratedPatch,
   buildSurveyResultsFilteredQuestionsCountPatch,
+  buildSurveyResultsFilteredResponsesPatchPlan,
   buildSurveyResultsIndividualResponseAggregator,
   buildSurveyResultsKeyedTogglePatch,
   buildSurveyResultsLockedResponsesDecryptCompletePatch,
   buildSurveyResultsLockedResponsesDecryptingPatch,
+  buildSurveyResultsLocalStoragePollPatch,
   buildSurveyResultsNetworkLatestBlockPatch,
   buildSurveyResultsQuestionIdSortPatch,
   buildSurveyResultsQuestionFilterCountPatch,
   buildSurveyResultsQuestionFilterQuestions,
+  buildSurveyResultsQuestionFilterPatch,
+  buildSurveyResultsQuestionScopeResetPatch,
   buildSurveyResultsRefreshStatusSequencePlan,
   buildSurveyResultsRefreshTargetBlocksPatch,
   buildSurveyResultsRefreshStatusWritePlan,
+  buildSurveyResultsSurveyIdPropChangePatch,
+  buildSurveyResultsSurveyIdStateChangePatch,
   buildSurveyResultsSurveyModeHydratedPatch,
   buildSurveyResultsSurveyViewModePatch,
   buildSurveyResultsUnfilteredQuestionModeHydratedPatch,
+  buildSurveyResultsViewModeResetPatch,
   buildSurveyResultsViewStatePatch,
   buildSurveyRespondersSignature,
   countQuestionModeResponses,
@@ -101,6 +109,73 @@ describe('surveyResultsHelpers state patches', () => {
     });
     expect(buildSurveyResultsNetworkLatestBlockPatch(Number.POSITIVE_INFINITY)).toEqual({
       networkLatestBlock: 0,
+    });
+    expect(buildSurveyResultsViewModeResetPatch({
+      questionResultsHydrated: true,
+      surveyId: '0xsurvey',
+      surveyResultsHydrated: true,
+      viewMode: 'questions',
+    })).toEqual({
+      questionLocalBlock: 0,
+      responseLocalBlock: 0,
+      surveyLocalBlock: 0,
+      refreshTargetQuestionBlock: 0,
+      refreshTargetResponseBlock: 0,
+      refreshTargetSurveyBlock: 0,
+      questionResultsHydrated: false,
+      surveyResultsHydrated: true,
+      demoResultsViewMode: 'raw',
+      demoResultsAtlasNodeId: null,
+      surveyId: '',
+    });
+    expect(buildSurveyResultsViewModeResetPatch({
+      questionResultsHydrated: true,
+      surveyId: '0xsurvey',
+      surveyResultsHydrated: true,
+      viewMode: 'survey',
+    })).toEqual({
+      questionLocalBlock: 0,
+      responseLocalBlock: 0,
+      surveyLocalBlock: 0,
+      refreshTargetQuestionBlock: 0,
+      refreshTargetResponseBlock: 0,
+      refreshTargetSurveyBlock: 0,
+      questionResultsHydrated: true,
+      surveyResultsHydrated: false,
+      demoResultsViewMode: 'raw',
+      demoResultsAtlasNodeId: null,
+      surveyId: '0xsurvey',
+    });
+    expect(buildSurveyResultsSurveyIdPropChangePatch('0xnext')).toEqual({
+      surveyId: '0xnext',
+      viewMode: 'survey',
+      surveyLocalBlock: 0,
+      refreshTargetSurveyBlock: 0,
+      surveyResultsHydrated: false,
+      demoResultsViewMode: 'raw',
+      demoResultsAtlasNodeId: null,
+    });
+    expect(buildSurveyResultsSurveyIdStateChangePatch()).toEqual({
+      surveyLocalBlock: 0,
+      refreshTargetSurveyBlock: 0,
+      surveyResultsHydrated: false,
+      demoResultsViewMode: 'raw',
+      demoResultsAtlasNodeId: null,
+    });
+    expect(buildSurveyResultsLocalStoragePollPatch({
+      cachedQuestionsCount: 3,
+      cachedSurveyResponsesCount: 4,
+      networkLatestBlock: 99,
+      questionLocalBlock: 10,
+      responseLocalBlock: 11,
+      surveyLocalBlock: 12,
+    })).toEqual({
+      questionLocalBlock: 10,
+      responseLocalBlock: 11,
+      surveyLocalBlock: 12,
+      cachedQuestionsCount: 3,
+      cachedSurveyResponsesCount: 4,
+      networkLatestBlock: 99,
     });
     expect(buildSurveyResultsRefreshTargetBlocksPatch(456)).toEqual({
       refreshTargetQuestionBlock: 456,
@@ -425,6 +500,167 @@ describe('surveyResultsHelpers state patches', () => {
     });
   });
 
+  it('builds committed filter and question-filter state patches', () => {
+    expect(buildSurveyResultsCommittedFilterStatePatch({
+      filterState: { questionTypes: ['binary'] },
+      statePatch: { filteredQuestionsCount: 2 },
+    })).toEqual({
+      filteredQuestionsCount: 2,
+      filterState: { questionTypes: ['binary'] },
+    });
+    expect(buildSurveyResultsCommittedFilterStatePatch({
+      filterState: { questionTypes: ['rating'] },
+      statePatch: null,
+    })).toEqual({
+      filterState: { questionTypes: ['rating'] },
+    });
+    expect(buildSurveyResultsQuestionScopeResetPatch()).toEqual({
+      questionResponses: {},
+      aggregatorQuestionResponses: {},
+      sbtFilteredAggregatorQuestionResponses: {},
+      totalQuestionsCount: 0,
+      totalResponsesCount: 0,
+      filteredResponsesCount: 0,
+      filteredQuestionsCount: 0,
+      questionResultsHydrated: false,
+    });
+
+    const sourceMap = {
+      q1: [{ responder: '0x1', response: { answer: { value: 'source' } } }],
+      q2: [{ responder: '0x2', response: { answer: { value: 'source' } } }],
+      q3: [{ responder: '0x3', response: { answer: { value: 'omitted' } } }],
+    };
+    expect(buildSurveyResultsQuestionFilterPatch({
+      filteredQuestions: [{ id: 'Q1' }, { id: 'q2' }],
+      filteredResponsesByQuestion: {
+        q1: [{ responder: '0x4', response: { answer: { value: 'filtered' } } }],
+        q2: [],
+      },
+      networkQuestions: {
+        q1: { type: 'freeform' },
+        q2: { type: 'freeform' },
+      },
+      sourceMap,
+      totalResponsesCount: 5,
+    })).toEqual({
+      filteredQuestionsCount: 2,
+      sbtFilteredAggregatorQuestionResponses: {
+        q1: [{ responder: '0x4', response: { answer: { value: 'filtered' } } }],
+      },
+      filteredResponsesCount: 1,
+    });
+
+    expect(buildSurveyResultsQuestionFilterPatch({
+      filteredQuestions: [{ id: 'q1' }, { id: 'q2' }],
+      isSurveyAggregate: true,
+      sourceMap: {
+        q1: [
+          { responder: '0xAAA' },
+          { responder: '0xaaa' },
+        ],
+        q2: [{ responder: '0xBBB' }],
+      },
+      totalResponsesCount: 1,
+    })).toEqual({
+      filteredQuestionsCount: 2,
+      sbtFilteredAggregatorQuestionResponses: {
+        q1: [
+          { responder: '0xAAA' },
+          { responder: '0xaaa' },
+        ],
+        q2: [{ responder: '0xBBB' }],
+      },
+      filteredResponsesCount: 1,
+    });
+
+    expect(buildSurveyResultsQuestionFilterPatch({
+      filteredQuestions: [{ id: 'q1' }, { id: 'q2' }],
+      isSurveyIndividuals: true,
+      sourceMap,
+      totalResponsesCount: 5,
+    })).toEqual({
+      filteredQuestionsCount: 2,
+    });
+  });
+
+  it('builds filtered response patch plans by view mode', () => {
+    expect(buildSurveyResultsFilteredResponsesPatchPlan({
+      filteredResponses: [{ responder: '0x1' }],
+      surveyViewMode: 'individuals',
+      viewMode: 'survey',
+    })).toEqual({
+      patch: {
+        sbtFilteredResponses: [{ responder: '0x1' }],
+        filteredResponsesCount: 1,
+      },
+      status: 'apply',
+    });
+
+    expect(buildSurveyResultsFilteredResponsesPatchPlan({
+      filteredResponses: null,
+      surveyViewMode: 'individuals',
+      viewMode: 'survey',
+    })).toEqual({
+      patch: {
+        sbtFilteredResponses: [],
+        filteredResponsesCount: 0,
+      },
+      status: 'invalid-array',
+    });
+
+    expect(buildSurveyResultsFilteredResponsesPatchPlan({
+      filteredResponses: {
+        q1: [
+          { responder: '0xAAA' },
+          { responder: '0xaaa' },
+        ],
+        q2: [],
+        q3: [{ responder: '0xBBB' }],
+      },
+      surveyViewMode: 'aggregate',
+      totalResponsesCount: 5,
+      viewMode: 'survey',
+    })).toEqual({
+      patch: {
+        sbtFilteredAggregatorQuestionResponses: {
+          q1: [
+            { responder: '0xAAA' },
+            { responder: '0xaaa' },
+          ],
+          q3: [{ responder: '0xBBB' }],
+        },
+        filteredResponsesCount: 2,
+      },
+      status: 'apply',
+    });
+
+    expect(buildSurveyResultsFilteredResponsesPatchPlan({
+      filteredResponses: {
+        q1: [{ responder: '0x1', response: { answer: { value: 'Yes' } } }],
+        q2: [],
+      },
+      networkQuestions: { q1: { type: 'freeform' } },
+      totalResponsesCount: 1,
+      viewMode: 'questions',
+    })).toEqual({
+      patch: {
+        sbtFilteredAggregatorQuestionResponses: {
+          q1: [{ responder: '0x1', response: { answer: { value: 'Yes' } } }],
+        },
+        filteredResponsesCount: 1,
+      },
+      status: 'apply',
+    });
+
+    expect(buildSurveyResultsFilteredResponsesPatchPlan({
+      filteredResponses: 'invalid',
+      viewMode: 'questions',
+    })).toEqual({
+      patch: null,
+      status: 'invalid-aggregator',
+    });
+  });
+
   it('builds bookmark-list and locked decrypt state patches', () => {
     const surveyIds = ['s1'];
     const questionIds = ['q1'];
@@ -695,6 +931,43 @@ describe('surveyResultsHelpers timestamps', () => {
     expect(normalized.responses.map((row) => row.questionID || row.questionId || row.kind))
       .toEqual(['q1', 'legacyMeta']);
     expect(normalized.responses[0]?.answer?.value).toBe('latest');
+  });
+
+  it('preserves passthrough row order around deduped question answers', () => {
+    const normalized = normalizeSurveyResponsePayloadByQuestionId({
+      responses: [
+        {
+          questionID: 'q1',
+          timeStamp: '2025-01-01T00:00:00.000Z',
+          answer: { value: 'stale q1' },
+        },
+        { kind: 'intro-note' },
+        {
+          questionID: 'q2',
+          timeStamp: '2025-01-02T00:00:00.000Z',
+          answer: { value: 'q2 answer' },
+        },
+        { kind: 'between-note' },
+        {
+          questionID: 'q1',
+          timeStamp: '2025-01-03T00:00:00.000Z',
+          answer: { value: 'fresh q1' },
+        },
+        { kind: 'closing-note' },
+      ],
+    }) as {
+      responses: Array<Record<string, unknown> & { answer?: { value?: unknown } }>;
+    };
+
+    expect(normalized.responses.map((row) => row.kind || row.questionID)).toEqual([
+      'q1',
+      'intro-note',
+      'q2',
+      'between-note',
+      'closing-note',
+    ]);
+    expect(normalized.responses[0]?.answer?.value).toBe('fresh q1');
+    expect(normalized.responses[2]?.answer?.value).toBe('q2 answer');
   });
 
   it('picks CSV timestamps from answer, payload, then row fallbacks', () => {

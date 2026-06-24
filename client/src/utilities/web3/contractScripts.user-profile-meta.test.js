@@ -792,7 +792,57 @@ describe('contractScripts user profile metadata wrappers', () => {
       }),
     }));
     expect(contractGetResponse).toHaveBeenCalledTimes(1);
-    expect(downloadSpy).toHaveBeenCalled();
+    expect(downloadSpy).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        directToArIo: false,
+        gatewayTimeoutMs: 4500,
+        debugContext: expect.objectContaining({
+          category: 'question_response_payload',
+          fn: 'getResponse',
+        }),
+      })
+    );
+  });
+
+  it('honors a custom response payload gateway timeout while keeping gateway fanout enabled', async () => {
+    const groupCfg = makeProfileGroupCfg('edge-custom-response-timeout', 1000);
+    const responderAddress = TEST_PROFILE_ADDRESS;
+    const questionId = `0x${'55'.repeat(32)}`;
+    const contractGetResponse = jest.fn().mockResolvedValue(`0x${'66'.repeat(32)}`);
+    const downloadedPayload = {
+      responder: responderAddress,
+      questionID: questionId,
+      type: 'binary',
+      answer: { value: 'Agree', encrypted: false },
+      additional: { value: '', encrypted: false },
+    };
+
+    jest.spyOn(ethers, 'Contract').mockImplementation(() => ({
+      getResponse: contractGetResponse,
+    }));
+    const downloadSpy = jest
+      .spyOn(arweaveScripts, 'downloadDataFromArweave')
+      .mockResolvedValue(JSON.stringify(downloadedPayload));
+
+    const result = await contractScripts.getResponse(
+      'none',
+      responderAddress,
+      questionId,
+      groupCfg,
+      { arweaveGatewayTimeoutMs: 1200 }
+    );
+
+    expect(result).toEqual(expect.objectContaining({
+      answer: expect.objectContaining({ value: 'Agree' }),
+    }));
+    expect(downloadSpy).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        directToArIo: false,
+        gatewayTimeoutMs: 1200,
+      })
+    );
   });
 
   it('passes resolved cfg through block-window lookups during question-response scans', async () => {

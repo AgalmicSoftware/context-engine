@@ -20,6 +20,7 @@ const ENV_KEYS = [
   'REACT_APP_CE_PROFILE_SCAN_SBT_BURST_SIZE',
   'REACT_APP_CE_SBT_INSTANCE_LISTENERS_MODE',
   'REACT_APP_SHOW_DEMO_SESSIONS',
+  'REACT_APP_CE_DEMO_SESSION_SLUGS',
   'REACT_APP_POLIS_DEMO_DATA_AUTOLOAD_SLUGS',
   'REACT_APP_USE_ONCHAIN_SESSION_REGISTRY',
   'REACT_APP_CE_SESSION_SCAN_RESOLVE_DEMO_SESSION_ALIASES',
@@ -129,6 +130,7 @@ describe('appConfig env-backed config', () => {
     process.env.REACT_APP_CE_PROFILE_SCAN_SBT_BURST_SIZE = '9';
     process.env.REACT_APP_CE_SBT_INSTANCE_LISTENERS_MODE = 'on';
     process.env.REACT_APP_SHOW_DEMO_SESSIONS = 'true';
+    process.env.REACT_APP_CE_DEMO_SESSION_SLUGS = 'demo-1,demo-3,demo-2,demo';
     process.env.REACT_APP_POLIS_DEMO_DATA_AUTOLOAD_SLUGS = 'demo,edge';
     process.env.REACT_APP_USE_ONCHAIN_SESSION_REGISTRY = 'false';
     process.env.REACT_APP_SERVER = 'https://api.example.test';
@@ -160,6 +162,7 @@ describe('appConfig env-backed config', () => {
       expect(config.CE_PROFILE_SCAN_SBT_BURST_SIZE).toBe(9);
       expect(config.CE_SBT_INSTANCE_LISTENERS_MODE).toBe('on');
       expect(config.SHOW_DEMO_SESSIONS).toBe(true);
+      expect(config.CE_DEMO_SESSION_SLUGS).toEqual(['demo-1', 'demo-3', 'demo-2', 'demo']);
       expect(config.POLIS_DEMO_DATA_AUTOLOAD_SLUGS).toEqual(['demo', 'edge']);
       expect(config.USE_ONCHAIN_SESSION_REGISTRY).toBe(false);
       expect(config.CE_SESSION_SCAN_RESOLVE_DEMO_SESSION_ALIASES).toBe(true);
@@ -213,7 +216,9 @@ describe('appConfig env-backed config', () => {
 
       expect(config.DEFAULT_CHAIN_ID).toBe(11155420);
       expect(config.CE_SESSION_SCAN_SCOPE).toBe('list');
-      expect(config.CE_SESSION_SCAN_SLUGS).toEqual(['demo']);
+      expect(config.CE_SESSION_SCAN_SLUGS).toEqual(['demo-1']);
+      expect(config.CE_DEMO_SESSION_SLUGS).toEqual(['demo-1', 'demo-3', 'demo-2', 'demo']);
+      expect(config.POLIS_DEMO_DATA_AUTOLOAD_SLUGS).toEqual(['demo-1', 'demo-3', 'demo-2', 'demo']);
       expect(config.CE_ARWEAVE_DIRECT_TO_AR_IO).toBe(true);
       expect(config.CE_ARWEAVE_PREFLIGHT_SESSION_METADATA).toBe(false);
       expect(config.CE_ARWEAVE_PREFLIGHT_SBT_METADATA).toBe(false);
