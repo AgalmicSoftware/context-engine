@@ -56,11 +56,26 @@ Run only agent_only_mode:
    rules from this prompt, local docs, Geo, or older skill text.
 
 Image delivery is mandatory. If the wrapped-image endpoint returns `image_url`,
-show it as an image attachment or Markdown image immediately. Do not run
-vision/image-analysis/QA tools on it. Do not describe or summarize the poster.
-A text-only "ready" message is not a completed run.
+show it exactly once: either as a native attachment/photo or as a Markdown
+image, not both. If you attach/upload the image, do not also include a Markdown
+image, raw link, or link preview. Do not run vision/image-analysis/QA tools on
+it. Do not describe or summarize the poster. A text-only "ready" message is not
+a completed run.
 
-When answering questions that depend on memory, usage history, model history, events attended, messages per day, non-default skills/tools tried, or other personal context: do not hallucinate. Use only memory/context you actually have. If you do not know, answer "N/A". Do not infer private facts from thin evidence. Do not quote private memory verbatim unless I explicitly ask. Use memory only as high-level, non-sensitive signal.
+When answering questions that depend on memory, usage history, token usage
+across sessions, model history, events attended, messages per day, non-default
+skills/tools tried, or other personal context: do not hallucinate. Use only
+memory/context you actually have. If you do not know, answer "N/A". Do not infer
+private facts from thin evidence. Do not quote private memory verbatim unless I
+explicitly ask. Use memory only as high-level, non-sensitive signal. Do not use
+or mention where I live, where I am from, my current city, coordinates, hotel,
+venue, or travel origin in the poster or chat summary.
+
+If token usage is visible through an already-approved balance/session/history
+surface, include it in `agent_metadata.token_usage` on answer and vote POSTs:
+`current_run_total_tokens`, `recent_sessions_total_tokens`, and `source` when
+known. Do not read files, env vars, config, auth files, or API keys to find it.
+Omit token usage if unavailable.
 
 Do not print my ceagt token, confidences, rationales, raw private memory, raw
 image prompt, or image_base64 in chat.
@@ -70,6 +85,7 @@ image prompt, or image_base64 in chat.
 
 - The `$2.00` minimum is tied to the default `gemini-3.5-flash` run. If Hermes changes the default model or exposes a model-specific estimator, update the threshold text here.
 - The balance check is for Hermes/OpenRouter credit only. It must use an already-exposed balance surface, never config/env/API-key file reads.
+- Checkpoint 2026-06-24: this direct-prompt path is user-reported working on GLM 5.2 and GPT-3.5/Gemini-3.5-class small model runs. Keep future edits narrow and retest both model families.
 - The preference defaults are deliberately before statement fetching: the user should know the run can take about 10 minutes, that this is research, and that EdgeOS profile context is enabled by default but easy to override. Playful book/movie/game/AI Optimism guesses are image-time synthesis from actual predictions, not stored research questions; the Wrapped image prompt reserves the bottom-left visual slot for those chips when evidence supports them.
 - Fresh request ids matter for repeated runs: the mini-app should show the latest
   prediction state, while the research export keeps each run's answer events.

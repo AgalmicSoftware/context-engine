@@ -164,19 +164,26 @@ test('start payload pins path-only endpoints and instruction size', () => {
   assert.match(payload.instructions, /wrappedImageEndpoint/);
   assert.match(payload.instructions, /mode "political_compass"/);
   assert.match(payload.instructions, /!\[Agent Village Wrapped\]\(<image_url>\)/);
+  assert.match(payload.instructions, /display it exactly once/);
+  assert.match(payload.instructions, /not both/);
+  assert.match(payload.instructions, /do not also include a Markdown image, raw link, or link preview/);
   assert.match(payload.instructions, /Do not call vision, image-analysis, or QA tools/);
   assert.match(payload.instructions, /Do not inspect, critique, describe, summarize, or list poster contents/);
   assert.match(payload.instructions, /A text statement that the image is ready is not enough/);
+  assert.match(payload.instructions, /agent_metadata\.token_usage/);
+  assert.match(payload.instructions, /recent_sessions_total_tokens/);
   assert.match(payload.instructions, /fresh run id/);
   assert.match(payload.instructions, /unique request_id values/);
   assert.match(payload.instructions, /each answer-batch POST/);
   assert.match(payload.instructions, /Calibrate before posting/);
   assert.match(payload.instructions, /90-95 only for direct memory\/profile evidence/);
-  assert.match(payload.instructions, /Use 100 only when you have an exact prior answer/);
+  assert.match(payload.instructions, /Use 100 only for an exact prior answer/);
   assert.match(payload.instructions, /otherwise cap confidence at 95/);
   assert.match(payload.instructions, /Do not use a repeated default like 85 across a batch/);
   assert.match(payload.instructions, /scan for flat confidence/);
   assert.match(payload.instructions, /To inspect or change your agent's responses/);
+  assert.match(payload.instructions, /where the principal lives\/is from\/currently is/);
+  assert.match(payload.instructions, /Abstract location evidence into non-location preferences/);
   assert.doesNotMatch(payload.instructions, /Review or edit your agent's responses in Context Engine Telegram Bot/);
   assert.ok(agentOnlyInstructionWordCount(AGENT_ONLY_INSTRUCTIONS) >= 400);
   assert.ok(agentOnlyInstructionWordCount(AGENT_ONLY_INSTRUCTIONS) <= 800);
@@ -293,7 +300,20 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   };
   const state = {
     byStatement: {
-      ceq_trust: { agent: { answer: { value: 'agree' }, confidence: 92 } },
+      ceq_trust: {
+        agent: {
+          answer: { value: 'agree' },
+          confidence: 92,
+          updatedAt: '2026-06-12T15:10:00.000Z',
+          agentMetadata: {
+            tokenUsage: {
+              currentRunTotalTokens: 1248000,
+              recentSessionsTotalTokens: 4300000,
+              source: 'Hermes visible usage',
+            },
+          },
+        },
+      },
       ceq_info: { agent: { answer: { value: 'unsure' }, confidence: 41 } },
       ceq_book: { agent: { answer: { text: 'The Diamond Age' }, confidence: 52 } },
       ceq_book_followup: { agent: { answer: { text: 'Neuromancer' }, confidence: 70 } },
@@ -345,6 +365,7 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.match(prompt, /weave it through the whole poster/);
   assert.match(prompt, /visually clean and minimal/);
   assert.match(prompt, /fewest borders and grid lines needed/);
+  assert.match(prompt, /no readable location labels/);
   assert.match(prompt, /Section typography: make section titles large/);
   assert.match(prompt, /Agent Core Insight \+ Agent Impression/);
   assert.match(prompt, /Make this the largest content block/);
@@ -353,6 +374,9 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.match(prompt, /Use plain concrete language/);
   assert.match(prompt, /Do not invent undefined acronyms/);
   assert.match(prompt, /do not create new technical-sounding slogans/);
+  assert.match(prompt, /Location privacy rule/);
+  assert.match(prompt, /do not mention or imply where the principal lives/);
+  assert.match(prompt, /current city, neighborhood, hotel, venue, coordinates, or travel origin/);
   assert.doesNotMatch(prompt, /triple-v/i);
   assert.match(prompt, /ask first, explain their reasoning, and protect private context/);
   assert.match(prompt, /Show exactly 3 actual question prompts/);
@@ -412,6 +436,10 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.match(prompt, /synthesized at image-generation time from the actual prediction evidence/);
   assert.match(prompt, /not based on dedicated favorite-book\/movie\/game questions/);
   assert.match(prompt, /For AI Optimism, use actual AI-futures predicted response rows/);
+  assert.match(prompt, /Token Use metric: Token Use: 1\.2M current run; 4\.3M recent sessions \(source: Hermes visible usage\)\./);
+  assert.match(prompt, /render one compact "Token Use" chip/);
+  assert.match(prompt, /Token Use is a runtime metric, not a playful guess/);
+  assert.match(prompt, /Never invent, estimate, or back-calculate token usage/);
   assert.match(prompt, /Do not use stored favorite\/book\/movie\/game answer rows as source data/);
   assert.match(prompt, /flower\/sunrise for AI Optimism/);
   assert.match(prompt, /omit that chip entirely instead of showing unavailable text/);
@@ -1489,6 +1517,13 @@ test('answer bulk validates rows, writes sidecar events/state, and replays idemp
       model: 'unit-model',
       scaffold_version: 'unit-scaffold',
       agent_initialized_at: '2026-06-12T12:00:00.000Z',
+      token_usage: {
+        current_run_total_tokens: '1,234,567',
+        recent_sessions_total_tokens: 4567000,
+        input_tokens: 900000,
+        output_tokens: 334567,
+        source: 'Hermes visible usage',
+      },
     },
   };
   const rejected = await submitAgentOnlyAnswersBulk({
@@ -1580,6 +1615,12 @@ test('answer bulk validates rows, writes sidecar events/state, and replays idemp
   assert.equal(exported.ok, true);
   assert.equal(answerRows.length, 4);
   assert.equal(answerRows.every((row) => row.request_id === 'answers-1'), true);
+  assert.equal(answerRows.every((row) => row.model === 'unit-model'), true);
+  assert.equal(answerRows.every((row) => row.token_current_run_total === 1234567), true);
+  assert.equal(answerRows.every((row) => row.token_recent_sessions_total === 4567000), true);
+  assert.equal(answerRows.every((row) => row.token_input === 900000), true);
+  assert.equal(answerRows.every((row) => row.token_output === 334567), true);
+  assert.equal(answerRows.every((row) => row.token_usage_source === 'Hermes visible usage'), true);
   assert.equal(skipRow.rationale, null);
   assert.equal(skipRow.confidence, null);
 

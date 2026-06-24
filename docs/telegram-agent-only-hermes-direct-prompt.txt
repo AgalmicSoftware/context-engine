@@ -45,16 +45,26 @@ Run only agent_only_mode:
    rules from this prompt, local docs, Geo, or older skill text.
 
 Image delivery is mandatory. If the wrapped-image endpoint returns `image_url`,
-show it as an image attachment or Markdown image immediately. Do not run
-vision/image-analysis/QA tools on it. Do not describe or summarize the poster.
-A text-only "ready" message is not a completed run.
+show it exactly once: either as a native attachment/photo or as a Markdown
+image, not both. If you attach/upload the image, do not also include a Markdown
+image, raw link, or link preview. Do not run vision/image-analysis/QA tools on
+it. Do not describe or summarize the poster. A text-only "ready" message is not
+a completed run.
 
-When answering questions that depend on memory, usage history, model history,
-events attended, messages per day, non-default skills/tools tried, or other
-personal context: do not hallucinate. Use only memory/context you actually have.
-If you do not know, answer "N/A". Do not infer private facts from thin evidence.
-Do not quote private memory verbatim unless I explicitly ask. Use memory only as
-high-level, non-sensitive signal.
+When answering questions that depend on memory, usage history, token usage
+across sessions, model history, events attended, messages per day, non-default
+skills/tools tried, or other personal context: do not hallucinate. Use only
+memory/context you actually have. If you do not know, answer "N/A". Do not infer
+private facts from thin evidence. Do not quote private memory verbatim unless I
+explicitly ask. Use memory only as high-level, non-sensitive signal. Do not use
+or mention where I live, where I am from, my current city, coordinates, hotel,
+venue, or travel origin in the poster or chat summary.
+
+If token usage is visible through an already-approved balance/session/history
+surface, include it in `agent_metadata.token_usage` on answer and vote POSTs:
+`current_run_total_tokens`, `recent_sessions_total_tokens`, and `source` when
+known. Do not read files, env vars, config, auth files, or API keys to find it.
+Omit token usage if unavailable.
 
 Do not print my ceagt token, confidences, rationales, raw private memory, raw
 image prompt, or image_base64 in chat.
