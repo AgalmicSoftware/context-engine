@@ -336,9 +336,8 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.equal(html.includes('sessionPickerCollapsed'), false);
   assert.equal(html.includes('if (isOpen && picker.required !== true)'), false);
   assert.match(html, /class="status loadingStatus" id="status"/);
-  assert.match(html, /class="loadingSpinner" aria-hidden="true"/);
-  assert.match(html, /const LOADING_VISUAL_MODE = "spinner";/);
-  assert.equal(html.includes('<img class="loadingGif" src="/telegram/mini-app/loading.gif"'), false);
+  assert.match(html, /class="loadingGif" src="\/telegram\/mini-app\/loading\.gif" alt="" aria-hidden="true"/);
+  assert.match(html, /const LOADING_VISUAL_MODE = "gif";/);
   assert.equal(html.includes('data-loading-src="data:image/gif;base64,'), false);
   assert.match(html, /\.loadingStatus/);
   assert.match(html, /\.loadingStatus \{[\s\S]*flex-direction: column;[\s\S]*min-height: 280px;/);
@@ -1009,33 +1008,34 @@ test('Mini App admin menu action opens a visible admin panel above the session p
   assert.equal(elements.get('adminSummary').textContent.length > 0, true);
 });
 
-test('Mini App defaults to CSS loading spinner and keeps GIF loading option', async () => {
+test('Mini App defaults to loading GIF and keeps CSS spinner test option', async () => {
   const defaultResponse = await handleTelegramMiniAppRequest({
     request: new Request('https://bridge.example/telegram/mini-app'),
     env: {},
   });
   const defaultHtml = await defaultResponse.text();
   assert.equal(defaultResponse.status, 200);
-  assert.match(defaultHtml, /class="loadingSpinner" aria-hidden="true"/);
-  assert.match(defaultHtml, /const LOADING_VISUAL_MODE = "spinner";/);
-  assert.equal(defaultHtml.includes('<img class="loadingGif" src="/telegram/mini-app/loading.gif"'), false);
+  assert.match(defaultHtml, /<img class="loadingGif" src="\/telegram\/mini-app\/loading\.gif" alt="" aria-hidden="true">/);
+  assert.match(defaultHtml, /const LOADING_VISUAL_MODE = "gif";/);
+  assert.equal(defaultHtml.includes('class="loadingSpinner" aria-hidden="true"'), false);
 
-  const gifResponse = await handleTelegramMiniAppRequest({
-    request: new Request('https://bridge.example/telegram/mini-app?loading=gif'),
+  const spinnerResponse = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app?loading=spinner'),
     env: {},
   });
-  const gifHtml = await gifResponse.text();
-  assert.equal(gifResponse.status, 200);
-  assert.match(gifHtml, /<img class="loadingGif" src="\/telegram\/mini-app\/loading\.gif" alt="" aria-hidden="true">/);
-  assert.match(gifHtml, /const LOADING_VISUAL_MODE = "gif";/);
+  const spinnerHtml = await spinnerResponse.text();
+  assert.equal(spinnerResponse.status, 200);
+  assert.match(spinnerHtml, /class="loadingSpinner" aria-hidden="true"/);
+  assert.match(spinnerHtml, /const LOADING_VISUAL_MODE = "spinner";/);
+  assert.equal(spinnerHtml.includes('<img class="loadingGif" src="/telegram/mini-app/loading.gif"'), false);
 
-  const envGifResponse = await handleTelegramMiniAppRequest({
+  const envSpinnerResponse = await handleTelegramMiniAppRequest({
     request: new Request('https://bridge.example/telegram/mini-app'),
-    env: { AGENT_BRIDGE_MINI_APP_LOADING_VISUAL: 'gif' },
+    env: { AGENT_BRIDGE_MINI_APP_LOADING_VISUAL: 'spinner' },
   });
-  const envGifHtml = await envGifResponse.text();
-  assert.equal(envGifResponse.status, 200);
-  assert.match(envGifHtml, /<img class="loadingGif" src="\/telegram\/mini-app\/loading\.gif" alt="" aria-hidden="true">/);
+  const envSpinnerHtml = await envSpinnerResponse.text();
+  assert.equal(envSpinnerResponse.status, 200);
+  assert.match(envSpinnerHtml, /class="loadingSpinner" aria-hidden="true"/);
 });
 
 test('Mini App loading GIF route serves image bytes for Telegram WebView', async () => {

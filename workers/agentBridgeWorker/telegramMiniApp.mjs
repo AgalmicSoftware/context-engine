@@ -203,10 +203,10 @@ function safeString(value) {
   return String(value || '').trim();
 }
 
-function normalizeMiniAppLoadingVisual(value = '') {
+function normalizeMiniAppLoadingVisual(value = MINI_APP_LOADING_VISUAL_GIF) {
   const normalized = lower(value);
-  if (['gif', 'image', 'logo'].includes(normalized)) return MINI_APP_LOADING_VISUAL_GIF;
-  return MINI_APP_LOADING_VISUAL_SPINNER;
+  if (['spinner', 'css', 'loader'].includes(normalized)) return MINI_APP_LOADING_VISUAL_SPINNER;
+  return MINI_APP_LOADING_VISUAL_GIF;
 }
 
 function miniAppLoadingVisualMode({ url = null, env = {} } = {}) {
@@ -5510,13 +5510,13 @@ async function handleSettingsRequest({
   });
 }
 
-function miniAppLoadingVisualHtml(mode = MINI_APP_LOADING_VISUAL_SPINNER) {
+function miniAppLoadingVisualHtml(mode = MINI_APP_LOADING_VISUAL_GIF) {
   return normalizeMiniAppLoadingVisual(mode) === MINI_APP_LOADING_VISUAL_GIF
     ? '<img class="loadingGif" src="/telegram/mini-app/loading.gif" alt="" aria-hidden="true">'
     : '<span class="loadingSpinner" aria-hidden="true"></span>';
 }
 
-function telegramMiniAppHtml({ loadingVisual = MINI_APP_LOADING_VISUAL_SPINNER } = {}) {
+function telegramMiniAppHtml({ loadingVisual = MINI_APP_LOADING_VISUAL_GIF } = {}) {
   const normalizedLoadingVisual = normalizeMiniAppLoadingVisual(loadingVisual);
   return `<!doctype html>
 <html lang="en">

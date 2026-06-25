@@ -662,10 +662,9 @@ session context stay server-side.
 `AGENT_BRIDGE_MINI_APP_URL` may override the default
 `$AGENT_BRIDGE_PUBLIC_URL/telegram/mini-app`. The URL must be HTTPS for live
 Telegram, except localhost during local development.
-The first-load shell defaults to a CSS spinner so Telegram does not fetch the
-heavier GIF asset before state is usable. Operators can test the legacy GIF with
-`/telegram/mini-app?loading=gif` or set
-`AGENT_BRIDGE_MINI_APP_LOADING_VISUAL=gif` for a deployment.
+The first-load shell defaults to the loading GIF. Operators can test the CSS
+spinner variant with `/telegram/mini-app?loading=spinner` or set
+`AGENT_BRIDGE_MINI_APP_LOADING_VISUAL=spinner` for a deployment.
 When Telegram init data validates in live mode, the state and draft APIs require
 a valid opaque launch action and will not fall back to a default session for
 missing or expired launch parameters. Draft writes also verify that the launch
