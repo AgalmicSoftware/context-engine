@@ -7222,9 +7222,9 @@ function telegramMiniAppHtml() {
       </section>
       <div class="status loadingStatus" id="status">
         <img class="loadingGif" src="/telegram/mini-app/loading.gif" alt="" aria-hidden="true">
-        <span>Loading session and agent predictions</span>
+        <span>Loading questions and agent predictions</span>
         <div class="loadingProgress" aria-hidden="true"><div class="loadingProgressBar" style="--progress: 18%"></div></div>
-        <div class="loadingHint">Opening the session and checking agent predictions.</div>
+        <div class="loadingHint">Loading questions and agent predictions</div>
       </div>
       <section class="adminPanel" id="adminPanel" aria-label="Admin actions">
         <div class="resultsHeader">
@@ -8331,7 +8331,7 @@ function telegramMiniAppHtml() {
       image.alt = '';
       image.setAttribute('aria-hidden', 'true');
       const label = document.createElement('span');
-      label.textContent = message || 'Loading session and agent predictions';
+      label.textContent = message || 'Loading questions and agent predictions';
       const track = document.createElement('div');
       track.className = 'loadingProgress';
       track.setAttribute('aria-hidden', 'true');
@@ -8342,17 +8342,17 @@ function telegramMiniAppHtml() {
       track.appendChild(bar);
       const note = document.createElement('div');
       note.className = 'loadingHint';
-      note.textContent = hint || 'Opening the session and checking agent predictions.';
+      note.textContent = hint || 'Loading questions and agent predictions';
       el.status.appendChild(image);
       el.status.appendChild(label);
       el.status.appendChild(track);
       el.status.appendChild(note);
     };
     function startLoadingProgress({
-      message = 'Loading session and agent predictions',
+      message = 'Loading questions and agent predictions',
       initialPercent = 22,
       maxPercent = 72,
-      hint = 'Opening the session and loading the first question.',
+      hint = 'Loading questions and agent predictions',
     } = {}) {
       stopLoadingProgressTimer();
       state.loadingProgressPercent = Math.max(8, Math.min(96, Number(initialPercent) || 22));
@@ -11866,10 +11866,10 @@ function telegramMiniAppHtml() {
         state.loadingMoreQuestions = false;
         state.backgroundQuestionLoadPending = false;
         startLoadingProgress({
-          message: 'Loading session and agent predictions',
+          message: 'Loading questions and agent predictions',
           initialPercent: retry ? 34 : 22,
           maxPercent: retry ? 74 : 72,
-          hint: 'Opening the session and loading the first question.',
+          hint: 'Loading questions and agent predictions',
         });
       } else if (backgroundLoad) {
         state.questionsLoading = true;
@@ -11907,7 +11907,7 @@ function telegramMiniAppHtml() {
       }
       if (!state.loadedOnce) {
         stopLoadingProgressTimer();
-        setLoadingProgress('Loading session and agent predictions', 86, 'Rendering the first question.');
+        setLoadingProgress('Loading questions and agent predictions', 86, 'Loading questions and agent predictions');
       }
       const wasLoadedOnce = state.loadedOnce;
       state.data = body;
