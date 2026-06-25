@@ -1909,6 +1909,8 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   const wrappedPrompt = openAiRequestForm.get('prompt');
   assert.match(wrappedPrompt, /Do not number the visible sections/);
   assert.match(wrappedPrompt, /Questions your agent thought you would care about most/);
+  assert.match(wrappedPrompt, /Every visible word and sentence must be complete/);
+  assert.match(wrappedPrompt, /Hero text fit rule/);
   assert.match(wrappedPrompt, /compact top-left "Agent Village" wordmark/);
   assert.match(wrappedPrompt, /attached Agent Village logo image as the style reference/);
   assert.match(wrappedPrompt, /lay "AGENT" and "VILLAGE" side-by-side/);

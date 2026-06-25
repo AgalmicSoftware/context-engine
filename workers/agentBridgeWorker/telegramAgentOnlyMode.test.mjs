@@ -394,12 +394,18 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.match(prompt, /weave it through the whole poster/);
   assert.match(prompt, /visually clean and minimal/);
   assert.match(prompt, /fewest borders and grid lines needed/);
+  assert.match(prompt, /Every visible word and sentence must be complete/);
+  assert.match(prompt, /no cropped words, cut-off lines, trailing hyphen fragments/);
+  assert.match(prompt, /shorten the wording rather than shrinking it below readable size/);
   assert.match(prompt, /no readable location labels/);
   assert.match(prompt, /Section typography: make section titles large/);
   assert.match(prompt, /Agent Core Insight \+ Agent Impression/);
   assert.match(prompt, /Make this the largest content block/);
   assert.match(prompt, /tall phone card or portrait story panel/);
   assert.match(prompt, /rather than a wide landscape banner/);
+  assert.match(prompt, /Hero text fit rule/);
+  assert.match(prompt, /under 14 words and under 90 characters/);
+  assert.match(prompt, /Never hyphenate, crop, truncate, or trail off the hero sentence mid-word/);
   assert.match(prompt, /Use plain concrete language/);
   assert.match(prompt, /Do not invent undefined acronyms/);
   assert.match(prompt, /do not create new technical-sounding slogans/);
