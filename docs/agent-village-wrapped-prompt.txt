@@ -1,95 +1,14 @@
-Use the Context Engine Telegram agent handoff skill:
-https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=41
+Use the Agent Village Wrapped runtime skill:
+https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/agent-village-wrapped/skill?v=1
 
 Run Agent Village Wrapped for me.
 
-Worker origin: https://ce-agent-bridge-worker.agalmic.workers.dev
+EdgeOS Read Permission: Yes
 
-Run rules:
-- Use the EdgeOS setting below for profile access; do not add an extra setup step.
-- Do not use old images, previous image URLs, cached files, or previous responses.
-  Always POST the wrapped-image endpoint fresh after submitting answers/votes, and
-  display only the image returned by that same response.
-- Do not use Geo, Index Network, context-engine local skills, local reference docs,
-  API-pitfall docs, search_files, grep, find, sqlite, filesystem scans, or
-  skill_view to discover setup, credentials, prompts, or procedures.
-- Do not read local files for tokens, auth, env, config, API keys, balance, or
-  token usage.
-
-`EdgeOS Read Permission: Yes` allows high-level EdgeOS profile/memory context.
-`EdgeOS Read Permission: No` means do not use EdgeOS profile/memory context. If
-missing, default to No. Respect No.
-
-Do not do setup discovery. Do not run `hermes --help`. Use only: an
-already-exposed Hermes/OpenRouter balance command or UI surface, EdgeOS
-profile/memory if allowed, the current Telegram/Hermes principal context, the
-Context Engine skill URL above, and the Context Engine worker endpoints below.
-
-Check Hermes/OpenRouter balance first only through an already-exposed Hermes
-balance command or UI surface. Do not read config files, env files, auth files,
-or API keys to check balance. Minimum: $2.00. If the exposed balance is below
-$2.00, say exactly: "You need to add more credit before I can run Agent Village
-Wrapped." If no balance surface is immediately available without reading files,
-skip the balance check silently and continue.
-
-Credential/onboarding: if an active Context Engine agent-only credential is
-already available in the current Hermes auth/session context, use it privately.
-Otherwise use the Context Engine agent-only onboarding flow described in the
-skill URL above only if the required inviteToken and Telegram principal context
-are already present in the current message/session context. Do not ask me to
-paste a token, do not print any token, and do not search files for one. If
-neither an active credential nor a complete in-context agent-only onboarding
-payload is available, stop immediately and say exactly: "I need a Context
-Engine agent credential before I can run Agent Village Wrapped."
-
-Run only agent_only_mode:
-1. GET /telegram/agent/api/skill-version and silently verify v41.
-2. GET /telegram/agent/api/agent-only/start.
-3. Follow the returned `instructions` exactly for statement pagination,
-   predicted answers, confidence, token allocations, image generation, retries,
-   and final response. Also apply the default story-image request below as an
-   extra requested image mode. Do not replace those runtime instructions with
-   cached rules from this prompt, local docs, Geo, or older skill text.
-
-Image delivery is mandatory. If the wrapped-image endpoint returns `image_url`,
-show it exactly once: either as a native attachment/photo or as a Markdown
-image, not both. If you attach/upload the image, do not also include a Markdown
-image, raw link, or link preview. Do not run vision/image-analysis/QA tools on
-it. Do not describe or summarize the poster. Do not reuse an old local PNG,
-previous image_url, cached attachment, or old image response. A text-only
-"ready" message is not a completed run.
-
-Default visual output is two images. First generate and display the standard
-`mode: "wrapped"` poster. Then, without asking, call the same wrapped-image
-endpoint with `mode: "wrapped_story"` and the same fresh `run_id`. It returns
-one animated SVG story asset with five generated portrait screens: summary,
-token use, prediction rows, playful guesses, and comparison. Display the story
-once just like the poster. True MP4/GIF export is not part of this worker path
-yet. Generate `mode: "political_compass"` only if the user asks for the Agent
-Norms Compass.
-
-When answering questions that depend on memory, usage history, token usage
-across sessions, model history, events attended, messages per day, non-default
-skills/tools tried, or other personal context: do not hallucinate. Use only
-memory/context you actually have. If you do not know, answer "N/A". Do not infer
-private facts from thin evidence. Do not quote private memory verbatim unless I
-explicitly ask. Use memory only as high-level, non-sensitive signal. Do not use
-or mention where I live, where I am from, my current city, coordinates, hotel,
-venue, or travel origin in the poster or chat summary.
-
-If token usage is visible through an already-approved balance/session/history
-surface, include it in `agent_metadata.token_usage` on answer and vote POSTs:
-`current_run_total_tokens`, `recent_sessions_total_tokens`, and `source` when
-known. Fast optional check: run at most one command,
-`hermes insights --days 30 --source telegram`, and use a clear total token line
-from that output if present. If that exact command is unavailable, errors, or
-does not show a clear total, omit token usage. Do not use `skill_view
-token-usage-audit`, search, Python scripts, or file/env/config/auth/API-key
-reads to calculate it. The poster will omit the Token Use chip when this
-metadata is absent.
-
-Do not print my ceagt token, confidences, rationales, raw private memory, raw
-image prompt, or image_base64 in chat. In the final message, make "Context
-Engine Bot" a Markdown link to
-https://t.me/contextengineer_bot?start=agent_onboarding__agent-village-wrapped
-and tell the user to tap Open Mini App.
+Do not use the broader Context Engine skill, Geo, Index Network, local reference
+docs, filesystem searches, broad credential scans, or setup discovery. The
+skill URL above is the complete procedure. Use the current Telegram/Hermes auth
+context privately. If `memory/context-engine-state.json` is the known Context
+Engine state file, you may read only that file for the private CE credential.
+Do not ask me to paste a token. If no active Context Engine agent credential is
+available, stop with the exact credential-needed sentence from the skill.

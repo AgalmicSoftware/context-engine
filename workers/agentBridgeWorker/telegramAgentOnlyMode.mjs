@@ -32,6 +32,7 @@ const AGENT_ONLY_PRINCIPAL_ID_SALT = 'context-engine-agent-only-principal-id-v1'
 const DEFAULT_WRAPPED_IMAGE_MODEL = 'gpt-image-2';
 const DEFAULT_WRAPPED_IMAGE_SIZE = '2048x1152';
 const DEFAULT_WRAPPED_STORY_IMAGE_SIZE = '1024x1536';
+const DEFAULT_WRAPPED_STORYBOARD_IMAGE_SIZE = '3240x1152';
 const DEFAULT_WRAPPED_IMAGE_QUALITY = 'medium';
 const WRAPPED_SECTION_ITEM_LIMIT = 3;
 const WRAPPED_AGENT_GUESS_ITEM_LIMIT = 4;
@@ -72,13 +73,13 @@ Step 2, answer every statement. Create one fresh run_id for this user-requested 
 
 Step 3, allocate both token balances. You have two independent 100-token balances for statements your principal would most want raised or lowered. POST once to /telegram/agent/api/agent-only/token-votes/bulk with mode linear: signed integer weights where sum(abs(weight)) is at most 100. POST once with mode quadratic: signed integers -10 to 10 where sum(weight squared) is at most 100. Submit both modes. Negative values lower priority; positive values raise priority.
 
-Step 4, Agent Village Wrapped image. After Step 3 succeeds, POST to wrappedImageEndpoint with JSON body { "window_id": "<window_id>", "run_id": "<fresh_run_id>", "mode": "wrapped", "format": "json" }. For every new user-requested run, make a fresh wrappedImageEndpoint POST and display only that response's image_url or image_base64; never reuse a prior local PNG, previous image_url, cached attachment, or old image response. If it returns agent_only_wrapped_incomplete_predictions or all_statements_covered false, re-fetch statements, resubmit predictions or privacy skips once, then call it again; do not present a partial image. If image_url exists, display it exactly once: either as a native attachment/photo or as Markdown image ![Agent Village Wrapped](<image_url>), not both. Do not also include a raw link or link preview. If image_url is absent, decode image_base64 as the returned image_content_type and attach or show it exactly once. Do not call vision, image-analysis, or QA tools. Do not inspect, critique, describe, or summarize the poster. Do not print raw image_base64 or the full image prompt. A text statement that the image is ready is not enough. Optional: POST mode "wrapped_story" with the same run_id for a five-screen phone story, and mode "political_compass" only if the principal asks for the Agent Norms Compass. Display each returned image once.
+Step 4, Agent Village Wrapped image. After Step 3 succeeds, POST to wrappedImageEndpoint with body { "window_id": "<window_id>", "run_id": "<fresh_run_id>", "mode": "wrapped", "format": "json" } when visualDefaults.wrapped is true. For every new run, make a fresh wrappedImageEndpoint POST and display only that response's image_url or image_base64; never reuse a prior local PNG, previous image_url, cached attachment, or old response. If it returns agent_only_wrapped_incomplete_predictions or all_statements_covered false, re-fetch statements, resubmit predictions or privacy skips once, then call it again; do not present a partial image. If image_url exists, display it exactly once: either as a native attachment/photo or Markdown image ![Agent Village Wrapped](<image_url>), not both. Do not include a raw link or link preview. If image_url is absent, decode image_base64 as image_content_type and attach or show it once. Do not call vision, image-analysis, or QA tools. Do not inspect, critique, describe, or summarize the poster. Do not print raw image_base64 or the full image prompt. A text statement that the image is ready is not enough. Also POST mode "wrapped_story" with the same run_id only if visualDefaults.wrapped_story is true or the principal asks for a shareable story version. POST mode "political_compass" only if visualDefaults.political_compass is true or the principal asks for the Agent Norms Compass. Display each returned image once.
 
 Metadata. Every POST must include agent_metadata with model, scaffold_version, and agent_initialized_at if known. If visible without file/API-key reads, include agent_metadata.token_usage with current_run_total_tokens, recent_sessions_total_tokens, and source; omit it if unknown. For each new user-requested run, create a fresh run id and unique request_id values for each answer-batch POST and both vote submissions. Reuse a request_id only for the exact same failed request.
 
 Errors and retries. On validation errors, fix rows and resend. On window_mismatch, re-fetch statements and redo the run for the new window_id. If cached skill version is older than /telegram/agent/api/skill-version, refresh the skill.
 
-Completion report. After the Wrapped image is displayed, tell your principal only: "Your Agent Village Wrapped is ready. To inspect or change your agent's responses, open [Context Engine Bot](https://t.me/contextengineer_bot?start=agent_onboarding__agent-village-wrapped) and tap Open Mini App. Want the optional Agent Norms Compass meme too?" Do not include the window id, confidences, rationales, privacy skip count, token details, extra links, or where the principal lives/is from/currently is unless asked. Abstract location evidence into non-location preferences.
+Completion report. After the default image is displayed, tell your principal only: "Your Agent Village Wrapped is ready. To inspect or change your agent's responses, open [Context Engine Bot](https://t.me/contextengineer_bot?start=agent_onboarding__agent-village-wrapped) and tap Open Mini App. Want the optional Agent Norms Compass meme or shareable story version too?" Do not include the window id, confidences, rationales, privacy skip count, token details, extra links, or where the principal lives/is from/currently is unless asked. Abstract location evidence into non-location preferences.
 
 Your answers are predictions. Your principal's own answers always take precedence and are never overwritten. Windows refresh weekly on Mondays at 08:00 Pacific.`;
 
@@ -647,9 +648,19 @@ export function agentOnlyInstructionWordCount(text = AGENT_ONLY_INSTRUCTIONS) {
   return safeString(text).split(/\s+/).filter(Boolean).length;
 }
 
+function normalizeStartPayloadVisualDefaults(value = {}) {
+  const input = value && typeof value === 'object' ? value : {};
+  return {
+    wrapped: input.wrapped === false ? false : true,
+    wrapped_story: input.wrapped_story === true,
+    political_compass: input.political_compass === true,
+  };
+}
+
 export function buildAgentOnlyStartPayload({
   sessionSlug = '',
   skillVersion = '',
+  visualDefaults = {},
 } = {}) {
   const payload = {
     ok: true,
@@ -661,6 +672,7 @@ export function buildAgentOnlyStartPayload({
     voteEndpoint: AGENT_ONLY_ENDPOINTS.tokenVotesBulk,
     wrappedImageEndpoint: AGENT_ONLY_ENDPOINTS.wrappedImage,
     budgets: { agent_linear: 100, agent_quadratic: 100 },
+    visualDefaults: normalizeStartPayloadVisualDefaults(visualDefaults),
     skillVersion: safeString(skillVersion),
     instructions: AGENT_ONLY_INSTRUCTIONS,
   };
@@ -2463,6 +2475,73 @@ ${evidence}`,
   return frames;
 }
 
+export function buildAgentOnlyWrappedStoryboardPrompt({
+  snapshot = {},
+  state = {},
+  linearVoteState = {},
+  quadraticVoteState = {},
+  styleHint = '',
+} = {}) {
+  const {
+    importantLines,
+    highLines,
+    cautiousLines,
+    allPredictionEvidenceLines,
+    agentAnalysisLines,
+    tokenUsageLine,
+  } = buildWrappedPromptEvidence({ snapshot, state, linearVoteState, quadraticVoteState });
+  const styleLine = wrappedDisplayText(styleHint, 240);
+  const prompt = `Create one wide five-panel Agent Village Wrapped storyboard image${styleLine ? `, with this extra style hint: ${styleLine}` : ''}.
+
+This is NOT the standard 16:9 poster. It is a dedicated source image for a phone-story animation. The image must contain exactly five equal-width vertical phone screens side by side, ordered left to right. Each panel will be cropped into a separate 9:16 phone story frame, so every panel must be self-contained, centered, and readable after cropping. Make the panel boundaries clear but elegant. Keep a shared visual identity across all five panels while letting each panel have its own composition. Use the attached Agent Village logo image as wordmark reference: AGENT is bold uppercase sans, VILLAGE is elegant serif with a flowing calligraphic V.
+
+Global rules:
+- Do not alter or imitate the standard wide poster layout; design this as a native phone-story storyboard.
+- Do not mention or imply where the principal lives, is from, currently is, traveled from, or stayed.
+- Do not show access credentials, raw Telegram ids, private memory text, unavailable/N/A content, raw rationales, or fake UI chrome.
+- Keep all text large and sparse enough for a phone. Prefer a premium social story look with strong art direction, clean spacing, minimal borders, and no decorative filler text.
+- Use the whole space of each panel. No panel should feel like a cropped table pasted from the wide poster.
+- Binary answers must render as exactly one selected pill only: green Agree, yellow Unsure, or red Disagree. Do not show all three choices in a row.
+- Rating answers must show scale context like 7/10. Multichoice/freeform answers must show selected option/text, not Agree/Unsure/Disagree pills.
+- If a section lacks enough supported evidence, omit weak rows rather than inventing or showing N/A.
+
+Panel 1: "What your agent thinks it knows about you"
+Hero opener. Large abstract illustration plus archetype and one memeable one-liner. Make it feel like a phone wallpaper or album cover. Use agent-about-user analysis if present; otherwise synthesize cautiously from predicted-answer evidence.
+
+Panel 2: "Token trail"
+Feature token usage only if real token evidence is supplied. If present, show the metric prominently plus a short intuitive comparison like books, printed pages, or paper-stack height. Add a week-by-week heatmap/timeline labeled Week 1, Week 2, Week 3, Week 4, with dates only if supplied by evidence. If token evidence is missing, make this a qualitative "signal map" without numbers.
+
+Panel 3: "Predictions"
+Show three compact blocks in one screen: questions the agent thought the principal would care about most (prompts only), High-Confidence Predictions, and Cautious Predictions. Prediction rows must be actual predicted human responses, with Question, Predicted answer, and Confidence. No agent-about-user analysis rows.
+
+Panel 4: "Agent guesses"
+Playful, not facts. Show up to four chips: Book Guess, Movie/Show Guess, Game/Play Pattern, AI Optimism. Synthesize from prediction themes, not from dedicated favorite-media question rows. One item per category, no duplicates.
+
+Panel 5: "Agent comparison"
+Historical figure or fictional/book character comparison if supported. Prefer an interesting accurate deep cut over obvious default polymaths. Show a stylized portrait/silhouette, name, one short reason, and 2-3 tiny evidence chips tied to actual predictions. If unsupported, make a tasteful abstract closing panel instead.
+
+Evidence pool for synthesis only:
+Agent-about-user analysis:
+${agentAnalysisLines || 'No separate agent-about-user analysis rows were submitted.'}
+
+Predicted human-answer evidence:
+${allPredictionEvidenceLines}
+
+Questions the agent considered important:
+${importantLines}
+
+High-confidence predictions:
+${highLines}
+
+Cautious predictions:
+${cautiousLines}
+
+Token evidence:
+${tokenUsageLine || 'No submitted token usage metric; omit token numbers and do not invent them.'}`;
+  assertNoSecretShape({ prompt }, 'Agent-only wrapped story storyboard prompt must not serialize secrets.');
+  return prompt;
+}
+
 function buildAgentOnlyPoliticalCompassPrompt({
   importantLines = '',
   highLines = '',
@@ -2637,6 +2716,38 @@ function buildWrappedStorySvgBase64(frames = []) {
   return base64EncodeText(svg);
 }
 
+function buildWrappedStoryboardSvgBase64(storyboardImageBase64 = '', frameKeys = []) {
+  const imageBase64 = safeString(storyboardImageBase64);
+  if (!imageBase64) return '';
+  const keys = (Array.isArray(frameKeys) && frameKeys.length ? frameKeys : ['summary', 'token_use', 'predictions', 'agent_guesses', 'comparison'])
+    .map((key, index) => safeString(key) || `frame_${index + 1}`)
+    .slice(0, WRAPPED_STORY_FRAME_COUNT);
+  if (!keys.length) return '';
+  const frameCount = keys.length;
+  const durationSeconds = frameCount * WRAPPED_STORY_FRAME_SECONDS;
+  const keyTimes = [...Array.from({ length: frameCount }, (_, index) => (index / frameCount).toFixed(4).replace(/0+$/, '').replace(/\.$/, '')), '1'].join(';');
+  const clipId = 'story-frame-clip';
+  const images = keys.map((key, frameIndex) => {
+    const values = [
+      ...Array.from({ length: frameCount }, (_, index) => (index === frameIndex ? '1' : '0')),
+      frameIndex === 0 ? '1' : '0',
+    ].join(';');
+    const id = key.replace(/[^a-z0-9_-]/gi, '') || `frame_${frameIndex + 1}`;
+    return `<g id="${id}" clip-path="url(#${clipId})" opacity="${frameIndex === 0 ? '1' : '0'}"><image href="data:image/png;base64,${imageBase64}" x="${-1080 * frameIndex}" y="0" width="${1080 * frameCount}" height="1920" preserveAspectRatio="none"/><animate attributeName="opacity" dur="${durationSeconds}s" repeatCount="indefinite" calcMode="discrete" keyTimes="${keyTimes}" values="${values}"/></g>`;
+  }).join('');
+  const progress = keys.map((key, index) => {
+    const x = 54 + index * (972 / frameCount);
+    const width = (972 / frameCount) - 12;
+    const values = [
+      ...Array.from({ length: frameCount }, (_, frameIndex) => (frameIndex === index ? '1' : '0.28')),
+      index === 0 ? '1' : '0.28',
+    ].join(';');
+    return `<rect x="${x.toFixed(1)}" y="36" width="${width.toFixed(1)}" height="8" rx="4" fill="#ffffff" opacity="${index === 0 ? '1' : '0.28'}"><animate attributeName="opacity" dur="${durationSeconds}s" repeatCount="indefinite" calcMode="discrete" keyTimes="${keyTimes}" values="${values}"/></rect>`;
+  }).join('');
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1920" width="1080" height="1920" role="img" aria-label="Agent Village Wrapped phone story"><title>Agent Village Wrapped phone story</title><defs><clipPath id="${clipId}"><rect width="1080" height="1920"/></clipPath></defs><rect width="1080" height="1920" fill="#0b140d"/>${images}${progress}</svg>`;
+  return base64EncodeText(svg);
+}
+
 function buildOpenAiWrappedImageFormData({
   model = '',
   prompt = '',
@@ -2795,50 +2906,40 @@ export async function generateAgentOnlyWrappedImage({
   const targetUrl = safeString(env.AGENT_BRIDGE_OPENAI_IMAGE_URL) || DEFAULT_OPENAI_IMAGE_EDIT_URL;
   const referenceBytes = base64ToUint8Array(AGENT_VILLAGE_LOGO_REFERENCE_BASE64);
   if (imageMode === 'wrapped_story') {
-    const storySize = normalizeWrappedImageSize(
+    const storyboardSize = normalizeWrappedImageSize(
+      body.storyboard_size ||
+      body.storyboardSize ||
       body.frame_size ||
       body.frameSize ||
       body.size ||
+      env.AGENT_BRIDGE_AGENT_WRAPPED_STORYBOARD_IMAGE_SIZE ||
       env.AGENT_BRIDGE_AGENT_WRAPPED_STORY_IMAGE_SIZE ||
-      DEFAULT_WRAPPED_STORY_IMAGE_SIZE,
+      DEFAULT_WRAPPED_STORYBOARD_IMAGE_SIZE,
     );
-    const framePrompts = buildAgentOnlyWrappedStoryFramePrompts({
+    const storyboardPrompt = buildAgentOnlyWrappedStoryboardPrompt({
       snapshot,
       state: stateForRun,
       linearVoteState,
       quadraticVoteState,
       styleHint: body.style_hint || body.styleHint || '',
     });
-    const generatedFrames = [];
-    for (let index = 0; index < framePrompts.length; index += 1) {
-      const frame = framePrompts[index];
-      const frameResult = await requestOpenAiWrappedImage({
-        fetchImpl,
-        targetUrl,
-        openAiKey,
-        model,
-        prompt: frame.prompt,
-        size: storySize,
-        quality,
-        referenceBytes,
-      });
-      if (!frameResult.ok) {
-        return {
-          ...frameResult,
-          frame_index: index,
-          frame_key: frame.key,
-          frame_title: frame.title,
-        };
-      }
-      generatedFrames.push({ ...frame, imageBase64: frameResult.imageBase64 });
-    }
-    const storyImageBase64 = buildWrappedStorySvgBase64(generatedFrames);
+    const storyboardResult = await requestOpenAiWrappedImage({
+      fetchImpl,
+      targetUrl,
+      openAiKey,
+      model,
+      prompt: storyboardPrompt,
+      size: storyboardSize,
+      quality,
+      referenceBytes,
+    });
+    if (!storyboardResult.ok) return storyboardResult;
+    const frameKeys = ['summary', 'token_use', 'predictions', 'agent_guesses', 'comparison'];
+    const storyImageBase64 = buildWrappedStoryboardSvgBase64(storyboardResult.imageBase64, frameKeys);
     if (!storyImageBase64) {
       return { ok: false, status: 502, reason: 'wrapped_story_svg_missing' };
     }
-    const storyPrompt = framePrompts.map((frame, index) => `Frame ${index + 1} (${frame.key}):\n${frame.prompt}`).join('\n\n---\n\n');
-    const storyDurationSeconds = framePrompts.length * WRAPPED_STORY_FRAME_SECONDS;
-    const frameKeys = framePrompts.map((frame) => frame.key);
+    const storyDurationSeconds = frameKeys.length * WRAPPED_STORY_FRAME_SECONDS;
     const savedImage = await saveAgentOnlyWrappedImage({
       env,
       sessionSlug: slug,
@@ -2847,16 +2948,16 @@ export async function generateAgentOnlyWrappedImage({
       runId,
       mode: imageMode,
       model,
-      size: storySize,
+      size: storyboardSize,
       quality,
       referenceImage: AGENT_VILLAGE_LOGO_REFERENCE_FILENAME,
-      mediaKind: 'animated_svg_story',
-      frameCount: framePrompts.length,
+      mediaKind: 'animated_svg_storyboard',
+      frameCount: frameKeys.length,
       storyDurationSeconds,
       frameKeys,
       imageContentType: 'image/svg+xml',
       imageBase64: storyImageBase64,
-      prompt: storyPrompt,
+      prompt: storyboardPrompt,
       now,
     });
     const payload = {
@@ -2871,16 +2972,17 @@ export async function generateAgentOnlyWrappedImage({
       all_statements_predicted: coverage.allStatementsPredicted,
       all_statements_covered: coverage.allStatementsCovered,
       model,
-      size: storySize,
+      size: storyboardSize,
       quality,
       reference_image: AGENT_VILLAGE_LOGO_REFERENCE_FILENAME,
-      media_kind: 'animated_svg_story',
+      media_kind: 'animated_svg_storyboard',
       image_content_type: 'image/svg+xml',
       image_base64: storyImageBase64,
-      frame_count: framePrompts.length,
+      frame_count: frameKeys.length,
       story_duration_seconds: storyDurationSeconds,
       story_frame_seconds: WRAPPED_STORY_FRAME_SECONDS,
       frame_keys: frameKeys,
+      story_source: 'single_storyboard',
       image_safety_retried: false,
       image_saved: savedImage.ok === true,
       ...(savedImage.ok ? {
@@ -2891,8 +2993,8 @@ export async function generateAgentOnlyWrappedImage({
         image_save_reason: savedImage.reason || 'wrapped_image_save_failed',
       }),
       ...(body.include_prompt === true || body.includePrompt === true ? {
-        prompt: storyPrompt,
-        frame_prompts: framePrompts.map((frame) => ({ key: frame.key, title: frame.title, prompt: frame.prompt })),
+        prompt: storyboardPrompt,
+        storyboard_prompt: storyboardPrompt,
       } : {}),
     };
     assertNoSecretShape({ ...payload, image_base64: '[image omitted]' }, 'Agent-only wrapped story response metadata must not serialize secrets.');

@@ -306,6 +306,10 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
     new URL('./skills/ce-telegram-bot-reference/SKILL.md', import.meta.url),
     'utf8',
   );
+  const wrapped = readFileSync(
+    new URL('./skills/ce-agent-village-wrapped/SKILL.md', import.meta.url),
+    'utf8',
+  );
 
   assert.match(source, /name:\s+context-engine/);
   assert.match(source, /^# Context Engine Agent Runtime/m);
@@ -362,6 +366,21 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.match(reference, /Detailed Context Engine Telegram bot, Mini App, admin, and operator reference/);
   assert.match(reference, /POST \/telegram\/agent\/api\/mini-app-launch/);
   assert.match(source, /skillUpdateAvailable/);
+
+  assert.match(wrapped, /name:\s+agent-village-wrapped/);
+  assert.match(wrapped, /^# Agent Village Wrapped Runtime/m);
+  assert.match(wrapped, /\*\*Skill version:\*\* 2026-06-25 \(wrapped-v1\)/);
+  assert.match(wrapped, /Use this skill only to run Agent Village Wrapped/);
+  assert.match(wrapped, /Do not use the broader\s+`context-engine` skill/);
+  assert.match(wrapped, /memory\/context-engine-state\.json/);
+  assert.match(wrapped, /Do not read other local auth, env, config, SQLite/);
+  assert.match(wrapped, /GET `\/telegram\/agent\/api\/agent-village-wrapped\/skill-version`/);
+  assert.match(wrapped, /mode": "wrapped_story"/);
+  assert.match(wrapped, /visualDefaults\.wrapped_story/);
+  assert.match(wrapped, /shareable story version/);
+  assert.match(wrapped, /Context Engine Bot/);
+  assert.doesNotMatch(wrapped, /question-queue\/apply/);
+  assert.doesNotMatch(wrapped, /results-image/);
 });
 
 test('Telegram agent handoff skill version constant matches SKILL.md header', () => {
@@ -395,6 +414,27 @@ test('Telegram agent handoff exposes unauthenticated skill version metadata', as
   assert.equal(body.updateNote, '');
 });
 
+test('Telegram agent handoff exposes the dedicated Agent Village Wrapped skill metadata', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_AGENT_VILLAGE_WRAPPED_SKILL_URL: 'https://example.test/skills/agent-village-wrapped/SKILL.md',
+  });
+  const response = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/agent-village-wrapped/skill-version', { token: '' }),
+    env,
+  });
+  const body = await jsonBody(response);
+
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(body.version, '2026-06-25 (wrapped-v1)');
+  assert.equal(body.protocolVersion, '2026-06-16 (v41)');
+  assert.equal(body.skill, 'agent-village-wrapped');
+  assert.equal(body.skillUrl, 'https://example.test/skills/agent-village-wrapped/SKILL.md');
+  assert.equal(body.workerSkillVersionEndpoint, '/telegram/agent/api/skill-version');
+  assert.equal(body.startEndpoint, '/telegram/agent/api/agent-only/start');
+  assert.equal(body.wrappedImageEndpoint, '/telegram/agent/api/agent-only/wrapped-image');
+});
+
 test('Telegram agent handoff serves a short skill redirect', async () => {
   const response = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/skill?v=19', { token: '' }),
@@ -405,6 +445,38 @@ test('Telegram agent handoff serves a short skill redirect', async () => {
   const location = response.headers.get('location') || '';
   assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-telegram-agent-handoff\/SKILL\.md/);
   assert.match(location, /v=2026-06-16-v41-/);
+});
+
+test('Telegram agent handoff serves a dedicated Agent Village Wrapped skill redirect', async () => {
+  const response = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/agent-village-wrapped/skill?v=1', { token: '' }),
+    env: baseEnv(),
+  });
+
+  assert.equal(response.status, 302);
+  const location = response.headers.get('location') || '';
+  assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-agent-village-wrapped\/SKILL\.md/);
+  assert.match(location, /v=2026-06-25-wrapped-v1-/);
+});
+
+test('Agent-only start payload exposes configurable visual defaults', async () => {
+  const response = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/agent-only/start', { token: '' }),
+    env: baseEnv({
+      AGENT_BRIDGE_AGENT_WRAPPED_STORY_DEFAULT: 'true',
+      AGENT_BRIDGE_AGENT_WRAPPED_COMPASS_DEFAULT: 'true',
+    }),
+  });
+  const body = await jsonBody(response);
+
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(body.wrappedImageEndpoint, '/telegram/agent/api/agent-only/wrapped-image');
+  assert.deepEqual(body.visualDefaults, {
+    wrapped: true,
+    wrapped_story: true,
+    political_compass: true,
+  });
 });
 
 test('Telegram agent handoff wraps unexpected throws as JSON errors', async () => {
@@ -1908,7 +1980,7 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
       assert.equal(init.body instanceof FormData, true);
       storyAttempts += 1;
       storyPrompts.push(init.body.get('prompt'));
-      assert.equal(init.body.get('size'), '1024x1536');
+      assert.equal(init.body.get('size'), '3240x1152');
       return new Response(JSON.stringify({
         data: [{ b64_json: Buffer.from(`fake-story-frame-${storyAttempts}`).toString('base64') }],
       }), { status: 200, headers: { 'content-type': 'application/json' } });
@@ -1918,22 +1990,23 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   assert.equal(storyResponse.status, 200);
   assert.equal(story.ok, true);
   assert.equal(story.mode, 'wrapped_story');
-  assert.equal(story.media_kind, 'animated_svg_story');
+  assert.equal(story.media_kind, 'animated_svg_storyboard');
   assert.equal(story.image_content_type, 'image/svg+xml');
   assert.equal(story.frame_count, 5);
   assert.equal(story.story_duration_seconds, 20);
   assert.equal(story.story_frame_seconds, 4);
   assert.deepEqual(story.frame_keys, ['summary', 'token_use', 'predictions', 'agent_guesses', 'comparison']);
-  assert.equal(storyAttempts, 5);
-  assert.match(storyPrompts[0], /Screen 1 of 5/);
-  assert.match(storyPrompts[1], /Screen 2 of 5/);
-  assert.match(storyPrompts[2], /Screen 3 of 5/);
-  assert.match(storyPrompts[3], /Screen 4 of 5/);
-  assert.match(storyPrompts[4], /Screen 5 of 5/);
+  assert.equal(story.story_source, 'single_storyboard');
+  assert.equal(storyAttempts, 1);
+  assert.equal(storyPrompts.length, 1);
+  assert.match(storyPrompts[0], /exactly five equal-width vertical phone screens side by side/);
+  assert.match(storyPrompts[0], /Panel 1: "What your agent thinks it knows about you"/);
+  assert.match(storyPrompts[0], /Panel 5: "Agent comparison"/);
   const storySvg = Buffer.from(story.image_base64, 'base64').toString();
   assert.match(storySvg, /<svg/);
   assert.match(storySvg, /Agent Village Wrapped phone story/);
   assert.match(storySvg, /data:image\/png;base64/);
+  assert.match(storySvg, new RegExp(Buffer.from('fake-story-frame-1').toString('base64')));
   assert.match(storySvg, /dur="20s"/);
 
   const storyImageViewResponse = await handleTelegramAgentHandoffRequest({
@@ -1955,7 +2028,7 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   assert.equal(storyExportResponse.status, 200);
   const storyExportRow = storyExportRows.find((row) => row.mode === 'wrapped_story');
   assert.equal(storyExportRow.image_id, story.image_id);
-  assert.equal(storyExportRow.media_kind, 'animated_svg_story');
+  assert.equal(storyExportRow.media_kind, 'animated_svg_storyboard');
   assert.equal(storyExportRow.frame_count, 5);
   assert.equal(storyExportRow.story_duration_seconds, 20);
   assert.equal(storyExportRow.frame_keys, 'summary,token_use,predictions,agent_guesses,comparison');

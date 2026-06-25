@@ -55,11 +55,15 @@ test('resolveAgentBridgeDeployConfig builds the default workers.dev public URL a
     flags: { 'worker-name': 'ce-agent-bridge-worker-staging' },
     env: completeEnv({
       AGENT_BRIDGE_AGENT_ONLY_TOKEN_TTL_SECONDS: '604800',
+      AGENT_BRIDGE_AGENT_WRAPPED_STORY_DEFAULT: 'true',
+      AGENT_BRIDGE_AGENT_WRAPPED_COMPASS_DEFAULT: 'true',
     }),
   });
   assert.equal(staging.workerName, 'ce-agent-bridge-worker-staging');
   assert.equal(staging.resources.actionKvTitle, 'ContextEngineAgentBridgeActions:ce-agent-bridge-worker-staging');
   assert.equal(staging.vars.AGENT_BRIDGE_AGENT_ONLY_TOKEN_TTL_SECONDS, '604800');
+  assert.equal(staging.vars.AGENT_BRIDGE_AGENT_WRAPPED_STORY_DEFAULT, 'true');
+  assert.equal(staging.vars.AGENT_BRIDGE_AGENT_WRAPPED_COMPASS_DEFAULT, 'true');
 });
 
 test('validateAgentBridgeDeployConfig requires only live deploy credentials, not unit-test credentials', () => {

@@ -123,6 +123,9 @@ const DEFAULT_AGENT_BRIDGE_PUBLIC_URL = 'https://ce-agent-bridge-worker.agalmic.
 const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=41';
 const DEFAULT_AGENT_RAW_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/edge-2026/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
 const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-06-16 (v41)';
+const DEFAULT_AGENT_VILLAGE_WRAPPED_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/agent-village-wrapped/skill?v=1';
+const DEFAULT_AGENT_VILLAGE_WRAPPED_RAW_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/edge-2026/workers/agentBridgeWorker/skills/ce-agent-village-wrapped/SKILL.md';
+const CE_AGENT_VILLAGE_WRAPPED_SKILL_VERSION = '2026-06-25 (wrapped-v1)';
 const MINI_APP_QUESTION_VOTE_KV_PREFIX = 'telegram:mini-app-question-vote:v1:';
 const AGENT_QUESTION_VOTE_DECISION_KV_PREFIX = 'telegram:agent-question-vote-decision:v1:';
 const ANSWER_DRAFT_KV_PREFIX = 'telegram:answer-draft:';
@@ -245,6 +248,14 @@ function agentSkillUrl(env = {}) {
   );
 }
 
+function agentVillageWrappedSkillUrl(env = {}) {
+  return safeString(
+    env.AGENT_BRIDGE_AGENT_VILLAGE_WRAPPED_SKILL_URL ||
+      env.AGENT_BRIDGE_AGENT_WRAPPED_SKILL_URL ||
+      DEFAULT_AGENT_VILLAGE_WRAPPED_SKILL_URL
+  );
+}
+
 function skillVersionPayload(env = {}) {
   const skillUrl = agentSkillUrl(env);
   return {
@@ -268,9 +279,30 @@ async function skillVersionPayloadWithFlag(env = {}) {
   return payload;
 }
 
+function agentVillageWrappedSkillVersionPayload(env = {}) {
+  const payload = {
+    ok: true,
+    version: CE_AGENT_VILLAGE_WRAPPED_SKILL_VERSION,
+    protocolVersion: CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION,
+    skill: 'agent-village-wrapped',
+    skillUrl: agentVillageWrappedSkillUrl(env),
+    workerSkillVersionEndpoint: '/telegram/agent/api/skill-version',
+    startEndpoint: AGENT_ONLY_ENDPOINTS.start,
+    wrappedImageEndpoint: AGENT_ONLY_ENDPOINTS.wrappedImage,
+  };
+  assertNoSecretShape(payload, 'Agent Village Wrapped skill-version response must not serialize secrets.');
+  return payload;
+}
+
 function skillRedirectResponse() {
   const redirectUrl = new URL(DEFAULT_AGENT_RAW_SKILL_URL);
   redirectUrl.searchParams.set('v', CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION.replace(/[^0-9A-Za-z_-]+/g, '-'));
+  return Response.redirect(redirectUrl.toString(), 302);
+}
+
+function agentVillageWrappedSkillRedirectResponse() {
+  const redirectUrl = new URL(DEFAULT_AGENT_VILLAGE_WRAPPED_RAW_SKILL_URL);
+  redirectUrl.searchParams.set('v', CE_AGENT_VILLAGE_WRAPPED_SKILL_VERSION.replace(/[^0-9A-Za-z_-]+/g, '-'));
   return Response.redirect(redirectUrl.toString(), 302);
 }
 
@@ -3036,6 +3068,11 @@ async function handleAgentOnlyStartRequest({ request, env = {} } = {}) {
   const payload = buildAgentOnlyStartPayload({
     sessionSlug,
     skillVersion: CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION,
+    visualDefaults: {
+      wrapped: normalizeBoolean(env.AGENT_BRIDGE_AGENT_WRAPPED_POSTER_DEFAULT, true),
+      wrapped_story: normalizeBoolean(env.AGENT_BRIDGE_AGENT_WRAPPED_STORY_DEFAULT, false),
+      political_compass: normalizeBoolean(env.AGENT_BRIDGE_AGENT_WRAPPED_COMPASS_DEFAULT, false),
+    },
   });
   return jsonSessionMeta(request, env, payload);
 }
@@ -5913,6 +5950,12 @@ async function handleTelegramAgentHandoffRequestUnsafe({
   if (url.pathname === '/telegram/agent/api/skill' && request.method === 'GET') {
     return skillRedirectResponse();
   }
+  if (url.pathname === '/telegram/agent/api/agent-village-wrapped/skill-version' && request.method === 'GET') {
+    return json(agentVillageWrappedSkillVersionPayload(env));
+  }
+  if (url.pathname === '/telegram/agent/api/agent-village-wrapped/skill' && request.method === 'GET') {
+    return agentVillageWrappedSkillRedirectResponse();
+  }
 
   if (url.pathname === '/telegram/agent/api/admin/questions/delete') {
     const auth = await authenticateAgentHandoff(request, env);
@@ -6221,6 +6264,7 @@ export async function handleTelegramAgentHandoffRequest(args = {}) {
 
 export const __test__telegramAgentHandoff = {
   CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION,
+  CE_AGENT_VILLAGE_WRAPPED_SKILL_VERSION,
   authenticateAgentHandoff,
   normalizeAgentTelegramContext,
   normalizeDraftForQuestion,
@@ -6232,4 +6276,5 @@ export const __test__telegramAgentHandoff = {
   safeJsonParse,
   skillVersionPayload,
   skillVersionPayloadWithFlag,
+  agentVillageWrappedSkillVersionPayload,
 };

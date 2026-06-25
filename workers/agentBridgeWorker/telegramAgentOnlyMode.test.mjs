@@ -10,6 +10,7 @@ import {
   agentOnlyInstructionWordCount,
   buildAgentOnlyWrappedImagePrompt,
   buildAgentOnlyWrappedStoryFramePrompts,
+  buildAgentOnlyWrappedStoryboardPrompt,
   buildAgentOnlyStartPayload,
   buildAgentOnlyMetrics,
   canonicalAgentOnlyAnswerProjection,
@@ -161,16 +162,24 @@ test('start payload pins path-only endpoints and instruction size', () => {
   assert.equal(payload.answerEndpoint, '/telegram/agent/api/agent-only/answers/bulk');
   assert.equal(payload.voteEndpoint, '/telegram/agent/api/agent-only/token-votes/bulk');
   assert.equal(payload.wrappedImageEndpoint, '/telegram/agent/api/agent-only/wrapped-image');
+  assert.deepEqual(payload.visualDefaults, {
+    wrapped: true,
+    wrapped_story: false,
+    political_compass: false,
+  });
   assert.match(payload.instructions, /Agent Village Wrapped image/);
   assert.match(payload.instructions, /wrappedImageEndpoint/);
   assert.match(payload.instructions, /mode "wrapped_story"/);
   assert.match(payload.instructions, /mode "political_compass"/);
+  assert.match(payload.instructions, /visualDefaults\.wrapped/);
+  assert.match(payload.instructions, /visualDefaults\.wrapped_story/);
+  assert.match(payload.instructions, /visualDefaults\.political_compass/);
   assert.match(payload.instructions, /!\[Agent Village Wrapped\]\(<image_url>\)/);
   assert.match(payload.instructions, /display it exactly once/);
   assert.match(payload.instructions, /make a fresh wrappedImageEndpoint POST/);
-  assert.match(payload.instructions, /never reuse a prior local PNG, previous image_url, cached attachment, or old image response/);
+  assert.match(payload.instructions, /never reuse a prior local PNG, previous image_url, cached attachment, or old response/);
   assert.match(payload.instructions, /not both/);
-  assert.match(payload.instructions, /Do not also include a raw link or link preview/);
+  assert.match(payload.instructions, /Do not include a raw link or link preview/);
   assert.match(payload.instructions, /Do not call vision, image-analysis, or QA tools/);
   assert.match(payload.instructions, /Do not inspect, critique, describe, or summarize the poster/);
   assert.match(payload.instructions, /A text statement that the image is ready is not enough/);
@@ -188,6 +197,7 @@ test('start payload pins path-only endpoints and instruction size', () => {
   assert.match(payload.instructions, /Do not use a repeated default like 85 across a batch/);
   assert.match(payload.instructions, /scan for flat confidence/);
   assert.match(payload.instructions, /To inspect or change your agent's responses/);
+  assert.match(payload.instructions, /shareable story version/);
   assert.match(payload.instructions, /\[Context Engine Bot\]\(https:\/\/t\.me\/contextengineer_bot\?start=agent_onboarding__agent-village-wrapped\)/);
   assert.match(payload.instructions, /extra links/);
   assert.match(payload.instructions, /where the principal lives\/is from\/currently is/);
@@ -196,6 +206,17 @@ test('start payload pins path-only endpoints and instruction size', () => {
   assert.ok(agentOnlyInstructionWordCount(AGENT_ONLY_INSTRUCTIONS) >= 400);
   assert.ok(agentOnlyInstructionWordCount(AGENT_ONLY_INSTRUCTIONS) <= 800);
   assert.equal((payload.instructions.match(/https?:\/\//gi) || []).length, 1);
+
+  const storyDefaultPayload = buildAgentOnlyStartPayload({
+    sessionSlug: 'alpha',
+    skillVersion: '2026-06-16 (v41)',
+    visualDefaults: { wrapped_story: true, political_compass: true },
+  });
+  assert.deepEqual(storyDefaultPayload.visualDefaults, {
+    wrapped: true,
+    wrapped_story: true,
+    political_compass: true,
+  });
 });
 
 test('wrapped image prompt uses importance wording and suppresses decorative text', () => {
@@ -615,6 +636,22 @@ test('wrapped story prompts split the report into five phone screens', () => {
   assert.match(frames[4].prompt, /historical figure or fictional\/book character/);
   assert.match(frames[4].prompt, /interesting, historically accurate deep cut/);
   assert.match(frames.map((frame) => frame.prompt).join('\n'), /Do not mention or imply where the principal lives/);
+
+  const storyboardPrompt = buildAgentOnlyWrappedStoryboardPrompt({
+    snapshot,
+    state,
+    linearVoteState: { mode: 'linear', votes: { ceq_privacy: 20, ceq_code: 10 } },
+    quadraticVoteState: { mode: 'quadratic', votes: { ceq_ai_optimism: 3 } },
+  });
+  assert.match(storyboardPrompt, /dedicated source image for a phone-story animation/);
+  assert.match(storyboardPrompt, /exactly five equal-width vertical phone screens side by side/);
+  assert.match(storyboardPrompt, /Panel 1: "What your agent thinks it knows about you"/);
+  assert.match(storyboardPrompt, /Panel 2: "Token trail"/);
+  assert.match(storyboardPrompt, /Panel 3: "Predictions"/);
+  assert.match(storyboardPrompt, /Panel 4: "Agent guesses"/);
+  assert.match(storyboardPrompt, /Panel 5: "Agent comparison"/);
+  assert.match(storyboardPrompt, /Token Use: 880K current run; 2\.2M recent sessions/);
+  assert.match(storyboardPrompt, /Do not alter or imitate the standard wide poster layout/);
 });
 
 test('wrapped image prompt has a neutral safety retry variant for compass mode', () => {

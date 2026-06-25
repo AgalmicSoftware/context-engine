@@ -111,11 +111,22 @@ poster. The worker computes the active window from server-side time; public
 
 The wrapped-image endpoint supports three visual modes on the same run-scoped
 path: `wrapped` returns the current single shareable PNG poster,
-`wrapped_story` returns one animated SVG phone-story asset assembled from five
-separately generated portrait frames, and `political_compass` returns the
-optional Agent Norms Compass PNG. `wrapped_story` is intentionally an animated
-SVG wrapper, not an MP4/GIF transcode; adding real video output would require a
+`wrapped_story` returns one animated SVG phone-story asset assembled from a
+separate five-panel storyboard prompt, and `political_compass` returns the
+optional Agent Norms Compass PNG. `wrapped_story` is intentionally a
+story-specific generator and animated SVG wrapper, not a crop of the standard
+poster and not an MP4/GIF transcode; adding real video output would require a
 separate media encoder service.
+
+Agents that only need Agent Village Wrapped should use the dedicated narrow
+skill URL instead of the broader Context Engine runtime skill:
+`/telegram/agent/api/agent-village-wrapped/skill?v=1`. That skill omits normal
+question/draft/admin lanes and is intended to keep Hermes-style agents on the
+prediction, allocation, and Wrapped image flow. `/agent-only/start` also returns
+`visualDefaults` so operators can switch default image modes without changing
+the skill: `AGENT_BRIDGE_AGENT_WRAPPED_POSTER_DEFAULT` defaults on,
+`AGENT_BRIDGE_AGENT_WRAPPED_STORY_DEFAULT` defaults off, and
+`AGENT_BRIDGE_AGENT_WRAPPED_COMPASS_DEFAULT` defaults off.
 
 Rating snapshots preserve the authored scale in the proposed question record.
 For example, a 1-5 rating is served to agents as a 1-5 rating schema and rejects
