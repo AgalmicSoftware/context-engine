@@ -136,6 +136,7 @@ import {
 const DEFAULT_MINI_APP_AUTH_MAX_AGE_SECONDS = 24 * 60 * 60;
 const DEFAULT_MINI_APP_PAGE_SIZE = 50;
 const DEFAULT_MINI_APP_FAST_INITIAL_QUESTION_LIMIT = 1;
+const DEFAULT_MINI_APP_FAST_FOLLOWUP_QUESTION_COUNT = 5;
 const MAX_MINI_APP_QUESTION_LIMIT = 500;
 const QUESTION_ACTION_TTL_SECONDS = 30 * 60;
 const AGENT_REQUEST_KV_PREFIX = 'telegram:agent-request:';
@@ -7586,6 +7587,7 @@ function telegramMiniAppHtml({ loadingVisual = MINI_APP_LOADING_VISUAL_GIF } = {
     const POPULAR_QUESTION_LIMIT_MAX = 50;
     const POPULAR_QUESTION_LIMIT_STEP = 2;
     const FAST_INITIAL_QUESTION_LIMIT = ${DEFAULT_MINI_APP_FAST_INITIAL_QUESTION_LIMIT};
+    const FAST_FOLLOWUP_QUESTION_COUNT = ${DEFAULT_MINI_APP_FAST_FOLLOWUP_QUESTION_COUNT};
     const MAX_QUESTION_LIMIT = ${MAX_MINI_APP_QUESTION_LIMIT};
     const QUESTION_TAG_LIMIT = 10;
     const QUESTION_TAG_FILTER_COLLAPSED_LIMIT = 5;
@@ -12024,6 +12026,8 @@ function telegramMiniAppHtml({ loadingVisual = MINI_APP_LOADING_VISUAL_GIF } = {
       const loadedCount = Number(data?.loadedQuestionCount || 0) || 0;
       const pageSize = Number(data?.pageSize || 50) || 50;
       const current = Math.max(loadedLimit, loadedCount, Number(state.questionLimit || 0) || 0);
+      const fastFollowupLimit = FAST_INITIAL_QUESTION_LIMIT + FAST_FOLLOWUP_QUESTION_COUNT;
+      if (current <= FAST_INITIAL_QUESTION_LIMIT && fastFollowupLimit > current) return Math.min(MAX_QUESTION_LIMIT, fastFollowupLimit);
       return Math.min(MAX_QUESTION_LIMIT, Math.max(current + 1, current + pageSize));
     }
     el.continueSessions.onclick = () => {

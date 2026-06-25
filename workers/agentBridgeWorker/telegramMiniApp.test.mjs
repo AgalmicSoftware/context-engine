@@ -286,12 +286,15 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /function loadMoreQuestions\(\)/);
   assert.match(html, /stateUrl\.searchParams\.set\('questionLimit', String\(state\.questionLimit\)\);/);
   assert.match(html, /const FAST_INITIAL_QUESTION_LIMIT = 1;/);
+  assert.match(html, /const FAST_FOLLOWUP_QUESTION_COUNT = 5;/);
   assert.match(html, /const MAX_QUESTION_LIMIT = 500;/);
   assert.match(html, /questionLimit: FAST_INITIAL_QUESTION_LIMIT,/);
   assert.match(html, /loadingMoreQuestions: false,/);
   assert.match(html, /backgroundQuestionLoadPending: false,/);
   assert.match(html, /function shouldAutoExpandQuestions\(data\)/);
   assert.match(html, /function nextQuestionLimit\(data\)/);
+  assert.match(html, /const fastFollowupLimit = FAST_INITIAL_QUESTION_LIMIT \+ FAST_FOLLOWUP_QUESTION_COUNT;/);
+  assert.match(html, /if \(current <= FAST_INITIAL_QUESTION_LIMIT && fastFollowupLimit > current\) return Math\.min\(MAX_QUESTION_LIMIT, fastFollowupLimit\);/);
   assert.match(html, /loaded < MAX_QUESTION_LIMIT/);
   assert.equal(html.includes('loaded < pageSize'), false);
   assert.match(html, /setTimeout\(\(\) => load\(\), wasLoadedOnce \? 80 : 0\);/);

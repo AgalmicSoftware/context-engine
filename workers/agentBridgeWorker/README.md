@@ -701,10 +701,10 @@ Current v0 scope:
   lists question storage once, reuses inline question payloads returned by that
   list when present, reads only the requested page of missing payloads, and
   reports the full discovered count so the UI can show `1/N` immediately while
-  loading the rest in the background. Sessions with `telegramOnly=true`,
-  `sessionMode=telegram_only`, or Cloudflare question storage and no explicit
-  on-chain question mode do not use SessionRegistry/RPC question indexing on
-  this path.
+  loading five more questions before the normal background page-size expansion.
+  Sessions with `telegramOnly=true`, `sessionMode=telegram_only`, or Cloudflare
+  question storage and no explicit on-chain question mode do not use
+  SessionRegistry/RPC question indexing on this path.
 - Native freeform, binary, rating, and multichoice answer forms rendered inline
   on each displayed question card in one document-scroll question list. The Mini
   App does not render question IDs or a `Create Agent` launcher; filters and
