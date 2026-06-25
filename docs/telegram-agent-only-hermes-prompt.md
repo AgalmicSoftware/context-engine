@@ -5,6 +5,8 @@ Hermes. Keep the prompt conservative: the agent should not expose bearer tokens,
 should verify v41 before doing work, should stop before fetching statements if
 it cannot verify enough credit for the default model, and should not pause for a
 separate EdgeOS permission question when the prompt includes explicit defaults.
+The GitHub-facing attachment/source file is
+`docs/agent-village-wrapped-prompt.txt`.
 
 ## Current Prompt
 
@@ -70,12 +72,14 @@ it. Do not describe or summarize the poster. Do not reuse an old local PNG,
 previous image_url, cached attachment, or old image response. A text-only
 "ready" message is not a completed run.
 
-The default visual is `mode: "wrapped"`: one full-width shareable poster. If
-the user asks for a phone/story version, call the same wrapped-image endpoint
-with `mode: "wrapped_story"` and the same fresh `run_id`. It returns one
-animated SVG story asset with five generated portrait screens: summary, token
-use, prediction rows, playful guesses, and comparison. Display it once just
-like the poster. True MP4/GIF export is not part of this worker path yet.
+Default visual output is two images. First generate and display the standard
+`mode: "wrapped"` poster. Then, without asking, call the same wrapped-image
+endpoint with `mode: "wrapped_story"` and the same fresh `run_id`. It returns
+one animated SVG story asset with five generated portrait screens: summary,
+token use, prediction rows, playful guesses, and comparison. Display the story
+once just like the poster. True MP4/GIF export is not part of this worker path
+yet. Generate `mode: "political_compass"` only if the user asks for the Agent
+Norms Compass.
 
 When answering questions that depend on memory, usage history, token usage
 across sessions, model history, events attended, messages per day, non-default
