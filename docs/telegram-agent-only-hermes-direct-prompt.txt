@@ -71,9 +71,13 @@ venue, or travel origin in the poster or chat summary.
 If token usage is visible through an already-approved balance/session/history
 surface, include it in `agent_metadata.token_usage` on answer and vote POSTs:
 `current_run_total_tokens`, `recent_sessions_total_tokens`, and `source` when
-known. Do not search for it. Do not read files, env vars, config, auth files, or
-API keys to find it. Omit token usage if unavailable; the poster will omit the
-Token Use chip when this metadata is absent.
+known. Fast optional check: run at most one command,
+`hermes insights --days 30 --source telegram`, and use a clear total token line
+from that output if present. If that exact command is unavailable, errors, or
+does not show a clear total, omit token usage. Do not use `skill_view
+token-usage-audit`, search, Python scripts, or file/env/config/auth/API-key
+reads to calculate it. The poster will omit the Token Use chip when this
+metadata is absent.
 
 Do not print my ceagt token, confidences, rationales, raw private memory, raw
 image prompt, or image_base64 in chat. In the final message, make "Context
