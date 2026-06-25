@@ -7235,7 +7235,7 @@ function telegramMiniAppHtml() {
       </section>
       <div class="status loadingStatus" id="status">
         <img class="loadingGif" src="/telegram/mini-app/loading.gif" alt="" aria-hidden="true">
-        <span>Loading questions...</span>
+        <span>Loading session and agent predictions</span>
         <div class="loadingProgress" aria-hidden="true"><div class="loadingProgressBar" style="--progress: 18%"></div></div>
         <div class="loadingHint">Opening the session and checking agent predictions.</div>
       </div>
@@ -8344,7 +8344,7 @@ function telegramMiniAppHtml() {
       image.alt = '';
       image.setAttribute('aria-hidden', 'true');
       const label = document.createElement('span');
-      label.textContent = message || 'Loading questions...';
+      label.textContent = message || 'Loading session and agent predictions';
       const track = document.createElement('div');
       track.className = 'loadingProgress';
       track.setAttribute('aria-hidden', 'true');
@@ -8362,7 +8362,7 @@ function telegramMiniAppHtml() {
       el.status.appendChild(note);
     };
     function startLoadingProgress({
-      message = 'Loading questions...',
+      message = 'Loading session and agent predictions',
       initialPercent = 22,
       maxPercent = 72,
       hint = 'Opening the session and loading the first question.',
@@ -11954,7 +11954,7 @@ function telegramMiniAppHtml() {
         state.loadingMoreQuestions = false;
         state.backgroundQuestionLoadPending = false;
         startLoadingProgress({
-          message: retry ? 'Still loading questions...' : 'Loading questions...',
+          message: 'Loading session and agent predictions',
           initialPercent: retry ? 34 : 22,
           maxPercent: retry ? 74 : 72,
           hint: 'Opening the session and loading the first question.',
@@ -11995,7 +11995,7 @@ function telegramMiniAppHtml() {
       }
       if (!state.loadedOnce) {
         stopLoadingProgressTimer();
-        setLoadingProgress('Preparing questions...', 86, 'Rendering the first question.');
+        setLoadingProgress('Loading session and agent predictions', 86, 'Rendering the first question.');
       }
       const wasLoadedOnce = state.loadedOnce;
       state.data = body;

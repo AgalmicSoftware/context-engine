@@ -298,6 +298,9 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /state\.questionLimit = FAST_INITIAL_QUESTION_LIMIT;/);
   assert.match(html, /loadingProgressTimer: null,/);
   assert.match(html, /function startLoadingProgress\(/);
+  assert.match(html, /<span>Loading session and agent predictions<\/span>/);
+  assert.match(html, /message: 'Loading session and agent predictions',/);
+  assert.match(html, /setLoadingProgress\('Loading session and agent predictions', 86, 'Rendering the first question\.'\);/);
   assert.match(html, /state\.loadingProgressPercent = Math\.min\(Number\(maxPercent\) \|\| 72, current \+ step\);/);
   assert.match(html, /hint: 'Opening the session and loading the first question\.'/);
   assert.match(html, /\.card \{[\s\S]*border-radius: 20px;[\s\S]*min-width: 0;[\s\S]*max-width: 100%;[\s\S]*overflow: hidden;[\s\S]*box-shadow: var\(--question-card-shadow\);/);
