@@ -7094,12 +7094,6 @@ function telegramMiniAppHtml() {
       background: linear-gradient(90deg, var(--accent), var(--ok));
       transition: width 260ms ease;
     }
-    .loadingHint {
-      max-width: min(78vw, 420px);
-      font-size: 13px;
-      line-height: 1.35;
-      color: var(--muted);
-    }
     .inlineSpinner {
       width: 18px;
       height: 18px;
@@ -7224,7 +7218,6 @@ function telegramMiniAppHtml() {
         <img class="loadingGif" src="/telegram/mini-app/loading.gif" alt="" aria-hidden="true">
         <span>Loading questions and agent predictions</span>
         <div class="loadingProgress" aria-hidden="true"><div class="loadingProgressBar" style="--progress: 18%"></div></div>
-        <div class="loadingHint">Loading questions and agent predictions</div>
       </div>
       <section class="adminPanel" id="adminPanel" aria-label="Admin actions">
         <div class="resultsHeader">
@@ -8322,7 +8315,7 @@ function telegramMiniAppHtml() {
       el.status.className = 'status ' + kind;
       el.status.textContent = message || '';
     };
-    const setLoadingProgress = (message, percent = 18, hint = '') => {
+    const setLoadingProgress = (message, percent = 18) => {
       el.status.className = 'status loadingStatus';
       el.status.innerHTML = '';
       const image = document.createElement('img');
@@ -8340,29 +8333,24 @@ function telegramMiniAppHtml() {
       const boundedPercent = Math.max(8, Math.min(96, Number(percent) || 18));
       bar.style.setProperty('--progress', boundedPercent + '%');
       track.appendChild(bar);
-      const note = document.createElement('div');
-      note.className = 'loadingHint';
-      note.textContent = hint || 'Loading questions and agent predictions';
       el.status.appendChild(image);
       el.status.appendChild(label);
       el.status.appendChild(track);
-      el.status.appendChild(note);
     };
     function startLoadingProgress({
       message = 'Loading questions and agent predictions',
       initialPercent = 22,
       maxPercent = 72,
-      hint = 'Loading questions and agent predictions',
     } = {}) {
       stopLoadingProgressTimer();
       state.loadingProgressPercent = Math.max(8, Math.min(96, Number(initialPercent) || 22));
-      setLoadingProgress(message, state.loadingProgressPercent, hint);
+      setLoadingProgress(message, state.loadingProgressPercent);
       if (typeof window.setInterval !== 'function' || typeof window.clearInterval !== 'function') return;
       state.loadingProgressTimer = window.setInterval(() => {
         const current = Number(state.loadingProgressPercent || initialPercent) || initialPercent;
         const step = current < 42 ? 5 : current < 60 ? 3 : 1.5;
         state.loadingProgressPercent = Math.min(Number(maxPercent) || 72, current + step);
-        setLoadingProgress(message, state.loadingProgressPercent, hint);
+        setLoadingProgress(message, state.loadingProgressPercent);
         if (state.loadingProgressPercent >= (Number(maxPercent) || 72)) {
           stopLoadingProgressTimer();
         }
@@ -11869,7 +11857,6 @@ function telegramMiniAppHtml() {
           message: 'Loading questions and agent predictions',
           initialPercent: retry ? 34 : 22,
           maxPercent: retry ? 74 : 72,
-          hint: 'Loading questions and agent predictions',
         });
       } else if (backgroundLoad) {
         state.questionsLoading = true;
@@ -11907,7 +11894,7 @@ function telegramMiniAppHtml() {
       }
       if (!state.loadedOnce) {
         stopLoadingProgressTimer();
-        setLoadingProgress('Loading questions and agent predictions', 86, 'Loading questions and agent predictions');
+        setLoadingProgress('Loading questions and agent predictions', 86);
       }
       const wasLoadedOnce = state.loadedOnce;
       state.data = body;

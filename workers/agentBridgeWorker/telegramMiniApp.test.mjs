@@ -300,12 +300,15 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /function startLoadingProgress\(/);
   assert.match(html, /<span>Loading questions and agent predictions<\/span>/);
   assert.match(html, /message: 'Loading questions and agent predictions',/);
-  assert.match(html, /setLoadingProgress\('Loading questions and agent predictions', 86, 'Loading questions and agent predictions'\);/);
+  assert.match(html, /setLoadingProgress\('Loading questions and agent predictions', 86\);/);
+  assert.equal(html.includes('class="loadingHint"'), false);
+  assert.equal(html.includes('.loadingHint'), false);
+  assert.equal(html.includes("note.className = 'loadingHint'"), false);
+  assert.equal(html.includes("hint: 'Loading questions and agent predictions'"), false);
   assert.equal(html.includes('Loading session and agent predictions'), false);
   assert.equal(html.includes('loading the first question'), false);
   assert.equal(html.includes('Rendering the first question'), false);
   assert.match(html, /state\.loadingProgressPercent = Math\.min\(Number\(maxPercent\) \|\| 72, current \+ step\);/);
-  assert.match(html, /hint: 'Loading questions and agent predictions'/);
   assert.match(html, /\.card \{[\s\S]*border-radius: 20px;[\s\S]*min-width: 0;[\s\S]*max-width: 100%;[\s\S]*overflow: hidden;[\s\S]*box-shadow: var\(--question-card-shadow\);/);
   assert.match(html, /\.prompt \{[\s\S]*overflow-wrap: anywhere;[\s\S]*word-break: break-word;/);
   assert.match(html, /\.cardBody \{[\s\S]*min-width: 0;[\s\S]*max-width: 100%;/);
