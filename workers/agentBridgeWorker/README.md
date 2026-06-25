@@ -97,7 +97,21 @@ quadratic allocations at
 `POST /telegram/agent/api/agent-only/token-votes/bulk`. Normal delegation
 tokens do not include `agent_autofill` and receive 403 on these write lanes;
 agent-only tokens do not include normal read, draft, vote, or question-write
-scopes.
+scopes. Even if an agent-only token record carries an additional read scope,
+the handoff layer rejects it on non-agent-only routes and enforces the token's
+minted `sessionSlug`.
+
+Every agent-only answer, token-vote, and wrapped-image POST requires a caller
+supplied `run_id`. Events remain append-only, while materialized answer/vote
+state and wrapped image generation are scoped to the latest matching run id.
+This lets a principal rerun Agent Village Wrapped in the same active window
+without overwriting earlier research events or accidentally reusing a prior
+poster. The worker computes the active window from server-side time; public
+`createdAt` query/body values are ignored for agent-only window selection.
+
+Rating snapshots preserve the authored scale in the proposed question record.
+For example, a 1-5 rating is served to agents as a 1-5 rating schema and rejects
+out-of-scale values such as `0`; 0-10 ratings continue to serve 0-10 schemas.
 
 Operators configure flagged statements with the worker service token or a
 `ceagt_...` token whose managed account is an admin for the session:
@@ -147,6 +161,10 @@ Agent-only exports use a built-in worker pseudonym salt for `principal_id`
 values, so operators do not need to configure a separate export secret. Admin
 metrics count agent-only answers, privacy skips, vote state, principals, and
 windows from KV metadata only, behind the existing metrics cache.
+
+`POST /telegram/agent/api/result-view-cache` is service-token-only. Participant
+and copied `ceagt_...` tokens can read cache entries when their route scopes
+allow it, but they cannot write or overwrite cached Polis/atlas analysis.
 
 For staging load tests, deploy a separate worker and KV namespace with the
 existing helper flags:
@@ -428,7 +446,7 @@ Required values:
 | `TELEGRAM_WEBHOOK_SECRET` random high-entropy string | Paste into `.dev.vars`; `deploy:apply -- --apply` writes deployed Worker secret `TELEGRAM_WEBHOOK_SECRET`; Telegram sends it as `X-Telegram-Bot-Api-Secret-Token` |
 | `DEMO_SIGNER_ROOT_SECRET` random high-entropy string | Paste into `.dev.vars`; `deploy:apply -- --apply` writes deployed Worker secret `DEMO_SIGNER_ROOT_SECRET` |
 | `AGENT_BRIDGE_AGENT_API_TOKEN` random high-entropy string | Paste into `.dev.vars`; `deploy:apply -- --apply` writes deployed Worker secret `AGENT_BRIDGE_AGENT_API_TOKEN` for OpenClaw/agent handoff API authentication |
-| Production web client origins | Set `AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS=https://contextengine.xyz,https://www.contextengine.xyz` so hosted clients can exchange Telegram tokens and read/write result-view cache entries. Add Mini App origins to `AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS`; those origins are also accepted for client-login exchanges |
+| Production web client origins | Set `AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS=https://contextengine.xyz,https://www.contextengine.xyz` so hosted clients can exchange Telegram tokens and read result-view cache entries. Result-view cache writes require the worker service token. Add Mini App origins to `AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS`; those origins are also accepted for client-login exchanges |
 | Optional trusted Geo/Hermes onboarding invite | Store a SHA-256 hash in `AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITE_TOKEN_HASHES`, or use `AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON` records with `tokenHash`, `sessionSlug`, `label`, and `source`. The Geo node/link carries the plaintext invite token; Hermes supplies the Telegram user id it observes and receives a normal user-scoped `ceagt_...` token from `POST /telegram/agent/api/invite/onboard` |
 | Optional OpenAI key for Telegram AI | Paste into untracked `.dev.vars` as `AGENT_BRIDGE_OPENAI_API_KEY` or `OPENAI_API_KEY`; `deploy:apply -- --apply` writes deployed Worker secret `AGENT_BRIDGE_OPENAI_API_KEY`. Telegram question generation, AI search, add-question formatting, group analysis, and transcription pass it as a request-local `apiKey` to the configured session worker when that session worker has no per-session `openaiKey` secret |
 | Public deployed `agentBridgeWorker` URL | Paste or derive the Workers.dev base URL as `AGENT_BRIDGE_PUBLIC_URL`, for example `https://ce-agent-bridge-worker.<workers-subdomain>.workers.dev`; live apply can derive it when the token can read the account workers.dev subdomain |

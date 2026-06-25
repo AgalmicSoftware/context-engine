@@ -241,6 +241,39 @@ function normalizeOptions(value = []) {
     .slice(0, 12);
 }
 
+function leadingNumber(value) {
+  const match = safeString(value).match(/^-?\d+(?:\.\d+)?/);
+  if (!match) return null;
+  const numeric = Number(match[0]);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function normalizeRatingScale(value = {}, options = []) {
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  const optionNumbers = normalizeOptions(options)
+    .map((option) => leadingNumber(option))
+    .filter((number) => Number.isFinite(number));
+  let min = Number(source.min ?? source.minimum);
+  let max = Number(source.max ?? source.maximum);
+  let step = Number(source.step ?? source.interval);
+  if (!Number.isFinite(min) && optionNumbers.length >= 2) min = Math.min(...optionNumbers);
+  if (!Number.isFinite(max) && optionNumbers.length >= 2) max = Math.max(...optionNumbers);
+  if (!Number.isFinite(step)) {
+    const sorted = [...new Set(optionNumbers)].sort((left, right) => left - right);
+    const diffs = sorted.slice(1).map((number, index) => number - sorted[index]).filter((number) => number > 0);
+    step = diffs.length ? Math.min(...diffs) : 1;
+  }
+  min = Math.floor(min);
+  max = Math.floor(max);
+  step = Math.floor(step);
+  if (!Number.isFinite(min) || !Number.isFinite(max) || max < min) return null;
+  if (!Number.isFinite(step) || step < 1) step = 1;
+  min = Math.max(-100, Math.min(100, min));
+  max = Math.max(-100, Math.min(100, max));
+  if (Math.floor((max - min) / step) + 1 > 21) return null;
+  return { min, max, step };
+}
+
 function normalizeReferenceUrl(value = '') {
   const text = safeString(value).slice(0, 2000);
   if (!text) return '';
@@ -386,6 +419,10 @@ function proposedRecordToQuestion(record = {}) {
   if (questionType === 'multichoice' && record.singleSelect === true) {
     question.singleSelect = true;
   }
+  if (questionType === 'rating') {
+    const ratingScale = normalizeRatingScale(record.ratingScale || record.rating_scale, options);
+    if (ratingScale) question.ratingScale = ratingScale;
+  }
   if (tags.length) question.tags = tags;
   if (references.length) question.references = references;
   if (geoRefs.length) question.geoRefs = geoRefs;
@@ -432,6 +469,7 @@ export async function persistTelegramProposedQuestion({
   prompt = '',
   questionType = 'freeform',
   options = [],
+  ratingScale = null,
   tags = [],
   references = [],
   geoRefs = [],
@@ -445,6 +483,9 @@ export async function persistTelegramProposedQuestion({
   const promptText = normalizePrompt(prompt);
   const type = normalizeQuestionType(questionType);
   const normalizedOptions = normalizeOptions(options);
+  const normalizedRatingScale = type === 'rating'
+    ? normalizeRatingScale(ratingScale, normalizedOptions)
+    : null;
   const normalizedReferences = normalizeQuestionReferences(references);
   const normalizedGeoRefs = normalizeQuestionGeoRefs(geoRefs);
   const normalizedSessionContext = normalizeSessionContext(sessionContext);
@@ -482,6 +523,7 @@ export async function persistTelegramProposedQuestion({
     questionType: type,
     prompt: promptText,
     options: normalizedOptions,
+    ...(normalizedRatingScale ? { ratingScale: normalizedRatingScale } : {}),
     ...(type === 'multichoice' && singleSelect === true ? { singleSelect: true } : {}),
     tags: normalizedTags,
     references: normalizedReferences,

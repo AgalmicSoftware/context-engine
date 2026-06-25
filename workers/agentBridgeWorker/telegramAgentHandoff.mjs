@@ -1387,13 +1387,37 @@ function applyDelegationToInput(auth = {}, input = {}, pathname = '', method = '
     return { ok: false, status: 403, reason: 'agent_token_scope_denied', requiredScope: scope || 'unsupported_route' };
   }
   const requestedSessionSlug = sanitizeSessionSlug(input.sessionSlug);
+  const delegatedSessionSlug = sanitizeSessionSlug(delegation.sessionSlug);
+  const isAgentOnlyToken = delegationTokenHasScope(delegation, TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.AGENT_AUTOFILL);
+  const allowedAgentOnlyPath = (
+    pathname === AGENT_ONLY_ENDPOINTS.statements ||
+    pathname === AGENT_ONLY_ENDPOINTS.answersBulk ||
+    pathname === AGENT_ONLY_ENDPOINTS.tokenVotesBulk ||
+    pathname === AGENT_ONLY_ENDPOINTS.wrappedImage
+  );
+  if (isAgentOnlyToken && !allowedAgentOnlyPath) {
+    return {
+      ok: false,
+      status: 403,
+      reason: 'agent_only_token_route_denied',
+      requiredScope: TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.AGENT_AUTOFILL,
+    };
+  }
+  if (isAgentOnlyToken && delegatedSessionSlug && requestedSessionSlug && requestedSessionSlug !== delegatedSessionSlug) {
+    return {
+      ok: false,
+      status: 403,
+      reason: 'agent_token_session_mismatch',
+      sessionSlug: delegatedSessionSlug,
+    };
+  }
   return {
     ok: true,
     input: {
       ...input,
       telegramUserId: safeString(delegation.telegramUserId),
       username: safeString(input.username || delegation.username),
-      sessionSlug: requestedSessionSlug,
+      sessionSlug: isAgentOnlyToken && delegatedSessionSlug ? delegatedSessionSlug : requestedSessionSlug,
       groupChatId: safeString(input.groupChatId),
     },
   };
@@ -2711,6 +2735,12 @@ async function handleResultViewCacheHttpRequest({ request, env = {} } = {}) {
   if (!auth.ok) {
     return jsonResultViewCache(request, env, { ok: false, reason: auth.reason }, { status: auth.status || 401 });
   }
+  if (request.method === 'POST' && auth.authMode !== 'service_token') {
+    return jsonResultViewCache(request, env, {
+      ok: false,
+      reason: 'result_view_cache_write_service_token_required',
+    }, { status: 403 });
+  }
   const delegated = applyDelegationToInput(auth, inputFromRequest(request, body), url.pathname, request.method);
   if (!delegated.ok) {
     return jsonResultViewCache(request, env, {
@@ -3010,6 +3040,15 @@ async function handleAgentOnlyStartRequest({ request, env = {} } = {}) {
   return jsonSessionMeta(request, env, payload);
 }
 
+function agentOnlyRequestNow(env = {}) {
+  const raw = safeString(
+    env.AGENT_BRIDGE_AGENT_ONLY_REQUEST_NOW ||
+    env.AGENT_BRIDGE_AGENT_ONLY_TEST_NOW ||
+    env.AGENT_BRIDGE_TEST_NOW,
+  );
+  return Number.isFinite(Date.parse(raw)) ? new Date(Date.parse(raw)).toISOString() : null;
+}
+
 async function handleAgentOnlyStatementsRequest({
   env = {},
   context = {},
@@ -3020,7 +3059,7 @@ async function handleAgentOnlyStatementsRequest({
     sessionSlug: context.session.sessionSlug,
     cursor: input.cursor,
     limit: input.limit,
-    now: input.createdAt || null,
+    now: agentOnlyRequestNow(env),
   });
   const status = page.ok === false ? (page.status || 500) : 200;
   assertNoSecretShape(page, 'Agent-only statements response must not serialize secrets.');
@@ -3038,7 +3077,7 @@ async function handleAgentOnlyAnswersBulkRequest({
     sessionSlug: context.session.sessionSlug,
     telegramUserId: input.telegramUserId,
     body,
-    now: input.createdAt || null,
+    now: agentOnlyRequestNow(env),
   });
   const status = result.ok === false ? (result.status || 400) : 200;
   assertNoSecretShape(result, 'Agent-only answers response must not serialize secrets.');
@@ -3056,7 +3095,7 @@ async function handleAgentOnlyTokenVotesBulkRequest({
     sessionSlug: context.session.sessionSlug,
     telegramUserId: input.telegramUserId,
     body,
-    now: input.createdAt || null,
+    now: agentOnlyRequestNow(env),
   });
   const status = result.ok === false ? (result.status || 400) : 200;
   assertNoSecretShape(result, 'Agent-only token-votes response must not serialize secrets.');
@@ -3120,7 +3159,7 @@ async function handleAgentOnlyWrappedImageRequest({
     sessionSlug: context.session.sessionSlug,
     telegramUserId: input.telegramUserId,
     body: { ...body, format: input.format || body.format },
-    now: input.createdAt || null,
+    now: agentOnlyRequestNow(env),
     fetchImpl,
   });
   const status = result.ok === false ? (result.status || 400) : 200;
@@ -3376,6 +3415,7 @@ async function handleQuestionQueueApplyRequest({
       prompt: draft.prompt,
       questionType: draft.questionType,
       options: draft.options,
+      ratingScale: draft.ratingScale || draft.rating_scale || null,
       tags: draft.tags,
       sessionContext: draft.sessionContext || sessionContextFromPolicySession(context.session),
       metadata: {
@@ -4287,7 +4327,7 @@ function anonymizedGroupsEnabledForAgent(session = {}) {
   const exposure = session.resultsExposure && typeof session.resultsExposure === 'object' && !Array.isArray(session.resultsExposure)
     ? session.resultsExposure
     : {};
-  return exposure.anonymizedGroupsEnabled !== false;
+  return exposure.anonymizedGroupsEnabled === true;
 }
 
 function agentResultsMinGroupSize(session = {}) {
@@ -4295,7 +4335,7 @@ function agentResultsMinGroupSize(session = {}) {
     ? session.resultsExposure
     : {};
   const n = Math.floor(Number(exposure.minGroupSize));
-  return Number.isFinite(n) && n >= 1 ? n : 2;
+  return Number.isFinite(n) && n >= 1 ? n : 5;
 }
 
 function normalizeAgentResultsView(value = '') {
@@ -4599,6 +4639,18 @@ async function handleResultsRequest({
     }
     const loaded = await loadAgentResultsDataset({ env, context, input });
     const body = buildAgentPolisDataset(loaded);
+    const minGroupSize = agentResultsMinGroupSize(context.session);
+    if (!loaded.demo && Number(body.participantCount || 0) < minGroupSize) {
+      const insufficient = {
+        ok: false,
+        reason: 'polis_min_group_size_not_met',
+        minGroupSize,
+        participantCount: Number(body.participantCount || 0),
+      };
+      assertNoSecretShape(insufficient, 'Telegram agent polis min-group response must not serialize secrets.');
+      return json(insufficient, { status: 403 });
+    }
+    body.minGroupSize = minGroupSize;
     assertNoSecretShape(body, 'Telegram agent polis dataset response must not serialize secrets.');
     return json(body, { status: 200 });
   }
@@ -5123,6 +5175,11 @@ async function handleCreateQuestionsRequest({
         prompt,
         questionType: question.questionType || question.type || 'binary',
         options: question.options,
+        ratingScale: question.ratingScale || question.rating_scale || {
+          min: question.min,
+          max: question.max,
+          step: question.step,
+        },
         singleSelect: singleSelectForCreatedQuestion(question),
         tags,
         references,
@@ -5226,6 +5283,11 @@ async function handlePoseRequest({
       prompt,
       questionType: input.questionType || 'freeform',
       options: input.options,
+      ratingScale: input.ratingScale || input.rating_scale || {
+        min: input.min,
+        max: input.max,
+        step: input.step,
+      },
       tags: input.tags,
       sessionContext: input.sessionContext || input.context || sessionContextFromPolicySession(context.session),
       metadata: {

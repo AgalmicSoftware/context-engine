@@ -175,6 +175,8 @@ test('start payload pins path-only endpoints and instruction size', () => {
   assert.match(payload.instructions, /agent_metadata\.token_usage/);
   assert.match(payload.instructions, /recent_sessions_total_tokens/);
   assert.match(payload.instructions, /fresh run id/);
+  assert.match(payload.instructions, /include that same run_id on every answer, vote, and image POST/);
+  assert.match(payload.instructions, /"run_id": "<fresh_run_id>"/);
   assert.match(payload.instructions, /unique request_id values/);
   assert.match(payload.instructions, /each answer-batch POST/);
   assert.match(payload.instructions, /Calibrate before posting/);
@@ -631,7 +633,13 @@ test('config normalizes ceq ids and active snapshots sync flagged statements wit
     kind: 'choice',
     values: ['agree', 'disagree', 'unsure'],
   });
-  assert.deepEqual(opened.snapshot.statements[2].answer_schema.values, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  assert.deepEqual(opened.snapshot.statements[2].answer_schema, {
+    kind: 'rating',
+    min: 0,
+    max: 10,
+    step: 1,
+    values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+  });
   assert.equal(opened.snapshot.statements[3].answer_schema.selectionMode, 'multi');
   assert.equal(opened.snapshot.statements[3].answer_schema.maxSelections, 3);
   assert.equal(testEnv.AGENT_ACTION_KV.metadata.get(`${AGENT_ONLY_WINDOW_KV_PREFIX}alpha:w-2026-06-12`).c, 4);
@@ -689,6 +697,78 @@ test('config normalizes ceq ids and active snapshots sync flagged statements wit
   assert.equal(extended.snapshot.evalTypesByQuestionId[added.questionId], 'preference');
   assert.equal(testEnv.AGENT_ACTION_KV.listCalls > 0, true);
   assert.equal(testEnv.AGENT_ACTION_KV.metadata.get(`${AGENT_ONLY_WINDOW_KV_PREFIX}alpha:w-2026-06-12`).c, 2);
+});
+
+test('rating snapshots preserve uploaded 1-5 scales and reject out-of-scale values', async () => {
+  const testEnv = env();
+  const rating = await persistTelegramProposedQuestion({
+    env: testEnv,
+    normalized: normalizedUser(),
+    sessionSlug: 'alpha',
+    prompt: 'How strongly do you support this on a 1 to 5 scale?',
+    questionType: 'rating',
+    options: ['1', '2', '3', '4', '5'],
+    createdAt: '2026-06-12T15:01:00.000Z',
+  });
+  await saveAgentOnlyModeConfig({
+    env: testEnv,
+    sessionSlug: 'alpha',
+    patch: { enabledQuestionIds: [rating.questionId] },
+    createdAt: '2026-06-12T15:02:00.000Z',
+  });
+
+  const opened = await materializeAgentOnlyWindow({
+    env: testEnv,
+    sessionSlug: 'alpha',
+    now: '2026-06-12T15:05:00.000Z',
+  });
+  assert.equal(opened.ok, true);
+  assert.deepEqual(opened.snapshot.statements[0].answer_schema, {
+    kind: 'rating',
+    min: 1,
+    max: 5,
+    step: 1,
+    values: [1, 2, 3, 4, 5],
+  });
+
+  const invalid = await submitAgentOnlyAnswersBulk({
+    env: testEnv,
+    sessionSlug: 'alpha',
+    telegramUserId: '1001',
+    body: {
+      window_id: 'w-2026-06-12',
+      run_id: 'run-rating-scale-invalid',
+      agent_metadata: { model: 'unit', scaffold_version: 'test' },
+      answers: [{
+        statement_id: rating.questionId,
+        answer: { value: 0 },
+        confidence: 80,
+      }],
+    },
+    now: '2026-06-12T15:06:00.000Z',
+  });
+  assert.equal(invalid.ok, false);
+  assert.equal(invalid.status, 400);
+  assert.equal(invalid.errors[0].reason, 'answer_rating_invalid');
+
+  const accepted = await submitAgentOnlyAnswersBulk({
+    env: testEnv,
+    sessionSlug: 'alpha',
+    telegramUserId: '1001',
+    body: {
+      window_id: 'w-2026-06-12',
+      run_id: 'run-rating-scale-valid',
+      agent_metadata: { model: 'unit', scaffold_version: 'test' },
+      answers: [{
+        statement_id: rating.questionId,
+        answer: { value: 5 },
+        confidence: 80,
+      }],
+    },
+    now: '2026-06-12T15:07:00.000Z',
+  });
+  assert.equal(accepted.ok, true);
+  assert.equal(accepted.accepted, 1);
 });
 
 test('active window sync updates current eval types without changing questions', async () => {
@@ -1519,6 +1599,7 @@ test('answer bulk validates rows, writes sidecar events/state, and replays idemp
   await materializeAgentOnlyWindow({ env: testEnv, sessionSlug: 'alpha', now: '2026-06-12T15:05:00.000Z' });
   const base = {
     window_id: 'w-2026-06-12',
+    run_id: 'run-answers-1',
     request_id: 'answers-1',
     agent_metadata: {
       model: 'unit-model',
@@ -1622,6 +1703,7 @@ test('answer bulk validates rows, writes sidecar events/state, and replays idemp
   assert.equal(exported.ok, true);
   assert.equal(answerRows.length, 4);
   assert.equal(answerRows.every((row) => row.request_id === 'answers-1'), true);
+  assert.equal(answerRows.every((row) => row.run_id === 'run-answers-1'), true);
   assert.equal(answerRows.every((row) => row.model === 'unit-model'), true);
   assert.equal(answerRows.every((row) => row.token_current_run_total === 1234567), true);
   assert.equal(answerRows.every((row) => row.token_recent_sessions_total === 4567000), true);
@@ -1648,6 +1730,7 @@ test('answer bulk validates rows, writes sidecar events/state, and replays idemp
     now: '2026-06-12T15:11:00.000Z',
     body: {
       ...base,
+      run_id: 'run-answers-rerun',
       request_id: 'answers-rerun',
       answers: [{ statement_id: ids[0], answer: { value: 'disagree' }, confidence: 42 }],
     },
@@ -1667,6 +1750,7 @@ test('answer bulk validates rows, writes sidecar events/state, and replays idemp
     now: '2026-06-12T15:12:00.000Z',
     body: {
       ...base,
+      run_id: 'run-answers-rerun-2',
       request_id: 'answers-rerun-identical-fresh-run',
       answers: [{ statement_id: ids[0], answer: { value: 'disagree' }, confidence: 42 }],
     },
@@ -1697,6 +1781,7 @@ test('admin metrics count distinct principals once across multiple windows', asy
   const testEnv = env();
   const { ids } = await seedQuestions(testEnv);
   const common = {
+    run_id: 'run-principal-window',
     agent_metadata: { model: 'unit-model', scaffold_version: 'unit-scaffold' },
     answers: [{ statement_id: ids[0], answer: { value: 'agree' }, confidence: 83 }],
   };
@@ -1708,6 +1793,7 @@ test('admin metrics count distinct principals once across multiple windows', asy
     body: {
       ...common,
       window_id: 'w-2026-06-12',
+      run_id: 'run-principal-window-a',
       request_id: 'principal-window-a',
     },
   });
@@ -1719,6 +1805,7 @@ test('admin metrics count distinct principals once across multiple windows', asy
     body: {
       ...common,
       window_id: 'w-2026-06-15',
+      run_id: 'run-principal-window-b',
       request_id: 'principal-window-b',
     },
   });
@@ -1745,6 +1832,7 @@ test('rating zero predictions keep a visible label and matching semantic fingerp
     now: '2026-06-12T15:10:00.000Z',
     body: {
       window_id: 'w-2026-06-12',
+      run_id: 'run-rating-zero',
       request_id: 'rating-zero',
       agent_metadata: { model: 'unit-model', scaffold_version: 'unit-scaffold' },
       answers: [{ statement_id: ids[2], answer: { value: 0 }, confidence: 77 }],
@@ -1770,6 +1858,7 @@ test('token votes enforce linear and quadratic budgets and replace per-mode allo
   await materializeAgentOnlyWindow({ env: testEnv, sessionSlug: 'alpha', now: '2026-06-12T15:05:00.000Z' });
   const common = {
     window_id: 'w-2026-06-12',
+    run_id: 'run-votes-1',
     agent_metadata: { model: 'unit-model', scaffold_version: 'unit-scaffold' },
   };
   const linear = await submitAgentOnlyTokenVotesBulk({
@@ -1844,6 +1933,7 @@ test('token votes enforce linear and quadratic budgets and replace per-mode allo
     now: '2026-06-12T15:11:00.000Z',
     body: {
       ...common,
+      run_id: 'run-votes-2',
       request_id: 'linear-2',
       mode: 'linear',
       votes: [{ statement_id: ids[0], votes: 30 }],
@@ -1876,6 +1966,7 @@ test('human review is idempotent and agent reruns never overwrite human preceden
     now: '2026-06-12T15:10:00.000Z',
     body: {
       window_id: 'w-2026-06-12',
+      run_id: 'run-precedence-1',
       request_id: 'precedence-agent-1',
       agent_metadata: { model: 'unit-model', scaffold_version: 'unit-scaffold' },
       answers: [{ statement_id: ids[0], answer: { value: 'agree' }, confidence: 85 }],
@@ -1913,6 +2004,7 @@ test('human review is idempotent and agent reruns never overwrite human preceden
     now: '2026-06-12T15:13:00.000Z',
     body: {
       window_id: 'w-2026-06-12',
+      run_id: 'run-precedence-2',
       request_id: 'precedence-agent-2',
       agent_metadata: { model: 'unit-model', scaffold_version: 'unit-scaffold' },
       answers: [{ statement_id: ids[0], answer: { value: 'disagree' }, confidence: 64 }],
@@ -1974,6 +2066,7 @@ test('explicit confirm after a human edit is a no-op and preserves edit classifi
     now: '2026-06-12T15:10:00.000Z',
     body: {
       window_id: 'w-2026-06-12',
+      run_id: 'run-edit-before-confirm',
       request_id: 'edit-before-confirm-agent',
       agent_metadata: { model: 'unit-model', scaffold_version: 'unit-scaffold' },
       answers: [{ statement_id: ids[0], answer: { value: 'agree' }, confidence: 85 }],
@@ -2024,6 +2117,7 @@ test('human review and vote sidecars sync active pruning before recording', asyn
     now: '2026-06-12T15:10:00.000Z',
     body: {
       window_id: 'w-2026-06-12',
+      run_id: 'run-pruned-sidecar',
       request_id: 'pruned-sidecar-agent-answer',
       agent_metadata: { model: 'unit-model', scaffold_version: 'unit-scaffold' },
       answers: [
@@ -2234,6 +2328,7 @@ test('wide and gold exports join normal submitted answers and snapshot eval type
     now: '2026-06-12T15:05:00.000Z',
     body: {
       window_id: 'w-2026-06-12',
+      run_id: 'run-agent-after-prior',
       agent_metadata: { model: 'unit', scaffold_version: 'test' },
       request_id: 'agent-after-prior',
       answers: [{ statement_id: ids[0], answer: { value: 'agree' }, confidence: 70 }],

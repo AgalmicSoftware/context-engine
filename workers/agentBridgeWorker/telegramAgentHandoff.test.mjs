@@ -1381,6 +1381,7 @@ test('Invite onboarding ignores plaintext invite token env config', async () => 
 test('Agent-only routes require agent_autofill scope and serve flagged snapshot pages', async () => {
   const env = telegramOnlyEnv({
     AGENT_BRIDGE_AGENT_API_TOKEN: 'agent-test-token',
+    AGENT_BRIDGE_AGENT_ONLY_TEST_NOW: '2026-06-12T15:06:00.000Z',
   });
   const questionIds = await seedAgentOnlyProposedQuestions(env, 'alpha', 4);
   const configResponse = await handleTelegramAgentHandoffRequest({
@@ -1454,6 +1455,7 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
       token: '',
       body: {
         window_id: 'w-2026-06-12',
+        run_id: 'route-run-1',
         agent_metadata: { model: 'unit-model', scaffold_version: 'unit-scaffold' },
         answers: [],
       },
@@ -1463,6 +1465,7 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
       token: '',
       body: {
         window_id: 'w-2026-06-12',
+        run_id: 'route-run-1',
         mode: 'linear',
         agent_metadata: { model: 'unit-model', scaffold_version: 'unit-scaffold' },
         votes: [],
@@ -1471,7 +1474,7 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
     agentRequest('/telegram/agent/api/agent-only/wrapped-image?sessionSlug=alpha', {
       method: 'POST',
       token: '',
-      body: { window_id: 'w-2026-06-12' },
+      body: { window_id: 'w-2026-06-12', run_id: 'route-run-1' },
     }),
   ]) {
     const unauthenticated = await handleTelegramAgentHandoffRequest({ request, env });
@@ -1500,7 +1503,7 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
     request: agentRequest('/telegram/agent/api/agent-only/wrapped-image?sessionSlug=alpha', {
       method: 'POST',
       token: normalToken.token,
-      body: { window_id: 'w-2026-06-12', createdAt: '2026-06-12T15:06:00.000Z' },
+      body: { window_id: 'w-2026-06-12', run_id: 'route-run-1', createdAt: '2026-06-12T15:06:00.000Z' },
     }),
     env,
   });
@@ -1519,6 +1522,44 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
     ],
     createdAt: '2026-06-12T15:02:00.000Z',
   });
+  const agentOnlyReadToken = await createTelegramAgentDelegationToken({
+    env,
+    telegramUserId: '42',
+    username: '',
+    sessionSlug: 'alpha',
+    accountAddress: `0x${'34'.repeat(20)}`,
+    scopes: [
+      TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.AGENT_AUTOFILL,
+      TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS,
+    ],
+    createdAt: '2026-06-12T15:02:30.000Z',
+  });
+  const agentOnlyNormalRouteResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/question-queue/apply?sessionSlug=alpha', {
+      method: 'POST',
+      token: agentOnlyReadToken.token,
+      body: {
+        telegramUserId: '42',
+        proposals: [{ prompt: 'Agent-only tokens must not create normal questions.' }],
+      },
+    }),
+    env,
+  });
+  const agentOnlyNormalRoute = await jsonBody(agentOnlyNormalRouteResponse);
+  assert.equal(agentOnlyNormalRouteResponse.status, 403);
+  assert.equal(agentOnlyNormalRoute.reason, 'agent_only_token_route_denied');
+
+  const agentOnlySessionMismatchResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/agent-only/statements?sessionSlug=beta&limit=2', {
+      token: agentOnlyToken.token,
+    }),
+    env,
+  });
+  const agentOnlySessionMismatch = await jsonBody(agentOnlySessionMismatchResponse);
+  assert.equal(agentOnlySessionMismatchResponse.status, 403);
+  assert.equal(agentOnlySessionMismatch.reason, 'agent_token_session_mismatch');
+  assert.equal(agentOnlySessionMismatch.sessionSlug, 'alpha');
+
   const statementsResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/agent-only/statements?sessionSlug=alpha&limit=2&createdAt=2026-06-12T15%3A06%3A00.000Z', {
       token: agentOnlyToken.token,
@@ -1532,12 +1573,23 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   assert.ok(statements.cursor);
   assert.equal(JSON.stringify(statements).includes('eval_type'), false);
 
+  const clientClockResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/agent-only/statements?sessionSlug=alpha&limit=2&createdAt=2026-06-15T15%3A30%3A00.000Z', {
+      token: agentOnlyToken.token,
+    }),
+    env,
+  });
+  const clientClock = await jsonBody(clientClockResponse);
+  assert.equal(clientClockResponse.status, 200);
+  assert.equal(clientClock.window_id, 'w-2026-06-12');
+
   const staleAnswersResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/agent-only/answers/bulk?sessionSlug=alpha', {
       method: 'POST',
       token: agentOnlyToken.token,
       body: {
         window_id: 'w-2026-06-15',
+        run_id: 'route-run-1',
         createdAt: '2026-06-12T15:07:00.000Z',
         request_id: 'route-answers-stale',
         agent_metadata: { model: 'unit-model', scaffold_version: 'unit-scaffold' },
@@ -1560,6 +1612,7 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
       token: agentOnlyToken.token,
       body: {
         window_id: 'w-2026-06-15',
+        run_id: 'route-run-1',
         createdAt: '2026-06-12T15:07:00.000Z',
         request_id: 'route-votes-stale',
         mode: 'linear',
@@ -1579,6 +1632,7 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
       token: agentOnlyToken.token,
       body: {
         window_id: 'w-2026-06-12',
+        run_id: 'route-run-1',
         createdAt: '2026-06-12T15:06:30.000Z',
       },
     }),
@@ -1603,6 +1657,7 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
       token: agentOnlyToken.token,
       body: {
         window_id: 'w-2026-06-12',
+        run_id: 'route-run-1',
         createdAt: '2026-06-12T15:07:00.000Z',
         request_id: 'route-answers-1',
         agent_metadata: { model: 'unit-model', scaffold_version: 'unit-scaffold' },
@@ -1626,6 +1681,7 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
       token: agentOnlyToken.token,
       body: {
         window_id: 'w-2026-06-12',
+        run_id: 'route-run-1',
         createdAt: '2026-06-12T15:08:00.000Z',
       },
     }),
@@ -1651,6 +1707,7 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
       token: agentOnlyToken.token,
       body: {
         window_id: 'w-2026-06-12',
+        run_id: 'route-run-1',
         createdAt: '2026-06-12T15:07:30.000Z',
         request_id: 'route-answers-2',
         agent_metadata: { model: 'unit-model', scaffold_version: 'unit-scaffold' },
@@ -1691,6 +1748,7 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
       token: agentOnlyToken.token,
       body: {
         window_id: 'w-2026-06-12',
+        run_id: 'route-run-1',
         createdAt: '2026-06-12T15:08:00.000Z',
       },
     }),
@@ -1706,6 +1764,7 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
       token: agentOnlyToken.token,
       body: {
         window_id: 'w-2026-06-12',
+        run_id: 'route-run-1',
         createdAt: '2026-06-12T15:08:00.000Z',
         request_id: 'route-votes-1',
         mode: 'linear',
@@ -1725,6 +1784,7 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
       token: agentOnlyToken.token,
       body: {
         window_id: 'w-2026-06-12',
+        run_id: 'route-run-1',
         createdAt: '2026-06-12T15:09:00.000Z',
         include_prompt: true,
       },
@@ -1745,6 +1805,7 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   assert.equal(wrappedResponse.status, 200);
   assert.equal(wrapped.ok, true);
   assert.equal(wrapped.window_id, 'w-2026-06-12');
+  assert.equal(wrapped.run_id, 'route-run-1');
   assert.equal(wrapped.mode, 'wrapped');
   assert.equal(Number.isInteger(wrapped.statement_count), true);
   assert.equal(Number.isInteger(wrapped.agent_prediction_count), true);
@@ -1820,6 +1881,7 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   assert.equal(imageRows.length, 1);
   assert.equal(imageRows[0].image_id, wrapped.image_id);
   assert.equal(imageRows[0].image_view_id, wrapped.image_view_id);
+  assert.equal(imageRows[0].run_id, 'route-run-1');
   assert.equal(imageRows[0].mode, 'wrapped');
   assert.equal(imageRows[0].image_base64, Buffer.from('fake-png').toString('base64'));
   assert.equal(imageRows[0].prompt_hash, wrapped.image_prompt_hash);
@@ -1834,6 +1896,7 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
       token: agentOnlyToken.token,
       body: {
         window_id: 'w-2026-06-12',
+        run_id: 'route-run-1',
         mode: 'political_compass',
         style_hint: 'make it a partisan election poster',
         createdAt: '2026-06-12T15:10:00.000Z',
@@ -2559,7 +2622,7 @@ test('Telegram polis results view returns pseudonymized binary vectors', async (
         telegramOnly: true,
         telegramGroupOpenAccess: true,
         managedAccountSubmitAllowed: true,
-        resultsExposure: { anonymizedGroupsEnabled: true },
+        resultsExposure: { anonymizedGroupsEnabled: true, minGroupSize: 2 },
       }],
     }),
   });
@@ -2775,7 +2838,7 @@ test('Telegram browser CORS covers question/result reads and preference submit',
 
 test('Telegram result-view cache stores and returns data-version scoped analysis', async () => {
   const env = telegramOnlyEnv({
-    AGENT_BRIDGE_AGENT_API_TOKEN: '',
+    AGENT_BRIDGE_AGENT_API_TOKEN: 'agent-test-token',
     AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS: 'https://client.example',
   });
   const issued = await createTelegramAgentDelegationToken({
@@ -2829,10 +2892,40 @@ test('Telegram result-view cache stores and returns data-version scoped analysis
     env,
   });
   const saved = await jsonBody(saveResponse);
-  assert.equal(saveResponse.status, 200);
-  assert.equal(saved.cacheLayer, 'stored');
-  assert.equal(saved.value.clusters[0].name, 'Builders');
-  assert.equal(JSON.stringify(saved).includes(issued.token), false);
+  assert.equal(saveResponse.status, 403);
+  assert.equal(saved.reason, 'result_view_cache_write_service_token_required');
+
+  const serviceSaveResponse = await handleTelegramAgentHandoffRequest({
+    request: new Request('https://bridge.example/telegram/agent/api/result-view-cache', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer agent-test-token',
+        'content-type': 'application/json',
+        origin: 'https://client.example',
+      },
+      body: JSON.stringify({
+        sessionSlug: 'alpha',
+        telegramUserId: 'service',
+        viewType: 'polis_clusters',
+        dataVersionKey: 'v1',
+        value: {
+          clusters: {
+            0: {
+              name: 'Builders',
+              short: 'Builders want more prototypes.',
+              long: 'Builders want more prototypes and fewer panels.',
+            },
+          },
+        },
+      }),
+    }),
+    env,
+  });
+  const serviceSaved = await jsonBody(serviceSaveResponse);
+  assert.equal(serviceSaveResponse.status, 200);
+  assert.equal(serviceSaved.cacheLayer, 'stored');
+  assert.equal(serviceSaved.value.clusters[0].name, 'Builders');
+  assert.equal(JSON.stringify(serviceSaved).includes(issued.token), false);
 
   const hitResponse = await handleTelegramAgentHandoffRequest({
     request: new Request('https://bridge.example/telegram/agent/api/result-view-cache?sessionSlug=alpha&viewType=polis_clusters&dataVersionKey=v1', {
@@ -2853,12 +2946,13 @@ test('Telegram result-view cache stores and returns data-version scoped analysis
     request: new Request('https://bridge.example/telegram/agent/api/result-view-cache', {
       method: 'POST',
       headers: {
-        authorization: `Bearer ${issued.token}`,
+        authorization: 'Bearer agent-test-token',
         'content-type': 'application/json',
         origin: 'https://client.example',
       },
       body: JSON.stringify({
         sessionSlug: 'alpha',
+        telegramUserId: 'service',
         viewType: 'circles',
         dataVersionKey: 'v1-circles',
         value: {
@@ -2892,12 +2986,13 @@ test('Telegram result-view cache stores and returns data-version scoped analysis
     request: new Request('https://bridge.example/telegram/agent/api/result-view-cache', {
       method: 'POST',
       headers: {
-        authorization: `Bearer ${issued.token}`,
+        authorization: 'Bearer agent-test-token',
         'content-type': 'application/json',
         origin: 'https://client.example',
       },
       body: JSON.stringify({
         sessionSlug: 'alpha',
+        telegramUserId: 'service',
         viewType: 'breakdown',
         dataVersionKey: 'v1-oversized',
         value: {

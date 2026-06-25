@@ -105,4 +105,6 @@ and tell the user to tap Open Mini App.
 - The preference defaults are deliberately before statement fetching: the user should know the run can take about 10 minutes, that this is research, and that EdgeOS profile context is enabled by default but easy to override. Playful book/movie/game/AI Optimism guesses are image-time synthesis from actual predictions, not stored research questions; the Wrapped image prompt reserves the bottom-left visual slot for those chips when evidence supports them.
 - Fresh request ids matter for repeated runs: the mini-app should show the latest
   prediction state, while the research export keeps each run's answer events.
+  The runtime `/agent-only/start` instructions also require a fresh `run_id` on
+  every answer, vote, and wrapped-image POST for each user-requested run.
 - The final report is short by design. Detailed predictions, edits, and review belong in the Context Engine Telegram mini-app.

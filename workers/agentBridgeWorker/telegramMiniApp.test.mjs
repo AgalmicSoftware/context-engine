@@ -2329,6 +2329,7 @@ test('Mini App exposes agent-only sidecar state, human votes, confirm, and edit-
     now: '2026-06-12T15:03:00.000Z',
     body: {
       window_id: 'w-2026-06-12',
+      run_id: 'run-mini-agent-answer',
       request_id: 'mini-agent-answer',
       agent_metadata: { model: 'unit-model', scaffold_version: 'unit-scaffold' },
       answers: [{
@@ -2497,6 +2498,7 @@ test('Mini App classifies agent-only confirm/edit by answer semantics, not displ
     now: '2026-06-12T15:03:00.000Z',
     body: {
       window_id: 'w-2026-06-12',
+      run_id: 'run-semantic-agent-answers',
       request_id: 'semantic-agent-answers',
       agent_metadata: { model: 'unit-model', scaffold_version: 'unit-scaffold' },
       answers: [
@@ -2700,6 +2702,7 @@ test('Mini App submit contains agent-only review failures after persisting the h
     now: '2026-06-12T15:03:00.000Z',
     body: {
       window_id: 'w-2026-06-12',
+      run_id: 'run-contained-review-agent-answer',
       request_id: 'contained-review-agent-answer',
       agent_metadata: { model: 'unit-model', scaffold_version: 'unit-scaffold' },
       answers: [{

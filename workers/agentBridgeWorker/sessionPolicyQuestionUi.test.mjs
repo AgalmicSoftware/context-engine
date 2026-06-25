@@ -197,6 +197,7 @@ test('Telegram question cards preserve CE rating/comment/mic/doc conventions by 
   const ratingControls = buildTelegramQuestionControls({
     questionId: 'rating-1',
     questionType: 'rating',
+    ratingScale: { min: 1, max: 5 },
   }, {
     docsExist: true,
   });
@@ -236,11 +237,11 @@ test('Telegram question cards preserve CE rating/comment/mic/doc conventions by 
     rating.controls
       .filter((control) => control.controlType === 'rating_button')
       .map((control) => control.value),
-    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+    [1, 2, 3, 4, 5],
   );
-  assert.equal(rating.controls.find((control) => control.value === 10).label, '10');
-  assert.equal(rating.controls.find((control) => control.controlType === 'rating_button').min, 0);
-  assert.equal(rating.controls.find((control) => control.controlType === 'rating_button').max, 10);
+  assert.equal(rating.controls.find((control) => control.value === 5).label, '5');
+  assert.equal(rating.controls.find((control) => control.controlType === 'rating_button').min, 1);
+  assert.equal(rating.controls.find((control) => control.controlType === 'rating_button').max, 5);
   assert.equal(ratingControls.some((control) => control.action === TELEGRAM_BRIDGE_ACTIONS.ADDITIONAL_COMMENTS), true);
   assert.equal(ratingControls.some((control) => control.action === TELEGRAM_BRIDGE_ACTIONS.MICROPHONE_INPUT), true);
   assert.equal(ratingControls.some((control) => control.action === TELEGRAM_BRIDGE_ACTIONS.DOC_CONTEXT), true);
