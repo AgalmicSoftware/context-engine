@@ -9,6 +9,7 @@ import {
   __test__telegramAgentOnlyMode,
   agentOnlyInstructionWordCount,
   buildAgentOnlyWrappedImagePrompt,
+  buildAgentOnlyWrappedStoryFramePrompts,
   buildAgentOnlyStartPayload,
   buildAgentOnlyMetrics,
   canonicalAgentOnlyAnswerProjection,
@@ -162,6 +163,7 @@ test('start payload pins path-only endpoints and instruction size', () => {
   assert.equal(payload.wrappedImageEndpoint, '/telegram/agent/api/agent-only/wrapped-image');
   assert.match(payload.instructions, /Agent Village Wrapped image/);
   assert.match(payload.instructions, /wrappedImageEndpoint/);
+  assert.match(payload.instructions, /mode "wrapped_story"/);
   assert.match(payload.instructions, /mode "political_compass"/);
   assert.match(payload.instructions, /!\[Agent Village Wrapped\]\(<image_url>\)/);
   assert.match(payload.instructions, /display it exactly once/);
@@ -541,6 +543,78 @@ test('wrapped image prompt supports Agent Norms Compass mode around the most-imp
   assert.match(prompt, /I would rather my agent be too conservative with privacy/);
   assert.match(prompt, /Agent guesses/);
   assert.doesNotMatch(prompt, /Most Important To You/);
+});
+
+test('wrapped story prompts split the report into five phone screens', () => {
+  const snapshot = {
+    windowId: 'w-2026-06-15',
+    statements: [
+      {
+        statement_id: 'ceq_privacy',
+        text: 'I would rather my agent be too conservative with privacy than too proactive with opportunities.',
+        answer_schema: { kind: 'choice', values: ['agree', 'unsure', 'disagree'] },
+      },
+      {
+        statement_id: 'ceq_code',
+        text: 'I would still advise a smart 18-year-old to learn to code.',
+        answer_schema: { kind: 'choice', values: ['agree', 'unsure', 'disagree'] },
+      },
+      {
+        statement_id: 'ceq_ai_optimism',
+        text: 'How optimistic am I that AI will broadly improve human flourishing over the next decade?',
+        answer_schema: { kind: 'choice', values: [1, 2, 3, 4, 5] },
+      },
+      {
+        statement_id: 'ceq_archetype',
+        text: 'Which archetype best describes this principal?',
+        answer_schema: { kind: 'text', maxChars: 280 },
+      },
+    ],
+    evalTypesByQuestionId: {
+      ceq_archetype: 'wrapped_generation',
+    },
+  };
+  const state = {
+    byStatement: {
+      ceq_privacy: {
+        agent: {
+          answer: { value: 'agree' },
+          confidence: 94,
+          agentMetadata: {
+            tokenUsage: {
+              currentRunTotalTokens: 880000,
+              recentSessionsTotalTokens: 2200000,
+              source: 'Hermes visible usage',
+            },
+          },
+        },
+      },
+      ceq_code: { agent: { answer: { value: 'agree' }, confidence: 81 } },
+      ceq_ai_optimism: { agent: { answer: { value: 4 }, confidence: 62 } },
+      ceq_archetype: { agent: { answer: { text: 'privacy-first coordination builder' }, confidence: 95 } },
+    },
+  };
+  const frames = buildAgentOnlyWrappedStoryFramePrompts({
+    snapshot,
+    state,
+    linearVoteState: { mode: 'linear', votes: { ceq_privacy: 20, ceq_code: 10 } },
+    quadraticVoteState: { mode: 'quadratic', votes: { ceq_ai_optimism: 3 } },
+  });
+  assert.equal(frames.length, 5);
+  assert.deepEqual(frames.map((frame) => frame.key), ['summary', 'token_use', 'predictions', 'agent_guesses', 'comparison']);
+  assert.match(frames[0].prompt, /Screen 1 of 5/);
+  assert.match(frames[0].prompt, /one large abstract image/);
+  assert.match(frames[1].prompt, /Screen 2 of 5/);
+  assert.match(frames[1].prompt, /Token Use: 880K current run; 2\.2M recent sessions/);
+  assert.match(frames[1].prompt, /before arrival, during in-person days, and after/);
+  assert.match(frames[2].prompt, /High-confidence predictions/);
+  assert.match(frames[2].prompt, /Cautious predictions/);
+  assert.match(frames[2].prompt, /Render binary answers as one selected pill only/);
+  assert.match(frames[3].prompt, /Book Guess, Movie\/Show Guess, Game\/Play Pattern, and AI Optimism/);
+  assert.match(frames[3].prompt, /not from dedicated favorite-book\/movie\/game question rows/);
+  assert.match(frames[4].prompt, /historical figure or fictional\/book character/);
+  assert.match(frames[4].prompt, /interesting, historically accurate deep cut/);
+  assert.match(frames.map((frame) => frame.prompt).join('\n'), /Do not mention or imply where the principal lives/);
 });
 
 test('wrapped image prompt has a neutral safety retry variant for compass mode', () => {

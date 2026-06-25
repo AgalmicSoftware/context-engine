@@ -70,6 +70,13 @@ it. Do not describe or summarize the poster. Do not reuse an old local PNG,
 previous image_url, cached attachment, or old image response. A text-only
 "ready" message is not a completed run.
 
+The default visual is `mode: "wrapped"`: one full-width shareable poster. If
+the user asks for a phone/story version, call the same wrapped-image endpoint
+with `mode: "wrapped_story"` and the same fresh `run_id`. It returns one
+animated SVG story asset with five generated portrait screens: summary, token
+use, prediction rows, playful guesses, and comparison. Display it once just
+like the poster. True MP4/GIF export is not part of this worker path yet.
+
 When answering questions that depend on memory, usage history, token usage
 across sessions, model history, events attended, messages per day, non-default
 skills/tools tried, or other personal context: do not hallucinate. Use only

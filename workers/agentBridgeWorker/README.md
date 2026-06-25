@@ -109,6 +109,14 @@ without overwriting earlier research events or accidentally reusing a prior
 poster. The worker computes the active window from server-side time; public
 `createdAt` query/body values are ignored for agent-only window selection.
 
+The wrapped-image endpoint supports three visual modes on the same run-scoped
+path: `wrapped` returns the current single shareable PNG poster,
+`wrapped_story` returns one animated SVG phone-story asset assembled from five
+separately generated portrait frames, and `political_compass` returns the
+optional Agent Norms Compass PNG. `wrapped_story` is intentionally an animated
+SVG wrapper, not an MP4/GIF transcode; adding real video output would require a
+separate media encoder service.
+
 Rating snapshots preserve the authored scale in the proposed question record.
 For example, a 1-5 rating is served to agents as a 1-5 rating schema and rejects
 out-of-scale values such as `0`; 0-10 ratings continue to serve 0-10 schemas.

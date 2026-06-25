@@ -1888,6 +1888,78 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   assert.equal(imageRows[0].principal_id.startsWith('cep_'), true);
   assert.equal(JSON.stringify(imageRows).includes('telegramUserId'), false);
 
+  let storyAttempts = 0;
+  const storyPrompts = [];
+  const storyResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/agent-only/wrapped-image?sessionSlug=alpha', {
+      method: 'POST',
+      token: agentOnlyToken.token,
+      body: {
+        window_id: 'w-2026-06-12',
+        run_id: 'route-run-1',
+        mode: 'wrapped_story',
+        createdAt: '2026-06-12T15:09:30.000Z',
+      },
+    }),
+    env,
+    fetchImpl: async (url, init = {}) => {
+      assert.equal(url, 'https://api.openai.com/v1/images/edits');
+      assert.equal(init.headers.authorization, 'Bearer sk-bridge-openai');
+      assert.equal(init.body instanceof FormData, true);
+      storyAttempts += 1;
+      storyPrompts.push(init.body.get('prompt'));
+      assert.equal(init.body.get('size'), '1024x1536');
+      return new Response(JSON.stringify({
+        data: [{ b64_json: Buffer.from(`fake-story-frame-${storyAttempts}`).toString('base64') }],
+      }), { status: 200, headers: { 'content-type': 'application/json' } });
+    },
+  });
+  const story = await jsonBody(storyResponse);
+  assert.equal(storyResponse.status, 200);
+  assert.equal(story.ok, true);
+  assert.equal(story.mode, 'wrapped_story');
+  assert.equal(story.media_kind, 'animated_svg_story');
+  assert.equal(story.image_content_type, 'image/svg+xml');
+  assert.equal(story.frame_count, 5);
+  assert.equal(story.story_duration_seconds, 20);
+  assert.equal(story.story_frame_seconds, 4);
+  assert.deepEqual(story.frame_keys, ['summary', 'token_use', 'predictions', 'agent_guesses', 'comparison']);
+  assert.equal(storyAttempts, 5);
+  assert.match(storyPrompts[0], /Screen 1 of 5/);
+  assert.match(storyPrompts[1], /Screen 2 of 5/);
+  assert.match(storyPrompts[2], /Screen 3 of 5/);
+  assert.match(storyPrompts[3], /Screen 4 of 5/);
+  assert.match(storyPrompts[4], /Screen 5 of 5/);
+  const storySvg = Buffer.from(story.image_base64, 'base64').toString();
+  assert.match(storySvg, /<svg/);
+  assert.match(storySvg, /Agent Village Wrapped phone story/);
+  assert.match(storySvg, /data:image\/png;base64/);
+  assert.match(storySvg, /dur="20s"/);
+
+  const storyImageViewResponse = await handleTelegramAgentHandoffRequest({
+    request: new Request(story.image_url),
+    env,
+  });
+  assert.equal(storyImageViewResponse.status, 200);
+  assert.equal(storyImageViewResponse.headers.get('content-type'), 'image/svg+xml');
+  assert.equal(storyImageViewResponse.headers.get('content-disposition'), 'inline; filename="agent-village-wrapped.svg"');
+  assert.match(Buffer.from(await storyImageViewResponse.arrayBuffer()).toString(), /<svg/);
+
+  const storyExportResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/agent-only/export?sessionSlug=alpha&view=images&format=jsonl', {
+      token: 'agent-test-token',
+    }),
+    env,
+  });
+  const storyExportRows = (await storyExportResponse.text()).trim().split('\n').filter(Boolean).map((line) => JSON.parse(line));
+  assert.equal(storyExportResponse.status, 200);
+  const storyExportRow = storyExportRows.find((row) => row.mode === 'wrapped_story');
+  assert.equal(storyExportRow.image_id, story.image_id);
+  assert.equal(storyExportRow.media_kind, 'animated_svg_story');
+  assert.equal(storyExportRow.frame_count, 5);
+  assert.equal(storyExportRow.story_duration_seconds, 20);
+  assert.equal(storyExportRow.frame_keys, 'summary,token_use,predictions,agent_guesses,comparison');
+
   let compassAttempts = 0;
   const compassPrompts = [];
   const compassResponse = await handleTelegramAgentHandoffRequest({

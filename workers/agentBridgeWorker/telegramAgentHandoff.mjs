@@ -3133,7 +3133,7 @@ async function handleAgentOnlyWrappedImageViewRequest({
     headers: {
       'content-type': result.image_content_type || 'image/png',
       'cache-control': 'private, max-age=3600',
-      'content-disposition': 'inline; filename="agent-village-wrapped.png"',
+      'content-disposition': `inline; filename="agent-village-wrapped.${lower(result.image_content_type).includes('svg') ? 'svg' : 'png'}"`,
       'x-agent-only-image-id': result.image_id || '',
       'x-agent-only-image-view-id': result.image_view_id || '',
     },
