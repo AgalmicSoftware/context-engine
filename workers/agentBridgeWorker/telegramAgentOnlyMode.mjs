@@ -2493,14 +2493,14 @@ export function buildAgentOnlyWrappedStoryboardPrompt({
   const styleLine = wrappedDisplayText(styleHint, 240);
   const prompt = `Create one wide five-panel Agent Village Wrapped storyboard image${styleLine ? `, with this extra style hint: ${styleLine}` : ''}.
 
-This is NOT the standard 16:9 poster. It is a dedicated source image for a phone-story animation. The image must contain exactly five equal-width vertical phone screens side by side, ordered left to right. Each panel will be cropped into a separate 9:16 phone story frame, so every panel must be self-contained, centered, and readable after cropping. Make the panel boundaries clear but elegant. Keep a shared visual identity across all five panels while letting each panel have its own composition. Use the attached Agent Village logo image as wordmark reference: AGENT is bold uppercase sans, VILLAGE is elegant serif with a flowing calligraphic V.
+This is NOT the standard 16:9 poster. It is a dedicated source image for a phone-story animation. The requested canvas is 3240x1152: exactly five 648x1152 vertical phone panels side by side, ordered left to right. Each panel is a natural 9:16 frame and will be cropped without stretching into a 1080x1920 phone story frame. Do not squeeze five narrow columns into a normal landscape poster. Do not add extra outer margins that change the panel aspect. Every panel must be self-contained, centered, full-width, and readable after a clean 9:16 crop. Make the panel boundaries clear but elegant. Keep a shared visual identity across all five panels while letting each panel have its own composition. Use the attached Agent Village logo image as wordmark reference: AGENT is bold uppercase sans, VILLAGE is elegant serif with a flowing calligraphic V.
 
 Global rules:
 - Do not alter or imitate the standard wide poster layout; design this as a native phone-story storyboard.
 - Do not mention or imply where the principal lives, is from, currently is, traveled from, or stayed.
 - Do not show access credentials, raw Telegram ids, private memory text, unavailable/N/A content, raw rationales, or fake UI chrome.
 - Keep all text large and sparse enough for a phone. Prefer a premium social story look with strong art direction, clean spacing, minimal borders, and no decorative filler text.
-- Use the whole space of each panel. No panel should feel like a cropped table pasted from the wide poster.
+- Use the whole space of each 648x1152 panel. No panel should feel like a cropped table pasted from the wide poster.
 - Binary answers must render as exactly one selected pill only: green Agree, yellow Unsure, or red Disagree. Do not show all three choices in a row.
 - Rating answers must show scale context like 7/10. Multichoice/freeform answers must show selected option/text, not Agree/Unsure/Disagree pills.
 - If a section lacks enough supported evidence, omit weak rows rather than inventing or showing N/A.

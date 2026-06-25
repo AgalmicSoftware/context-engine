@@ -644,7 +644,8 @@ test('wrapped story prompts split the report into five phone screens', () => {
     quadraticVoteState: { mode: 'quadratic', votes: { ceq_ai_optimism: 3 } },
   });
   assert.match(storyboardPrompt, /dedicated source image for a phone-story animation/);
-  assert.match(storyboardPrompt, /exactly five equal-width vertical phone screens side by side/);
+  assert.match(storyboardPrompt, /requested canvas is 3240x1152: exactly five 648x1152 vertical phone panels/);
+  assert.match(storyboardPrompt, /natural 9:16 frame/);
   assert.match(storyboardPrompt, /Panel 1: "What your agent thinks it knows about you"/);
   assert.match(storyboardPrompt, /Panel 2: "Token trail"/);
   assert.match(storyboardPrompt, /Panel 3: "Predictions"/);

@@ -1999,7 +1999,9 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   assert.equal(story.story_source, 'single_storyboard');
   assert.equal(storyAttempts, 1);
   assert.equal(storyPrompts.length, 1);
-  assert.match(storyPrompts[0], /exactly five equal-width vertical phone screens side by side/);
+  assert.match(storyPrompts[0], /requested canvas is 3240x1152: exactly five 648x1152 vertical phone panels/);
+  assert.match(storyPrompts[0], /natural 9:16 frame/);
+  assert.match(storyPrompts[0], /exactly five 648x1152 vertical phone panels side by side/);
   assert.match(storyPrompts[0], /Panel 1: "What your agent thinks it knows about you"/);
   assert.match(storyPrompts[0], /Panel 5: "Agent comparison"/);
   const storySvg = Buffer.from(story.image_base64, 'base64').toString();
