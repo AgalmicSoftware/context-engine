@@ -513,6 +513,12 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /\.questionVotes/);
   assert.match(html, /\.questionVoteRow/);
   assert.match(html, /grid-template-columns: 30px minmax\(28px, auto\) 30px;/);
+  assert.equal(html.includes('.agentOnlyVotes'), false);
+  assert.equal(html.includes('.agentOnlyBudget'), false);
+  assert.equal(html.includes('function renderAgentOnlyVoteControls'), false);
+  assert.equal(html.includes('function submitAgentOnlyHumanVote'), false);
+  assert.equal(html.includes("fetch('/telegram/mini-app/api/agent-only/token-votes'"), false);
+  assert.equal(html.includes("agentVoteRow.className = 'questionVoteRow expandedOnly';"), false);
   assert.match(html, /\.voteButton \{[\s\S]*border: 0;[\s\S]*background: transparent;/);
   assert.match(html, /\.voteButton\.up \{[\s\S]*color: var\(--ok\);/);
   assert.match(html, /\.voteButton\.down \{[\s\S]*color: var\(--danger\);/);
@@ -526,7 +532,8 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /voteRow\.appendChild\(renderQuestionVoteControls\(question\)\);/);
   assert.match(html, /score\.className = 'voteScore' \+ \(summary\.score > 0 \? ' positive' : \(summary\.score < 0 \? ' negative' : ''\)\);/);
   assert.match(html, /score\.textContent = String\(summary\.score\);/);
-  assert.match(html, /wrap\.append\(makeButton\('up', VOTE_UP_ICON, 'Upvote question'\), score, makeButton\('down', VOTE_DOWN_ICON, 'Downvote question'\)\);/);
+  assert.match(html, /wrap\.append\(makeButton\('down', VOTE_DOWN_ICON, 'Downvote question'\), score, makeButton\('up', VOTE_UP_ICON, 'Upvote question'\)\);/);
+  assert.equal(html.includes("wrap.append(makeButton('up', VOTE_UP_ICON, 'Upvote question'), score, makeButton('down', VOTE_DOWN_ICON, 'Downvote question'));"), false);
   assert.match(html, /\.voteButton\.active/);
   assert.equal(html.includes("setStatus('Saving vote...');"), false);
   assert.equal(html.includes("setStatus('Vote saved.', 'ok');"), false);

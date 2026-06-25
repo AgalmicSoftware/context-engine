@@ -6778,19 +6778,6 @@ function telegramMiniAppHtml() {
       background: #f44336;
       color: #ffffff;
     }
-    .agentOnlyVotes {
-      display: grid;
-      grid-template-columns: 30px minmax(34px, auto) 30px minmax(72px, auto);
-      align-items: center;
-      justify-content: end;
-      gap: 6px;
-    }
-    .agentOnlyBudget {
-      color: var(--muted);
-      font-size: 12px;
-      font-weight: 700;
-      white-space: nowrap;
-    }
     .voteButton {
       min-height: 30px;
       min-width: 30px;
@@ -8500,52 +8487,14 @@ function telegramMiniAppHtml() {
       const score = document.createElement('span');
       score.className = 'voteScore' + (summary.score > 0 ? ' positive' : (summary.score < 0 ? ' negative' : ''));
       score.textContent = String(summary.score);
-      wrap.append(makeButton('up', VOTE_UP_ICON, 'Upvote question'), score, makeButton('down', VOTE_DOWN_ICON, 'Downvote question'));
+      wrap.append(makeButton('down', VOTE_DOWN_ICON, 'Downvote question'), score, makeButton('up', VOTE_UP_ICON, 'Upvote question'));
       return wrap;
     }
     const agentOnlyState = () => state.data?.agentOnly || {};
-    const agentOnlyFlagged = (question) => {
-      const keys = Array.isArray(agentOnlyState().flaggedQuestionKeys) ? agentOnlyState().flaggedQuestionKeys : [];
-      return Boolean(question?.questionKey && keys.includes(question.questionKey));
-    };
     const agentOnlyPredictionFor = (question) => {
       if (!question?.questionKey || agentOnlyState().showAgentResponses === false) return null;
       return agentOnlyState().predictions?.[question.questionKey] || null;
     };
-    const agentOnlyHumanVote = () => {
-      const block = agentOnlyState();
-      block.humanVote = block.humanVote || { nets: {}, budgetUsed: 0, budget: 100 };
-      block.humanVote.nets = block.humanVote.nets || {};
-      block.humanVote.budget = Number(block.humanVote.budget || 100) || 100;
-      block.humanVote.budgetUsed = Number(block.humanVote.budgetUsed || 0) || 0;
-      return block.humanVote;
-    };
-    const agentOnlyBudgetAfter = (questionKey, delta) => {
-      const humanVote = agentOnlyHumanVote();
-      const current = Number(humanVote.nets[questionKey] || 0) || 0;
-      return humanVote.budgetUsed - Math.abs(current) + Math.abs(current + delta);
-    };
-    async function submitAgentOnlyHumanVote(question, delta, button) {
-      if (!question?.questionKey) return;
-      if (button) button.disabled = true;
-      try {
-        const response = await fetch('/telegram/mini-app/api/agent-only/token-votes', {
-          method: 'POST',
-          headers: headers(),
-          body: JSON.stringify({ launch, taps: [{ questionKey: question.questionKey, delta }] }),
-        });
-        const body = await response.json().catch(() => ({}));
-        if (!response.ok || body.ok === false) throw new Error(body.error || body.reason || 'agent_only_vote_failed');
-        const humanVote = agentOnlyHumanVote();
-        humanVote.nets = body.nets || {};
-        humanVote.budgetUsed = Number(body.budgetUsed || 0) || 0;
-        humanVote.budget = Number(body.budget || 100) || 100;
-        renderQuestionStack();
-      } catch (error) {
-        setStatus(String(error?.message || error || 'Could not save agent-only vote.'), 'error');
-        if (button) button.disabled = false;
-      }
-    }
     async function confirmAgentPrediction(question, button) {
       if (!question?.questionKey) return;
       if (button) button.disabled = true;
@@ -8596,36 +8545,6 @@ function telegramMiniAppHtml() {
       row.appendChild(badge);
       return row;
     }
-    function renderAgentOnlyVoteControls(question) {
-      if (!agentOnlyFlagged(question)) return null;
-      const humanVote = agentOnlyHumanVote();
-      const current = Number(humanVote.nets[question.questionKey] || 0) || 0;
-      const budget = Number(humanVote.budget || 100) || 100;
-      const left = Math.max(0, budget - Number(humanVote.budgetUsed || 0));
-      const wrap = document.createElement('div');
-      wrap.className = 'agentOnlyVotes';
-      const makeButton = (delta, label) => {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = 'voteButton ' + (delta > 0 ? 'up' : 'down');
-        button.innerHTML = delta > 0 ? VOTE_UP_ICON : VOTE_DOWN_ICON;
-        button.setAttribute('aria-label', label);
-        button.disabled = !question?.questionKey || agentOnlyBudgetAfter(question.questionKey, delta) > budget;
-        button.onclick = (event) => {
-          event.stopPropagation();
-          submitAgentOnlyHumanVote(question, delta, button);
-        };
-        return button;
-      };
-      const net = document.createElement('span');
-      net.className = 'voteScore' + (current > 0 ? ' positive' : (current < 0 ? ' negative' : ''));
-      net.textContent = String(current);
-      const budgetText = document.createElement('span');
-      budgetText.className = 'agentOnlyBudget';
-      budgetText.textContent = left + '/' + budget + ' left';
-      wrap.append(makeButton(-1, 'Lower with agent-only vote'), net, makeButton(1, 'Raise with agent-only vote'), budgetText);
-      return wrap;
-    }
     function renderQuestionStack() {
       const questions = orderedQuestions();
       el.questionStack.innerHTML = '';
@@ -8674,13 +8593,6 @@ function telegramMiniAppHtml() {
         voteRow.className = 'questionVoteRow expandedOnly';
         voteRow.appendChild(renderQuestionVoteControls(question));
         body.appendChild(voteRow);
-        const agentVoteControls = renderAgentOnlyVoteControls(question);
-        if (agentVoteControls) {
-          const agentVoteRow = document.createElement('div');
-          agentVoteRow.className = 'questionVoteRow expandedOnly';
-          agentVoteRow.appendChild(agentVoteControls);
-          body.appendChild(agentVoteRow);
-        }
         card.append(head, body);
         el.questionStack.appendChild(card);
       });
