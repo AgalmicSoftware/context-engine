@@ -109,6 +109,7 @@ import {
   readPrivateSessionBinding,
   requestUrlQuestionGenerationAi,
   shortQuestionId,
+  sessionUsesWorkerBackedQuestions,
   summarizeQuestionResults,
   telegramVisibleSessions,
   normalizeGeneratedQuestionCandidates,
@@ -1152,12 +1153,12 @@ function linkedPolicySessions(policy = {}, env = {}) {
         sessionName: safeString(session.sessionName || session.sessionSlug),
         default: session.default === true,
         telegramBridgeEnabled: session.telegramBridgeEnabled !== false,
-        telegramOnly: session.telegramOnly === true,
+        telegramOnly: session.telegramOnly === true || sessionUsesWorkerBackedQuestions(session),
         sessionContext,
         tags: inferQuestionTags({ session, sessionContext }),
       };
     })
-    .filter((session) => session.sessionSlug && session.telegramBridgeEnabled && session.telegramOnly);
+    .filter((session) => session.sessionSlug && session.telegramBridgeEnabled && sessionUsesWorkerBackedQuestions(session));
 }
 
 function buildMiniAppSessionPicker(policy = {}, selectedSessionSlugs = [], env = {}) {

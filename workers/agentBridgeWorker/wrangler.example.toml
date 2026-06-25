@@ -112,8 +112,10 @@ AGENT_BRIDGE_AUTO_FAUCET_ON_JOIN = "true"
 # CE_SESSION_WORKER_BASE_URL, Surveys address config from the linked session,
 # AGENT_BRIDGE_SURVEYS_ADDRESS, or the OP Sepolia default, plus
 # managedAccountSubmitAllowed=true in AGENT_BRIDGE_SESSION_POLICY_JSON.
-# Telegram-visible sessions also require telegramOnly=true/sessionMode=telegram_only
-# so ordinary registry sessions are not listed accidentally. Set
+# Telegram-visible worker-backed sessions should set telegramOnly=true,
+# sessionMode=telegram_only, or Cloudflare question storage without an explicit
+# on-chain question mode so ordinary registry sessions are not listed
+# accidentally. Set
 # either broadcast flag to "false" to force canonical submit-request records
 # instead of broadcasting.
 # Optional override for session worker auth. Defaults to AGENT_BRIDGE_PUBLIC_URL

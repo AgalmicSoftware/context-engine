@@ -3246,6 +3246,89 @@ test('/questions reads telegram_only Cloudflare question payloads concurrently',
   assert.equal(maxActiveReads, 3);
 });
 
+test('/questions reads Cloudflare question storage without falling back to on-chain when no onchain mode is configured', async () => {
+  const fetchCalls = [];
+  const fetchImpl = async (url, init = {}) => {
+    const target = new URL(String(url));
+    fetchCalls.push({ url: target.toString(), init });
+    if (init?.body) {
+      const body = JSON.parse(init.body);
+      if (body?.jsonrpc || body?.method?.startsWith?.('eth_')) {
+        throw new Error(`unexpected_rpc_${body.method || 'call'}`);
+      }
+    }
+    if (target.pathname.endsWith('/auth/nonce')) {
+      return new Response(JSON.stringify({ nonce: 'nonce-1' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (target.pathname.endsWith('/auth/login')) {
+      return new Response(JSON.stringify({ token: 'worker-token' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (target.pathname.endsWith('/storage/list')) {
+      return new Response(JSON.stringify({ items: [{ id: 'q-storage-1' }] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (target.pathname.endsWith('/storage/read')) {
+      return new Response(JSON.stringify({
+        questionId: target.searchParams.get('id'),
+        questionType: 'binary',
+        prompt: 'Loaded from Cloudflare without chain indexing.',
+        sessionSlug: 'cloudflare-worker',
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    throw new Error(`unexpected_url_${target.pathname}`);
+  };
+
+  const result = await buildTelegramCommandResponse({
+    update: groupMessage('/questions cloudflare-worker'),
+    env: baseEnv({
+      AGENT_BRIDGE_DEPLOYMENT_ID: 'unit-deploy',
+      AGENT_BRIDGE_QUESTION_SOURCE: 'live',
+      AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+        defaultSessionSlug: 'cloudflare-worker',
+        sessions: [{
+          sessionSlug: 'cloudflare-worker',
+          sessionName: 'Cloudflare Worker',
+          telegramBridgeEnabled: true,
+          telegramGroupOpenAccess: true,
+          sessionMode: 'telegram_enabled',
+          sessionWorkerUrl: 'https://session.example',
+          workerSessionSlug: 'cloudflare-worker',
+          questionSource: 'cloudflare_storage',
+          storageProfile: { backend: 'cloudflare' },
+        }],
+      }),
+      QUESTION_FETCH: fetchImpl,
+      REGISTRY_FETCH: async () => {
+        throw new Error('registry_rpc_should_not_be_called');
+      },
+    }),
+    now: '2026-05-08T12:00:00.000Z',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.questionSourceReason, 'telegram_only_cloudflare_questions_loaded');
+  assert.equal(result.response.text, [
+    'Questions (1/1)',
+    '',
+    '1. Loaded from Cloudflare without chain indexing.',
+  ].join('\n'));
+  assert.deepEqual(
+    fetchCalls.map((call) => new URL(call.url).pathname),
+    ['/auth/nonce', '/auth/login', '/storage/list', '/storage/read']
+  );
+});
+
 test('telegram_only storage auth failures still surface proposed questions', async () => {
   const env = baseEnv({
     AGENT_BRIDGE_DEPLOYMENT_ID: 'unit-deploy',

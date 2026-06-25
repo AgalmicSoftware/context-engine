@@ -694,11 +694,13 @@ Current v0 scope:
   with a selected session set, the picker collapses into a compact top summary;
   joined-session launches start in that collapsed state.
 - First state loads are intentionally paged. The shell starts with
-  `questionLimit=1`; for Telegram-only Cloudflare-backed sessions the worker
+  `questionLimit=1`; for worker-backed Cloudflare question storage the worker
   lists question storage once, reads only the requested page of payloads, and
   reports the full discovered count so the UI can show `1/N` immediately while
-  loading the rest in the background. Telegram-only policy sessions do not use
-  SessionRegistry/RPC question indexing on this path.
+  loading the rest in the background. Sessions with `telegramOnly=true`,
+  `sessionMode=telegram_only`, or Cloudflare question storage and no explicit
+  on-chain question mode do not use SessionRegistry/RPC question indexing on
+  this path.
 - Native freeform, binary, rating, and multichoice answer forms rendered inline
   on each displayed question card in one document-scroll question list. The Mini
   App does not render question IDs or a `Create Agent` launcher; filters and

@@ -1247,6 +1247,105 @@ test('Mini App first state for Telegram-only Cloudflare sessions reads one quest
   );
 });
 
+test('Mini App first state treats Cloudflare storage without explicit onchain mode as worker-backed', async () => {
+  const kv = new MemoryKv();
+  const launch = 'cecb_cloudflarenochain';
+  await kv.put(`telegram:action:${launch}`, JSON.stringify({
+    type: 'agent_bridge_opaque_action',
+    actionId: launch,
+    action: 'view_questions',
+    lane: 'telegram_mini_app',
+    miniAppLaunch: true,
+    serverContextRef: { sessionSlug: 'alpha' },
+  }));
+  const fetchCalls = [];
+  const fetchImpl = async (url, init = {}) => {
+    const target = new URL(String(url));
+    fetchCalls.push({ url: target.toString(), init });
+    if (init?.body) {
+      const body = JSON.parse(init.body);
+      if (body?.jsonrpc || body?.method?.startsWith?.('eth_')) {
+        throw new Error(`unexpected_rpc_${body.method || 'call'}`);
+      }
+    }
+    if (target.pathname.endsWith('/auth/nonce')) {
+      return new Response(JSON.stringify({ nonce: 'nonce-1' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (target.pathname.endsWith('/auth/login')) {
+      return new Response(JSON.stringify({ token: 'worker-token' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (target.pathname.endsWith('/storage/list')) {
+      return new Response(JSON.stringify({
+        items: [
+          { id: 'q-storage-1' },
+          { id: 'q-storage-2' },
+        ],
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (target.pathname.endsWith('/storage/read')) {
+      return new Response(JSON.stringify({
+        questionId: target.searchParams.get('id'),
+        questionType: 'binary',
+        prompt: 'Cloudflare first question without chain mode.',
+        sessionSlug: 'alpha',
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    throw new Error(`unexpected_url_${target.pathname}`);
+  };
+  const state = await __test__telegramMiniApp.buildMiniAppState({
+    request: new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}&sessions=alpha&questionLimit=1`),
+    env: {
+      AGENT_ACTION_KV: kv,
+      AGENT_BRIDGE_DEPLOYMENT_ID: 'unit-deploy',
+      DEMO_SIGNER_ROOT_SECRET: 'unit-root-secret',
+      AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
+      AGENT_BRIDGE_QUESTION_SOURCE: 'live',
+      AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+        defaultSessionSlug: 'alpha',
+        sessions: [{
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha',
+          telegramBridgeEnabled: true,
+          sessionMode: 'telegram_enabled',
+          sessionWorkerUrl: 'https://session.example',
+          workerSessionSlug: 'alpha',
+          questionSource: 'cloudflare_storage',
+          storageProfile: { backend: 'cloudflare' },
+        }],
+      }),
+      QUESTION_FETCH: fetchImpl,
+      REGISTRY_FETCH: async () => {
+        throw new Error('registry_rpc_should_not_be_called');
+      },
+    },
+  });
+
+  assert.equal(state.ok, true);
+  assert.equal(state.questionSource, 'telegram_only_cloudflare_storage');
+  assert.equal(state.questionCount, 2);
+  assert.equal(state.loadedQuestionCount, 1);
+  assert.equal(state.hasMoreQuestions, true);
+  assert.equal(state.questionIndexComplete, false);
+  assert.deepEqual(state.selectedSessionSlugs, ['alpha']);
+  assert.deepEqual(state.questions.map((question) => question.title), ['Cloudflare first question without chain mode.']);
+  assert.deepEqual(
+    fetchCalls.map((call) => new URL(call.url).pathname),
+    ['/auth/nonce', '/auth/login', '/storage/list', '/storage/read']
+  );
+});
+
 test('Mini App session picker honors the Telegram session created-after cutoff', async () => {
   const kv = new MemoryKv();
   const launch = 'cecb_cutoff1234';
