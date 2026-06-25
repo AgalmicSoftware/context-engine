@@ -8,11 +8,11 @@ describe('resolveSessionDataMode', () => {
     })).toBe('onchain');
   });
 
-  it('uses telegram mode only when a telegram-only session has auth', () => {
+  it('uses telegram mode for telegram-only sessions before auth is ready', () => {
     expect(resolveSessionDataMode({
       sessionConfig: { telegramOnly: true },
       telegramAuth: { loggedIn: false },
-    })).toBe('onchain');
+    })).toBe('telegram');
     expect(resolveSessionDataMode({
       sessionConfig: { telegramOnly: true },
       telegramAuth: { loggedIn: true },
@@ -22,7 +22,7 @@ describe('resolveSessionDataMode', () => {
   it('honors the session-meta probe when config is synthetic or missing', () => {
     expect(resolveSessionDataMode({
       probeResult: { telegramOnly: true, telegramBridgeEnabled: true },
-      telegramAuth: { ok: true },
+      telegramAuth: { ok: false },
     })).toBe('telegram');
   });
 });

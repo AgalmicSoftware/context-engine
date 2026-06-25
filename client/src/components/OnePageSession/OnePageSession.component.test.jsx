@@ -406,27 +406,42 @@ describe('OnePageSession view gating', () => {
   });
 
   it('shows the Telegram token login for Telegram-only sessions', async () => {
-    render(<OnePageSession
-      {...buildProps()}
-      sessionConfig={{
-        ...buildProps().sessionConfig,
-        telegramOnly: true,
-        sessionMode: 'telegram_only',
-      }}
-    />);
+    const ensureLightSbtUniverse = jest.fn(() => Promise.resolve());
+    const priorUrl = window.location.href;
+    window.history.replaceState(
+      {},
+      '',
+      `/session/edge?auto=1&sbt=${'0x1111111111111111111111111111111111111111'}&gp=group-password`
+    );
 
-    expect(await screen.findByTestId(E2E_TESTIDS.SESSION_TELEGRAM_ONLY_NOTICE)).toHaveTextContent(
-      /Telegram-only session/i
-    );
-    expect(screen.getByTestId('ce-session-telegram-token-login')).toBeInTheDocument();
-    expect(screen.getByTestId('ce-session-telegram-token-input')).toHaveAttribute(
-      'placeholder',
-      expect.stringMatching(/copied bot message/i)
-    );
-    expect(screen.queryByText(/Connect wallet/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/passkey/i)).not.toBeInTheDocument();
-    expect(screen.queryByTestId('survey-page-pile')).not.toBeInTheDocument();
-    expect(mockSurveyPage).not.toHaveBeenCalled();
+    try {
+      render(<OnePageSession
+        {...buildProps()}
+        ensureLightSbtUniverse={ensureLightSbtUniverse}
+        sessionConfig={{
+          ...buildProps().sessionConfig,
+          telegramOnly: true,
+          sessionMode: 'telegram_only',
+        }}
+      />);
+
+      expect(await screen.findByTestId(E2E_TESTIDS.SESSION_TELEGRAM_ONLY_NOTICE)).toHaveTextContent(
+        /Telegram-only session/i
+      );
+      expect(screen.getByTestId('ce-session-telegram-token-login')).toBeInTheDocument();
+      expect(screen.getByTestId('ce-session-telegram-token-input')).toHaveAttribute(
+        'placeholder',
+        expect.stringMatching(/copied bot message/i)
+      );
+      expect(screen.queryByText(/Connect wallet/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/passkey/i)).not.toBeInTheDocument();
+      expect(screen.queryByTestId('survey-page-pile')).not.toBeInTheDocument();
+      expect(mockSurveyPage).not.toHaveBeenCalled();
+      expect(ensureLightSbtUniverse).not.toHaveBeenCalled();
+      expect(window.sessionStorage.getItem('dg:autoHash:edge')).toBeNull();
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
   });
 
   it('restores Telegram token login from stored credentials on reload', async () => {
@@ -993,12 +1008,12 @@ describe('OnePageSession view gating', () => {
     expect(screen.getByRole('checkbox', { name: 'Geo' })).not.toBeDisabled();
     expect(screen.getByRole('checkbox', { name: 'Index' })).not.toBeDisabled();
     expect(screen.getByTestId('ce-session-telegram-question-item')).toContainElement(
-      screen.getByTestId('ce-session-telegram-question-multichoice-controls').querySelector('#multiChoice')
+      (await screen.findByTestId('ce-session-telegram-question-multichoice-controls')).querySelector('#multiChoice')
     );
 
     fireEvent.click(screen.getByTestId('ce-session-telegram-question-next'));
     expect(await screen.findByText('How comfortable are you?')).toBeInTheDocument();
-    expect(screen.getByTestId('ce-session-telegram-question-rating-controls')).toBeInTheDocument();
+    expect(await screen.findByTestId('ce-session-telegram-question-rating-controls')).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('ce-session-telegram-question-next'));
     expect(await screen.findByText('How can agents help?')).toBeInTheDocument();

@@ -307,4 +307,14 @@ describe('client package modernization contract', () => {
       expect(pkg.devDependencies[name]).toBeUndefined();
     });
   });
+
+  it('keeps Telegram mini-app heavy panels behind lazy imports', () => {
+    const onePageSession = readClientFile('src/components/OnePageSession/OnePageSession.tsx');
+    const telegramQuestionPile = readClientFile('src/components/OnePageSession/telegram/TelegramQuestionPile.tsx');
+
+    expect(onePageSession).not.toContain("import TelegramDebateMapPanel from './telegram/TelegramDebateMapPanel'");
+    expect(onePageSession).toContain("React.lazy(() => import('./telegram/TelegramDebateMapPanel'))");
+    expect(telegramQuestionPile).not.toContain("import SurveyAudioFieldInput from '../../SurveyTool/SurveyAudioFieldInput'");
+    expect(telegramQuestionPile).toContain("React.lazy(() => import('../../SurveyTool/SurveyAudioFieldInput'))");
+  });
 });

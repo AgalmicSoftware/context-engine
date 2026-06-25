@@ -25,7 +25,6 @@ import { ethers } from 'ethers';
 
 import styles from './OnePageSession.module.scss';
 import TelegramBucketCards from './telegram/TelegramBucketCards';
-import TelegramDebateMapPanel from './telegram/TelegramDebateMapPanel';
 import TelegramQuestionPile from './telegram/TelegramQuestionPile';
 import TelegramTokenGate from './telegram/TelegramTokenGate';
 
@@ -87,6 +86,7 @@ const DebateMap = React.lazy(() => import('../DebateMap/DebateMap'));
 const CorpusViewer = React.lazy(() => import('../DemoViews/CorpusViewer'));
 const RiskMatrix = React.lazy(() => import('../MainContent/RiskMatrix'));
 const DemoAnalysisWorkspace = React.lazy(() => import('../DemoViews/DemoAnalysis/DemoAnalysisWorkspace'));
+const TelegramDebateMapPanel = React.lazy(() => import('./telegram/TelegramDebateMapPanel'));
 
 const demoLog = createLogger('demo');
 const ONE_PAGE_DEMO_PERF_SCOPE = 'onePageDemo';
@@ -732,8 +732,17 @@ class OnePageSession extends Component<any, any> {
     }
   }
 
+  isTelegramBackendMode(sessionConfig: unknown = this.resolveCurrentSessionConfig()) {
+    return resolveSessionDataMode({
+      sessionConfig,
+      probeResult: this.isTelegramOnlySession(sessionConfig)
+        ? { telegramOnly: true, telegramBridgeEnabled: true }
+        : null,
+    }) === 'telegram';
+  }
+
   isTelegramDataMode(sessionConfig: any = this.resolveCurrentSessionConfig()) {
-    return this.isTelegramOnlySession(sessionConfig) && this.hasTelegramClientAuth();
+    return this.isTelegramBackendMode(sessionConfig) && this.hasTelegramClientAuth();
   }
 
   handleTelegramAgentAuthFailure() {
@@ -983,10 +992,14 @@ class OnePageSession extends Component<any, any> {
 
   componentDidMount() {
     const routeUiState = resolveOnePageSessionRouteUiState(this.props);
+    const initialSessionConfig = this.resolveCurrentSessionConfig();
+    const telegramBackendMode = this.isTelegramBackendMode(initialSessionConfig);
     this.recordOriginalURL(routeUiState.showQuestions
       ? buildOnePageSessionCanonicalBaseUrl(this.props)
       : null);
-    this.kickoffLightSbtUniverseScan(this.props);
+    if (!telegramBackendMode) {
+      this.kickoffLightSbtUniverseScan(this.props);
+    }
 
     // Make redirect flag group-aware (avoid cross-group bleed)
     try {
@@ -994,42 +1007,44 @@ class OnePageSession extends Component<any, any> {
       sessionStorage.setItem(`dg:hasRedirectedToDemo:${slug}`, 'true');
     } catch (e) { demoLog.warn('OnePageSession: fallback', e); }
 
-    // Persist any incoming auto-mint params so they survive Web3Auth redirect cycles
-    try {
-      const currentSearch =
-        typeof window !== 'undefined' ? (window.location.search || '') : '';
-      const hasAutoFlag = () => {
-        try {
-          const raw = currentSearch.replace(/^\?/, '');
-          const params = new URLSearchParams(raw);
-          if (params.get('auto') === '1') return true;
-          for (const key of params.keys()) {
-            if (/^auto\d+$/.test(key) && params.get(key) === '1') return true;
-          }
-        } catch (e) { demoLog.warn('OnePageSession: fallback', e); }
-        return false;
-      };
-      if (currentSearch && hasAutoFlag()) {
-        sessionStorage.setItem(this.getAutoHashStorageKey(), currentSearch.replace(/^\?/, ''));
-      }
-    } catch (e) { demoLog.warn('OnePageSession: fallback', e); }
+    if (!telegramBackendMode) {
+      // Persist any incoming auto-mint params so they survive Web3Auth redirect cycles
+      try {
+        const currentSearch =
+          typeof window !== 'undefined' ? (window.location.search || '') : '';
+        const hasAutoFlag = () => {
+          try {
+            const raw = currentSearch.replace(/^\?/, '');
+            const params = new URLSearchParams(raw);
+            if (params.get('auto') === '1') return true;
+            for (const key of params.keys()) {
+              if (/^auto\d+$/.test(key) && params.get(key) === '1') return true;
+            }
+          } catch (e) { demoLog.warn('OnePageSession: fallback', e); }
+          return false;
+        };
+        if (currentSearch && hasAutoFlag()) {
+          sessionStorage.setItem(this.getAutoHashStorageKey(), currentSearch.replace(/^\?/, ''));
+        }
+      } catch (e) { demoLog.warn('OnePageSession: fallback', e); }
 
-    // Fragment-driven auto mint (both limited/unlimited)
-    const targets = this.parseAutoMintFragment();
-    if (targets.length > 0) {
-      this.primeAutoMintTargets(targets);
+      // Fragment-driven auto mint (both limited/unlimited)
+      const targets = this.parseAutoMintFragment();
+      if (targets.length > 0) {
+        this.primeAutoMintTargets(targets);
+      }
+
+      window.addEventListener('sbt-mint-success', this.onSbtMintSuccess);
+
+      // Auto-open Groups section if a Create-SBT cache exists (idempotent, group-aware)
+      try {
+        const slug = resolveEffectiveSlug(this.props);
+        if (hasCachedCreateSbtForm(slug) && !this._autoOpenedGroups) {
+          this.setState({ showGroups: true });
+          this._autoOpenedGroups = true;
+        }
+      } catch (e) { demoLog.warn('OnePageSession: fallback', e); }
     }
-
-    window.addEventListener('sbt-mint-success', this.onSbtMintSuccess);
-
-    // Auto-open Groups section if a Create-SBT cache exists (idempotent, group-aware)
-    try {
-      const slug = resolveEffectiveSlug(this.props);
-      if (hasCachedCreateSbtForm(slug) && !this._autoOpenedGroups) {
-        this.setState({ showGroups: true });
-        this._autoOpenedGroups = true;
-      }
-    } catch (e) { demoLog.warn('OnePageSession: fallback', e); }
 
     this._aggregatorInputSig = this.buildAggregatorInputSignature(this.props, this.state);
     if (this.state.telegramLoginInput) {
@@ -1199,6 +1214,7 @@ class OnePageSession extends Component<any, any> {
       });
     }
     const currentSessionConfig = this.resolveCurrentSessionConfig();
+    const telegramBackendMode = this.isTelegramBackendMode(currentSessionConfig);
     const currentProbeKey = this.currentTelegramProbeKey(currentSessionConfig);
     if (
       currentProbeKey &&
@@ -1252,10 +1268,13 @@ class OnePageSession extends Component<any, any> {
       currentFilterSig !== nextDefaultSig
     );
     if (
-      slugChanged ||
+      !telegramBackendMode &&
       (
-        typeof prevProps.ensureLightSbtUniverse !== 'function' &&
-        typeof this.props.ensureLightSbtUniverse === 'function'
+        slugChanged ||
+        (
+          typeof prevProps.ensureLightSbtUniverse !== 'function' &&
+          typeof this.props.ensureLightSbtUniverse === 'function'
+        )
       )
     ) {
       this.kickoffLightSbtUniverseScan(this.props);
@@ -1269,6 +1288,7 @@ class OnePageSession extends Component<any, any> {
     }
     const loginJustCompleted = !prevProps.loginComplete && this.props.loginComplete;
     const runLoginTransitionAutoMint = () => {
+      if (telegramBackendMode) return false;
       if (!loginJustCompleted) return false;
       if ((this.state.autoMintTargets || []).length === 0 && this.hasAutoMintIntent()) {
         const retryTargets = this.parseAutoMintFragment();
@@ -1295,6 +1315,7 @@ class OnePageSession extends Component<any, any> {
     );
 
     const maybeScheduleAggregatorRebuild = () => {
+      if (telegramBackendMode) return;
       if (!(showResultsOpened || (showResultsVisible && aggregatorInvalidated))) return;
       const nextSig = this.buildAggregatorInputSignature(this.props, this.state);
       const shouldSchedule = showResultsOpened || this._aggregatorInputSig !== nextSig;
@@ -1340,7 +1361,7 @@ class OnePageSession extends Component<any, any> {
       this.setState(bannerResetPatch);
     }
 
-    if ((this.state.autoMintTargets || []).length === 0 && this.hasAutoMintIntent()) {
+    if (!telegramBackendMode && (this.state.autoMintTargets || []).length === 0 && this.hasAutoMintIntent()) {
       const retryTargets = this.parseAutoMintFragment();
       if (retryTargets.length > 0) {
         this.primeAutoMintTargets(retryTargets);
@@ -2717,7 +2738,6 @@ class OnePageSession extends Component<any, any> {
       incomingSessionConfig?.polisDemoDataBySlug ||
       resolvedSessionConfig?.polisDemoDataBySlug ||
       null;
-    const scopedLitHooks = this.resolveScopedLitHooks(resolvedSessionConfig);
     const effectiveSlug = resolveEffectiveSlug(this.props) || slug;
     // Only show DebateHUD/CorpusViewer on the generic demo session.
     const isDemoSlug = effectiveSlug === 'demo';
@@ -2769,6 +2789,7 @@ class OnePageSession extends Component<any, any> {
     const telegramOnlySession = this.isTelegramOnlySession(resolvedSessionConfig);
     const telegramClientLoggedIn = telegramOnlySession && this.hasTelegramClientAuth(effectiveSlug);
     const telegramClientAuth = telegramClientLoggedIn ? (this.state.telegramClientAuth || {}) : {};
+    const scopedLitHooks = telegramOnlySession ? null : this.resolveScopedLitHooks(resolvedSessionConfig);
     const sessionDataMode = resolveSessionDataMode({
       sessionConfig: resolvedSessionConfig,
       probeResult: this.state.telegramOnlyProbe === true
@@ -3484,11 +3505,13 @@ class OnePageSession extends Component<any, any> {
                     this.renderTelegramResultsPanel()
                   )}
                   {resultsViewMode === 'debateMap' && telegramDataMode && (
-                    <TelegramDebateMapPanel
-                      questions={this.state.telegramAgentQuestions || []}
-                      sessionSlug={this.resolveCurrentSessionSlug()}
-                      views={this.state.telegramAgentResults}
-                    />
+                    <Suspense fallback={<LazyFallback label="Loading Topic Map..." minHeight="20vh" />}>
+                      <TelegramDebateMapPanel
+                        questions={this.state.telegramAgentQuestions || []}
+                        sessionSlug={this.resolveCurrentSessionSlug()}
+                        views={this.state.telegramAgentResults}
+                      />
+                    </Suspense>
                   )}
                   {resultsViewMode === 'polis' && !telegramDataMode && (
                     <Suspense fallback={<LazyFallback label="Loading..." minHeight="20vh" />}>
