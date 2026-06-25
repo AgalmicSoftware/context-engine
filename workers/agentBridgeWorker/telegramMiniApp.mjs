@@ -1821,10 +1821,17 @@ async function buildMiniAppState({
   const sessionSlug = effectiveSelectedSessionSlugs[0] || launchSessionSlug(launchRecord, env);
   const launchSeries = miniAppLaunchSeriesRef(launchRecord);
   const launchQuestionId = launchSeries.questionIds[0] || safeString(launchRecord?.serverContextRef?.questionId);
+  const preferredQuestionIds = launchSeries.questionIds.length
+    ? launchSeries.questionIds
+    : [launchQuestionId].filter(Boolean);
   const loadedEntries = await Promise.all(effectiveSelectedSessionSlugs.map(async (slug) => ({
     sessionSlug: slug,
     session: linkedSessionBySlug.get(slug) || { sessionSlug: slug },
-    loaded: await loadQuestionsForSession(env, slug, { waitUntil }),
+    loaded: await loadQuestionsForSession(env, slug, {
+      waitUntil,
+      questionLimit: Math.max(requestedQuestionLimit, preferredQuestionIds.length || 0),
+      preferredQuestionIds,
+    }),
   })));
   let questionIndex = 0;
   const sourceQuestionEntries = loadedEntries.flatMap(({ sessionSlug: slug, session, loaded }) => {
@@ -1836,6 +1843,9 @@ async function buildMiniAppState({
       index: questionIndex++,
     }));
   });
+  const totalSourceQuestionCount = loadedEntries.reduce((sum, entry) => (
+    sum + (Number(entry.loaded.discoveredCount || entry.loaded.indexedQuestionCount || entry.loaded.questionCount || entry.loaded.questions?.length || 0) || 0)
+  ), 0) || sourceQuestionEntries.length;
   const sourceQuestionEntriesById = new Map();
   sourceQuestionEntries.forEach((entry) => {
     const qid = readQuestionId(entry.question);
@@ -1852,7 +1862,7 @@ async function buildMiniAppState({
     : sourceQuestionEntries;
   const fastInitialStateLoad = !seriesSourceEntries.length
     && requestedQuestionLimit <= DEFAULT_MINI_APP_FAST_INITIAL_QUESTION_LIMIT
-    && allQuestionEntries.length > requestedQuestionLimit
+    && totalSourceQuestionCount > requestedQuestionLimit
     && requestedQuestionLimit < pageSize;
   const questionEntries = seriesSourceEntries.length
     ? allQuestionEntries
@@ -1875,7 +1885,7 @@ async function buildMiniAppState({
   const lockedQuestionCount = questions.filter((question) => question?.locked === true).length;
   const discoveredQuestionCount = loadedEntries.reduce((sum, entry) => (
     sum + (Number(entry.loaded.discoveredCount || entry.loaded.indexedQuestionCount || entry.loaded.questions?.length || 0) || 0)
-  ), 0) || allQuestionEntries.length;
+  ), 0) || totalSourceQuestionCount;
   const activeQuestionKey = (seriesSourceEntries.length
     ? questions.find((question) => question.canAnswer)?.questionKey || questions[0]?.questionKey
     : '') ||
@@ -1883,51 +1893,63 @@ async function buildMiniAppState({
     questions.find((question) => question.canAnswer)?.questionKey ||
     questions[0]?.questionKey ||
     '';
-  const submittedAnswerState = await loadSubmittedMiniAppAnswers({
-    env,
-    auth,
-    questions,
-  });
-  await applyMiniAppQuestionResponseCounts({
-    env,
-    questions,
-  });
-  const savedDraftState = await loadSavedMiniAppDrafts({
-    env,
-    auth,
-    sessionSlug,
-    questions,
-    submittedAnswerKeys: submittedAnswerState.submittedAnswerKeys,
-    createdAt,
-  });
+  const submittedAnswerState = fastInitialStateLoad
+    ? { submittedAnswerKeys: [], submittedAnswers: [] }
+    : await loadSubmittedMiniAppAnswers({
+      env,
+      auth,
+      questions,
+    });
+  if (!fastInitialStateLoad) {
+    await applyMiniAppQuestionResponseCounts({
+      env,
+      questions,
+    });
+  }
+  const savedDraftState = fastInitialStateLoad
+    ? { savedDrafts: [], draftAnswersByQuestionKey: {} }
+    : await loadSavedMiniAppDrafts({
+      env,
+      auth,
+      sessionSlug,
+      questions,
+      submittedAnswerKeys: submittedAnswerState.submittedAnswerKeys,
+      createdAt,
+    });
   const prefilledDraftAnswersByQuestionKey = {};
   questions.forEach((question) => {
     const draft = launchSeries.draftsByQuestionId.get(lower(question.questionId));
     if (draft && question.questionKey) prefilledDraftAnswersByQuestionKey[question.questionKey] = draft;
   });
-  await applyMiniAppQuestionVoteSummaries({
-    env,
-    auth,
-    questions,
-  });
-  const agentSettingsValues = await loadTelegramAgentSettings({
-    env,
-    sessionSlug,
-    telegramUserId: auth.user?.telegramUserId,
-  });
+  if (!fastInitialStateLoad) {
+    await applyMiniAppQuestionVoteSummaries({
+      env,
+      auth,
+      questions,
+    });
+  }
+  const agentSettingsValues = fastInitialStateLoad
+    ? {}
+    : await loadTelegramAgentSettings({
+      env,
+      sessionSlug,
+      telegramUserId: auth.user?.telegramUserId,
+    });
   const agentSettings = defaultAgentSettingsState({
     sessionSlug,
     settings: agentSettingsValues,
     createdAt,
   });
-  const agentOnly = await buildMiniAppAgentOnlyState({
-    env,
-    auth,
-    sessionSlug,
-    questions,
-    settings: agentSettingsValues,
-    createdAt,
-  });
+  const agentOnly = fastInitialStateLoad
+    ? null
+    : await buildMiniAppAgentOnlyState({
+      env,
+      auth,
+      sessionSlug,
+      questions,
+      settings: agentSettingsValues,
+      createdAt,
+    });
   const primaryResolved = resolveSessionInvocation(policy, sessionSlug);
   const groups = fastInitialStateLoad
     ? emptyMiniAppGroupState(sessionSlug)
@@ -1994,10 +2016,10 @@ async function buildMiniAppState({
       skippedQuestionCount: skippedLaunchQuestionIds.size,
     },
     activeQuestionKey,
-    questionCount: allQuestionEntries.length,
+    questionCount: seriesSourceEntries.length ? allQuestionEntries.length : totalSourceQuestionCount,
     loadedQuestionCount: questions.length,
     loadedQuestionLimit: requestedQuestionLimit,
-    hasMoreQuestions: allQuestionEntries.length > questions.length,
+    hasMoreQuestions: (seriesSourceEntries.length ? allQuestionEntries.length : totalSourceQuestionCount) > questions.length,
     deferredPanels: fastInitialStateLoad ? ['groups', 'admin'] : [],
     availableQuestionCount,
     unavailableQuestionCount,
@@ -7650,6 +7672,8 @@ function telegramMiniAppHtml() {
       questionsLoading: false,
       loadingMoreQuestions: false,
       backgroundQuestionLoadPending: false,
+      loadingProgressTimer: null,
+      loadingProgressPercent: 18,
     };
     const el = {
       meta: document.getElementById('meta'),
@@ -8299,7 +8323,14 @@ function telegramMiniAppHtml() {
       else state.expandedQuestionKeys.delete(question.questionKey);
       if (!syncQuestionCardExpanded(question, expanded)) renderQuestionStack();
     };
+    function stopLoadingProgressTimer() {
+      if (state.loadingProgressTimer && typeof window.clearInterval === 'function') {
+        window.clearInterval(state.loadingProgressTimer);
+      }
+      state.loadingProgressTimer = null;
+    }
     const setStatus = (message, kind = '') => {
+      stopLoadingProgressTimer();
       el.status.className = 'status ' + kind;
       el.status.textContent = message || '';
     };
@@ -8329,6 +8360,26 @@ function telegramMiniAppHtml() {
       el.status.appendChild(track);
       el.status.appendChild(note);
     };
+    function startLoadingProgress({
+      message = 'Loading questions...',
+      initialPercent = 22,
+      maxPercent = 72,
+      hint = 'Opening the session and loading the first question.',
+    } = {}) {
+      stopLoadingProgressTimer();
+      state.loadingProgressPercent = Math.max(8, Math.min(96, Number(initialPercent) || 22));
+      setLoadingProgress(message, state.loadingProgressPercent, hint);
+      if (typeof window.setInterval !== 'function' || typeof window.clearInterval !== 'function') return;
+      state.loadingProgressTimer = window.setInterval(() => {
+        const current = Number(state.loadingProgressPercent || initialPercent) || initialPercent;
+        const step = current < 42 ? 5 : current < 60 ? 3 : 1.5;
+        state.loadingProgressPercent = Math.min(Number(maxPercent) || 72, current + step);
+        setLoadingProgress(message, state.loadingProgressPercent, hint);
+        if (state.loadingProgressPercent >= (Number(maxPercent) || 72)) {
+          stopLoadingProgressTimer();
+        }
+      }, 420);
+    }
     function shouldRetryQuestions(data) {
       if (data?.sessionPicker?.required === true) return false;
       const questions = Array.isArray(data?.questions) ? data.questions : [];
@@ -11901,11 +11952,12 @@ function telegramMiniAppHtml() {
         state.questionsLoading = true;
         state.loadingMoreQuestions = false;
         state.backgroundQuestionLoadPending = false;
-        setLoadingProgress(
-          retry ? 'Still loading questions...' : 'Loading questions...',
-          retry ? 34 : 22,
-          'Opening the session and checking agent predictions.'
-        );
+        startLoadingProgress({
+          message: retry ? 'Still loading questions...' : 'Loading questions...',
+          initialPercent: retry ? 34 : 22,
+          maxPercent: retry ? 74 : 72,
+          hint: 'Opening the session and loading the first question.',
+        });
       } else if (backgroundLoad) {
         state.questionsLoading = true;
         state.loadingMoreQuestions = true;
@@ -11941,7 +11993,8 @@ function telegramMiniAppHtml() {
         return;
       }
       if (!state.loadedOnce) {
-        setLoadingProgress('Preparing questions...', 78, 'Applying saved answers, drafts, and agent prediction badges.');
+        stopLoadingProgressTimer();
+        setLoadingProgress('Preparing questions...', 86, 'Rendering the first question.');
       }
       const wasLoadedOnce = state.loadedOnce;
       state.data = body;

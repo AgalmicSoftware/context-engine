@@ -889,6 +889,57 @@ function filterQuestionsForSession(questions = [], sessionSlug = '') {
   });
 }
 
+function normalizeQuestionLoadLimit(value = 0) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return 0;
+  return Math.floor(parsed);
+}
+
+function questionIdLookupSet(values = []) {
+  return new Set((Array.isArray(values) ? values : [])
+    .map((value) => lower(value))
+    .filter(Boolean));
+}
+
+function cloudflareQuestionItemIds(item = {}) {
+  const storageRef = item?.storageRef && typeof item.storageRef === 'object' && !Array.isArray(item.storageRef)
+    ? item.storageRef
+    : {};
+  return [
+    storageRef.id,
+    storageRef.questionId,
+    item?.id,
+    item?.questionId,
+    item?.key,
+    item?.name,
+  ].map(lower).filter(Boolean);
+}
+
+function selectTelegramOnlyCloudflareQuestionItems(items = [], {
+  questionLimit = 0,
+  preferredQuestionIds = [],
+} = {}) {
+  const source = Array.isArray(items) ? items : [];
+  const limit = normalizeQuestionLoadLimit(questionLimit);
+  if (!limit) return source;
+  const preferred = questionIdLookupSet(preferredQuestionIds);
+  if (!preferred.size) return source.slice(0, limit);
+  const selected = [];
+  const selectedIndexes = new Set();
+  source.forEach((item, index) => {
+    if (cloudflareQuestionItemIds(item).some((id) => preferred.has(id))) {
+      selected.push(item);
+      selectedIndexes.add(index);
+    }
+  });
+  const targetCount = Math.max(limit, selected.length || 0);
+  for (let index = 0; index < source.length && selected.length < targetCount; index += 1) {
+    if (selectedIndexes.has(index)) continue;
+    selected.push(source[index]);
+  }
+  return selected;
+}
+
 function questionIsPayloadUnavailable(question = {}) {
   return question?.payloadUnavailable === true || lower(question?.visibility) === 'payload_unavailable';
 }
@@ -1215,6 +1266,8 @@ async function fetchTelegramOnlyCloudflareJson({
 async function loadTelegramOnlyCloudflareQuestions({
   env = {},
   session = {},
+  questionLimit = 0,
+  preferredQuestionIds = [],
   fetchImpl = env.QUESTION_FETCH || env.REGISTRY_FETCH || globalThis.fetch,
 } = {}) {
   const sessionSlug = sanitizeSessionSlug(session.sessionSlug || session.slug);
@@ -1254,9 +1307,13 @@ async function loadTelegramOnlyCloudflareQuestions({
     };
   }
   const items = Array.isArray(listed.body?.items) ? listed.body.items : [];
+  const selectedItems = selectTelegramOnlyCloudflareQuestionItems(items, {
+    questionLimit,
+    preferredQuestionIds,
+  });
   const questions = [];
   const readErrors = [];
-  const readResults = await Promise.all(items.map(async (item, index) => {
+  const readResults = await Promise.all(selectedItems.map(async (item, index) => {
     const storageRef = item?.storageRef && typeof item.storageRef === 'object' && !Array.isArray(item.storageRef)
       ? item.storageRef
       : {};
@@ -1296,13 +1353,18 @@ async function loadTelegramOnlyCloudflareQuestions({
     source: 'telegram_only_cloudflare_storage',
     questions,
     questionCount: questions.length,
+    complete: selectedItems.length >= items.length && readErrors.length === 0,
+    loadedCount: questions.length,
     discoveredCount: items.length,
     payloadFailureCount: readErrors.length,
     readErrors,
   };
 }
 
-async function loadTelegramOnlyQuestionsForSession(env = {}, sessionSlug = '') {
+async function loadTelegramOnlyQuestionsForSession(env = {}, sessionSlug = '', {
+  questionLimit = 0,
+  preferredQuestionIds = [],
+} = {}) {
   const policy = await loadSessionPolicy(env);
   const resolved = resolveSessionInvocation(policy, sessionSlug);
   if (!resolved.ok || resolved.session?.telegramOnly !== true) return null;
@@ -1336,7 +1398,12 @@ async function loadTelegramOnlyQuestionsForSession(env = {}, sessionSlug = '') {
       discoveredCount: 0,
     };
   }
-  const cloudflare = await loadTelegramOnlyCloudflareQuestions({ env, session });
+  const cloudflare = await loadTelegramOnlyCloudflareQuestions({
+    env,
+    session,
+    questionLimit,
+    preferredQuestionIds,
+  });
   return {
     ...cloudflare,
     questions: orderQuestionsForPresentation(cloudflare.questions || []),
@@ -1345,6 +1412,8 @@ async function loadTelegramOnlyQuestionsForSession(env = {}, sessionSlug = '') {
 
 async function loadQuestionsForSession(env = {}, sessionSlug = '', {
   waitUntil = null,
+  questionLimit = 0,
+  preferredQuestionIds = [],
 } = {}) {
   const mode = questionSourceMode(env);
   if (mode === 'fixture') {
@@ -1355,7 +1424,10 @@ async function loadQuestionsForSession(env = {}, sessionSlug = '', {
       questions: orderQuestionsForPresentation(filterQuestionsForSession(loadDemoQuestions(env), sessionSlug)),
     });
   }
-  const telegramOnly = await loadTelegramOnlyQuestionsForSession(env, sessionSlug);
+  const telegramOnly = await loadTelegramOnlyQuestionsForSession(env, sessionSlug, {
+    questionLimit,
+    preferredQuestionIds,
+  });
   if (telegramOnly) return withTelegramProposedQuestions(env, sessionSlug, telegramOnly);
   const livePromise = listCachedSessionQuestionsForBridge({ env, sessionSlug, waitUntil }).catch((error) => ({
     ok: false,
