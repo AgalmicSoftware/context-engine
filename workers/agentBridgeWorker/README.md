@@ -701,9 +701,9 @@ Current v0 scope:
   lists question storage once, reuses inline question payloads returned by that
   list when present, reads only the requested page of missing payloads, and
   reports the full discovered count so the UI can show `1/N` immediately while
-  automatically loading five more questions. Later user-triggered loads jump to
-  the normal page size so the Mini App does not immediately issue a second large
-  background read burst.
+  delaying the first background fetch. The Mini App automatically loads five
+  more questions next, then continues page-size background loads until the full
+  question set is hydrated.
   Sessions with `telegramOnly=true`, `sessionMode=telegram_only`, or Cloudflare
   question storage and no explicit on-chain question mode do not use
   SessionRegistry/RPC question indexing on this path.

@@ -137,6 +137,8 @@ const DEFAULT_MINI_APP_AUTH_MAX_AGE_SECONDS = 24 * 60 * 60;
 const DEFAULT_MINI_APP_PAGE_SIZE = 50;
 const DEFAULT_MINI_APP_FAST_INITIAL_QUESTION_LIMIT = 1;
 const DEFAULT_MINI_APP_FAST_FOLLOWUP_QUESTION_COUNT = 5;
+const DEFAULT_MINI_APP_FAST_FOLLOWUP_DELAY_MS = 220;
+const DEFAULT_MINI_APP_BACKGROUND_PAGE_DELAY_MS = 650;
 const MAX_MINI_APP_QUESTION_LIMIT = 500;
 const QUESTION_ACTION_TTL_SECONDS = 30 * 60;
 const AGENT_REQUEST_KV_PREFIX = 'telegram:agent-request:';
@@ -7600,6 +7602,8 @@ function telegramMiniAppHtml({ loadingVisual = MINI_APP_LOADING_VISUAL_GIF } = {
     const POPULAR_QUESTION_LIMIT_STEP = 2;
     const FAST_INITIAL_QUESTION_LIMIT = ${DEFAULT_MINI_APP_FAST_INITIAL_QUESTION_LIMIT};
     const FAST_FOLLOWUP_QUESTION_COUNT = ${DEFAULT_MINI_APP_FAST_FOLLOWUP_QUESTION_COUNT};
+    const FAST_FOLLOWUP_DELAY_MS = ${DEFAULT_MINI_APP_FAST_FOLLOWUP_DELAY_MS};
+    const BACKGROUND_PAGE_DELAY_MS = ${DEFAULT_MINI_APP_BACKGROUND_PAGE_DELAY_MS};
     const MAX_QUESTION_LIMIT = ${MAX_MINI_APP_QUESTION_LIMIT};
     const QUESTION_TAG_LIMIT = 10;
     const QUESTION_TAG_FILTER_COLLAPSED_LIMIT = 5;
@@ -7610,6 +7614,7 @@ function telegramMiniAppHtml({ loadingVisual = MINI_APP_LOADING_VISUAL_GIF } = {
       draftAutosaveTimers: new Map(),
       draftAutosaveVersions: new Map(),
       retryTimer: null,
+      autoQuestionLoadTimer: null,
       aiSearchTimer: null,
       aiSearchResultQuery: '',
       aiSearchResultScores: new Map(),
@@ -8426,6 +8431,10 @@ function telegramMiniAppHtml({ loadingVisual = MINI_APP_LOADING_VISUAL_GIF } = {
       if (state.retryTimer) window.clearTimeout(state.retryTimer);
       state.retryTimer = null;
     }
+    function clearAutoQuestionLoadTimer() {
+      if (state.autoQuestionLoadTimer) window.clearTimeout(state.autoQuestionLoadTimer);
+      state.autoQuestionLoadTimer = null;
+    }
     function scheduleQuestionRetry() {
       clearQuestionRetry();
       state.retryTimer = window.setTimeout(() => {
@@ -8661,7 +8670,7 @@ function telegramMiniAppHtml({ loadingVisual = MINI_APP_LOADING_VISUAL_GIF } = {
         spinner.setAttribute('aria-label', 'Loading more questions');
         const label = document.createElement('span');
         label.textContent = state.backgroundQuestionLoadPending
-          ? 'Loading the next questions...'
+          ? backgroundQuestionLoadMessage()
           : 'Loading more questions...';
         loading.append(spinner, label);
         el.questionStack.appendChild(loading);
@@ -8676,6 +8685,12 @@ function telegramMiniAppHtml({ loadingVisual = MINI_APP_LOADING_VISUAL_GIF } = {
         loadMore.onclick = () => loadMoreQuestions();
         el.questionStack.appendChild(loadMore);
       }
+    }
+    function backgroundQuestionLoadMessage() {
+      const loaded = Number(state.data?.loadedQuestionLimit || state.data?.loadedQuestionCount || 0) || 0;
+      return loaded <= FAST_INITIAL_QUESTION_LIMIT
+        ? 'Loading the next questions...'
+        : 'Loading the rest in the background...';
     }
     function selectValue(question, value) {
       activate(question);
@@ -11911,7 +11926,7 @@ function telegramMiniAppHtml({ loadingVisual = MINI_APP_LOADING_VISUAL_GIF } = {
       renderResults();
       scrollPanelIntoView(el.groupAnalysisSection);
     }
-    async function load({ retry = false } = {}) {
+    async function load({ retry = false, backgroundAuto = false } = {}) {
       let response;
       let body;
       const backgroundLoad = state.loadedOnce && state.data?.hasMoreQuestions === true;
@@ -11926,8 +11941,8 @@ function telegramMiniAppHtml({ loadingVisual = MINI_APP_LOADING_VISUAL_GIF } = {
         });
       } else if (backgroundLoad) {
         state.questionsLoading = true;
-        state.loadingMoreQuestions = true;
-        state.backgroundQuestionLoadPending = false;
+        state.loadingMoreQuestions = !backgroundAuto;
+        state.backgroundQuestionLoadPending = backgroundAuto;
         renderQuestionStack();
       }
       try {
@@ -11944,6 +11959,7 @@ function telegramMiniAppHtml({ loadingVisual = MINI_APP_LOADING_VISUAL_GIF } = {
         state.questionsLoading = false;
         state.loadingMoreQuestions = false;
         state.backgroundQuestionLoadPending = false;
+        clearAutoQuestionLoadTimer();
         if (state.loadedOnce) renderQuestionStack();
         setStatus('Could not load Mini App. Retrying...', 'error');
         scheduleQuestionRetry();
@@ -11953,6 +11969,7 @@ function telegramMiniAppHtml({ loadingVisual = MINI_APP_LOADING_VISUAL_GIF } = {
         state.questionsLoading = false;
         state.loadingMoreQuestions = false;
         state.backgroundQuestionLoadPending = false;
+        clearAutoQuestionLoadTimer();
         if (state.loadedOnce) renderQuestionStack();
         setStatus(userFacingErrorMessage(body, 'Could not load Mini App.'), 'error');
         clearQuestionRetry();
@@ -11962,7 +11979,6 @@ function telegramMiniAppHtml({ loadingVisual = MINI_APP_LOADING_VISUAL_GIF } = {
         stopLoadingProgressTimer();
         setLoadingProgress('Loading questions and agent predictions', 86);
       }
-      const wasLoadedOnce = state.loadedOnce;
       state.data = body;
       const loadedLimit = Number(body.loadedQuestionLimit || body.loadedQuestionCount || body.pageSize || 0);
       if (loadedLimit > 0) state.questionLimit = loadedLimit;
@@ -12024,14 +12040,12 @@ function telegramMiniAppHtml({ loadingVisual = MINI_APP_LOADING_VISUAL_GIF } = {
       state.backgroundQuestionLoadPending = willAutoExpand;
       render();
       state.loadedOnce = true;
-      if (willAutoExpand) {
-        state.questionLimit = nextQuestionLimit(body);
-        setTimeout(() => load(), wasLoadedOnce ? 80 : 0);
-      }
+      if (willAutoExpand) scheduleAutoQuestionLoad(body);
       if (state.aiSearchQuery) scheduleAiSearch(0);
     }
     function loadMoreQuestions() {
       if (state.loadingMoreQuestions === true) return;
+      clearAutoQuestionLoadTimer();
       const current = Number(state.data?.loadedQuestionLimit || state.questionLimit || state.data?.loadedQuestionCount || state.data?.pageSize || 0);
       const increment = Number(state.data?.pageSize || 50) || 50;
       state.questionLimit = current < increment ? increment : current + increment;
@@ -12042,7 +12056,7 @@ function telegramMiniAppHtml({ loadingVisual = MINI_APP_LOADING_VISUAL_GIF } = {
     }
     function shouldAutoExpandQuestions(data) {
       const loaded = Number(data?.loadedQuestionLimit || data?.loadedQuestionCount || 0) || 0;
-      return data?.hasMoreQuestions === true && loaded > 0 && loaded <= FAST_INITIAL_QUESTION_LIMIT;
+      return data?.hasMoreQuestions === true && loaded > 0 && loaded < MAX_QUESTION_LIMIT;
     }
     function nextQuestionLimit(data) {
       const loadedLimit = Number(data?.loadedQuestionLimit || 0) || 0;
@@ -12051,10 +12065,24 @@ function telegramMiniAppHtml({ loadingVisual = MINI_APP_LOADING_VISUAL_GIF } = {
       const current = Math.max(loadedLimit, loadedCount, Number(state.questionLimit || 0) || 0);
       const fastFollowupLimit = FAST_INITIAL_QUESTION_LIMIT + FAST_FOLLOWUP_QUESTION_COUNT;
       if (current <= FAST_INITIAL_QUESTION_LIMIT && fastFollowupLimit > current) return Math.min(MAX_QUESTION_LIMIT, fastFollowupLimit);
+      if (current < pageSize) return Math.min(MAX_QUESTION_LIMIT, pageSize);
       return Math.min(MAX_QUESTION_LIMIT, Math.max(current + 1, current + pageSize));
+    }
+    function autoQuestionLoadDelay(data) {
+      const loaded = Number(data?.loadedQuestionLimit || data?.loadedQuestionCount || 0) || 0;
+      return loaded <= FAST_INITIAL_QUESTION_LIMIT ? FAST_FOLLOWUP_DELAY_MS : BACKGROUND_PAGE_DELAY_MS;
+    }
+    function scheduleAutoQuestionLoad(data) {
+      clearAutoQuestionLoadTimer();
+      state.questionLimit = nextQuestionLimit(data);
+      state.autoQuestionLoadTimer = window.setTimeout(() => {
+        state.autoQuestionLoadTimer = null;
+        load({ backgroundAuto: true });
+      }, autoQuestionLoadDelay(data));
     }
     el.continueSessions.onclick = () => {
       if (!state.selectedSessionSlugs.size) return;
+      clearAutoQuestionLoadTimer();
       state.activeKey = '';
       state.loadedOnce = false;
       resetResultsForSelection();
