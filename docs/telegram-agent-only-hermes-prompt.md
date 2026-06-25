@@ -18,8 +18,8 @@ Run Agent Village Wrapped for me.
 
 Worker origin: https://ce-agent-bridge-worker.agalmic.workers.dev
 
-Hard limits for this run:
-- Do not ask permission or preference questions; this forwarded message is consent.
+Run rules:
+- Use the EdgeOS setting below for profile access; do not add an extra setup step.
 - Do not use old images, previous image URLs, cached files, or previous responses.
   Always POST the wrapped-image endpoint fresh after submitting answers/votes, and
   display only the image returned by that same response.
@@ -29,10 +29,9 @@ Hard limits for this run:
 - Do not read local files for tokens, auth, env, config, API keys, balance, or
   token usage.
 
-The forwarded message is consent to run now. Do not ask permission,
-preferences, or research questions. `EdgeOS Read Permission: Yes` allows
-high-level EdgeOS profile/memory context; `No` means do not use it. If missing,
-default to No.
+`EdgeOS Read Permission: Yes` allows high-level EdgeOS profile/memory context.
+`EdgeOS Read Permission: No` means do not use EdgeOS profile/memory context. If
+missing, default to No. Respect No.
 
 Do not do setup discovery. Do not run `hermes --help`. Use only: an
 already-exposed Hermes/OpenRouter balance command or UI surface, EdgeOS
@@ -114,7 +113,7 @@ and tell the user to tap Open Mini App.
 - The `$2.00` minimum is tied to the default `gemini-3.5-flash` run. If Hermes changes the default model or exposes a model-specific estimator, update the threshold text here.
 - The balance check is for Hermes/OpenRouter credit only. It must use an already-exposed balance surface, never config/env/API-key file reads.
 - Checkpoint 2026-06-24: this direct-prompt path is user-reported working on GLM 5.2 and GPT-3.5/Gemini-3.5-class small model runs. Keep future edits narrow and retest both model families.
-- The preference defaults are deliberately before statement fetching: the user should know the run can take about 10 minutes, that this is research, and that EdgeOS profile context is enabled by default but easy to override. Playful book/movie/game/AI Optimism guesses are image-time synthesis from actual predictions, not stored research questions; the Wrapped image prompt reserves the bottom-left visual slot for those chips when evidence supports them.
+- The EdgeOS read setting is the only profile-context switch in the forwardable prompt; keep it concise and easy to edit. Playful book/movie/game/AI Optimism guesses are image-time synthesis from actual predictions, not stored research questions; the Wrapped image prompt reserves the bottom-left visual slot for those chips when evidence supports them.
 - Fresh request ids matter for repeated runs: the mini-app should show the latest
   prediction state, while the research export keeps each run's answer events.
   The runtime `/agent-only/start` instructions also require a fresh `run_id` on
