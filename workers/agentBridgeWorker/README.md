@@ -109,23 +109,20 @@ without overwriting earlier research events or accidentally reusing a prior
 poster. The worker computes the active window from server-side time; public
 `createdAt` query/body values are ignored for agent-only window selection.
 
-The wrapped-image endpoint supports three visual modes on the same run-scoped
-path: `wrapped` returns the current single shareable PNG poster,
-`wrapped_story` returns one animated SVG phone-story asset assembled from a
-separate five-panel storyboard prompt, and `political_compass` returns the
-optional Agent Norms Compass PNG. `wrapped_story` is intentionally a
-story-specific generator and animated SVG wrapper, not a crop of the standard
-poster and not an MP4/GIF transcode; adding real video output would require a
-separate media encoder service.
+The wrapped-image endpoint supports the standard `wrapped` PNG poster and the
+optional `political_compass` PNG. MP4 story/video output is not enabled in the
+current runtime skill. The old `wrapped_story` SVG storyboard path is
+experimental-only and is not advertised to Hermes runs; adding real video output
+requires a separate media encoder service.
 
 Agents that only need Agent Village Wrapped should use the dedicated narrow
 skill URL instead of the broader Context Engine runtime skill:
-`/telegram/agent/api/agent-village-wrapped/skill?v=1`. That skill omits normal
+`/telegram/agent/api/agent-village-wrapped/skill?v=2`. That skill omits normal
 question/draft/admin lanes and is intended to keep Hermes-style agents on the
 prediction, allocation, and Wrapped image flow. `/agent-only/start` also returns
 `visualDefaults` so operators can switch default image modes without changing
 the skill: `AGENT_BRIDGE_AGENT_WRAPPED_POSTER_DEFAULT` defaults on,
-`AGENT_BRIDGE_AGENT_WRAPPED_STORY_DEFAULT` defaults off, and
+`wrapped_story` is forced off until real video output exists, and
 `AGENT_BRIDGE_AGENT_WRAPPED_COMPASS_DEFAULT` defaults off.
 
 Rating snapshots preserve the authored scale in the proposed question record.

@@ -186,6 +186,7 @@ test('start payload pins path-only endpoints and instruction size', () => {
   assert.match(payload.instructions, /A text statement that the image is ready is not enough/);
   assert.match(payload.instructions, /agent_metadata\.token_usage/);
   assert.match(payload.instructions, /recent_sessions_total_tokens/);
+  assert.match(payload.instructions, /hermes insights --days 30 --source telegram/);
   assert.match(payload.instructions, /fresh run id/);
   assert.match(payload.instructions, /include that same run_id on every answer, vote, and image POST/);
   assert.match(payload.instructions, /"run_id": "<fresh_run_id>"/);
@@ -405,8 +406,10 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.match(prompt, /tall phone card or portrait story panel/);
   assert.match(prompt, /rather than a wide landscape banner/);
   assert.match(prompt, /Hero text fit rule/);
+  assert.match(prompt, /render exactly one memeable sentence/);
   assert.match(prompt, /under 14 words and under 90 characters/);
   assert.match(prompt, /Never hyphenate, crop, truncate, or trail off the hero sentence mid-word/);
+  assert.match(prompt, /Do not add a second sentence elsewhere inside the hero/);
   assert.match(prompt, /Use plain concrete language/);
   assert.match(prompt, /Do not invent undefined acronyms/);
   assert.match(prompt, /do not create new technical-sounding slogans/);
@@ -471,13 +474,18 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.match(prompt, /AI Optimism/);
   assert.match(prompt, /synthesized at image-generation time from the actual prediction evidence/);
   assert.match(prompt, /not based on dedicated favorite-book\/movie\/game questions/);
+  assert.match(prompt, /Title the visible section exactly "Agent Guesses"/);
+  assert.match(prompt, /do not add any subtitle, disclaimer, caveat, or extra explanatory line/);
   assert.match(prompt, /For AI Optimism, use actual AI-futures predicted response rows/);
+  assert.match(prompt, /render it as a numeric score out of 10/);
+  assert.match(prompt, /AI Optimism 7\/10/);
   assert.match(prompt, /Token Use metric: Token Use: 1\.2M current run; 4\.3M recent sessions; intuition: roughly 57 books, 5\.7K pages, paper stack about 1\.9 ft tall \(source: Hermes visible usage\)\./);
   assert.match(prompt, /feature one prominent "Token Use" chip/);
   assert.match(prompt, /books, printed pages, or paper-stack height/);
   assert.match(prompt, /4\.3M tokens ~ 57 books \/ 5\.7K pages/);
   assert.match(prompt, /Token Use is a runtime metric, not a playful guess/);
   assert.match(prompt, /Never invent, estimate, or back-calculate token usage/);
+  assert.match(prompt, /omit one taste chip before omitting Token Use/);
   assert.match(prompt, /Do not use stored favorite\/book\/movie\/game answer rows as source data/);
   assert.match(prompt, /flower\/sunrise for AI Optimism/);
   assert.match(prompt, /omit that chip entirely instead of showing unavailable text/);
@@ -640,6 +648,8 @@ test('wrapped story prompts split the report into five phone screens', () => {
   assert.match(frames[2].prompt, /Render binary answers as one selected pill only/);
   assert.match(frames[3].prompt, /Book Guess, Movie\/Show Guess, Game\/Play Pattern, and AI Optimism/);
   assert.match(frames[3].prompt, /not from dedicated favorite-book\/movie\/game question rows/);
+  assert.match(frames[3].prompt, /score out of 10/);
+  assert.match(frames[3].prompt, /Do not show any subtitle, disclaimer, caveat, or extra explanatory line/);
   assert.match(frames[4].prompt, /historical figure or fictional\/book character/);
   assert.match(frames[4].prompt, /interesting, historically accurate deep cut/);
   assert.match(frames.map((frame) => frame.prompt).join('\n'), /Do not mention or imply where the principal lives/);
@@ -656,7 +666,7 @@ test('wrapped story prompts split the report into five phone screens', () => {
   assert.match(storyboardPrompt, /Panel 1: "What your agent thinks it knows about you"/);
   assert.match(storyboardPrompt, /Panel 2: "Token trail"/);
   assert.match(storyboardPrompt, /Panel 3: "Predictions"/);
-  assert.match(storyboardPrompt, /Panel 4: "Agent guesses"/);
+  assert.match(storyboardPrompt, /Panel 4: "Agent Guesses"/);
   assert.match(storyboardPrompt, /Panel 5: "Agent comparison"/);
   assert.match(storyboardPrompt, /Token Use: 880K current run; 2\.2M recent sessions/);
   assert.match(storyboardPrompt, /Do not alter or imitate the standard wide poster layout/);

@@ -123,9 +123,9 @@ const DEFAULT_AGENT_BRIDGE_PUBLIC_URL = 'https://ce-agent-bridge-worker.agalmic.
 const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=41';
 const DEFAULT_AGENT_RAW_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/edge-2026/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
 const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-06-16 (v41)';
-const DEFAULT_AGENT_VILLAGE_WRAPPED_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/agent-village-wrapped/skill?v=1';
+const DEFAULT_AGENT_VILLAGE_WRAPPED_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/agent-village-wrapped/skill?v=2';
 const DEFAULT_AGENT_VILLAGE_WRAPPED_RAW_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/edge-2026/workers/agentBridgeWorker/skills/ce-agent-village-wrapped/SKILL.md';
-const CE_AGENT_VILLAGE_WRAPPED_SKILL_VERSION = '2026-06-25 (wrapped-v1)';
+const CE_AGENT_VILLAGE_WRAPPED_SKILL_VERSION = '2026-06-25 (wrapped-v2)';
 const MINI_APP_QUESTION_VOTE_KV_PREFIX = 'telegram:mini-app-question-vote:v1:';
 const AGENT_QUESTION_VOTE_DECISION_KV_PREFIX = 'telegram:agent-question-vote-decision:v1:';
 const ANSWER_DRAFT_KV_PREFIX = 'telegram:answer-draft:';
@@ -629,7 +629,7 @@ function agentTokenRefreshError(reason = 'agent_token_invalid') {
     ok: false,
     status: 401,
     reason,
-    message: 'This Context Engine agent token is expired, revoked, or no longer available. If you have a trusted Geo/Hermes invite, call /telegram/agent/api/invite/onboard again with the observed Telegram from.id and store the newly returned ceagt_ token as bearer auth. Otherwise ask the user to refresh through the Context Engine bot Onboard Agent flow.',
+    message: 'This Context Engine agent token is expired, revoked, or no longer available. Ask the user to refresh through the Context Engine bot Onboard Agent flow, then store the newly returned ceagt_ token privately as bearer auth.',
     action: 'refresh_user_agent_token',
     telegramCommand: '/start',
     telegramButton: 'Onboard Agent',

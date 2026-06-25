@@ -369,7 +369,7 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
 
   assert.match(wrapped, /name:\s+agent-village-wrapped/);
   assert.match(wrapped, /^# Agent Village Wrapped Runtime/m);
-  assert.match(wrapped, /\*\*Skill version:\*\* 2026-06-25 \(wrapped-v1\)/);
+  assert.match(wrapped, /\*\*Skill version:\*\* 2026-06-25 \(wrapped-v2\)/);
   assert.match(wrapped, /Use this skill only to run Agent Village Wrapped/);
   assert.match(wrapped, /Do not use the broader\s+`context-engine` skill/);
   assert.match(wrapped, /memory\/context-engine-state\.json/);
@@ -426,7 +426,7 @@ test('Telegram agent handoff exposes the dedicated Agent Village Wrapped skill m
 
   assert.equal(response.status, 200);
   assert.equal(body.ok, true);
-  assert.equal(body.version, '2026-06-25 (wrapped-v1)');
+  assert.equal(body.version, '2026-06-25 (wrapped-v2)');
   assert.equal(body.protocolVersion, '2026-06-16 (v41)');
   assert.equal(body.skill, 'agent-village-wrapped');
   assert.equal(body.skillUrl, 'https://example.test/skills/agent-village-wrapped/SKILL.md');
@@ -449,14 +449,14 @@ test('Telegram agent handoff serves a short skill redirect', async () => {
 
 test('Telegram agent handoff serves a dedicated Agent Village Wrapped skill redirect', async () => {
   const response = await handleTelegramAgentHandoffRequest({
-    request: agentRequest('/telegram/agent/api/agent-village-wrapped/skill?v=1', { token: '' }),
+    request: agentRequest('/telegram/agent/api/agent-village-wrapped/skill?v=2', { token: '' }),
     env: baseEnv(),
   });
 
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
   assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-agent-village-wrapped\/SKILL\.md/);
-  assert.match(location, /v=2026-06-25-wrapped-v1-/);
+  assert.match(location, /v=2026-06-25-wrapped-v2-/);
 });
 
 test('Agent-only start payload exposes configurable visual defaults', async () => {
@@ -608,7 +608,8 @@ test('Telegram agent handoff accepts scoped user delegation tokens without a sha
   assert.equal(expiredBody.action, 'refresh_user_agent_token');
   assert.equal(expiredBody.telegramCommand, '/start');
   assert.equal(expiredBody.telegramButton, 'Onboard Agent');
-  assert.match(expiredBody.message, /trusted Geo\/Hermes invite/i);
+  assert.doesNotMatch(expiredBody.message, /invite\/onboard/i);
+  assert.doesNotMatch(expiredBody.message, /trusted Geo\/Hermes invite/i);
   assert.match(expiredBody.message, /Onboard Agent/);
 
   const missingTokenResponse = await handleTelegramAgentHandoffRequest({

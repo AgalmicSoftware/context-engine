@@ -12,7 +12,7 @@ The GitHub-facing attachment/source file is
 
 ```text
 Run Agent Village Wrapped (by Context Engine) for me using this skill:
-https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/agent-village-wrapped/skill?v=1
+https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/agent-village-wrapped/skill?v=2
 
 EdgeOS Read Permission: Yes
 ```
