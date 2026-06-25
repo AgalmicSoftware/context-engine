@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { Suspense, useMemo, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faCaretDown,
@@ -7,14 +7,11 @@ import {
   faCheck,
   faExpand,
   faFilter,
+  faMicrophone,
   faSpinner,
 } from '@fortawesome/free-solid-svg-icons';
 import { Button, Card, CardBody } from 'reactstrap';
 
-import BinaryChoiceInput from '../../SurveyTool/BinaryChoiceInput';
-import MultichoiceQuestionInput from '../../SurveyTool/MultichoiceQuestionInput';
-import SurveyAudioFieldInput from '../../SurveyTool/SurveyAudioFieldInput';
-import CESlider from '../../Shared/CESlider';
 import type { TelegramAgentQuestion } from '../../../utilities/session/telegramAgentData';
 import type { TelegramAnswerInput } from '../../../utilities/session/telegramSessionBackend';
 import {
@@ -29,6 +26,17 @@ import {
   isSingleSelectMultichoice,
   normalizeMultichoiceValue,
 } from '../../SurveyTool/surveyToolResponseState';
+
+const BinaryChoiceInput = React.lazy(() => import('../../SurveyTool/BinaryChoiceInput'));
+const MultichoiceQuestionInput = React.lazy(() => import('../../SurveyTool/MultichoiceQuestionInput'));
+const CESlider = React.lazy(() => import('../../Shared/CESlider'));
+const SurveyAudioFieldInput = React.lazy(() => import('../../SurveyTool/SurveyAudioFieldInput'));
+
+const controlsFallback = (
+  <div className={styles.telegramListEmpty}>
+    <FontAwesomeIcon icon={faSpinner} spin /> Loading answer controls...
+  </div>
+);
 
 type TelegramQuestionPileProps = {
   compact?: boolean;
@@ -100,6 +108,7 @@ export default function TelegramQuestionPile({
   const [filterMode, setFilterMode] = useState<QuestionFilterMode>('all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [showFilterPanel, setShowFilterPanel] = useState(false);
+  const [richFreeformQuestionIds, setRichFreeformQuestionIds] = useState<Record<string, boolean>>({});
   const isQuestionAnswered = (question: TelegramAgentQuestion): boolean => (
     Boolean(question?.answeredByUser || (question?.questionId && submittedQuestionIds.has(question.questionId)))
   );
@@ -154,15 +163,17 @@ export default function TelegramQuestionPile({
       : [];
     if (type === 'binary') {
       return (
-        <div data-testid="ce-session-telegram-question-binary-controls">
-          <BinaryChoiceInput
-            questionId={qid}
-            value={String(draft.value || '')}
-            inputNamePrefix="telegram-q"
-            disabled={isSubmitting}
-            onChange={(value) => setDraft(qid, { value })}
-          />
-        </div>
+        <Suspense fallback={controlsFallback}>
+          <div data-testid="ce-session-telegram-question-binary-controls">
+            <BinaryChoiceInput
+              questionId={qid}
+              value={String(draft.value || '')}
+              inputNamePrefix="telegram-q"
+              disabled={isSubmitting}
+              onChange={(value) => setDraft(qid, { value })}
+            />
+          </div>
+        </Suspense>
       );
     }
     if (type === 'rating') {
@@ -170,55 +181,94 @@ export default function TelegramQuestionPile({
         ? getNormalizedUiRatingValue(draft.value)
         : RATING_MIN;
       return (
-        <div
-          className={surveyToolStyles.ratingContainer}
-          data-testid="ce-session-telegram-question-rating-controls"
-        >
-          <CESlider
-            min={RATING_MIN}
-            max={RATING_MAX}
-            step={1}
-            value={ratingValue}
-            onChange={(value) => setDraft(qid, { value })}
-            disabled={isSubmitting}
-            className={surveyToolStyles.ratingSlider}
-          />
-          <span className={surveyToolStyles.ratingValueDisplay}>
-            {ratingValue}
-          </span>
-        </div>
+        <Suspense fallback={controlsFallback}>
+          <div
+            className={surveyToolStyles.ratingContainer}
+            data-testid="ce-session-telegram-question-rating-controls"
+          >
+            <CESlider
+              min={RATING_MIN}
+              max={RATING_MAX}
+              step={1}
+              value={ratingValue}
+              onChange={(value) => setDraft(qid, { value })}
+              disabled={isSubmitting}
+              className={surveyToolStyles.ratingSlider}
+            />
+            <span className={surveyToolStyles.ratingValueDisplay}>
+              {ratingValue}
+            </span>
+          </div>
+        </Suspense>
       );
     }
     if (type === 'multichoice' || options.length > 0) {
       return (
+        <Suspense fallback={controlsFallback}>
+          <div
+            data-testid="ce-session-telegram-question-multichoice-controls"
+          >
+            <MultichoiceQuestionInput
+              questionId={qid}
+              options={options.length > 0 ? options : ['Other']}
+              selectedValues={normalizeMultichoiceValue(draft.values)}
+              isSingleSelect={isSingleSelectMultichoice(pileQuestion)}
+              disabled={isSubmitting}
+              onChange={(values) => setDraft(qid, { values })}
+            />
+          </div>
+        </Suspense>
+      );
+    }
+    if (!richFreeformQuestionIds[qid]) {
+      return (
         <div
-          data-testid="ce-session-telegram-question-multichoice-controls"
+          className={styles.telegramFreeformInline}
+          data-testid="ce-session-telegram-question-freeform-controls"
         >
-          <MultichoiceQuestionInput
-            questionId={qid}
-            options={options.length > 0 ? options : ['Other']}
-            selectedValues={normalizeMultichoiceValue(draft.values)}
-            isSingleSelect={isSingleSelectMultichoice(pileQuestion)}
+          <textarea
+            className={styles.telegramFreeformTextarea}
+            placeholder="Your response..."
+            value={String(draft.text || '')}
+            onChange={(event) => setDraft(qid, { text: event.target.value })}
             disabled={isSubmitting}
-            onChange={(values) => setDraft(qid, { values })}
+            data-testid="ce-session-telegram-question-freeform-textarea"
           />
+          <button
+            type="button"
+            className={styles.telegramFreeformComposerButton}
+            onClick={() => {
+              setRichFreeformQuestionIds((previous) => ({
+                ...previous,
+                [qid]: true,
+              }));
+            }}
+            disabled={isSubmitting}
+            title="Open voice and AI response tools"
+            aria-label="Open voice and AI response tools"
+            data-testid="ce-session-telegram-question-rich-freeform-toggle"
+          >
+            <FontAwesomeIcon icon={faMicrophone} />
+          </button>
         </div>
       );
     }
     return (
-      <div data-testid="ce-session-telegram-question-freeform-controls">
-        <SurveyAudioFieldInput
-          placeholder="Your response..."
-          value={String(draft.text || '')}
-          updateFunction={(value) => setDraft(qid, { text: value })}
-          toggleEncryption={() => {}}
-          disabled={isSubmitting}
-          disableEncryption
-          enableDownloads={false}
-        />
-      </div>
+      <Suspense fallback={controlsFallback}>
+        <div data-testid="ce-session-telegram-question-freeform-controls">
+          <SurveyAudioFieldInput
+            placeholder="Your response..."
+            value={String(draft.text || '')}
+            updateFunction={(value) => setDraft(qid, { text: value })}
+            toggleEncryption={() => {}}
+            disabled={isSubmitting}
+            disableEncryption
+            enableDownloads={false}
+          />
+        </div>
+      </Suspense>
     );
-  }, [activeQuestion, draft, isSubmitting]);
+  }, [activeQuestion, draft, isSubmitting, richFreeformQuestionIds]);
 
   const questionContainerClass = activeQuestion
     ? surveyToolStyles[`${questionType(activeQuestion)}QuestionContainer`] || ''

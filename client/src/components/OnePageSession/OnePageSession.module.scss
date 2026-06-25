@@ -326,6 +326,67 @@
   padding: 7px 10px;
 }
 
+.telegramFreeformInline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px;
+  align-items: stretch;
+  gap: 10px;
+  width: 100%;
+}
+
+.telegramFreeformTextarea {
+  width: 100%;
+  min-height: 118px;
+  resize: vertical;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: var(--ce-radius-8);
+  padding: 12px 14px;
+  background: rgba(18, 25, 61, 0.78);
+  color: #ffffff;
+  font: inherit;
+  line-height: 1.45;
+
+  &::placeholder {
+    color: rgba(255, 255, 255, 0.56);
+  }
+
+  &:focus-visible {
+    border-color: rgba(77, 255, 164, 0.64);
+    box-shadow: 0 0 0 3px rgba(77, 255, 164, 0.18);
+    outline: none;
+  }
+
+  &:disabled {
+    opacity: 0.68;
+    cursor: not-allowed;
+  }
+}
+
+.telegramFreeformComposerButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: var(--ce-radius-8);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.86);
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    border-color: rgba(77, 255, 164, 0.58);
+    background: rgba(77, 255, 164, 0.15);
+    color: #ffffff;
+    outline: none;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
 .telegramChipRow {
   display: flex;
   flex-wrap: wrap;
