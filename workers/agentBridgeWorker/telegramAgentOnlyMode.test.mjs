@@ -182,12 +182,14 @@ test('start payload pins path-only endpoints and instruction size', () => {
   assert.match(payload.instructions, /Do not use a repeated default like 85 across a batch/);
   assert.match(payload.instructions, /scan for flat confidence/);
   assert.match(payload.instructions, /To inspect or change your agent's responses/);
+  assert.match(payload.instructions, /\[Context Engine Bot\]\(https:\/\/t\.me\/contextengineer_bot\?start=agent_onboarding__agent-village-wrapped\)/);
+  assert.match(payload.instructions, /extra links/);
   assert.match(payload.instructions, /where the principal lives\/is from\/currently is/);
   assert.match(payload.instructions, /Abstract location evidence into non-location preferences/);
   assert.doesNotMatch(payload.instructions, /Review or edit your agent's responses in Context Engine Telegram Bot/);
   assert.ok(agentOnlyInstructionWordCount(AGENT_ONLY_INSTRUCTIONS) >= 400);
   assert.ok(agentOnlyInstructionWordCount(AGENT_ONLY_INSTRUCTIONS) <= 800);
-  assert.equal(/https?:\/\//i.test(payload.instructions), false);
+  assert.equal((payload.instructions.match(/https?:\/\//gi) || []).length, 1);
 });
 
 test('wrapped image prompt uses importance wording and suppresses decorative text', () => {

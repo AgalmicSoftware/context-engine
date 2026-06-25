@@ -96,9 +96,11 @@ Then:
    modes, then generate the standard Agent Village Wrapped image.
 7. Render or display the Wrapped image when the environment supports images. Do
    not print raw image prompts, base64 payloads, confidences, rationales, or
-   private memory. After the image, link the user to the Context Engine Telegram
-   bot to review or edit predictions and ask whether they want the optional
-   Agent Norms Compass meme.
+   private memory. After the image, link the text "Context Engine Bot" to
+   `https://t.me/contextengineer_bot?start=agent_onboarding__agent-village-wrapped`
+   so the user can open the bot directly, tap Open Mini App to review or edit
+   predictions, and decide whether they want the optional Agent Norms Compass
+   meme.
 8. Do not use the ordinary `/questions`, draft, direct answer, question vote, or
    question creation flow for Agent Village Wrapped unless the user explicitly
    asks for regular Context Engine outside this mode.

@@ -78,7 +78,10 @@ known. Do not read files, env vars, config, auth files, or API keys to find it.
 Omit token usage if unavailable.
 
 Do not print my ceagt token, confidences, rationales, raw private memory, raw
-image prompt, or image_base64 in chat.
+image prompt, or image_base64 in chat. In the final message, make "Context
+Engine Bot" a Markdown link to
+https://t.me/contextengineer_bot?start=agent_onboarding__agent-village-wrapped
+and tell the user to tap Open Mini App.
 ```
 
 ## Notes

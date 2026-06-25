@@ -74,7 +74,7 @@ Metadata. Every POST must include agent_metadata with model, scaffold_version, a
 
 Errors and retries. On validation errors, fix the listed rows and resend. On window_mismatch, re-fetch statements because a new window opened, then redo the run for the new window_id. If your cached skill version is older than /telegram/agent/api/skill-version, refresh the skill before continuing.
 
-Completion report. After the Wrapped image is displayed, tell your principal only: "Your Agent Village Wrapped is ready. To inspect or change your agent's responses, open Context Engine Telegram Bot and tap Open Mini App. Want the optional Agent Norms Compass meme too?" Do not include the window id, confidences, rationales, privacy skip count, raw links, token details, or where the principal lives/is from/currently is unless asked. Abstract location evidence into non-location preferences.
+Completion report. After the Wrapped image is displayed, tell your principal only: "Your Agent Village Wrapped is ready. To inspect or change your agent's responses, open [Context Engine Bot](https://t.me/contextengineer_bot?start=agent_onboarding__agent-village-wrapped) and tap Open Mini App. Want the optional Agent Norms Compass meme too?" Do not include the window id, confidences, rationales, privacy skip count, token details, extra links, or where the principal lives/is from/currently is unless asked. Abstract location evidence into non-location preferences.
 
 Your answers are predictions. Your principal's own answers always take precedence and are never overwritten. Windows refresh weekly on Mondays at 08:00 Pacific.`;
 
