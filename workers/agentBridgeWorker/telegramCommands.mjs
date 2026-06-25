@@ -1145,6 +1145,78 @@ function allowAdHocQuestions(env = {}) {
     || questionSourceMode(env) === 'fixture';
 }
 
+function sessionStorageProfile(session = {}) {
+  return session?.storageProfile && typeof session.storageProfile === 'object' && !Array.isArray(session.storageProfile)
+    ? session.storageProfile
+    : {};
+}
+
+function sessionStorageConfig(session = {}) {
+  return session?.storage && typeof session.storage === 'object' && !Array.isArray(session.storage)
+    ? session.storage
+    : {};
+}
+
+function sessionUsesCloudflareQuestionStorage(session = {}) {
+  const storageProfile = sessionStorageProfile(session);
+  const storage = sessionStorageConfig(session);
+  const profiles = storage.profiles && typeof storage.profiles === 'object' && !Array.isArray(storage.profiles)
+    ? storage.profiles
+    : {};
+  const cloudflareProfile = profiles.cloudflare && typeof profiles.cloudflare === 'object' && !Array.isArray(profiles.cloudflare)
+    ? profiles.cloudflare
+    : {};
+  const backend = lower(
+    storageProfile.backend ||
+    storageProfile.defaultBackend ||
+    storage.defaultBackend ||
+    session.questionStorageBackend ||
+    session.storageBackend
+  );
+  const source = lower(session.questionSource || session.telegramQuestionSource);
+  const artifactTypes = Array.isArray(cloudflareProfile.artifactTypes)
+    ? cloudflareProfile.artifactTypes.map(lower)
+    : [];
+  return backend === 'cloudflare' ||
+    source === 'cloudflare_storage' ||
+    source === 'cloudflare' ||
+    (cloudflareProfile.enabled === true && (
+      lower(storage.defaultBackend) === 'cloudflare' ||
+      artifactTypes.includes('questions')
+    ));
+}
+
+function sessionUsesExplicitOnchainQuestionMode(session = {}) {
+  const values = [
+    session.sessionMode,
+    session.questionSource,
+    session.telegramQuestionSource,
+    session.questionRuntime,
+    session.backendMode,
+    session.backend,
+  ].map(lower).filter(Boolean);
+  return values.some((value) => [
+    'onchain',
+    'on_chain',
+    'chain',
+    'web3',
+    'registry',
+    'session_registry',
+    'contract',
+    'contracts',
+  ].includes(value));
+}
+
+function sessionUsesWorkerBackedQuestions(session = {}) {
+  if (!session || typeof session !== 'object') return false;
+  const mode = lower(session.sessionMode || session.backendMode || session.backend);
+  if (session.telegramOnly === true || mode === 'telegram_only' || mode === 'telegram-only' || mode === 'telegram') {
+    return true;
+  }
+  if (sessionUsesExplicitOnchainQuestionMode(session)) return false;
+  return sessionUsesCloudflareQuestionStorage(session);
+}
+
 function questionLoadIssueText(result = {}) {
   const reason = safeString(result.reason);
   if (reason === 'telegram_only_cloudflare_questions_list_failed') {
@@ -1367,7 +1439,7 @@ async function loadTelegramOnlyQuestionsForSession(env = {}, sessionSlug = '', {
 } = {}) {
   const policy = await loadSessionPolicy(env);
   const resolved = resolveSessionInvocation(policy, sessionSlug);
-  if (!resolved.ok || resolved.session?.telegramOnly !== true) return null;
+  if (!resolved.ok || !sessionUsesWorkerBackedQuestions(resolved.session)) return null;
   const session = resolved.session;
   const inlineQuestions = normalizePreloadedQuestionRecords(session.questions, {
     fallbackSessionSlug: session.sessionSlug,
@@ -1383,12 +1455,7 @@ async function loadTelegramOnlyQuestionsForSession(env = {}, sessionSlug = '', {
       discoveredCount: inlineQuestions.length,
     };
   }
-  const storageProfile = session.storageProfile && typeof session.storageProfile === 'object' && !Array.isArray(session.storageProfile)
-    ? session.storageProfile
-    : {};
-  const cloudflareSelected = lower(storageProfile.backend || session.questionStorageBackend || session.storageBackend) === 'cloudflare' ||
-    lower(session.questionSource || session.telegramQuestionSource) === 'cloudflare_storage';
-  if (!cloudflareSelected) {
+  if (!sessionUsesCloudflareQuestionStorage(session)) {
     return {
       ok: true,
       reason: 'telegram_only_questions_empty',
@@ -4480,7 +4547,7 @@ function sessionVisibleInTelegram(session = {}, {
       if (createdAtMs < createdAfterMs) return false;
     }
   }
-  return session.telegramBridgeEnabled === true && session.telegramOnly === true;
+  return session.telegramBridgeEnabled === true && sessionUsesWorkerBackedQuestions(session);
 }
 
 async function sessionAllowedInCurrentTelegramChat(session = {}, normalized = {}, env = {}, {
@@ -11567,6 +11634,7 @@ export {
   telegramVisibleSessions,
   readAgentSkillUpdateFlag,
   readAdminDefaultSessionOverride,
+  sessionUsesWorkerBackedQuestions,
   writeAgentSkillUpdateFlag,
   writeAdminDefaultSessionOverride,
   writeDraftLifecycleEvent,
