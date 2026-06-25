@@ -5139,7 +5139,7 @@ test('Telegram agent can batch-create sourced proposed questions without posing 
           },
           {
             prompt: 'Which topics need a follow-up discussion?',
-            questionType: 'multichoice',
+            questionType: 'single_choice',
             options: ['onboarding', 'results', 'groups'],
             references: [{ type: 'url', url: 'https://example.com/followup', title: 'Follow-up note' }],
           },
@@ -5159,6 +5159,9 @@ test('Telegram agent can batch-create sourced proposed questions without posing 
   const questions = await jsonBody(questionsResponse);
   const sourcedQuestion = questions.questions.find((question) => (
     question.prompt === 'Should Agent Village organizers publish a daily recap?'
+  ));
+  const singleChoiceQuestion = questions.questions.find((question) => (
+    question.prompt === 'Which topics need a follow-up discussion?'
   ));
   const geoFilteredResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/questions?sessionSlug=alpha&telegramUserId=42&groupChatId=-100123&tags=geo:edge-node-1&relevanceMode=filter'),
@@ -5205,16 +5208,22 @@ test('Telegram agent can batch-create sourced proposed questions without posing 
   assert.equal(body.created[0].geoRefs[0].geoId, 'edge-node-1');
   assert.equal(body.created[0].tags.includes('geo:edge-node-1'), true);
   assert.equal(body.created[0].tags.includes('src:example-com'), true);
+  assert.equal(body.created[2].questionType, 'multichoice');
+  assert.equal(body.created[2].singleSelect, true);
   assert.equal(proposedRecords.length, 3);
   assert.equal(proposedRecords.every((record) => record.status === 'active'), true);
   assert.equal(proposedRecords.every((record) => record.sponsored !== true), true);
   assert.equal(proposedRecords.every((record) => record.actionMetadata.endpoint === '/telegram/agent/api/questions/create'), true);
+  assert.equal(proposedRecords[2].questionType, 'multichoice');
+  assert.equal(proposedRecords[2].singleSelect, true);
   assert.equal(proposedRecords[0].references[0].url, sourceUrl);
   assert.equal(proposedRecords[0].geoRefs[0].geoId, 'edge-node-1');
   assert.equal(sourcedQuestion.references[0].url, sourceUrl);
   assert.equal(sourcedQuestion.geoRefs[0].geoId, 'edge-node-1');
   assert.equal(sourcedQuestion.tags.includes('src:example-com'), true);
   assert.equal(sourcedQuestion.tags.includes('geo:edge-node-1'), true);
+  assert.equal(singleChoiceQuestion.questionType, 'multichoice');
+  assert.equal(singleChoiceQuestion.singleSelect, true);
   assert.equal(geoFilteredResponse.status, 200);
   assert.deepEqual(geoFiltered.questions.map((question) => question.questionId), [body.created[0].questionId]);
   assert.equal(backlinkResponse.status, 200);

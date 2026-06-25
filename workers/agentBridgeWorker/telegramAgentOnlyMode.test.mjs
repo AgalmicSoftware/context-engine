@@ -438,8 +438,10 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.match(prompt, /synthesized at image-generation time from the actual prediction evidence/);
   assert.match(prompt, /not based on dedicated favorite-book\/movie\/game questions/);
   assert.match(prompt, /For AI Optimism, use actual AI-futures predicted response rows/);
-  assert.match(prompt, /Token Use metric: Token Use: 1\.2M current run; 4\.3M recent sessions \(source: Hermes visible usage\)\./);
-  assert.match(prompt, /render one compact "Token Use" chip/);
+  assert.match(prompt, /Token Use metric: Token Use: 1\.2M current run; 4\.3M recent sessions; intuition: roughly 57 books, 5\.7K pages, paper stack about 1\.9 ft tall \(source: Hermes visible usage\)\./);
+  assert.match(prompt, /feature one prominent "Token Use" chip/);
+  assert.match(prompt, /books, printed pages, or paper-stack height/);
+  assert.match(prompt, /4\.3M tokens ~ 57 books \/ 5\.7K pages/);
   assert.match(prompt, /Token Use is a runtime metric, not a playful guess/);
   assert.match(prompt, /Never invent, estimate, or back-calculate token usage/);
   assert.match(prompt, /Do not use stored favorite\/book\/movie\/game answer rows as source data/);
@@ -567,12 +569,13 @@ test('wrapped image prompt has a neutral safety retry variant for compass mode',
 
 test('current Wrapped question bank excludes image-only taste and old optimism guess prompts', () => {
   const questionBank = JSON.parse(readFileSync(new URL('../../docs/agent-village-wrapped-questions-current.json', import.meta.url), 'utf8'));
-  assert.equal(questionBank.length, 60);
+  assert.equal(questionBank.length, 79);
   const serialized = JSON.stringify(questionBank);
   assert.doesNotMatch(serialized, /Agent guess:/i);
   assert.doesNotMatch(serialized, /favorite book|favorite movie|movie or TV show|favorite game|p\(bloom\)|AI Optimism score/i);
   assert.equal(questionBank.some((question) => question.id === 'R1'), true);
   assert.equal(questionBank.some((question) => question.id === 'R4'), true);
+  assert.equal(questionBank.some((question) => question.id === 'F19'), true);
 });
 
 test('canonical answer fingerprints compare semantics across agent and mini-app shapes', async () => {

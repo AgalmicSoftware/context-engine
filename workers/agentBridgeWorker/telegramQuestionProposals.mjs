@@ -83,6 +83,7 @@ function sanitizeSessionSlug(value = '') {
 function normalizeQuestionType(value = '') {
   const type = lower(value).replace(/_/g, '-');
   if (type === 'agree-disagree' || type === 'agree-unsure-disagree') return 'binary';
+  if (type === 'single-choice') return 'multichoice';
   return SUPPORTED_QUESTION_TYPES.has(type) ? type : 'freeform';
 }
 
@@ -382,6 +383,9 @@ function proposedRecordToQuestion(record = {}) {
   };
   const options = normalizeOptions(record.options);
   if (options.length) question.options = options;
+  if (questionType === 'multichoice' && record.singleSelect === true) {
+    question.singleSelect = true;
+  }
   if (tags.length) question.tags = tags;
   if (references.length) question.references = references;
   if (geoRefs.length) question.geoRefs = geoRefs;
@@ -431,6 +435,7 @@ export async function persistTelegramProposedQuestion({
   tags = [],
   references = [],
   geoRefs = [],
+  singleSelect = false,
   sessionContext = '',
   metadata = null,
   createdAt = null,
@@ -477,6 +482,7 @@ export async function persistTelegramProposedQuestion({
     questionType: type,
     prompt: promptText,
     options: normalizedOptions,
+    ...(type === 'multichoice' && singleSelect === true ? { singleSelect: true } : {}),
     tags: normalizedTags,
     references: normalizedReferences,
     geoRefs: normalizedGeoRefs,

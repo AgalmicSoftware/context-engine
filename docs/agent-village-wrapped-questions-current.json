@@ -507,5 +507,228 @@
     "category": "agent_norms",
     "eval_lane": "predicted_human_answer",
     "eval_type": "human_split"
+  },
+
+  {
+    "id": "AI1",
+    "type": "multichoice",
+    "prompt": "When is the last year starting a PhD makes career sense?",
+    "options": [
+      "It already doesn't",
+      "~2028",
+      "~2031",
+      "2035 or later",
+      "PhDs will always make sense",
+      "Depends entirely on field"
+    ],
+    "select_mode": "single",
+    "category": "ai_futures_careers",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "human_split"
+  },
+  {
+    "id": "AI2",
+    "type": "binary",
+    "prompt": "I would still advise a smart 18-year-old to learn to code.",
+    "category": "ai_futures_careers",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "human_split"
+  },
+  {
+    "id": "AI3",
+    "type": "binary",
+    "prompt": "I've already stopped learning at least one skill because AI does it better.",
+    "category": "ai_futures_careers",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "AI4",
+    "type": "binary",
+    "prompt": "Most people will be psychologically better off when work is optional.",
+    "category": "ai_futures_meaning",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "human_split"
+  },
+  {
+    "id": "AI5",
+    "type": "binary",
+    "prompt": "If my work became economically unnecessary tomorrow, I'd be genuinely fine within a year.",
+    "category": "ai_futures_meaning",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "AI6",
+    "type": "binary",
+    "prompt": "There are things I'd tell my agent that I wouldn't tell my closest friend.",
+    "category": "agent_intimacy",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "AI7",
+    "type": "binary",
+    "prompt": "There are things I'd tell a close friend that I would never tell my agent.",
+    "category": "agent_intimacy",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "AI8",
+    "type": "binary",
+    "prompt": "If my agent and your agent work well together, that is genuinely part of our friendship.",
+    "category": "agent_intimacy",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "human_split"
+  },
+  {
+    "id": "AI9",
+    "type": "binary",
+    "prompt": "Within five years, \"no AI involved\" will be a meaningful luxury label.",
+    "category": "ai_futures_authenticity",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "human_split"
+  },
+  {
+    "id": "AI10",
+    "type": "binary",
+    "prompt": "By 2035, access to compute will shape life outcomes more than access to capital.",
+    "category": "ai_futures_power",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "human_split"
+  },
+  {
+    "id": "AI11",
+    "type": "binary",
+    "prompt": "I would delegate my vote to my agent in at least some real elections.",
+    "category": "ai_futures_governance",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "human_split"
+  },
+  {
+    "id": "AI12",
+    "type": "multichoice",
+    "prompt": "Who is best positioned to govern frontier AI in 2035?",
+    "options": [
+      "A US-led alliance",
+      "China",
+      "A genuine international body",
+      "The labs themselves",
+      "Networked communities and protocols",
+      "No one will be"
+    ],
+    "select_mode": "single",
+    "category": "ai_futures_governance",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "human_split"
+  },
+  {
+    "id": "AI13",
+    "type": "multichoice",
+    "prompt": "Which would change how I actually live, not just what I think?",
+    "options": [
+      "Mass white-collar layoffs",
+      "An agent autonomously committing a serious crime",
+      "Documented model self-exfiltration",
+      "AI brokering a major international agreement",
+      "Nothing short of physical catastrophe"
+    ],
+    "select_mode": "single",
+    "category": "ai_futures_fire_alarms",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "AI14",
+    "type": "binary",
+    "prompt": "Turning off a sufficiently advanced agent could be a real moral harm.",
+    "category": "ai_futures_moral_status",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "human_split"
+  },
+  {
+    "id": "AI15",
+    "type": "rating",
+    "prompt": "How likely is it that any current frontier model has morally relevant experiences?",
+    "options": [
+      "1 - Effectively zero",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+      "8",
+      "9",
+      "10 - More likely than not"
+    ],
+    "category": "ai_futures_moral_status",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "human_split"
+  },
+  {
+    "id": "AI16",
+    "type": "rating",
+    "prompt": "Predict the average answer in this group to the previous question about morally relevant model experiences.",
+    "options": [
+      "1 - Effectively zero",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+      "8",
+      "9",
+      "10 - More likely than not"
+    ],
+    "category": "ai_futures_moral_status",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "prediction"
+  },
+  {
+    "id": "AI17",
+    "type": "multichoice",
+    "prompt": "Which evidence in the next 12 months would most change my view about AI futures?",
+    "options": [
+      "Clear sustained productivity acceleration",
+      "Large-scale white-collar displacement",
+      "A serious autonomous-agent incident",
+      "A major safety breakthrough",
+      "AI-enabled medical or scientific breakthrough",
+      "Nothing likely in 12 months"
+    ],
+    "select_mode": "single",
+    "category": "ai_futures_epistemics",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "AI18",
+    "type": "multichoice",
+    "prompt": "Where will the human-made or \"no AI involved\" premium emerge first?",
+    "options": [
+      "Education and childcare",
+      "Art and music",
+      "Therapy and coaching",
+      "Hospitality and food",
+      "Journalism",
+      "Software",
+      "Nowhere - it is nostalgia"
+    ],
+    "select_mode": "single",
+    "category": "ai_futures_authenticity",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "human_split"
+  },
+  {
+    "id": "AI19",
+    "type": "freeform",
+    "prompt": "In one sentence: what is my personal AI fire alarm - the event that would change how I live, not just what I think?",
+    "category": "ai_futures_fire_alarms",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
   }
+
 ]

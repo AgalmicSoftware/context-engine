@@ -1758,6 +1758,23 @@ function formatWrappedTokenCount(value = 0) {
   return String(count);
 }
 
+function formatWrappedStackHeight(inches = 0) {
+  if (!Number.isFinite(inches) || inches <= 0) return '';
+  if (inches < 12) return `${Math.max(1, Math.round(inches))} in`;
+  return `${(inches / 12).toFixed(inches >= 120 ? 0 : 1).replace(/\.0$/, '')} ft`;
+}
+
+function wrappedTokenUsageComparison(value = 0) {
+  const count = normalizeTokenCount(value);
+  if (!count) return '';
+  const pages = Math.max(1, Math.round(count / 750));
+  const books = Math.max(1, Math.round(count / 75_000));
+  const stackHeight = formatWrappedStackHeight(pages / 250);
+  const pageLabel = pages >= 1000 ? `${(pages / 1000).toFixed(pages >= 10_000 ? 0 : 1).replace(/\.0$/, '')}K pages` : `${pages} pages`;
+  const bookLabel = books === 1 ? '1 book' : `${books} books`;
+  return `roughly ${bookLabel}, ${pageLabel}${stackHeight ? `, paper stack about ${stackHeight} tall` : ''}`;
+}
+
 function wrappedTokenUsageEvidenceLine(state = {}) {
   const candidates = [];
   for (const entry of Object.values(state.byStatement || {})) {
@@ -1789,7 +1806,9 @@ function wrappedTokenUsageEvidenceLine(state = {}) {
     if (total) parts.push(`${formatWrappedTokenCount(total)} visible usage`);
   }
   if (!parts.length) return '';
-  return `Token Use: ${parts.join('; ')}${usage.source ? ` (source: ${usage.source})` : ''}.`;
+  const comparisonBase = usage.recentSessionsTotalTokens || usage.currentRunTotalTokens || usage.inputTokens + usage.outputTokens;
+  const comparison = wrappedTokenUsageComparison(comparisonBase);
+  return `Token Use: ${parts.join('; ')}${comparison ? `; intuition: ${comparison}` : ''}${usage.source ? ` (source: ${usage.source})` : ''}.`;
 }
 
 function agentOnlyResponseCoverage(snapshot = {}, state = {}) {
@@ -2264,7 +2283,7 @@ Bottom row: Agent Guesses + Agent Comparison
 Put Agent Guesses and Agent Comparison together in one continuous full-width bottom band that uses the available horizontal space. Agent Guesses should be a compact chip grid on the left side of that same band; Agent Comparison should be a calm comparison strip on the right side of that same band. Keep them aligned to the same baseline and visual height, with no extra empty background block beside or above them. If one side has less content, expand its illustration, portrait, or spacing inside the shared band instead of leaving unused canvas. Do not create a separate third bottom panel for Abstract Agent Impression, because that visual belongs inside the Agent Core Insight hero.
 
 Agent Guesses are synthesized at image-generation time from the actual prediction evidence above; they are not based on dedicated favorite-book/movie/game questions and should not be treated as research data. Use this category order: Book Guess, Movie/Show Guess, Game/Play Pattern, AI Optimism. Try to include Book Guess and Movie/Show Guess alongside Game/Play Pattern and AI Optimism when the evidence supports even a loose taste-vibe inference, but frame them as playful guesses rather than facts. Use at most one item per category, so there is never a duplicate book, movie/show, game/play, or AI Optimism guess. Use a compact chip grid, ideally 2x2 when all four guesses are supported. Use compact chips with precise icons: book, cinema/message screen, board-game/Go stones, and flower/sunrise for AI Optimism. These must be clearly framed as playful guesses, not facts. For AI Optimism, use actual AI-futures predicted response rows or broader prediction themes, especially optimism/flourishing questions; do not rely on old standalone optimism guess rows. If evidence is weak for a category, omit that chip entirely instead of showing unavailable text or inventing a confident specific answer. Do not repeat Agent Guesses under Agent Comparison or anywhere else. These guesses are additive; they must not replace the historical comparison.
-Token Use metric: ${tokenUsageLine || 'No submitted token usage metric; omit the Token Use chip entirely.'} If Token Use evidence exists, render one compact "Token Use" chip in the Agent Guesses area using the exact supplied metric, such as "1.2M current run" or "4.8M recent sessions". Token Use is a runtime metric, not a playful guess. Never invent, estimate, or back-calculate token usage from confidence or answer count.
+Token Use metric: ${tokenUsageLine || 'No submitted token usage metric; omit the Token Use chip entirely.'} If Token Use evidence exists, feature one prominent "Token Use" chip in the Agent Guesses area using the exact supplied metric plus the supplied intuition comparison, such as books, printed pages, or paper-stack height. Keep it short and viral, e.g. "4.3M tokens ~ 57 books / 5.7K pages". Token Use is a runtime metric, not a playful guess. Never invent, estimate, or back-calculate token usage from confidence or answer count.
 Supporting evidence for optional playful guesses:
 - Use the Most Important, High-Confidence, Cautious, Agent-about-user, and style evidence already provided in this prompt.
 - Do not use stored favorite/book/movie/game answer rows as source data; those rows are not part of the current research question set.

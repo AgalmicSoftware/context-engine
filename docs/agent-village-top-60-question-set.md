@@ -1,4 +1,7 @@
-# Agent Village Wrapped — Top 60 Question Set
+# Agent Village Wrapped — Top 60 Question Set Archive
+
+Note: this file is the initial 60-question curation archive. The active expanded
+question bank lives in `docs/agent-village-wrapped-questions-current.json`.
 
 Purpose: a low-redundancy launch-quality set that covers personal-agent
 prediction, AI futures, governance, community priorities, personal preferences,

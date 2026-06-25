@@ -1537,6 +1537,7 @@ function publicAgentQuestion(question = {}, {
     questionType,
     prompt,
     options,
+    ...(questionType === 'multichoice' && question.singleSelect === true ? { singleSelect: true } : {}),
     tags,
     answerable: Boolean(questionId && prompt && !locked && !unavailable),
     locked,
@@ -5069,6 +5070,17 @@ function geoRefsForCreatedQuestion(question = {}, input = {}) {
   );
 }
 
+function singleSelectForCreatedQuestion(question = {}) {
+  const type = lower(question.questionType || question.type);
+  const mode = lower(question.selectionMode || question.selectMode || question.select_mode);
+  return question.singleSelect === true
+    || question.singleChoice === true
+    || question.oneSelectionOnly === true
+    || mode === 'single'
+    || type === 'single_choice'
+    || type === 'single-choice';
+}
+
 async function handleCreateQuestionsRequest({
   env = {},
   context = {},
@@ -5111,6 +5123,7 @@ async function handleCreateQuestionsRequest({
         prompt,
         questionType: question.questionType || question.type || 'binary',
         options: question.options,
+        singleSelect: singleSelectForCreatedQuestion(question),
         tags,
         references,
         geoRefs,
@@ -5135,6 +5148,7 @@ async function handleCreateQuestionsRequest({
       questionId: saved.questionId,
       prompt: saved.record.prompt,
       questionType: saved.record.questionType,
+      ...(saved.record.singleSelect === true ? { singleSelect: true } : {}),
       tags: saved.record.tags,
       references: saved.record.references || [],
       geoRefs: saved.record.geoRefs || [],
