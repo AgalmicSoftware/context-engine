@@ -154,6 +154,8 @@ const DEFAULT_OPENAI_TRANSCRIBE_URL = 'https://api.openai.com/v1/audio/transcrip
 const MINI_APP_URL_QUESTION_COUNT = 5;
 const MINI_APP_URL_QUESTION_MAX_COUNT = 20;
 const MINI_APP_RESULT_GROUP_COUNT = 2;
+const MINI_APP_LOADING_VISUAL_SPINNER = 'spinner';
+const MINI_APP_LOADING_VISUAL_GIF = 'gif';
 const MINI_APP_LAUNCH_RECOVERY_MESSAGE = 'This Mini App launch expired or Telegram reopened an old view. Close this screen, open the Context Engine bot, and send /start to get a fresh Mini App button.';
 const MINI_APP_GROUP_APPROVAL_LINK_TTL_SECONDS = 7 * 24 * 60 * 60;
 const MINI_APP_RESULTS_EXPOSURE_FIELDS = Object.freeze({
@@ -199,6 +201,22 @@ const RESULT_VIEW_LEVELS = Object.freeze([
 
 function safeString(value) {
   return String(value || '').trim();
+}
+
+function normalizeMiniAppLoadingVisual(value = '') {
+  const normalized = lower(value);
+  if (['gif', 'image', 'logo'].includes(normalized)) return MINI_APP_LOADING_VISUAL_GIF;
+  return MINI_APP_LOADING_VISUAL_SPINNER;
+}
+
+function miniAppLoadingVisualMode({ url = null, env = {} } = {}) {
+  const requested = url?.searchParams?.get('loadingVisual') ||
+    url?.searchParams?.get('loading') ||
+    url?.searchParams?.get('loadingAsset') ||
+    env.AGENT_BRIDGE_MINI_APP_LOADING_VISUAL ||
+    env.AGENT_BRIDGE_MINI_APP_LOADING_ASSET ||
+    '';
+  return normalizeMiniAppLoadingVisual(requested);
 }
 
 function safeAnswerString(value) {
@@ -5492,7 +5510,14 @@ async function handleSettingsRequest({
   });
 }
 
-function telegramMiniAppHtml() {
+function miniAppLoadingVisualHtml(mode = MINI_APP_LOADING_VISUAL_SPINNER) {
+  return normalizeMiniAppLoadingVisual(mode) === MINI_APP_LOADING_VISUAL_GIF
+    ? '<img class="loadingGif" src="/telegram/mini-app/loading.gif" alt="" aria-hidden="true">'
+    : '<span class="loadingSpinner" aria-hidden="true"></span>';
+}
+
+function telegramMiniAppHtml({ loadingVisual = MINI_APP_LOADING_VISUAL_SPINNER } = {}) {
+  const normalizedLoadingVisual = normalizeMiniAppLoadingVisual(loadingVisual);
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -7107,6 +7132,17 @@ function telegramMiniAppHtml() {
     @keyframes ceSpin {
       to { transform: rotate(360deg); }
     }
+    .loadingSpinner {
+      width: min(34vw, 112px);
+      height: min(34vw, 112px);
+      border: 8px solid rgba(255, 255, 255, 0.15);
+      border-top-color: var(--accent);
+      border-right-color: var(--ok);
+      border-radius: 50%;
+      animation: ceSpin 0.9s linear infinite;
+      flex: 0 0 auto;
+      box-shadow: 0 0 28px rgba(98, 255, 191, 0.14);
+    }
     .loadingGif {
       width: min(68vw, 240px);
       height: min(68vw, 240px);
@@ -7215,7 +7251,7 @@ function telegramMiniAppHtml() {
         </div>
       </section>
       <div class="status loadingStatus" id="status">
-        <img class="loadingGif" src="/telegram/mini-app/loading.gif" alt="" aria-hidden="true">
+        ${miniAppLoadingVisualHtml(normalizedLoadingVisual)}
         <span>Loading questions and agent predictions</span>
         <div class="loadingProgress" aria-hidden="true"><div class="loadingProgressBar" style="--progress: 18%"></div></div>
       </div>
@@ -7531,6 +7567,7 @@ function telegramMiniAppHtml() {
     const RESULT_GROUP_COUNT = 2;
     const SHOW_UNANSWERED_STORAGE_KEY = 'ce:telegram-mini-app:show-unanswered-first';
     const DEMO_RESULTS_STORAGE_KEY = 'ce:telegram-mini-app:demo-results:v2';
+    const LOADING_VISUAL_MODE = ${JSON.stringify(normalizedLoadingVisual)};
     const MINI_APP_LAUNCH_RECOVERY_MESSAGE = ${JSON.stringify(MINI_APP_LAUNCH_RECOVERY_MESSAGE)};
     const readShowUnansweredFirst = () => {
       try { return window.localStorage.getItem(SHOW_UNANSWERED_STORAGE_KEY) !== 'false'; } catch { return true; }
@@ -8318,11 +8355,15 @@ function telegramMiniAppHtml() {
     const setLoadingProgress = (message, percent = 18) => {
       el.status.className = 'status loadingStatus';
       el.status.innerHTML = '';
-      const image = document.createElement('img');
-      image.className = 'loadingGif';
-      image.src = '/telegram/mini-app/loading.gif';
-      image.alt = '';
-      image.setAttribute('aria-hidden', 'true');
+      const visual = document.createElement(LOADING_VISUAL_MODE === 'gif' ? 'img' : 'span');
+      if (LOADING_VISUAL_MODE === 'gif') {
+        visual.className = 'loadingGif';
+        visual.src = '/telegram/mini-app/loading.gif';
+        visual.alt = '';
+      } else {
+        visual.className = 'loadingSpinner';
+      }
+      visual.setAttribute('aria-hidden', 'true');
       const label = document.createElement('span');
       label.textContent = message || 'Loading questions and agent predictions';
       const track = document.createElement('div');
@@ -8333,7 +8374,7 @@ function telegramMiniAppHtml() {
       const boundedPercent = Math.max(8, Math.min(96, Number(percent) || 18));
       bar.style.setProperty('--progress', boundedPercent + '%');
       track.appendChild(bar);
-      el.status.appendChild(image);
+      el.status.appendChild(visual);
       el.status.appendChild(label);
       el.status.appendChild(track);
     };
@@ -12318,7 +12359,9 @@ export async function handleTelegramMiniAppRequest({
 } = {}) {
   const url = new URL(request.url);
   if (url.pathname === '/telegram/mini-app' && request.method === 'GET') {
-    return html(telegramMiniAppHtml());
+    return html(telegramMiniAppHtml({
+      loadingVisual: miniAppLoadingVisualMode({ url, env }),
+    }));
   }
   if (url.pathname === '/telegram/mini-app/loading.gif' && request.method === 'GET') {
     return telegramMiniAppLoadingGifResponse();

@@ -662,6 +662,10 @@ session context stay server-side.
 `AGENT_BRIDGE_MINI_APP_URL` may override the default
 `$AGENT_BRIDGE_PUBLIC_URL/telegram/mini-app`. The URL must be HTTPS for live
 Telegram, except localhost during local development.
+The first-load shell defaults to a CSS spinner so Telegram does not fetch the
+heavier GIF asset before state is usable. Operators can test the legacy GIF with
+`/telegram/mini-app?loading=gif` or set
+`AGENT_BRIDGE_MINI_APP_LOADING_VISUAL=gif` for a deployment.
 When Telegram init data validates in live mode, the state and draft APIs require
 a valid opaque launch action and will not fall back to a default session for
 missing or expired launch parameters. Draft writes also verify that the launch
@@ -695,7 +699,8 @@ Current v0 scope:
   joined-session launches start in that collapsed state.
 - First state loads are intentionally paged. The shell starts with
   `questionLimit=1`; for worker-backed Cloudflare question storage the worker
-  lists question storage once, reads only the requested page of payloads, and
+  lists question storage once, reuses inline question payloads returned by that
+  list when present, reads only the requested page of missing payloads, and
   reports the full discovered count so the UI can show `1/N` immediately while
   loading the rest in the background. Sessions with `telegramOnly=true`,
   `sessionMode=telegram_only`, or Cloudflare question storage and no explicit

@@ -336,11 +336,14 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.equal(html.includes('sessionPickerCollapsed'), false);
   assert.equal(html.includes('if (isOpen && picker.required !== true)'), false);
   assert.match(html, /class="status loadingStatus" id="status"/);
-  assert.match(html, /class="loadingGif" src="\/telegram\/mini-app\/loading\.gif" alt="" aria-hidden="true"/);
+  assert.match(html, /class="loadingSpinner" aria-hidden="true"/);
+  assert.match(html, /const LOADING_VISUAL_MODE = "spinner";/);
+  assert.equal(html.includes('<img class="loadingGif" src="/telegram/mini-app/loading.gif"'), false);
   assert.equal(html.includes('data-loading-src="data:image/gif;base64,'), false);
   assert.match(html, /\.loadingStatus/);
   assert.match(html, /\.loadingStatus \{[\s\S]*flex-direction: column;[\s\S]*min-height: 280px;/);
   assert.match(html, /\.loadingStatus span \{[\s\S]*font-size: clamp\(22px, 5vw, 28px\);[\s\S]*font-weight: 800;/);
+  assert.match(html, /\.loadingSpinner \{[\s\S]*width: min\(34vw, 112px\);[\s\S]*animation: ceSpin 0\.9s linear infinite;/);
   assert.match(html, /\.loadingGif \{[\s\S]*width: min\(68vw, 240px\);[\s\S]*height: min\(68vw, 240px\);[\s\S]*background: transparent;/);
   assert.match(html, /id="documentsPanel"[^>]*aria-label="Documents"/);
   assert.match(html, /id="toggleDocumentsPanelBody"[^>]*aria-expanded="true"/);
@@ -1006,6 +1009,35 @@ test('Mini App admin menu action opens a visible admin panel above the session p
   assert.equal(elements.get('adminSummary').textContent.length > 0, true);
 });
 
+test('Mini App defaults to CSS loading spinner and keeps GIF loading option', async () => {
+  const defaultResponse = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app'),
+    env: {},
+  });
+  const defaultHtml = await defaultResponse.text();
+  assert.equal(defaultResponse.status, 200);
+  assert.match(defaultHtml, /class="loadingSpinner" aria-hidden="true"/);
+  assert.match(defaultHtml, /const LOADING_VISUAL_MODE = "spinner";/);
+  assert.equal(defaultHtml.includes('<img class="loadingGif" src="/telegram/mini-app/loading.gif"'), false);
+
+  const gifResponse = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app?loading=gif'),
+    env: {},
+  });
+  const gifHtml = await gifResponse.text();
+  assert.equal(gifResponse.status, 200);
+  assert.match(gifHtml, /<img class="loadingGif" src="\/telegram\/mini-app\/loading\.gif" alt="" aria-hidden="true">/);
+  assert.match(gifHtml, /const LOADING_VISUAL_MODE = "gif";/);
+
+  const envGifResponse = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app'),
+    env: { AGENT_BRIDGE_MINI_APP_LOADING_VISUAL: 'gif' },
+  });
+  const envGifHtml = await envGifResponse.text();
+  assert.equal(envGifResponse.status, 200);
+  assert.match(envGifHtml, /<img class="loadingGif" src="\/telegram\/mini-app\/loading\.gif" alt="" aria-hidden="true">/);
+});
+
 test('Mini App loading GIF route serves image bytes for Telegram WebView', async () => {
   const response = await handleTelegramMiniAppRequest({
     request: new Request('https://bridge.example/telegram/mini-app/loading.gif'),
@@ -1260,6 +1292,105 @@ test('Mini App first state for Telegram-only Cloudflare sessions reads one quest
       .filter((call) => new URL(call.url).pathname.endsWith('/storage/read'))
       .map((call) => new URL(call.url).searchParams.get('id')),
     ['q-storage-1']
+  );
+});
+
+test('Mini App first state reuses inline Cloudflare question payloads without read', async () => {
+  const kv = new MemoryKv();
+  const launch = 'cecb_inlinecloudflare';
+  await kv.put(`telegram:action:${launch}`, JSON.stringify({
+    type: 'agent_bridge_opaque_action',
+    actionId: launch,
+    action: 'view_questions',
+    lane: 'telegram_mini_app',
+    miniAppLaunch: true,
+    serverContextRef: { sessionSlug: 'alpha' },
+  }));
+  const fetchCalls = [];
+  const fetchImpl = async (url, init = {}) => {
+    const target = new URL(String(url));
+    fetchCalls.push({ url: target.toString(), init });
+    if (init?.body) {
+      const body = JSON.parse(init.body);
+      if (body?.jsonrpc || body?.method?.startsWith?.('eth_')) {
+        throw new Error(`unexpected_rpc_${body.method || 'call'}`);
+      }
+    }
+    if (target.pathname.endsWith('/auth/nonce')) {
+      return new Response(JSON.stringify({ nonce: 'nonce-1' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (target.pathname.endsWith('/auth/login')) {
+      return new Response(JSON.stringify({ token: 'worker-token' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (target.pathname.endsWith('/storage/list')) {
+      return new Response(JSON.stringify({
+        items: [
+          {
+            id: 'q-inline-1',
+            questionId: 'q-inline-1',
+            questionType: 'binary',
+            prompt: 'Inline listed question payload.',
+            sessionSlug: 'alpha',
+          },
+          { id: 'q-storage-2' },
+        ],
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (target.pathname.endsWith('/storage/read')) {
+      throw new Error('storage_read_should_not_be_called_for_inline_payload');
+    }
+    throw new Error(`unexpected_url_${target.pathname}`);
+  };
+  const state = await __test__telegramMiniApp.buildMiniAppState({
+    request: new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}&sessions=alpha&questionLimit=1`),
+    env: {
+      AGENT_ACTION_KV: kv,
+      AGENT_BRIDGE_DEPLOYMENT_ID: 'unit-deploy',
+      DEMO_SIGNER_ROOT_SECRET: 'unit-root-secret',
+      AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
+      AGENT_BRIDGE_QUESTION_SOURCE: 'live',
+      AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+        defaultSessionSlug: 'alpha',
+        sessions: [{
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          sessionWorkerUrl: 'https://session.example',
+          workerSessionSlug: 'alpha',
+          questionSource: 'cloudflare_storage',
+          storageProfile: { backend: 'cloudflare' },
+        }],
+      }),
+      QUESTION_FETCH: fetchImpl,
+      REGISTRY_FETCH: async () => {
+        throw new Error('registry_rpc_should_not_be_called');
+      },
+    },
+  });
+
+  assert.equal(state.ok, true);
+  assert.equal(state.questionSource, 'telegram_only_cloudflare_storage');
+  assert.equal(state.questionSourceReason, 'telegram_only_cloudflare_questions_loaded');
+  assert.equal(state.questionCount, 2);
+  assert.equal(state.discoveredQuestionCount, 2);
+  assert.equal(state.loadedQuestionCount, 1);
+  assert.equal(state.loadedQuestionLimit, 1);
+  assert.equal(state.hasMoreQuestions, true);
+  assert.equal(state.questionIndexComplete, false);
+  assert.deepEqual(state.questions.map((question) => question.title), ['Inline listed question payload.']);
+  assert.deepEqual(
+    fetchCalls.map((call) => new URL(call.url).pathname),
+    ['/auth/nonce', '/auth/login', '/storage/list']
   );
 });
 

@@ -975,6 +975,16 @@ function firstQuestionTextValue(question = {}) {
   return '';
 }
 
+function cloudflareQuestionItemHasInlinePayload(item = {}) {
+  const root = questionPayloadRoot(item);
+  if (!root) return false;
+  for (const value of [root.questionText, root.prompt, item?.questionText, item?.prompt]) {
+    if (value === undefined || value === null || typeof value !== 'string') continue;
+    if (safeString(value)) return true;
+  }
+  return false;
+}
+
 function questionRecordMalformedReason(question = {}) {
   if (!question || typeof question !== 'object' || Array.isArray(question)) return 'record_not_object';
   let qid = '';
@@ -1391,6 +1401,22 @@ async function loadTelegramOnlyCloudflareQuestions({
       : {};
     const id = safeString(storageRef.id || item?.id);
     if (!id) return null;
+    if (cloudflareQuestionItemHasInlinePayload(item)) {
+      const normalized = normalizePreloadedQuestionRecord(
+        {
+          ...(item && typeof item === 'object' && !Array.isArray(item) ? item : {}),
+          storageRef,
+        },
+        {
+          index,
+          fallbackSessionSlug: sessionSlug,
+          source: 'telegram_only_cloudflare_questions',
+        }
+      );
+      if (normalized && !questionIsPayloadUnavailable(normalized) && !questionRecordMalformedReason(normalized)) {
+        return { question: normalized };
+      }
+    }
     const read = await fetchTelegramOnlyCloudflareJson({
       auth,
       path: `/storage/read?id=${encodeURIComponent(id)}`,
