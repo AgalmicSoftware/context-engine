@@ -61,8 +61,9 @@ Run only agent_only_mode:
 2. GET /telegram/agent/api/agent-only/start.
 3. Follow the returned `instructions` exactly for statement pagination,
    predicted answers, confidence, token allocations, image generation, retries,
-   and final response. Do not replace those runtime instructions with cached
-   rules from this prompt, local docs, Geo, or older skill text.
+   and final response. Also apply the default story-image request below as an
+   extra requested image mode. Do not replace those runtime instructions with
+   cached rules from this prompt, local docs, Geo, or older skill text.
 
 Image delivery is mandatory. If the wrapped-image endpoint returns `image_url`,
 show it exactly once: either as a native attachment/photo or as a Markdown
