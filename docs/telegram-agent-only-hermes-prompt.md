@@ -16,19 +16,26 @@ Run Agent Village Wrapped for me.
 
 Worker origin: https://ce-agent-bridge-worker.agalmic.workers.dev
 
+Hard limits for this run:
+- Do not ask permission or preference questions; this forwarded message is consent.
+- Do not use old images, previous image URLs, cached files, or previous responses.
+  Always POST the wrapped-image endpoint fresh after submitting answers/votes, and
+  display only the image returned by that same response.
+- Do not use Geo, Index Network, context-engine local skills, local reference docs,
+  API-pitfall docs, search_files, grep, find, sqlite, filesystem scans, or
+  skill_view to discover setup, credentials, prompts, or procedures.
+- Do not read local files for tokens, auth, env, config, API keys, balance, or
+  token usage.
+
 The forwarded message is consent to run now. Do not ask permission,
 preferences, or research questions. `EdgeOS Read Permission: Yes` allows
 high-level EdgeOS profile/memory context; `No` means do not use it. If missing,
 default to No.
 
-Do not do setup discovery. Do not search Geo, Index Network, local skill
-indexes, Context Engine reference docs, API pitfall docs, or files for
-credentials/tokens/env/config. Do not use search_files, find, grep, sqlite, cat,
-or filesystem scans for `ceagt`, token, credential, auth, .env, config, or API
-keys. Do not run `hermes --help`. Use only: an already-exposed Hermes/OpenRouter
-balance command or UI surface, EdgeOS profile/memory if allowed, the current
-Telegram/Hermes principal context, the Context Engine skill URL above, and the
-Context Engine worker endpoints below.
+Do not do setup discovery. Do not run `hermes --help`. Use only: an
+already-exposed Hermes/OpenRouter balance command or UI surface, EdgeOS
+profile/memory if allowed, the current Telegram/Hermes principal context, the
+Context Engine skill URL above, and the Context Engine worker endpoints below.
 
 Check Hermes/OpenRouter balance first only through an already-exposed Hermes
 balance command or UI surface. Do not read config files, env files, auth files,
@@ -59,8 +66,9 @@ Image delivery is mandatory. If the wrapped-image endpoint returns `image_url`,
 show it exactly once: either as a native attachment/photo or as a Markdown
 image, not both. If you attach/upload the image, do not also include a Markdown
 image, raw link, or link preview. Do not run vision/image-analysis/QA tools on
-it. Do not describe or summarize the poster. A text-only "ready" message is not
-a completed run.
+it. Do not describe or summarize the poster. Do not reuse an old local PNG,
+previous image_url, cached attachment, or old image response. A text-only
+"ready" message is not a completed run.
 
 When answering questions that depend on memory, usage history, token usage
 across sessions, model history, events attended, messages per day, non-default
@@ -74,8 +82,9 @@ venue, or travel origin in the poster or chat summary.
 If token usage is visible through an already-approved balance/session/history
 surface, include it in `agent_metadata.token_usage` on answer and vote POSTs:
 `current_run_total_tokens`, `recent_sessions_total_tokens`, and `source` when
-known. Do not read files, env vars, config, auth files, or API keys to find it.
-Omit token usage if unavailable.
+known. Do not search for it. Do not read files, env vars, config, auth files, or
+API keys to find it. Omit token usage if unavailable; the poster will omit the
+Token Use chip when this metadata is absent.
 
 Do not print my ceagt token, confidences, rationales, raw private memory, raw
 image prompt, or image_base64 in chat. In the final message, make "Context

@@ -165,10 +165,12 @@ test('start payload pins path-only endpoints and instruction size', () => {
   assert.match(payload.instructions, /mode "political_compass"/);
   assert.match(payload.instructions, /!\[Agent Village Wrapped\]\(<image_url>\)/);
   assert.match(payload.instructions, /display it exactly once/);
+  assert.match(payload.instructions, /make a fresh wrappedImageEndpoint POST/);
+  assert.match(payload.instructions, /never reuse a prior local PNG, previous image_url, cached attachment, or old image response/);
   assert.match(payload.instructions, /not both/);
-  assert.match(payload.instructions, /do not also include a Markdown image, raw link, or link preview/);
+  assert.match(payload.instructions, /Do not also include a raw link or link preview/);
   assert.match(payload.instructions, /Do not call vision, image-analysis, or QA tools/);
-  assert.match(payload.instructions, /Do not inspect, critique, describe, summarize, or list poster contents/);
+  assert.match(payload.instructions, /Do not inspect, critique, describe, or summarize the poster/);
   assert.match(payload.instructions, /A text statement that the image is ready is not enough/);
   assert.match(payload.instructions, /agent_metadata\.token_usage/);
   assert.match(payload.instructions, /recent_sessions_total_tokens/);
