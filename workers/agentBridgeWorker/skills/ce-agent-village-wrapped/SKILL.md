@@ -18,7 +18,9 @@ the worker endpoints below are the whole procedure.
 The user may forward a short message with:
 
 ```text
-Run Agent Village Wrapped for me
+Run Agent Village Wrapped (by Context Engine) for me using this skill:
+https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/agent-village-wrapped/skill?v=1
+
 EdgeOS Read Permission: Yes
 ```
 

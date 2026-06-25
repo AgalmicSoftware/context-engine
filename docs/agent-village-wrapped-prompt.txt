@@ -1,14 +1,4 @@
-Use the Agent Village Wrapped runtime skill:
+Run Agent Village Wrapped (by Context Engine) for me using this skill:
 https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/agent-village-wrapped/skill?v=1
 
-Run Agent Village Wrapped for me.
-
 EdgeOS Read Permission: Yes
-
-Do not use the broader Context Engine skill, Geo, Index Network, local reference
-docs, filesystem searches, broad credential scans, or setup discovery. The
-skill URL above is the complete procedure. Use the current Telegram/Hermes auth
-context privately. If `memory/context-engine-state.json` is the known Context
-Engine state file, you may read only that file for the private CE credential.
-Do not ask me to paste a token. If no active Context Engine agent credential is
-available, stop with the exact credential-needed sentence from the skill.
