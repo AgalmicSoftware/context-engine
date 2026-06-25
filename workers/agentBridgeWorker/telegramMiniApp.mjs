@@ -6744,6 +6744,10 @@ function telegramMiniAppHtml({ loadingVisual = MINI_APP_LOADING_VISUAL_GIF } = {
       flex-wrap: wrap;
       margin-top: 10px;
     }
+    .agentOnlyBadgeRow.stackedPredictionRow {
+      display: block;
+      width: 100%;
+    }
     .agentPredictionBadge, .agentVoteMarker {
       border: 1px solid var(--border);
       border-radius: 8px;
@@ -6760,6 +6764,14 @@ function telegramMiniAppHtml({ loadingVisual = MINI_APP_LOADING_VISUAL_GIF } = {
       align-items: center;
       gap: 9px;
       max-width: 100%;
+    }
+    .agentPredictionBadge.stackedPrediction {
+      display: grid;
+      width: min(100%, 560px);
+      gap: 7px;
+      justify-items: start;
+      align-items: start;
+      padding: 12px 14px;
     }
     .agentPredictionBadge.choicePrediction {
       gap: 10px;
@@ -8548,13 +8560,24 @@ function telegramMiniAppHtml({ loadingVisual = MINI_APP_LOADING_VISUAL_GIF } = {
     function renderAgentOnlyPredictionBadge(question) {
       const prediction = agentOnlyPredictionFor(question);
       if (!prediction?.valueLabel) return null;
+      const questionType = questionTypeFilterValue(question);
+      const stacked = questionType === 'freeform' || questionType === 'multichoice';
       const row = document.createElement('div');
-      row.className = 'agentOnlyBadgeRow';
+      row.className = 'agentOnlyBadgeRow' + (stacked ? ' stackedPredictionRow' : '');
       const badge = document.createElement('span');
       const answerKind = ['agree', 'unsure', 'disagree'].includes(String(prediction.answerKind || ''))
         ? String(prediction.answerKind)
         : '';
-      if (answerKind) {
+      if (stacked) {
+        badge.className = 'agentPredictionBadge stackedPrediction';
+        const label = document.createElement('span');
+        label.className = 'agentPredictionLabel';
+        label.textContent = 'Agent prediction';
+        const value = document.createElement('span');
+        value.className = 'agentPredictionValue';
+        value.textContent = prediction.valueLabel;
+        badge.append(label, value);
+      } else if (answerKind) {
         badge.className = 'agentPredictionBadge choicePrediction';
         const label = document.createElement('span');
         label.className = 'agentPredictionLabel';
@@ -8638,7 +8661,7 @@ function telegramMiniAppHtml({ loadingVisual = MINI_APP_LOADING_VISUAL_GIF } = {
         spinner.setAttribute('aria-label', 'Loading more questions');
         const label = document.createElement('span');
         label.textContent = state.backgroundQuestionLoadPending
-          ? 'Loading the rest in the background...'
+          ? 'Loading the next questions...'
           : 'Loading more questions...';
         loading.append(spinner, label);
         el.questionStack.appendChild(loading);
@@ -12011,7 +12034,7 @@ function telegramMiniAppHtml({ loadingVisual = MINI_APP_LOADING_VISUAL_GIF } = {
       if (state.loadingMoreQuestions === true) return;
       const current = Number(state.data?.loadedQuestionLimit || state.questionLimit || state.data?.loadedQuestionCount || state.data?.pageSize || 0);
       const increment = Number(state.data?.pageSize || 50) || 50;
-      state.questionLimit = current + increment;
+      state.questionLimit = current < increment ? increment : current + increment;
       state.loadingMoreQuestions = true;
       state.backgroundQuestionLoadPending = false;
       renderQuestionStack();
@@ -12019,7 +12042,7 @@ function telegramMiniAppHtml({ loadingVisual = MINI_APP_LOADING_VISUAL_GIF } = {
     }
     function shouldAutoExpandQuestions(data) {
       const loaded = Number(data?.loadedQuestionLimit || data?.loadedQuestionCount || 0) || 0;
-      return data?.hasMoreQuestions === true && loaded > 0 && loaded < MAX_QUESTION_LIMIT;
+      return data?.hasMoreQuestions === true && loaded > 0 && loaded <= FAST_INITIAL_QUESTION_LIMIT;
     }
     function nextQuestionLimit(data) {
       const loadedLimit = Number(data?.loadedQuestionLimit || 0) || 0;
