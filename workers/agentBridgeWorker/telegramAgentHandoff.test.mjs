@@ -375,9 +375,9 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.match(wrapped, /memory\/context-engine-state\.json/);
   assert.match(wrapped, /Do not read other local auth, env, config, SQLite/);
   assert.match(wrapped, /GET `\/telegram\/agent\/api\/agent-village-wrapped\/skill-version`/);
-  assert.match(wrapped, /mode": "wrapped_story"/);
-  assert.match(wrapped, /visualDefaults\.wrapped_story/);
-  assert.match(wrapped, /shareable story version/);
+  assert.match(wrapped, /MP4 story video is not enabled yet/);
+  assert.doesNotMatch(wrapped, /visualDefaults\.wrapped_story/);
+  assert.doesNotMatch(wrapped, /shareable story version/);
   assert.match(wrapped, /Context Engine Bot/);
   assert.doesNotMatch(wrapped, /question-queue\/apply/);
   assert.doesNotMatch(wrapped, /results-image/);
@@ -474,7 +474,7 @@ test('Agent-only start payload exposes configurable visual defaults', async () =
   assert.equal(body.wrappedImageEndpoint, '/telegram/agent/api/agent-only/wrapped-image');
   assert.deepEqual(body.visualDefaults, {
     wrapped: true,
-    wrapped_story: true,
+    wrapped_story: false,
     political_compass: true,
   });
 });
@@ -1962,6 +1962,27 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   assert.equal(imageRows[0].principal_id.startsWith('cep_'), true);
   assert.equal(JSON.stringify(imageRows).includes('telegramUserId'), false);
 
+  const unavailableStoryResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/agent-only/wrapped-image?sessionSlug=alpha', {
+      method: 'POST',
+      token: agentOnlyToken.token,
+      body: {
+        window_id: 'w-2026-06-12',
+        run_id: 'route-run-1',
+        mode: 'wrapped_story',
+        createdAt: '2026-06-12T15:09:30.000Z',
+      },
+    }),
+    env,
+    fetchImpl: async () => {
+      throw new Error('story video unavailable path must not call OpenAI');
+    },
+  });
+  const unavailableStory = await jsonBody(unavailableStoryResponse);
+  assert.equal(unavailableStoryResponse.status, 501);
+  assert.equal(unavailableStory.ok, false);
+  assert.equal(unavailableStory.reason, 'wrapped_story_mp4_unavailable');
+
   let storyAttempts = 0;
   const storyPrompts = [];
   const storyResponse = await handleTelegramAgentHandoffRequest({
@@ -1972,6 +1993,7 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
         window_id: 'w-2026-06-12',
         run_id: 'route-run-1',
         mode: 'wrapped_story',
+        media_kind: 'animated_svg_storyboard',
         createdAt: '2026-06-12T15:09:30.000Z',
       },
     }),

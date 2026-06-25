@@ -99,16 +99,10 @@ https://ce-agent-bridge-worker.agalmic.workers.dev
 { "window_id": "<window_id>", "run_id": "<fresh_run_id>", "mode": "wrapped", "format": "json" }
 ```
 
-8. Generate and display the phone story only when `visualDefaults.wrapped_story`
-   is true or when the user asks for a shareable story version. POST the same
-   endpoint with:
-
-```json
-{ "window_id": "<window_id>", "run_id": "<same_run_id>", "mode": "wrapped_story", "format": "json" }
-```
-
-Generate `mode: "political_compass"` only if `visualDefaults.political_compass`
-is true or the user asks for the Agent Norms Compass.
+8. Generate `mode: "political_compass"` only if
+   `visualDefaults.political_compass` is true or the user asks for the Agent
+   Norms Compass. Do not request `mode: "wrapped_story"` in this skill version;
+   MP4 story video is not enabled yet.
 
 ## Token Usage Metadata
 
@@ -128,12 +122,6 @@ a native attachment/photo. If using Markdown, use:
 ![Agent Village Wrapped](<image_url>)
 ```
 
-or for the story:
-
-```markdown
-![Agent Village Wrapped Story](<image_url>)
-```
-
 Do not also include a raw link or link preview. If only `image_base64` is
 returned, decode it using `image_content_type` and attach/show it once. Do not
 print raw base64 or the full image prompt. Do not run vision/image-analysis/QA
@@ -145,5 +133,5 @@ After displaying the images, send only this concise text, with the link rendered
 as a Markdown link:
 
 ```text
-Your Agent Village Wrapped is ready. To inspect or change your agent's responses, open [Context Engine Bot](https://t.me/contextengineer_bot?start=agent_onboarding__agent-village-wrapped) and tap Open Mini App. Want the optional Agent Norms Compass meme or shareable story version too?
+Your Agent Village Wrapped is ready. To inspect or change your agent's responses, open [Context Engine Bot](https://t.me/contextengineer_bot?start=agent_onboarding__agent-village-wrapped) and tap Open Mini App. Want the optional Agent Norms Compass meme too?
 ```

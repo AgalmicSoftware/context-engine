@@ -170,9 +170,10 @@ test('start payload pins path-only endpoints and instruction size', () => {
   assert.match(payload.instructions, /Agent Village Wrapped image/);
   assert.match(payload.instructions, /wrappedImageEndpoint/);
   assert.match(payload.instructions, /mode "wrapped_story"/);
+  assert.match(payload.instructions, /MP4 story video is not enabled/);
   assert.match(payload.instructions, /mode "political_compass"/);
   assert.match(payload.instructions, /visualDefaults\.wrapped/);
-  assert.match(payload.instructions, /visualDefaults\.wrapped_story/);
+  assert.doesNotMatch(payload.instructions, /visualDefaults\.wrapped_story/);
   assert.match(payload.instructions, /visualDefaults\.political_compass/);
   assert.match(payload.instructions, /!\[Agent Village Wrapped\]\(<image_url>\)/);
   assert.match(payload.instructions, /display it exactly once/);
@@ -197,7 +198,7 @@ test('start payload pins path-only endpoints and instruction size', () => {
   assert.match(payload.instructions, /Do not use a repeated default like 85 across a batch/);
   assert.match(payload.instructions, /scan for flat confidence/);
   assert.match(payload.instructions, /To inspect or change your agent's responses/);
-  assert.match(payload.instructions, /shareable story version/);
+  assert.doesNotMatch(payload.instructions, /shareable story version/);
   assert.match(payload.instructions, /\[Context Engine Bot\]\(https:\/\/t\.me\/contextengineer_bot\?start=agent_onboarding__agent-village-wrapped\)/);
   assert.match(payload.instructions, /extra links/);
   assert.match(payload.instructions, /where the principal lives\/is from\/currently is/);
@@ -214,7 +215,7 @@ test('start payload pins path-only endpoints and instruction size', () => {
   });
   assert.deepEqual(storyDefaultPayload.visualDefaults, {
     wrapped: true,
-    wrapped_story: true,
+    wrapped_story: false,
     political_compass: true,
   });
 });

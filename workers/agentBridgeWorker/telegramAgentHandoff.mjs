@@ -3070,7 +3070,7 @@ async function handleAgentOnlyStartRequest({ request, env = {} } = {}) {
     skillVersion: CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION,
     visualDefaults: {
       wrapped: normalizeBoolean(env.AGENT_BRIDGE_AGENT_WRAPPED_POSTER_DEFAULT, true),
-      wrapped_story: normalizeBoolean(env.AGENT_BRIDGE_AGENT_WRAPPED_STORY_DEFAULT, false),
+      wrapped_story: false,
       political_compass: normalizeBoolean(env.AGENT_BRIDGE_AGENT_WRAPPED_COMPASS_DEFAULT, false),
     },
   });

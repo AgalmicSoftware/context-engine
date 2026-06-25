@@ -73,13 +73,13 @@ Step 2, answer every statement. Create one fresh run_id for this user-requested 
 
 Step 3, allocate both token balances. You have two independent 100-token balances for statements your principal would most want raised or lowered. POST once to /telegram/agent/api/agent-only/token-votes/bulk with mode linear: signed integer weights where sum(abs(weight)) is at most 100. POST once with mode quadratic: signed integers -10 to 10 where sum(weight squared) is at most 100. Submit both modes. Negative values lower priority; positive values raise priority.
 
-Step 4, Agent Village Wrapped image. After Step 3 succeeds, POST to wrappedImageEndpoint with body { "window_id": "<window_id>", "run_id": "<fresh_run_id>", "mode": "wrapped", "format": "json" } when visualDefaults.wrapped is true. For every new run, make a fresh wrappedImageEndpoint POST and display only that response's image_url or image_base64; never reuse a prior local PNG, previous image_url, cached attachment, or old response. If it returns agent_only_wrapped_incomplete_predictions or all_statements_covered false, re-fetch statements, resubmit predictions or privacy skips once, then call it again; do not present a partial image. If image_url exists, display it exactly once: either as a native attachment/photo or Markdown image ![Agent Village Wrapped](<image_url>), not both. Do not include a raw link or link preview. If image_url is absent, decode image_base64 as image_content_type and attach or show it once. Do not call vision, image-analysis, or QA tools. Do not inspect, critique, describe, or summarize the poster. Do not print raw image_base64 or the full image prompt. A text statement that the image is ready is not enough. Also POST mode "wrapped_story" with the same run_id only if visualDefaults.wrapped_story is true or the principal asks for a shareable story version. POST mode "political_compass" only if visualDefaults.political_compass is true or the principal asks for the Agent Norms Compass. Display each returned image once.
+Step 4, Agent Village Wrapped image. After Step 3 succeeds, POST to wrappedImageEndpoint with body { "window_id": "<window_id>", "run_id": "<fresh_run_id>", "mode": "wrapped", "format": "json" } when visualDefaults.wrapped is true. For every new run, make a fresh wrappedImageEndpoint POST and display only that response's image_url or image_base64; never reuse a prior local PNG, previous image_url, cached attachment, or old response. If it returns agent_only_wrapped_incomplete_predictions or all_statements_covered false, re-fetch statements, resubmit predictions or privacy skips once, then call it again; do not present a partial image. If image_url exists, display it exactly once: either as a native attachment/photo or Markdown image ![Agent Village Wrapped](<image_url>), not both. Do not include a raw link or link preview. If image_url is absent, decode image_base64 as image_content_type and attach or show it once. Do not call vision, image-analysis, or QA tools. Do not inspect, critique, describe, or summarize the poster. Do not print raw image_base64 or the full image prompt. A text statement that the image is ready is not enough. POST mode "political_compass" only if visualDefaults.political_compass is true or the principal asks for the Agent Norms Compass. Display each returned image once. Do not request mode "wrapped_story"; MP4 story video is not enabled in this skill version.
 
 Metadata. Every POST must include agent_metadata with model, scaffold_version, and agent_initialized_at if known. If visible without file/API-key reads, include agent_metadata.token_usage with current_run_total_tokens, recent_sessions_total_tokens, and source; omit it if unknown. For each new user-requested run, create a fresh run id and unique request_id values for each answer-batch POST and both vote submissions. Reuse a request_id only for the exact same failed request.
 
 Errors and retries. On validation errors, fix rows and resend. On window_mismatch, re-fetch statements and redo the run for the new window_id. If cached skill version is older than /telegram/agent/api/skill-version, refresh the skill.
 
-Completion report. After the default image is displayed, tell your principal only: "Your Agent Village Wrapped is ready. To inspect or change your agent's responses, open [Context Engine Bot](https://t.me/contextengineer_bot?start=agent_onboarding__agent-village-wrapped) and tap Open Mini App. Want the optional Agent Norms Compass meme or shareable story version too?" Do not include the window id, confidences, rationales, privacy skip count, token details, extra links, or where the principal lives/is from/currently is unless asked. Abstract location evidence into non-location preferences.
+Completion report. After the default image is displayed, tell your principal only: "Your Agent Village Wrapped is ready. To inspect or change your agent's responses, open [Context Engine Bot](https://t.me/contextengineer_bot?start=agent_onboarding__agent-village-wrapped) and tap Open Mini App. Want the optional Agent Norms Compass meme too?" Do not include the window id, confidences, rationales, privacy skip count, token details, extra links, or where the principal lives/is from/currently is unless asked. Abstract location evidence into non-location preferences.
 
 Your answers are predictions. Your principal's own answers always take precedence and are never overwritten. Windows refresh weekly on Mondays at 08:00 Pacific.`;
 
@@ -652,7 +652,7 @@ function normalizeStartPayloadVisualDefaults(value = {}) {
   const input = value && typeof value === 'object' ? value : {};
   return {
     wrapped: input.wrapped === false ? false : true,
-    wrapped_story: input.wrapped_story === true,
+    wrapped_story: false,
     political_compass: input.political_compass === true,
   };
 }
@@ -1802,6 +1802,15 @@ function normalizeWrappedImageMode(value = '') {
   return 'wrapped';
 }
 
+function allowsExperimentalWrappedSvgStoryboard(body = {}) {
+  const mediaKind = lower(body.media_kind || body.mediaKind || body.output_media_kind || body.outputMediaKind);
+  const format = lower(body.format);
+  return mediaKind === 'animated_svg_storyboard'
+    || body.allow_svg_storyboard === true
+    || body.allowSvgStoryboard === true
+    || format === 'svg';
+}
+
 function wrappedImageModeMetadata(mode = '') {
   const normalized = normalizeWrappedImageMode(mode);
   if (normalized === 'political_compass') return 'c';
@@ -2908,6 +2917,14 @@ export async function generateAgentOnlyWrappedImage({
   const targetUrl = safeString(env.AGENT_BRIDGE_OPENAI_IMAGE_URL) || DEFAULT_OPENAI_IMAGE_EDIT_URL;
   const referenceBytes = base64ToUint8Array(AGENT_VILLAGE_LOGO_REFERENCE_BASE64);
   if (imageMode === 'wrapped_story') {
+    if (!allowsExperimentalWrappedSvgStoryboard(body)) {
+      return {
+        ok: false,
+        status: 501,
+        reason: 'wrapped_story_mp4_unavailable',
+        message: 'Agent Village Wrapped story video is not enabled yet. Generate mode "wrapped" for the poster or mode "political_compass" for the Agent Norms Compass.',
+      };
+    }
     const storyboardSize = normalizeWrappedImageSize(
       body.storyboard_size ||
       body.storyboardSize ||
