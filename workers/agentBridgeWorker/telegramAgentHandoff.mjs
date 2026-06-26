@@ -5967,7 +5967,7 @@ async function handleTelegramAgentHandoffRequestUnsafe({
   if (url.pathname === '/telegram/agent/api/agent-village-wrapped/skill-version' && request.method === 'GET') {
     return json(agentVillageWrappedSkillVersionPayload(env));
   }
-  if ((url.pathname === '/telegram/agent/api/agent-village-wrapped/skill' || url.pathname === '/wrapped') && request.method === 'GET') {
+  if ((url.pathname === '/telegram/agent/api/agent-village-wrapped/skill' || url.pathname === '/wrapped') && (request.method === 'GET' || request.method === 'HEAD')) {
     return agentVillageWrappedSkillRedirectResponse();
   }
 

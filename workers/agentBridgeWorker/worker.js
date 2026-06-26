@@ -212,7 +212,7 @@ export default {
         broadcastEnabled: directSubmitFeatureEnabled(env),
       });
     }
-    if (url.pathname === '/wrapped' && request.method === 'GET') {
+    if (url.pathname === '/wrapped' && (request.method === 'GET' || request.method === 'HEAD')) {
       return handleTelegramAgentHandoffRequest({
         request,
         env,

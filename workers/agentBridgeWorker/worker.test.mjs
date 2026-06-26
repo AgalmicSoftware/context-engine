@@ -179,6 +179,15 @@ test('worker serves the short Agent Village Wrapped skill route', async () => {
   assert.match(location, /v=2026-06-26-wrapped-v8-/);
 });
 
+test('worker serves the short Agent Village Wrapped skill route to HEAD probes', async () => {
+  const response = await worker.fetch(new Request('https://bridge.example/wrapped', { method: 'HEAD' }));
+
+  assert.equal(response.status, 302);
+  const location = response.headers.get('location') || '';
+  assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-agent-village-wrapped\/SKILL\.md/);
+  assert.match(location, /v=2026-06-26-wrapped-v8-/);
+});
+
 test('worker mock demo route returns end-to-end private Telegram flow without secrets', async () => {
   const response = await worker.fetch(new Request('https://bridge.example/mock/telegram/demo-flow', {
     method: 'POST',
