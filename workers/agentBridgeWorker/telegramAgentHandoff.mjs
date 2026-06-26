@@ -123,7 +123,7 @@ const DEFAULT_AGENT_BRIDGE_PUBLIC_URL = 'https://ce-agent-bridge-worker.agalmic.
 const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=41';
 const DEFAULT_AGENT_RAW_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/edge-2026/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
 const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-06-16 (v41)';
-const DEFAULT_AGENT_VILLAGE_WRAPPED_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/agent-village-wrapped/skill';
+const DEFAULT_AGENT_VILLAGE_WRAPPED_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/wrapped';
 const DEFAULT_AGENT_VILLAGE_WRAPPED_RAW_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/edge-2026/workers/agentBridgeWorker/skills/ce-agent-village-wrapped/SKILL.md';
 const CE_AGENT_VILLAGE_WRAPPED_SKILL_VERSION = '2026-06-25 (wrapped-v6)';
 const MINI_APP_QUESTION_VOTE_KV_PREFIX = 'telegram:mini-app-question-vote:v1:';
@@ -5967,7 +5967,7 @@ async function handleTelegramAgentHandoffRequestUnsafe({
   if (url.pathname === '/telegram/agent/api/agent-village-wrapped/skill-version' && request.method === 'GET') {
     return json(agentVillageWrappedSkillVersionPayload(env));
   }
-  if (url.pathname === '/telegram/agent/api/agent-village-wrapped/skill' && request.method === 'GET') {
+  if ((url.pathname === '/telegram/agent/api/agent-village-wrapped/skill' || url.pathname === '/wrapped') && request.method === 'GET') {
     return agentVillageWrappedSkillRedirectResponse();
   }
 

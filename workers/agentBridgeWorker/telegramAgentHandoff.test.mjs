@@ -476,6 +476,18 @@ test('Telegram agent handoff serves a dedicated Agent Village Wrapped skill redi
   assert.match(location, /v=2026-06-25-wrapped-v6-/);
 });
 
+test('Telegram agent handoff serves a short Agent Village Wrapped skill alias', async () => {
+  const response = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/wrapped', { token: '' }),
+    env: baseEnv(),
+  });
+
+  assert.equal(response.status, 302);
+  const location = response.headers.get('location') || '';
+  assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-agent-village-wrapped\/SKILL\.md/);
+  assert.match(location, /v=2026-06-25-wrapped-v6-/);
+});
+
 test('Agent-only start payload exposes configurable visual defaults', async () => {
   const response = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/agent-only/start', { token: '' }),
