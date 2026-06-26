@@ -123,9 +123,9 @@ const DEFAULT_AGENT_BRIDGE_PUBLIC_URL = 'https://ce-agent-bridge-worker.agalmic.
 const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=41';
 const DEFAULT_AGENT_RAW_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/edge-2026/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
 const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-06-16 (v41)';
-const DEFAULT_AGENT_VILLAGE_WRAPPED_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/agent-village-wrapped/skill?v=2';
+const DEFAULT_AGENT_VILLAGE_WRAPPED_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/agent-village-wrapped/skill?v=3';
 const DEFAULT_AGENT_VILLAGE_WRAPPED_RAW_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/edge-2026/workers/agentBridgeWorker/skills/ce-agent-village-wrapped/SKILL.md';
-const CE_AGENT_VILLAGE_WRAPPED_SKILL_VERSION = '2026-06-25 (wrapped-v2)';
+const CE_AGENT_VILLAGE_WRAPPED_SKILL_VERSION = '2026-06-25 (wrapped-v3)';
 const MINI_APP_QUESTION_VOTE_KV_PREFIX = 'telegram:mini-app-question-vote:v1:';
 const AGENT_QUESTION_VOTE_DECISION_KV_PREFIX = 'telegram:agent-question-vote-decision:v1:';
 const ANSWER_DRAFT_KV_PREFIX = 'telegram:answer-draft:';
@@ -304,6 +304,19 @@ function agentVillageWrappedSkillRedirectResponse() {
   const redirectUrl = new URL(DEFAULT_AGENT_VILLAGE_WRAPPED_RAW_SKILL_URL);
   redirectUrl.searchParams.set('v', CE_AGENT_VILLAGE_WRAPPED_SKILL_VERSION.replace(/[^0-9A-Za-z_-]+/g, '-'));
   return Response.redirect(redirectUrl.toString(), 302);
+}
+
+function isAgentVillageWrappedOnboardingRequest(body = {}) {
+  const labels = [
+    body.skill,
+    body.flow,
+    body.modeLabel,
+    body.source,
+    body.contextEngine?.skill,
+    body.contextEngine?.flow,
+    body.contextEngine?.source,
+  ].map((value) => lower(value));
+  return labels.some((label) => label === 'agent-village-wrapped' || label === 'agent_village_wrapped' || label.includes('agent-village-wrapped'));
 }
 
 function trustedOnboardingInviteValueList(value = '') {
@@ -5661,6 +5674,7 @@ async function handleInviteOnboardRequest({
   });
   const onboardingMode = lower(body.mode || body.onboardingMode);
   if (onboardingMode === 'agent_only') {
+    const wrappedOnboarding = isAgentVillageWrappedOnboardingRequest(body);
     const previousAgentOnlyPointer = await readTelegramAgentOnlyTokenUserPointer({ env, telegramUserId });
     if (previousAgentOnlyPointer.tokenHash) {
       await revokeTelegramAgentDelegationTokenHash({ env, tokenHash: previousAgentOnlyPointer.tokenHash });
@@ -5709,8 +5723,8 @@ async function handleInviteOnboardRequest({
       ok: true,
       token: issued.token,
       worker: agentBridgePublicUrl(env),
-      skill: 'context-engine',
-      skillUrl: agentSkillUrl(env),
+      skill: wrappedOnboarding ? 'agent-village-wrapped' : 'context-engine',
+      skillUrl: wrappedOnboarding ? agentVillageWrappedSkillUrl(env) : agentSkillUrl(env),
       sessionSlug: resolved.session.sessionSlug,
       expiresAt: issued.record.expiresAt,
       inviteLabel: invite.invite.label || '',

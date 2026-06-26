@@ -369,11 +369,16 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
 
   assert.match(wrapped, /name:\s+agent-village-wrapped/);
   assert.match(wrapped, /^# Agent Village Wrapped Runtime/m);
-  assert.match(wrapped, /\*\*Skill version:\*\* 2026-06-25 \(wrapped-v2\)/);
+  assert.match(wrapped, /\*\*Skill version:\*\* 2026-06-25 \(wrapped-v3\)/);
   assert.match(wrapped, /Use this skill only to run Agent Village Wrapped/);
   assert.match(wrapped, /Do not use the broader\s+`context-engine` skill/);
   assert.match(wrapped, /memory\/context-engine-state\.json/);
   assert.match(wrapped, /Do not read other local auth, env, config, SQLite/);
+  assert.match(wrapped, /Agent Village Wrapped Invite Token/);
+  assert.match(wrapped, /"mode": "agent_only"/);
+  assert.match(wrapped, /"skill": "agent-village-wrapped"/);
+  assert.match(wrapped, /\/telegram\/agent\/api\/invite\/onboard/);
+  assert.doesNotMatch(wrapped, /Telegram User ID:/);
   assert.match(wrapped, /GET `\/telegram\/agent\/api\/agent-village-wrapped\/skill-version`/);
   assert.match(wrapped, /MP4 story video is not enabled yet/);
   assert.doesNotMatch(wrapped, /visualDefaults\.wrapped_story/);
@@ -426,7 +431,7 @@ test('Telegram agent handoff exposes the dedicated Agent Village Wrapped skill m
 
   assert.equal(response.status, 200);
   assert.equal(body.ok, true);
-  assert.equal(body.version, '2026-06-25 (wrapped-v2)');
+  assert.equal(body.version, '2026-06-25 (wrapped-v3)');
   assert.equal(body.protocolVersion, '2026-06-16 (v41)');
   assert.equal(body.skill, 'agent-village-wrapped');
   assert.equal(body.skillUrl, 'https://example.test/skills/agent-village-wrapped/SKILL.md');
@@ -449,14 +454,14 @@ test('Telegram agent handoff serves a short skill redirect', async () => {
 
 test('Telegram agent handoff serves a dedicated Agent Village Wrapped skill redirect', async () => {
   const response = await handleTelegramAgentHandoffRequest({
-    request: agentRequest('/telegram/agent/api/agent-village-wrapped/skill?v=2', { token: '' }),
+    request: agentRequest('/telegram/agent/api/agent-village-wrapped/skill?v=3', { token: '' }),
     env: baseEnv(),
   });
 
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
   assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-agent-village-wrapped\/SKILL\.md/);
-  assert.match(location, /v=2026-06-25-wrapped-v2-/);
+  assert.match(location, /v=2026-06-25-wrapped-v3-/);
 });
 
 test('Agent-only start payload exposes configurable visual defaults', async () => {
@@ -1333,6 +1338,59 @@ test('Invite onboarding mode agent_only mints short scoped token without revokin
   assert.equal(loaded.record.ttlSeconds, 604800);
   assert.equal((await loadTelegramAgentDelegationToken({ env, token: previous.token })).ok, true);
   const pointer = await readTelegramAgentOnlyTokenUserPointer({ env, telegramUserId: '42' });
+  assert.equal(pointer.tokenHash, loaded.tokenHash);
+});
+
+test('Agent Village Wrapped invite onboarding mints wrapped agent-only credential metadata', async () => {
+  const env = multiTelegramOnlyEnv({
+    defaultSessionSlug: 'agent-village-wrapped',
+    sessions: ['agent-village-wrapped'],
+    overrides: {
+      AGENT_BRIDGE_AGENT_API_TOKEN: '',
+      AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
+      AGENT_BRIDGE_AGENT_ONLY_TOKEN_TTL_SECONDS: '604800',
+      AGENT_BRIDGE_AGENT_VILLAGE_WRAPPED_SKILL_URL: 'https://bridge.example/telegram/agent/api/agent-village-wrapped/skill?v=3',
+      AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON: JSON.stringify([{
+        tokenHash: sha256Hex('wrapped-demo-invite'),
+        sessionSlug: 'agent-village-wrapped',
+        label: 'Agent Village Wrapped',
+      }]),
+    },
+  });
+
+  const response = await handleTelegramAgentHandoffRequest({
+    request: new Request('https://bridge.example/telegram/agent/api/invite/onboard', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        inviteToken: 'wrapped-demo-invite',
+        telegramUserId: '4242',
+        mode: 'agent_only',
+        skill: 'agent-village-wrapped',
+        source: 'agent-village-wrapped-forwarded-prompt',
+      }),
+    }),
+    env,
+  });
+  const body = await jsonBody(response);
+
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(body.mode, 'agent_only');
+  assert.equal(body.skill, 'agent-village-wrapped');
+  assert.equal(body.skillUrl, 'https://bridge.example/telegram/agent/api/agent-village-wrapped/skill?v=3');
+  assert.equal(body.sessionSlug, 'agent-village-wrapped');
+  assert.equal(body.start, 'https://bridge.example/telegram/agent/api/agent-only/start');
+  assert.equal(Object.hasOwn(body, 'onboarding'), false);
+  const loaded = await loadTelegramAgentDelegationToken({ env, token: body.token });
+  assert.equal(loaded.ok, true);
+  assert.deepEqual(loaded.record.scopes, [
+    TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.AGENT_AUTOFILL,
+  ]);
+  assert.equal(loaded.record.sessionSlug, 'agent-village-wrapped');
+  assert.equal(loaded.record.username, '');
+  assert.equal(loaded.record.ttlSeconds, 604800);
+  const pointer = await readTelegramAgentOnlyTokenUserPointer({ env, telegramUserId: '4242' });
   assert.equal(pointer.tokenHash, loaded.tokenHash);
 });
 

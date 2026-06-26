@@ -5,7 +5,7 @@ description: Run Context Engine Agent Village Wrapped only: predict answers, sub
 
 # Agent Village Wrapped Runtime
 
-**Skill version:** 2026-06-25 (wrapped-v2)
+**Skill version:** 2026-06-25 (wrapped-v3)
 **Protocol version:** Context Engine agent bridge v41
 
 Use this skill only to run Agent Village Wrapped. Do not use the broader
@@ -19,9 +19,11 @@ The user may forward a short message with:
 
 ```text
 Run Agent Village Wrapped (by Context Engine) for me using this skill:
-https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/agent-village-wrapped/skill?v=2
+https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/agent-village-wrapped/skill?v=3
 
 EdgeOS Read Permission: Yes
+
+Agent Village Wrapped Invite Token: <private invite token, if supplied>
 ```
 
 `EdgeOS Read Permission: Yes` means you may use high-level, non-sensitive
@@ -41,8 +43,8 @@ present.
   credential files to find a token or OpenRouter key.
 - Do not use `skill_view`, `search_files`, grep/find, local docs, Geo, or Index
   Network to discover setup.
-- Do not call `/telegram/agent/api/invite/onboard`; this forwarded run does not
-  use trusted invite-token onboarding.
+- Do not call `/telegram/agent/api/invite/onboard` except for the explicit
+  Agent Village Wrapped credential fallback in the Credential section below.
 - Do not narrate internal setup, endpoint status, retries, prompts, rationales,
   confidence values, or image QA.
 - Do not mention where the principal lives, is from, currently is, traveled
@@ -63,14 +65,45 @@ balance check and continue.
 
 ## Credential
 
-Use an active Context Engine agent-only credential if the current Hermes/session
-auth context already has one, including a credential loaded from the known
+If the forwarded message contains an `Agent Village Wrapped Invite Token`, use
+it first to mint or refresh the wrapped agent-only credential. Use the Telegram
+id from the current Telegram/Hermes runtime context. Do not ask the user to type
+or paste their Telegram id, and do not read files to discover it. If the runtime
+context cannot provide a Telegram id, stop with the credential-needed sentence
+below. Otherwise, POST once to:
+
+```text
+/telegram/agent/api/invite/onboard
+```
+
+with:
+
+```json
+{
+  "inviteToken": "<Agent Village Wrapped Invite Token>",
+  "telegramUserId": "<telegram id>",
+  "mode": "agent_only",
+  "skill": "agent-village-wrapped",
+  "source": "agent-village-wrapped-forwarded-prompt"
+}
+```
+
+Use the returned `token` privately as the Bearer token for the rest of the run.
+Never print the invite token or returned credential. Do not call invite
+onboarding without both an invite token and Telegram id, and do not call it with
+any mode except `agent_only`.
+
+If the forwarded message does not include an invite token, or if invite
+onboarding is unavailable but the current Hermes/session auth context already
+has an active Context Engine agent-only credential, use that existing
+credential, including a credential loaded from the known
 `memory/context-engine-state.json` state file. Send it only as
 `Authorization: Bearer <token>` to the worker origin. The public start endpoint
 may load without a credential, but statements, submissions, votes, and image
-generation require this credential. If no active credential is available, do
-not search local files, do not scan previous sessions, and do not try invite
-onboarding; stop and say exactly:
+generation require this credential.
+
+If no invite token and no active credential are available, do not search local
+files or scan previous sessions. Stop and say exactly:
 
 ```text
 I need a Context Engine agent credential before I can run Agent Village Wrapped.
@@ -85,7 +118,7 @@ https://ce-agent-bridge-worker.agalmic.workers.dev
 ```
 
 1. GET `/telegram/agent/api/agent-village-wrapped/skill-version`; verify this
-   skill is `agent-village-wrapped` and the version includes `wrapped-v2`.
+   skill is `agent-village-wrapped` and the version includes `wrapped-v3`.
 2. GET `/telegram/agent/api/skill-version`; silently verify protocol v41.
 3. GET `/telegram/agent/api/agent-only/start` with the private Bearer token.
 4. Follow the returned `instructions` exactly for statement pagination,

@@ -12,9 +12,13 @@ The GitHub-facing attachment/source file is
 
 ```text
 Run Agent Village Wrapped (by Context Engine) for me using this skill:
-https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/agent-village-wrapped/skill?v=2
+https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/agent-village-wrapped/skill?v=3
 
 EdgeOS Read Permission: Yes
+Agent Village Wrapped Invite Token: <private demo invite token, if needed>
 ```
 
 Change only the `EdgeOS Read Permission` line to `No` for a no-profile run.
+Keep the invite-token line private; it is optional for already-onboarded agents
+and required for first-time demo agents. The agent should use the Telegram id
+from its Telegram/Hermes runtime context; users should not paste a Telegram id.
