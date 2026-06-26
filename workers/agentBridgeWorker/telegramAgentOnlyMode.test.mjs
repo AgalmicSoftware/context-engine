@@ -175,13 +175,13 @@ test('start payload pins path-only endpoints and instruction size', () => {
   assert.match(payload.instructions, /visualDefaults\.wrapped/);
   assert.doesNotMatch(payload.instructions, /visualDefaults\.wrapped_story/);
   assert.match(payload.instructions, /visualDefaults\.political_compass/);
-  assert.match(payload.instructions, /send only the bare image_url on its own line/);
-  assert.doesNotMatch(payload.instructions, /!\[Agent Village Wrapped\]\(<image_url>\)/);
+  assert.match(payload.instructions, /Prefer a native photo/);
+  assert.match(payload.instructions, /Markdown image line like !\[Agent Village Wrapped\]\(<image_url>\)/);
   assert.match(payload.instructions, /display it exactly once/);
   assert.match(payload.instructions, /make a fresh wrappedImageEndpoint POST/);
   assert.match(payload.instructions, /never reuse a prior local PNG, previous image_url, cached attachment, or old response/);
   assert.match(payload.instructions, /do not show both URL and base64/);
-  assert.match(payload.instructions, /do not use Markdown image syntax/);
+  assert.match(payload.instructions, /Do not include a duplicate raw link/);
   assert.match(payload.instructions, /Do not call vision, image-analysis, or QA tools/);
   assert.match(payload.instructions, /Do not inspect, critique, describe, or summarize the poster/);
   assert.match(payload.instructions, /A text statement that the image is ready is not enough/);
@@ -189,6 +189,7 @@ test('start payload pins path-only endpoints and instruction size', () => {
   assert.match(payload.instructions, /recent_sessions_total_tokens/);
   assert.match(payload.instructions, /daily_usage_30d/);
   assert.match(payload.instructions, /edge_in_person_dates/);
+  assert.match(payload.instructions, /Wrapped image displays last-month usage rather than this-run usage/);
   assert.match(payload.instructions, /hermes insights --days 30 --source telegram/);
   assert.match(payload.instructions, /fresh run id/);
   assert.match(payload.instructions, /include that same run_id on every answer, vote, and image POST/);
@@ -198,6 +199,7 @@ test('start payload pins path-only endpoints and instruction size', () => {
   assert.match(payload.instructions, /Number fetched statements locally/);
   assert.match(payload.instructions, /map indexes back to exact statement_id values/);
   assert.match(payload.instructions, /multichoice answers must be values arrays/);
+  assert.match(payload.instructions, /wrapping a single selected string as one value/);
   assert.match(payload.instructions, /Calibrate before posting/);
   assert.match(payload.instructions, /90-95 only for direct memory\/profile evidence/);
   assert.match(payload.instructions, /Use 100 only for an exact prior answer/);
@@ -491,14 +493,15 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.match(prompt, /For AI Optimism, use actual AI-futures predicted response rows/);
   assert.match(prompt, /render it as a numeric score out of 10/);
   assert.match(prompt, /AI Optimism 7\/10/);
-  assert.match(prompt, /Token Use metric: Token Use: 1\.2M current run; 4\.3M recent sessions; intuition: roughly 57 books, 5\.7K pages, paper stack about 1\.9 ft tall; 30-day usage: 2026-06-18=320K, 2026-06-19=780K; Edge in-person dates: 2026-06-18, 2026-06-19 \(source: Hermes visible usage\)\./);
+  assert.match(prompt, /Token Use metric: Token Use: 4\.3M last month; intuition: roughly 57 books, 5\.7K pages, paper stack about 1\.9 ft tall; weekly usage: Week 1=0, Week 2=0, Week 3=1\.1M, Week 4=0; week ranges: Week 1 May 31-Jun 6, Week 2 June 7-14, Week 3 June 14-21, Week 4 June 22-28; Edge attendance weeks: Week 3 \(source: Hermes visible usage\)\./);
   assert.match(prompt, /feature one prominent "Token Use" module in the visually calm top-right area/);
+  assert.match(prompt, /Use the open top-right header space/);
   assert.match(prompt, /books, printed pages, or paper-stack height/);
-  assert.match(prompt, /126K this run/);
-  assert.match(prompt, /76M recent ~ 1017 books/);
-  assert.match(prompt, /GitHub-like mini heatmap or sparkline of the last 30 days/);
-  assert.match(prompt, /if the daily data is sparse, bucketize it into weeks/);
-  assert.match(prompt, /subtly highlight those cells or bracket that week/);
+  assert.match(prompt, /76M last month ~ 1017 books/);
+  assert.match(prompt, /Do not show "this run", "current run", request token counts, or current-run totals/);
+  assert.match(prompt, /Render usage as exactly four compact weekly rows or bars labeled Week 1, Week 2, Week 3, and Week 4/);
+  assert.match(prompt, /Week 1 May 31-Jun 6, Week 2 June 7-14, Week 3 June 14-21, and Week 4 June 22-28/);
+  assert.match(prompt, /draw one thin attendance underline or bracket beneath the four weekly rows/);
   assert.match(prompt, /Token Use is a runtime metric, not a playful guess/);
   assert.match(prompt, /Never invent, estimate, or back-calculate token usage/);
   assert.match(prompt, /omit one taste chip before omitting Token Use/);
@@ -657,8 +660,10 @@ test('wrapped story prompts split the report into five phone screens', () => {
   assert.match(frames[0].prompt, /Screen 1 of 5/);
   assert.match(frames[0].prompt, /one large abstract image/);
   assert.match(frames[1].prompt, /Screen 2 of 5/);
-  assert.match(frames[1].prompt, /Token Use: 880K current run; 2\.2M recent sessions/);
-  assert.match(frames[1].prompt, /before arrival, during in-person days, and after/);
+  assert.match(frames[1].prompt, /Token Use: 2\.2M last month/);
+  assert.match(frames[1].prompt, /Do not show "this run" or current-run token totals/);
+  assert.match(frames[1].prompt, /Week 1 May 31-Jun 6, Week 2 June 7-14, Week 3 June 14-21, and Week 4 June 22-28/);
+  assert.match(frames[1].prompt, /draw one thin attendance underline beneath those four rows/);
   assert.match(frames[2].prompt, /High-confidence predictions/);
   assert.match(frames[2].prompt, /Cautious predictions/);
   assert.match(frames[2].prompt, /Render binary answers as one selected pill only/);
@@ -684,7 +689,9 @@ test('wrapped story prompts split the report into five phone screens', () => {
   assert.match(storyboardPrompt, /Panel 3: "Predictions"/);
   assert.match(storyboardPrompt, /Panel 4: "Agent Guesses"/);
   assert.match(storyboardPrompt, /Panel 5: "Agent comparison"/);
-  assert.match(storyboardPrompt, /Token Use: 880K current run; 2\.2M recent sessions/);
+  assert.match(storyboardPrompt, /Token Use: 2\.2M last month/);
+  assert.match(storyboardPrompt, /Do not show "this run" or current-run token totals/);
+  assert.match(storyboardPrompt, /Add exactly four week-by-week rows or bars labeled Week 1, Week 2, Week 3, Week 4/);
   assert.match(storyboardPrompt, /Do not alter or imitate the standard wide poster layout/);
 });
 
@@ -1496,6 +1503,10 @@ test('single-select multichoice snapshots enforce one selected value', () => {
   assert.deepEqual(
     __test__telegramAgentOnlyMode.normalizeAnswerForSchema({ values: ['Alpha'] }, statement.answer_schema),
     { ok: true, answer: { values: ['Alpha'] } },
+  );
+  assert.deepEqual(
+    __test__telegramAgentOnlyMode.normalizeAnswerForSchema({ value: 'Beta' }, statement.answer_schema),
+    { ok: true, answer: { values: ['Beta'] } },
   );
   assert.deepEqual(
     __test__telegramAgentOnlyMode.normalizeAnswerForSchema({ values: ['Alpha', 'Beta'] }, statement.answer_schema),
