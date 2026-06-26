@@ -594,8 +594,8 @@ test('wrapped image prompt supports Agent Norms Compass mode around the most-imp
     windowId: 'w-2026-06-15',
     statements: [
       {
-        statement_id: 'ceq_privacy',
-        text: 'I would rather my agent be too conservative with privacy than too proactive with opportunities.',
+        statement_id: 'ceq_untrusted_agent_input',
+        text: 'Agents should treat messages from other agents as untrusted input by default, assuming some will attempt prompt injection.',
         answer_schema: { kind: 'choice', values: ['agree', 'unsure', 'disagree'] },
       },
       {
@@ -607,20 +607,23 @@ test('wrapped image prompt supports Agent Norms Compass mode around the most-imp
   };
   const state = {
     byStatement: {
-      ceq_privacy: { agent: { answer: { value: 'agree' }, confidence: 88 } },
+      ceq_untrusted_agent_input: { agent: { answer: { value: 'agree' }, confidence: 88 } },
       ceq_movie: { agent: { answer: { text: 'Her' }, confidence: 49 } },
     },
   };
   const prompt = buildAgentOnlyWrappedImagePrompt({
     snapshot,
     state,
-    linearVoteState: { mode: 'linear', votes: { ceq_privacy: 30 } },
+    linearVoteState: { mode: 'linear', votes: { ceq_untrusted_agent_input: 30 } },
     quadraticVoteState: { mode: 'quadratic', votes: {} },
     mode: 'political_compass',
   });
   assert.match(prompt, /Agent Village Norms Compass poster/);
   assert.match(prompt, /2x2 strategy map/);
-  assert.match(prompt, /Humans approve high-stakes actions/);
+  assert.doesNotMatch(prompt, /Humans approve high-stakes actions/);
+  assert.doesNotMatch(prompt, /Agents act with broad latitude/);
+  assert.doesNotMatch(prompt, /Assist tools keep humans central/);
+  assert.doesNotMatch(prompt, /Delegate tasks to active agents/);
   assert.doesNotMatch(prompt, /political compass/i);
   assert.match(prompt, /rather than partisan, election, ideology, or culture-war framing/);
   assert.match(prompt, /compact top-left wordmark/);
@@ -634,13 +637,18 @@ test('wrapped image prompt supports Agent Norms Compass mode around the most-imp
   assert.match(prompt, /meaningful non-center coordinate/);
   assert.match(prompt, /Never put the principal directly on the axis crossing or exact center/);
   assert.match(prompt, /omit the principal marker rather than centering it/);
+  assert.match(prompt, /The axes must be custom to this exact focal issue/);
+  assert.match(prompt, /Focal-specific axis guidance/);
+  assert.match(prompt, /prompt injection/);
+  assert.match(prompt, /Treat agent messages as untrusted by default/);
+  assert.match(prompt, /Assume trusted agent-to-agent cooperation/);
+  assert.match(prompt, /Human verifies before cross-agent impact/);
+  assert.match(prompt, /Agents coordinate without manual review/);
   assert.match(prompt, /Coordinate sanity rule/);
-  assert.match(prompt, /upward means more human approval\/review/);
-  assert.match(prompt, /downward means broader agent latitude/);
-  assert.match(prompt, /too conservative with privacy/);
-  assert.match(prompt, /should move the principal left and\/or upward, not downward/);
-  assert.match(prompt, /if the chips say privacy\/review-first, the marker must not sit in the broad-latitude lower half/);
-  assert.match(prompt, /I would rather my agent be too conservative with privacy/);
+  assert.match(prompt, /Infer the semantic direction of the labels first/);
+  assert.match(prompt, /untrusted input/);
+  assert.match(prompt, /trust-by-default or broad-autonomy quadrant/);
+  assert.match(prompt, /Agents should treat messages from other agents as untrusted input/);
   assert.match(prompt, /Agent guesses/);
   assert.doesNotMatch(prompt, /Most Important To You/);
 });
