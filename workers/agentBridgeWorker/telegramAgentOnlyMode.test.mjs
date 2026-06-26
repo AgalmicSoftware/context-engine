@@ -175,29 +175,36 @@ test('start payload pins path-only endpoints and instruction size', () => {
   assert.match(payload.instructions, /visualDefaults\.wrapped/);
   assert.doesNotMatch(payload.instructions, /visualDefaults\.wrapped_story/);
   assert.match(payload.instructions, /visualDefaults\.political_compass/);
-  assert.match(payload.instructions, /!\[Agent Village Wrapped\]\(<image_url>\)/);
+  assert.match(payload.instructions, /send only the bare image_url on its own line/);
+  assert.doesNotMatch(payload.instructions, /!\[Agent Village Wrapped\]\(<image_url>\)/);
   assert.match(payload.instructions, /display it exactly once/);
   assert.match(payload.instructions, /make a fresh wrappedImageEndpoint POST/);
   assert.match(payload.instructions, /never reuse a prior local PNG, previous image_url, cached attachment, or old response/);
-  assert.match(payload.instructions, /not both/);
-  assert.match(payload.instructions, /Do not include a raw link or link preview/);
+  assert.match(payload.instructions, /do not show both URL and base64/);
+  assert.match(payload.instructions, /do not use Markdown image syntax/);
   assert.match(payload.instructions, /Do not call vision, image-analysis, or QA tools/);
   assert.match(payload.instructions, /Do not inspect, critique, describe, or summarize the poster/);
   assert.match(payload.instructions, /A text statement that the image is ready is not enough/);
   assert.match(payload.instructions, /agent_metadata\.token_usage/);
   assert.match(payload.instructions, /recent_sessions_total_tokens/);
+  assert.match(payload.instructions, /daily_usage_30d/);
+  assert.match(payload.instructions, /edge_in_person_dates/);
   assert.match(payload.instructions, /hermes insights --days 30 --source telegram/);
   assert.match(payload.instructions, /fresh run id/);
   assert.match(payload.instructions, /include that same run_id on every answer, vote, and image POST/);
   assert.match(payload.instructions, /"run_id": "<fresh_run_id>"/);
   assert.match(payload.instructions, /unique request_id values/);
   assert.match(payload.instructions, /each answer-batch POST/);
+  assert.match(payload.instructions, /Number fetched statements locally/);
+  assert.match(payload.instructions, /map indexes back to exact statement_id values/);
+  assert.match(payload.instructions, /multichoice answers must be values arrays/);
   assert.match(payload.instructions, /Calibrate before posting/);
   assert.match(payload.instructions, /90-95 only for direct memory\/profile evidence/);
   assert.match(payload.instructions, /Use 100 only for an exact prior answer/);
   assert.match(payload.instructions, /otherwise cap confidence at 95/);
   assert.match(payload.instructions, /Do not use a repeated default like 85 across a batch/);
   assert.match(payload.instructions, /scan for flat confidence/);
+  assert.match(payload.instructions, /Do not include process notes, debugging, script names, parallelization/);
   assert.match(payload.instructions, /To inspect or change your agent's responses/);
   assert.doesNotMatch(payload.instructions, /shareable story version/);
   assert.match(payload.instructions, /\[Context Engine Bot\]\(https:\/\/t\.me\/contextengineer_bot\?start=agent_onboarding__agent-village-wrapped\)/);
@@ -340,6 +347,11 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
             tokenUsage: {
               currentRunTotalTokens: 1248000,
               recentSessionsTotalTokens: 4300000,
+              dailyUsage30d: [
+                { date: '2026-06-18', tokens: 320000 },
+                { date: '2026-06-19', tokens: 780000 },
+              ],
+              edgeInPersonDates: ['2026-06-18', '2026-06-19'],
               source: 'Hermes visible usage',
             },
           },
@@ -479,10 +491,13 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.match(prompt, /For AI Optimism, use actual AI-futures predicted response rows/);
   assert.match(prompt, /render it as a numeric score out of 10/);
   assert.match(prompt, /AI Optimism 7\/10/);
-  assert.match(prompt, /Token Use metric: Token Use: 1\.2M current run; 4\.3M recent sessions; intuition: roughly 57 books, 5\.7K pages, paper stack about 1\.9 ft tall \(source: Hermes visible usage\)\./);
-  assert.match(prompt, /feature one prominent "Token Use" chip/);
+  assert.match(prompt, /Token Use metric: Token Use: 1\.2M current run; 4\.3M recent sessions; intuition: roughly 57 books, 5\.7K pages, paper stack about 1\.9 ft tall; 30-day usage: 2026-06-18=320K, 2026-06-19=780K; Edge in-person dates: 2026-06-18, 2026-06-19 \(source: Hermes visible usage\)\./);
+  assert.match(prompt, /feature one prominent "Token Use" module in the visually calm top-right area/);
   assert.match(prompt, /books, printed pages, or paper-stack height/);
-  assert.match(prompt, /4\.3M tokens ~ 57 books \/ 5\.7K pages/);
+  assert.match(prompt, /126K this run/);
+  assert.match(prompt, /76M recent ~ 1017 books/);
+  assert.match(prompt, /GitHub-like mini heatmap or sparkline of the last 30 days/);
+  assert.match(prompt, /subtly highlight those cells or bracket that week/);
   assert.match(prompt, /Token Use is a runtime metric, not a playful guess/);
   assert.match(prompt, /Never invent, estimate, or back-calculate token usage/);
   assert.match(prompt, /omit one taste chip before omitting Token Use/);
@@ -1739,6 +1754,11 @@ test('answer bulk validates rows, writes sidecar events/state, and replays idemp
         recent_sessions_total_tokens: 4567000,
         input_tokens: 900000,
         output_tokens: 334567,
+        daily_usage_30d: [
+          { date: '2026-06-10', tokens: 120000 },
+          { date: '2026-06-11', tokens: 240000 },
+        ],
+        edge_in_person_dates: ['2026-06-10'],
         source: 'Hermes visible usage',
       },
     },
@@ -1838,6 +1858,11 @@ test('answer bulk validates rows, writes sidecar events/state, and replays idemp
   assert.equal(answerRows.every((row) => row.token_recent_sessions_total === 4567000), true);
   assert.equal(answerRows.every((row) => row.token_input === 900000), true);
   assert.equal(answerRows.every((row) => row.token_output === 334567), true);
+  assert.deepEqual(answerRows[0].token_daily_usage_30d, [
+    { date: '2026-06-10', tokens: 120000 },
+    { date: '2026-06-11', tokens: 240000 },
+  ]);
+  assert.deepEqual(answerRows[0].token_edge_in_person_dates, ['2026-06-10']);
   assert.equal(answerRows.every((row) => row.token_usage_source === 'Hermes visible usage'), true);
   assert.equal(skipRow.rationale, null);
   assert.equal(skipRow.confidence, null);

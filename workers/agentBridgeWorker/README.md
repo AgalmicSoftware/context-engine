@@ -117,7 +117,9 @@ requires a separate media encoder service.
 
 Agents that only need Agent Village Wrapped should use the dedicated narrow
 skill URL instead of the broader Context Engine runtime skill:
-`/telegram/agent/api/agent-village-wrapped/skill?v=2`. That skill omits normal
+`/telegram/agent/api/agent-village-wrapped/skill`. That unversioned URL is the
+stable QR/forwarding target; the worker redirects it to the current raw skill
+with a cache-busting version parameter. That skill omits normal
 question/draft/admin lanes and is intended to keep Hermes-style agents on the
 prediction, allocation, and Wrapped image flow. `/agent-only/start` also returns
 `visualDefaults` so operators can switch default image modes without changing

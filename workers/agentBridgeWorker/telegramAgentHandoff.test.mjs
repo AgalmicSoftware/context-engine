@@ -369,7 +369,7 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
 
   assert.match(wrapped, /name:\s+agent-village-wrapped/);
   assert.match(wrapped, /^# Agent Village Wrapped Runtime/m);
-  assert.match(wrapped, /\*\*Skill version:\*\* 2026-06-25 \(wrapped-v3\)/);
+  assert.match(wrapped, /\*\*Skill version:\*\* 2026-06-25 \(wrapped-v4\)/);
   assert.match(wrapped, /Use this skill only to run Agent Village Wrapped/);
   assert.match(wrapped, /Do not use the broader\s+`context-engine` skill/);
   assert.match(wrapped, /memory\/context-engine-state\.json/);
@@ -380,6 +380,13 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.match(wrapped, /\/telegram\/agent\/api\/invite\/onboard/);
   assert.doesNotMatch(wrapped, /Telegram User ID:/);
   assert.match(wrapped, /GET `\/telegram\/agent\/api\/agent-village-wrapped\/skill-version`/);
+  assert.match(wrapped, /version includes `wrapped-v4`/);
+  assert.match(wrapped, /Map indexes back to exact[\s\S]+`statement_id` values programmatically/);
+  assert.match(wrapped, /multichoice answers are\s+`values` arrays/);
+  assert.match(wrapped, /daily_usage_30d/);
+  assert.match(wrapped, /edge_in_person_dates/);
+  assert.match(wrapped, /send\s+only the bare `image_url` on its own line/);
+  assert.doesNotMatch(wrapped, /!\[Agent Village Wrapped\]/);
   assert.match(wrapped, /MP4 story video is not enabled yet/);
   assert.doesNotMatch(wrapped, /visualDefaults\.wrapped_story/);
   assert.doesNotMatch(wrapped, /shareable story version/);
@@ -431,7 +438,7 @@ test('Telegram agent handoff exposes the dedicated Agent Village Wrapped skill m
 
   assert.equal(response.status, 200);
   assert.equal(body.ok, true);
-  assert.equal(body.version, '2026-06-25 (wrapped-v3)');
+  assert.equal(body.version, '2026-06-25 (wrapped-v4)');
   assert.equal(body.protocolVersion, '2026-06-16 (v41)');
   assert.equal(body.skill, 'agent-village-wrapped');
   assert.equal(body.skillUrl, 'https://example.test/skills/agent-village-wrapped/SKILL.md');
@@ -454,14 +461,14 @@ test('Telegram agent handoff serves a short skill redirect', async () => {
 
 test('Telegram agent handoff serves a dedicated Agent Village Wrapped skill redirect', async () => {
   const response = await handleTelegramAgentHandoffRequest({
-    request: agentRequest('/telegram/agent/api/agent-village-wrapped/skill?v=3', { token: '' }),
+    request: agentRequest('/telegram/agent/api/agent-village-wrapped/skill', { token: '' }),
     env: baseEnv(),
   });
 
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
   assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-agent-village-wrapped\/SKILL\.md/);
-  assert.match(location, /v=2026-06-25-wrapped-v3-/);
+  assert.match(location, /v=2026-06-25-wrapped-v4-/);
 });
 
 test('Agent-only start payload exposes configurable visual defaults', async () => {
@@ -1349,7 +1356,7 @@ test('Agent Village Wrapped invite onboarding mints wrapped agent-only credentia
       AGENT_BRIDGE_AGENT_API_TOKEN: '',
       AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
       AGENT_BRIDGE_AGENT_ONLY_TOKEN_TTL_SECONDS: '604800',
-      AGENT_BRIDGE_AGENT_VILLAGE_WRAPPED_SKILL_URL: 'https://bridge.example/telegram/agent/api/agent-village-wrapped/skill?v=3',
+      AGENT_BRIDGE_AGENT_VILLAGE_WRAPPED_SKILL_URL: 'https://bridge.example/telegram/agent/api/agent-village-wrapped/skill',
       AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON: JSON.stringify([{
         tokenHash: sha256Hex('wrapped-demo-invite'),
         sessionSlug: 'agent-village-wrapped',
@@ -1378,7 +1385,7 @@ test('Agent Village Wrapped invite onboarding mints wrapped agent-only credentia
   assert.equal(body.ok, true);
   assert.equal(body.mode, 'agent_only');
   assert.equal(body.skill, 'agent-village-wrapped');
-  assert.equal(body.skillUrl, 'https://bridge.example/telegram/agent/api/agent-village-wrapped/skill?v=3');
+  assert.equal(body.skillUrl, 'https://bridge.example/telegram/agent/api/agent-village-wrapped/skill');
   assert.equal(body.sessionSlug, 'agent-village-wrapped');
   assert.equal(body.start, 'https://bridge.example/telegram/agent/api/agent-only/start');
   assert.equal(Object.hasOwn(body, 'onboarding'), false);

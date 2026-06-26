@@ -5,7 +5,7 @@ description: Run Context Engine Agent Village Wrapped only: predict answers, sub
 
 # Agent Village Wrapped Runtime
 
-**Skill version:** 2026-06-25 (wrapped-v3)
+**Skill version:** 2026-06-25 (wrapped-v4)
 **Protocol version:** Context Engine agent bridge v41
 
 Use this skill only to run Agent Village Wrapped. Do not use the broader
@@ -19,7 +19,7 @@ The user may forward a short message with:
 
 ```text
 Run Agent Village Wrapped (by Context Engine) for me using this skill:
-https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/agent-village-wrapped/skill?v=3
+https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/agent-village-wrapped/skill
 
 EdgeOS Read Permission: Yes
 
@@ -45,7 +45,8 @@ present.
   Network to discover setup.
 - Do not call `/telegram/agent/api/invite/onboard` except for the explicit
   Agent Village Wrapped credential fallback in the Credential section below.
-- Do not narrate internal setup, endpoint status, retries, prompts, rationales,
+- Do not narrate internal setup, endpoint status, retries, scripts,
+  parallelization, killed processes, validation failures, prompts, rationales,
   confidence values, or image QA.
 - Do not mention where the principal lives, is from, currently is, traveled
   from, or stayed.
@@ -118,7 +119,7 @@ https://ce-agent-bridge-worker.agalmic.workers.dev
 ```
 
 1. GET `/telegram/agent/api/agent-village-wrapped/skill-version`; verify this
-   skill is `agent-village-wrapped` and the version includes `wrapped-v3`.
+   skill is `agent-village-wrapped` and the version includes `wrapped-v4`.
 2. GET `/telegram/agent/api/skill-version`; silently verify protocol v41.
 3. GET `/telegram/agent/api/agent-only/start` with the private Bearer token.
 4. Follow the returned `instructions` exactly for statement pagination,
@@ -126,6 +127,13 @@ https://ce-agent-bridge-worker.agalmic.workers.dev
    and completion rules. Use one fresh `run_id` for the whole run.
 5. Answer or privacy-skip every current statement. Do not stop at 50 if more
    pages remain.
+   - For lower token cost and fewer validation failures, number fetched
+     statements locally and have any model reasoning output short indexes,
+     not full `statement_id` strings. Map indexes back to exact
+     `statement_id` values programmatically before POSTing.
+   - Validate/coerce answer shapes before POSTing: multichoice answers are
+     `values` arrays, choice/rating answers are `{ "value": ... }`, and
+     freeform answers are `{ "text": ... }`.
 6. Submit both linear and quadratic token allocations.
 7. Generate and display the standard image when `visualDefaults.wrapped` from
    the start response is true. POST `/telegram/agent/api/agent-only/wrapped-image`
@@ -144,8 +152,9 @@ https://ce-agent-bridge-worker.agalmic.workers.dev
 
 If token usage is visible through an already-approved session/history surface,
 include it in `agent_metadata.token_usage` on answer and vote POSTs:
-`current_run_total_tokens`, `recent_sessions_total_tokens`, and `source`. A
-single fast command such as
+`current_run_total_tokens`, `recent_sessions_total_tokens`, `source`, and, when
+available, `daily_usage_30d` plus `edge_in_person_dates` as `YYYY-MM-DD` values.
+A single fast command such as
 `/opt/hermes/.venv/bin/hermes insights --days 30 --source telegram` is
 acceptable if available. If unavailable or unclear, omit token usage. Do not
 search files or calculate it from logs.
@@ -153,18 +162,14 @@ search files or calculate it from logs.
 ## Image Delivery
 
 For each wrapped-image response, display the returned image exactly once. Prefer
-a native attachment/photo. If using Markdown, use exactly one Markdown image and
-no other URL text:
-
-```markdown
-![Agent Village Wrapped](<image_url>)
-```
-
-Do not also include a raw link or link preview. If only `image_base64` is
-returned, decode it using `image_content_type` and attach/show it once. Do not
-print raw base64 or the full image prompt. Do not run vision/image-analysis/QA
-tools on the image. If the user later asks for Agent Norms Compass, display
-that compass image exactly once and do not repeat the standard Wrapped image.
+a native attachment/photo. If the host cannot attach the image natively, send
+only the bare `image_url` on its own line so Telegram can generate a preview.
+Do not use Markdown image syntax, do not also include a duplicate raw link, and
+do not display both URL and base64. If only `image_base64` is returned, decode
+it using `image_content_type` and attach/show it once. Do not print raw base64
+or the full image prompt. Do not run vision/image-analysis/QA tools on the
+image. If the user later asks for Agent Norms Compass, display that compass
+image exactly once and do not repeat the standard Wrapped image.
 
 ## Final Chat Text
 
