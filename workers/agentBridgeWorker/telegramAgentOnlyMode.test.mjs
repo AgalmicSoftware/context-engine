@@ -497,6 +497,7 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.match(prompt, /126K this run/);
   assert.match(prompt, /76M recent ~ 1017 books/);
   assert.match(prompt, /GitHub-like mini heatmap or sparkline of the last 30 days/);
+  assert.match(prompt, /if the daily data is sparse, bucketize it into weeks/);
   assert.match(prompt, /subtly highlight those cells or bracket that week/);
   assert.match(prompt, /Token Use is a runtime metric, not a playful guess/);
   assert.match(prompt, /Never invent, estimate, or back-calculate token usage/);
