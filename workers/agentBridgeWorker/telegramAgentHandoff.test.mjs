@@ -395,6 +395,7 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.match(wrapped, /reuse it for every answer and\s+image POST/);
   assert.match(wrapped, /do not print, review, render, or summarize their\s+text, options, schemas, or ids/);
   assert.match(wrapped, /Keep helper stdout to one compact status JSON/);
+  assert.doesNotMatch(wrapped, /vote status/);
   assert.match(wrapped, /Never print per-row\s+predictions/);
   assert.match(wrapped, /Never print local file paths as image delivery/);
   assert.match(wrapped, /`clocal:`/);
@@ -406,6 +407,8 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.match(wrapped, /Fetch all pages silently/);
   assert.match(wrapped, /do not echo their text, options, schemas, or ids/);
   assert.match(wrapped, /Do not create a second `run_id` after answer submission/);
+  assert.match(wrapped, /answer-batch or image request fails/);
+  assert.doesNotMatch(wrapped, /batch,\s+vote, or image request fails/);
   assert.match(wrapped, /retry with the same\s+`run_id`/);
   assert.match(wrapped, /make model prediction calls in batches of roughly\s+10-15 statements/);
   assert.match(wrapped, /Map indexes back to exact[\s\S]+`statement_id` values programmatically/);

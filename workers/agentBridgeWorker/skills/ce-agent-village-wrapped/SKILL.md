@@ -97,7 +97,7 @@ process, switch to low-output execution:
   text, options, schemas, or ids. Only counts such as `statement_count` and
   `page_count` may appear in stdout.
 - Keep helper stdout to one compact status JSON or at most five short lines:
-  counts, submit status, vote status, and `image_url`. Never print per-row
+  counts, submit status, and `image_url`. Never print per-row
   predictions.
 - Batch prediction reasoning in groups of roughly 10-15 statements when
   possible, output local indexes rather than full `ceq_...` ids, and map those
@@ -175,8 +175,8 @@ https://ce-agent-bridge-worker.agalmic.workers.dev
 5. Follow the returned `instructions` exactly for statement pagination,
    answers, confidence, privacy skips, request ids, retries, and completion
    rules. Use one fresh `run_id` for the whole run.
-   - Do not create a second `run_id` after answer submission. If a later batch,
-     vote, or image request fails, fix that request and retry with the same
+   - Do not create a second `run_id` after answer submission. If a later
+     answer-batch or image request fails, fix that request and retry with the same
      `run_id`.
 6. Answer or privacy-skip every current statement. Do not stop at 50 if more
    pages remain.
