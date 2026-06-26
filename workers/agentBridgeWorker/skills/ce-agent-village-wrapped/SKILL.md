@@ -5,7 +5,7 @@ description: Run Context Engine Agent Village Wrapped only: predict answers, sub
 
 # Agent Village Wrapped Runtime
 
-**Skill version:** 2026-06-26 (wrapped-v7)
+**Skill version:** 2026-06-26 (wrapped-v8)
 **Protocol version:** Context Engine agent bridge v41
 
 Use this skill only to run Agent Village Wrapped. Do not use the broader
@@ -18,12 +18,12 @@ the worker endpoints below are the whole procedure.
 The user may forward a short message with:
 
 ```text
-Run Agent Village Wrapped (by Context Engine) for me using this skill:
+Read the skill (no search):
 https://ce-agent-bridge-worker.agalmic.workers.dev/wrapped
 
+Run Agent Village Wrapped for me.
+Invite Token: <private invite token, if supplied>
 EdgeOS Read Permission: Yes
-
-Agent Village Wrapped Invite Token: <private invite token, if supplied>
 ```
 
 `Invite Token: ...`, `Wrapped Invite Token: ...`, and
@@ -87,10 +87,12 @@ balance check and continue.
 If the forwarded message contains an `Agent Village Wrapped Invite Token` or an
 invite-token alias (`Invite Token`, `Wrapped Invite Token`, or
 `AVW Invite Token`), use it first to mint or refresh the wrapped agent-only
-credential. Use the Telegram id from the current Telegram/Hermes runtime
-context. Do not ask the user to type or paste their Telegram id, and do not read
-files to discover it. If the runtime context cannot provide a Telegram id, stop
-with the credential-needed sentence below. Otherwise, POST once to:
+credential. Do this even if local memory, previous sessions, or older
+`ceagt_...` credentials might exist; first-time demo runs should not search
+backward. Use the Telegram id from the current Telegram/Hermes runtime context.
+Do not ask the user to type or paste their Telegram id, and do not read files to
+discover it. If the runtime context cannot provide a Telegram id, stop with the
+credential-needed sentence below. Otherwise, POST once to:
 
 ```text
 /telegram/agent/api/invite/onboard
@@ -138,7 +140,7 @@ https://ce-agent-bridge-worker.agalmic.workers.dev
 ```
 
 1. GET `/telegram/agent/api/agent-village-wrapped/skill-version`; verify this
-   skill is `agent-village-wrapped` and the version includes `wrapped-v7`.
+   skill is `agent-village-wrapped` and the version includes `wrapped-v8`.
 2. GET `/telegram/agent/api/skill-version`; silently verify protocol v41.
 3. GET `/telegram/agent/api/agent-only/start` with the private Bearer token.
 4. Follow the returned `instructions` exactly for statement pagination,

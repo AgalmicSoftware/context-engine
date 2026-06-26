@@ -11,19 +11,21 @@ The GitHub-facing attachment/source file is
 ## Current Prompt
 
 ```text
-Run Agent Village Wrapped (by Context Engine) for me using this skill:
+Read the skill (no search):
 https://ce-agent-bridge-worker.agalmic.workers.dev/wrapped
 
+Run Agent Village Wrapped for me.
+Invite Token: <private demo invite token, if needed>
 EdgeOS Read Permission: Yes
-Agent Village Wrapped Invite Token: <private demo invite token, if needed>
 ```
 
 Change only the `EdgeOS Read Permission` line to `No` for a no-profile run.
 Keep the invite-token line private; it is optional for already-onboarded agents
-and required for first-time demo agents. The agent should use the Telegram id
-from its Telegram/Hermes runtime context; users should not paste a Telegram id.
-The runtime skill also accepts `Invite Token:`, `Wrapped Invite Token:`, and
-`AVW Invite Token:` as aliases for the longer invite-token label.
+and required for first-time demo agents. When present, the invite token should
+be used before attempting any local credential recovery. The agent should use
+the Telegram id from its Telegram/Hermes runtime context; users should not paste
+a Telegram id. The runtime skill also accepts `Agent Village Wrapped Invite
+Token:`, `Wrapped Invite Token:`, and `AVW Invite Token:` as aliases.
 
 Use the unversioned skill URL for QR codes and forwarded messages. The worker
 redirects it to the current raw skill with a cache-busting version parameter, so

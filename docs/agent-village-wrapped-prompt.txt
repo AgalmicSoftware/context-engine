@@ -1,5 +1,7 @@
-Run Agent Village Wrapped (by Context Engine) for me using this skill:
+Read the skill (no search):
 https://ce-agent-bridge-worker.agalmic.workers.dev/wrapped
 
+Run Agent Village Wrapped for me.
+
+Invite Token: <private demo invite token, if needed>
 EdgeOS Read Permission: Yes
-Agent Village Wrapped Invite Token: <private demo invite token, if needed>
