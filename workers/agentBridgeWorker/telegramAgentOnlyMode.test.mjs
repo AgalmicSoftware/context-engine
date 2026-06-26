@@ -167,14 +167,16 @@ test('start payload pins path-only endpoints and instruction size', () => {
     wrapped_story: false,
     political_compass: false,
   });
-  assert.match(payload.instructions, /Agent Village Wrapped image/);
+  assert.match(payload.instructions, /Wrapped image/);
   assert.match(payload.instructions, /wrappedImageEndpoint/);
   assert.match(payload.instructions, /mode "wrapped_story"/);
-  assert.match(payload.instructions, /MP4 story video is not enabled/);
+  assert.match(payload.instructions, /MP4 story video is disabled/);
   assert.match(payload.instructions, /mode "political_compass"/);
+  assert.match(payload.instructions, /Do not POST mode "political_compass" during the default run/);
+  assert.match(payload.instructions, /only generate it if the principal asks for Agent Norms Compass after the image/);
   assert.match(payload.instructions, /visualDefaults\.wrapped/);
   assert.doesNotMatch(payload.instructions, /visualDefaults\.wrapped_story/);
-  assert.match(payload.instructions, /visualDefaults\.political_compass/);
+  assert.doesNotMatch(payload.instructions, /visualDefaults\.political_compass/);
   assert.match(payload.instructions, /Prefer a native photo/);
   assert.match(payload.instructions, /Markdown image line like !\[Agent Village Wrapped\]\(<image_url>\)/);
   assert.match(payload.instructions, /display it exactly once/);
@@ -231,7 +233,7 @@ test('start payload pins path-only endpoints and instruction size', () => {
   assert.deepEqual(storyDefaultPayload.visualDefaults, {
     wrapped: true,
     wrapped_story: false,
-    political_compass: true,
+    political_compass: false,
   });
 });
 

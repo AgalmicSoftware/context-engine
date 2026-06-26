@@ -3085,7 +3085,7 @@ async function handleAgentOnlyStartRequest({ request, env = {} } = {}) {
     visualDefaults: {
       wrapped: normalizeBoolean(env.AGENT_BRIDGE_AGENT_WRAPPED_POSTER_DEFAULT, true),
       wrapped_story: false,
-      political_compass: normalizeBoolean(env.AGENT_BRIDGE_AGENT_WRAPPED_COMPASS_DEFAULT, false),
+      political_compass: false,
     },
   });
   return jsonSessionMeta(request, env, payload);

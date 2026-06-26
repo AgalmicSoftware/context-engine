@@ -191,10 +191,10 @@ https://ce-agent-bridge-worker.agalmic.workers.dev
 { "window_id": "<window_id>", "run_id": "<fresh_run_id>", "mode": "wrapped", "format": "json" }
 ```
 
-9. Generate `mode: "political_compass"` only if
-   `visualDefaults.political_compass` is true or the user asks for the Agent
-   Norms Compass. Do not request `mode: "wrapped_story"` in this skill version;
-   MP4 story video is not enabled yet.
+9. Do not generate `mode: "political_compass"` during the default run.
+   Generate it only if the user asks for the Agent Norms Compass after the
+   standard image is displayed. Do not request `mode: "wrapped_story"` in this
+   skill version; MP4 story video is not enabled yet.
 
 ## Token Usage Metadata
 

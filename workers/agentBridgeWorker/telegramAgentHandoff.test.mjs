@@ -413,6 +413,8 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.match(wrapped, /Do not run image generation, polling, image download, or display in a detached\s+background process/);
   assert.match(wrapped, /The final assistant message must start with exactly one image\s+attachment/);
   assert.match(wrapped, /Never send the closeout sentence before the image/);
+  assert.match(wrapped, /Do not generate `mode: "political_compass"` during the default run/);
+  assert.match(wrapped, /Generate it only if the user asks for the Agent Norms Compass after the\s+standard image is displayed/);
   assert.match(wrapped, /MP4 story video is not enabled yet/);
   assert.doesNotMatch(wrapped, /visualDefaults\.wrapped_story/);
   assert.doesNotMatch(wrapped, /shareable story version/);
@@ -537,7 +539,7 @@ test('Agent-only start payload exposes configurable visual defaults', async () =
   assert.deepEqual(body.visualDefaults, {
     wrapped: true,
     wrapped_story: false,
-    political_compass: true,
+    political_compass: false,
   });
 });
 
