@@ -176,7 +176,7 @@ test('worker serves the short Agent Village Wrapped skill route', async () => {
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
   assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-agent-village-wrapped\/SKILL\.md/);
-  assert.match(location, /v=2026-06-26-wrapped-v11-/);
+  assert.match(location, /v=2026-06-26-wrapped-v12-/);
 });
 
 test('worker serves the short Agent Village Wrapped skill route to HEAD probes', async () => {
@@ -185,7 +185,7 @@ test('worker serves the short Agent Village Wrapped skill route to HEAD probes',
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
   assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-agent-village-wrapped\/SKILL\.md/);
-  assert.match(location, /v=2026-06-26-wrapped-v11-/);
+  assert.match(location, /v=2026-06-26-wrapped-v12-/);
 });
 
 test('worker mock demo route returns end-to-end private Telegram flow without secrets', async () => {

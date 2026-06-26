@@ -190,9 +190,10 @@ test('start payload pins path-only endpoints and instruction size', () => {
   assert.match(payload.instructions, /daily_usage_30d/);
   assert.match(payload.instructions, /Wrapped image displays recent session usage rather than this-run usage/);
   assert.match(payload.instructions, /Token usage, before answering/);
-  assert.match(payload.instructions, /run it once before Step 2/);
-  assert.match(payload.instructions, /source: "hermes insights --days 30 --source telegram"/);
-  assert.match(payload.instructions, /hermes insights --days 30 --source telegram/);
+  assert.match(payload.instructions, /run one 30-day total query and one daily GROUP BY date query/);
+  assert.match(payload.instructions, /source: "local sqlite3 query \(including cache\)"/);
+  assert.match(payload.instructions, /sqlite3 can read state\.db/);
+  assert.match(payload.instructions, /Do not run hermes insights/);
   assert.match(payload.instructions, /fresh run id/);
   assert.match(payload.instructions, /include that same run_id on every answer, vote, and image POST/);
   assert.match(payload.instructions, /"run_id": "<fresh_run_id>"/);
@@ -576,7 +577,7 @@ test('wrapped image prompt omits weekly token bars when daily rows conflict with
             tokenUsage: {
               recentSessionsTotalTokens: 149638701,
               dailyUsage30d: [{ date: '2026-06-25', total_tokens: 2828667 }],
-              source: 'hermes insights --days 30 --source telegram',
+              source: 'local sqlite3 query (including cache)',
             },
           },
         },
