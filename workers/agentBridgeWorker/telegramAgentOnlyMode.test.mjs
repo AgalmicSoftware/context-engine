@@ -188,8 +188,10 @@ test('start payload pins path-only endpoints and instruction size', () => {
   assert.match(payload.instructions, /agent_metadata\.token_usage/);
   assert.match(payload.instructions, /recent_sessions_total_tokens/);
   assert.match(payload.instructions, /daily_usage_30d/);
-  assert.match(payload.instructions, /edge_in_person_dates/);
   assert.match(payload.instructions, /Wrapped image displays recent session usage rather than this-run usage/);
+  assert.match(payload.instructions, /Token usage, before answering/);
+  assert.match(payload.instructions, /run it once before Step 2/);
+  assert.match(payload.instructions, /source: "hermes insights --days 30 --source telegram"/);
   assert.match(payload.instructions, /hermes insights --days 30 --source telegram/);
   assert.match(payload.instructions, /fresh run id/);
   assert.match(payload.instructions, /include that same run_id on every answer, vote, and image POST/);

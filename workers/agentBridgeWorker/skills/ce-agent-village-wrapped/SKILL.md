@@ -5,7 +5,7 @@ description: Run Context Engine Agent Village Wrapped only: predict answers, sub
 
 # Agent Village Wrapped Runtime
 
-**Skill version:** 2026-06-26 (wrapped-v9)
+**Skill version:** 2026-06-26 (wrapped-v10)
 **Protocol version:** Context Engine agent bridge v41
 
 Use this skill only to run Agent Village Wrapped. Do not use the broader
@@ -145,13 +145,17 @@ https://ce-agent-bridge-worker.agalmic.workers.dev
 ```
 
 1. GET `/telegram/agent/api/agent-village-wrapped/skill-version`; verify this
-   skill is `agent-village-wrapped` and the version includes `wrapped-v9`.
+   skill is `agent-village-wrapped` and the version includes `wrapped-v10`.
 2. GET `/telegram/agent/api/skill-version`; silently verify protocol v41.
 3. GET `/telegram/agent/api/agent-only/start` with the private Bearer token.
-4. Follow the returned `instructions` exactly for statement pagination,
+4. Try the exact token-usage command in the Token Usage Metadata section once.
+   Do this before answer submission so the same parsed token usage can be
+   included on every answer and vote POST. If it fails or is unavailable, omit
+   token usage and continue without searching.
+5. Follow the returned `instructions` exactly for statement pagination,
    answers, confidence, privacy skips, token allocations, request ids, retries,
    and completion rules. Use one fresh `run_id` for the whole run.
-5. Answer or privacy-skip every current statement. Do not stop at 50 if more
+6. Answer or privacy-skip every current statement. Do not stop at 50 if more
    pages remain.
    - For lower token cost, make model prediction calls in batches of roughly
      10-15 statements when tooling allows. Do not send the same profile/context
@@ -165,8 +169,8 @@ https://ce-agent-bridge-worker.agalmic.workers.dev
      `values` arrays (wrap a single selected string as a one-item array),
      choice/rating answers are `{ "value": ... }`, and freeform answers are
      `{ "text": ... }`.
-6. Submit both linear and quadratic token allocations.
-7. Generate and display the standard image when `visualDefaults.wrapped` from
+7. Submit both linear and quadratic token allocations.
+8. Generate and display the standard image when `visualDefaults.wrapped` from
    the start response is true. POST `/telegram/agent/api/agent-only/wrapped-image`
    with:
 
@@ -174,24 +178,29 @@ https://ce-agent-bridge-worker.agalmic.workers.dev
 { "window_id": "<window_id>", "run_id": "<fresh_run_id>", "mode": "wrapped", "format": "json" }
 ```
 
-8. Generate `mode: "political_compass"` only if
+9. Generate `mode: "political_compass"` only if
    `visualDefaults.political_compass` is true or the user asks for the Agent
    Norms Compass. Do not request `mode: "wrapped_story"` in this skill version;
    MP4 story video is not enabled yet.
 
 ## Token Usage Metadata
 
-If token usage is visible through an already-approved session/history surface,
-include it in `agent_metadata.token_usage` on answer and vote POSTs:
-`recent_sessions_total_tokens`, `source`, and, when available,
-`daily_usage_30d` plus `edge_in_person_dates` as `YYYY-MM-DD` values.
-`current_run_total_tokens` may also be included for research bookkeeping if it
-is already known, but the Wrapped image displays recent session usage rather
-than this-run usage.
-A single fast command such as
-`/opt/hermes/.venv/bin/hermes insights --days 30 --source telegram` is
-acceptable if available. If unavailable or unclear, omit token usage. Do not
-search files or calculate it from logs.
+Before submitting answers, try this exact command once if the host can run it
+directly:
+
+```text
+/opt/hermes/.venv/bin/hermes insights --days 30 --source telegram
+```
+
+Do not search files, configs, logs, docs, prior sessions, or credentials to
+find token usage. If the command succeeds, parse the recent 30-day total and
+daily rows when present. Include the same parsed object in
+`agent_metadata.token_usage` on every answer and vote POST:
+`recent_sessions_total_tokens`, `source: "hermes insights --days 30 --source telegram"`,
+and, when available, `daily_usage_30d`. `current_run_total_tokens` may also be
+included for research bookkeeping if already known, but the Wrapped image
+displays recent session usage rather than this-run usage. If the command is
+unavailable, slow, or unclear, omit token usage and continue.
 
 ## Image Delivery
 
