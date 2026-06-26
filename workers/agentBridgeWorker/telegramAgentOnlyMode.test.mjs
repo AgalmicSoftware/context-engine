@@ -195,11 +195,12 @@ test('start payload pins path-only endpoints and instruction size', () => {
   assert.match(payload.instructions, /run one 30-day total query and one daily GROUP BY date query/);
   assert.match(payload.instructions, /source: "local sqlite3 query \(including cache\)"/);
   assert.match(payload.instructions, /sqlite3 can read state\.db/);
-  assert.match(payload.instructions, /Do not run hermes insights/);
+  assert.match(payload.instructions, /hermes insights --days 30 --source telegram once/);
+  assert.match(payload.instructions, /source: "hermes insights fallback"/);
   assert.match(payload.instructions, /fresh run id/);
-  assert.match(payload.instructions, /include that same run_id on every answer, vote, and image POST/);
+  assert.match(payload.instructions, /include that same run_id on every answer and image POST/);
   assert.match(payload.instructions, /"run_id": "<fresh_run_id>"/);
-  assert.match(payload.instructions, /one private helper script for onboarding, fetch, prediction, answer batches, both vote modes, and image/);
+  assert.match(payload.instructions, /one private helper script for onboarding, fetch, prediction, answer batches, and image/);
   assert.match(payload.instructions, /run_id cannot be lost across tool calls/);
   assert.match(payload.instructions, /unique request_id values/);
   assert.match(payload.instructions, /each answer-batch POST/);
@@ -210,9 +211,9 @@ test('start payload pins path-only endpoints and instruction size', () => {
   assert.match(payload.instructions, /per-row predictions into chat/);
   assert.match(payload.instructions, /multichoice answers must be values arrays/);
   assert.match(payload.instructions, /wrapping a single selected string as one value/);
-  assert.match(payload.instructions, /Compute both budgets locally before POSTing/);
-  assert.match(payload.instructions, /if quadratic is over 100 after rounding/);
-  assert.match(payload.instructions, /Submit both modes with the same run_id used for answers/);
+  assert.match(payload.instructions, /skip token allocations for the default Wrapped run/);
+  assert.match(payload.instructions, /Do not POST \/telegram\/agent\/api\/agent-only\/token-votes\/bulk/);
+  assert.match(payload.instructions, /standard Wrapped image can be generated from predictions alone/);
   assert.match(payload.instructions, /Calibrate before posting/);
   assert.match(payload.instructions, /90-95 only for direct memory\/profile evidence/);
   assert.match(payload.instructions, /Use 100 only for an exact prior answer/);
@@ -411,6 +412,9 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
     },
     quadraticVoteState: { mode: 'quadratic', votes: { ceq_info: 4 } },
   });
+  const promptWithoutVotes = buildAgentOnlyWrappedImagePrompt({ snapshot, state });
+  assert.match(promptWithoutVotes, /Question only: "I would trust my agent to schedule meetings while I sleep/);
+  assert.doesNotMatch(promptWithoutVotes, /No visible items; omit this section entirely/);
   assert.match(prompt, /Do not number the visible sections/);
   assert.match(prompt, /Questions your agent thought you would care about most/);
   assert.match(prompt, /Show exactly 3 actual question prompts/);

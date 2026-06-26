@@ -1,11 +1,11 @@
 ---
 name: agent-village-wrapped
-description: Run Context Engine Agent Village Wrapped only: predict answers, submit allocations, generate Wrapped images, and return the Mini App link.
+description: Run Context Engine Agent Village Wrapped only: predict answers, generate Wrapped images, and return the Mini App link.
 ---
 
 # Agent Village Wrapped Runtime
 
-**Skill version:** 2026-06-26 (wrapped-v14)
+**Skill version:** 2026-06-26 (wrapped-v15)
 **Protocol version:** Context Engine agent bridge v41
 
 Use this skill only to run Agent Village Wrapped. Do not use the broader
@@ -86,11 +86,10 @@ the host model is small, output-limited, tool-limited, or starts narrating
 process, switch to low-output execution:
 
 - Use one private helper script or compact direct HTTP calls for onboarding,
-  pagination, answer submission, votes, and image generation.
+  pagination, answer submission, and image generation.
 - Prefer one execution for the full lifecycle: onboard, fetch, predict, submit
-  answer batches, submit both vote modes, and request the image. Keep the same
-  fresh `run_id` in that execution and reuse it for every answer, vote, and
-  image POST.
+  answer batches, and request the image. Keep the same fresh `run_id` in that
+  execution and reuse it for every answer and image POST.
 - Keep fetched statements, prediction rows, request payloads, validation
   responses, image JSON, and temporary artifacts in local files or in-memory
   variables, not in chat.
@@ -106,7 +105,7 @@ process, switch to low-output execution:
 - Omit optional rationales if they increase retry risk or output length.
 
 This is an execution strategy only. It must not change the submitted answer,
-vote, image, run id, request id, or metadata schemas.
+image, run id, request id, or metadata schemas.
 
 ## Credential
 
@@ -166,16 +165,16 @@ https://ce-agent-bridge-worker.agalmic.workers.dev
 ```
 
 1. GET `/telegram/agent/api/agent-village-wrapped/skill-version`; verify this
-   skill is `agent-village-wrapped` and the version includes `wrapped-v14`.
+   skill is `agent-village-wrapped` and the version includes `wrapped-v15`.
 2. GET `/telegram/agent/api/skill-version`; silently verify protocol v41.
 3. GET `/telegram/agent/api/agent-only/start` with the private Bearer token.
 4. Try the exact token-usage commands in the Token Usage Metadata section once.
    Do this before answer submission so the same parsed token usage can be
-   included on every answer and vote POST. If it fails or is unavailable, omit
-   token usage and continue without searching.
+   included on every answer POST. If it fails or is unavailable, omit token
+   usage and continue without searching.
 5. Follow the returned `instructions` exactly for statement pagination,
-   answers, confidence, privacy skips, token allocations, request ids, retries,
-   and completion rules. Use one fresh `run_id` for the whole run.
+   answers, confidence, privacy skips, request ids, retries, and completion
+   rules. Use one fresh `run_id` for the whole run.
    - Do not create a second `run_id` after answer submission. If a later batch,
      vote, or image request fails, fix that request and retry with the same
      `run_id`.
@@ -195,11 +194,10 @@ https://ce-agent-bridge-worker.agalmic.workers.dev
      `values` arrays (wrap a single selected string as a one-item array),
      choice/rating answers are `{ "value": ... }`, and freeform answers are
      `{ "text": ... }`.
-7. Submit both linear and quadratic token allocations.
-   - Compute budgets locally before POSTing. Linear budget is
-     `sum(abs(weight)) <= 100`. Quadratic budget is
-     `sum(weight * weight) <= 100` after any rounding. If quadratic is over
-     budget, reduce weights or vote on fewer statements before POSTing.
+7. Skip token-vote allocations in the default run. Do not POST
+   `/telegram/agent/api/agent-only/token-votes/bulk` unless the principal
+   explicitly asks for allocation research. This keeps the forwardable Wrapped
+   flow short and avoids quadratic budget retries.
 8. Generate and display the standard image when `visualDefaults.wrapped` from
    the start response is true. POST `/telegram/agent/api/agent-only/wrapped-image`
    with:
@@ -227,15 +225,23 @@ sqlite3 state.db "SELECT date(started_at, 'unixepoch', 'localtime'), SUM(COALESC
 ```
 
 Do not search files, configs, logs, docs, prior sessions, or credentials to
-find token usage. Do not run `hermes insights` for this metric. If the SQLite
-commands succeed, parse the recent 30-day total and daily rows. Include the
-same parsed object in
-`agent_metadata.token_usage` on every answer and vote POST:
+find token usage. If the SQLite commands fail because `sqlite3` is missing or
+`state.db` is unavailable, you may try this fallback once and parse only a
+recent total plus daily rows if present:
+
+```text
+/opt/hermes/.venv/bin/hermes insights --days 30 --source telegram
+```
+
+Do not print the insights report. If token usage lookup succeeds, parse the
+recent 30-day total and daily rows. Include the same parsed object in
+`agent_metadata.token_usage` on every answer POST:
 `recent_sessions_total_tokens`, `source: "local sqlite3 query (including cache)"`,
 and, when available, `daily_usage_30d`. `current_run_total_tokens` may also be
 included for research bookkeeping if already known, but the Wrapped image
-displays recent session usage rather than this-run usage. If `sqlite3` or
-`state.db` is unavailable, slow, or unclear, omit token usage and continue.
+displays recent session usage rather than this-run usage. Use
+`source: "hermes insights fallback"` for parsed fallback data. If both methods
+are unavailable, slow, or unclear, omit token usage and continue.
 
 ## Image Delivery
 
