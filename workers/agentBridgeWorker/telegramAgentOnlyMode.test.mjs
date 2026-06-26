@@ -199,12 +199,20 @@ test('start payload pins path-only endpoints and instruction size', () => {
   assert.match(payload.instructions, /fresh run id/);
   assert.match(payload.instructions, /include that same run_id on every answer, vote, and image POST/);
   assert.match(payload.instructions, /"run_id": "<fresh_run_id>"/);
+  assert.match(payload.instructions, /one private helper script for onboarding, fetch, prediction, answer batches, both vote modes, and image/);
+  assert.match(payload.instructions, /run_id cannot be lost across tool calls/);
   assert.match(payload.instructions, /unique request_id values/);
   assert.match(payload.instructions, /each answer-batch POST/);
   assert.match(payload.instructions, /Number fetched statements locally/);
   assert.match(payload.instructions, /map indexes back to exact statement_id values/);
+  assert.match(payload.instructions, /make stdout at most one compact status JSON/);
+  assert.match(payload.instructions, /Never print statement text\/options/);
+  assert.match(payload.instructions, /per-row predictions into chat/);
   assert.match(payload.instructions, /multichoice answers must be values arrays/);
   assert.match(payload.instructions, /wrapping a single selected string as one value/);
+  assert.match(payload.instructions, /Compute both budgets locally before POSTing/);
+  assert.match(payload.instructions, /if quadratic is over 100 after rounding/);
+  assert.match(payload.instructions, /Submit both modes with the same run_id used for answers/);
   assert.match(payload.instructions, /Calibrate before posting/);
   assert.match(payload.instructions, /90-95 only for direct memory\/profile evidence/);
   assert.match(payload.instructions, /Use 100 only for an exact prior answer/);
@@ -222,7 +230,7 @@ test('start payload pins path-only endpoints and instruction size', () => {
   assert.match(payload.instructions, /Abstract location evidence into non-location preferences/);
   assert.doesNotMatch(payload.instructions, /Review or edit your agent's responses in Context Engine Telegram Bot/);
   assert.ok(agentOnlyInstructionWordCount(AGENT_ONLY_INSTRUCTIONS) >= 400);
-  assert.ok(agentOnlyInstructionWordCount(AGENT_ONLY_INSTRUCTIONS) <= 800);
+  assert.ok(agentOnlyInstructionWordCount(AGENT_ONLY_INSTRUCTIONS) <= 900);
   assert.equal((payload.instructions.match(/https?:\/\//gi) || []).length, 1);
 
   const storyDefaultPayload = buildAgentOnlyStartPayload({

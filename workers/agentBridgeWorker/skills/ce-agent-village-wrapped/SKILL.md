@@ -87,11 +87,19 @@ process, switch to low-output execution:
 
 - Use one private helper script or compact direct HTTP calls for onboarding,
   pagination, answer submission, votes, and image generation.
+- Prefer one execution for the full lifecycle: onboard, fetch, predict, submit
+  answer batches, submit both vote modes, and request the image. Keep the same
+  fresh `run_id` in that execution and reuse it for every answer, vote, and
+  image POST.
 - Keep fetched statements, prediction rows, request payloads, validation
   responses, image JSON, and temporary artifacts in local files or in-memory
   variables, not in chat.
-- Keep stdout short: only a compact machine-readable summary needed to attach
-  or display the final image.
+- After fetching statements, do not print, review, render, or summarize their
+  text, options, schemas, or ids. Only counts such as `statement_count` and
+  `page_count` may appear in stdout.
+- Keep helper stdout to one compact status JSON or at most five short lines:
+  counts, submit status, vote status, and `image_url`. Never print per-row
+  predictions.
 - Batch prediction reasoning in groups of roughly 10-15 statements when
   possible, output local indexes rather than full `ceq_...` ids, and map those
   indexes back to exact `statement_id` values programmatically.
@@ -168,8 +176,13 @@ https://ce-agent-bridge-worker.agalmic.workers.dev
 5. Follow the returned `instructions` exactly for statement pagination,
    answers, confidence, privacy skips, token allocations, request ids, retries,
    and completion rules. Use one fresh `run_id` for the whole run.
+   - Do not create a second `run_id` after answer submission. If a later batch,
+     vote, or image request fails, fix that request and retry with the same
+     `run_id`.
 6. Answer or privacy-skip every current statement. Do not stop at 50 if more
    pages remain.
+   - Fetch all pages silently. Do not display the fetched statements for review
+     and do not echo their text, options, schemas, or ids into chat or stdout.
    - For lower token cost, make model prediction calls in batches of roughly
      10-15 statements when tooling allows. Do not send the same profile/context
      prompt once per statement.
@@ -183,6 +196,10 @@ https://ce-agent-bridge-worker.agalmic.workers.dev
      choice/rating answers are `{ "value": ... }`, and freeform answers are
      `{ "text": ... }`.
 7. Submit both linear and quadratic token allocations.
+   - Compute budgets locally before POSTing. Linear budget is
+     `sum(abs(weight)) <= 100`. Quadratic budget is
+     `sum(weight * weight) <= 100` after any rounding. If quadratic is over
+     budget, reduce weights or vote on fewer statements before POSTing.
 8. Generate and display the standard image when `visualDefaults.wrapped` from
    the start response is true. POST `/telegram/agent/api/agent-only/wrapped-image`
    with:

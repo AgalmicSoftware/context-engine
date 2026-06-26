@@ -391,6 +391,11 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.match(wrapped, /version includes `wrapped-v14`/);
   assert.match(wrapped, /Adaptive Low-Output Execution/);
   assert.match(wrapped, /There is no separate "core", "short", or partial deck mode/);
+  assert.match(wrapped, /Prefer one execution for the full lifecycle/);
+  assert.match(wrapped, /reuse it for every answer, vote, and\s+image POST/);
+  assert.match(wrapped, /do not print, review, render, or summarize their\s+text, options, schemas, or ids/);
+  assert.match(wrapped, /Keep helper stdout to one compact status JSON/);
+  assert.match(wrapped, /Never print per-row\s+predictions/);
   assert.match(wrapped, /Never print local file paths as image delivery/);
   assert.match(wrapped, /`clocal:`/);
   assert.doesNotMatch(wrapped, /## No Balance Check/);
@@ -398,10 +403,16 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.match(wrapped, /mcp_index_\*/);
   assert.match(wrapped, /Try the exact token-usage commands/);
   assert.match(wrapped, /Do this before answer submission/);
+  assert.match(wrapped, /Fetch all pages silently/);
+  assert.match(wrapped, /do not echo their text, options, schemas, or ids/);
+  assert.match(wrapped, /Do not create a second `run_id` after answer submission/);
+  assert.match(wrapped, /retry with the same\s+`run_id`/);
   assert.match(wrapped, /make model prediction calls in batches of roughly\s+10-15 statements/);
   assert.match(wrapped, /Map indexes back to exact[\s\S]+`statement_id` values programmatically/);
   assert.match(wrapped, /multichoice answers are\s+`values` arrays/);
   assert.match(wrapped, /wrap a single selected string as a one-item array/);
+  assert.match(wrapped, /Quadratic budget is\s+`sum\(weight \* weight\) <= 100`/);
+  assert.match(wrapped, /If quadratic is over\s+budget, reduce weights or vote on fewer statements before POSTing/);
   assert.match(wrapped, /daily_usage_30d/);
   assert.match(wrapped, /source: "local sqlite3 query \(including cache\)"/);
   assert.match(wrapped, /sqlite3 state\.db/);
