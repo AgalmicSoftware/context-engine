@@ -5,7 +5,7 @@ description: Run Context Engine Agent Village Wrapped only: predict answers, sub
 
 # Agent Village Wrapped Runtime
 
-**Skill version:** 2026-06-25 (wrapped-v5)
+**Skill version:** 2026-06-25 (wrapped-v6)
 **Protocol version:** Context Engine agent bridge v41
 
 Use this skill only to run Agent Village Wrapped. Do not use the broader
@@ -57,7 +57,7 @@ confirmation question when this setting is present.
 ## Balance
 
 If an already-exposed Hermes/OpenRouter balance command or UI surface is
-available, check it once. Minimum: $2.00. If below $2.00, say exactly:
+available, check it once. Minimum: $4.00. If below $4.00, say exactly:
 
 ```text
 You need to add more credit before I can run Agent Village Wrapped.
@@ -121,7 +121,7 @@ https://ce-agent-bridge-worker.agalmic.workers.dev
 ```
 
 1. GET `/telegram/agent/api/agent-village-wrapped/skill-version`; verify this
-   skill is `agent-village-wrapped` and the version includes `wrapped-v5`.
+   skill is `agent-village-wrapped` and the version includes `wrapped-v6`.
 2. GET `/telegram/agent/api/skill-version`; silently verify protocol v41.
 3. GET `/telegram/agent/api/agent-only/start` with the private Bearer token.
 4. Follow the returned `instructions` exactly for statement pagination,
@@ -162,8 +162,8 @@ include it in `agent_metadata.token_usage` on answer and vote POSTs:
 `recent_sessions_total_tokens`, `source`, and, when available,
 `daily_usage_30d` plus `edge_in_person_dates` as `YYYY-MM-DD` values.
 `current_run_total_tokens` may also be included for research bookkeeping if it
-is already known, but the Wrapped image displays last-month usage rather than
-this-run usage.
+is already known, but the Wrapped image displays recent session usage rather
+than this-run usage.
 A single fast command such as
 `/opt/hermes/.venv/bin/hermes insights --days 30 --source telegram` is
 acceptable if available. If unavailable or unclear, omit token usage. Do not
