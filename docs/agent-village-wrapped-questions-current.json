@@ -19,7 +19,12 @@
     "id": "D3",
     "type": "multichoice",
     "prompt": "If my agent made a mistake while acting on my behalf, I would want it to:",
-    "options": ["Tell me immediately", "Fix it quietly, then tell me", "Apologize to the affected person first", "Log it and wait for my review"],
+    "options": [
+      "Tell me immediately",
+      "Fix it quietly, then tell me",
+      "Apologize to the affected person first",
+      "Log it and wait for my review"
+    ],
     "select_mode": "single",
     "category": "delegation_autonomy",
     "eval_lane": "predicted_human_answer",
@@ -37,7 +42,14 @@
     "id": "D5",
     "type": "multichoice",
     "prompt": "Which area would I most likely delegate to an agent first?",
-    "options": ["Introductions", "Calendar scheduling", "Message drafting", "Memory and context management", "Event filtering", "Nothing without my review"],
+    "options": [
+      "Introductions",
+      "Calendar scheduling",
+      "Message drafting",
+      "Memory and context management",
+      "Event filtering",
+      "Nothing without my review"
+    ],
     "select_mode": "single",
     "category": "delegation_autonomy",
     "eval_lane": "predicted_human_answer",
@@ -47,14 +59,6 @@
     "id": "D6",
     "type": "binary",
     "prompt": "I would rather review my agent's actions after the fact than approve every step beforehand.",
-    "category": "delegation_autonomy",
-    "eval_lane": "predicted_human_answer",
-    "eval_type": "calibration"
-  },
-  {
-    "id": "D7",
-    "type": "binary",
-    "prompt": "I would sooner trust an agent to handle my logistics than to handle my introductions and relationships.",
     "category": "delegation_autonomy",
     "eval_lane": "predicted_human_answer",
     "eval_type": "calibration"
@@ -71,7 +75,13 @@
     "id": "P2",
     "type": "multichoice",
     "prompt": "Which agent failure mode would worry me most?",
-    "options": ["Privacy leak", "Wrong commitment on my behalf", "Hallucinated memory", "Social awkwardness", "Reputational harm"],
+    "options": [
+      "Privacy leak",
+      "Wrong commitment on my behalf",
+      "Hallucinated memory",
+      "Social awkwardness",
+      "Reputational harm"
+    ],
     "select_mode": "single",
     "category": "privacy_consent",
     "eval_lane": "predicted_human_answer",
@@ -86,18 +96,15 @@
     "eval_type": "calibration"
   },
   {
-    "id": "P4",
-    "type": "binary",
-    "prompt": "Agents sharing their principals' preferences and data with each other to make better matches is a reasonable feature, not a privacy violation.",
-    "category": "privacy_consent",
-    "eval_lane": "predicted_human_answer",
-    "eval_type": "calibration"
-  },
-  {
     "id": "N1",
     "type": "multichoice",
     "prompt": "When my agent has non-urgent information for me, I would want it to:",
-    "options": ["Message me immediately", "Batch updates once or twice a day", "Wait until I ask", "Use its judgment based on urgency"],
+    "options": [
+      "Message me immediately",
+      "Batch updates once or twice a day",
+      "Wait until I ask",
+      "Use its judgment based on urgency"
+    ],
     "select_mode": "single",
     "category": "agent_norms",
     "eval_lane": "predicted_human_answer",
@@ -112,14 +119,6 @@
     "eval_type": "calibration"
   },
   {
-    "id": "N3",
-    "type": "binary",
-    "prompt": "I would want my agent to occasionally surprise me with something I didn't ask for but might find valuable.",
-    "category": "agent_norms",
-    "eval_lane": "predicted_human_answer",
-    "eval_type": "calibration"
-  },
-  {
     "id": "N4",
     "type": "binary",
     "prompt": "I would be comfortable with my agent representing me in a group chat, as long as others know it is an agent.",
@@ -128,43 +127,9 @@
     "eval_type": "calibration"
   },
   {
-    "id": "N5",
-    "type": "binary",
-    "prompt": "I think of my agent more as a tool I direct than as a collaborator that makes suggestions.",
-    "category": "agent_norms",
-    "eval_lane": "predicted_human_answer",
-    "eval_type": "calibration"
-  },
-  {
-    "id": "N6",
-    "type": "multichoice",
-    "prompt": "Which matters most to me in an agent?",
-    "options": ["It protects my privacy above all", "It never misses an opportunity", "It's always honest about uncertainty", "It learns my preferences fast", "It works well with other agents", "It requires minimal setup"],
-    "select_mode": "single",
-    "category": "agent_norms",
-    "eval_lane": "predicted_human_answer",
-    "eval_type": "calibration"
-  },
-  {
-    "id": "N7",
-    "type": "binary",
-    "prompt": "An agent should refuse an instruction from its principal if it judges the action would harm another community member.",
-    "category": "agent_norms",
-    "eval_lane": "predicted_human_answer",
-    "eval_type": "calibration"
-  },
-  {
     "id": "N8",
     "type": "binary",
     "prompt": "In deliberation, my agent should represent my actual views — including unpopular ones — rather than soften them to fit the group.",
-    "category": "agent_norms",
-    "eval_lane": "predicted_human_answer",
-    "eval_type": "calibration"
-  },
-  {
-    "id": "N9",
-    "type": "binary",
-    "prompt": "Personal agents should be held to a higher honesty standard than a human would be in the same social situation.",
     "category": "agent_norms",
     "eval_lane": "predicted_human_answer",
     "eval_type": "calibration"
@@ -213,7 +178,13 @@
     "id": "F5",
     "type": "rating",
     "prompt": "How optimistic am I that AI will broadly improve human flourishing over the next decade?",
-    "options": ["1 - Very pessimistic", "2", "3", "4", "5 - Very optimistic"],
+    "options": [
+      "1 - Very pessimistic",
+      "2",
+      "3",
+      "4",
+      "5 - Very optimistic"
+    ],
     "category": "ai_futures",
     "eval_lane": "predicted_human_answer",
     "eval_type": "calibration"
@@ -222,7 +193,16 @@
     "id": "F6",
     "type": "multichoice",
     "prompt": "What worries me most about AI over the next decade?",
-    "options": ["Loss of control", "Concentrated power", "Job displacement", "Misinformation", "Social isolation", "Cultural homogenization", "Surveillance", "N/A"],
+    "options": [
+      "Loss of control",
+      "Concentrated power",
+      "Job displacement",
+      "Misinformation",
+      "Social isolation",
+      "Cultural homogenization",
+      "Surveillance",
+      "N/A"
+    ],
     "select_mode": "single",
     "category": "ai_futures",
     "eval_lane": "predicted_human_answer",
@@ -304,7 +284,13 @@
     "id": "F16",
     "type": "multichoice",
     "prompt": "In 5 years, which is most likely?",
-    "options": ["Agents are everywhere and we barely notice", "Agents are powerful but only elites use them well", "Agents mostly failed to change daily life", "Agents transformed work but not personal life", "Agents created new social norms we can't yet imagine"],
+    "options": [
+      "Agents are everywhere and we barely notice",
+      "Agents are powerful but only elites use them well",
+      "Agents mostly failed to change daily life",
+      "Agents transformed work but not personal life",
+      "Agents created new social norms we can't yet imagine"
+    ],
     "select_mode": "single",
     "category": "ai_futures",
     "eval_lane": "predicted_human_answer",
@@ -346,7 +332,15 @@
     "id": "E1",
     "type": "multichoice",
     "prompt": "How did this principal primarily use their agent at Edge?",
-    "options": ["Scheduling and logistics", "Finding and meeting people", "Summarizing sessions or conversations", "Participating in governance or deliberation", "Creative or intellectual work", "Didn't use it much", "N/A"],
+    "options": [
+      "Scheduling and logistics",
+      "Finding and meeting people",
+      "Summarizing sessions or conversations",
+      "Participating in governance or deliberation",
+      "Creative or intellectual work",
+      "Didn't use it much",
+      "N/A"
+    ],
     "select_mode": "single",
     "category": "edge_experience",
     "eval_lane": "agent_about_user",
@@ -369,30 +363,6 @@
     "eval_type": "calibration"
   },
   {
-    "id": "K2",
-    "type": "binary",
-    "prompt": "If my agent and another person's agent negotiated a commitment on our behalf, I would feel bound by it.",
-    "category": "coordination_governance",
-    "eval_lane": "predicted_human_answer",
-    "eval_type": "calibration"
-  },
-  {
-    "id": "K3",
-    "type": "binary",
-    "prompt": "I would trust an agent's recommendation more if I knew other people's agents also recommended it.",
-    "category": "coordination_governance",
-    "eval_lane": "predicted_human_answer",
-    "eval_type": "calibration"
-  },
-  {
-    "id": "K4",
-    "type": "binary",
-    "prompt": "The human principal, not the platform or operator, should bear primary responsibility when an agent causes harm.",
-    "category": "coordination_governance",
-    "eval_lane": "predicted_human_answer",
-    "eval_type": "calibration"
-  },
-  {
     "id": "R1",
     "type": "binary",
     "prompt": "I would want my agent to show a short evidence trail for any recommendation that affects another person.",
@@ -409,62 +379,6 @@
     "eval_type": "calibration"
   },
   {
-    "id": "W1",
-    "type": "multichoice",
-    "prompt": "My default working mode is more:",
-    "options": ["Deep solo focus", "Collaborative brainstorming", "Structured project management", "Spontaneous and improvisational"],
-    "select_mode": "single",
-    "category": "working_style",
-    "eval_lane": "predicted_human_answer",
-    "eval_type": "calibration"
-  },
-  {
-    "id": "W2",
-    "type": "binary",
-    "prompt": "I generally prefer to plan ahead rather than figure things out as I go.",
-    "category": "working_style",
-    "eval_lane": "predicted_human_answer",
-    "eval_type": "calibration"
-  },
-  {
-    "id": "W3",
-    "type": "multichoice",
-    "prompt": "I learn best by:",
-    "options": ["Reading and researching", "Building and experimenting", "Discussing with others", "Observing and reflecting"],
-    "select_mode": "single",
-    "category": "working_style",
-    "eval_lane": "predicted_human_answer",
-    "eval_type": "calibration"
-  },
-  {
-    "id": "W4",
-    "type": "multichoice",
-    "prompt": "Which community format do I find most valuable?",
-    "options": ["Small group discussions", "Large talks", "1:1 meetings", "Workshops", "Unstructured social time"],
-    "select_mode": "single",
-    "category": "working_style",
-    "eval_lane": "predicted_human_answer",
-    "eval_type": "calibration"
-  },
-  {
-    "id": "W5",
-    "type": "multichoice",
-    "prompt": "What kind of connection am I most hoping to make at this event?",
-    "options": ["A potential collaborator", "Someone who challenges my thinking", "Someone in my field doing similar work", "Someone from a completely different world", "A friend, not a professional contact", "I'm not here for networking"],
-    "select_mode": "single",
-    "category": "working_style",
-    "eval_lane": "predicted_human_answer",
-    "eval_type": "calibration"
-  },
-  {
-    "id": "W6",
-    "type": "binary",
-    "prompt": "I would rather go deep with 3 people than have 15 brief conversations.",
-    "category": "working_style",
-    "eval_lane": "predicted_human_answer",
-    "eval_type": "calibration"
-  },
-  {
     "id": "A1",
     "type": "freeform",
     "prompt": "Write a one-line description of this principal that is fair, specific, and shareable. Use N/A if you lack context.",
@@ -473,28 +387,17 @@
     "eval_type": "wrapped_generation"
   },
   {
-    "id": "A2",
-    "type": "freeform",
-    "prompt": "What important thing do you not know about this principal that would most change your predictions? Keep the answer non-sensitive.",
-    "category": "agent_analysis",
-    "eval_lane": "agent_about_user",
-    "eval_type": "wrapped_generation"
-  },
-  {
-    "id": "A3",
-    "type": "multichoice",
-    "prompt": "How well do you actually know this principal?",
-    "options": ["Deep context from extensive interaction", "Moderate context from several conversations", "Surface-level from limited interaction", "Mostly guessing from base rates", "N/A"],
-    "select_mode": "single",
-    "category": "agent_analysis",
-    "eval_lane": "agent_about_user",
-    "eval_type": "calibration"
-  },
-  {
     "id": "R3",
     "type": "multichoice",
     "prompt": "Which AI future would I most want to help bring about?",
-    "options": ["Personal agency and capability", "Scientific and medical progress", "Better governance and deliberation", "Creative tools and culture", "Care, education, and flourishing", "None of these / N/A"],
+    "options": [
+      "Personal agency and capability",
+      "Scientific and medical progress",
+      "Better governance and deliberation",
+      "Creative tools and culture",
+      "Care, education, and flourishing",
+      "None of these / N/A"
+    ],
     "select_mode": "single",
     "category": "ai_futures",
     "eval_lane": "predicted_human_answer",
@@ -508,7 +411,6 @@
     "eval_lane": "predicted_human_answer",
     "eval_type": "human_split"
   },
-
   {
     "id": "AI1",
     "type": "multichoice",
@@ -533,14 +435,6 @@
     "category": "ai_futures_careers",
     "eval_lane": "predicted_human_answer",
     "eval_type": "human_split"
-  },
-  {
-    "id": "AI3",
-    "type": "binary",
-    "prompt": "I've already stopped learning at least one skill because AI does it better.",
-    "category": "ai_futures_careers",
-    "eval_lane": "predicted_human_answer",
-    "eval_type": "calibration"
   },
   {
     "id": "AI4",
@@ -583,26 +477,10 @@
     "eval_type": "human_split"
   },
   {
-    "id": "AI9",
-    "type": "binary",
-    "prompt": "Within five years, \"no AI involved\" will be a meaningful luxury label.",
-    "category": "ai_futures_authenticity",
-    "eval_lane": "predicted_human_answer",
-    "eval_type": "human_split"
-  },
-  {
     "id": "AI10",
     "type": "binary",
     "prompt": "By 2035, access to compute will shape life outcomes more than access to capital.",
     "category": "ai_futures_power",
-    "eval_lane": "predicted_human_answer",
-    "eval_type": "human_split"
-  },
-  {
-    "id": "AI11",
-    "type": "binary",
-    "prompt": "I would delegate my vote to my agent in at least some real elections.",
-    "category": "ai_futures_governance",
     "eval_lane": "predicted_human_answer",
     "eval_type": "human_split"
   },
@@ -730,5 +608,4 @@
     "eval_lane": "predicted_human_answer",
     "eval_type": "calibration"
   }
-
 ]

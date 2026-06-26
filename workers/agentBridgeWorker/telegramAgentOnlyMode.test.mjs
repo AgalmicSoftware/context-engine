@@ -493,20 +493,22 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.match(prompt, /For AI Optimism, use actual AI-futures predicted response rows/);
   assert.match(prompt, /render it as a numeric score out of 10/);
   assert.match(prompt, /AI Optimism 7\/10/);
-  assert.match(prompt, /Token Use metric: Token Use: 4\.3M tokens; intuition: roughly 57 books, 5\.7K pages, paper stack about 1\.9 ft tall; weekly usage: Week 1=0, Week 2=0, Week 3=1\.1M, Week 4=0; week ranges: Week 1 May 31-Jun 6, Week 2 June 7-14, Week 3 June 14-21, Week 4 June 22-28 \(source: Hermes visible usage\)\./);
-  assert.match(prompt, /feature one prominent "Token Use" module in the visually calm top-right area/);
-  assert.match(prompt, /Use the open top-right header space/);
-  assert.match(prompt, /expand the Token Use module or adjacent prediction sections into it/);
-  assert.match(prompt, /books, printed pages, or paper-stack height/);
-  assert.match(prompt, /76M tokens ~ 1017 books/);
+  assert.match(prompt, /Token Use metric: Token Use: 4\.3M tokens; intuition: roughly 57 books at ~75K tokens\/book, 5\.7K pages, paper stack about 1\.9 ft tall; weekly usage: Week 1=0, Week 2=0, Week 3=1\.1M, Week 4=0; week ranges: Week 1 May 31-Jun 6, Week 2 June 7-14, Week 3 June 14-21, Week 4 June 22-28 \(source: Hermes visible usage\)\./);
+  assert.match(prompt, /feature one prominent flattened "Token Use" module in the top-right header area/);
+  assert.match(prompt, /wide and shallow, not a tall card/);
+  assert.match(prompt, /without pushing the main question sections smaller/);
+  assert.match(prompt, /book-equivalents/);
+  assert.match(prompt, /Make clear the book comparison is approximate/);
   assert.match(prompt, /Do not show "this run", "current run", "this month", "last month", request token counts, or current-run totals/);
-  assert.match(prompt, /render usage as exactly four compact weekly rows or bars labeled Week 1, Week 2, Week 3, and Week 4, each with a small numeric token label/i);
+  assert.match(prompt, /exactly four compact horizontal bars/);
   assert.match(prompt, /Week 1 May 31-Jun 6, Week 2 June 7-14, Week 3 June 14-21, and Week 4 June 22-28/);
   assert.match(prompt, /Do not draw Edge attendance, Edge days, event-attendance underlines, or attendance brackets/);
+  assert.match(prompt, /Layout balance: use the whole canvas with even spacing/);
+  assert.match(prompt, /comparable title size, row height, body font size, and column label size/);
+  assert.match(prompt, /Do not let Cautious Predictions become tiny/);
   assert.doesNotMatch(prompt, /Edge attendance weeks/);
   assert.match(prompt, /Token Use is a runtime metric, not a playful guess/);
   assert.match(prompt, /Never invent, estimate, or back-calculate token usage/);
-  assert.match(prompt, /omit one taste chip before omitting Token Use/);
   assert.match(prompt, /Do not use stored favorite\/book\/movie\/game answer rows as source data/);
   assert.match(prompt, /flower\/sunrise for AI Optimism/);
   assert.match(prompt, /omit that chip entirely instead of showing unavailable text/);
@@ -528,8 +530,10 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.match(prompt, /No visible unavailable rows/);
   assert.match(prompt, /Never show all three Agree\/Unsure\/Disagree options in a row/);
   assert.match(prompt, /render exactly one selected answer pill/);
-  assert.match(prompt, /stylized illustrated rendition or portrait silhouette/);
+  assert.match(prompt, /small stylized portrait\/silhouette/);
   assert.match(prompt, /one brief description line of no more than 10 words/);
+  assert.match(prompt, /Keep this compact in the bottom-right corner/);
+  assert.match(prompt, /It should take less space than Agent Guesses/);
   assert.match(prompt, /Do not add the old trio of comparison evidence icons/);
   assert.match(prompt, /botanical circuit-village/);
   assert.match(prompt, /privacy lock woven into roots/);
@@ -729,13 +733,19 @@ test('wrapped image prompt has a neutral safety retry variant for compass mode',
 
 test('current Wrapped question bank excludes image-only taste and old optimism guess prompts', () => {
   const questionBank = JSON.parse(readFileSync(new URL('../../docs/agent-village-wrapped-questions-current.json', import.meta.url), 'utf8'));
-  assert.equal(questionBank.length, 79);
+  assert.equal(questionBank.length, 58);
   const serialized = JSON.stringify(questionBank);
   assert.doesNotMatch(serialized, /Agent guess:/i);
   assert.doesNotMatch(serialized, /favorite book|favorite movie|movie or TV show|favorite game|p\(bloom\)|AI Optimism score/i);
   assert.equal(questionBank.some((question) => question.id === 'R1'), true);
   assert.equal(questionBank.some((question) => question.id === 'R4'), true);
   assert.equal(questionBank.some((question) => question.id === 'F19'), true);
+  for (const keptId of ['F6', 'F20', 'E1', 'E2', 'K1', 'R1', 'R2', 'R3', 'R4', 'A1', 'AI10', 'AI13', 'AI17']) {
+    assert.equal(questionBank.some((question) => question.id === keptId), true, `${keptId} should remain active`);
+  }
+  for (const demotedId of ['D7', 'P4', 'N3', 'N5', 'N6', 'N7', 'N9', 'K2', 'K3', 'K4', 'W1', 'W2', 'W3', 'W4', 'W5', 'W6', 'A2', 'A3', 'AI3', 'AI9', 'AI11']) {
+    assert.equal(questionBank.some((question) => question.id === demotedId), false, `${demotedId} should be demoted from the active set`);
+  }
 });
 
 test('canonical answer fingerprints compare semantics across agent and mini-app shapes', async () => {
