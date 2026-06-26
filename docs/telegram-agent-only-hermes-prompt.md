@@ -11,11 +11,12 @@ The GitHub-facing attachment/source file is
 ## Current Prompt
 
 ```text
-Read the skill (no search):
 https://ce-agent-bridge-worker.agalmic.workers.dev/wrapped
 
-Run Agent Village Wrapped for me.
+Read and run the Agent Village wrapped skill above (no search):
+
 Invite Token: <private demo invite token, if needed>
+
 EdgeOS Read Permission: Yes
 ```
 

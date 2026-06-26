@@ -5,7 +5,7 @@ description: Run Context Engine Agent Village Wrapped only: predict answers, sub
 
 # Agent Village Wrapped Runtime
 
-**Skill version:** 2026-06-26 (wrapped-v8)
+**Skill version:** 2026-06-26 (wrapped-v9)
 **Protocol version:** Context Engine agent bridge v41
 
 Use this skill only to run Agent Village Wrapped. Do not use the broader
@@ -18,13 +18,17 @@ the worker endpoints below are the whole procedure.
 The user may forward a short message with:
 
 ```text
-Read the skill (no search):
 https://ce-agent-bridge-worker.agalmic.workers.dev/wrapped
 
-Run Agent Village Wrapped for me.
+Read and run the Agent Village wrapped skill above (no search):
+
 Invite Token: <private invite token, if supplied>
+
 EdgeOS Read Permission: Yes
 ```
+
+This URL-first shape is the canonical Telegram/QR format. The words "above
+(no search)" refer to the skill URL at the top of the same forwarded message.
 
 `Invite Token: ...`, `Wrapped Invite Token: ...`, and
 `AVW Invite Token: ...` are accepted aliases for
@@ -39,13 +43,14 @@ confirmation question when this setting is present.
 
 ## First Action
 
-When invoked from a short forwarded prompt, do not inspect local skills, local
-files, previous sessions, memories, recovered scripts, Geo, or Index first.
-Fetch/read this skill URL, parse `EdgeOS Read Permission` and any invite-token
-line from the forwarded message, then run the Credential section. A valid
-invite-token line is enough to mint the wrapped credential; do not search for
-previous `ceagt_...` tokens or old prediction scripts. Every run must fetch the
-current statements from the worker.
+When invoked from a short forwarded prompt, the skill URL may appear before the
+instruction line. Do not inspect local skills, local files, previous sessions,
+memories, recovered scripts, Geo, or Index first. Fetch/read this skill URL,
+parse `EdgeOS Read Permission` and any invite-token line from the forwarded
+message, then run the Credential section. A valid invite-token line is enough
+to mint the wrapped credential; do not search for previous `ceagt_...` tokens
+or old prediction scripts. Every run must fetch the current statements from the
+worker.
 
 ## Hard Rules
 
@@ -140,7 +145,7 @@ https://ce-agent-bridge-worker.agalmic.workers.dev
 ```
 
 1. GET `/telegram/agent/api/agent-village-wrapped/skill-version`; verify this
-   skill is `agent-village-wrapped` and the version includes `wrapped-v8`.
+   skill is `agent-village-wrapped` and the version includes `wrapped-v9`.
 2. GET `/telegram/agent/api/skill-version`; silently verify protocol v41.
 3. GET `/telegram/agent/api/agent-only/start` with the private Bearer token.
 4. Follow the returned `instructions` exactly for statement pagination,
