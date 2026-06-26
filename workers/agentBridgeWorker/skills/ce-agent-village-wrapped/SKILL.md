@@ -5,7 +5,7 @@ description: Run Context Engine Agent Village Wrapped only: predict answers, sub
 
 # Agent Village Wrapped Runtime
 
-**Skill version:** 2026-06-25 (wrapped-v6)
+**Skill version:** 2026-06-26 (wrapped-v7)
 **Protocol version:** Context Engine agent bridge v41
 
 Use this skill only to run Agent Village Wrapped. Do not use the broader
@@ -26,12 +26,26 @@ EdgeOS Read Permission: Yes
 Agent Village Wrapped Invite Token: <private invite token, if supplied>
 ```
 
+`Invite Token: ...`, `Wrapped Invite Token: ...`, and
+`AVW Invite Token: ...` are accepted aliases for
+`Agent Village Wrapped Invite Token: ...`.
+
 `EdgeOS Read Permission: Yes` means you may use high-level, non-sensitive
 EdgeOS profile or memory context that is already exposed by the host as
 prediction signal. It does not authorize Index Network, Geo, or `mcp_index_*`
 tool calls. `No` means do not use EdgeOS profile or memory context. If absent,
 default to No. Never ask a second permission, preference, research, or
 confirmation question when this setting is present.
+
+## First Action
+
+When invoked from a short forwarded prompt, do not inspect local skills, local
+files, previous sessions, memories, recovered scripts, Geo, or Index first.
+Fetch/read this skill URL, parse `EdgeOS Read Permission` and any invite-token
+line from the forwarded message, then run the Credential section. A valid
+invite-token line is enough to mint the wrapped credential; do not search for
+previous `ceagt_...` tokens or old prediction scripts. Every run must fetch the
+current statements from the worker.
 
 ## Hard Rules
 
@@ -42,8 +56,10 @@ confirmation question when this setting is present.
   file to recover the private CE credential. Do not print its contents.
 - Do not read other local auth, env, config, SQLite, memory-token, or
   credential files to find a token or OpenRouter key.
-- Do not use `skill_view`, `search_files`, grep/find, local docs, Geo, Index
-  Network, or `mcp_index_*` tools to discover setup or profile context.
+- Do not use `skill_view`, `skills_list`, `search_files`, `session_search`,
+  grep/find, local docs, previous session JSON, Geo, Index Network, or
+  `mcp_index_*` tools to discover setup, credentials, profile context, or prior
+  prediction scripts.
 - Do not call `/telegram/agent/api/invite/onboard` except for the explicit
   Agent Village Wrapped credential fallback in the Credential section below.
 - You may use one private helper script or direct HTTP calls to keep the run
@@ -68,12 +84,13 @@ balance check and continue.
 
 ## Credential
 
-If the forwarded message contains an `Agent Village Wrapped Invite Token`, use
-it first to mint or refresh the wrapped agent-only credential. Use the Telegram
-id from the current Telegram/Hermes runtime context. Do not ask the user to type
-or paste their Telegram id, and do not read files to discover it. If the runtime
-context cannot provide a Telegram id, stop with the credential-needed sentence
-below. Otherwise, POST once to:
+If the forwarded message contains an `Agent Village Wrapped Invite Token` or an
+invite-token alias (`Invite Token`, `Wrapped Invite Token`, or
+`AVW Invite Token`), use it first to mint or refresh the wrapped agent-only
+credential. Use the Telegram id from the current Telegram/Hermes runtime
+context. Do not ask the user to type or paste their Telegram id, and do not read
+files to discover it. If the runtime context cannot provide a Telegram id, stop
+with the credential-needed sentence below. Otherwise, POST once to:
 
 ```text
 /telegram/agent/api/invite/onboard
@@ -121,7 +138,7 @@ https://ce-agent-bridge-worker.agalmic.workers.dev
 ```
 
 1. GET `/telegram/agent/api/agent-village-wrapped/skill-version`; verify this
-   skill is `agent-village-wrapped` and the version includes `wrapped-v6`.
+   skill is `agent-village-wrapped` and the version includes `wrapped-v7`.
 2. GET `/telegram/agent/api/skill-version`; silently verify protocol v41.
 3. GET `/telegram/agent/api/agent-only/start` with the private Bearer token.
 4. Follow the returned `instructions` exactly for statement pagination,

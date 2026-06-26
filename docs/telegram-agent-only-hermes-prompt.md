@@ -22,6 +22,8 @@ Change only the `EdgeOS Read Permission` line to `No` for a no-profile run.
 Keep the invite-token line private; it is optional for already-onboarded agents
 and required for first-time demo agents. The agent should use the Telegram id
 from its Telegram/Hermes runtime context; users should not paste a Telegram id.
+The runtime skill also accepts `Invite Token:`, `Wrapped Invite Token:`, and
+`AVW Invite Token:` as aliases for the longer invite-token label.
 
 Use the unversioned skill URL for QR codes and forwarded messages. The worker
 redirects it to the current raw skill with a cache-busting version parameter, so
