@@ -212,6 +212,13 @@ export default {
         broadcastEnabled: directSubmitFeatureEnabled(env),
       });
     }
+    if (url.pathname === '/wrapped' && request.method === 'GET') {
+      return handleTelegramAgentHandoffRequest({
+        request,
+        env,
+        waitUntil: typeof ctx.waitUntil === 'function' ? (promise) => ctx.waitUntil(promise) : null,
+      });
+    }
     if (url.pathname === '/mock/telegram/demo-flow' && request.method === 'POST') {
       const body = await request.json().catch(() => ({}));
       return json(await runMockTelegramDemoFlow({

@@ -170,6 +170,15 @@ test('worker health endpoint marks private bridge and default broadcast-enabled 
   assert.equal(body.broadcastEnabled, true);
 });
 
+test('worker serves the short Agent Village Wrapped skill route', async () => {
+  const response = await worker.fetch(new Request('https://bridge.example/wrapped'));
+
+  assert.equal(response.status, 302);
+  const location = response.headers.get('location') || '';
+  assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-agent-village-wrapped\/SKILL\.md/);
+  assert.match(location, /v=2026-06-25-wrapped-v6-/);
+});
+
 test('worker mock demo route returns end-to-end private Telegram flow without secrets', async () => {
   const response = await worker.fetch(new Request('https://bridge.example/mock/telegram/demo-flow', {
     method: 'POST',
