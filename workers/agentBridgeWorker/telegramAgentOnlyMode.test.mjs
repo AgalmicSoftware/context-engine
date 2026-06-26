@@ -208,6 +208,8 @@ test('start payload pins path-only endpoints and instruction size', () => {
   assert.match(payload.instructions, /otherwise cap confidence at 95/);
   assert.match(payload.instructions, /Do not use a repeated default like 85 across a batch/);
   assert.match(payload.instructions, /scan for flat confidence/);
+  assert.match(payload.instructions, /Do not run image generation or display in a detached background process/);
+  assert.match(payload.instructions, /Never send the closeout sentence before the image/);
   assert.match(payload.instructions, /Do not include process notes, debugging, script names, parallelization/);
   assert.match(payload.instructions, /To inspect or change your agent's responses/);
   assert.doesNotMatch(payload.instructions, /shareable story version/);
@@ -352,8 +354,10 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
               currentRunTotalTokens: 1248000,
               recentSessionsTotalTokens: 4300000,
               dailyUsage30d: [
-                { date: '2026-06-18', tokens: 320000 },
-                { date: '2026-06-19', tokens: 780000 },
+                { date: '2026-06-03', tokens: 1000000 },
+                { date: '2026-06-10', tokens: 1200000 },
+                { date: '2026-06-18', tokens: 1100000 },
+                { date: '2026-06-25', tokens: 1000000 },
               ],
               edgeInPersonDates: ['2026-06-18', '2026-06-19'],
               source: 'Hermes visible usage',
@@ -495,12 +499,12 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.match(prompt, /For AI Optimism, use actual AI-futures predicted response rows/);
   assert.match(prompt, /render it as a numeric score out of 10/);
   assert.match(prompt, /AI Optimism 7\/10/);
-  assert.match(prompt, /Token Use metric: Token Use: 4\.3M tokens; intuition: roughly 57 books at ~75K tokens\/book, 5\.7K pages, paper stack about 1\.9 ft tall; weekly usage: Week 1=0, Week 2=0, Week 3=1\.1M, Week 4=0; week ranges: Week 1 May 31-Jun 6, Week 2 June 7-14, Week 3 June 14-21, Week 4 June 22-28 \(source: Hermes visible usage\)\./);
+  assert.match(prompt, /Token Use metric: Token Use: 4\.3M tokens; intuition: roughly 57 books at ~75K tokens\/book, 5\.7K pages, paper stack about 1\.9 ft tall; weekly usage: Week 1=1M, Week 2=1\.2M, Week 3=1\.1M, Week 4=1M; week ranges: Week 1 May 31-Jun 6, Week 2 June 7-14, Week 3 June 14-21, Week 4 June 22-28 \(source: Hermes visible usage\)\./);
   assert.match(prompt, /feature one prominent flattened "Token Use" module in the top-right header area/);
   assert.match(prompt, /wide and shallow, not a tall card/);
   assert.match(prompt, /without pushing the main question sections smaller/);
   assert.match(prompt, /book-equivalents/);
-  assert.match(prompt, /Make clear the book comparison is approximate/);
+  assert.match(prompt, /Use "roughly" for approximate comparisons; do not also write "approx\." or "approximately"/);
   assert.match(prompt, /Do not show "this run", "current run", "this month", "last month", request token counts, or current-run totals/);
   assert.match(prompt, /exactly four compact horizontal bars/);
   assert.match(prompt, /Week 1 May 31-Jun 6, Week 2 June 7-14, Week 3 June 14-21, and Week 4 June 22-28/);
@@ -550,6 +554,39 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.doesNotMatch(prompt, /What Your Agent Upvoted/);
   assert.doesNotMatch(prompt, /\n1\. Agent Core Insight/);
   assert.doesNotMatch(prompt, /\n7\. Abstract Agent Impression/);
+});
+
+test('wrapped image prompt omits weekly token bars when daily rows conflict with the total', () => {
+  const snapshot = {
+    windowId: 'w-2026-06-22',
+    statements: [{
+      statement_id: 'ceq_privacy',
+      text: 'I would rather my agent be too conservative with privacy than too proactive with opportunities.',
+      answer_schema: { kind: 'choice', values: ['agree', 'unsure', 'disagree'] },
+    }],
+  };
+  const state = {
+    byStatement: {
+      ceq_privacy: {
+        agent: {
+          answer: { value: 'agree' },
+          confidence: 90,
+          updatedAt: '2026-06-26T11:09:43.352Z',
+          agentMetadata: {
+            tokenUsage: {
+              recentSessionsTotalTokens: 149638701,
+              dailyUsage30d: [{ date: '2026-06-25', total_tokens: 2828667 }],
+              source: 'hermes insights --days 30 --source telegram',
+            },
+          },
+        },
+      },
+    },
+  };
+  const prompt = buildAgentOnlyWrappedImagePrompt({ snapshot, state });
+  assert.match(prompt, /Token Use metric: Token Use: 150M tokens/);
+  assert.doesNotMatch(prompt, /weekly usage: Week 1=/);
+  assert.match(prompt, /If weekly usage evidence exists/);
 });
 
 test('wrapped image prompt supports Agent Norms Compass mode around the most-important question', () => {

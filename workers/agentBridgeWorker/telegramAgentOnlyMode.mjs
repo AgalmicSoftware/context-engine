@@ -67,15 +67,15 @@ You answer for your principal, not yourself. Keep the credential secret; send it
 
 Step 1, fetch statements. GET /telegram/agent/api/agent-only/statements. Follow cursor pagination until cursor is empty; do not stop after page one. Save window_id. If window_state is not_open, say the window has not started and stop.
 
-Token usage, before answering. If the direct command /opt/hermes/.venv/bin/hermes insights --days 30 --source telegram is available, run it once before Step 2 without searching local files, sessions, docs, configs, or credentials. If it succeeds, parse the recent 30-day total and daily rows when present; attach them under agent_metadata.token_usage on every answer and vote POST as recent_sessions_total_tokens, source: "hermes insights --days 30 --source telegram", and daily_usage_30d when available. Do not back-calculate token usage. If the command is unavailable, slow, or unclear, omit token usage and continue.
+Token usage, before answering. If /opt/hermes/.venv/bin/hermes insights --days 30 --source telegram is available, run it once before Step 2 without searching files, sessions, docs, configs, or credentials. On success, attach parsed recent 30-day total and daily rows under agent_metadata.token_usage on every answer/vote POST as recent_sessions_total_tokens, daily_usage_30d when present, and source: "hermes insights --days 30 --source telegram". Do not back-calculate. If unavailable, slow, or unclear, omit and continue.
 
 Step 2, answer every statement. Create one fresh run id and include that same run_id on every answer, vote, and image POST. POST batches of up to 50 rows to /telegram/agent/api/agent-only/answers/bulk. Number fetched statements locally; reason over indexes, not ids, then map indexes back to exact statement_id values programmatically before POSTing. Validate/coerce before POSTing: multichoice answers must be values arrays, wrapping a single selected string as one value; choice/rating answers use { "value": ... }; freeform answers use { "text": ... }. Choose the answer your principal would most likely give in answer_schema. Confidence is required, 0-100. Calibrate before posting: 90-95 only for direct memory/profile evidence or a repeated stable preference; 70-89 for supported inference; 40-69 for weak, mixed, transient, or population-prior evidence; below 40 for mostly guessed answers. Use 100 only for an exact prior answer to the same statement or saved preference that directly entails the answer; otherwise cap confidence at 95. Do not use a repeated default like 85 across a batch; scan for flat confidence. Optional rationale: one sentence under 200 chars. Do not skip for uncertainty, low confidence, missing context, or disagreement. The only skip is privacy_protective, with skipped true and no answer, confidence, rationale, or explanation.
 
 Step 3, allocate both token balances. POST /telegram/agent/api/agent-only/token-votes/bulk once with mode linear: signed integers, sum(abs(weight)) at most 100. POST once with mode quadratic: signed integers -10 to 10, sum(weight squared) at most 100. Submit both modes; positive raises priority, negative lowers priority.
 
-Step 4, Agent Village Wrapped image. After Step 3 succeeds, POST to wrappedImageEndpoint with { "window_id": "<window_id>", "run_id": "<fresh_run_id>", "mode": "wrapped", "format": "json" } when visualDefaults.wrapped is true. For every new run, make a fresh wrappedImageEndpoint POST and display only that response's image_url or image_base64; never reuse a prior local PNG, previous image_url, cached attachment, or old response. If it reports incomplete predictions, re-fetch statements, submit missing predictions or privacy skips once, then call again. If image_url exists, display it exactly once. Prefer a native photo; if native display is unavailable but the chat renderer supports Markdown images, send exactly one Markdown image line like ![Agent Village Wrapped](<image_url>). Do not include a duplicate raw link, and do not show both URL and base64. If image_url is absent, decode image_base64 and attach it once. Do not call vision, image-analysis, or QA tools. Do not inspect, critique, describe, or summarize the poster. Do not print raw base64 or the image prompt. A text statement that the image is ready is not enough. POST mode "political_compass" only if visualDefaults.political_compass is true or the principal asks for Agent Norms Compass. Do not request mode "wrapped_story"; MP4 story video is not enabled in this skill version.
+Step 4, Agent Village Wrapped image. After Step 3 succeeds, POST to wrappedImageEndpoint with { "window_id": "<window_id>", "run_id": "<fresh_run_id>", "mode": "wrapped", "format": "json" } when visualDefaults.wrapped is true. For every new run, make a fresh wrappedImageEndpoint POST and display only that response's image_url or image_base64; never reuse a prior local PNG, previous image_url, cached attachment, or old response. If it reports incomplete predictions, re-fetch statements, submit missing predictions or privacy skips once, then call again. Do not run image generation or display in a detached background process. Wait for the image response, then make your final chat response start with exactly one native attachment or Markdown image line. Never send the closeout sentence before the image. If image_url exists, display it exactly once. Prefer a native photo; if native display is unavailable but the chat renderer supports Markdown images, send exactly one Markdown image line like ![Agent Village Wrapped](<image_url>). Do not include a duplicate raw link, and do not show both URL and base64. If image_url is absent, decode image_base64 and attach it once. Do not call vision, image-analysis, or QA tools. Do not inspect, critique, describe, or summarize the poster. Do not print raw base64 or the image prompt. A text statement that the image is ready is not enough. POST mode "political_compass" only if visualDefaults.political_compass is true or the principal asks for Agent Norms Compass. Do not request mode "wrapped_story"; MP4 story video is not enabled in this skill version.
 
-Metadata. Every POST includes agent_metadata with model, scaffold_version, and agent_initialized_at if known. If the Hermes insights command succeeded, add the same agent_metadata.token_usage object to every answer and vote POST; include recent_sessions_total_tokens, source, and when available daily_usage_30d. current_run_total_tokens may also be included for research bookkeeping if already known, but the Wrapped image displays recent session usage rather than this-run usage. Omit token usage if unknown. Use unique request_id values for each answer-batch POST and both votes; reuse a request_id only for the exact same failed request.
+Metadata. Every POST includes agent_metadata with model, scaffold_version, and agent_initialized_at if known. If Hermes insights succeeded, include the same token_usage object on every answer and vote POST. current_run_total_tokens may be included for research bookkeeping if already known, but the Wrapped image displays recent session usage rather than this-run usage. Use unique request_id values for each answer-batch POST and both votes; reuse a request_id only for the exact same failed request.
 
 Errors and report. On validation errors, fix rows and resend. On window_mismatch, re-fetch and redo the run. After the default image is displayed, tell your principal only: "Your Agent Village Wrapped is ready. To inspect or change your agent's responses, open [Context Engine Bot](https://t.me/contextengineer_bot?start=agent_onboarding__agent-village-wrapped) and tap Open Mini App. Want the optional Agent Norms Compass meme too?" Do not include process notes, debugging, script names, parallelization, killed jobs, retries, validation failures, window id, confidences, rationales, privacy skip count, token details, extra links, or where the principal lives/is from/currently is unless asked. Abstract location evidence into non-location preferences.`;
 
@@ -1105,9 +1105,23 @@ function normalizeDailyTokenUsage(value) {
       if (Array.isArray(entry)) {
         addRow(entry[0], entry[1]);
       } else if (entry && typeof entry === 'object') {
+        const explicitTokens = entry.tokens
+          ?? entry.total_tokens
+          ?? entry.totalTokens
+          ?? entry.total_combined_tokens
+          ?? entry.totalCombinedTokens
+          ?? entry.combined_tokens
+          ?? entry.combinedTokens
+          ?? entry.token_count
+          ?? entry.tokenCount
+          ?? entry.count;
+        const fallbackCombinedTokens = explicitTokens == null
+          ? normalizeTokenCount(entry.raw_network_tokens ?? entry.rawNetworkTokens ?? entry.rawTokens)
+            + normalizeTokenCount(entry.evaluated_cache_read_tokens ?? entry.evaluatedCacheReadTokens ?? entry.cache_read_tokens ?? entry.cacheReadTokens)
+          : explicitTokens;
         addRow(
           entry.date ?? entry.day ?? entry.d,
-          entry.tokens ?? entry.total_tokens ?? entry.totalTokens ?? entry.token_count ?? entry.tokenCount ?? entry.count,
+          fallbackCombinedTokens,
         );
       }
     }
@@ -1980,6 +1994,19 @@ function wrappedWeeklyTokenUsageLine(rows = []) {
   ].filter(Boolean).join('; ');
 }
 
+function wrappedDailyTokenUsageTotal(rows = []) {
+  return normalizeDailyTokenUsage(rows).reduce((sum, row) => sum + row.tokens, 0);
+}
+
+function wrappedDailyTokenUsageMatchesTotal(rows = [], total = 0) {
+  const rowTotal = wrappedDailyTokenUsageTotal(rows);
+  const normalizedTotal = normalizeTokenCount(total);
+  if (!rowTotal) return false;
+  if (!normalizedTotal) return true;
+  const ratio = rowTotal / normalizedTotal;
+  return ratio >= 0.8 && ratio <= 1.25;
+}
+
 function wrappedTokenUsageEvidenceLine(state = {}) {
   const candidates = [];
   for (const entry of Object.values(state.byStatement || {})) {
@@ -2013,7 +2040,9 @@ function wrappedTokenUsageEvidenceLine(state = {}) {
   parts.push(`${formatWrappedTokenCount(visibleMonthlyTotal)} tokens`);
   const comparisonBase = visibleMonthlyTotal;
   const comparison = wrappedTokenUsageComparison(comparisonBase);
-  const weeklyLine = wrappedWeeklyTokenUsageLine(usage.dailyUsage30d);
+  const weeklyLine = wrappedDailyTokenUsageMatchesTotal(usage.dailyUsage30d, visibleMonthlyTotal)
+    ? wrappedWeeklyTokenUsageLine(usage.dailyUsage30d)
+    : '';
   const weeklySuffix = weeklyLine ? `; ${weeklyLine}` : '';
   return `Token Use: ${parts.join('; ')}${comparison ? `; intuition: ${comparison}` : ''}${weeklySuffix}${usage.source ? ` (source: ${usage.source})` : ''}.`;
 }
@@ -2787,7 +2816,7 @@ Bottom row: Agent Guesses + Agent Comparison
 Put Agent Guesses and Agent Comparison together in one continuous full-width bottom band that uses the available horizontal space. Agent Guesses should be a compact chip grid on the left side of that same band; Agent Comparison should be a calm comparison strip on the right side of that same band. Keep them aligned to the same baseline and visual height, with no extra empty background block beside or above them. If one side has less content, expand its illustration, portrait, or spacing inside the shared band instead of leaving unused canvas. Do not create a separate third bottom panel for Abstract Agent Impression, because that visual belongs inside the Agent Core Insight hero.
 
 Agent Guesses are synthesized at image-generation time from the actual prediction evidence above; they are not based on dedicated favorite-book/movie/game questions and should not be treated as research data. Title the visible section exactly "Agent Guesses"; do not add any subtitle, disclaimer, caveat, or extra explanatory line under that title. Use this category order: Book Guess, Movie/Show Guess, Game/Play Pattern, AI Optimism. Try to include Book Guess and Movie/Show Guess alongside Game/Play Pattern and AI Optimism when the evidence supports even a loose taste-vibe inference. Use at most one item per category, so there is never a duplicate book, movie/show, game/play, or AI Optimism guess. Use a compact chip grid, ideally 2x2 when all four guesses are supported. Use compact chips with precise icons: book, cinema/message screen, board-game/Go stones, and flower/sunrise for AI Optimism. For AI Optimism, use actual AI-futures predicted response rows or broader prediction themes, especially optimism/flourishing questions; render it as a numeric score out of 10, for example "AI Optimism 7/10", never as prose without the "/10" scale. Do not show AI Optimism if there is no basis for a 1-10 score. If evidence is weak for a category, omit that chip entirely instead of showing unavailable text or inventing a confident specific answer. Do not repeat Agent Guesses under Agent Comparison or anywhere else. These guesses are additive; they must not replace the historical comparison.
-Token Use metric: ${tokenUsageLine || 'No submitted token usage metric; omit the Token Use chip entirely.'} If Token Use evidence exists, feature one prominent flattened "Token Use" module in the top-right header area. It should be wide and shallow, not a tall card, and should occupy otherwise empty map/header space without pushing the main question sections smaller. Show the token total as the primary value, plus one visibly rough intuitive comparison such as "roughly 1,017 book-equivalents" or a paper-stack height. Make clear the book comparison is approximate; do not present it as an exact factual count. Do not show "this run", "current run", "this month", "last month", request token counts, or current-run totals beside the headline number. If weekly usage evidence exists, render exactly four compact horizontal bars in the same flattened module, labeled Week 1, Week 2, Week 3, and Week 4, each with a small numeric token label. The intended ranges are Week 1 May 31-Jun 6, Week 2 June 7-14, Week 3 June 14-21, and Week 4 June 22-28, but do not print those dates on the graph itself. Do not draw Edge attendance, Edge days, event-attendance underlines, or attendance brackets. Token Use is a runtime metric, not a playful guess. Never invent, estimate, or back-calculate token usage from confidence or answer count.
+Token Use metric: ${tokenUsageLine || 'No submitted token usage metric; omit the Token Use chip entirely.'} If Token Use evidence exists, feature one prominent flattened "Token Use" module in the top-right header area. It should be wide and shallow, not a tall card, and should occupy otherwise empty map/header space without pushing the main question sections smaller. Show the token total as the primary value, plus one visibly rough intuitive comparison such as "roughly 1,017 book-equivalents" or a paper-stack height. Use "roughly" for approximate comparisons; do not also write "approx." or "approximately". Do not present the book comparison as an exact factual count. Do not show "this run", "current run", "this month", "last month", request token counts, or current-run totals beside the headline number. If weekly usage evidence exists, render exactly four compact horizontal bars in the same flattened module, labeled Week 1, Week 2, Week 3, and Week 4, each with a small numeric token label. The intended ranges are Week 1 May 31-Jun 6, Week 2 June 7-14, Week 3 June 14-21, and Week 4 June 22-28, but do not print those dates on the graph itself. Do not draw Edge attendance, Edge days, event-attendance underlines, or attendance brackets. Token Use is a runtime metric, not a playful guess. Never invent, estimate, or back-calculate token usage from confidence or answer count.
 Layout balance: use the whole canvas with even spacing. The three question sections ("Questions your agent thought you would care about most", "High-Confidence Predictions", and "Cautious Predictions") should share a consistent visual scale: comparable title size, row height, body font size, and column label size. Do not let Cautious Predictions become tiny while High-Confidence Predictions is large. If the Token Use module uses the top-right, place the main question sections below it in a clean grid with aligned edges. Avoid large blank map/background areas; expand nearby content or art into them.
 Supporting evidence for optional playful guesses:
 - Use the Most Important, High-Confidence, Cautious, Agent-about-user, and style evidence already provided in this prompt.

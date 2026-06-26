@@ -5,7 +5,7 @@ description: Run Context Engine Agent Village Wrapped only: predict answers, sub
 
 # Agent Village Wrapped Runtime
 
-**Skill version:** 2026-06-26 (wrapped-v10)
+**Skill version:** 2026-06-26 (wrapped-v11)
 **Protocol version:** Context Engine agent bridge v41
 
 Use this skill only to run Agent Village Wrapped. Do not use the broader
@@ -145,7 +145,7 @@ https://ce-agent-bridge-worker.agalmic.workers.dev
 ```
 
 1. GET `/telegram/agent/api/agent-village-wrapped/skill-version`; verify this
-   skill is `agent-village-wrapped` and the version includes `wrapped-v10`.
+   skill is `agent-village-wrapped` and the version includes `wrapped-v11`.
 2. GET `/telegram/agent/api/skill-version`; silently verify protocol v41.
 3. GET `/telegram/agent/api/agent-only/start` with the private Bearer token.
 4. Try the exact token-usage command in the Token Usage Metadata section once.
@@ -211,15 +211,25 @@ Markdown image rendering, send exactly one Markdown image line like
 is available, send only the bare `image_url` on its own line so Telegram can
 generate a preview. Do not include both a Markdown image and a duplicate raw
 link, and do not display both URL and base64. If only `image_base64` is
-returned, decode it using `image_content_type` and attach/show it once. Do not
-print raw base64 or the full image prompt. Do not run vision/image-analysis/QA
-tools on the image. If the user later asks for Agent Norms Compass, display that
-compass image exactly once and do not repeat the standard Wrapped image.
+returned, decode it using `image_content_type` and attach/show it once.
+
+Do not run image generation, polling, image download, or display in a detached
+background process that can finish after your final chat response. If you use a
+helper script, wait for it to return the `image_url` or decoded image file before
+you answer. The final assistant message must start with exactly one image
+attachment, or exactly one Markdown image line when native attachment is not
+available. Never send the closeout sentence before the image. Do not report
+background-process completion text to the user.
+
+Do not print raw base64 or the full image prompt. Do not run
+vision/image-analysis/QA tools on the image. If the user later asks for Agent
+Norms Compass, display that compass image exactly once and do not repeat the
+standard Wrapped image.
 
 ## Final Chat Text
 
-After displaying the images, send only this concise text, with the link rendered
-as a Markdown link:
+After displaying the image, send only this concise text, with the link rendered
+as a Markdown link. This text is not a substitute for displaying the image:
 
 ```text
 Your Agent Village Wrapped is ready. To inspect or change your agent's responses, open [Context Engine Bot](https://t.me/contextengineer_bot?start=agent_onboarding__agent-village-wrapped) and tap Open Mini App. Want the optional Agent Norms Compass meme too?

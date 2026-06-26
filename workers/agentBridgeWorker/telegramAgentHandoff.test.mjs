@@ -369,7 +369,7 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
 
   assert.match(wrapped, /name:\s+agent-village-wrapped/);
   assert.match(wrapped, /^# Agent Village Wrapped Runtime/m);
-  assert.match(wrapped, /\*\*Skill version:\*\* 2026-06-26 \(wrapped-v10\)/);
+  assert.match(wrapped, /\*\*Skill version:\*\* 2026-06-26 \(wrapped-v11\)/);
   assert.match(wrapped, /Use this skill only to run Agent Village Wrapped/);
   assert.match(wrapped, /Do not use the broader\s+`context-engine` skill/);
   assert.match(wrapped, /memory\/context-engine-state\.json/);
@@ -388,7 +388,7 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.match(wrapped, /\/telegram\/agent\/api\/invite\/onboard/);
   assert.doesNotMatch(wrapped, /Telegram User ID:/);
   assert.match(wrapped, /GET `\/telegram\/agent\/api\/agent-village-wrapped\/skill-version`/);
-  assert.match(wrapped, /version includes `wrapped-v10`/);
+  assert.match(wrapped, /version includes `wrapped-v11`/);
   assert.match(wrapped, /Minimum: \$4\.00/);
   assert.match(wrapped, /mcp_index_\*/);
   assert.match(wrapped, /Try the exact token-usage command/);
@@ -403,6 +403,9 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.match(wrapped, /Markdown image rendering/);
   assert.match(wrapped, /!\[Agent Village Wrapped\]\(<image_url>\)/);
   assert.match(wrapped, /Do not include both a Markdown image and a duplicate raw\s+link/);
+  assert.match(wrapped, /Do not run image generation, polling, image download, or display in a detached\s+background process/);
+  assert.match(wrapped, /The final assistant message must start with exactly one image\s+attachment/);
+  assert.match(wrapped, /Never send the closeout sentence before the image/);
   assert.match(wrapped, /MP4 story video is not enabled yet/);
   assert.doesNotMatch(wrapped, /visualDefaults\.wrapped_story/);
   assert.doesNotMatch(wrapped, /shareable story version/);
@@ -454,7 +457,7 @@ test('Telegram agent handoff exposes the dedicated Agent Village Wrapped skill m
 
   assert.equal(response.status, 200);
   assert.equal(body.ok, true);
-  assert.equal(body.version, '2026-06-26 (wrapped-v10)');
+  assert.equal(body.version, '2026-06-26 (wrapped-v11)');
   assert.equal(body.protocolVersion, '2026-06-16 (v41)');
   assert.equal(body.skill, 'agent-village-wrapped');
   assert.equal(body.skillUrl, 'https://example.test/skills/agent-village-wrapped/SKILL.md');
@@ -484,7 +487,7 @@ test('Telegram agent handoff serves a dedicated Agent Village Wrapped skill redi
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
   assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-agent-village-wrapped\/SKILL\.md/);
-  assert.match(location, /v=2026-06-26-wrapped-v10-/);
+  assert.match(location, /v=2026-06-26-wrapped-v11-/);
 });
 
 test('Telegram agent handoff serves a short Agent Village Wrapped skill alias', async () => {
@@ -496,7 +499,7 @@ test('Telegram agent handoff serves a short Agent Village Wrapped skill alias', 
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
   assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-agent-village-wrapped\/SKILL\.md/);
-  assert.match(location, /v=2026-06-26-wrapped-v10-/);
+  assert.match(location, /v=2026-06-26-wrapped-v11-/);
 });
 
 test('Telegram agent handoff serves a short Agent Village Wrapped skill alias to HEAD probes', async () => {
@@ -508,7 +511,7 @@ test('Telegram agent handoff serves a short Agent Village Wrapped skill alias to
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
   assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-agent-village-wrapped\/SKILL\.md/);
-  assert.match(location, /v=2026-06-26-wrapped-v10-/);
+  assert.match(location, /v=2026-06-26-wrapped-v11-/);
 });
 
 test('Agent-only start payload exposes configurable visual defaults', async () => {
