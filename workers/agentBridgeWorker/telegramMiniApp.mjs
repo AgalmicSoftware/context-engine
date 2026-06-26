@@ -8295,6 +8295,13 @@ function telegramMiniAppHtml({ loadingVisual = MINI_APP_LOADING_VISUAL_GIF } = {
       if (!state.popularQuestionsOnly) return entries;
       return entries.sort(popularitySort).slice(0, normalizePopularQuestionLimit(state.popularQuestionLimit));
     };
+    const questionHasAgentPrediction = (question) => {
+      if (!question?.questionKey || state.data?.agentOnly?.showAgentResponses === false) return false;
+      return Boolean(state.data?.agentOnly?.predictions?.[question.questionKey]);
+    };
+    const predictionPrioritySort = (left, right) => (
+      Number(questionHasAgentPrediction(right.question)) - Number(questionHasAgentPrediction(left.question))
+    );
     const orderedQuestions = () => {
       const questions = filteredQuestionEntries();
       if (seriesModeEnabled()) {
@@ -8309,14 +8316,18 @@ function telegramMiniAppHtml({ loadingVisual = MINI_APP_LOADING_VISUAL_GIF } = {
       if (state.aiSearchQuery) {
         questions.sort((left, right) => (
           right.score - left.score ||
+          predictionPrioritySort(left, right) ||
           Number(questionAnswered(left.question)) - Number(questionAnswered(right.question)) ||
           left.index - right.index
         ));
         return questions.map((entry) => entry.question);
       }
-      if (state.showUnansweredFirst) {
+      if (state.showUnansweredFirst || questions.some((entry) => questionHasAgentPrediction(entry.question))) {
         questions.sort((left, right) => (
-          Number(questionAnswered(left.question)) - Number(questionAnswered(right.question)) ||
+          predictionPrioritySort(left, right) ||
+          (state.showUnansweredFirst
+            ? Number(questionAnswered(left.question)) - Number(questionAnswered(right.question))
+            : 0) ||
           left.index - right.index
         ));
       }

@@ -104,6 +104,7 @@ import {
   loadAgentOnlyWrappedImageByViewId,
   loadAgentOnlyModeConfig,
   materializeAgentOnlyWindow,
+  recordAgentOnlyAttemptEventQuietly,
   saveAgentOnlyModeConfig,
   submitAgentOnlyAnswersBulk,
   submitAgentOnlyTokenVotesBulk,
@@ -125,7 +126,7 @@ const DEFAULT_AGENT_RAW_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSo
 const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-06-16 (v41)';
 const DEFAULT_AGENT_VILLAGE_WRAPPED_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/wrapped';
 const DEFAULT_AGENT_VILLAGE_WRAPPED_RAW_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/edge-2026/workers/agentBridgeWorker/skills/ce-agent-village-wrapped/SKILL.md';
-const CE_AGENT_VILLAGE_WRAPPED_SKILL_VERSION = '2026-06-26 (wrapped-v12)';
+const CE_AGENT_VILLAGE_WRAPPED_SKILL_VERSION = '2026-06-26 (wrapped-v13)';
 const MINI_APP_QUESTION_VOTE_KV_PREFIX = 'telegram:mini-app-question-vote:v1:';
 const AGENT_QUESTION_VOTE_DECISION_KV_PREFIX = 'telegram:agent-question-vote-decision:v1:';
 const ANSWER_DRAFT_KV_PREFIX = 'telegram:answer-draft:';
@@ -3130,6 +3131,16 @@ async function handleAgentOnlyAnswersBulkRequest({
     now: agentOnlyRequestNow(env),
   });
   const status = result.ok === false ? (result.status || 400) : 200;
+  await recordAgentOnlyAttemptEventQuietly({
+    env,
+    sessionSlug: context.session.sessionSlug,
+    telegramUserId: input.telegramUserId,
+    stage: 'answers_bulk',
+    status,
+    result,
+    body,
+    now: agentOnlyRequestNow(env),
+  });
   assertNoSecretShape(result, 'Agent-only answers response must not serialize secrets.');
   return json(result, { status });
 }
@@ -3148,6 +3159,16 @@ async function handleAgentOnlyTokenVotesBulkRequest({
     now: agentOnlyRequestNow(env),
   });
   const status = result.ok === false ? (result.status || 400) : 200;
+  await recordAgentOnlyAttemptEventQuietly({
+    env,
+    sessionSlug: context.session.sessionSlug,
+    telegramUserId: input.telegramUserId,
+    stage: 'token_votes_bulk',
+    status,
+    result,
+    body,
+    now: agentOnlyRequestNow(env),
+  });
   assertNoSecretShape(result, 'Agent-only token-votes response must not serialize secrets.');
   return json(result, { status });
 }
@@ -3213,6 +3234,16 @@ async function handleAgentOnlyWrappedImageRequest({
     fetchImpl,
   });
   const status = result.ok === false ? (result.status || 400) : 200;
+  await recordAgentOnlyAttemptEventQuietly({
+    env,
+    sessionSlug: context.session.sessionSlug,
+    telegramUserId: input.telegramUserId,
+    stage: 'wrapped_image',
+    status,
+    result,
+    body: { ...body, format: input.format || body.format },
+    now: agentOnlyRequestNow(env),
+  });
   if (!result.ok) {
     assertNoSecretShape(result, 'Agent-only wrapped image error must not serialize secrets.');
     return json(result, { status });

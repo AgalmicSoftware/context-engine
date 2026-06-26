@@ -717,6 +717,10 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /SHOW_UNANSWERED_STORAGE_KEY/);
   assert.match(html, /function renderSessionPicker\(\)/);
   assert.match(html, /const orderedQuestions = \(\) => \{/);
+  assert.match(html, /const questionHasAgentPrediction = \(question\) => \{/);
+  assert.match(html, /state\.data\?\.agentOnly\?\.predictions\?\.\[question\.questionKey\]/);
+  assert.match(html, /right\.score - left\.score \|\|[\s\S]*predictionPrioritySort\(left, right\)/);
+  assert.match(html, /predictionPrioritySort\(left, right\) \|\|[\s\S]*Number\(questionAnswered\(left\.question\)\) - Number\(questionAnswered\(right\.question\)\)/);
   assert.match(html, /\/telegram\/mini-app\/api\/search/);
   assert.match(html, /function scheduleAiSearch/);
   assert.match(html, /state\.aiSearchQuery = state\.aiDraftQuery\.trim\(\);[\s\S]*scheduleAiSearch\(\);/);

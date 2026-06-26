@@ -369,7 +369,7 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
 
   assert.match(wrapped, /name:\s+agent-village-wrapped/);
   assert.match(wrapped, /^# Agent Village Wrapped Runtime/m);
-  assert.match(wrapped, /\*\*Skill version:\*\* 2026-06-26 \(wrapped-v12\)/);
+  assert.match(wrapped, /\*\*Skill version:\*\* 2026-06-26 \(wrapped-v13\)/);
   assert.match(wrapped, /Use this skill only to run Agent Village Wrapped/);
   assert.match(wrapped, /Do not use the broader\s+`context-engine` skill/);
   assert.match(wrapped, /memory\/context-engine-state\.json/);
@@ -388,7 +388,11 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.match(wrapped, /\/telegram\/agent\/api\/invite\/onboard/);
   assert.doesNotMatch(wrapped, /Telegram User ID:/);
   assert.match(wrapped, /GET `\/telegram\/agent\/api\/agent-village-wrapped\/skill-version`/);
-  assert.match(wrapped, /version includes `wrapped-v12`/);
+  assert.match(wrapped, /version includes `wrapped-v13`/);
+  assert.match(wrapped, /Adaptive Low-Output Execution/);
+  assert.match(wrapped, /There is no separate "core", "short", or partial deck mode/);
+  assert.match(wrapped, /Never print local file paths as image delivery/);
+  assert.match(wrapped, /`clocal:`/);
   assert.match(wrapped, /Minimum: \$4\.00/);
   assert.match(wrapped, /mcp_index_\*/);
   assert.match(wrapped, /Try the exact token-usage commands/);
@@ -459,7 +463,7 @@ test('Telegram agent handoff exposes the dedicated Agent Village Wrapped skill m
 
   assert.equal(response.status, 200);
   assert.equal(body.ok, true);
-  assert.equal(body.version, '2026-06-26 (wrapped-v12)');
+  assert.equal(body.version, '2026-06-26 (wrapped-v13)');
   assert.equal(body.protocolVersion, '2026-06-16 (v41)');
   assert.equal(body.skill, 'agent-village-wrapped');
   assert.equal(body.skillUrl, 'https://example.test/skills/agent-village-wrapped/SKILL.md');
@@ -489,7 +493,7 @@ test('Telegram agent handoff serves a dedicated Agent Village Wrapped skill redi
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
   assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-agent-village-wrapped\/SKILL\.md/);
-  assert.match(location, /v=2026-06-26-wrapped-v12-/);
+  assert.match(location, /v=2026-06-26-wrapped-v13-/);
 });
 
 test('Telegram agent handoff serves a short Agent Village Wrapped skill alias', async () => {
@@ -501,7 +505,7 @@ test('Telegram agent handoff serves a short Agent Village Wrapped skill alias', 
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
   assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-agent-village-wrapped\/SKILL\.md/);
-  assert.match(location, /v=2026-06-26-wrapped-v12-/);
+  assert.match(location, /v=2026-06-26-wrapped-v13-/);
 });
 
 test('Telegram agent handoff serves a short Agent Village Wrapped skill alias to HEAD probes', async () => {
@@ -513,7 +517,7 @@ test('Telegram agent handoff serves a short Agent Village Wrapped skill alias to
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
   assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-agent-village-wrapped\/SKILL\.md/);
-  assert.match(location, /v=2026-06-26-wrapped-v12-/);
+  assert.match(location, /v=2026-06-26-wrapped-v13-/);
 });
 
 test('Agent-only start payload exposes configurable visual defaults', async () => {
@@ -2072,6 +2076,63 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   assert.equal(imageRows[0].prompt_hash, wrapped.image_prompt_hash);
   assert.equal(imageRows[0].principal_id.startsWith('cep_'), true);
   assert.equal(JSON.stringify(imageRows).includes('telegramUserId'), false);
+
+  const attemptExportResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/agent-only/export?sessionSlug=alpha&view=attempts&format=jsonl', {
+      token: 'agent-test-token',
+    }),
+    env,
+  });
+  const attemptRows = (await attemptExportResponse.text()).trim().split('\n').filter(Boolean).map((line) => JSON.parse(line));
+  assert.equal(attemptExportResponse.status, 200);
+  assert.equal(attemptRows.some((row) => (
+    row.stage === 'answers_bulk' &&
+    row.ok === true &&
+    row.status === 200 &&
+    row.accepted === 1 &&
+    row.request_id === 'route-answers-1'
+  )), true);
+  assert.equal(attemptRows.some((row) => (
+    row.stage === 'answers_bulk' &&
+    row.ok === false &&
+    row.status === 409 &&
+    row.reason === 'window_mismatch' &&
+    row.request_id === 'route-answers-stale'
+  )), true);
+  assert.equal(attemptRows.some((row) => (
+    row.stage === 'token_votes_bulk' &&
+    row.ok === true &&
+    row.status === 200 &&
+    row.budget_used === 20 &&
+    row.request_id === 'route-votes-1'
+  )), true);
+  assert.equal(attemptRows.some((row) => (
+    row.stage === 'wrapped_image' &&
+    row.ok === false &&
+    row.status === 409 &&
+    row.reason === 'agent_only_wrapped_incomplete_predictions' &&
+    row.statement_count === 5 &&
+    row.agent_response_count === 0
+  )), true);
+  assert.equal(attemptRows.some((row) => (
+    row.stage === 'wrapped_image' &&
+    row.ok === false &&
+    row.status === 503 &&
+    row.reason === 'openai_key_missing' &&
+    row.agent_response_count === 5
+  )), true);
+  assert.equal(attemptRows.some((row) => (
+    row.stage === 'wrapped_image' &&
+    row.ok === true &&
+    row.status === 200 &&
+    row.run_id === 'route-run-1' &&
+    row.mode === 'wrapped' &&
+    row.agent_response_count === 5 &&
+    row.privacy_skip_count === 1
+  )), true);
+  assert.equal(attemptRows.every((row) => row.principal_id.startsWith('cep_')), true);
+  assert.equal(JSON.stringify(attemptRows).includes('telegramUserId'), false);
+  assert.equal(JSON.stringify(attemptRows).includes(agentOnlyToken.token), false);
 
   const unavailableStoryResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/agent-only/wrapped-image?sessionSlug=alpha', {

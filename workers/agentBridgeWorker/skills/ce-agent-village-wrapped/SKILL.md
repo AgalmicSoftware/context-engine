@@ -5,7 +5,7 @@ description: Run Context Engine Agent Village Wrapped only: predict answers, sub
 
 # Agent Village Wrapped Runtime
 
-**Skill version:** 2026-06-26 (wrapped-v12)
+**Skill version:** 2026-06-26 (wrapped-v13)
 **Protocol version:** Context Engine agent bridge v41
 
 Use this skill only to run Agent Village Wrapped. Do not use the broader
@@ -88,6 +88,28 @@ You need to add more credit before I can run Agent Village Wrapped.
 If no balance surface is immediately available without reading files, skip the
 balance check and continue.
 
+## Adaptive Low-Output Execution
+
+Use the same endpoint contracts and answer every statement the worker serves.
+There is no separate "core", "short", or partial deck mode in this skill. If
+the host model is small, output-limited, tool-limited, or starts narrating
+process, switch to low-output execution:
+
+- Use one private helper script or compact direct HTTP calls for onboarding,
+  pagination, answer submission, votes, and image generation.
+- Keep fetched statements, prediction rows, request payloads, validation
+  responses, image JSON, and temporary artifacts in local files or in-memory
+  variables, not in chat.
+- Keep stdout short: only a compact machine-readable summary needed to attach
+  or display the final image.
+- Batch prediction reasoning in groups of roughly 10-15 statements when
+  possible, output local indexes rather than full `ceq_...` ids, and map those
+  indexes back to exact `statement_id` values programmatically.
+- Omit optional rationales if they increase retry risk or output length.
+
+This is an execution strategy only. It must not change the submitted answer,
+vote, image, run id, request id, or metadata schemas.
+
 ## Credential
 
 If the forwarded message contains an `Agent Village Wrapped Invite Token` or an
@@ -146,7 +168,7 @@ https://ce-agent-bridge-worker.agalmic.workers.dev
 ```
 
 1. GET `/telegram/agent/api/agent-village-wrapped/skill-version`; verify this
-   skill is `agent-village-wrapped` and the version includes `wrapped-v12`.
+   skill is `agent-village-wrapped` and the version includes `wrapped-v13`.
 2. GET `/telegram/agent/api/skill-version`; silently verify protocol v41.
 3. GET `/telegram/agent/api/agent-only/start` with the private Bearer token.
 4. Try the exact token-usage commands in the Token Usage Metadata section once.
@@ -218,6 +240,11 @@ is available, send only the bare `image_url` on its own line so Telegram can
 generate a preview. Do not include both a Markdown image and a duplicate raw
 link, and do not display both URL and base64. If only `image_base64` is
 returned, decode it using `image_content_type` and attach/show it once.
+
+Never print local file paths as image delivery. A line beginning with `clocal:`,
+`file:`, `/opt/data/`, `/tmp/`, or `./` is not an image attachment. If you decode
+to a local file, attach it natively and keep the path out of chat; if native
+attachment is unavailable, use the worker `image_url` instead.
 
 Do not run image generation, polling, image download, or display in a detached
 background process that can finish after your final chat response. If you use a

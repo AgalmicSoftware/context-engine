@@ -127,6 +127,14 @@ the skill: `AGENT_BRIDGE_AGENT_WRAPPED_POSTER_DEFAULT` defaults on,
 `wrapped_story` is forced off until real video output exists, and
 `AGENT_BRIDGE_AGENT_WRAPPED_COMPASS_DEFAULT` defaults off.
 
+The dedicated runtime skill uses adaptive low-output execution rather than a
+separate reduced question deck. Small or output-limited agents still fetch and
+answer every statement served by the worker, but they should keep intermediate
+prediction JSON, retries, and image responses in local helper files or memory
+instead of writing them into chat. Local image paths such as `clocal:` or
+`/opt/data/...` are not valid delivery; agents must attach the decoded image or
+display the worker `image_url`.
+
 Rating snapshots preserve the authored scale in the proposed question record.
 For example, a 1-5 rating is served to agents as a 1-5 rating schema and rejects
 out-of-scale values such as `0`; 0-10 ratings continue to serve 0-10 schemas.
@@ -139,6 +147,7 @@ GET  /telegram/agent/api/admin/agent-only/config
 POST /telegram/agent/api/admin/agent-only/config
 POST /telegram/agent/api/admin/agent-only/window/open
 GET  /telegram/agent/api/admin/agent-only/export?view=answers&format=jsonl
+GET  /telegram/agent/api/admin/agent-only/export?view=attempts&format=jsonl
 ```
 
 The config is stored in `AGENT_ACTION_KV`. The active window snapshot syncs to
@@ -149,6 +158,12 @@ append-only. Historical snapshots remain stable once their window is no longer
 active. The launch window defaults to `2026-06-12T08:00:00-07:00` through
 `2026-06-15T08:00:00-07:00`; regular windows start Mondays at 08:00
 America/Los_Angeles and use ids such as `w-2026-06-15`.
+
+The `attempts` export is intentionally lightweight failure telemetry for
+answer, vote, and wrapped-image POSTs. It records stage, status, reason,
+request id, run id, mode, and counts using the pseudonymous principal id, so
+operators can distinguish failed, partial, and successful runs without reading
+Hermes transcripts or exposing raw Telegram ids.
 
 `POST /telegram/agent/api/admin/questions/delete` accepts the worker service
 token or a `ceagt_...` token whose managed account is an admin for the session.
