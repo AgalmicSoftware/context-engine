@@ -5,7 +5,7 @@ description: Run Context Engine Agent Village Wrapped only: predict answers, gen
 
 # Agent Village Wrapped Runtime
 
-**Skill version:** 2026-06-26 (wrapped-v15)
+**Skill version:** 2026-06-26 (wrapped-v16)
 **Protocol version:** Context Engine agent bridge v41
 
 Use this skill only to run Agent Village Wrapped. Do not use the broader
@@ -165,7 +165,7 @@ https://ce-agent-bridge-worker.agalmic.workers.dev
 ```
 
 1. GET `/telegram/agent/api/agent-village-wrapped/skill-version`; verify this
-   skill is `agent-village-wrapped` and the version includes `wrapped-v15`.
+   skill is `agent-village-wrapped` and the version includes `wrapped-v16`.
 2. GET `/telegram/agent/api/skill-version`; silently verify protocol v41.
 3. GET `/telegram/agent/api/agent-only/start` with the private Bearer token.
 4. Try the exact token-usage commands in the Token Usage Metadata section once.
@@ -226,22 +226,23 @@ sqlite3 state.db "SELECT date(started_at, 'unixepoch', 'localtime'), SUM(COALESC
 
 Do not search files, configs, logs, docs, prior sessions, or credentials to
 find token usage. If the SQLite commands fail because `sqlite3` is missing or
-`state.db` is unavailable, you may try this fallback once and parse only a
-recent total plus daily rows if present:
+`state.db` is unavailable, you may try this fallback once:
 
 ```text
 /opt/hermes/.venv/bin/hermes insights --days 30 --source telegram
 ```
 
-Do not print the insights report. If token usage lookup succeeds, parse the
-recent 30-day total and daily rows. Include the same parsed object in
-`agent_metadata.token_usage` on every answer POST:
+Do not print the insights report. Include `recent_sessions_total_tokens` only
+when the report gives an explicit recent 30-day total. Include `daily_usage_30d`
+only for explicit dated daily rows. Do not infer, distribute, estimate, or
+fabricate daily or weekly token values from a total. Include the same parsed
+object in `agent_metadata.token_usage` on every answer POST:
 `recent_sessions_total_tokens`, `source: "local sqlite3 query (including cache)"`,
 and, when available, `daily_usage_30d`. `current_run_total_tokens` may also be
 included for research bookkeeping if already known, but the Wrapped image
 displays recent session usage rather than this-run usage. Use
-`source: "hermes insights fallback"` for parsed fallback data. If both methods
-are unavailable, slow, or unclear, omit token usage and continue.
+`source: "hermes insights fallback"` only for mechanically parsed fallback data.
+If both methods are unavailable, slow, or unclear, omit token usage and continue.
 
 ## Image Delivery
 

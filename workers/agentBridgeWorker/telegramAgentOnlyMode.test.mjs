@@ -197,6 +197,9 @@ test('start payload pins path-only endpoints and instruction size', () => {
   assert.match(payload.instructions, /source: "local sqlite3 query \(including cache\)"/);
   assert.match(payload.instructions, /sqlite3 can read state\.db/);
   assert.match(payload.instructions, /hermes insights --days 30 --source telegram once/);
+  assert.match(payload.instructions, /Include recent_sessions_total_tokens only when the report gives an explicit 30-day total/);
+  assert.match(payload.instructions, /Include daily_usage_30d only for explicit dated daily rows/);
+  assert.match(payload.instructions, /Do not infer, distribute, estimate, or fabricate daily or weekly token values/);
   assert.match(payload.instructions, /source: "hermes insights fallback"/);
   assert.match(payload.instructions, /fresh run id/);
   assert.match(payload.instructions, /include that same run_id on every answer and image POST/);
@@ -519,7 +522,9 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.match(prompt, /feature one prominent flattened "Token Use" module in the top-right header area/);
   assert.match(prompt, /wide and shallow, not a tall card/);
   assert.match(prompt, /without pushing the main question sections smaller/);
-  assert.match(prompt, /book-equivalents/);
+  assert.match(prompt, /Use only the token total, comparison, and weekly values already present in Token Use evidence/);
+  assert.match(prompt, /do not invent, recalculate, substitute, or copy numeric examples from these instructions/);
+  assert.doesNotMatch(prompt, /1,017|book-equivalents/);
   assert.match(prompt, /Use "roughly" for approximate comparisons; do not also write "approx\." or "approximately"/);
   assert.match(prompt, /Do not show "this run", "current run", "this month", "last month", request token counts, or current-run totals/);
   assert.match(prompt, /exactly four compact horizontal bars/);
