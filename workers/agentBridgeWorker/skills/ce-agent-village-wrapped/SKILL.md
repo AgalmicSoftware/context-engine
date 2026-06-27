@@ -5,7 +5,7 @@ description: "Run Context Engine Agent Village Wrapped only: predict answers, ge
 
 # Agent Village Wrapped Runtime
 
-**Skill version:** 2026-06-26 (wrapped-v17)
+**Skill version:** 2026-06-26 (wrapped-v18)
 **Protocol version:** Context Engine agent bridge v41
 
 Use this skill only to run Agent Village Wrapped. Do not use the broader
@@ -60,7 +60,7 @@ worker.
   provided by the host as the Context Engine state file, you may read only that
   file to recover the private CE credential. Do not print its contents.
 - Do not read other local auth, env, config, memory-token, or credential files.
-  The only SQLite access this skill permits is the `state.db` token-usage query
+  The only SQLite access this skill permits is the known-path token-usage query
   in the Token Usage Metadata section.
 - Skip credit, billing, wallet, and cost-floor checks. Start with the
   Credential section.
@@ -168,10 +168,10 @@ https://ce-agent-bridge-worker.agalmic.workers.dev
 ```
 
 1. GET `/telegram/agent/api/agent-village-wrapped/skill-version`; verify this
-   skill is `agent-village-wrapped` and the version includes `wrapped-v17`.
+   skill is `agent-village-wrapped` and the version includes `wrapped-v18`.
 2. GET `/telegram/agent/api/skill-version`; silently verify protocol v41.
 3. GET `/telegram/agent/api/agent-only/start` with the private Bearer token.
-4. Try the exact token-usage commands in the Token Usage Metadata section once.
+4. Try the token-usage procedure in the Token Usage Metadata section once.
    Do this before answer submission so the same parsed token usage can be
    included on every answer POST. If it fails or is unavailable, omit token
    usage and continue without searching.
@@ -216,29 +216,37 @@ https://ce-agent-bridge-worker.agalmic.workers.dev
 
 ## Token Usage Metadata
 
-Before submitting answers, query local SQLite directly if `sqlite3` can read
-`state.db` in the current working directory. Try these exact commands once:
+Before submitting answers, try to create `/tmp/agent-village-token-usage.json`
+from local SQLite. Prefer Python's standard `sqlite3` module because it often
+exists even when the `sqlite3` CLI is missing. Use only these known DB paths:
+`state.db` and `/opt/data/state.db`. Do not install sqlite, search for DB files,
+or inspect configs, logs, docs, prior sessions, or credentials to find usage.
 
-```text
-sqlite3 state.db "SELECT COALESCE(SUM(COALESCE(input_tokens,0) + COALESCE(output_tokens,0) + COALESCE(cache_read_tokens,0) + COALESCE(cache_write_tokens,0)), 0) FROM sessions WHERE started_at >= strftime('%s', 'now') - 2592000 AND source = 'telegram';"
+The JSON shape is:
+
+```json
+{
+  "recent_sessions_total_tokens": 0,
+  "source": "local sqlite3 query (including cache)",
+  "daily_usage_30d": [{ "date": "2026-06-26", "tokens": 0 }]
+}
 ```
 
-```text
-sqlite3 state.db "SELECT date(started_at, 'unixepoch', 'localtime'), SUM(COALESCE(input_tokens,0) + COALESCE(output_tokens,0) + COALESCE(cache_read_tokens,0) + COALESCE(cache_write_tokens,0)) FROM sessions WHERE started_at >= strftime('%s', 'now') - 2592000 AND source = 'telegram' GROUP BY 1 ORDER BY 1;"
-```
+Compute `recent_sessions_total_tokens` and `daily_usage_30d` from `sessions`
+rows where `started_at >= now - 2592000` and `source = 'telegram'`, summing
+`input_tokens + output_tokens + cache_read_tokens + cache_write_tokens` with
+nulls treated as zero. If Python `sqlite3` is unavailable, try the `sqlite3`
+CLI against the same two known paths only. If both fail, omit token usage and
+continue.
 
-Do not search files, configs, logs, docs, prior sessions, or credentials to
-find token usage. If the SQLite commands fail because `sqlite3` is missing or
-`state.db` is unavailable, omit token usage and continue. Do not run
-`hermes insights`, database discovery, file searches, shell greps, or log scans
-to recover token usage. Do not infer, distribute, estimate, or fabricate daily
-or weekly token values from a total. Include the same parsed object in
-`agent_metadata.token_usage` on every answer POST:
-`recent_sessions_total_tokens`, `source: "local sqlite3 query (including cache)"`,
-and, when available, `daily_usage_30d`. `current_run_total_tokens` may also be
-included for research bookkeeping if already known, but the Wrapped image
-displays recent session usage rather than this-run usage. If SQLite is
-unavailable, slow, or unclear, omit token usage and continue.
+Never print, summarize, paste, or stream raw DB rows or command output. Read
+only the compact JSON object. Do not run `hermes insights`, database discovery,
+file searches, shell greps, or log scans to recover token usage. Do not infer,
+distribute, estimate, or fabricate daily or weekly token values from a total.
+Include the parsed object in `agent_metadata.token_usage` on every answer POST
+when available. `current_run_total_tokens` may also be included for research
+bookkeeping if already known, but the Wrapped image displays recent session
+usage rather than this-run usage.
 
 ## Image Delivery
 

@@ -369,11 +369,11 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
 
   assert.match(wrapped, /name:\s+agent-village-wrapped/);
   assert.match(wrapped, /^# Agent Village Wrapped Runtime/m);
-  assert.match(wrapped, /\*\*Skill version:\*\* 2026-06-26 \(wrapped-v17\)/);
+  assert.match(wrapped, /\*\*Skill version:\*\* 2026-06-26 \(wrapped-v18\)/);
   assert.match(wrapped, /Use this skill only to run Agent Village Wrapped/);
   assert.match(wrapped, /Do not use the broader\s+`context-engine` skill/);
   assert.match(wrapped, /memory\/context-engine-state\.json/);
-  assert.match(wrapped, /The only SQLite access this skill permits\s+is the `state\.db` token-usage query/);
+  assert.match(wrapped, /The only SQLite access this skill permits\s+is the known-path token-usage query/);
   assert.match(wrapped, /Agent Village Wrapped Invite Token/);
   assert.match(wrapped, /https:\/\/ce-agent-bridge-worker\.agalmic\.workers\.dev\/wrapped\n\nRead and run the Agent Village wrapped skill above \(no search\):/);
   assert.match(wrapped, /This URL-first shape is the canonical Telegram\/QR format/);
@@ -388,7 +388,7 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.match(wrapped, /\/telegram\/agent\/api\/invite\/onboard/);
   assert.doesNotMatch(wrapped, /Telegram User ID:/);
   assert.match(wrapped, /GET `\/telegram\/agent\/api\/agent-village-wrapped\/skill-version`/);
-  assert.match(wrapped, /version includes `wrapped-v17`/);
+  assert.match(wrapped, /version includes `wrapped-v18`/);
   assert.match(wrapped, /Adaptive Low-Output Execution/);
   assert.match(wrapped, /There is no separate "core", "short", or partial deck mode/);
   assert.match(wrapped, /Prefer one execution for the full lifecycle/);
@@ -396,9 +396,7 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.match(wrapped, /Redirect verbose helper stdout\/stderr to a local log/);
   assert.match(wrapped, /do not print, review, render, or summarize their\s+text, options, schemas, or ids/);
   assert.match(wrapped, /Keep helper stdout to one compact status JSON/);
-  assert.match(wrapped, /Do not run\s+`hermes insights`/);
   assert.doesNotMatch(wrapped, /vote status/);
-  assert.doesNotMatch(wrapped, /hermes insights --days 30 --source telegram/);
   assert.match(wrapped, /Never print per-row\s+predictions/);
   assert.match(wrapped, /Never print local file paths as image delivery/);
   assert.match(wrapped, /The exact failure mode to avoid\s+is sending only "Your Agent Village Wrapped is ready/);
@@ -406,7 +404,7 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.doesNotMatch(wrapped, /## No Balance Check/);
   assert.match(wrapped, /Skip credit, billing, wallet, and cost-floor checks/);
   assert.match(wrapped, /mcp_index_\*/);
-  assert.match(wrapped, /Try the exact token-usage commands/);
+  assert.match(wrapped, /Try the token-usage procedure/);
   assert.match(wrapped, /Do this before answer submission/);
   assert.match(wrapped, /Fetch all pages silently/);
   assert.match(wrapped, /do not echo their text, options, schemas, or ids/);
@@ -422,12 +420,16 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.match(wrapped, /Do not POST\s+`\/telegram\/agent\/api\/agent-only\/token-votes\/bulk`/);
   assert.match(wrapped, /avoids quadratic budget retries/);
   assert.match(wrapped, /daily_usage_30d/);
-  assert.match(wrapped, /source: "local sqlite3 query \(including cache\)"/);
-  assert.match(wrapped, /sqlite3 state\.db/);
+  assert.match(wrapped, /local sqlite3 query \(including cache\)/);
+  assert.match(wrapped, /Python's standard\s+`sqlite3`\s+module/);
+  assert.match(wrapped, /`state\.db`\s+and\s+`\/opt\/data\/state\.db`/);
+  assert.match(wrapped, /\/tmp\/agent-village-token-usage\.json/);
+  assert.match(wrapped, /Do not install sqlite/);
   assert.match(wrapped, /Do not run\s+`hermes insights`/);
-  assert.match(wrapped, /omit token usage and continue/);
-  assert.doesNotMatch(wrapped, /\/opt\/hermes\/\.venv\/bin\/hermes insights --days 30 --source telegram/);
-  assert.doesNotMatch(wrapped, /source: "hermes insights fallback"/);
+  assert.match(wrapped, /Never print, summarize, paste, or stream raw DB rows/);
+  assert.match(wrapped, /omit token\s+usage and continue/);
+  assert.doesNotMatch(wrapped, /hermes insights redirected/);
+  assert.doesNotMatch(wrapped, /\/opt\/hermes\/\.venv\/bin\/hermes insights/);
   assert.match(wrapped, /Markdown image rendering/);
   assert.match(wrapped, /!\[Agent Village Wrapped\]\(<image_url>\)/);
   assert.match(wrapped, /Do not include both a Markdown image and a duplicate raw\s+link/);
@@ -488,7 +490,7 @@ test('Telegram agent handoff exposes the dedicated Agent Village Wrapped skill m
 
   assert.equal(response.status, 200);
   assert.equal(body.ok, true);
-  assert.equal(body.version, '2026-06-26 (wrapped-v17)');
+  assert.equal(body.version, '2026-06-26 (wrapped-v18)');
   assert.equal(body.protocolVersion, '2026-06-16 (v41)');
   assert.equal(body.skill, 'agent-village-wrapped');
   assert.equal(body.skillUrl, 'https://example.test/skills/agent-village-wrapped/SKILL.md');
@@ -518,7 +520,7 @@ test('Telegram agent handoff serves a dedicated Agent Village Wrapped skill redi
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
   assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-agent-village-wrapped\/SKILL\.md/);
-  assert.match(location, /v=2026-06-26-wrapped-v17-/);
+  assert.match(location, /v=2026-06-26-wrapped-v18-/);
 });
 
 test('Telegram agent handoff serves a short Agent Village Wrapped skill alias', async () => {
@@ -530,7 +532,7 @@ test('Telegram agent handoff serves a short Agent Village Wrapped skill alias', 
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
   assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-agent-village-wrapped\/SKILL\.md/);
-  assert.match(location, /v=2026-06-26-wrapped-v17-/);
+  assert.match(location, /v=2026-06-26-wrapped-v18-/);
 });
 
 test('Telegram agent handoff serves a short Agent Village Wrapped skill alias to HEAD probes', async () => {
@@ -542,7 +544,7 @@ test('Telegram agent handoff serves a short Agent Village Wrapped skill alias to
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
   assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-agent-village-wrapped\/SKILL\.md/);
-  assert.match(location, /v=2026-06-26-wrapped-v17-/);
+  assert.match(location, /v=2026-06-26-wrapped-v18-/);
 });
 
 test('Agent-only start payload exposes configurable visual defaults', async () => {
