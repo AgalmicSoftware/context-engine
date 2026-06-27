@@ -5,7 +5,7 @@ description: "Run Context Engine Agent Village Wrapped only: predict answers, ge
 
 # Agent Village Wrapped Runtime
 
-**Skill version:** 2026-06-26 (wrapped-v16)
+**Skill version:** 2026-06-26 (wrapped-v17)
 **Protocol version:** Context Engine agent bridge v41
 
 Use this skill only to run Agent Village Wrapped. Do not use the broader
@@ -90,6 +90,9 @@ process, switch to low-output execution:
 - Prefer one execution for the full lifecycle: onboard, fetch, predict, submit
   answer batches, and request the image. Keep the same fresh `run_id` in that
   execution and reuse it for every answer and image POST.
+- Redirect verbose helper stdout/stderr to a local log if needed, but do not
+  print that log into chat. The user-facing response must not contain generated
+  code, statement lists, schemas, retry traces, debug JSON, or tool transcripts.
 - Keep fetched statements, prediction rows, request payloads, validation
   responses, image JSON, and temporary artifacts in local files or in-memory
   variables, not in chat.
@@ -165,7 +168,7 @@ https://ce-agent-bridge-worker.agalmic.workers.dev
 ```
 
 1. GET `/telegram/agent/api/agent-village-wrapped/skill-version`; verify this
-   skill is `agent-village-wrapped` and the version includes `wrapped-v16`.
+   skill is `agent-village-wrapped` and the version includes `wrapped-v17`.
 2. GET `/telegram/agent/api/skill-version`; silently verify protocol v41.
 3. GET `/telegram/agent/api/agent-only/start` with the private Bearer token.
 4. Try the exact token-usage commands in the Token Usage Metadata section once.
@@ -226,23 +229,16 @@ sqlite3 state.db "SELECT date(started_at, 'unixepoch', 'localtime'), SUM(COALESC
 
 Do not search files, configs, logs, docs, prior sessions, or credentials to
 find token usage. If the SQLite commands fail because `sqlite3` is missing or
-`state.db` is unavailable, you may try this fallback once:
-
-```text
-/opt/hermes/.venv/bin/hermes insights --days 30 --source telegram
-```
-
-Do not print the insights report. Include `recent_sessions_total_tokens` only
-when the report gives an explicit recent 30-day total. Include `daily_usage_30d`
-only for explicit dated daily rows. Do not infer, distribute, estimate, or
-fabricate daily or weekly token values from a total. Include the same parsed
-object in `agent_metadata.token_usage` on every answer POST:
+`state.db` is unavailable, omit token usage and continue. Do not run
+`hermes insights`, database discovery, file searches, shell greps, or log scans
+to recover token usage. Do not infer, distribute, estimate, or fabricate daily
+or weekly token values from a total. Include the same parsed object in
+`agent_metadata.token_usage` on every answer POST:
 `recent_sessions_total_tokens`, `source: "local sqlite3 query (including cache)"`,
 and, when available, `daily_usage_30d`. `current_run_total_tokens` may also be
 included for research bookkeeping if already known, but the Wrapped image
-displays recent session usage rather than this-run usage. Use
-`source: "hermes insights fallback"` only for mechanically parsed fallback data.
-If both methods are unavailable, slow, or unclear, omit token usage and continue.
+displays recent session usage rather than this-run usage. If SQLite is
+unavailable, slow, or unclear, omit token usage and continue.
 
 ## Image Delivery
 
@@ -267,6 +263,11 @@ you answer. The final assistant message must start with exactly one image
 attachment, or exactly one Markdown image line when native attachment is not
 available. Never send the closeout sentence before the image. Do not report
 background-process completion text to the user.
+
+If you cannot display or link the image in the same final response, do not send
+the closeout sentence. Continue until you have the fresh `image_url` or decoded
+image file, then respond with the image first. The exact failure mode to avoid
+is sending only "Your Agent Village Wrapped is ready..." without the image.
 
 Do not print raw base64 or the full image prompt. Do not run
 vision/image-analysis/QA tools on the image. If the user later asks for Agent

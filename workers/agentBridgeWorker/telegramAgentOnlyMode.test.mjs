@@ -196,11 +196,11 @@ test('start payload pins path-only endpoints and instruction size', () => {
   assert.match(payload.instructions, /run one 30-day total query and one daily GROUP BY date query/);
   assert.match(payload.instructions, /source: "local sqlite3 query \(including cache\)"/);
   assert.match(payload.instructions, /sqlite3 can read state\.db/);
-  assert.match(payload.instructions, /hermes insights --days 30 --source telegram once/);
-  assert.match(payload.instructions, /Include recent_sessions_total_tokens only when the report gives an explicit 30-day total/);
-  assert.match(payload.instructions, /Include daily_usage_30d only for explicit dated daily rows/);
+  assert.match(payload.instructions, /If sqlite3 or state\.db is unavailable, omit token_usage and continue/);
+  assert.match(payload.instructions, /Do not run hermes insights/);
   assert.match(payload.instructions, /Do not infer, distribute, estimate, or fabricate daily or weekly token values/);
-  assert.match(payload.instructions, /source: "hermes insights fallback"/);
+  assert.doesNotMatch(payload.instructions, /hermes insights --days 30 --source telegram/);
+  assert.doesNotMatch(payload.instructions, /source: "hermes insights fallback"/);
   assert.match(payload.instructions, /fresh run id/);
   assert.match(payload.instructions, /include that same run_id on every answer and image POST/);
   assert.match(payload.instructions, /"run_id": "<fresh_run_id>"/);
@@ -226,6 +226,7 @@ test('start payload pins path-only endpoints and instruction size', () => {
   assert.match(payload.instructions, /scan for flat confidence/);
   assert.match(payload.instructions, /Do not run image generation or display in a detached background process/);
   assert.match(payload.instructions, /Never send the closeout sentence before the image/);
+  assert.match(payload.instructions, /If you cannot display or link the image in the same final response, do not send the closeout sentence/);
   assert.match(payload.instructions, /Do not include process notes, debugging, script names, parallelization/);
   assert.match(payload.instructions, /To inspect or change your agent's responses/);
   assert.doesNotMatch(payload.instructions, /shareable story version/);
@@ -235,7 +236,7 @@ test('start payload pins path-only endpoints and instruction size', () => {
   assert.match(payload.instructions, /Abstract location evidence into non-location preferences/);
   assert.doesNotMatch(payload.instructions, /Review or edit your agent's responses in Context Engine Telegram Bot/);
   assert.ok(agentOnlyInstructionWordCount(AGENT_ONLY_INSTRUCTIONS) >= 400);
-  assert.ok(agentOnlyInstructionWordCount(AGENT_ONLY_INSTRUCTIONS) <= 900);
+  assert.ok(agentOnlyInstructionWordCount(AGENT_ONLY_INSTRUCTIONS) <= 1000);
   assert.equal((payload.instructions.match(/https?:\/\//gi) || []).length, 1);
 
   const storyDefaultPayload = buildAgentOnlyStartPayload({

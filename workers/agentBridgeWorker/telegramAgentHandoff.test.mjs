@@ -369,7 +369,7 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
 
   assert.match(wrapped, /name:\s+agent-village-wrapped/);
   assert.match(wrapped, /^# Agent Village Wrapped Runtime/m);
-  assert.match(wrapped, /\*\*Skill version:\*\* 2026-06-26 \(wrapped-v16\)/);
+  assert.match(wrapped, /\*\*Skill version:\*\* 2026-06-26 \(wrapped-v17\)/);
   assert.match(wrapped, /Use this skill only to run Agent Village Wrapped/);
   assert.match(wrapped, /Do not use the broader\s+`context-engine` skill/);
   assert.match(wrapped, /memory\/context-engine-state\.json/);
@@ -388,16 +388,20 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.match(wrapped, /\/telegram\/agent\/api\/invite\/onboard/);
   assert.doesNotMatch(wrapped, /Telegram User ID:/);
   assert.match(wrapped, /GET `\/telegram\/agent\/api\/agent-village-wrapped\/skill-version`/);
-  assert.match(wrapped, /version includes `wrapped-v16`/);
+  assert.match(wrapped, /version includes `wrapped-v17`/);
   assert.match(wrapped, /Adaptive Low-Output Execution/);
   assert.match(wrapped, /There is no separate "core", "short", or partial deck mode/);
   assert.match(wrapped, /Prefer one execution for the full lifecycle/);
   assert.match(wrapped, /reuse it for every answer and\s+image POST/);
+  assert.match(wrapped, /Redirect verbose helper stdout\/stderr to a local log/);
   assert.match(wrapped, /do not print, review, render, or summarize their\s+text, options, schemas, or ids/);
   assert.match(wrapped, /Keep helper stdout to one compact status JSON/);
+  assert.match(wrapped, /Do not run\s+`hermes insights`/);
   assert.doesNotMatch(wrapped, /vote status/);
+  assert.doesNotMatch(wrapped, /hermes insights --days 30 --source telegram/);
   assert.match(wrapped, /Never print per-row\s+predictions/);
   assert.match(wrapped, /Never print local file paths as image delivery/);
+  assert.match(wrapped, /The exact failure mode to avoid\s+is sending only "Your Agent Village Wrapped is ready/);
   assert.match(wrapped, /`clocal:`/);
   assert.doesNotMatch(wrapped, /## No Balance Check/);
   assert.match(wrapped, /Skip credit, billing, wallet, and cost-floor checks/);
@@ -420,15 +424,17 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.match(wrapped, /daily_usage_30d/);
   assert.match(wrapped, /source: "local sqlite3 query \(including cache\)"/);
   assert.match(wrapped, /sqlite3 state\.db/);
-  assert.match(wrapped, /\/opt\/hermes\/\.venv\/bin\/hermes insights --days 30 --source telegram/);
-  assert.match(wrapped, /source: "hermes insights fallback"/);
-  assert.match(wrapped, /If both methods\s+are unavailable, slow, or unclear, omit token usage and continue/);
+  assert.match(wrapped, /Do not run\s+`hermes insights`/);
+  assert.match(wrapped, /omit token usage and continue/);
+  assert.doesNotMatch(wrapped, /\/opt\/hermes\/\.venv\/bin\/hermes insights --days 30 --source telegram/);
+  assert.doesNotMatch(wrapped, /source: "hermes insights fallback"/);
   assert.match(wrapped, /Markdown image rendering/);
   assert.match(wrapped, /!\[Agent Village Wrapped\]\(<image_url>\)/);
   assert.match(wrapped, /Do not include both a Markdown image and a duplicate raw\s+link/);
   assert.match(wrapped, /Do not run image generation, polling, image download, or display in a detached\s+background process/);
   assert.match(wrapped, /The final assistant message must start with exactly one image\s+attachment/);
   assert.match(wrapped, /Never send the closeout sentence before the image/);
+  assert.match(wrapped, /If you cannot display or link the image in the same final response/);
   assert.match(wrapped, /Do not generate `mode: "political_compass"` during the default run/);
   assert.match(wrapped, /Generate it only if the user asks for the Agent Norms Compass after the\s+standard image is displayed/);
   assert.match(wrapped, /MP4 story video is not enabled yet/);
@@ -482,7 +488,7 @@ test('Telegram agent handoff exposes the dedicated Agent Village Wrapped skill m
 
   assert.equal(response.status, 200);
   assert.equal(body.ok, true);
-  assert.equal(body.version, '2026-06-26 (wrapped-v16)');
+  assert.equal(body.version, '2026-06-26 (wrapped-v17)');
   assert.equal(body.protocolVersion, '2026-06-16 (v41)');
   assert.equal(body.skill, 'agent-village-wrapped');
   assert.equal(body.skillUrl, 'https://example.test/skills/agent-village-wrapped/SKILL.md');
@@ -512,7 +518,7 @@ test('Telegram agent handoff serves a dedicated Agent Village Wrapped skill redi
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
   assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-agent-village-wrapped\/SKILL\.md/);
-  assert.match(location, /v=2026-06-26-wrapped-v16-/);
+  assert.match(location, /v=2026-06-26-wrapped-v17-/);
 });
 
 test('Telegram agent handoff serves a short Agent Village Wrapped skill alias', async () => {
@@ -524,7 +530,7 @@ test('Telegram agent handoff serves a short Agent Village Wrapped skill alias', 
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
   assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-agent-village-wrapped\/SKILL\.md/);
-  assert.match(location, /v=2026-06-26-wrapped-v16-/);
+  assert.match(location, /v=2026-06-26-wrapped-v17-/);
 });
 
 test('Telegram agent handoff serves a short Agent Village Wrapped skill alias to HEAD probes', async () => {
@@ -536,7 +542,7 @@ test('Telegram agent handoff serves a short Agent Village Wrapped skill alias to
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
   assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-agent-village-wrapped\/SKILL\.md/);
-  assert.match(location, /v=2026-06-26-wrapped-v16-/);
+  assert.match(location, /v=2026-06-26-wrapped-v17-/);
 });
 
 test('Agent-only start payload exposes configurable visual defaults', async () => {
