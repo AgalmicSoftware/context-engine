@@ -1522,7 +1522,12 @@ async function loadQuestionsForSession(env = {}, sessionSlug = '', {
     preferredQuestionIds,
   });
   if (telegramOnly) return withTelegramProposedQuestions(env, sessionSlug, telegramOnly);
-  const livePromise = listCachedSessionQuestionsForBridge({ env, sessionSlug, waitUntil }).catch((error) => ({
+  const livePromise = listCachedSessionQuestionsForBridge({
+    env,
+    sessionSlug,
+    waitUntil,
+    questionLimit,
+  }).catch((error) => ({
     ok: false,
     reason: 'live_question_cache_failed',
     error: safeString(error?.message || error),

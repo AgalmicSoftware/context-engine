@@ -1042,6 +1042,17 @@ function foregroundChunks(env = {}) {
   return normalizePositiveInteger(env.AGENT_BRIDGE_QUESTION_FOREGROUND_CHUNKS, DEFAULT_FOREGROUND_CHUNKS);
 }
 
+function normalizeOptionalPositiveInteger(value) {
+  const raw = Number(value);
+  if (!Number.isFinite(raw) || raw <= 0) return null;
+  return Math.floor(raw);
+}
+
+function foregroundPayloadBatchSize(env = {}, questionLimit = 0) {
+  return normalizeOptionalPositiveInteger(env.AGENT_BRIDGE_QUESTION_FOREGROUND_PAYLOADS) ||
+    normalizeOptionalPositiveInteger(questionLimit);
+}
+
 function cacheKey(sessionSlug = '') {
   return `${QUESTION_CACHE_PREFIX}${lower(sessionSlug) || 'general'}`;
 }
@@ -1246,6 +1257,7 @@ async function scanQuestionRange({
   toBlock = 0,
   seenQuestionIds = new Set(),
   stopAfterFirstAvailable = false,
+  foregroundPayloadLimit = 0,
   maxChunks = Infinity,
   env = {},
   fetchImpl = globalThis.fetch,
@@ -1310,23 +1322,44 @@ async function scanQuestionRange({
         summary.ids.push(questionId);
       }
     }
-    const payloads = await fetchQuestionPayloads({
-      rpcUrls,
-      surveysAddress,
-      questionIds: chunkIds,
-      session,
-      sessionSlug,
-      pointerBackend,
-      getCloudflareAuth,
-      seenQuestionIds,
-      env,
-      fetchImpl,
-    });
-    payloadFailureCount += payloads.payloadFailureCount;
-    skippedSessionMismatchCount += payloads.skippedSessionMismatchCount;
-    questions.push(...payloads.questions);
+    const firstAvailableBatchSize = stopAfterFirstAvailable
+      ? foregroundPayloadBatchSize(env, foregroundPayloadLimit)
+      : 0;
+    const payloadBatches = firstAvailableBatchSize > 0
+      ? Array.from({ length: Math.ceil(chunkIds.length / firstAvailableBatchSize) }, (_, index) => (
+          chunkIds.slice(index * firstAvailableBatchSize, (index + 1) * firstAvailableBatchSize)
+        ))
+      : [chunkIds];
+    let stoppedWithinChunk = false;
+    for (let batchIndex = 0; batchIndex < payloadBatches.length; batchIndex += 1) {
+      const batchQuestionIds = payloadBatches[batchIndex];
+      const payloads = await fetchQuestionPayloads({
+        rpcUrls,
+        surveysAddress,
+        questionIds: batchQuestionIds,
+        session,
+        sessionSlug,
+        pointerBackend,
+        getCloudflareAuth,
+        seenQuestionIds,
+        env,
+        fetchImpl,
+      });
+      payloadFailureCount += payloads.payloadFailureCount;
+      skippedSessionMismatchCount += payloads.skippedSessionMismatchCount;
+      questions.push(...payloads.questions);
+      if (stopAfterFirstAvailable && questions.length > 0) {
+        stoppedWithinChunk = batchIndex < payloadBatches.length - 1;
+        nextScanToBlock = stoppedWithinChunk
+          ? to
+          : (from - 1 >= fromBlock ? from - 1 : null);
+        break;
+      }
+    }
     if (stopAfterFirstAvailable && questions.length > 0) {
-      nextScanToBlock = from - 1 >= fromBlock ? from - 1 : null;
+      if (stoppedWithinChunk) {
+        lowestScannedBlock = null;
+      }
       break;
     }
     to = from - 1;
@@ -1368,6 +1401,7 @@ async function refreshSessionQuestionIndex({
   sessionSlug = '',
   existingIndex = null,
   mode = 'complete',
+  foregroundPayloadLimit = 0,
   fetchImpl = globalThis.fetch,
 } = {}) {
   const slug = lower(sessionSlug) || lower(env.AGENT_BRIDGE_DEFAULT_SESSION_SLUG || env.DEFAULT_SESSION_SLUG) || 'general';
@@ -1502,6 +1536,7 @@ async function refreshSessionQuestionIndex({
   }
 
   for (const range of ranges) {
+    const firstAvailableMode = mode === 'until_first_available' && questions.length === 0;
     const rangeResult = await scanQuestionRange({
       rpcUrls,
       surveysAddress,
@@ -1512,8 +1547,9 @@ async function refreshSessionQuestionIndex({
       fromBlock: range.fromBlock,
       toBlock: range.toBlock,
       seenQuestionIds,
-      stopAfterFirstAvailable: mode === 'until_first_available' && questions.length === 0,
-      maxChunks: mode === 'until_first_available' && questions.length === 0 ? foregroundChunks(env) : Infinity,
+      stopAfterFirstAvailable: firstAvailableMode,
+      foregroundPayloadLimit: firstAvailableMode ? foregroundPayloadLimit : 0,
+      maxChunks: firstAvailableMode ? foregroundChunks(env) : Infinity,
       env,
       fetchImpl,
     });
@@ -1603,6 +1639,7 @@ export async function listCachedSessionQuestionsForBridge({
   fetchImpl = env.QUESTION_FETCH || env.REGISTRY_FETCH || globalThis.fetch,
   waitUntil = null,
   forceRefresh = false,
+  questionLimit = 0,
 } = {}) {
   const slug = lower(sessionSlug) || lower(env.AGENT_BRIDGE_DEFAULT_SESSION_SLUG || env.DEFAULT_SESSION_SLUG) || 'general';
   const ttlSeconds = cacheTtlSeconds(env);
@@ -1635,6 +1672,7 @@ export async function listCachedSessionQuestionsForBridge({
     sessionSlug: slug,
     existingIndex: refreshBaseIndex,
     mode: forceRefresh || typeof waitUntil !== 'function' ? 'complete' : 'until_first_available',
+    foregroundPayloadLimit: questionLimit,
     fetchImpl,
   });
   if (
