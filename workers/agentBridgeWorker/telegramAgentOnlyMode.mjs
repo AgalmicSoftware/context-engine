@@ -4004,6 +4004,123 @@ export async function exportAgentOnlyData({
         created_at: safeString(record.createdAt),
       });
     }
+  } else if (view === 'summary') {
+    const entries = await listKvEntriesByPrefix(env, `${AGENT_ONLY_ATTEMPT_EVENT_KV_PREFIX}${slug}:`);
+    const principalRows = new Map();
+    const runRows = new Map();
+    let firstAttemptAt = '';
+    let latestAttemptAt = '';
+    let includedAttemptEventCount = 0;
+    for (const entry of entries) {
+      const record = await readKvJson(env, entry.key);
+      if (!record || (selectedWindow && safeString(record.windowId) !== selectedWindow)) continue;
+      includedAttemptEventCount += 1;
+      const createdAt = safeString(record.createdAt);
+      if (createdAt && (!firstAttemptAt || createdAt < firstAttemptAt)) firstAttemptAt = createdAt;
+      if (createdAt && (!latestAttemptAt || createdAt > latestAttemptAt)) latestAttemptAt = createdAt;
+      const principalId = await agentOnlyPrincipalId(env, record.telegramUserId);
+      if (!principalRows.has(principalId)) {
+        principalRows.set(principalId, {
+          principal_id: principalId,
+          attempt_event_count: 0,
+          run_count: 0,
+          answer_complete_run_count: 0,
+          wrapped_image_run_count: 0,
+          successful_run_count: 0,
+          first_attempt_at: createdAt,
+          latest_attempt_at: createdAt,
+        });
+      }
+      const principal = principalRows.get(principalId);
+      principal.attempt_event_count += 1;
+      if (createdAt && (!principal.first_attempt_at || createdAt < principal.first_attempt_at)) principal.first_attempt_at = createdAt;
+      if (createdAt && (!principal.latest_attempt_at || createdAt > principal.latest_attempt_at)) principal.latest_attempt_at = createdAt;
+
+      const runId = normalizeAgentOnlyRunId(record.runId) || 'unknown';
+      const runKey = `${principalId}\t${runId}`;
+      if (!runRows.has(runKey)) {
+        runRows.set(runKey, {
+          principal_id: principalId,
+          run_id: runId,
+          attempt_event_count: 0,
+          accepted_answer_count: 0,
+          statement_count: 0,
+          agent_response_count: 0,
+          privacy_skip_count: 0,
+          wrapped_image_ok: false,
+          first_attempt_at: createdAt,
+          latest_attempt_at: createdAt,
+        });
+      }
+      const run = runRows.get(runKey);
+      run.attempt_event_count += 1;
+      if (createdAt && (!run.first_attempt_at || createdAt < run.first_attempt_at)) run.first_attempt_at = createdAt;
+      if (createdAt && (!run.latest_attempt_at || createdAt > run.latest_attempt_at)) run.latest_attempt_at = createdAt;
+      const stage = safeString(record.stage);
+      const counts = record.counts && typeof record.counts === 'object' && !Array.isArray(record.counts)
+        ? record.counts
+        : {};
+      if (stage === 'answers_bulk' && record.ok === true) {
+        run.accepted_answer_count += Number(counts.accepted || 0) || 0;
+      }
+      run.statement_count = Math.max(run.statement_count, Number(counts.statementCount || 0) || 0);
+      run.agent_response_count = Math.max(run.agent_response_count, Number(counts.agentResponseCount || 0) || 0);
+      run.privacy_skip_count = Math.max(run.privacy_skip_count, Number(counts.privacySkipCount || 0) || 0);
+      if (stage === 'wrapped_image' && record.ok === true) run.wrapped_image_ok = true;
+    }
+    const runs = [...runRows.values()].map((run) => {
+      const answerTarget = Math.max(Number(run.statement_count || 0), Number(run.agent_response_count || 0));
+      const answerComplete = answerTarget > 0 && Number(run.accepted_answer_count || 0) >= answerTarget;
+      return {
+        ...run,
+        answer_complete: answerComplete,
+        successful: answerComplete || run.wrapped_image_ok,
+      };
+    }).sort((left, right) => safeString(left.first_attempt_at).localeCompare(safeString(right.first_attempt_at)));
+    for (const run of runs) {
+      const principal = principalRows.get(run.principal_id);
+      if (!principal) continue;
+      principal.run_count += 1;
+      if (run.answer_complete) principal.answer_complete_run_count += 1;
+      if (run.wrapped_image_ok) principal.wrapped_image_run_count += 1;
+      if (run.successful) principal.successful_run_count += 1;
+    }
+    const principals = [...principalRows.values()]
+      .sort((left, right) => safeString(left.first_attempt_at).localeCompare(safeString(right.first_attempt_at)));
+    const summary = {
+      ok: true,
+      session_slug: slug,
+      window_id: selectedWindow,
+      generated_at: nowIso(now),
+      attempt_event_count: includedAttemptEventCount,
+      distinct_principal_count: principals.length,
+      answer_complete_principal_count: principals.filter((principal) => principal.answer_complete_run_count > 0).length,
+      wrapped_image_principal_count: principals.filter((principal) => principal.wrapped_image_run_count > 0).length,
+      successful_principal_count: principals.filter((principal) => principal.successful_run_count > 0).length,
+      run_count: runs.length,
+      answer_complete_run_count: runs.filter((run) => run.answer_complete).length,
+      wrapped_image_run_count: runs.filter((run) => run.wrapped_image_ok).length,
+      successful_run_count: runs.filter((run) => run.successful).length,
+      first_attempt_at: firstAttemptAt,
+      latest_attempt_at: latestAttemptAt,
+      principals,
+      runs,
+    };
+    const outputFormat = lower(format) === 'csv' ? 'csv' : lower(format) === 'jsonl' ? 'jsonl' : 'json';
+    if (outputFormat === 'csv') {
+      return {
+        ok: true,
+        rows: principals,
+        body: rowsToCsv(principals),
+        contentType: 'text/csv; charset=utf-8',
+      };
+    }
+    return {
+      ok: true,
+      rows: [summary],
+      body: outputFormat === 'jsonl' ? rowsToJsonl([summary]) : JSON.stringify(summary, null, 2),
+      contentType: outputFormat === 'jsonl' ? 'application/x-ndjson; charset=utf-8' : 'application/json; charset=utf-8',
+    };
   } else if (view === 'images') {
     const entries = await listKvEntriesByPrefix(env, `${AGENT_ONLY_WRAPPED_IMAGE_KV_PREFIX}${slug}:`);
     for (const entry of entries) {

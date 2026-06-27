@@ -146,6 +146,7 @@ Operators configure flagged statements with the worker service token or a
 GET  /telegram/agent/api/admin/agent-only/config
 POST /telegram/agent/api/admin/agent-only/config
 POST /telegram/agent/api/admin/agent-only/window/open
+GET  /telegram/agent/api/admin/agent-only/export?view=summary&format=json
 GET  /telegram/agent/api/admin/agent-only/export?view=answers&format=jsonl
 GET  /telegram/agent/api/admin/agent-only/export?view=attempts&format=jsonl
 ```
@@ -164,6 +165,10 @@ answer, vote, and wrapped-image POSTs. It records stage, status, reason,
 request id, run id, mode, and counts using the pseudonymous principal id, so
 operators can distinguish failed, partial, and successful runs without reading
 Hermes transcripts or exposing raw Telegram ids.
+The `summary` export aggregates that same attempts stream into high-level
+principal and run counts, including first/latest attempt timestamps, completed
+answer runs, and wrapped-image runs. It does not read answer bodies or image
+records.
 
 `POST /telegram/agent/api/admin/questions/delete` accepts the worker service
 token or a `ceagt_...` token whose managed account is an admin for the session.

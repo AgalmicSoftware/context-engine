@@ -19,6 +19,7 @@ import {
   loadAgentOnlyPredictionsForPrincipal,
   loadAgentOnlyModeConfig,
   materializeAgentOnlyWindow,
+  recordAgentOnlyAttemptEvent,
   recordAgentOnlyHumanReview,
   saveAgentOnlyModeConfig,
   semanticFingerprintForAgentOnlyAnswer,
@@ -2202,6 +2203,103 @@ test('token votes enforce linear and quadratic budgets and replace per-mode allo
     .filter((row) => row.source === 'agent_autofill' && row.mode === 'linear' && row.statement_id === ids[0])
     .sort((left, right) => String(left.created_at).localeCompare(String(right.created_at)));
   assert.deepEqual(linearRows.map((row) => row.votes), [60, 30]);
+});
+
+test('summary export counts distinct principals and completed runs from attempt telemetry', async () => {
+  const testEnv = env();
+  await recordAgentOnlyAttemptEvent({
+    env: testEnv,
+    sessionSlug: 'alpha',
+    telegramUserId: '1001',
+    stage: 'answers_bulk',
+    status: 200,
+    now: '2026-06-12T15:00:00.000Z',
+    body: { window_id: 'w-2026-06-12', run_id: 'run-complete', request_id: 'answers-1' },
+    result: {
+      ok: true,
+      window_id: 'w-2026-06-12',
+      run_id: 'run-complete',
+      accepted: 58,
+      statement_count: 58,
+      agent_response_count: 58,
+      privacy_skip_count: 0,
+    },
+  });
+  await recordAgentOnlyAttemptEvent({
+    env: testEnv,
+    sessionSlug: 'alpha',
+    telegramUserId: '1001',
+    stage: 'wrapped_image',
+    status: 200,
+    now: '2026-06-12T15:01:00.000Z',
+    body: { window_id: 'w-2026-06-12', run_id: 'run-complete', request_id: 'image-1' },
+    result: {
+      ok: true,
+      window_id: 'w-2026-06-12',
+      run_id: 'run-complete',
+      statement_count: 58,
+      agent_response_count: 58,
+    },
+  });
+  await recordAgentOnlyAttemptEvent({
+    env: testEnv,
+    sessionSlug: 'alpha',
+    telegramUserId: '2002',
+    stage: 'answers_bulk',
+    status: 200,
+    now: '2026-06-12T15:02:00.000Z',
+    body: { window_id: 'w-2026-06-12', run_id: 'run-partial', request_id: 'answers-2' },
+    result: {
+      ok: true,
+      window_id: 'w-2026-06-12',
+      run_id: 'run-partial',
+      accepted: 12,
+      statement_count: 58,
+      agent_response_count: 58,
+    },
+  });
+  await recordAgentOnlyAttemptEvent({
+    env: testEnv,
+    sessionSlug: 'alpha',
+    telegramUserId: '3003',
+    stage: 'answers_bulk',
+    status: 200,
+    now: '2026-06-19T15:00:00.000Z',
+    body: { window_id: 'w-2026-06-19', run_id: 'run-other-window', request_id: 'answers-3' },
+    result: {
+      ok: true,
+      window_id: 'w-2026-06-19',
+      run_id: 'run-other-window',
+      accepted: 58,
+      statement_count: 58,
+      agent_response_count: 58,
+    },
+  });
+
+  const exported = await exportAgentOnlyData({
+    env: testEnv,
+    sessionSlug: 'alpha',
+    windowId: 'w-2026-06-12',
+    view: 'summary',
+    format: 'json',
+    now: '2026-06-12T16:00:00.000Z',
+  });
+  assert.equal(exported.ok, true);
+  assert.equal(exported.contentType, 'application/json; charset=utf-8');
+  const summary = JSON.parse(exported.body);
+  assert.equal(summary.attempt_event_count, 3);
+  assert.equal(summary.distinct_principal_count, 2);
+  assert.equal(summary.answer_complete_principal_count, 1);
+  assert.equal(summary.wrapped_image_principal_count, 1);
+  assert.equal(summary.successful_principal_count, 1);
+  assert.equal(summary.run_count, 2);
+  assert.equal(summary.answer_complete_run_count, 1);
+  assert.equal(summary.wrapped_image_run_count, 1);
+  assert.equal(summary.first_attempt_at, '2026-06-12T15:00:00.000Z');
+  assert.equal(summary.latest_attempt_at, '2026-06-12T15:02:00.000Z');
+  assert.equal(summary.principals.length, 2);
+  assert.equal(summary.runs.find((run) => run.run_id === 'run-complete').answer_complete, true);
+  assert.equal(summary.runs.find((run) => run.run_id === 'run-partial').answer_complete, false);
 });
 
 test('human review is idempotent and agent reruns never overwrite human precedence', async () => {
