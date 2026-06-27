@@ -1,6 +1,6 @@
 ---
 name: agent-village-wrapped
-description: Run Context Engine Agent Village Wrapped only: predict answers, generate Wrapped images, and return the Mini App link.
+description: "Run Context Engine Agent Village Wrapped only: predict answers, generate Wrapped images, and return the Mini App link."
 ---
 
 # Agent Village Wrapped Runtime
