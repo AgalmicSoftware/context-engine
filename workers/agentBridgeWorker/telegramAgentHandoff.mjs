@@ -126,7 +126,7 @@ const DEFAULT_AGENT_RAW_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSo
 const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-06-16 (v41)';
 const DEFAULT_AGENT_VILLAGE_WRAPPED_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/wrapped';
 const DEFAULT_AGENT_VILLAGE_WRAPPED_RAW_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/edge-2026/workers/agentBridgeWorker/skills/ce-agent-village-wrapped/SKILL.md';
-const CE_AGENT_VILLAGE_WRAPPED_SKILL_VERSION = '2026-06-26 (wrapped-v18)';
+const CE_AGENT_VILLAGE_WRAPPED_SKILL_VERSION = '2026-06-27 (wrapped-v19)';
 const MINI_APP_QUESTION_VOTE_KV_PREFIX = 'telegram:mini-app-question-vote:v1:';
 const AGENT_QUESTION_VOTE_DECISION_KV_PREFIX = 'telegram:agent-question-vote-decision:v1:';
 const ANSWER_DRAFT_KV_PREFIX = 'telegram:answer-draft:';
@@ -3248,7 +3248,8 @@ async function handleAgentOnlyWrappedImageRequest({
     assertNoSecretShape(result, 'Agent-only wrapped image error must not serialize secrets.');
     return json(result, { status });
   }
-  const wantsPng = lower(input.format || body.format) === 'png';
+  const responseFormat = lower(input.format || body.format);
+  const wantsPng = responseFormat === 'png';
   if (wantsPng) {
     return new Response(base64ToBytes(result.image_base64), {
       status: 200,
@@ -3259,12 +3260,31 @@ async function handleAgentOnlyWrappedImageRequest({
       },
     });
   }
+  const includeBase64Input = lower(input.include_base64 || input.includeBase64);
+  const omitBase64 =
+    responseFormat === 'json_url'
+    || body.compact === true
+    || body.include_base64 === false
+    || body.includeBase64 === false
+    || includeBase64Input === 'false';
+  const includeBase64 =
+    !omitBase64
+    && (
+      responseFormat === 'json_base64'
+      || responseFormat === 'json_with_base64'
+      || body.include_base64 === true
+      || body.includeBase64 === true
+      || includeBase64Input === 'true'
+    );
   const payload = {
     ...result,
     ...(result.image_view_id ? {
       image_url: agentOnlyWrappedImageViewUrl(env, result.image_view_id),
     } : {}),
   };
+  if (!includeBase64) {
+    delete payload.image_base64;
+  }
   assertNoSecretShape({ ...payload, image_base64: '[image omitted]' }, 'Agent-only wrapped image response metadata must not serialize secrets.');
   return json(payload, { status, headers: { 'cache-control': 'no-store' } });
 }

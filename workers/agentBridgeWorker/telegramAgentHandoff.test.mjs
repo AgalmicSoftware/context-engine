@@ -369,76 +369,47 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
 
   assert.match(wrapped, /name:\s+agent-village-wrapped/);
   assert.match(wrapped, /^# Agent Village Wrapped Runtime/m);
-  assert.match(wrapped, /\*\*Skill version:\*\* 2026-06-26 \(wrapped-v18\)/);
+  assert.match(wrapped, /\*\*Skill version:\*\* 2026-06-27 \(wrapped-v19\)/);
   assert.match(wrapped, /Use this skill only to run Agent Village Wrapped/);
   assert.match(wrapped, /Do not use the broader\s+`context-engine` skill/);
   assert.match(wrapped, /memory\/context-engine-state\.json/);
-  assert.match(wrapped, /The only SQLite access this skill permits\s+is the known-path token-usage query/);
+  assert.match(wrapped, /The only local data enrichment allowed is the optional known-path token usage/);
   assert.match(wrapped, /Agent Village Wrapped Invite Token/);
   assert.match(wrapped, /https:\/\/ce-agent-bridge-worker\.agalmic\.workers\.dev\/wrapped\n\nRead and run the Agent Village wrapped skill above \(no search\):/);
-  assert.match(wrapped, /This URL-first shape is the canonical Telegram\/QR format/);
-  assert.match(wrapped, /`Invite Token: \.\.\.`/);
-  assert.match(wrapped, /When invoked from a short forwarded prompt, the skill URL may appear before the\s+instruction line/);
-  assert.match(wrapped, /Do not inspect local skills, local files, previous sessions,\s+memories, recovered scripts, Geo, or Index first/);
-  assert.match(wrapped, /Do this even if local memory, previous sessions, or older\s+`ceagt_\.\.\.` credentials might exist/);
-  assert.match(wrapped, /`skills_list`/);
-  assert.match(wrapped, /`session_search`/);
+  assert.match(wrapped, /Canonical Telegram\/QR message/);
+  assert.match(wrapped, /`Invite Token`, `Wrapped Invite Token`, and `AVW Invite Token`/);
+  assert.match(wrapped, /Do not ask another\s+permission, preference, research, or confirmation question/);
   assert.match(wrapped, /"mode": "agent_only"/);
   assert.match(wrapped, /"skill": "agent-village-wrapped"/);
   assert.match(wrapped, /\/telegram\/agent\/api\/invite\/onboard/);
   assert.doesNotMatch(wrapped, /Telegram User ID:/);
   assert.match(wrapped, /GET `\/telegram\/agent\/api\/agent-village-wrapped\/skill-version`/);
-  assert.match(wrapped, /version includes `wrapped-v18`/);
-  assert.match(wrapped, /Adaptive Low-Output Execution/);
-  assert.match(wrapped, /There is no separate "core", "short", or partial deck mode/);
-  assert.match(wrapped, /Prefer one execution for the full lifecycle/);
-  assert.match(wrapped, /reuse it for every answer and\s+image POST/);
-  assert.match(wrapped, /Redirect verbose helper stdout\/stderr to a local log/);
-  assert.match(wrapped, /do not print, review, render, or summarize their\s+text, options, schemas, or ids/);
-  assert.match(wrapped, /Keep helper stdout to one compact status JSON/);
+  assert.match(wrapped, /version `wrapped-v19`/);
+  assert.match(wrapped, /Quiet Lifecycle/);
+  assert.match(wrapped, /Create one fresh `run_id` for the whole run/);
+  assert.match(wrapped, /Do not discover files, inspect logs\/configs\/sessions/);
+  assert.match(wrapped, /Internal prediction\s+calls may return compact JSON keyed by local index/);
+  assert.match(wrapped, /never print that JSON to\s+chat or stdout/);
+  assert.match(wrapped, /Fetch all statement pages silently/);
+  assert.match(wrapped, /Do not print statements, options,\s+schemas, ids, payloads, prediction JSON/);
   assert.doesNotMatch(wrapped, /vote status/);
-  assert.match(wrapped, /Never print per-row\s+predictions/);
-  assert.match(wrapped, /Never print local file paths as image delivery/);
-  assert.match(wrapped, /The exact failure mode to avoid\s+is sending only "Your Agent Village Wrapped is ready/);
-  assert.match(wrapped, /`clocal:`/);
   assert.doesNotMatch(wrapped, /## No Balance Check/);
-  assert.match(wrapped, /Skip credit, billing, wallet, and cost-floor checks/);
-  assert.match(wrapped, /mcp_index_\*/);
-  assert.match(wrapped, /Try the token-usage procedure/);
-  assert.match(wrapped, /Do this before answer submission/);
-  assert.match(wrapped, /Fetch all pages silently/);
-  assert.match(wrapped, /do not echo their text, options, schemas, or ids/);
-  assert.match(wrapped, /Do not create a second `run_id` after answer submission/);
-  assert.match(wrapped, /answer-batch or image request fails/);
-  assert.doesNotMatch(wrapped, /batch,\s+vote, or image request fails/);
-  assert.match(wrapped, /retry with the same\s+`run_id`/);
-  assert.match(wrapped, /make model prediction calls in batches of roughly\s+10-15 statements/);
-  assert.match(wrapped, /Map indexes back to exact[\s\S]+`statement_id` values programmatically/);
-  assert.match(wrapped, /multichoice answers are\s+`values` arrays/);
-  assert.match(wrapped, /wrap a single selected string as a one-item array/);
+  assert.doesNotMatch(wrapped, /skill_view|skills_list|search_files|session_search|mcp_index|hermes insights|\/opt\/hermes/i);
   assert.match(wrapped, /Skip token-vote allocations in the default run/);
-  assert.match(wrapped, /Do not POST\s+`\/telegram\/agent\/api\/agent-only\/token-votes\/bulk`/);
-  assert.match(wrapped, /avoids quadratic budget retries/);
+  assert.match(wrapped, /multichoice uses\s+`values` arrays/);
+  assert.match(wrapped, /Do not POST token votes\s+unless the principal explicitly asks/);
   assert.match(wrapped, /daily_usage_30d/);
   assert.match(wrapped, /local sqlite3 query \(including cache\)/);
-  assert.match(wrapped, /Python's standard\s+`sqlite3`\s+module/);
-  assert.match(wrapped, /`state\.db`\s+and\s+`\/opt\/data\/state\.db`/);
-  assert.match(wrapped, /\/tmp\/agent-village-token-usage\.json/);
-  assert.match(wrapped, /Do not install sqlite/);
-  assert.match(wrapped, /Do not run\s+`hermes insights`/);
-  assert.match(wrapped, /Never print, summarize, paste, or stream raw DB rows/);
-  assert.match(wrapped, /omit token\s+usage and continue/);
-  assert.doesNotMatch(wrapped, /hermes insights redirected/);
-  assert.doesNotMatch(wrapped, /\/opt\/hermes\/\.venv\/bin\/hermes insights/);
-  assert.match(wrapped, /Markdown image rendering/);
+  assert.match(wrapped, /make at most one quiet\s+known-path SQLite attempt/);
+  assert.match(wrapped, /If unavailable or unclear,\s+omit `token_usage`/);
+  assert.match(wrapped, /Never print rows or command\s+output/);
+  assert.match(wrapped, /"format": "json_url"/);
+  assert.match(wrapped, /"include_base64": false/);
+  assert.match(wrapped, /exactly\s+one Markdown image line using the returned `image_url`/);
   assert.match(wrapped, /!\[Agent Village Wrapped\]\(<image_url>\)/);
-  assert.match(wrapped, /Do not include both a Markdown image and a duplicate raw\s+link/);
-  assert.match(wrapped, /Do not run image generation, polling, image download, or display in a detached\s+background process/);
-  assert.match(wrapped, /The final assistant message must start with exactly one image\s+attachment/);
-  assert.match(wrapped, /Never send the closeout sentence before the image/);
-  assert.match(wrapped, /If you cannot display or link the image in the same final response/);
-  assert.match(wrapped, /Do not generate `mode: "political_compass"` during the default run/);
-  assert.match(wrapped, /Generate it only if the user asks for the Agent Norms Compass after the\s+standard image is displayed/);
+  assert.match(wrapped, /Do not use local paths, raw `image_base64`, duplicate raw links/);
+  assert.match(wrapped, /Do not request `mode: "political_compass"` during the default run/);
+  assert.match(wrapped, /Generate\s+Agent Norms Compass only if the user asks after the standard image is shown/);
   assert.match(wrapped, /MP4 story video is not enabled yet/);
   assert.doesNotMatch(wrapped, /visualDefaults\.wrapped_story/);
   assert.doesNotMatch(wrapped, /shareable story version/);
@@ -490,7 +461,7 @@ test('Telegram agent handoff exposes the dedicated Agent Village Wrapped skill m
 
   assert.equal(response.status, 200);
   assert.equal(body.ok, true);
-  assert.equal(body.version, '2026-06-26 (wrapped-v18)');
+  assert.equal(body.version, '2026-06-27 (wrapped-v19)');
   assert.equal(body.protocolVersion, '2026-06-16 (v41)');
   assert.equal(body.skill, 'agent-village-wrapped');
   assert.equal(body.skillUrl, 'https://example.test/skills/agent-village-wrapped/SKILL.md');
@@ -520,7 +491,7 @@ test('Telegram agent handoff serves a dedicated Agent Village Wrapped skill redi
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
   assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-agent-village-wrapped\/SKILL\.md/);
-  assert.match(location, /v=2026-06-26-wrapped-v18-/);
+  assert.match(location, /v=2026-06-27-wrapped-v19-/);
 });
 
 test('Telegram agent handoff serves a short Agent Village Wrapped skill alias', async () => {
@@ -532,7 +503,7 @@ test('Telegram agent handoff serves a short Agent Village Wrapped skill alias', 
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
   assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-agent-village-wrapped\/SKILL\.md/);
-  assert.match(location, /v=2026-06-26-wrapped-v18-/);
+  assert.match(location, /v=2026-06-27-wrapped-v19-/);
 });
 
 test('Telegram agent handoff serves a short Agent Village Wrapped skill alias to HEAD probes', async () => {
@@ -544,7 +515,7 @@ test('Telegram agent handoff serves a short Agent Village Wrapped skill alias to
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
   assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-agent-village-wrapped\/SKILL\.md/);
-  assert.match(location, /v=2026-06-26-wrapped-v18-/);
+  assert.match(location, /v=2026-06-27-wrapped-v19-/);
 });
 
 test('Agent-only start payload exposes configurable visual defaults', async () => {
@@ -1992,6 +1963,16 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   env.AGENT_BRIDGE_OPENAI_API_KEY = 'sk-bridge-openai';
   env.AGENT_BRIDGE_PUBLIC_URL = 'https://bridge.example';
   let openAiRequestForm = null;
+  const fakeImageFetch = async (url, init = {}) => {
+    assert.equal(url, 'https://api.openai.com/v1/images/edits');
+    assert.equal(init.headers.authorization, 'Bearer sk-bridge-openai');
+    assert.equal(init.headers['content-type'], undefined);
+    assert.equal(init.body instanceof FormData, true);
+    openAiRequestForm = init.body;
+    return new Response(JSON.stringify({
+      data: [{ b64_json: Buffer.from('fake-png').toString('base64') }],
+    }), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
   const wrappedResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/agent-only/wrapped-image?sessionSlug=alpha', {
       method: 'POST',
@@ -2000,20 +1981,13 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
         window_id: 'w-2026-06-12',
         run_id: 'route-run-1',
         createdAt: '2026-06-12T15:09:00.000Z',
+        format: 'json_url',
+        include_base64: false,
         include_prompt: true,
       },
     }),
     env,
-    fetchImpl: async (url, init = {}) => {
-      assert.equal(url, 'https://api.openai.com/v1/images/edits');
-      assert.equal(init.headers.authorization, 'Bearer sk-bridge-openai');
-      assert.equal(init.headers['content-type'], undefined);
-      assert.equal(init.body instanceof FormData, true);
-      openAiRequestForm = init.body;
-      return new Response(JSON.stringify({
-        data: [{ b64_json: Buffer.from('fake-png').toString('base64') }],
-      }), { status: 200, headers: { 'content-type': 'application/json' } });
-    },
+    fetchImpl: fakeImageFetch,
   });
   const wrapped = await jsonBody(wrappedResponse);
   assert.equal(wrappedResponse.status, 200);
@@ -2036,12 +2010,13 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   assert.equal(wrapped.model, 'gpt-image-2');
   assert.equal(wrapped.size, '2048x1152');
   assert.equal(wrapped.reference_image, 'agent-village-logo-reference.png');
-  assert.equal(wrapped.image_base64, Buffer.from('fake-png').toString('base64'));
+  assert.equal(Object.hasOwn(wrapped, 'image_base64'), false);
   assert.equal(wrapped.image_saved, true);
   assert.match(wrapped.image_id, /^\d{13}-[0-9a-f]{8}$/);
   assert.match(wrapped.image_view_id, /^[0-9a-f]{32}$/);
   assert.equal(wrapped.image_url, `https://bridge.example/telegram/agent/api/agent-only/wrapped-image/view/${wrapped.image_view_id}`);
   assert.match(wrapped.image_prompt_hash, /^sha256:[0-9a-f]{32}$/);
+  assert.equal(typeof wrapped.prompt, 'string');
   assert.equal(openAiRequestForm.get('model'), 'gpt-image-2');
   assert.equal(openAiRequestForm.get('output_format'), 'png');
   const logoReference = openAiRequestForm.get('image');
@@ -2059,6 +2034,65 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   assert.match(wrappedPrompt, /contextengine\.xyz/);
   assert.doesNotMatch(wrappedPrompt, /Review or edit your agent's responses in Context Engine/);
   assert.doesNotMatch(wrappedPrompt, /What Your Agent Upvoted/);
+
+  const wrappedDefaultResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/agent-only/wrapped-image?sessionSlug=alpha', {
+      method: 'POST',
+      token: agentOnlyToken.token,
+      body: {
+        window_id: 'w-2026-06-12',
+        run_id: 'route-run-1',
+        createdAt: '2026-06-12T15:09:15.000Z',
+      },
+    }),
+    env,
+    fetchImpl: fakeImageFetch,
+  });
+  const wrappedDefault = await jsonBody(wrappedDefaultResponse);
+  assert.equal(wrappedDefaultResponse.status, 200);
+  assert.equal(wrappedDefault.ok, true);
+  assert.equal(Object.hasOwn(wrappedDefault, 'image_base64'), false);
+  assert.equal(typeof wrappedDefault.image_url, 'string');
+  assert.equal(Object.hasOwn(wrappedDefault, 'prompt'), false);
+
+  const wrappedBase64Response = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/agent-only/wrapped-image?sessionSlug=alpha', {
+      method: 'POST',
+      token: agentOnlyToken.token,
+      body: {
+        window_id: 'w-2026-06-12',
+        run_id: 'route-run-1',
+        createdAt: '2026-06-12T15:09:30.000Z',
+        include_base64: true,
+      },
+    }),
+    env,
+    fetchImpl: fakeImageFetch,
+  });
+  const wrappedBase64 = await jsonBody(wrappedBase64Response);
+  assert.equal(wrappedBase64Response.status, 200);
+  assert.equal(wrappedBase64.ok, true);
+  assert.equal(wrappedBase64.image_base64, Buffer.from('fake-png').toString('base64'));
+  assert.equal(typeof wrappedBase64.image_url, 'string');
+  assert.equal(Object.hasOwn(wrappedBase64, 'prompt'), false);
+
+  const wrappedPngResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/agent-only/wrapped-image?sessionSlug=alpha', {
+      method: 'POST',
+      token: agentOnlyToken.token,
+      body: {
+        window_id: 'w-2026-06-12',
+        run_id: 'route-run-1',
+        createdAt: '2026-06-12T15:09:45.000Z',
+        format: 'png',
+      },
+    }),
+    env,
+    fetchImpl: fakeImageFetch,
+  });
+  assert.equal(wrappedPngResponse.status, 200);
+  assert.equal(wrappedPngResponse.headers.get('content-type'), 'image/png');
+  assert.equal(Buffer.from(await wrappedPngResponse.arrayBuffer()).toString(), 'fake-png');
 
   const imageViewResponse = await handleTelegramAgentHandoffRequest({
     request: new Request(wrapped.image_url),
@@ -2094,14 +2128,14 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   const imageExportText = await imageExportResponse.text();
   assert.equal(imageExportResponse.status, 200);
   const imageRows = imageExportText.trim().split('\n').filter(Boolean).map((line) => JSON.parse(line));
-  assert.equal(imageRows.length, 1);
-  assert.equal(imageRows[0].image_id, wrapped.image_id);
-  assert.equal(imageRows[0].image_view_id, wrapped.image_view_id);
-  assert.equal(imageRows[0].run_id, 'route-run-1');
-  assert.equal(imageRows[0].mode, 'wrapped');
-  assert.equal(imageRows[0].image_base64, Buffer.from('fake-png').toString('base64'));
-  assert.equal(imageRows[0].prompt_hash, wrapped.image_prompt_hash);
-  assert.equal(imageRows[0].principal_id.startsWith('cep_'), true);
+  const wrappedImageRow = imageRows.find((row) => row.image_id === wrapped.image_id);
+  assert.ok(wrappedImageRow);
+  assert.equal(wrappedImageRow.image_view_id, wrapped.image_view_id);
+  assert.equal(wrappedImageRow.run_id, 'route-run-1');
+  assert.equal(wrappedImageRow.mode, 'wrapped');
+  assert.equal(wrappedImageRow.image_base64, Buffer.from('fake-png').toString('base64'));
+  assert.equal(wrappedImageRow.prompt_hash, wrapped.image_prompt_hash);
+  assert.equal(wrappedImageRow.principal_id.startsWith('cep_'), true);
   assert.equal(JSON.stringify(imageRows).includes('telegramUserId'), false);
 
   const attemptExportResponse = await handleTelegramAgentHandoffRequest({
@@ -2227,12 +2261,7 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   assert.match(storyPrompts[0], /exactly five 648x1152 vertical phone panels side by side/);
   assert.match(storyPrompts[0], /Panel 1: "What your agent thinks it knows about you"/);
   assert.match(storyPrompts[0], /Panel 5: "Agent comparison"/);
-  const storySvg = Buffer.from(story.image_base64, 'base64').toString();
-  assert.match(storySvg, /<svg/);
-  assert.match(storySvg, /Agent Village Wrapped phone story/);
-  assert.match(storySvg, /data:image\/png;base64/);
-  assert.match(storySvg, new RegExp(Buffer.from('fake-story-frame-1').toString('base64')));
-  assert.match(storySvg, /dur="20s"/);
+  assert.equal(Object.hasOwn(story, 'image_base64'), false);
 
   const storyImageViewResponse = await handleTelegramAgentHandoffRequest({
     request: new Request(story.image_url),
@@ -2241,7 +2270,12 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   assert.equal(storyImageViewResponse.status, 200);
   assert.equal(storyImageViewResponse.headers.get('content-type'), 'image/svg+xml');
   assert.equal(storyImageViewResponse.headers.get('content-disposition'), 'inline; filename="agent-village-wrapped.svg"');
-  assert.match(Buffer.from(await storyImageViewResponse.arrayBuffer()).toString(), /<svg/);
+  const storySvg = Buffer.from(await storyImageViewResponse.arrayBuffer()).toString();
+  assert.match(storySvg, /<svg/);
+  assert.match(storySvg, /Agent Village Wrapped phone story/);
+  assert.match(storySvg, /data:image\/png;base64/);
+  assert.match(storySvg, new RegExp(Buffer.from('fake-story-frame-1').toString('base64')));
+  assert.match(storySvg, /dur="20s"/);
 
   const storyExportResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/admin/agent-only/export?sessionSlug=alpha&view=images&format=jsonl', {
@@ -2298,7 +2332,15 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   assert.match(compassPrompts[1], /Agent Village Norms Map/);
   assert.match(compassPrompts[1], /neutral product-research language/);
   assert.doesNotMatch(compassPrompts[1], /partisan election poster/);
-  assert.equal(compass.image_base64, Buffer.from('fake-compass').toString('base64'));
+  assert.equal(Object.hasOwn(compass, 'image_base64'), false);
+  assert.match(compass.image_url, /\/telegram\/agent\/api\/agent-only\/wrapped-image\/view\//);
+  const compassImageViewResponse = await handleTelegramAgentHandoffRequest({
+    request: new Request(compass.image_url),
+    env,
+  });
+  assert.equal(compassImageViewResponse.status, 200);
+  assert.equal(compassImageViewResponse.headers.get('content-type'), 'image/png');
+  assert.equal(Buffer.from(await compassImageViewResponse.arrayBuffer()).toString(), 'fake-compass');
 
   const metricsResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/admin/agent-only/export?sessionSlug=alpha&view=answers&format=jsonl', {
