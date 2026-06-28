@@ -77,7 +77,7 @@ import {
 } from './adminPageDraftFormattingHelpers';
 import {
   areAdminEncryptedEntriesEquivalent,
-  buildAdminPageSessionIdentityKey,
+  buildAdminChainRegistryDisplay,
   buildSessionUrl,
   collectEncryptedEntries,
   getAdminSessionDisplayUrl,
@@ -257,6 +257,7 @@ const AdminPageRuntime = ({
   const rawMetadataCopyResetRef = useRef<any>(null);
   const prevSelectedSlugForDraftRef = useRef(selectedSlug);
   const prevSelectedSlugForAllowOriginsDraftRef = useRef(selectedSlug);
+  const encryptedFieldsSessionKeyRef = useRef('');
   const metadataDraftTouchedRef = useRef(metadataDraftTouched);
   metadataDraftTouchedRef.current = metadataDraftTouched;
 
@@ -564,32 +565,23 @@ const AdminPageRuntime = ({
   const allowOriginsHasChanges = normalizedAllowOriginsDraftText !== effectiveAllowOriginsDraft;
 
   const groupMetadata = useMemo(() => selectedConfig, [selectedConfig]);
-  const relevantSessionChainId = useMemo(
-    () => Number(selectedConfig?.networkChainId || selectedConfig?.__registry?.chainId || network?.id || 0) || 0,
-    [selectedConfig, network?.id],
-  );
-  const relevantRegistryChainId = useMemo(
-    () =>
-      Number(
-        selectedConfig?.__registry?.registryChainId ||
-          selectedConfig?.__registry?.chainId ||
-          selectedConfig?.networkChainId ||
-          network?.id ||
-          0,
-      ) || 0,
-    [selectedConfig, network?.id],
-  );
-  const encryptedFieldsSessionKey = useMemo(
-    () =>
-      [
-        normalizeSlug(groupMetadata?.slug || selectedSlug),
-        toStr(groupMetadata?.sessionId || groupMetadata?.__registry?.sessionIdHex).trim(),
-        toStr(
-          groupMetadata?.__registry?.registryChainId || groupMetadata?.__registry?.chainId || relevantRegistryChainId,
-        ).trim(),
-      ].join('|'),
-    [groupMetadata, selectedSlug, relevantRegistryChainId],
-  );
+  const relevantSessionChainId = useMemo(() => (
+    Number(selectedConfig?.networkChainId || selectedConfig?.__registry?.chainId || network?.id || 0) || 0
+  ), [selectedConfig, network?.id]);
+  const relevantRegistryChainId = useMemo(() => (
+    Number(
+      selectedConfig?.__registry?.registryChainId ||
+      selectedConfig?.__registry?.chainId ||
+      selectedConfig?.networkChainId ||
+      network?.id ||
+      0
+    ) || 0
+  ), [selectedConfig, network?.id]);
+  const encryptedFieldsSessionKey = useMemo(() => ([
+    normalizeSlug(groupMetadata?.slug || selectedSlug),
+    toStr(groupMetadata?.sessionId || groupMetadata?.__registry?.sessionIdHex).trim(),
+    toStr(groupMetadata?.__registry?.registryChainId || groupMetadata?.__registry?.chainId || relevantRegistryChainId).trim(),
+  ].join('|')), [groupMetadata, selectedSlug, relevantRegistryChainId]);
   const relevantSessionChainLabel = useMemo(() => {
     if (!relevantSessionChainId) return '';
     const name = getChainName(relevantSessionChainId);
@@ -735,9 +727,9 @@ const AdminPageRuntime = ({
     }
     // Do not auto-decrypt in /admin; decrypting triggers wallet popups. Users can decrypt on demand.
     const canPreserveUnlockedFields = walletReady && previousSessionKey === encryptedFieldsSessionKey;
-    setDecryptedFields((previous: AdminDecryptedFieldMap = {}) => {
-      const next: AdminDecryptedFieldMap = {};
-      Object.entries(entries).forEach(([key, envelope]) => {
+    setDecryptedFields((previous: Record<string, any> = {}) => {
+      const next: Record<string, any> = {};
+      Object.entries(entries).forEach(([key, envelope]: any) => {
         const previousEntry = previous?.[key];
         if (
           canPreserveUnlockedFields &&
@@ -746,7 +738,7 @@ const AdminPageRuntime = ({
         ) {
           next[key] = {
             ...previousEntry,
-            status: previousEntry.status === 'wallet-required' ? 'locked' : previousEntry.status || 'locked',
+            status: previousEntry.status === 'wallet-required' ? 'locked' : (previousEntry.status || 'locked'),
             encryptedAvailable: true,
             envelope,
           };

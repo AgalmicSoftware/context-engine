@@ -77,6 +77,29 @@ export const buildAdminEncryptedEntrySignature = (entry: unknown): string => {
 export const areAdminEncryptedEntriesEquivalent = (a: unknown, b: unknown): boolean =>
   buildAdminEncryptedEntrySignature(a) === buildAdminEncryptedEntrySignature(b);
 
+const buildStableComparableValue = (value: unknown): unknown => {
+  if (Array.isArray(value)) return value.map(buildStableComparableValue);
+  if (!value || typeof value !== 'object') return value;
+  return Object.keys(value as Record<string, unknown>).sort().reduce<Record<string, unknown>>((acc, key) => {
+    acc[key] = buildStableComparableValue((value as Record<string, unknown>)[key]);
+    return acc;
+  }, {});
+};
+
+export const buildAdminEncryptedEntrySignature = (entry: unknown): string => {
+  if (entry == null) return '';
+  if (typeof entry === 'string') return entry;
+  try {
+    return JSON.stringify(buildStableComparableValue(entry)) || '';
+  } catch {
+    return toStr(entry);
+  }
+};
+
+export const areAdminEncryptedEntriesEquivalent = (a: unknown, b: unknown): boolean => (
+  buildAdminEncryptedEntrySignature(a) === buildAdminEncryptedEntrySignature(b)
+);
+
 export const buildSessionUrl = (slug: unknown, { allowGeneral = false }: BuildSessionUrlOptions = {}): string => {
   const hasExplicitSlug = slug !== undefined && slug !== null;
   const normalized = normalizeSlug(slug);

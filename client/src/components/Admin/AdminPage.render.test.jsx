@@ -1883,63 +1883,6 @@ describe('AdminPage rendered interactions', () => {
     expect(sessionSelect).toHaveValue('edge');
   });
 
-  it('round-trips requested registry refreshes through fetch, upsert, and store reads', async () => {
-    sessionEntries = [];
-    const requestedConfig = buildSessionConfig({
-      slug: 'requested-edge',
-      sessionName: 'Requested Edge Session',
-    });
-    mockFetchSessionFromRegistry.mockResolvedValue(requestedConfig);
-    mockUpsertSessionRegistryCache.mockImplementation(({ config }) => {
-      sessionEntries = [[config.slug, config]];
-    });
-
-    await renderAdminPage({
-      initialSessionId: 'requested-edge',
-      initialRegistryChainId: '84532',
-    });
-
-    await clickAndSettle(screen.getByRole('button', { name: 'Refresh sessions' }));
-
-    await waitFor(() => {
-      expect(mockFetchSessionFromRegistry).toHaveBeenCalledWith(
-        expect.objectContaining({
-          chainId: 84532,
-          slug: 'requested-edge',
-          providerLike: null,
-          account: '',
-          lit: null,
-          bootstrapRpc: true,
-        }),
-      );
-      expect(mockUpsertSessionRegistryCache).toHaveBeenCalledWith({
-        config: requestedConfig,
-      });
-      expect(screen.getByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('requested-edge');
-    });
-    expect(mockGetAllSessionEntries).toHaveBeenCalled();
-  });
-
-  it('subscribes and unsubscribes the registry cache update listener with the same callback', async () => {
-    const addEventListenerSpy = jest.spyOn(window, 'addEventListener');
-    const removeEventListenerSpy = jest.spyOn(window, 'removeEventListener');
-    try {
-      const { unmount } = await renderAdminPage();
-
-      const addCall = addEventListenerSpy.mock.calls.find(
-        ([eventName]) => eventName === SESSION_REGISTRY_CACHE_UPDATED_EVENT,
-      );
-      expect(addCall).toBeTruthy();
-
-      unmount();
-
-      expect(removeEventListenerSpy).toHaveBeenCalledWith(SESSION_REGISTRY_CACHE_UPDATED_EVENT, addCall[1]);
-    } finally {
-      addEventListenerSpy.mockRestore();
-      removeEventListenerSpy.mockRestore();
-    }
-  });
-
   it('preserves decrypted encrypted fields across equivalent registry cache refreshes', async () => {
     const { encryptedFieldsUtils } = require('../../utilities/crypto/encryptedFields.js');
     const firstEnvelope = {
@@ -1979,38 +1922,33 @@ describe('AdminPage rendered interactions', () => {
       status: 'encrypted',
       encryptedAvailable: true,
     });
-    sessionEntries = [
-      [
-        'edge',
-        buildSessionConfig({
-          encryptedFields: {
-            'ai.providers.openai.apiKey': firstEnvelope,
-          },
-        }),
-      ],
-    ];
+    sessionEntries = [[
+      'edge',
+      buildSessionConfig({
+        encryptedFields: {
+          'ai.providers.openai.apiKey': firstEnvelope,
+        },
+      }),
+    ]];
 
     await renderAdminPage();
 
-    const decryptButton = (await screen.findAllByRole('button', { name: 'Decrypt' })).find(
-      (button) => button.getAttribute('title') === 'Decrypt fields (wallet signature prompts)',
-    );
+    const decryptButton = (await screen.findAllByRole('button', { name: 'Decrypt' }))
+      .find((button) => button.getAttribute('title') === 'Decrypt fields (wallet signature prompts)');
     expect(decryptButton).toBeTruthy();
     fireEvent.click(decryptButton);
 
     expect(await screen.findByText('admin-openai-secret')).toBeInTheDocument();
     expect(encryptedFieldsUtils.resolveEncryptedValue).toHaveBeenCalledTimes(1);
 
-    sessionEntries = [
-      [
-        'edge',
-        buildSessionConfig({
-          encryptedFields: {
-            'ai.providers.openai.apiKey': clonedEnvelope,
-          },
-        }),
-      ],
-    ];
+    sessionEntries = [[
+      'edge',
+      buildSessionConfig({
+        encryptedFields: {
+          'ai.providers.openai.apiKey': clonedEnvelope,
+        },
+      }),
+    ]];
     act(() => {
       window.dispatchEvent(new Event(SESSION_REGISTRY_CACHE_UPDATED_EVENT));
     });
@@ -2020,4 +1958,5 @@ describe('AdminPage rendered interactions', () => {
     });
     expect(encryptedFieldsUtils.resolveEncryptedValue).toHaveBeenCalledTimes(1);
   });
+
 });

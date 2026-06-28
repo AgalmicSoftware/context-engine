@@ -2,7 +2,6 @@ import {
   areAdminEncryptedEntriesEquivalent,
   buildAdminChainRegistryDisplay,
   buildAdminEncryptedEntrySignature,
-  buildAdminPageSessionIdentityKey,
   buildSessionUrl,
   collectEncryptedEntries,
   getAdminSessionDisplayUrl,
