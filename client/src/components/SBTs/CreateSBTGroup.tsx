@@ -3555,7 +3555,7 @@ class CreateSBTGroup extends Component<any, any> {
       // Add white background for PNG transparency safety
       img.onload = () => {
         if (!ctx) {
-          resolve(null as unknown as Blob);
+          reject(new Error("QR canvas context unavailable"));
           return;
         }
         canvas.width = img.width;
@@ -3564,7 +3564,11 @@ class CreateSBTGroup extends Component<any, any> {
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0);
         canvas.toBlob((blob: Blob | null) => {
-           resolve(blob as Blob);
+          if (!blob) {
+            reject(new Error("QR image export failed"));
+            return;
+          }
+          resolve(blob);
         }, "image/png");
       };
 
@@ -3572,8 +3576,10 @@ class CreateSBTGroup extends Component<any, any> {
     });
   }
 
-  downloadQR = (elementId: string, filename: string): void => {
-    this.processQrImage(elementId).then((blob: Blob) => {
+  downloadQR = async (elementId: string, filename: string): Promise<void> => {
+    try {
+        const blob = await this.processQrImage(elementId);
+        if (!(blob instanceof Blob)) throw new Error("QR image export failed");
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -3582,22 +3588,29 @@ class CreateSBTGroup extends Component<any, any> {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-    }).catch((error: unknown) => sbtLog.error(error));
+    } catch (error: unknown) {
+        sbtLog.warn("QR download failed", error);
+        notify.warn('QR download failed');
+    }
   }
 
-  copyQRImage = (elementId: string, indexKey: unknown): void => {
-     this.processQrImage(elementId).then((blob: Blob) => {
-        try {
-            // Clipboard API usually requires secure context (https or localhost)
-            const item = new ClipboardItem({ "image/png": blob });
-            navigator.clipboard.write([item]);
-            if (!this._isMounted) return;
-            this.setState(buildCreateSbtCopiedLinkIndexPatch({ index: indexKey }));
-            this.scheduleTrackedStateReset('copiedLinkIndex', buildCreateSbtCopiedLinkIndexPatch(), 2000);
-        } catch (err) {
-            sbtLog.error("Clipboard write failed", err);
+  copyQRImage = async (elementId: string, indexKey: unknown): Promise<void> => {
+     try {
+        const blob = await this.processQrImage(elementId);
+        if (!(blob instanceof Blob)) throw new Error("QR image export failed");
+        if (typeof ClipboardItem === 'undefined' || !navigator.clipboard?.write) {
+          throw new Error("Clipboard image write is unavailable");
         }
-     }).catch((error: unknown) => sbtLog.error(error));
+        // Clipboard API usually requires secure context (https or localhost)
+        const item = new ClipboardItem({ "image/png": blob });
+        await navigator.clipboard.write([item]);
+        if (!this._isMounted) return;
+        this.setState(buildCreateSbtCopiedLinkIndexPatch({ index: indexKey }));
+        this.scheduleTrackedStateReset('copiedLinkIndex', buildCreateSbtCopiedLinkIndexPatch(), 2000);
+     } catch (error: unknown) {
+        sbtLog.warn("QR clipboard write failed", error);
+        notify.warn('QR copy failed');
+     }
   }
 
   handleNetworkChange = async (event: CreateSbtSelectChangeEvent): Promise<void> => {

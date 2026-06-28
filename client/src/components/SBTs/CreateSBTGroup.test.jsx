@@ -5,6 +5,7 @@ import {
   makeInstance,
   setupCreateSBTGroupTestLifecycle,
 } from './CreateSBTGroup.testUtils';
+import { notify } from '../../utilities/ui/notify.js';
 
 describe('CreateSBTGroup cache helpers', () => {
   setupCreateSBTGroupTestLifecycle();
@@ -191,6 +192,131 @@ describe('CreateSBTGroup cache helpers', () => {
       createElementSpy.mockRestore();
       global.Image = originalImage;
       document.body.innerHTML = '';
+    }
+  });
+
+  it('rejects QR image processing when canvas export primitives are unavailable', async () => {
+    const instance = makeInstance();
+    document.body.innerHTML = '<svg id="hidden-page-qr" xmlns="http://www.w3.org/2000/svg"></svg>';
+    const originalCreateElement = document.createElement.bind(document);
+    const originalImage = global.Image;
+    const createElementSpy = jest.spyOn(document, 'createElement').mockImplementation((tagName, options) => {
+      const element = originalCreateElement(tagName, options);
+      if (String(tagName).toLowerCase() === 'canvas') {
+        element.getContext = jest.fn(() => null);
+      }
+      return element;
+    });
+    class MockImage {
+      constructor() {
+        this.width = 24;
+        this.height = 24;
+        this.onload = null;
+      }
+
+      set src(_value) {
+        setTimeout(() => {
+          if (this.onload) this.onload();
+        }, 0);
+      }
+    }
+
+    global.Image = MockImage;
+    try {
+      await expect(instance.processQrImage('hidden-page-qr')).rejects.toThrow('QR canvas context unavailable');
+    } finally {
+      createElementSpy.mockRestore();
+      global.Image = originalImage;
+      document.body.innerHTML = '';
+    }
+  });
+
+  it('rejects QR image processing when canvas returns no PNG blob', async () => {
+    const instance = makeInstance();
+    document.body.innerHTML = '<svg id="hidden-page-qr" xmlns="http://www.w3.org/2000/svg"></svg>';
+    const originalCreateElement = document.createElement.bind(document);
+    const originalImage = global.Image;
+    const canvasContext = {
+      fillStyle: '',
+      fillRect: jest.fn(),
+      drawImage: jest.fn(),
+    };
+    const createElementSpy = jest.spyOn(document, 'createElement').mockImplementation((tagName, options) => {
+      const element = originalCreateElement(tagName, options);
+      if (String(tagName).toLowerCase() === 'canvas') {
+        element.getContext = jest.fn(() => canvasContext);
+        element.toBlob = jest.fn((callback) => callback(null));
+      }
+      return element;
+    });
+    class MockImage {
+      constructor() {
+        this.width = 24;
+        this.height = 24;
+        this.onload = null;
+      }
+
+      set src(_value) {
+        setTimeout(() => {
+          if (this.onload) this.onload();
+        }, 0);
+      }
+    }
+
+    global.Image = MockImage;
+    try {
+      await expect(instance.processQrImage('hidden-page-qr')).rejects.toThrow('QR image export failed');
+    } finally {
+      createElementSpy.mockRestore();
+      global.Image = originalImage;
+      document.body.innerHTML = '';
+    }
+  });
+
+  it('warns when QR download receives an invalid export blob', async () => {
+    const instance = makeInstance();
+    instance.processQrImage = jest.fn().mockResolvedValue(null);
+    const warnSpy = jest.spyOn(notify, 'warn').mockImplementation(() => undefined);
+
+    await instance.downloadQR('hidden-page-qr', 'qr.png');
+
+    expect(warnSpy).toHaveBeenCalledWith('QR download failed');
+  });
+
+  it('warns and does not mark QR image copied when clipboard write rejects', async () => {
+    const instance = makeInstance();
+    instance._isMounted = true;
+    instance.processQrImage = jest.fn().mockResolvedValue(new Blob(['qr'], { type: 'image/png' }));
+    const warnSpy = jest.spyOn(notify, 'warn').mockImplementation(() => undefined);
+    const originalClipboardItem = global.ClipboardItem;
+    const originalClipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+    const write = jest.fn().mockRejectedValue(new Error('clipboard denied'));
+    global.ClipboardItem = class ClipboardItem {
+      constructor(items) {
+        this.items = items;
+      }
+    };
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { write },
+    });
+
+    try {
+      await instance.copyQRImage('hidden-page-qr', 'copy-key');
+      expect(write).toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalledWith('QR copy failed');
+      expect(instance.state.copiedLinkIndex).not.toBe('copy-key');
+    } finally {
+      if (originalClipboardItem) {
+        global.ClipboardItem = originalClipboardItem;
+      } else {
+        delete global.ClipboardItem;
+      }
+      if (originalClipboardDescriptor) {
+        Object.defineProperty(navigator, 'clipboard', originalClipboardDescriptor);
+      } else {
+        delete navigator.clipboard;
+      }
     }
   });
 
