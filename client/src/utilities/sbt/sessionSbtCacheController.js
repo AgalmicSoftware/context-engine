@@ -1026,7 +1026,7 @@ export const createSessionSbtCacheController = (host = {}) => {
           }
         } catch (discErr) {
           discoveryScanSucceeded = false;
-          mainSiteLog.error('Error during SBT discovery scan:', discErr);
+          mainSiteLog.error("Error during SBT discovery scan:", discErr);
         }
       } else {
         updateFullScanProgress(SBT_FULL_SCAN_DISCOVERY_UNITS, true);
@@ -1279,7 +1279,9 @@ export const createSessionSbtCacheController = (host = {}) => {
       }
 
       updateFullScanProgress(fullScanTotalUnits, true);
-      currentNetworkCache.lastBlock = discoveryScanSucceeded ? baseTo : overallLastBlockProcessedByNetwork;
+      currentNetworkCache.lastBlock = discoveryScanSucceeded
+        ? baseTo
+        : overallLastBlockProcessedByNetwork;
       currentNetworkCache.sbtList = finalProcessedSbtsMap;
       writeSbtCache(slug, globalCache);
 
@@ -1291,19 +1293,16 @@ export const createSessionSbtCacheController = (host = {}) => {
       writeFlag('sbt:deferredFullScanNeeded', slug, !discoveryScanSucceeded);
       writeFlag('sbt:partialReady', slug, true);
 
-      setSbtCacheReadyForActiveSlug(slug);
+      setState(prev => ({ isSBTCacheReady: true, sbtCacheRevision: prev.sbtCacheRevision + 1 }));
       if (discoveryScanSucceeded) {
         mainSiteLog.log('initializeSbtCacheForGroup: Full discovery & processing complete.');
       } else {
-        mainSiteLog.warn(
-          'initializeSbtCacheForGroup: Full scan persisted existing SBT updates but left discovery watermark behind after a factory scan failure.',
-          {
-            slug,
-            networkID,
-            lastBlock: overallLastBlockProcessedByNetwork,
-            retryToBlock: baseTo,
-          },
-        );
+        mainSiteLog.warn('initializeSbtCacheForGroup: Full scan persisted existing SBT updates but left discovery watermark behind after a factory scan failure.', {
+          slug,
+          networkID,
+          lastBlock: overallLastBlockProcessedByNetwork,
+          retryToBlock: baseTo,
+        });
       }
     } finally {
       writeFlag('sbt:fullScanInProgress', slug, false);

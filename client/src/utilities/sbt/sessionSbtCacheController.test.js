@@ -1218,6 +1218,69 @@ describe('createSessionSbtCacheController', () => {
       expect(host.writeFlag).toHaveBeenCalledWith('sbt:fullScanInProgress', 'alpha', false);
     });
 
+    it('keeps full-scan discovery watermark behind when factory discovery fails', async () => {
+      const sbtAddress = '0x0000000000000000000000000000000000000f03';
+      const existingMetadata = createCompleteSbtMetadata({
+        name: 'Existing Full Scan SBT',
+        creationBlock: 10,
+      });
+      const host = createMockHost({
+        currentPath: '/dashboard',
+        initialStorage: {
+          sbtCache: {
+            alpha: {
+              11155420: {
+                lastBlock: 9,
+                sbtList: {
+                  [sbtAddress.toLowerCase()]: {
+                    sbtAddress,
+                    sbtInfo: existingMetadata,
+                    blockNumber: 9,
+                    countsLoaded: false,
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+      const controller = createSessionSbtCacheController(host);
+
+      contractScripts.getRelevantBlockWindowForFilter.mockResolvedValueOnce({ fromBlock: 10, toBlock: 40 });
+      contractScripts.getSbtsCreated.mockRejectedValueOnce(new Error('factory logs unavailable'));
+      contractScripts.getSbtMintBurnCountsByAddress.mockResolvedValueOnce({
+        ok: true,
+        mintedCountByAddress: {},
+        burnedCountByAddress: {},
+        mintedEventCount: 0,
+        burnedEventCount: 0,
+      });
+
+      await controller.initializeSbtCacheForGroup('alpha', { mode: 'full' });
+
+      const storedSbtCache = host.getStored('sbtCache', 'alpha');
+
+      expect(contractScripts.getSbtsCreated).toHaveBeenCalledWith(
+        'none',
+        10,
+        40,
+        'alpha',
+        expect.objectContaining({ onProgress: expect.any(Function) })
+      );
+      expect(storedSbtCache[11155420]).toEqual(expect.objectContaining({
+        lastBlock: 9,
+        sbtList: expect.objectContaining({
+          [sbtAddress.toLowerCase()]: expect.objectContaining({
+            sbtAddress,
+            blockNumber: 40,
+          }),
+        }),
+      }));
+      expect(host.writeFlag).toHaveBeenCalledWith('sbt:deferredFullScanNeeded', 'alpha', true);
+      expect(host.writeFlag).toHaveBeenCalledWith('sbt:partialReady', 'alpha', true);
+      expect(host.writeFlag).toHaveBeenCalledWith('sbt:fullScanInProgress', 'alpha', false);
+    });
+
     it('deduplicates concurrent light discovery calls for the same in-flight key', async () => {
       const host = createMockHost();
       const controller = createSessionSbtCacheController(host);
