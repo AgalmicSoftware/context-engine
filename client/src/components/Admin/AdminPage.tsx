@@ -81,6 +81,7 @@ import {
   parseAllowOriginsDraft,
 } from './adminPageDraftFormattingHelpers';
 import {
+  areAdminEncryptedEntriesEquivalent,
   buildAdminChainRegistryDisplay,
   buildSessionUrl,
   collectEncryptedEntries,
@@ -273,6 +274,7 @@ const AdminPage = ({
   const rawMetadataCopyResetRef = useRef<any>(null);
   const prevSelectedSlugForDraftRef = useRef(selectedSlug);
   const prevSelectedSlugForAllowOriginsDraftRef = useRef(selectedSlug);
+  const encryptedFieldsSessionKeyRef = useRef('');
   const metadataDraftTouchedRef = useRef(metadataDraftTouched);
   metadataDraftTouchedRef.current = metadataDraftTouched;
 
@@ -738,14 +740,32 @@ const AdminPage = ({
       return;
     }
     // Do not auto-decrypt in /admin; decrypting triggers wallet popups. Users can decrypt on demand.
-    const next: Record<string, any> = {};
-    Object.entries(entries).forEach(([key, envelope]: any) => {
-      next[key] = {
-        value: '',
-        status: walletReady ? 'locked' : 'wallet-required',
-        encryptedAvailable: true,
-        envelope,
-      };
+    const canPreserveUnlockedFields = walletReady && previousSessionKey === encryptedFieldsSessionKey;
+    setDecryptedFields((previous: Record<string, any> = {}) => {
+      const next: Record<string, any> = {};
+      Object.entries(entries).forEach(([key, envelope]: any) => {
+        const previousEntry = previous?.[key];
+        if (
+          canPreserveUnlockedFields &&
+          previousEntry &&
+          areAdminEncryptedEntriesEquivalent(previousEntry.envelope, envelope)
+        ) {
+          next[key] = {
+            ...previousEntry,
+            status: previousEntry.status === 'wallet-required' ? 'locked' : (previousEntry.status || 'locked'),
+            encryptedAvailable: true,
+            envelope,
+          };
+          return;
+        }
+        next[key] = {
+          value: '',
+          status: walletReady ? 'locked' : 'wallet-required',
+          encryptedAvailable: true,
+          envelope,
+        };
+      });
+      return next;
     });
   }, [encryptedFieldsSessionKey, groupMetadata, walletReady]);
 
