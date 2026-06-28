@@ -2741,7 +2741,7 @@ class UserPage extends Component<any, any> {
       accountLog.warn('UserPage address clipboard write failed:', error);
       notify.error('Could not copy address');
     }
-  };
+  }
 
   toggleCollapse = (): void => {
     if (this._isMounted) {
