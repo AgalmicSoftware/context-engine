@@ -3360,7 +3360,6 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     const applyDefaultSelectedGateIds = (value: unknown) => {
       const normalized = normalizeSelectedGateIds(value);
       if (normalized.length) return normalized;
-      if (Array.isArray(value)) return [];
       return defaultGateId ? [defaultGateId] : [];
     };
     const surveySelectedGateIds = !isStandaloneQuestion
