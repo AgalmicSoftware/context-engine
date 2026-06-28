@@ -865,16 +865,38 @@ export async function sendPortoTransaction(txRequest: AnyObj): Promise<any> {
     });
     return out;
   };
-  const isReplacementUnderpricedError = (error: any): boolean => {
+  const classifyRecoverableSendError = (error: any): {
+    replacementUnderpriced: boolean;
+    nonceTooLow: boolean;
+    alreadyKnown: boolean;
+    recoverable: boolean;
+  } => {
     const blob = collectErrorFragments(error)
       .join(' ')
       .toLowerCase();
-    return (
+    const replacementUnderpriced = (
       blob.includes('replacement transaction underpriced')
       || blob.includes('replacement fee too low')
       || blob.includes('replacement_underpriced')
       || (blob.includes('replacement') && (blob.includes('underpriced') || blob.includes('fee too low')))
     );
+    const nonceTooLow = (
+      blob.includes('nonce too low')
+      || blob.includes('nonce_too_low')
+      || (blob.includes('nonce') && blob.includes('too low'))
+    );
+    const alreadyKnown = (
+      blob.includes('already known')
+      || blob.includes('already_known')
+      || blob.includes('known transaction')
+      || blob.includes('transaction already imported')
+    );
+    return {
+      replacementUnderpriced,
+      nonceTooLow,
+      alreadyKnown,
+      recoverable: replacementUnderpriced || nonceTooLow || alreadyKnown,
+    };
   };
   const parseHexToBigInt = (value: any): bigint | null => {
     const raw = String(value || '').trim();
@@ -1110,21 +1132,28 @@ export async function sendPortoTransaction(txRequest: AnyObj): Promise<any> {
         return hash;
       } catch (error: any) {
         lastError = error;
-        const replacementUnderpriced = isReplacementUnderpricedError(error);
+        const recoverableSendError = classifyRecoverableSendError(error);
         portoLog.warn('[PORTO_RPC] sendTransaction attempt failed', {
           attempt,
-          replacementUnderpriced,
+          replacementUnderpriced: recoverableSendError.replacementUnderpriced,
+          nonceTooLow: recoverableSendError.nonceTooLow,
+          alreadyKnown: recoverableSendError.alreadyKnown,
+          recoverable: recoverableSendError.recoverable,
           message: error?.shortMessage || error?.message || String(error),
         });
-        if (replacementUnderpriced && replacementNonce == null) {
-          replacementNonce = await readPendingNonce();
-          if (replacementNonce != null) {
-            portoLog.warn('[PORTO_RPC] Pinned retry nonce after first failure', {
-              nonce: replacementNonce.toString(),
-            });
+        if (recoverableSendError.recoverable) {
+          const shouldRefreshNonce = recoverableSendError.nonceTooLow || replacementNonce == null;
+          if (shouldRefreshNonce) {
+            const pendingNonce = await readPendingNonce();
+            if (pendingNonce != null) {
+              replacementNonce = pendingNonce;
+              portoLog.warn('[PORTO_RPC] Pinned retry nonce after recoverable send failure', {
+                nonce: replacementNonce.toString(),
+              });
+            }
           }
         }
-        if (!replacementUnderpriced || attempt >= sendAttempts) {
+        if (!recoverableSendError.recoverable || attempt >= sendAttempts) {
           throw error;
         }
         if (useEip1559Fees) {
