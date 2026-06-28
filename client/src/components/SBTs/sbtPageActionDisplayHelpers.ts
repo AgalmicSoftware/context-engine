@@ -453,6 +453,11 @@ const coerceSbtPageBurnAuth = (burnAuth: unknown): number => {
   return Number.isFinite(burnAuthNumber) ? burnAuthNumber : Number.NaN;
 };
 
+const coerceSbtPageBurnAuth = (burnAuth: unknown): number => {
+  const burnAuthNumber = Number(burnAuth);
+  return Number.isFinite(burnAuthNumber) ? burnAuthNumber : Number.NaN;
+};
+
 export const resolveSbtPageMintEndDisplayState = ({
   nowMs = Date.now(),
   sbtInfo = null,
@@ -716,8 +721,11 @@ export const resolveSbtPageMiniBurnPermission = ({
   const adminAddr = info.admin || info.admin_;
   const adminAddrLower = adminAddr ? String(adminAddr).toLowerCase() : '';
   const burnAuth = coerceSbtPageBurnAuth(info.burnAuth);
-  const canOwnerBurn =
-    burnAuth === 1 || burnAuth === 2 || (burnAuth === 0 && !!adminAddr && adminAddrLower === userAddressLower);
+  const canOwnerBurn = (
+    burnAuth === 1 ||
+    burnAuth === 2 ||
+    (burnAuth === 0 && !!adminAddr && adminAddrLower === userAddressLower)
+  );
   const canAdminBurn = !!userIsSbtAdmin && (burnAuth === 0 || burnAuth === 2);
   return {
     canAdminBurn,
@@ -735,11 +743,12 @@ export const resolveSbtPageBurnButtonState = ({
   const userAddressLower = account ? String(account).toLowerCase() : null;
   const adminAddr = String(info.admin || info.admin_ || '');
   const burnAuth = coerceSbtPageBurnAuth(info.burnAuth);
-  const canOwnerBurn =
-    !!userHasSBT &&
-    (burnAuth === 1 ||
-      burnAuth === 2 ||
-      (burnAuth === 0 && !!adminAddr && adminAddr.toLowerCase() === userAddressLower));
+  const canOwnerBurn = !!userHasSBT && (
+    burnAuth === 1 ||
+    burnAuth === 2 ||
+    (burnAuth === 0 && !!adminAddr && adminAddr.toLowerCase() === userAddressLower) ||
+    (burnAuth === 1 && !!userHasSBT)
+  );
   return {
     canOwnerBurn,
     shouldRenderBurnButton: !!userHasSBT && canOwnerBurn,
@@ -1319,7 +1328,10 @@ export const resolveSbtPageAdminActionState = ({
   const showPasswordGen = hasPasswordMint && info.maxTokens === '0';
   const showNoMoreInvites = hasPasswordMint && info.maxTokens !== '0';
   return {
-    canAdminBurn: (burnAuth === 0 || burnAuth === 2) && adminAddr.toLowerCase() === String(account || '').toLowerCase(),
+    canAdminBurn: (
+      (burnAuth === 0 || burnAuth === 2) &&
+      adminAddr.toLowerCase() === String(account || '').toLowerCase()
+    ),
     hasPasswordMint,
     isInvite: !!hasInviteMint,
     showNoMoreInvites,

@@ -521,35 +521,29 @@ describe('sbtPageActionDisplayHelpers', () => {
       canBurnMini: true,
       canOwnerBurn: true,
     });
-    expect(
-      resolveSbtPageMiniBurnPermission({
-        account: '0xOwner',
-        sbtInfo: { burnAuth: '2' },
-        userIsSbtAdmin: true,
-      }),
-    ).toEqual({
+    expect(resolveSbtPageMiniBurnPermission({
+      account: '0xOwner',
+      sbtInfo: { burnAuth: '2' },
+      userIsSbtAdmin: true,
+    })).toEqual({
       canAdminBurn: true,
       canBurnMini: true,
       canOwnerBurn: true,
     });
-    expect(
-      resolveSbtPageMiniBurnPermission({
-        account: '0xOwner',
-        sbtInfo: { burnAuth: 'not-a-number' },
-        userIsSbtAdmin: true,
-      }),
-    ).toEqual({
+    expect(resolveSbtPageMiniBurnPermission({
+      account: '0xOwner',
+      sbtInfo: { burnAuth: 'not-a-number' },
+      userIsSbtAdmin: true,
+    })).toEqual({
       canAdminBurn: false,
       canBurnMini: false,
       canOwnerBurn: false,
     });
-    expect(
-      resolveSbtPageBurnButtonState({
-        account: '0xOwner',
-        sbtInfo: { burnAuth: '1' },
-        userHasSBT: true,
-      }),
-    ).toEqual({
+    expect(resolveSbtPageBurnButtonState({
+      account: '0xOwner',
+      sbtInfo: { burnAuth: '1' },
+      userHasSBT: true,
+    })).toEqual({
       canOwnerBurn: true,
       shouldRenderBurnButton: true,
     });
@@ -790,19 +784,15 @@ describe('sbtPageActionDisplayHelpers', () => {
       shouldRenderBurnedStatus: false,
       shouldRenderJoinedStatus: false,
     });
-    expect(
-      shouldRenderSbtPageMintButton({
-        nowSeconds: 100,
-        sbtInfo: { mintingEndTime: 200 },
-      }),
-    ).toBe(true);
-    expect(
-      resolveSbtPageAdminActionState({
-        account: '0xAdmin',
-        hasInviteMint: true,
-        sbtInfo: { admin: '0xadmin', burnAuth: '2', hasPasswordMint: true, maxTokens: '0' },
-      }),
-    ).toEqual({
+    expect(shouldRenderSbtPageMintButton({
+      nowSeconds: 100,
+      sbtInfo: { mintingEndTime: 200 },
+    })).toBe(true);
+    expect(resolveSbtPageAdminActionState({
+      account: '0xAdmin',
+      hasInviteMint: true,
+      sbtInfo: { admin: '0xadmin', burnAuth: '2', hasPasswordMint: true, maxTokens: '0' },
+    })).toEqual({
       canAdminBurn: true,
       hasPasswordMint: true,
       isInvite: true,
