@@ -166,10 +166,10 @@ describe('applySessionWizardMetadataUploadGuards', () => {
 
     expect(getSessionWizardMetadataSecretFieldGateKeys(metadata)).toEqual(['arweave.jwk']);
     expect(buildSessionWizardSecretFieldGateErrorMessage(['arweave.jwk'])).toBe(
-      'Worker secret fields cannot be locked in public metadata: arweave.jwk. Store secrets in the Worker panel instead.',
+      'Worker secret fields cannot be locked in public metadata: arweave.jwk. Store secrets in the Worker panel instead.'
     );
     expect(() => applySessionWizardMetadataUploadGuards({ metadata })).toThrow(
-      'Worker secret fields cannot be locked in public metadata: arweave.jwk. Store secrets in the Worker panel instead.',
+      'Worker secret fields cannot be locked in public metadata: arweave.jwk. Store secrets in the Worker panel instead.'
     );
     expect(metadata.arweave).toEqual({ jwk: 'secret-jwk' });
   });

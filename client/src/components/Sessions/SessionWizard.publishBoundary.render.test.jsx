@@ -30,36 +30,17 @@ const openPublishSection = async () => {
   return screen.findByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
 };
 
-const deployVerifiedCustomWorker = async ({ sessionName, sessionInfo, openaiKey }) => {
-  const fastPreset = screen.queryByTestId('ce-new-preset-fast_cheap_cloudflare');
-  if (fastPreset) {
-    const previousConfirm = window.confirm;
-    window.confirm = jest.fn(() => true);
-    fireEvent.click(fastPreset);
-    window.confirm = previousConfirm;
-  }
-  const continueButton = screen.queryByTestId('ce-new-preset-continue');
-  if (continueButton && !continueButton.disabled) fireEvent.click(continueButton);
-  fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
-    target: { value: sessionName },
-  });
-  fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_INFO), {
-    target: { value: sessionInfo },
-  });
-  await chooseCustomWorkerWithoutDeploy();
-  fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_HELPER_URL), {
-    target: { value: 'https://deploy-helper.example.test' },
-  });
-  const tokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
-  const reactPropsKey = Object.keys(tokenInput).find((key) => key.startsWith('__reactProps$'));
-  act(() => tokenInput[reactPropsKey].onChange({ target: { value: 'cf-test-token' } }));
-  const openAiKeyInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY);
-  fireEvent.change(openAiKeyInput, { target: { value: openaiKey } });
-  fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
-  await waitFor(() => {
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent('Worker deployed.');
-  });
-  return openAiKeyInput;
+const seedVerifiedWorkerCache = (workerUrl = 'https://worker.example.test', overrides = {}) => {
+  const draft = {
+    corsWorkerUrl: workerUrl,
+    ...(overrides.draft || {}),
+  };
+  localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
+    ...overrides,
+    draft,
+    deployComplete: true,
+    deployWorkerUrl: workerUrl,
+  }));
 };
 
 const seedVerifiedWorkerCache = (workerUrl = 'https://worker.example.test', overrides = {}) => {
@@ -938,6 +919,37 @@ describe('SessionWizard publish boundary rendering', () => {
       ).toBeInTheDocument();
     });
     expect(arweaveClient.uploadDataToArweave).not.toHaveBeenCalled();
+    expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
+  });
+
+  it('blocks cached secret field gates before metadata upload', async () => {
+    const { arweaveScripts } = require('../../utilities/arweave/arweaveScripts.js');
+    seedVerifiedWorkerCache('https://worker.example.test', {
+      encryptedFieldGates: {
+        'arweave.jwk': 'gate-1',
+      },
+    });
+
+    renderLoggedInSessionWizard();
+    enableAdvancedMode();
+
+    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
+      target: { value: 'Secret Gate Boundary Session' },
+    });
+
+    const publishButton = await openPublishSection();
+    await waitFor(() => {
+      expect(publishButton).not.toBeDisabled();
+    });
+
+    fireEvent.click(publishButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(
+        'Worker secret fields cannot be locked in public metadata: arweave.jwk. Store secrets in the Worker panel instead.'
+      )).toBeInTheDocument();
+    });
+    expect(arweaveScripts.uploadDataToArweave).not.toHaveBeenCalled();
     expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
   });
 
