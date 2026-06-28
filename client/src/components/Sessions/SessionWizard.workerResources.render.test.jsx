@@ -4,6 +4,7 @@ import {
   ethers,
   fireEvent,
   getWizardResourceCard,
+  mockRegisterSessionOnChain,
   renderLoggedInSessionWizard,
   renderSessionWizard,
   renderSessionWizardWithTooltipStore,
@@ -17,6 +18,11 @@ import {
 
 describe('SessionWizard worker resource rendering', () => {
   beforeEach(resetSessionWizardWorkerPanelTestState);
+
+  const openPublishSection = async () => {
+    fireEvent.click(screen.getByText('Publish').closest('button'));
+    return screen.findByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
+  };
 
   it('keeps session storage profile selection in advanced mode and defaults to Arweave', async () => {
     renderLoggedInSessionWizard();
@@ -109,6 +115,54 @@ describe('SessionWizard worker resource rendering', () => {
     });
     expect(within(arweaveCard).getByText('Arweave JWK *')).toBeInTheDocument();
     expect(within(arweaveCard).getByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK)).toBeInTheDocument();
+  });
+
+  it('blocks publishing worker resources with unrepresentable All gate groups', async () => {
+    localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
+      draft: {
+        sessionName: 'Unrepresentable All Gates',
+        slug: 'unrepresentable-all-gates',
+        networkChainId: 11155420,
+      },
+      encryptionGates: [
+        {
+          id: 'gate-all-a',
+          label: 'All A',
+          mode: 'all',
+          chainId: 11155420,
+          sbts: [{ address: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', name: 'All A SBT' }],
+        },
+        {
+          id: 'gate-all-b',
+          label: 'All B',
+          mode: 'all',
+          chainId: 11155420,
+          sbts: [{ address: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', name: 'All B SBT' }],
+        },
+      ],
+      defaultGateId: 'gate-all-a',
+      resourceGateMap: {
+        ai: ['gate-all-a', 'gate-all-b'],
+      },
+    }));
+
+    renderLoggedInSessionWizard();
+    enableAdvancedMode();
+
+    const publishButton = await openPublishSection();
+    fireEvent.click(screen.getByLabelText('Advanced publish settings'));
+    fireEvent.change(screen.getByPlaceholderText(/ar:\/\/<txId>/i), {
+      target: { value: `ar://${'c'.repeat(43)}` },
+    });
+
+    await waitFor(() => {
+      expect(publishButton).not.toBeDisabled();
+    });
+
+    fireEvent.click(publishButton);
+
+    expect(await screen.findByText(/Resource "ai" uses multiple gate groups with All semantics/i)).toBeInTheDocument();
+    expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
   });
 
   it('hides Lit worker inputs for Cloudflare worker SBT gate mode and restores them for Lit encrypted mode', async () => {
