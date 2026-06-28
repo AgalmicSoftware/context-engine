@@ -3193,15 +3193,80 @@ class QuestionFilter extends React.Component<any, any> {
 
     const bodyContent = (
       <div>
-        <QuestionFilterTopQuestionsSection
-          expandedSections={expandedSections}
-          pendingShowTopQuestions={pendingShowTopQuestions}
-          pendingShowTopQuestionsByResponses={pendingShowTopQuestionsByResponses}
-          pendingTopQuestionsCount={pendingTopQuestionsCount}
-          onToggleSection={this.toggleSection}
-          onToggleShowTopQuestions={this.toggleShowTopQuestions}
-          onTopQuestionsCountChange={this.handleTopQuestionsCountChange}
-        />
+
+        {/* MOST POPULAR (Top X) */}
+        {this.renderCollapsibleSection(
+          'Most Popular',
+          'popular',
+          faStar,
+          <div>
+            <FormGroup>
+              <Label className={styles.filterOption}>
+                <Input
+                  type="checkbox"
+                  checked={pendingShowTopQuestions}
+                  onChange={() => this.toggleShowTopQuestions(false)}
+                  disabled={false}
+                />
+                Show top
+                <Input
+                  type="number"
+                  min="1"
+                  value={pendingTopQuestionsCount}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                    this.setState(buildQuestionFilterTopQuestionsCountPatch(
+                      e.target.value,
+                      DEFAULT_TOP_QUESTIONS_COUNT
+                    ), () => {
+                      if (this.state.pendingShowTopQuestions || this.state.pendingShowTopQuestionsByResponses) { // Use this.state for check
+                        this.handleApplyFilters(true);
+                      }
+                    });
+                  }}
+                  disabled={!pendingShowTopQuestions && !pendingShowTopQuestionsByResponses}
+                  id={styles.topQuestionsCountInput}
+                />
+                {/* questions (by total importance) */}
+                questions (by total conviction)
+
+              </Label>
+            </FormGroup>
+
+            <FormGroup>
+              <Label className={styles.filterOption}>
+                <Input
+                  type="checkbox"
+                  checked={pendingShowTopQuestionsByResponses}
+                  onChange={() => this.toggleShowTopQuestions(true)}
+                />
+                Show top
+                <Input
+                  type="number"
+                  min="1"
+                  value={pendingTopQuestionsCount}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                    this.setState(buildQuestionFilterTopQuestionsCountPatch(
+                      e.target.value,
+                      DEFAULT_TOP_QUESTIONS_COUNT
+                    ), () => {
+                      if (this.state.pendingShowTopQuestions || this.state.pendingShowTopQuestionsByResponses) { // Use this.state for check
+                        this.handleApplyFilters(true);
+                      }
+                    });
+                  }}
+                  disabled={!pendingShowTopQuestions && !pendingShowTopQuestionsByResponses}
+                  id={styles.topQuestionsCountInput}
+                />
+                questions (by # of responses)
+              </Label>
+            </FormGroup>
+            {(pendingShowTopQuestions || pendingShowTopQuestionsByResponses) && (
+              <small className="text-muted">
+                This overrides other filters (type, tag, etc.)
+              </small>
+            )}
+          </div>
+        )}
 
         <div className={buildQuestionFilterDisabledSectionClassName(styles, isOtherFiltersDisabled)}>
           <QuestionFilterTagsSection
