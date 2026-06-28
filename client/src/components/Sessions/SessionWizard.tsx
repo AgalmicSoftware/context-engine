@@ -3767,6 +3767,11 @@ const SessionWizard = ({
         ];
         throw new Error(`Resource "${key}" has conflicting gate settings (${reason.join(', ')}).`);
       }
+      if (gate.registryRepresentable === false) {
+        throw new Error(
+          `Resource "${key}" uses multiple gate groups with All semantics, which cannot be encoded on-chain. Pick one resource gate or use Any-mode gates only.`
+        );
+      }
       const prev = gateSelections?.[key] || {};
       snapshot[key] = {
         sbts: gate.sbts,

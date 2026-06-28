@@ -112,6 +112,47 @@ describe('sessionWizardResourceGateSupport', () => {
         chainIdConflicts: true,
         perMemberLimitConflicts: true,
       },
+      registryRepresentable: false,
+      registryUnsupportedReason: 'multiple gates with All semantics cannot be encoded as one registry gate',
+    });
+  });
+
+  it('marks same-mode All multi-gate groups as unrepresentable by the registry', () => {
+    const allGates = [
+      {
+        id: 'gate-a',
+        mode: 'all',
+        chainId: 84532,
+        perMemberLimit: 0,
+        sbts: [{ address: '0xaaa', name: 'A' }],
+      },
+      {
+        id: 'gate-b',
+        mode: 'all',
+        chainId: 84532,
+        perMemberLimit: 0,
+        sbts: [{ address: '0xbbb', name: 'B' }],
+      },
+    ];
+
+    expect(resolveSessionWizardResourceGate(['gate-a', 'gate-b'], 'gate-a', allGates)).toEqual({
+      gateId: 'gate-a',
+      gateIds: ['gate-a', 'gate-b'],
+      sbts: [
+        { address: '0xaaa', name: '0xaaa' },
+        { address: '0xbbb', name: '0xbbb' },
+      ],
+      mode: 'all',
+      chainId: 84532,
+      perMemberLimit: 0,
+      hasConflicts: false,
+      conflictSummary: {
+        modeConflicts: false,
+        chainIdConflicts: false,
+        perMemberLimitConflicts: false,
+      },
+      registryRepresentable: false,
+      registryUnsupportedReason: 'multiple gates with All semantics cannot be encoded as one registry gate',
     });
   });
 
