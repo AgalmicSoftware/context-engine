@@ -895,7 +895,7 @@ export async function sendPortoTransaction(txRequest: AnyObj): Promise<any> {
       replacementUnderpriced,
       nonceTooLow,
       alreadyKnown,
-      recoverable: replacementUnderpriced || nonceTooLow || alreadyKnown,
+      recoverable: replacementUnderpriced || nonceTooLow,
     };
   };
   const parseHexToBigInt = (value: any): bigint | null => {

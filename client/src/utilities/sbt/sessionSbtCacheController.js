@@ -1003,6 +1003,7 @@ export const createSessionSbtCacheController = (host = {}) => {
 
       // Discovery: new SBTs from factory since our last watermark
       let newSbtsEventsFromDiscovery = [];
+      let discoveryScanSucceeded = true;
       const fromBlockForSbtDiscovery = overallLastBlockProcessedByNetwork + 1;
       if (fromBlockForSbtDiscovery <= baseTo) {
         try {
@@ -1029,6 +1030,7 @@ export const createSessionSbtCacheController = (host = {}) => {
             await new Promise(resolve => setTimeout(resolve, API_CALL_DELAY));
           }
         } catch (discErr) {
+          discoveryScanSucceeded = false;
           mainSiteLog.error("Error during SBT discovery scan:", discErr);
         }
       } else {
@@ -1293,7 +1295,9 @@ export const createSessionSbtCacheController = (host = {}) => {
       }
 
       updateFullScanProgress(fullScanTotalUnits, true);
-      currentNetworkCache.lastBlock = baseTo;
+      currentNetworkCache.lastBlock = discoveryScanSucceeded
+        ? baseTo
+        : overallLastBlockProcessedByNetwork;
       currentNetworkCache.sbtList = finalProcessedSbtsMap;
       dgWrite('sbtCache', slug, globalCache);
 
@@ -1302,11 +1306,20 @@ export const createSessionSbtCacheController = (host = {}) => {
         dgWrite('userCache', slug, userCache);
       }
 
-      writeFlag('sbt:deferredFullScanNeeded', slug, false);
+      writeFlag('sbt:deferredFullScanNeeded', slug, !discoveryScanSucceeded);
       writeFlag('sbt:partialReady', slug, true);
 
       setState(prev => ({ isSBTCacheReady: true, sbtCacheRevision: prev.sbtCacheRevision + 1 }));
-      mainSiteLog.log('initializeSbtCacheForGroup: Full discovery & processing complete.');
+      if (discoveryScanSucceeded) {
+        mainSiteLog.log('initializeSbtCacheForGroup: Full discovery & processing complete.');
+      } else {
+        mainSiteLog.warn('initializeSbtCacheForGroup: Full scan persisted existing SBT updates but left discovery watermark behind after a factory scan failure.', {
+          slug,
+          networkID,
+          lastBlock: overallLastBlockProcessedByNetwork,
+          retryToBlock: baseTo,
+        });
+      }
     } finally {
       writeFlag('sbt:fullScanInProgress', slug, false);
       clearSbtLiveProgress(slug, liveProgressToken);
