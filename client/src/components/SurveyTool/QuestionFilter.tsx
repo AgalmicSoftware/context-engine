@@ -2850,7 +2850,12 @@ class QuestionFilter extends React.Component<any, any> {
 
     const hasConnectedAccount = toStr(this.props.account).trim() !== '';
     const bothResponseChecked = this.state.filterByResponded && this.state.filterByNotResponded;
-    if (hasConnectedAccount && this.state.filterByResponded && !bothResponseChecked) {
+    const isAiOverrideModeActive = (
+      !!this.state.aiFilterApplied &&
+      toStr(this.state.aiSearchQuery).trim() !== '' &&
+      !this.state.aiCombineWithOtherFilters
+    );
+    if (hasConnectedAccount && !isAiOverrideModeActive && this.state.filterByResponded && !bothResponseChecked) {
       items.push({
         type: 'responseStatus',
         label: 'Responded',
@@ -2859,7 +2864,7 @@ class QuestionFilter extends React.Component<any, any> {
         }
       });
     }
-    if (hasConnectedAccount && this.state.filterByNotResponded && !bothResponseChecked) {
+    if (hasConnectedAccount && !isAiOverrideModeActive && this.state.filterByNotResponded && !bothResponseChecked) {
       items.push({
         type: 'responseStatus',
         label: 'Not responded',
