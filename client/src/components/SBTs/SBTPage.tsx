@@ -595,6 +595,7 @@ class SBTPage extends Component<any, any> {
           this.setState(buildSbtPageNetworkUpdatePatch({ resetMintUiState, network }), () => {
             if (this._isMounted) {
               this.loadSBTInfo();
+              this.restartMintingEndCountdown();
               this.checkForMintPassword();
             }
           });
@@ -603,6 +604,7 @@ class SBTPage extends Component<any, any> {
             this.setState(resetMintUiState);
           }
           this.loadSBTInfo();
+          this.restartMintingEndCountdown();
           this.checkForMintPassword();
         }
       }
@@ -622,14 +624,20 @@ class SBTPage extends Component<any, any> {
             ...(resetMintUiState || {}),
             ...buildSbtPageResolvedSessionSlugPatch({ slug: nextSessionSlug }),
           }, () => {
-            if (this._isMounted) this.loadSBTInfo();
+            if (this._isMounted) {
+              this.loadSBTInfo();
+              this.restartMintingEndCountdown();
+            }
           });
         } else {
           this.loadSBTInfo();
         }
       } else if (this._isMounted) {
         if (resetMintUiState) this.setState(resetMintUiState);
-        if (this.state.resolvedSessionSlug == null) this.loadSBTInfo();
+        if (this.state.resolvedSessionSlug == null) {
+          this.loadSBTInfo();
+          this.restartMintingEndCountdown();
+        }
       }
       return;
     }
@@ -650,6 +658,7 @@ class SBTPage extends Component<any, any> {
           if (Object.keys(mergedPatch).length > 0) this.setState(mergedPatch);
         } catch (e) { sbtLog.warn('SBTPage: fallback', e); }
         this.loadSBTInfo();
+        this.restartMintingEndCountdown();
       }
       try {
         this.handleUrlAutoMintIntent().catch((e: unknown) => {
@@ -2921,6 +2930,20 @@ class SBTPage extends Component<any, any> {
 
 
 
+  clearMintingEndCountdown() {
+    const { intervalId } = this.state;
+    if (intervalId) {
+      clearInterval(intervalId);
+      if (this._isMounted) this.setState(buildSbtPageIntervalIdPatch({ intervalId: null }));
+    }
+  }
+
+  restartMintingEndCountdown() {
+    if (!this._isMounted) return;
+    this.clearMintingEndCountdown();
+    this.startMintingEndCountdown();
+  }
+
   startMintingEndCountdown() {
     const pollingIntervalMs = Math.max(1000, this.getActiveBlockTimeMs(1));
     const intervalId = setInterval(() => {
@@ -2937,7 +2960,12 @@ class SBTPage extends Component<any, any> {
 
         if (distance <= 0) {
           clearInterval(intervalId);
-          if (this._isMounted) this.setState(buildSbtPageMintCountdownPatch());
+          if (this._isMounted && this.state.intervalId === intervalId) {
+            this.setState({
+              ...buildSbtPageMintCountdownPatch(),
+              ...buildSbtPageIntervalIdPatch({ intervalId: null }),
+            });
+          }
         } else {
           const days = Math.floor(distance / (1000 * 60 * 60 * 24));
           const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
