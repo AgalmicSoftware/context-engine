@@ -3283,7 +3283,7 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
     : 'question_response_payload';
   const forceArweaveFetch = !!opts?.forceArweaveFetch;
   const { baseKey } = resolveReadContext(groupKeyOrCfg);
-  const inflightKey = `${baseKey}|${responderLower}|${idB32}|strict:${throwOnError ? '1' : '0'}`;
+  const inflightKey = `${baseKey}|${responderLower}|${idB32}|strict:${throwOnError ? '1' : '0'}|force:${forceArweaveFetch ? '1' : '0'}`;
   const readE2EMockedViewedResponse = () => {
     if (typeof window === 'undefined') return null;
     if (globalThis.CE_E2E_LIT_MOCK !== true) return null;
@@ -3607,7 +3607,6 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
     const modeTag = buildDecryptModeTag(opts);
     const failureModeTag = buildFailureModeTag(opts);
     const arweaveReadModeTag = buildArweaveReadModeTag(opts);
-    const inflightKey = `${baseKey}|${qId}|${modeTag}|${failureModeTag}|${arweaveReadModeTag}`;
     const forceArweaveFetch = !!(opts && opts.forceArweaveFetch === true);
     const inflightKey = `${baseKey}|${qId}|${modeTag}|${failureModeTag}|${arweaveReadModeTag}|force:${forceArweaveFetch ? '1' : '0'}`;
     try {
