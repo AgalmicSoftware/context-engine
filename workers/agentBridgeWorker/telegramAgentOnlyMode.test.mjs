@@ -190,6 +190,16 @@ test('start payload pins path-only endpoints and instruction size', () => {
   assert.match(payload.instructions, /state\.db and \/opt\/data\/state\.db/);
   assert.match(payload.instructions, /source: "local sqlite3 query \(including cache\)"/);
   assert.match(payload.instructions, /make at most one quiet known-path SQLite attempt/);
+  assert.match(payload.instructions, /COALESCE\(input_tokens,0\)/);
+  assert.match(payload.instructions, /COALESCE\(output_tokens,0\)/);
+  assert.match(payload.instructions, /COALESCE\(cache_read_tokens,0\)/);
+  assert.match(payload.instructions, /COALESCE\(cache_write_tokens,0\)/);
+  assert.match(payload.instructions, /started_at >= cutoff/);
+  assert.match(payload.instructions, /date\(CAST\(started_at AS INTEGER\), 'unixepoch', 'localtime'\)/);
+  assert.match(payload.instructions, /Do not assume a precomputed aggregate column exists/);
+  assert.match(payload.instructions, /do not use SQL datetime string filters against started_at/);
+  assert.doesNotMatch(payload.instructions, /total_tokens\s+column|SUM\(\s*total_tokens|SELECT\s+total_tokens/i);
+  assert.doesNotMatch(payload.instructions, /datetime\('now'\)/);
   assert.match(payload.instructions, /If unavailable or unclear, omit token_usage/);
   assert.match(payload.instructions, /Never print rows or command output/);
   assert.doesNotMatch(payload.instructions, /skill_view|skills_list|search_files|session_search|hermes insights|\/opt\/hermes/i);
