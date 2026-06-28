@@ -5,6 +5,7 @@ import {
   makeInstance,
   setupCreateSBTGroupTestLifecycle,
 } from './CreateSBTGroup.testUtils';
+import { notify } from '../../utilities/ui/notify.js';
 
 describe('CreateSBTGroup cache helpers', () => {
   setupCreateSBTGroupTestLifecycle();
