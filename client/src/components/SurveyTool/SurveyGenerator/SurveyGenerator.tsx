@@ -1035,6 +1035,8 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
     const singleSourceTitle = queuedSources.length === 1 ? toStr(titleOverride).trim() : '';
 
     for (const source of queuedSources) {
+      if (abortedRef.current) break;
+
       const isUrlSource = source?.type === 'url';
       const isPhotoSource = source?.type === 'photo';
       const kind = isUrlSource ? 'link' : 'file';
@@ -1075,6 +1077,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
           encryption,
         });
       }
+      if (abortedRef.current) break;
 
       const viewerUrl = buildSessionDocLibraryViewerUrlForGenerator({
         sessionToken: docSaveSessionToken,
@@ -1088,6 +1091,8 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
       if (includePhotoAnalysis && isPhotoSource) {
         const analysisText = toStr(photoAnalysisBySourceId?.get(source?.id) || source?.analysisText).trim();
         if (analysisText) {
+          if (abortedRef.current) break;
+
           const analysisFile = new File(
             [buildPhotoAnalysisMarkdown({ photoName: source?.name, analysisText })],
             buildPhotoAnalysisFilename(source?.name),
@@ -1111,6 +1116,8 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
             tags: analysisTags,
             encryption,
           });
+          if (abortedRef.current) break;
+
           const analysisViewerUrl = buildSessionDocLibraryViewerUrlForGenerator({
             sessionToken: docSaveSessionToken,
             txId: analysisResult?.txId,
@@ -1133,6 +1140,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
   ) => {
     const queuedSources = Array.isArray(sources) ? sources : [];
     if (!saveExtraSourcesToDocLibrary || queuedSources.length === 0) return [];
+    if (abortedRef.current) return [];
     if (!loginComplete) {
       if (typeof toggleLoginModal === 'function') {
         toggleLoginModal(true);
@@ -1212,7 +1220,9 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
       }
 
       const photoAnalysisBySourceId = await analyzeQueuedPhotoSources(effectiveSources);
+      if (abortedRef.current) return;
       const savedDocRefs = await saveQueuedSourcesToDocLibrary(effectiveSources, photoAnalysisBySourceId);
+      if (abortedRef.current) return;
       const savedDocRefsBySourceId = new Map(
         savedDocRefs
           .filter((entry: UploadedSourceDocRef) => entry?.sourceId)
