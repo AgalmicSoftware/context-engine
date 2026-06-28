@@ -114,6 +114,21 @@ export const stripSessionWizardMetadataSecretFields = (metadata: AnyRecord): Any
   return metadata;
 };
 
+export const getSessionWizardMetadataSecretFieldGateKeys = (metadata: unknown): string[] => {
+  if (!isRecord(metadata) || !isRecord(metadata.encryptedFieldGates)) return [];
+  return Object.keys(metadata.encryptedFieldGates).filter((key) => (
+    isSecretFieldPath(key.split('.'))
+  ));
+};
+
+export const buildSessionWizardSecretFieldGateErrorMessage = (keys: unknown): string => {
+  const list = Array.isArray(keys)
+    ? keys.map((key) => toStr(key).trim()).filter(Boolean)
+    : [];
+  const suffix = list.length ? `: ${list.join(', ')}.` : '.';
+  return `Worker secret fields cannot be locked in public metadata${suffix} Store secrets in the Worker panel instead.`;
+};
+
 export const applySessionWizardMetadataUploadGuards = ({
   metadata,
   defaultGateId = '',
@@ -125,6 +140,10 @@ export const applySessionWizardMetadataUploadGuards = ({
 }): AnyRecord => {
   const next = isRecord(metadata) ? metadata : {};
   const selections = isRecord(gateSelections) ? gateSelections : {};
+  const secretFieldGateKeys = getSessionWizardMetadataSecretFieldGateKeys(next);
+  if (secretFieldGateKeys.length) {
+    throw new Error(buildSessionWizardSecretFieldGateErrorMessage(secretFieldGateKeys));
+  }
 
   stripSessionWizardMetadataSecretFields(next);
 
