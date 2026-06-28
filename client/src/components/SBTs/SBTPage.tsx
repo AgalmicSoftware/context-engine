@@ -3416,8 +3416,7 @@ class SBTPage extends Component<any, any> {
       (
         burnAuth === 1 ||
         burnAuth === 2 ||
-        (burnAuth === 0 && adminAddr && adminAddr.toLowerCase() === userAddress) ||
-        (burnAuth === 1 && this.state.userHasSBT)
+        (burnAuth === 0 && adminAddr && adminAddr.toLowerCase() === userAddress)
       );
 
     let tokenIdToBurn: unknown;
