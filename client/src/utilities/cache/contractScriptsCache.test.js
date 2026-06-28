@@ -147,6 +147,30 @@ describe('contractScriptsCache helpers', () => {
     expect(task).toHaveBeenCalledTimes(2);
   });
 
+  it('keeps forced and non-forced Arweave tx work isolated', async () => {
+    const subject = createSubject();
+    const task = jest.fn(async () => new Promise((resolve) => setTimeout(() => resolve('ok'), 10)));
+
+    const [a, b] = await Promise.all([
+      subject.runArweaveTxFetchCoalesced({
+        chainId: 84532,
+        txId: 'tx-force-1',
+        forceFetch: false,
+        task,
+      }),
+      subject.runArweaveTxFetchCoalesced({
+        chainId: 84532,
+        txId: 'tx-force-1',
+        forceFetch: true,
+        task,
+      }),
+    ]);
+
+    expect(a).toBe('ok');
+    expect(b).toBe('ok');
+    expect(task).toHaveBeenCalledTimes(2);
+  });
+
   it('reads arweave tx cache entries only from the exact network key', async () => {
     const readCacheValue = {
       '084532': {
