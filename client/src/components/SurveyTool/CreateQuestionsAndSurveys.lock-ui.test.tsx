@@ -303,7 +303,7 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
     expect(questionLock.querySelector(`.${gateLockStyles.dots}`)).toBeNull();
   });
 
-  it('keeps an explicit empty standalone question gate selection unlocked', () => {
+  it('shows the default lock for an explicit empty standalone question gate selection', () => {
     const instance = makeInstance();
     instance.resolveGateOptions = jest.fn(() => ({
       gateMap: {
@@ -337,8 +337,47 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
     expect(questionLock).not.toBeNull();
     if (!questionLock) throw new Error('Expected question header lock to render');
     const button = within(questionLock).getByTestId(E2E_TESTIDS.GATE_LOCK_BUTTON);
-    expect(button).toHaveAttribute('aria-label', expect.stringMatching(/^Choose /i));
-    expect(button.querySelector('svg')?.getAttribute('data-icon')).toBe('lock-open');
+    expect(button).toHaveAttribute('aria-label', 'Edit locked access rule');
+    expect(button.querySelector('svg')?.getAttribute('data-icon')).toBe('lock');
+  });
+
+  it('shows the default lock for an explicit empty survey gate selection', () => {
+    const instance = makeInstance();
+    instance.resolveGateOptions = jest.fn(() => ({
+      gateMap: {
+        gate_1: { id: 'gate_1' },
+      },
+      gateOptions: [
+        { id: 'gate_1', label: 'Edge Alpha', badgeLabel: 'Edge Alpha', color: '#5affc2' },
+      ],
+      defaultGateId: 'gate_1',
+    }));
+    instance.state = {
+      ...instance.state,
+      showAutoTool: false,
+      isStandaloneQuestion: false,
+      title: 'Survey title',
+      surveyLockGateIds: [],
+      questions: [{
+        uiKey: 'q1',
+        id: 'q1',
+        type: 'freeform',
+        prompt: 'Question 1',
+        tags: [],
+        currentTagInputValue: '',
+        aiGeneratedTagsFromSource: [],
+        isGeneratingTags: false,
+      }],
+    };
+
+    const { container } = render(instance.render());
+
+    const titleLock = container.querySelector(`.${surveyStyles.surveyTitleLock}`) as HTMLElement | null;
+    expect(titleLock).not.toBeNull();
+    if (!titleLock) throw new Error('Expected survey title lock to render');
+    const button = within(titleLock).getByTestId(E2E_TESTIDS.GATE_LOCK_BUTTON);
+    expect(button).toHaveAttribute('aria-label', 'Edit locked access rule');
+    expect(button.querySelector('svg')?.getAttribute('data-icon')).toBe('lock');
   });
 
   it('opens an app-native clear confirmation instead of calling window.confirm', () => {
