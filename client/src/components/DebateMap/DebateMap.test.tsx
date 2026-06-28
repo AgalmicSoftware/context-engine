@@ -411,6 +411,29 @@ describe('DebateMap', () => {
     expect(topNodes.map((node: any) => node.id)).toEqual(['comment-heavy', 'nested-high', 'early-tie']);
   });
 
+  it('ignores wrong-shaped bookmark storage before rendering bookmarkable list nodes', async () => {
+    localStorage.setItem('bookmarkedNodes', '{"bad":true}');
+
+    render(
+      <MemoryRouter>
+        <DebateMapComponent
+          account=""
+          provider=""
+          network={{ id: 84532 }}
+          activeSessionSlug=""
+          toggleLoginModal={jest.fn()}
+        />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(getDebateViewModeButton('list'));
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /^Debate Map$/i })).toBeInTheDocument();
+      expect(screen.getAllByTestId(E2E_TESTIDS.DEBATE_VIEW_MODE).length).toBeGreaterThan(0);
+    });
+  });
+
   it('switches between circles and atlas from the main mode controls', () => {
     render(
       <MemoryRouter>
