@@ -48,4 +48,42 @@ describe('cryptoUtils poseidon helpers', () => {
     expect(hasher).toHaveBeenCalledTimes(1);
     expect(field.poseidon).toBe(EXPECTED_POSEIDON_HEX);
   });
+
+  it('omits rating poseidon for blank and null values', async () => {
+    const emptyValues = ['', '   ', null, undefined];
+
+    for (const value of emptyValues) {
+      const field = { value };
+      const hasher = jest.fn(() => 5n);
+
+      await cryptoUtils.addTopLevelPoseidonIfRequired(field, {
+        kind: 'rating',
+        chainId: 84532,
+        surveyId: SURVEY_ID,
+        qId: 'q-rating-empty',
+        hasher,
+      });
+
+      expect(hasher).not.toHaveBeenCalled();
+      expect(field.poseidon).toBeUndefined();
+    }
+  });
+
+  it('keeps explicit zero rating values eligible for poseidon', async () => {
+    for (const value of [0, '0']) {
+      const field = { value };
+      const hasher = jest.fn(() => 5n);
+
+      await cryptoUtils.addTopLevelPoseidonIfRequired(field, {
+        kind: 'rating',
+        chainId: 84532,
+        surveyId: SURVEY_ID,
+        qId: 'q-rating-zero',
+        hasher,
+      });
+
+      expect(hasher).toHaveBeenCalledTimes(1);
+      expect(field.poseidon).toBe(EXPECTED_POSEIDON_HEX);
+    }
+  });
 });

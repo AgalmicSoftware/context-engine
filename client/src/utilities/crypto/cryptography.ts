@@ -1171,7 +1171,10 @@ async function addTopLevelPoseidonIfRequired(
     } else if (kind === 'binary') {
       nonEmpty = v === 'Agree' || v === 'Unsure' || v === 'Disagree';
     } else if (kind === 'rating') {
-      const n = Number(v);
+      const hasRatingValue = typeof v === 'string'
+        ? v.trim().length > 0
+        : v !== null && v !== undefined;
+      const n = hasRatingValue ? Number(v) : NaN;
       nonEmpty = Number.isFinite(n);
     } else if (kind === 'multichoice') {
       nonEmpty = Array.isArray(v) && v.length > 0;
