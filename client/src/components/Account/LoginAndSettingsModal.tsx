@@ -894,16 +894,43 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   }
 
   checkAndSendTestFundsIfNeeded = async () => {
-    const { runLoginTestFundsAutoSend } = await import('./loginTestFundsAutoSendController');
-    await runLoginTestFundsAutoSend({
-      autoSendTestFunds: this.autoSendTestFunds,
-      getActiveSessionConfig: () => this.getDisplaySessionConfig(this.getActiveSessionSlug()),
-      loginComplete: this.props.loginComplete,
-      setState: (patch) => this.setStateIfMounted(patch),
-      state: this.state,
-      syncWalletBalance: () => this.syncWalletBalance(),
-      walletAccount: this.getWalletAccount(),
-    });
+    const walletAccount = this.getWalletAccount();
+    if (!this.props.loginComplete || !walletAccount) {
+      const resetState: Partial<LoginAndSettingsModalState> = {};
+      if (this.state.autoSendTriggered) resetState.autoSendTriggered = false;
+      if (this.state.walletBalanceWei !== null) resetState.walletBalanceWei = null;
+      if (Object.keys(resetState).length) this.setStateIfMounted(resetState);
+      return;
+    }
+
+    const { balance: currentBalance, stale } = await this.syncWalletBalance();
+    if (stale) return;
+
+    if (!this.state.autoRequestTestnetFundsEnabled) {
+      if (this.state.autoSendTriggered) {
+        this.setStateIfMounted({ autoSendTriggered: false });
+      }
+      return;
+    }
+
+    let shouldTrigger = false;
+
+    try {
+      if (currentBalance != null) {
+        const threshold = ethers.utils.parseEther(TESTNET_AUTO_SEND_THRESHOLD_ETH);
+        shouldTrigger = currentBalance.lte(threshold);
+      }
+    } catch (e) {
+      accountLog.error("Error parsing wallet balance in auto-send check:", e);
+    }
+
+    if (shouldTrigger && !this.state.sendingTestFunds && !this.state.autoSendTriggered) {
+      this.autoSendTestFunds();
+    }
+
+    if (this.state.autoSendTriggered !== shouldTrigger) {
+      this.setStateIfMounted({ autoSendTriggered: shouldTrigger });
+    }
   };
 
   autoSendTestFunds = async () => {

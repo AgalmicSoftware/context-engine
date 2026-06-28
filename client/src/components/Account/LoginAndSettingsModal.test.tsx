@@ -766,23 +766,18 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
   });
 
   it('does not repeat automatic faucet sends for the same low-balance context', async () => {
-    enableRegistryFundingForAllSessions();
-    const subject = mountClassSubject(
-      new LoginAndSettingsModalSubject(
-        buildProps({
-          account: WAGMI_ADDRESS,
-          activeSessionSlug: 'edge',
-          loginComplete: true,
-          provider: 'wagmi',
-          wagmiBalance: { data: { value: 0n } },
-        }),
-      ),
-    );
+    const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps({
+      account: WAGMI_ADDRESS,
+      activeSessionSlug: 'edge',
+      loginComplete: true,
+      provider: 'wagmi',
+      wagmiBalance: { data: { value: 0n } },
+    })));
     subject.autoSendTestFunds = jest.fn();
     subject.loadAiSettings = jest.fn();
     subject.loadResourceKeys = jest.fn();
     subject.loadSponsoredAccess = jest.fn();
-    subject.syncPasskeyWalletChain = jest.fn();
+    subject.syncPortoChain = jest.fn();
 
     await subject.checkAndSendTestFundsIfNeeded();
     await subject.checkAndSendTestFundsIfNeeded();
