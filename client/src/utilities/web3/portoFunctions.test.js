@@ -291,16 +291,13 @@ describe('sendPortoTransaction nonce retry behavior', () => {
     ).toHaveLength(1);
   });
 
-  it.each([
-    ['nonce too low'],
-    ['already known'],
-  ])('retries recoverable duplicate send errors: %s', async (message) => {
+  it('retries nonce-too-low send errors with a refreshed nonce', async () => {
     let attempt = 0;
     const { porto, requestMock, sendTransactionMock } = loadPortoHarness({
       sendTransactionImpl: async () => {
         attempt += 1;
         if (attempt === 1) {
-          throw new Error(message);
+          throw new Error('nonce too low');
         }
         return '0xrecoverablehash';
       },
@@ -323,6 +320,30 @@ describe('sendPortoTransaction nonce retry behavior', () => {
     expect(
       requestMock.mock.calls.filter(([req]) => req?.method === 'eth_getTransactionCount')
     ).toHaveLength(1);
+  });
+
+  it('does not retry already-known sends with a fresh nonce', async () => {
+    const { porto, requestMock, sendTransactionMock } = loadPortoHarness({
+      sendTransactionImpl: async () => {
+        throw new Error('already known');
+      },
+    });
+    seedLegacyPortoSession();
+    globalThis.CE_PORTO_SEND_RETRY_ATTEMPTS = '2';
+    globalThis.CE_PORTO_SEND_RETRY_BASE_DELAY_MS = '1';
+    await porto.restoreSession();
+
+    await expect(porto.sendPortoTransaction({
+      to: TARGET_ADDRESS,
+      value: '0x0',
+      data: '0x',
+    })).rejects.toThrow('already known');
+
+    expect(sendTransactionMock).toHaveBeenCalledTimes(1);
+    expect(Object.prototype.hasOwnProperty.call(sendTransactionMock.mock.calls[0][0], 'nonce')).toBe(false);
+    expect(
+      requestMock.mock.calls.filter(([req]) => req?.method === 'eth_getTransactionCount')
+    ).toHaveLength(0);
   });
 
   it('does not lower the retry gas price when replacement gas price reads drop', async () => {
