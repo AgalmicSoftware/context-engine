@@ -1686,6 +1686,8 @@ export class SurveySelector extends Component<any, any> {
               preventUrlChange={this.props.preventUrlChange}
               sessionSlug={this.props.sessionSlug}
               activeSessionSlug={getActiveSessionSlugFromProps(this.props)}
+              sessionConfig={this.props.sessionConfig}
+              ensureLightSbtUniverse={this.props.ensureLightSbtUniverse}
               // Do not drop the pin at the results layer; otherwise /session pages
               // silently fan out to broader scan scope when opening results.
               sessionSlugPinned={this.props.sessionSlugPinned}
@@ -1736,6 +1738,8 @@ export class SurveySelector extends Component<any, any> {
 	            onFilterActivityChange={this.handleFilterActivityChange}
 	            sessionSlug={this.props.sessionSlug}
 	            activeSessionSlug={activeSessionSlug}
+            sessionConfig={this.props.sessionConfig}
+            ensureLightSbtUniverse={this.props.ensureLightSbtUniverse}
             ensureQuestionCached={this.props.ensureQuestionCached}
             computeSubmitLabel={this.props.computeSubmitLabel}
             cacheInitializationError={this.props.cacheInitializationError}
@@ -2043,6 +2047,8 @@ export class QuestionsDashboard extends Component<any, any> {
         defaultFeaturedSBTs={this.props.defaultFeaturedSBTs}
         activeSessionSlug={getActiveSessionSlugFromProps(this.props)}
         sessionSlug={this.props.sessionSlug}
+        sessionConfig={this.props.sessionConfig}
+        ensureLightSbtUniverse={this.props.ensureLightSbtUniverse}
         isQuestionCacheReady={this.props.isQuestionCacheReady}
         isSurveyCacheReady={this.props.isSurveyCacheReady}
         isSBTCacheReady={this.props.isSBTCacheReady}

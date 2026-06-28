@@ -91,6 +91,7 @@ type SurveyToolProps = {
   sessionSlug?: string;
   sessionSlugPinned?: boolean;
   sessionConfig?: unknown;
+  ensureLightSbtUniverse?: unknown;
   account?: string;
   provider?: unknown;
   loginComplete?: boolean;
@@ -300,6 +301,8 @@ const renderSurveyToolContent = ({
         computeSubmitLabel={computeSubmitLabel}
         activeSessionSlug={activeSessionSlug}
         sessionSlug={toolSessionSlug}
+        sessionConfig={props.sessionConfig}
+        ensureLightSbtUniverse={props.ensureLightSbtUniverse}
       />
     );
   }
@@ -411,6 +414,7 @@ const renderSurveyToolContent = ({
         sessionSlug={toolSessionSlug}
         sessionSlugPinned={props.sessionSlugPinned}
         sessionConfig={props.sessionConfig}
+        ensureLightSbtUniverse={props.ensureLightSbtUniverse}
         hideEmbeddedDebugUi={props.hideEmbeddedDebugUi}
       />
       <React.Suspense fallback={null}>
@@ -446,6 +450,8 @@ const renderSurveyToolContent = ({
           preventUrlChange={props.preventUrlChange}
           sessionSlug={toolSessionSlug}
           activeSessionSlug={activeSessionSlug}
+          sessionConfig={props.sessionConfig}
+          ensureLightSbtUniverse={props.ensureLightSbtUniverse}
           sessionSlugPinned={props.sessionSlugPinned}
           hideEmbeddedDebugUi={props.hideEmbeddedDebugUi}
         />

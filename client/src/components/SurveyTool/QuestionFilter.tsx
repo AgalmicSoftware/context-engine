@@ -174,7 +174,9 @@ type QuestionFilterSessionProps = UnknownRecord & {
     [key: string]: unknown;
   } | null;
   provider?: unknown;
+  sessionConfig?: unknown;
   sessionSlug?: unknown;
+  ensureLightSbtUniverse?: unknown;
   storageKeyPrefix?: unknown;
 };
 type QuestionFilterAiRequestOptions = {
@@ -3092,6 +3094,9 @@ class QuestionFilter extends React.Component<any, any> {
       ? 'Disabled by “Top X questions” selection.'
       : 'Disabled by AI Top-N override. Enable “Combine with other filters” to intersect.';
     const aiAccessState = this.getAiAccessState();
+    const sbtSessionContext = resolveEffectiveSessionContext(this.props);
+    const sbtFilterSessionSlug = sbtSessionContext.sessionSlug || resolveEffectiveSlug(this.props);
+    const sbtFilterSessionConfig = this.props.sessionConfig || sbtSessionContext.sessionConfig || {};
     const aiSectionDisabled = isTopQuestionsModeActive;
     const aiControlsDisabled = isTopQuestionsModeActive || !aiAccessState.enabled || aiApplying;
     const aiApplyButtonLabel = aiApplying
@@ -3398,6 +3403,9 @@ class QuestionFilter extends React.Component<any, any> {
                 isSurveyCacheReady={this.props.isSurveyCacheReady}
                 isSBTCacheReady={this.props.isSBTCacheReady}
                 sbtCacheRevision={this.props.sbtCacheRevision}
+                sessionSlug={sbtFilterSessionSlug}
+                sessionConfig={sbtFilterSessionConfig}
+                ensureLightSbtUniverse={this.props.ensureLightSbtUniverse}
               />
 	            ),
 	            isOtherFiltersDisabled || !this.props.isSBTCacheReady, // Pass disabled state

@@ -72,6 +72,31 @@ describe('SBTFilter render guards', () => {
     });
   });
 
+  it('passes session warm-start props through to address-mode SBT selectors', () => {
+    const sessionConfig = { slug: 'edge', networkChainId: 84532 };
+    const ensureLightSbtUniverse = jest.fn();
+    const subject = createSubject({
+      mode: 'addresses',
+      autoExpand: true,
+      sessionSlug: 'edge',
+      sessionConfig,
+      ensureLightSbtUniverse,
+    });
+
+    const tree = subject.render();
+    const addressSelectors = findElementsInTree(
+      tree,
+      (element) => ['includeAddresses', 'excludeAddresses'].includes(element?.props?.id)
+    );
+
+    expect(addressSelectors).toHaveLength(2);
+    addressSelectors.forEach((selectorNode) => {
+      expect(selectorNode.props.sessionSlug).toBe('edge');
+      expect(selectorNode.props.sessionConfig).toBe(sessionConfig);
+      expect(selectorNode.props.ensureLightSbtUniverse).toBe(ensureLightSbtUniverse);
+    });
+  });
+
   it('can suppress the top-level loading overlay for embedded results filters', () => {
     const withOverlay = createSubject(
       {

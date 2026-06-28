@@ -138,7 +138,9 @@ type SbtFilterProps = {
   onFilterResponders?: SbtFilterCallback;
   provider?: unknown;
   sbtCacheRevision?: unknown;
+  sessionConfig?: unknown;
   sessionSlug?: unknown;
+  ensureLightSbtUniverse?: unknown;
   setFilterLoading?: (loading: boolean) => unknown;
 };
 type SbtFilterState = Omit<SbtFilterInitialState, 'lastAppliedFilterSnapshot'> & {
@@ -1230,6 +1232,11 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
       shouldUseLightSurface: surfaceDisplayState.shouldUseLightSurface,
     });
     const layoutDisplayState = resolveSbtFilterLayoutDisplayState();
+    const sbtSelectorWarmStartProps = {
+      sessionSlug: this.props.sessionSlug,
+      sessionConfig: this.props.sessionConfig,
+      ensureLightSbtUniverse: this.props.ensureLightSbtUniverse,
+    };
 
     if (panelDisplayState.shouldRenderHiddenRoot) {
       return <div style={layoutDisplayState.hiddenRootStyle} />;
@@ -1288,7 +1295,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
                     onAddSBT={this.handleAddSBTIncludeResponder}
                     onRemoveSBT={this.handleRemoveSBTIncludeResponder}
                     selectedSBTs={selectedSBTGroupsResponder}
-                    sessionSlug={this.props.sessionSlug}
+                    {...sbtSelectorWarmStartProps}
                     label={'Include Responses from SBT Holders'}
                     defaultFeaturedSBTs={defaultFeaturedSBTs}
                     showAllSBTs={showAllSBTs}
@@ -1307,7 +1314,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
                     onAddSBT={this.handleAddSBTExcludeResponder}
                     onRemoveSBT={this.handleRemoveSBTExcludeResponder}
                     selectedSBTs={excludedSBTGroupsResponder}
-                    sessionSlug={this.props.sessionSlug}
+                    {...sbtSelectorWarmStartProps}
                     label={'Exclude Responses from SBT Holders'}
                     defaultFeaturedSBTs={defaultFeaturedSBTs}
                     showAllSBTs={showAllSBTs}
@@ -1332,7 +1339,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
                     onAddSBT={this.handleAddSBTInclude}
                     onRemoveSBT={this.handleRemoveSBTInclude}
                     selectedSBTs={selectedSBTGroups}
-                    sessionSlug={this.props.sessionSlug}
+                    {...sbtSelectorWarmStartProps}
                     label={'Include Addresses holding SBT'}
                     defaultFeaturedSBTs={defaultFeaturedSBTs}
                     showAllSBTs={showAllSBTs}
@@ -1351,7 +1358,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
                     onAddSBT={this.handleAddSBTExclude}
                     onRemoveSBT={this.handleRemoveSBTExclude}
                     selectedSBTs={excludedSBTGroups}
-                    sessionSlug={this.props.sessionSlug}
+                    {...sbtSelectorWarmStartProps}
                     label={'Exclude Addresses holding SBT'}
                     defaultFeaturedSBTs={defaultFeaturedSBTs}
                     showAllSBTs={showAllSBTs}
@@ -1378,7 +1385,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
                         onAddSBT={this.handleAddSBTIncludeCreator}
                         onRemoveSBT={this.handleRemoveSBTIncludeCreator}
                         selectedSBTs={selectedSBTGroupsCreator}
-                        sessionSlug={this.props.sessionSlug}
+                        {...sbtSelectorWarmStartProps}
                         label={'Include Questions created by SBT Holders'}
                         defaultFeaturedSBTs={defaultFeaturedSBTs} // Pass prop
                         showAllSBTs={showAllSBTs} // Pass state
@@ -1397,7 +1404,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
                         onAddSBT={this.handleAddSBTExcludeCreator}
                         onRemoveSBT={this.handleRemoveSBTExcludeCreator}
                         selectedSBTs={excludedSBTGroupsCreator}
-                        sessionSlug={this.props.sessionSlug}
+                        {...sbtSelectorWarmStartProps}
                         label={'Exclude Questions created by SBT Holders'}
                         defaultFeaturedSBTs={defaultFeaturedSBTs} // Pass prop
                         showAllSBTs={showAllSBTs} // Pass state
@@ -1422,7 +1429,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
                         onAddSBT={this.handleAddSBTIncludeResponder}
                         onRemoveSBT={this.handleRemoveSBTIncludeResponder}
                         selectedSBTs={selectedSBTGroupsResponder}
-                        sessionSlug={this.props.sessionSlug}
+                        {...sbtSelectorWarmStartProps}
                         label={'Include Responses from SBT Holders'}
                         defaultFeaturedSBTs={defaultFeaturedSBTs} // Pass prop
                         showAllSBTs={showAllSBTs} // Pass state
@@ -1441,7 +1448,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
                         onAddSBT={this.handleAddSBTExcludeResponder}
                         onRemoveSBT={this.handleRemoveSBTExcludeResponder}
                         selectedSBTs={excludedSBTGroupsResponder}
-                        sessionSlug={this.props.sessionSlug}
+                        {...sbtSelectorWarmStartProps}
                         label={'Exclude Responses from SBT Holders'}
                         defaultFeaturedSBTs={defaultFeaturedSBTs} // Pass prop
                         showAllSBTs={showAllSBTs} // Pass state

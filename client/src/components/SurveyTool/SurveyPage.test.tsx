@@ -38,10 +38,13 @@ describe('SurveyPage session propagation', () => {
   });
 
   it('keeps the same active/session slug propagation for full SurveyTool renders', () => {
+    const ensureLightSbtUniverse = jest.fn();
+
     render(
       <SurveyPage
         sessionSlug="alpha"
         sessionConfig={{ slug: 'alpha', sessionName: 'Alpha Session' }}
+        ensureLightSbtUniverse={ensureLightSbtUniverse}
       />
     );
 
@@ -55,6 +58,7 @@ describe('SurveyPage session propagation', () => {
           slug: 'alpha',
           sessionName: 'Alpha Session',
         }),
+        ensureLightSbtUniverse,
       })
     );
   });

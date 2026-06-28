@@ -2965,7 +2965,10 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
           currentSurveyIdForUrl={null}
           provider={engine.props.provider}
           network={engine.props.network}
+          sessionSlug={resolveEffectiveSlug(engine.props)}
           activeSessionSlug={getActiveSessionSlugFromProps(engine.props)}
+          sessionConfig={engine.props.sessionConfig}
+          ensureLightSbtUniverse={engine.props.ensureLightSbtUniverse}
           defaultFilterState={engine.props.defaultFilterState}
           defaultTags={engine.props.defaultTags}
           defaultFeaturedSBTs={engine.props.defaultFeaturedSBTs}

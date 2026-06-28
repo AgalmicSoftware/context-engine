@@ -248,6 +248,8 @@ const ToolExplorer = (props: ToolExplorerProps) => {
     provider: props.provider,
     litHooks: props.litHooks,
     activeSessionSlug: props.activeSessionSlug,
+    sessionConfig: getSessionConfigBySlug(props.activeSessionSlug || '') || null,
+    ensureLightSbtUniverse: props.ensureLightSbtUniverse,
     loginComplete: props.loginComplete,
     toggleLoginModal: props.toggleLoginModal,
     network: props.network,

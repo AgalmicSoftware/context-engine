@@ -561,6 +561,7 @@ export type SurveyResultsProps = SurveyResultsRecord & {
   account?: string;
   activeSessionSlug?: string;
   defaultTags?: unknown[];
+  ensureLightSbtUniverse?: unknown;
   filterState?: SurveyResultsFilterState | null;
   filteredQuestionsCount?: number | null;
   isOpen?: boolean;
@@ -587,6 +588,7 @@ export type SurveyResultsProps = SurveyResultsRecord & {
   refreshQuestionResponses?: () => unknown;
   refreshSurveyResponsesByID?: (surveyId: string) => unknown;
   sbtCacheRevision?: unknown;
+  sessionConfig?: unknown;
   sessionName?: string;
   sessionSlug?: string;
   sessionSlugPinned?: boolean;
@@ -5014,6 +5016,7 @@ const filterControlsNode = renderSurveyResultsFilterExportControls({
   currentSurveyIdForUrl: filterInput.currentSurveyIdForUrl,
   currentViewModeForUrl: filterInput.currentViewModeForUrl,
   defaultTags: propsRef.current.defaultTags,
+  ensureLightSbtUniverse: propsRef.current.ensureLightSbtUniverse,
   exportControlsDisplay,
   filterState: filterInput.filterState,
   isFilterActive,
@@ -5039,6 +5042,8 @@ const filterControlsNode = renderSurveyResultsFilterExportControls({
   questionsCacheNonce: filterInput.questionsCacheNonce,
   responses: stateRef.current.responses,
   sbtCacheRevision: filterInput.sbtCacheRevision,
+  sessionConfig: propsRef.current.sessionConfig,
+  sessionSlug: propsRef.current.sessionSlug,
   showQuestionFilter: filterInput.showQuestionFilter,
   storageKeyPrefix: filterInput.storageKeyPrefix,
   styleMap: styles,
