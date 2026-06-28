@@ -301,6 +301,7 @@ import {
 } from './sessionWizardResourceGateSupport';
 import {
   applySessionWizardMetadataUploadGuards,
+  buildSessionWizardSecretFieldGateErrorMessage,
   resolveSessionWizardMetadataPayloadBase,
 } from './sessionWizardMetadataPayload';
 import {
@@ -2794,6 +2795,9 @@ const SessionWizard = ({
         .filter(Boolean);
       if (!selectedGateIds.length) continue;
       const path = key.split('.');
+      if (isSecretFieldPath(path)) {
+        throw new Error(buildSessionWizardSecretFieldGateErrorMessage([key]));
+      }
       const value = getValueAtPath(metadata, path);
       if (value == null || value === '') continue;
 
@@ -2908,26 +2912,8 @@ const SessionWizard = ({
 
       const onChainFieldKey = getOnChainFieldKeyForPath(path);
       const skipEncryptedFields = (path.length === 1 && path[0] === 'sessionInfo');
-      if (path.length >= 4 && path[0] === 'ai' && path[1] === 'providers' && path[path.length - 1] === 'apiKey') {
-        const providerKey = path[2];
-        const encryptedPath = ['ai', 'providers', providerKey, 'encryptedApiKey'];
-        setValueAtPath(metadata, encryptedPath, envelope);
-        setValueAtPath(metadata, path, '');
-      } else if (path.length >= 4 && path[0] === 'rpc' && path[1] === 'providers' && path[path.length - 1] === 'apiKey') {
-        const providerKey = path[2];
-        const encryptedPath = ['rpc', 'providers', providerKey, 'encryptedApiKey'];
-        setValueAtPath(metadata, encryptedPath, envelope);
-        setValueAtPath(metadata, path, '');
-      } else if (path.length === 1 && path[0] === 'sessionInfo') {
+      if (path.length === 1 && path[0] === 'sessionInfo') {
         metadata.sessionInfoEncrypted = envelope;
-        setValueAtPath(metadata, path, '');
-      } else if (path.length === 2 && path[0] === 'arweave' && path[1] === 'jwk') {
-        const encryptedPath = ['arweave', 'encryptedJwk'];
-        setValueAtPath(metadata, encryptedPath, envelope);
-        setValueAtPath(metadata, path, '');
-      } else if (path.length === 2 && path[0] === 'faucet' && path[1] === 'privateKey') {
-        const encryptedPath = ['faucet', 'encryptedPrivateKey'];
-        setValueAtPath(metadata, encryptedPath, envelope);
         setValueAtPath(metadata, path, '');
       } else {
         setValueAtPath(metadata, path, '');

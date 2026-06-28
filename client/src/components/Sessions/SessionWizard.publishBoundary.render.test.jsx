@@ -20,11 +20,14 @@ const openPublishSection = async () => {
   return screen.findByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
 };
 
-const seedVerifiedWorkerCache = (workerUrl = 'https://worker.example.test') => {
+const seedVerifiedWorkerCache = (workerUrl = 'https://worker.example.test', overrides = {}) => {
+  const draft = {
+    corsWorkerUrl: workerUrl,
+    ...(overrides.draft || {}),
+  };
   localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
-    draft: {
-      corsWorkerUrl: workerUrl,
-    },
+    ...overrides,
+    draft,
     deployComplete: true,
     deployWorkerUrl: workerUrl,
   }));
@@ -286,6 +289,37 @@ describe('SessionWizard publish boundary rendering', () => {
       sessionFields: expect.any(Object),
     }));
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_METADATA_URI)).toHaveTextContent(`ar://${uploadedTxId}`);
+  });
+
+  it('blocks cached secret field gates before metadata upload', async () => {
+    const { arweaveScripts } = require('../../utilities/arweave/arweaveScripts.js');
+    seedVerifiedWorkerCache('https://worker.example.test', {
+      encryptedFieldGates: {
+        'arweave.jwk': 'gate-1',
+      },
+    });
+
+    renderLoggedInSessionWizard();
+    enableAdvancedMode();
+
+    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
+      target: { value: 'Secret Gate Boundary Session' },
+    });
+
+    const publishButton = await openPublishSection();
+    await waitFor(() => {
+      expect(publishButton).not.toBeDisabled();
+    });
+
+    fireEvent.click(publishButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(
+        'Worker secret fields cannot be locked in public metadata: arweave.jwk. Store secrets in the Worker panel instead.'
+      )).toBeInTheDocument();
+    });
+    expect(arweaveScripts.uploadDataToArweave).not.toHaveBeenCalled();
+    expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
   });
 
   it('resets progress and keeps publish retryable after metadata upload failure', async () => {
