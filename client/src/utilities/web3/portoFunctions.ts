@@ -865,7 +865,7 @@ export async function sendPortoTransaction(txRequest: AnyObj): Promise<any> {
     });
     return out;
   };
-  const classifyRecoverableSendError = (error: any): {
+  const classifyRecoverableSendError = (error: unknown): {
     replacementUnderpriced: boolean;
     nonceTooLow: boolean;
     alreadyKnown: boolean;
