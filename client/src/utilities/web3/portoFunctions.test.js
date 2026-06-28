@@ -333,6 +333,51 @@ describe('sendPortoTransaction nonce retry behavior', () => {
     expect(gasPriceReads).toBe(2);
   });
 
+  it('preserves caller gasPrice when it is higher than eth_gasPrice', async () => {
+    const { porto, requestMock, sendTransactionMock } = loadPortoHarness();
+    seedLegacyPortoSession();
+    await porto.restoreSession();
+
+    const txHash = await porto.sendPortoTransaction({
+      to: TARGET_ADDRESS,
+      value: '0x0',
+      data: '0x',
+      gasPrice: { _hex: '0x96', toString: () => '150' },
+    });
+
+    expect(txHash).toBe('0xhash');
+    expect(sendTransactionMock).toHaveBeenCalledTimes(1);
+    expect(sendTransactionMock.mock.calls[0][0].gasPrice).toBe(150n);
+    expect(
+      requestMock.mock.calls.filter(([req]) => req?.method === 'eth_gasPrice')
+    ).toHaveLength(1);
+  });
+
+  it('sends caller EIP-1559 fee fields without legacy gasPrice', async () => {
+    const { porto, requestMock, sendTransactionMock } = loadPortoHarness();
+    seedLegacyPortoSession();
+    await porto.restoreSession();
+
+    const txHash = await porto.sendPortoTransaction({
+      to: TARGET_ADDRESS,
+      value: '0x0',
+      data: '0x',
+      maxFeePerGas: '0x96',
+      maxPriorityFeePerGas: { toBigInt: () => 10n },
+      gasPrice: '0x64',
+    });
+
+    expect(txHash).toBe('0xhash');
+    expect(sendTransactionMock).toHaveBeenCalledTimes(1);
+    const sentPayload = sendTransactionMock.mock.calls[0][0];
+    expect(sentPayload.maxFeePerGas).toBe(150n);
+    expect(sentPayload.maxPriorityFeePerGas).toBe(10n);
+    expect(Object.prototype.hasOwnProperty.call(sentPayload, 'gasPrice')).toBe(false);
+    expect(
+      requestMock.mock.calls.filter(([req]) => req?.method === 'eth_gasPrice')
+    ).toHaveLength(0);
+  });
+
   it('uses selector-aware high fallback gas for addSurvey when estimateGas fails', async () => {
     const { porto, sendTransactionMock } = loadPortoHarness({
       estimateGasImpl: async () => {
