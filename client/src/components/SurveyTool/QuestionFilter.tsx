@@ -31,7 +31,7 @@ import {
   faQuestionCircle,
   faPlus
 } from '@fortawesome/free-solid-svg-icons';
-import { serializeFilterState, deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
+import { serializeFilterState, deserializeFilterStateStrict } from '../../utilities/survey/filterStateUtils.js';
 import { isFreeformBlankAnswer } from '../../utilities/survey/freeformAnswerUtils.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 
@@ -1544,6 +1544,11 @@ class QuestionFilter extends React.Component<any, any> {
 
   syncExternalFilterState(nextFilterState: unknown): void {
     if (!nextFilterState || typeof nextFilterState !== 'object') {
+      this.invalidatePendingAiApply();
+      this.setState(this.getDefaultFilterStatePatch(), () => {
+        this.handleApplyFilters(true);
+        this.checkIfCurrentFilterIsBookmarked();
+      });
       return;
     }
     const filterState = nextFilterState as UnknownRecord;
@@ -2634,7 +2639,7 @@ class QuestionFilter extends React.Component<any, any> {
     }
 
     try {
-      const deserializedState = deserializeFilterState(filterString) as unknown as UnknownRecord;
+      const deserializedState = deserializeFilterStateStrict(filterString) as unknown as UnknownRecord;
       if (!deserializedState) {
         throw new Error("Invalid filter string.");
       }

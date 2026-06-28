@@ -250,3 +250,30 @@ export function deserializeFilterState(base64UrlString: string | null | undefine
     return newDefaultStateInstance;
   }
 }
+
+export function deserializeFilterStateStrict(base64UrlString: string | null | undefined): SurveyFilterState {
+  if (base64UrlString === null || base64UrlString === undefined || base64UrlString.trim() === '') {
+    throw new Error('Filter state string is empty.');
+  }
+
+  let base64String = base64UrlString
+    .replace(/-/g, '+')
+    .replace(/_/g, '/');
+  const paddingLength = base64String.length % 4;
+  if (paddingLength === 1) {
+    throw new Error('Filter state string is malformed.');
+  }
+  if (paddingLength === 2) {
+    base64String += '==';
+  } else if (paddingLength === 3) {
+    base64String += '=';
+  }
+
+  const jsonString = decodeURIComponent(escape(window.atob(base64String)));
+  const parsedValue: unknown = JSON.parse(jsonString);
+  if (!isRecord(parsedValue)) {
+    throw new Error('Filter state must decode to an object.');
+  }
+
+  return deserializeFilterState(base64UrlString);
+}
