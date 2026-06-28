@@ -422,15 +422,11 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
   const waitTimerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
   const [surveyTitle, setSurveyTitle] = useState('');
   const [statementsToUpload, setStatementsToUpload] = useState<GeneratedSurveyStatement[]>([]);
-  const [prefilledAnswers, setPrefilledAnswers] = useState<unknown[]>([]);
   const [showCreateSurvey, setShowCreateSurvey] = useState(false);
   const [documentURLs, setDocumentURLs] = useState<string[]>([]);
 
   // AUDIO summary-first flow state
   const [summaryMd, setSummaryMd] = useState('');
-  const [summaryCollapsed, setSummaryCollapsed] = useState(true);
-  const [summaryArweaveTxId, setSummaryArweaveTxId] = useState('');
-  const [summaryDocURL, setSummaryDocURL] = useState('');
 
   const [showSessionSelector, setShowSessionSelector] = useState(false);
   const [localSessionOverrideSlug, setLocalSessionOverrideSlug] = useState<string | null>(null);
@@ -704,7 +700,6 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
       if (!newVal) {
         setAudioFile(null);
         setSummaryMd('');
-        setSummaryCollapsed(true);
       }
       return newVal;
     });
@@ -747,125 +742,6 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
       });
     }
     return parsed;
-  }
-
-  async function handleUploadSummaryAndCreateQuestions() {
-    try {
-      if (!loginComplete) {
-        toggleLoginModal!(true);
-        return;
-      }
-      if (!summaryMd) {
-        throw new Error('No summary available. Please generate it first.');
-      }
-
-      setError('');
-      setShowCreateSurvey(false);
-      setStatementsToUpload([]);
-      setActiveAction('generate');
-      setLoading(true);
-      setWaitingSeconds(0);
-
-      let txId = '';
-      let url = '';
-
-      if (uploadSummaryToArweave) {
-        const arweaveKey = await getEffectiveArweaveKey({
-          sessionSlug: resolvedSessionSlug || '',
-          sessionConfig: resolvedSessionConfig,
-          context: { account, providerLike: provider as ResourceKeyProviderLike, chainId: network?.id },
-        });
-        if (encryptSummary) {
-          const litHooks = getActiveLitHooks();
-          if (!litHooks || typeof litHooks.saveKey !== 'function') {
-            throw new Error('Lit hooks not initialized; connect a wallet to encrypt the summary.');
-          }
-          const gateChainId = summaryGate?.chainId || network?.id;
-          const litChain = resolveLitChain({
-            chainId: gateChainId,
-            litChain: summaryGate?.litChain || summaryGate?.chain,
-          });
-          const unsupportedGateError = sessionHasLitChipotle
-            ? ''
-            : getUnsupportedLitContractAccessControlError({
-              chainId: gateChainId,
-              litChain,
-            });
-          if (unsupportedGateError) {
-            throw new Error(unsupportedGateError);
-          }
-          const selectedAddresses = (summaryGateSBTs || []).map((sbt) => sbt.address).filter(Boolean) as string[];
-          const sbtAddresses = selectedAddresses.length ? selectedAddresses : summaryGateAddresses;
-          const gateMode = summaryGateMode || summaryGateModeDefault || 'any';
-          const accessControlConditions = buildSbtAccessControlConditions({
-            sbtAddresses,
-            chainId: gateChainId,
-            litChain,
-            mode: gateMode,
-          });
-          if (!accessControlConditions) {
-            throw new Error('Select at least one SBT to encrypt the summary.');
-          }
-
-          const result = await litStorage.uploadEncryptedArweaveData({
-            data: summaryMd,
-            format: 'md',
-            mime: 'text/markdown',
-            name: 'summary.md',
-            arweaveJwk: arweaveKey?.arweaveJwk || '',
-            providerLike: provider,
-            account,
-            chainId: gateChainId || null,
-            contextLabel: `summary:${resolvedSessionSlug || ''}`,
-            lit: {
-              saveKey: litHooks.saveKey,
-              accessControlConditions,
-              chain: litChain,
-              ...(litHooks.litNetwork ? { litNetwork: litHooks.litNetwork } : {}),
-              ...(litHooks.connectTimeout ? { connectTimeout: litHooks.connectTimeout } : {}),
-              ...(litHooks.providerLike ? { providerLike: litHooks.providerLike } : {}),
-              ...(litHooks.resourceAbilityRequests ? { resourceAbilityRequests: litHooks.resourceAbilityRequests } : {}),
-            },
-          });
-          if (abortedRef.current) return;
-          txId = result?.txId || '';
-          url = result?.url || '';
-        } else {
-          const result = await uploadMarkdownSummaryToArweave(summaryMd, {
-            sessionSlug: resolvedSessionSlug || '',
-            sessionConfig: resolvedSessionConfig,
-            arweaveJwk: arweaveKey?.arweaveJwk || '',
-            context: { account, providerLike: provider, chainId: network?.id },
-          });
-          if (abortedRef.current) return;
-          txId = result?.txId || '';
-          url = result?.url || '';
-        }
-      }
-
-      setSummaryArweaveTxId(txId || '');
-      setSummaryDocURL(url || '');
-      setDocumentURLs(url ? [url] : []);
-
-      const aiData = await makeSingleAiCall(summaryMd, {
-        sourceTypeOverride: 'document',
-        multiSpeakerHintOverride: 'likely_multiple_speakers'
-      }, count);
-      if (abortedRef.current) return;
-
-      processAndSetQuestions(aiData, url ? [url] : []);
-      setShowCreateSurvey(true);
-    } catch (err: unknown) {
-      if (!abortedRef.current) {
-        setError(getSurveyGeneratorErrorMessage(err, 'Failed to upload summary or generate questions.'));
-      }
-    } finally {
-      if (!abortedRef.current) {
-        setLoading(false);
-        setActiveAction('');
-        setWaitingSeconds(0);
-      }
-    }
   }
 
   function processAndSetQuestions(
@@ -1416,9 +1292,6 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
              });
              if (abortedRef.current) return;
 
-             setSummaryArweaveTxId(txId || '');
-             setSummaryDocURL(url || '');
-
              if (url) {
                finalDocUrls.unshift(url);
              }
@@ -1469,7 +1342,6 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
           miniaturized={minified}
           preformedQuestions={statementsToUpload}
           preformedSurvey={preformedSurvey}
-          prefilledAnswers={prefilledAnswers}
           account={account}
           loginComplete={loginComplete}
           sessionConfig={resolvedSessionConfig}
@@ -1618,7 +1490,6 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
       setTranscriptMode(false);
       setAudioFile(null);
       setSummaryMd('');
-      setSummaryCollapsed(true);
     }
   }, [hasTranscriptModeInput, transcriptMode]);
 
