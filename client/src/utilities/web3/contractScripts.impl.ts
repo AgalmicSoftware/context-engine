@@ -2175,13 +2175,15 @@ const contractScripts: any = {
   toCustomBlock: any = 'latest',
   onChunkProgress: any = null,
   onPartialData: any = null,
-  groupKeyOrCfg: any
+  groupKeyOrCfg: any,
+  opts: any = {}
 ) {
   let resolvedFromBlockNum;
   let resolvedToBlockNum;
 
   try {
     const cfg    = resolveSession(groupKeyOrCfg || '');
+    const forceArweaveFetch = !!(opts && opts.forceArweaveFetch === true);
     const gAddrs = getSessionAddresses(cfg);
     const addr   = (gAddrs.surveys?.address);
     const chId   = (gAddrs.surveys?.chainId) || (cfg?.networkChainId) || undefined;
@@ -2272,6 +2274,7 @@ const contractScripts: any = {
         try {
           respData = await this.getResponse(providerName, responder, qId, groupKeyOrCfg, {
             _resolvedCfg: cfg,
+            forceArweaveFetch,
           });
         } catch (e: any) {
           contractsLog.warn('[getQuestionResponsesFullRange] individual response read failed; skipping', { responder, qId, error: e?.message });
