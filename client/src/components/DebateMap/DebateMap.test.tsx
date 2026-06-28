@@ -247,6 +247,18 @@ const getAtlasModalContent = (headingName: string | RegExp): HTMLElement => {
   return modalContent as HTMLElement;
 };
 
+const getAtlasModalNetVoteScore = (modalContent: HTMLElement): number => {
+  const score = modalContent.querySelector('[class*="netScoreValue"]');
+  if (!score) throw new Error('Expected atlas modal net vote score.');
+  return Number(score.textContent);
+};
+
+const getAtlasModalConfirmVoteButton = (modalContent: HTMLElement): HTMLElement => {
+  const confirmButton = modalContent.querySelector('[class*="confirmBtn"]');
+  if (!confirmButton) throw new Error('Expected atlas modal vote confirmation button.');
+  return confirmButton as HTMLElement;
+};
+
 const openHistoricalCaseBrief = async (nodeId: string) => {
   renderDemoAtlasNode(nodeId);
   fireEvent.click(await screen.findByRole('button', { name: /Historical Cases/i }));
@@ -905,6 +917,34 @@ describe('DebateMap', () => {
     expect(screen.getByRole('heading', { name: 'For' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Historical Cases/i })).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByRole('button', { name: 'View full brief' })).not.toBeInTheDocument();
+  });
+
+  it('preserves local atlas votes across demo-mode tree rebuilds', async () => {
+    renderDemoAtlasNode(liabilityFrameworksNodeId);
+
+    expect(await screen.findByRole('heading', { name: 'Liability Frameworks' })).toBeInTheDocument();
+    const modal = getAtlasModalContent('Liability Frameworks');
+    const initialScore = getAtlasModalNetVoteScore(modal);
+
+    fireEvent.click(within(modal).getByTitle('Cast Upvotes'));
+    fireEvent.change(within(modal).getByRole('spinbutton'), { target: { value: '3' } });
+    fireEvent.click(getAtlasModalConfirmVoteButton(modal));
+
+    await waitFor(() => {
+      expect(getAtlasModalNetVoteScore(getAtlasModalContent('Liability Frameworks'))).toBe(initialScore + 3);
+    });
+
+    const demoModeCheckbox = screen.getByLabelText(/Demo Mode/i);
+    fireEvent.click(demoModeCheckbox);
+    await waitFor(() => {
+      expect(demoModeCheckbox).not.toBeChecked();
+    });
+
+    fireEvent.click(demoModeCheckbox);
+    await waitFor(() => {
+      expect(demoModeCheckbox).toBeChecked();
+      expect(getAtlasModalNetVoteScore(getAtlasModalContent('Liability Frameworks'))).toBe(initialScore + 3);
+    });
   });
 
   it('renders enriched Loophole historical cases inside relevant atlas nodes in demo mode', async () => {
