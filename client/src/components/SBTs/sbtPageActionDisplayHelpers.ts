@@ -507,6 +507,11 @@ const isSbtPageActionRecord = (value: unknown): value is Record<string, unknown>
   !!value && typeof value === 'object' && !Array.isArray(value)
 );
 
+const coerceSbtPageBurnAuth = (burnAuth: unknown): number => {
+  const burnAuthNumber = Number(burnAuth);
+  return Number.isFinite(burnAuthNumber) ? burnAuthNumber : Number.NaN;
+};
+
 export const resolveSbtPageMintEndDisplayState = ({
   nowMs = Date.now(),
   sbtInfo = null,
@@ -769,7 +774,7 @@ export const resolveSbtPageMiniBurnPermission = ({
   const userAddressLower = account ? String(account).toLowerCase() : null;
   const adminAddr = info.admin || info.admin_;
   const adminAddrLower = adminAddr ? String(adminAddr).toLowerCase() : '';
-  const burnAuth = info.burnAuth;
+  const burnAuth = coerceSbtPageBurnAuth(info.burnAuth);
   const canOwnerBurn = (
     burnAuth === 1 ||
     burnAuth === 2 ||
@@ -791,11 +796,11 @@ export const resolveSbtPageBurnButtonState = ({
   const info = isSbtPageActionRecord(sbtInfo) ? sbtInfo : {};
   const userAddressLower = account ? String(account).toLowerCase() : null;
   const adminAddr = String(info.admin || info.admin_ || '');
+  const burnAuth = coerceSbtPageBurnAuth(info.burnAuth);
   const canOwnerBurn = !!userHasSBT && (
-    info.burnAuth === 1 ||
-    info.burnAuth === 2 ||
-    (info.burnAuth === 0 && !!adminAddr && adminAddr.toLowerCase() === userAddressLower) ||
-    (info.burnAuth === 1 && !!userHasSBT)
+    burnAuth === 1 ||
+    burnAuth === 2 ||
+    (burnAuth === 0 && !!adminAddr && adminAddr.toLowerCase() === userAddressLower)
   );
   return {
     canOwnerBurn,
@@ -1478,7 +1483,7 @@ export const resolveSbtPageMintActionPlan = ({
     };
   }
   const mintingEndTime = (sbtInfo as { mintingEndTime?: unknown })?.mintingEndTime;
-  if (mintingEndTime !== 0 && Number(mintingEndTime) < Number(nowSeconds || 0)) {
+  if (mintingEndTime !== 0 && Number(mintingEndTime) <= Number(nowSeconds || 0)) {
     return {
       blockedReason: 'mint-ended',
       shouldRenderMintButton: false,
@@ -1511,12 +1516,13 @@ export const resolveSbtPageAdminActionState = ({
 }: ResolveSbtPageAdminActionStateArgs = {}): SbtPageAdminActionState => {
   const info = isSbtPageActionRecord(sbtInfo) ? sbtInfo : {};
   const adminAddr = String(info.admin || info.admin_ || '');
+  const burnAuth = coerceSbtPageBurnAuth(info.burnAuth);
   const hasPasswordMint = !!info.hasPasswordMint;
   const showPasswordGen = hasPasswordMint && info.maxTokens === '0';
   const showNoMoreInvites = hasPasswordMint && info.maxTokens !== '0';
   return {
     canAdminBurn: (
-      (info.burnAuth === 0 || info.burnAuth === 2) &&
+      (burnAuth === 0 || burnAuth === 2) &&
       adminAddr.toLowerCase() === String(account || '').toLowerCase()
     ),
     hasPasswordMint,

@@ -53,7 +53,10 @@ import {
 import { hasUsableSessionWorkerConfig } from '../../utilities/session/sessionWorkerAvailability.js';
 import { hasCachedCreateSbtForm } from '../../utilities/sbt/sbtCreateFormCache.js';
 import { getSbtDescriptionText, getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
-import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
+import {
+  readPublicUrlBasePath,
+  stripPublicUrlBasePath,
+} from '../../utilities/ui/publicUrl.js';
 import {
   bindSbtListRuntimePorts,
 } from './sbtListRuntimePorts';
@@ -349,7 +352,7 @@ const SBTsList = ({
     if (allSessionsModeProp) return true;
     try {
       const path = (typeof window !== 'undefined' && window.location && window.location.pathname) ? window.location.pathname : '';
-      const parts = path.split('/').filter(Boolean);
+      const parts = stripPublicUrlBasePath(path).split('/').filter(Boolean);
       return (parts[0] === 'sbts' || parts[0] === 'groups') && parts.length === 1;
     } catch (_) { return false; }
   }, [allSessionsModeProp]);

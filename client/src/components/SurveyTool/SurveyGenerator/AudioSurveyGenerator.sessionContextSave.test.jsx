@@ -238,6 +238,74 @@ describe('AudioSurveyGenerator session context saves', () => {
     expect(onQuestionsGenerated.mock.calls[0][1][0].startsWith('/session/0xSessionToken/docs?')).toBe(true);
   });
 
+  it('stops queued doc-library uploads after unmount aborts generation', async () => {
+    let resolveFirstUpload;
+    const onQuestionsGenerated = jest.fn();
+    const firstFile = new File(['first-source-content'], 'first-notes.txt', { type: 'text/plain' });
+    const secondFile = new File(['second-source-content'], 'second-notes.txt', { type: 'text/plain' });
+
+    mockUploadDocLibraryFile.mockImplementationOnce(() => new Promise((resolve) => {
+      resolveFirstUpload = resolve;
+    }));
+    mockCallAI.mockResolvedValue(JSON.stringify({
+      surveyTitle: 'Aborted Save Survey',
+      questions: [
+        {
+          prompt: 'Should aborted uploads stop?',
+          questionType: 'binary',
+          tags: ['docs'],
+        },
+      ],
+    }));
+
+    await renderSubject(
+      <AudioSurveyGenerator
+        provider={{ request: jest.fn() }}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        activeSessionSlug="edge"
+        sessionConfig={makeSessionConfig({
+          sessionId: '0xSessionToken',
+          sessionIdHex: `0x${'5'.repeat(32)}`,
+        })}
+        onQuestionsGenerated={onQuestionsGenerated}
+      />
+    );
+
+    setAudioInputValue('This primary context is long enough to generate questions after source uploads finish.');
+    addAdditionalFile(firstFile);
+    addAdditionalFile(secondFile);
+    toggleCheckbox(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}"]`));
+
+    await act(async () => {
+      container.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    expect(mockUploadDocLibraryFile).toHaveBeenCalledTimes(1);
+    expect(mockUploadDocLibraryFile.mock.calls[0][0].file).toBe(firstFile);
+
+    await renderSubject(null);
+
+    await act(async () => {
+      resolveFirstUpload({
+        txId: 'E'.repeat(43),
+        url: `https://example.com/${'E'.repeat(43)}`,
+        storage: 'lit-arweave',
+        kind: 'file',
+        tagMap: {},
+        data: { size: null, type: 'application/json' },
+      });
+      await Promise.resolve();
+    });
+
+    expect(mockUploadDocLibraryFile).toHaveBeenCalledTimes(1);
+    expect(mockProcessAdditionalSources).not.toHaveBeenCalled();
+    expect(mockCallAI).not.toHaveBeenCalled();
+    expect(onQuestionsGenerated).not.toHaveBeenCalled();
+  });
+
   it('keeps photo analysis ephemeral when doc-library saving is disabled', async () => {
     mockAnalyzePhotoForQuestionGeneration.mockResolvedValueOnce({
       text: 'This document photo summarizes a draft charter with enough detail to drive question generation without additional text input.',

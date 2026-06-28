@@ -8,6 +8,7 @@
 
 import store from '../../store';
 import { createLogger } from '../logging.js';
+import { stripPublicUrlBasePath } from '../ui/publicUrl.js';
 import { normalizeSessionSlug } from '../web3/sessionConfigResolvers.js';
 import {
   isSessionSlugAllowedByScope,
@@ -52,7 +53,7 @@ export const readActiveSessionSlugForScope = () => {
   }
   try {
     if (typeof window !== 'undefined') {
-      const path = String(window.location?.pathname || '').trim();
+      const path = stripPublicUrlBasePath(String(window.location?.pathname || '').trim());
       const parts = path.split('/').filter(Boolean);
       if (parts[0] === 'session' && parts[1] && String(parts[1]).toLowerCase() !== 'new') {
         const fromPath = normalizeSessionSlug(parts[1]);

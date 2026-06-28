@@ -595,6 +595,7 @@ class SBTPage extends Component<any, any> {
           this.setState(buildSbtPageNetworkUpdatePatch({ resetMintUiState, network }), () => {
             if (this._isMounted) {
               this.loadSBTInfo();
+              this.restartMintingEndCountdown();
               this.checkForMintPassword();
             }
           });
@@ -603,6 +604,7 @@ class SBTPage extends Component<any, any> {
             this.setState(resetMintUiState);
           }
           this.loadSBTInfo();
+          this.restartMintingEndCountdown();
           this.checkForMintPassword();
         }
       }
@@ -622,14 +624,20 @@ class SBTPage extends Component<any, any> {
             ...(resetMintUiState || {}),
             ...buildSbtPageResolvedSessionSlugPatch({ slug: nextSessionSlug }),
           }, () => {
-            if (this._isMounted) this.loadSBTInfo();
+            if (this._isMounted) {
+              this.loadSBTInfo();
+              this.restartMintingEndCountdown();
+            }
           });
         } else {
           this.loadSBTInfo();
         }
       } else if (this._isMounted) {
         if (resetMintUiState) this.setState(resetMintUiState);
-        if (this.state.resolvedSessionSlug == null) this.loadSBTInfo();
+        if (this.state.resolvedSessionSlug == null) {
+          this.loadSBTInfo();
+          this.restartMintingEndCountdown();
+        }
       }
       return;
     }
@@ -650,6 +658,7 @@ class SBTPage extends Component<any, any> {
           if (Object.keys(mergedPatch).length > 0) this.setState(mergedPatch);
         } catch (e) { sbtLog.warn('SBTPage: fallback', e); }
         this.loadSBTInfo();
+        this.restartMintingEndCountdown();
       }
       try {
         this.handleUrlAutoMintIntent().catch((e: unknown) => {
@@ -2921,6 +2930,20 @@ class SBTPage extends Component<any, any> {
 
 
 
+  clearMintingEndCountdown() {
+    const { intervalId } = this.state;
+    if (intervalId) {
+      clearInterval(intervalId);
+      if (this._isMounted) this.setState(buildSbtPageIntervalIdPatch({ intervalId: null }));
+    }
+  }
+
+  restartMintingEndCountdown() {
+    if (!this._isMounted) return;
+    this.clearMintingEndCountdown();
+    this.startMintingEndCountdown();
+  }
+
   startMintingEndCountdown() {
     const pollingIntervalMs = Math.max(1000, this.getActiveBlockTimeMs(1));
     const intervalId = setInterval(() => {
@@ -2937,7 +2960,12 @@ class SBTPage extends Component<any, any> {
 
         if (distance <= 0) {
           clearInterval(intervalId);
-          if (this._isMounted) this.setState(buildSbtPageMintCountdownPatch());
+          if (this._isMounted && this.state.intervalId === intervalId) {
+            this.setState({
+              ...buildSbtPageMintCountdownPatch(),
+              ...buildSbtPageIntervalIdPatch({ intervalId: null }),
+            });
+          }
         } else {
           const days = Math.floor(distance / (1000 * 60 * 60 * 24));
           const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
@@ -3274,7 +3302,7 @@ class SBTPage extends Component<any, any> {
 
       if (!sbtAddressOriginalCase) return;
 
-      const tokenIdToBurn = await contractScriptsUntyped.getSBTTokenIdByOwner(this.props.provider, sbtAddressOriginalCase, this.props.account, this.getEffectiveSessionSlug());
+      const tokenIdToBurn = await contractScriptsUntyped.getSBTTokenIdByOwner('none', sbtAddressOriginalCase, this.props.account, this.getEffectiveSessionSlug());
       if (!tokenIdToBurn) {
         if (this._isMounted) this.setState(buildSbtPageBurnFailurePatch({ error: "No valid token ID found" }));
         return;
@@ -3329,7 +3357,7 @@ class SBTPage extends Component<any, any> {
       // Full address search
       if (input.startsWith('0x') && input.length === 42) {
         const tokenId = await contractScriptsUntyped.getSBTTokenIdByOwner(
-          this.props.provider,
+          'none',
           sbtAddressOriginalCase,
           input,
           this.getEffectiveSessionSlug()
@@ -3345,7 +3373,7 @@ class SBTPage extends Component<any, any> {
       // Numeric tokenId search
       else if (/^\d+$/.test(input)) {
         const address = await contractScriptsUntyped.getOwnerByTokenId(
-          this.props.provider,
+          'none',
           sbtAddressOriginalCase,
           input,
           this.getEffectiveSessionSlug()
@@ -3381,13 +3409,14 @@ class SBTPage extends Component<any, any> {
 
     const userAddress = this.props.account.toLowerCase();
     const adminAddr = String(sbtInfoRecord.admin || sbtInfoRecord.admin_ || '');
-    const isAdminBurn = this.state.userIsSbtAdmin && (sbtInfoRecord.burnAuth === 0 || sbtInfoRecord.burnAuth === 2);
+    const burnAuthNumber = Number(sbtInfoRecord.burnAuth);
+    const burnAuth = Number.isFinite(burnAuthNumber) ? burnAuthNumber : Number.NaN;
+    const isAdminBurn = this.state.userIsSbtAdmin && (burnAuth === 0 || burnAuth === 2);
     const isOwnerBurn = this.state.userHasSBT &&
       (
-        sbtInfoRecord.burnAuth === 1 ||
-        sbtInfoRecord.burnAuth === 2 ||
-        (sbtInfoRecord.burnAuth === 0 && adminAddr && adminAddr.toLowerCase() === userAddress) ||
-        (sbtInfoRecord.burnAuth === 1 && this.state.userHasSBT)
+        burnAuth === 1 ||
+        burnAuth === 2 ||
+        (burnAuth === 0 && adminAddr && adminAddr.toLowerCase() === userAddress)
       );
 
     let tokenIdToBurn: unknown;
@@ -3397,13 +3426,13 @@ class SBTPage extends Component<any, any> {
       tokenIdToBurn = burnSearchResultRecord.tokenId;
       burnedAddrLower = burnSearchResultRecord.address ? String(burnSearchResultRecord.address).toLowerCase() : null;
     } else if (isOwnerBurn) {
-      tokenIdToBurn = await contractScriptsUntyped.getSBTTokenIdByOwner(this.props.provider, sbtAddressOriginalCase, this.props.account, this.getEffectiveSessionSlug());
+      tokenIdToBurn = await contractScriptsUntyped.getSBTTokenIdByOwner('none', sbtAddressOriginalCase, this.props.account, this.getEffectiveSessionSlug());
       burnedAddrLower = userAddress;
       if (!tokenIdToBurn) {
         if (this._isMounted) this.setState(buildSbtPageBurnFailurePatch({ error: "No valid token ID found" }));
         return;
       }
-    } else if (this.state.userIsSbtAdmin && (sbtInfoRecord.burnAuth === 0 || sbtInfoRecord.burnAuth === 2) && !burnSearchResult) {
+    } else if (this.state.userIsSbtAdmin && (burnAuth === 0 || burnAuth === 2) && !burnSearchResult) {
       if (this._isMounted) this.setState(buildSbtPageBurnFailurePatch({ error: "Admin burn requires specifying token ID or owner." }));
       return;
     } else {
@@ -3456,13 +3485,18 @@ class SBTPage extends Component<any, any> {
   };
 
 
-  copyToClipboard = (text: unknown, addressType: unknown): void => {
-    navigator.clipboard.writeText(String(text ?? '')).then(() => {
+  copyToClipboard = async (text: unknown, addressType: unknown): Promise<void> => {
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('Clipboard write is unavailable');
+      await navigator.clipboard.writeText(String(text ?? ''));
       notify.success('Copied to clipboard');
       if (this._isMounted) this.setState(buildSbtPageCopiedAddressPatch({ addressType }), () => {
         setTimeout(() => { if (this._isMounted) this.setState(buildSbtPageCopiedAddressPatch()) }, 2500);
       });
-    });
+    } catch (error: unknown) {
+      sbtLog.warn('SBTPage clipboard write failed', error);
+      notify.warn('Copy failed');
+    }
   };
 
   bookmarkSBT = (): void => {
@@ -3472,9 +3506,8 @@ class SBTPage extends Component<any, any> {
     const bookmarksSlug = String(
       this.state?.resolvedSessionSlug ??
       this.props?.activeSessionSlug ??
-      this.props?.activeSessionSlug ??
       this.props?.sessionSlug ??
-      this.props?.sessionSlug ??
+      this.props?.slug ??
       ''
     );
 
@@ -3858,19 +3891,22 @@ class SBTPage extends Component<any, any> {
     });
   };
 
-  copyErrorToClipboard = (): void => {
+  copyErrorToClipboard = async (): Promise<void> => {
     const raw = resolveSbtPageCopyableErrorText(this.state.error);
     if (!raw) return;
     try {
-      navigator.clipboard.writeText(raw).then(() => {
-        notify.success('Copied to clipboard');
-        if (this._isMounted) {
-          this.setState(buildSbtPageCopiedErrorPatch({ copied: true }), () => {
-            setTimeout(() => { if (this._isMounted) this.setState(buildSbtPageCopiedErrorPatch()); }, 2000);
-          });
-        }
-      });
-    } catch (e) { void e; notify.warn('Copy failed'); }
+      if (!navigator.clipboard?.writeText) throw new Error('Clipboard write is unavailable');
+      await navigator.clipboard.writeText(raw);
+      notify.success('Copied to clipboard');
+      if (this._isMounted) {
+        this.setState(buildSbtPageCopiedErrorPatch({ copied: true }), () => {
+          setTimeout(() => { if (this._isMounted) this.setState(buildSbtPageCopiedErrorPatch()); }, 2000);
+        });
+      }
+    } catch (error: unknown) {
+      sbtLog.warn('SBTPage error clipboard write failed', error);
+      notify.warn('Copy failed');
+    }
   };
 
 

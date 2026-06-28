@@ -329,6 +329,45 @@ describe('QuestionFilter session resolution', () => {
     expect(configSpy).toHaveBeenCalledWith('missing-session-slug');
     expect(configSpy).not.toHaveBeenCalledWith('');
   });
+
+  it('passes resolved session warm-start props into the SBT filter section', () => {
+    const sessionConfig = { slug: 'edge', networkChainId: 84532 };
+    const ensureLightSbtUniverse = jest.fn();
+    const instance = new QuestionFilter({
+      activeSessionSlug: 'edge',
+      sessionSlug: 'alpha',
+      sessionConfig,
+      ensureLightSbtUniverse,
+      questions: [],
+      questionResponses: {},
+      network: { id: 84532 },
+      filterModalOpen: true,
+      isQuestionCacheReady: true,
+      isSurveyCacheReady: true,
+      isSBTCacheReady: true,
+    });
+
+    instance.buildFilterPipelineResult = jest.fn(() => ({
+      finalQuestions: [],
+      count: 0,
+    }));
+    instance.getAllTagsWithCounts = jest.fn(() => []);
+    instance.getAiAccessState = jest.fn(() => ({
+      enabled: false,
+      localKeyAvailable: false,
+    }));
+
+    const tree = instance.render();
+    const sbtFilterNode = findElement(
+      tree,
+      (element) => element?.props?.mode === 'creator' && element?.props?.autoExpand === true
+    );
+
+    expect(sbtFilterNode).toBeTruthy();
+    expect(sbtFilterNode?.props.sessionSlug).toBe('edge');
+    expect(sbtFilterNode?.props.sessionConfig).toBe(sessionConfig);
+    expect(sbtFilterNode?.props.ensureLightSbtUniverse).toBe(ensureLightSbtUniverse);
+  });
 });
 
 describe('QuestionFilter encrypted count gate tooltip integration', () => {
@@ -422,6 +461,41 @@ describe('QuestionFilter encrypted count gate tooltip integration', () => {
 
     expect(respondedItem).toBeTruthy();
     expect(responseStatusHeader).not.toBeNull();
+  });
+
+  it('hides response-status summary chips while AI override owns the results', () => {
+    const instance = new QuestionFilter({
+      questions: [{ id: 'q1', prompt: 'Q1', type: 'freeform' }],
+      questionResponses: {},
+      network: { id: 84532 },
+      resultsMode: true,
+      filterModalOpen: true,
+      isQuestionCacheReady: true,
+      isSBTCacheReady: true,
+      account: '0xabc',
+    });
+
+    instance.state = {
+      ...instance.state,
+      aiAppliedTopN: 5,
+      aiCombineWithOtherFilters: false,
+      aiFilterApplied: true,
+      aiSearchQuery: 'priority topics',
+      filterByResponded: true,
+      filteredQuestionsCount: 1,
+    };
+
+    let summaryItems = instance.getFilterSummaryItems();
+    expect(summaryItems.find((item: any) => item.type === 'ai')).toBeTruthy();
+    expect(summaryItems.find((item: any) => item.label === 'Responded')).toBeUndefined();
+
+    instance.state = {
+      ...instance.state,
+      aiCombineWithOtherFilters: true,
+    };
+
+    summaryItems = instance.getFilterSummaryItems();
+    expect(summaryItems.find((item: any) => item.label === 'Responded')).toBeTruthy();
   });
 
   it('shows visible group-loading status while SBT cache is still hydrating', () => {

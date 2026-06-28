@@ -112,6 +112,39 @@ describe('SBTFilter performance guards', () => {
     expect(setFilterLoading).toHaveBeenLastCalledWith(false);
   });
 
+  it('does not enter loading state while caches are not ready', async () => {
+    const setFilterLoading = jest.fn();
+    const subject = createSubject({
+      isSBTCacheReady: false,
+      mode: 'responder',
+      setFilterLoading,
+    });
+
+    await subject.runApplyFilter('unready-cache');
+
+    expect(setFilterLoading).not.toHaveBeenCalledWith(true);
+    expect(subject.state.loading).toBe(false);
+  });
+
+  it('does not enter loading state when the filter snapshot is unchanged', async () => {
+    const setFilterLoading = jest.fn();
+    const onFilter = jest.fn();
+    const subject = createSubject({
+      items: ['0xa'],
+      onFilter,
+      setFilterLoading,
+    });
+
+    await subject.runApplyFilter('initial');
+    expect(setFilterLoading).toHaveBeenCalledWith(true);
+
+    setFilterLoading.mockClear();
+    const result = await subject.runApplyFilter('unchanged');
+
+    expect(result).toBe(false);
+    expect(setFilterLoading).not.toHaveBeenCalledWith(true);
+  });
+
   it('accepts a network prop shaped with chainId when resolving filter network', async () => {
     cacheScripts.peekCacheSync.mockImplementation((namespace) => {
       if (namespace !== 'sbtCache') return {};

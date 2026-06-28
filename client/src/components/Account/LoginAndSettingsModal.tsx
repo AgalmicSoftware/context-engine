@@ -647,7 +647,6 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       }
       this.setStateIfMounted({
         sendingTestFunds: false,
-        autoSendTriggered: false,
         sentTxHash: txHash,
         testFundsStatusMessage: this.buildTestFundsSuccessMessage(result),
         testFundsStatusTone: 'success',
@@ -857,7 +856,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       accountLog.error("Error parsing wallet balance in auto-send check:", e);
     }
 
-    if (shouldTrigger && !this.state.sendingTestFunds) {
+    if (shouldTrigger && !this.state.sendingTestFunds && !this.state.autoSendTriggered) {
       this.autoSendTestFunds();
     }
 

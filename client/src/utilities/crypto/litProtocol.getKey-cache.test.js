@@ -60,6 +60,38 @@ describe('litProtocol getKey memoization', () => {
     expect(r2).toBe(cekB);
   });
 
+  it('starts the success-cache ttl after the uncached call settles', async () => {
+    const realNow = Date.now;
+    const cek = new Uint8Array(32).fill(9);
+    let t = 1000;
+    // eslint-disable-next-line no-global-assign
+    Date.now = () => t;
+    try {
+      const getKeyUncached = jest.fn(async () => {
+        t = 591000;
+        return cek;
+      });
+      const { getKey } = __test__wrapLitGetKeyWithCache(getKeyUncached, {
+        account: ADDR_A,
+        litNetwork: BASE_OPTS.litNetwork,
+        chain: BASE_OPTS.chain,
+        accessControlConditions: BASE_OPTS.accessControlConditions,
+      });
+
+      await expect(getKey({ ...BASE_OPTS, requesterAddress: ADDR_A })).resolves.toBe(cek);
+      expect(getKeyUncached).toHaveBeenCalledTimes(1);
+
+      // The old pre-await expiry would have been 601000. This should still hit because
+      // the cached value settled at 591000 and expires around 1191000.
+      t = 602000;
+      await expect(getKey({ ...BASE_OPTS, requesterAddress: ADDR_A })).resolves.toBe(cek);
+      expect(getKeyUncached).toHaveBeenCalledTimes(1);
+    } finally {
+      // eslint-disable-next-line no-global-assign
+      Date.now = realNow;
+    }
+  });
+
   it('negative-caches transient failures briefly to avoid hammering Lit', async () => {
     const realNow = Date.now;
     let t = 1000;
@@ -126,4 +158,3 @@ describe('litProtocol getKey memoization', () => {
     }
   });
 });
-

@@ -63,8 +63,15 @@ const createSubject = (props = {}) => new SBTsPage({
 });
 
 describe('SBTsPage auto-feature flag', () => {
+  const originalPublicUrl = process.env.PUBLIC_URL;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    if (typeof originalPublicUrl === 'undefined') {
+      delete process.env.PUBLIC_URL;
+    } else {
+      process.env.PUBLIC_URL = originalPublicUrl;
+    }
     window.sessionStorage.clear();
     window.history.replaceState({}, '', '/');
     getSessionLists.mockReturnValue({ featured_SBTs_LIST: [], ignored_SBTs_LIST: [] });
@@ -175,6 +182,32 @@ describe('SBTsPage auto-feature flag', () => {
       isCreateRoute: false,
     }));
     expect(replaceStateSpy).toHaveBeenCalledWith(null, '', `${sbtsListPath()}/rxc`);
+    replaceStateSpy.mockRestore();
+  });
+
+  it('recognizes and canonicalizes PUBLIC_URL-prefixed groups routes', () => {
+    const contractScripts = jest.requireMock('../../utilities/web3/contractScripts.js');
+    process.env.PUBLIC_URL = '/ce/';
+    contractScripts.getSessionConfigBySlug.mockImplementation((slug) => {
+      const normalized = String(slug || '');
+      if (normalized === '') return { slug: '' };
+      if (normalized === 'rxc') return { slug: 'rxc' };
+      return null;
+    });
+    contractScripts.getSessionConfigBySlugOrDefault.mockReturnValue({ slug: '' });
+    window.history.replaceState({}, '', '/ce/groups');
+    const replaceStateSpy = jest.spyOn(window.history, 'replaceState');
+
+    const subject = createSubject({ activeSessionSlug: 'rxc' });
+    const resolved = subject.getResolvedRouting();
+
+    expect(resolved).toEqual(expect.objectContaining({
+      canonicalSlug: 'rxc',
+      onSbtsRoute: true,
+      urlHasNoSlug: false,
+      isCreateRoute: false,
+    }));
+    expect(replaceStateSpy).toHaveBeenCalledWith(null, '', '/ce/groups/rxc');
     replaceStateSpy.mockRestore();
   });
 

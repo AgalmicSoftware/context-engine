@@ -549,7 +549,10 @@ describe('SurveyResults session resolution', () => {
             },
           },
           questionResponses: {
-            qDemo: { '0xdemo': { answer: { value: 'demo', encrypted: false } } },
+            qDemo: {
+              '0xdemo': { answer: { value: 'demo', encrypted: false }, sessionSlug: 'demo' },
+              '0xforeign': { answer: { value: 'foreign', encrypted: false }, sessionSlug: 'test-2' },
+            },
             qLeakedExplicit: { '0xalpha': { answer: { value: 'alpha', encrypted: false } } },
             qLeakedLegacy: { '0xlegacy': { answer: { value: 'legacy', encrypted: false } } },
           },
@@ -569,6 +572,7 @@ describe('SurveyResults session resolution', () => {
 
     expectPromptAbsent('Wrong session question');
     expectPromptAbsent('Legacy leaked question');
+    expect(screen.queryByText(/foreign/i)).not.toBeInTheDocument();
     expectQuestionResponseCounts(1, 1);
   });
 

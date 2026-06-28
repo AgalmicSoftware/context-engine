@@ -600,7 +600,7 @@ describe('AudioInput', () => {
     expect(updateSpy).toHaveBeenLastCalledWith('abc');
   });
 
-  it('does not re-emit waiting text during parent rerenders with new update callbacks', () => {
+  it('keeps AI waiting text out of parent updates during rerenders', () => {
     mockRequestAiRewrite.mockImplementation(() => new Promise(() => {}));
     let waitingTick: (() => void) | null = null;
     const setIntervalMock: typeof window.setInterval = (handler: TimerHandler) => {
@@ -624,6 +624,7 @@ describe('AudioInput', () => {
       );
     });
 
+    const textarea = requireElement(container.querySelector('textarea'));
     const rewriteButton = requireElement(container.querySelector('button[title="AI rewrite"]'));
 
     act(() => {
@@ -641,8 +642,8 @@ describe('AudioInput', () => {
       flushRafQueue();
     });
 
-    expect(updateFns[0]).toHaveBeenCalledTimes(1);
-    expect(updateFns[0]).toHaveBeenLastCalledWith('Waiting for AI... 1s');
+    expect((textarea as HTMLTextAreaElement).value).toBe('Waiting for AI... 1s');
+    expect(updateFns[0]).not.toHaveBeenCalled();
 
     act(() => {
       root.render(
@@ -674,7 +675,7 @@ describe('AudioInput', () => {
     expect(updateFns[1]).toHaveBeenCalledTimes(0);
     expect(updateFns[2]).toHaveBeenCalledTimes(0);
     expect(updateFns[3]).toHaveBeenCalledTimes(0);
-    expect(updateFns.reduce((count, fn) => count + fn.mock.calls.length, 0)).toBe(1);
+    expect(updateFns.reduce((count, fn) => count + fn.mock.calls.length, 0)).toBe(0);
   });
 
   it('cancels queued parent updates on unmount', () => {

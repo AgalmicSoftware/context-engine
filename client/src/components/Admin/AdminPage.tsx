@@ -81,6 +81,7 @@ import {
   parseAllowOriginsDraft,
 } from './adminPageDraftFormattingHelpers';
 import {
+  areAdminEncryptedEntriesEquivalent,
   buildAdminChainRegistryDisplay,
   buildSessionUrl,
   collectEncryptedEntries,
@@ -146,6 +147,14 @@ const log = createLogger('general');
 type AdminSecrets = Record<string, string>;
 type AdminSecretKeySet = Set<string>;
 type AdminOpenSecretCards = Record<string, boolean>;
+type AdminDecryptedFieldEntry = {
+  value?: unknown;
+  status?: string;
+  encryptedAvailable?: boolean;
+  envelope?: unknown;
+  [key: string]: unknown;
+};
+type AdminDecryptedFieldMap = Record<string, AdminDecryptedFieldEntry>;
 type AdminMetadataBlockLimitsDraft = {
   start: string;
   end: string;
@@ -273,6 +282,7 @@ const AdminPage = ({
   const rawMetadataCopyResetRef = useRef<any>(null);
   const prevSelectedSlugForDraftRef = useRef(selectedSlug);
   const prevSelectedSlugForAllowOriginsDraftRef = useRef(selectedSlug);
+  const encryptedFieldsSessionKeyRef = useRef('');
   const metadataDraftTouchedRef = useRef(metadataDraftTouched);
   metadataDraftTouchedRef.current = metadataDraftTouched;
 
@@ -581,6 +591,11 @@ const AdminPage = ({
       0
     ) || 0
   ), [selectedConfig, network?.id]);
+  const encryptedFieldsSessionKey = useMemo(() => ([
+    normalizeSlug(groupMetadata?.slug || selectedSlug),
+    toStr(groupMetadata?.sessionId || groupMetadata?.__registry?.sessionIdHex).trim(),
+    toStr(groupMetadata?.__registry?.registryChainId || groupMetadata?.__registry?.chainId || relevantRegistryChainId).trim(),
+  ].join('|')), [groupMetadata, selectedSlug, relevantRegistryChainId]);
   const relevantSessionChainLabel = useMemo(() => {
     if (!relevantSessionChainId) return '';
     const name = getChainName(relevantSessionChainId);
@@ -725,23 +740,42 @@ const AdminPage = ({
 
   useEffect(() => {
     const entries = collectEncryptedEntries(groupMetadata);
+    const previousSessionKey = encryptedFieldsSessionKeyRef.current;
+    encryptedFieldsSessionKeyRef.current = encryptedFieldsSessionKey;
     setEncryptedFields(entries);
     if (!Object.keys(entries).length) {
       setDecryptedFields({});
       return;
     }
     // Do not auto-decrypt in /admin; decrypting triggers wallet popups. Users can decrypt on demand.
-    const next: Record<string, any> = {};
-    Object.entries(entries).forEach(([key, envelope]: any) => {
-      next[key] = {
-        value: '',
-        status: walletReady ? 'locked' : 'wallet-required',
-        encryptedAvailable: true,
-        envelope,
-      };
+    const canPreserveUnlockedFields = walletReady && previousSessionKey === encryptedFieldsSessionKey;
+    setDecryptedFields((previous: AdminDecryptedFieldMap = {}) => {
+      const next: AdminDecryptedFieldMap = {};
+      Object.entries(entries).forEach(([key, envelope]) => {
+        const previousEntry = previous?.[key];
+        if (
+          canPreserveUnlockedFields &&
+          previousEntry &&
+          areAdminEncryptedEntriesEquivalent(previousEntry.envelope, envelope)
+        ) {
+          next[key] = {
+            ...previousEntry,
+            status: previousEntry.status === 'wallet-required' ? 'locked' : (previousEntry.status || 'locked'),
+            encryptedAvailable: true,
+            envelope,
+          };
+          return;
+        }
+        next[key] = {
+          value: '',
+          status: walletReady ? 'locked' : 'wallet-required',
+          encryptedAvailable: true,
+          envelope,
+        };
+      });
+      return next;
     });
-    setDecryptedFields(next);
-  }, [groupMetadata, walletReady]);
+  }, [encryptedFieldsSessionKey, groupMetadata, walletReady]);
 
   const [decryptFieldsBusy, setDecryptFieldsBusy] = useState(false);
   const handleDecryptEncryptedFields = useCallback(async () => {

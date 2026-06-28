@@ -24,6 +24,20 @@ export const ARWEAVE_TX_CACHE_MAX_ENTRIES = 1200;
 export const ARWEAVE_TX_FAILURE_CACHE_MAX_ENTRIES = 1200;
 export const HASH_MISS_SENTINEL = '__ce_hash_missing__';
 
+const pruneTimestampedRecord = (record, { tsField, maxEntries } = {}) => {
+  if (!record || typeof record !== 'object') return record;
+  const max = Math.max(0, Math.floor(Number(maxEntries) || 0));
+  const keys = Object.keys(record);
+  if (max <= 0 || keys.length <= max) return record;
+  const sorted = keys
+    .map((key) => ({ key, ts: Number(record?.[key]?.[tsField] || 0) }))
+    .sort((a, b) => a.ts - b.ts);
+  for (let i = 0; i < sorted.length - max; i += 1) {
+    try { delete record[sorted[i].key]; } catch (_) {}
+  }
+  return record;
+};
+
 const ARWEAVE_TX_FAILURE_MEMO = new Map();
 const ARWEAVE_TX_FETCH_INFLIGHT = new Map();
 const QUESTION_HASH_REVERT_LOGGED = new Set();
@@ -503,15 +517,10 @@ export const createContractScriptsCache = ({
       const cache = (current && typeof current === 'object') ? current : {};
       const net = ensureQuestionsNetworkNode(cache, netIdStr);
       net.arweaveTxFailureCache[normalizedTxId] = { ...normalizedEntry };
-      const keys = Object.keys(net.arweaveTxFailureCache || {});
-      if (keys.length > ARWEAVE_TX_FAILURE_CACHE_MAX_ENTRIES) {
-        const sorted = keys
-          .map((k) => ({ key: k, ts: Number(net.arweaveTxFailureCache?.[k]?.lastFailedAtMs || 0) }))
-          .sort((a, b) => a.ts - b.ts);
-        for (let i = 0; i < sorted.length - ARWEAVE_TX_FAILURE_CACHE_MAX_ENTRIES; i += 1) {
-          try { delete net.arweaveTxFailureCache[sorted[i].key]; } catch (_) {}
-        }
-      }
+      pruneTimestampedRecord(net.arweaveTxFailureCache, {
+        tsField: 'lastFailedAtMs',
+        maxEntries: ARWEAVE_TX_FAILURE_CACHE_MAX_ENTRIES,
+      });
       return cache;
     });
     setArweaveFailureMemoEntry({ groupKeyOrCfg, txId: normalizedTxId, entry: normalizedEntry });
@@ -549,25 +558,20 @@ export const createContractScriptsCache = ({
         contentType: String(contentType || 'application/json'),
         savedAtMs: Date.now(),
       };
-      const keys = Object.keys(net.arweaveTxCache || {});
-      if (keys.length > ARWEAVE_TX_CACHE_MAX_ENTRIES) {
-        const sorted = keys
-          .map((k) => ({ key: k, ts: Number(net.arweaveTxCache?.[k]?.savedAtMs || 0) }))
-          .sort((a, b) => a.ts - b.ts);
-        for (let i = 0; i < sorted.length - ARWEAVE_TX_CACHE_MAX_ENTRIES; i += 1) {
-          try { delete net.arweaveTxCache[sorted[i].key]; } catch (_) {}
-        }
-      }
+      pruneTimestampedRecord(net.arweaveTxCache, {
+        tsField: 'savedAtMs',
+        maxEntries: ARWEAVE_TX_CACHE_MAX_ENTRIES,
+      });
       return cache;
     });
   };
 
-  const buildArweaveTxFetchInflightKey = ({ chainId, txId }) => (
-    `${Number(chainId || 0)}|${String(txId || '').trim()}`
+  const buildArweaveTxFetchInflightKey = ({ chainId, txId, forceFetch = false }) => (
+    `${Number(chainId || 0)}|${String(txId || '').trim()}|force:${forceFetch ? '1' : '0'}`
   );
 
-  const runArweaveTxFetchCoalesced = async ({ chainId, txId, task }) => {
-    const inflightKey = buildArweaveTxFetchInflightKey({ chainId, txId });
+  const runArweaveTxFetchCoalesced = async ({ chainId, txId, forceFetch = false, task }) => {
+    const inflightKey = buildArweaveTxFetchInflightKey({ chainId, txId, forceFetch });
     if (ARWEAVE_TX_FETCH_INFLIGHT.has(inflightKey)) {
       return ARWEAVE_TX_FETCH_INFLIGHT.get(inflightKey);
     }

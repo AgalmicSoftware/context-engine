@@ -27,6 +27,25 @@ export const buildPublicUrlPath = (
   return `${basePath}${normalizedPath}` || normalizedPath;
 };
 
+export const stripPublicUrlBasePath = (
+  pathname = '',
+  proc: ProcWithEnv = (typeof process !== 'undefined' ? process : undefined) as ProcWithEnv
+): string => {
+  const rawPath = toStr(pathname).trim();
+  const basePath = readPublicUrlBasePath(proc);
+  if (!rawPath || !basePath || basePath === '/') return rawPath;
+  const match = rawPath.match(/^([^?#]*)([?#].*)?$/);
+  const routePath = match?.[1] || '';
+  const suffix = match?.[2] || '';
+  if (routePath === basePath || routePath === `${basePath}/`) {
+    return `/${suffix}`;
+  }
+  if (routePath.startsWith(`${basePath}/`)) {
+    return `${routePath.slice(basePath.length) || '/'}${suffix}`;
+  }
+  return rawPath;
+};
+
 export const buildPublicRoute = (
   pathname = '',
   proc: ProcWithEnv = (typeof process !== 'undefined' ? process : undefined) as ProcWithEnv

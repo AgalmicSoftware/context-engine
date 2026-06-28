@@ -791,38 +791,48 @@ export const createSessionSurveyCacheController = (
               mainSiteLog.log(
                 `Fetching/updating responses for survey ${surveyIDLower}, from block ${startBlock} up to ${latestBlock} (group=${slug})`
               );
-              const surveyResponseBatch = normalizeSurveyResponseBatchResult(await surveyContractScripts.fetchAllSurveyResponses(
-                'none',
-                surveyIDLower,
-                startBlock,
-                latestBlock,
-                slug
-              ));
+              try {
+                const surveyResponseBatch = normalizeSurveyResponseBatchResult(await surveyContractScripts.fetchAllSurveyResponses(
+                  'none',
+                  surveyIDLower,
+                  startBlock,
+                  latestBlock,
+                  slug
+                ));
 
-              if (!currentNetworkCache.surveyResponses[surveyIDLower]) {
-                currentNetworkCache.surveyResponses[surveyIDLower] = {};
-              }
-              for (const item of surveyResponseBatch.responses) {
-                const responderAddr = item.responder.toLowerCase();
-                currentNetworkCache.surveyResponses[surveyIDLower][responderAddr] = item.response;
-
-                const uData = ensureUserNode(responderAddr, latestBlock);
-                if (!uData.surveyResponses) uData.surveyResponses = [];
-                if (!uData.surveyResponses.some((response) => response.surveyId === surveyIDLower)) {
-                  uData.surveyResponses.push({
-                    surveyId: surveyIDLower,
-                    responder: responderAddr,
-                    response: item.response,
-                  });
-                  userCacheModified = true;
+                if (!currentNetworkCache.surveyResponses[surveyIDLower]) {
+                  currentNetworkCache.surveyResponses[surveyIDLower] = {};
                 }
+                for (const item of surveyResponseBatch.responses) {
+                  const responderAddr = item.responder.toLowerCase();
+                  currentNetworkCache.surveyResponses[surveyIDLower][responderAddr] = item.response;
+
+                  const uData = ensureUserNode(responderAddr, latestBlock);
+                  if (!uData.surveyResponses) uData.surveyResponses = [];
+                  if (!uData.surveyResponses.some((response) => response.surveyId === surveyIDLower)) {
+                    uData.surveyResponses.push({
+                      surveyId: surveyIDLower,
+                      responder: responderAddr,
+                      response: item.response,
+                    });
+                    userCacheModified = true;
+                  }
+                }
+                currentNetworkCache.surveyResponsesLatestBlock[surveyIDLower] = resolveSurveyResponseWatermark({
+                  startBlock,
+                  latestBlock,
+                  hadPartialFailure: surveyResponseBatch.hadPartialFailure,
+                  lowestFailedBlock: surveyResponseBatch.lowestFailedBlock,
+                });
+              } catch (error: unknown) {
+                mainSiteLog.warn('Error fetching survey responses; leaving watermark unchanged', {
+                  slug,
+                  surveyID: surveyIDLower,
+                  startBlock,
+                  latestBlock,
+                  error,
+                });
               }
-              currentNetworkCache.surveyResponsesLatestBlock[surveyIDLower] = resolveSurveyResponseWatermark({
-                startBlock,
-                latestBlock,
-                hadPartialFailure: surveyResponseBatch.hadPartialFailure,
-                lowestFailedBlock: surveyResponseBatch.lowestFailedBlock,
-              });
             }
           }
 

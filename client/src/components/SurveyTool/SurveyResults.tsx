@@ -124,6 +124,7 @@ import {
   type SurveyResultsSurveyResponsePayload,
 } from './surveyResultsHelpers.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
+import { isResponseAllowedForSessionSlug } from '../../utilities/session/responseSessionScope.js';
 import {
   readSessionScanScope,
   readSessionScanSlugs,
@@ -561,6 +562,7 @@ export type SurveyResultsProps = SurveyResultsRecord & {
   account?: string;
   activeSessionSlug?: string;
   defaultTags?: unknown[];
+  ensureLightSbtUniverse?: unknown;
   filterState?: SurveyResultsFilterState | null;
   filteredQuestionsCount?: number | null;
   isOpen?: boolean;
@@ -587,6 +589,7 @@ export type SurveyResultsProps = SurveyResultsRecord & {
   refreshQuestionResponses?: () => unknown;
   refreshSurveyResponsesByID?: (surveyId: string) => unknown;
   sbtCacheRevision?: unknown;
+  sessionConfig?: unknown;
   sessionName?: string;
   sessionSlug?: string;
   sessionSlugPinned?: boolean;
@@ -2115,15 +2118,19 @@ const isDemoPolisFixtureResponse = (responseData: unknown): boolean => (
 );
 
 const filterLiveQuestionResponses = (
-  questionResponses: SurveyResultsQuestionResponsesByQuestion = {}
+  questionResponses: SurveyResultsQuestionResponsesByQuestion = {},
+  options: { sessionSlug?: unknown } = {}
 ): SurveyResultsQuestionResponsesByQuestion => {
   const out: SurveyResultsQuestionResponsesByQuestion = {};
+  const requiredSessionSlug = normalizeSessionSlug(options.sessionSlug || '');
   Object.entries(questionResponses || {}).forEach(([qId, responderMap]) => {
     const questionId = String(qId || '').trim().toLowerCase();
     if (!questionId || !responderMap || typeof responderMap !== 'object') return;
     const kept: SurveyResultsQuestionResponsesByResponder = {};
     Object.entries(responderMap).forEach(([responder, responseData]) => {
-      if (isDemoPolisFixtureResponse(parseResponse(responseData))) return;
+      const parsedResponse = parseResponse(responseData);
+      if (isDemoPolisFixtureResponse(parsedResponse)) return;
+      if (!isResponseAllowedForSessionSlug(parsedResponse, requiredSessionSlug)) return;
       kept[responder] = responseData;
     });
     if (Object.keys(kept).length > 0) out[questionId] = kept;
@@ -2330,7 +2337,11 @@ async function fetchQuestionModeResponses(): Promise<void> {
 const netIdStr = String(propsRef.current.network?.id ?? propsRef.current.networkChainId ?? '');
 if (!netIdStr) return;
 const questionNetCache = await getScopedQuestionNetworkData('questions') as SurveyResultsScopedQuestionNetworkData;
-	const partialQR: SurveyResultsQuestionResponsesByQuestion = filterLiveQuestionResponses(questionNetCache?.questionResponses || {});
+  const strictQuestionResponseSlug = isDemoSessionSlug(getEffectiveSlug()) ? getEffectiveSlug() : '';
+  const partialQR: SurveyResultsQuestionResponsesByQuestion = filterLiveQuestionResponses(
+    questionNetCache?.questionResponses || {},
+    { sessionSlug: strictQuestionResponseSlug }
+  );
   const liveQuestionIds = new Set(Object.keys(partialQR).map((qid) => String(qid || '').trim().toLowerCase()));
 	const allQuestions = filterLiveQuestionMetadata(questionNetCache?.questions || {}, liveQuestionIds);
 	const aggregatorMap: Record<string, unknown> = {};
@@ -5014,6 +5025,7 @@ const filterControlsNode = renderSurveyResultsFilterExportControls({
   currentSurveyIdForUrl: filterInput.currentSurveyIdForUrl,
   currentViewModeForUrl: filterInput.currentViewModeForUrl,
   defaultTags: propsRef.current.defaultTags,
+  ensureLightSbtUniverse: propsRef.current.ensureLightSbtUniverse,
   exportControlsDisplay,
   filterState: filterInput.filterState,
   isFilterActive,
@@ -5039,6 +5051,8 @@ const filterControlsNode = renderSurveyResultsFilterExportControls({
   questionsCacheNonce: filterInput.questionsCacheNonce,
   responses: stateRef.current.responses,
   sbtCacheRevision: filterInput.sbtCacheRevision,
+  sessionConfig: propsRef.current.sessionConfig,
+  sessionSlug: propsRef.current.sessionSlug,
   showQuestionFilter: filterInput.showQuestionFilter,
   storageKeyPrefix: filterInput.storageKeyPrefix,
   styleMap: styles,

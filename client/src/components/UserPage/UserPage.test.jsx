@@ -7,6 +7,7 @@ import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
 import { analyzeUserOpinions } from 'utilities/ai/aiScripts.js';
 import { ethers } from 'ethers';
+import { notify } from '../../utilities/ui/notify.js';
 
 jest.mock('../../utilities/crypto/litProtocol.js', () => ({
   getGlobalLitHooks: jest.fn(() => null),
@@ -196,6 +197,86 @@ const treeHasText = (node, text) => {
 const normalizeChildrenArray = (value) => (
   Array.isArray(value) ? value : [value].filter(Boolean)
 );
+
+describe('UserPage clipboard helpers', () => {
+  it('does not mark the address copied when clipboard write rejects', async () => {
+    const instance = makeInstance();
+    const originalClipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+    const writeText = jest.fn().mockRejectedValue(new Error('clipboard denied'));
+    const errorSpy = jest.spyOn(notify, 'error').mockImplementation(() => undefined);
+    const successSpy = jest.spyOn(notify, 'success').mockImplementation(() => undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+
+    try {
+      await instance.copyToClipboard();
+
+      expect(writeText).toHaveBeenCalledWith('0x00000000000000000000000000000000000000aa');
+      expect(errorSpy).toHaveBeenCalledWith('Could not copy address');
+      expect(successSpy).not.toHaveBeenCalled();
+      expect(instance.state.copied).not.toBe(true);
+    } finally {
+      if (originalClipboardDescriptor) {
+        Object.defineProperty(navigator, 'clipboard', originalClipboardDescriptor);
+      } else {
+        delete navigator.clipboard;
+      }
+    }
+  });
+});
+
+describe('UserPage username editing', () => {
+  it('keeps username editing open when local persistence fails', () => {
+    const viewAddress = '0x00000000000000000000000000000000000000aa';
+    const storageError = new Error('quota exceeded');
+    const setItemSpy = jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw storageError;
+    });
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const instance = makeInstance({
+      account: viewAddress,
+      viewAddress,
+      network: { id: 84532 },
+    });
+    instance.state = {
+      ...instance.state,
+      username: 'Unsaved User',
+      usernameError: '',
+      isEditingUsername: true,
+    };
+
+    try {
+      instance.setUsername();
+
+      expect(setItemSpy).toHaveBeenCalledWith(
+        'userPageUsername_84532_0x00000000000000000000000000000000000000aa',
+        'Unsaved User'
+      );
+      expect(instance.state.username).toBe('Unsaved User');
+      expect(instance.state.isEditingUsername).toBe(true);
+      expect(instance.state.usernameError).toBe('Failed to save username locally.');
+      expect(instance.setState.mock.calls.some(([patch]) => patch?.isEditingUsername === false)).toBe(false);
+      const [header] = collectTreeNodes(
+        instance.render(),
+        (node) => getNodeTypeName(node) === 'UserPageHeader'
+      );
+      expect(header.props.usernameErrorDisplayState).toEqual({
+        shouldRenderUsernameError: true,
+        usernameErrorText: 'Failed to save username locally.',
+      });
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[account]',
+        'Error saving username to localStorage:',
+        storageError
+      );
+    } finally {
+      setItemSpy.mockRestore();
+      consoleErrorSpy.mockRestore();
+    }
+  });
+});
 
 describe('UserPage analyze action boundary', () => {
   it('routes header analyze clicks through the parent-owned analyze handler with preserved args', () => {

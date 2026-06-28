@@ -1172,7 +1172,7 @@ describe('surveyToolDecryptFlow', () => {
     );
   });
 
-  it('finalizes question decrypt attempts with field values and rating envelope decrypts', async () => {
+  it('finalizes question decrypt attempts with normalized field keys and rating envelope decrypts', async () => {
     const decryptSingleField = jest.fn().mockResolvedValue({
       answers: { q1: { value: 'clear answer' } },
       additionalComments: { q1: { value: 'clear notes' } },
@@ -1184,7 +1184,7 @@ describe('surveyToolDecryptFlow', () => {
 
     await expect(finalizeQuestionDecryptAttempt(
       {
-        questionId: 'q1',
+        questionId: 'Q1',
         fieldToDecrypt: 'both',
         baselineForDecrypt: { answers: { q1: { value: '*', encrypted: true } } },
         ratingEnvelopes: { importanceEncrypted: 'imp-env' },

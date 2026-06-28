@@ -348,13 +348,12 @@ const AudioInput = ({
     };
   }, [waitingForAI]);
 
-  // Keep "Waiting for AI" message in sync without stale-closure writes
+  // Keep "Waiting for AI" message local so it never becomes a persisted answer.
   useEffect(() => {
     if (!waitingForAIRef.current) return;
     const msg = `Waiting for AI... ${waitingSeconds}s`;
     setUserText(msg);
-    callParentUpdate(msg);
-  }, [waitingSeconds, callParentUpdate]);
+  }, [waitingSeconds]);
 
   // Recording elapsed timer lifecycle
   const longFormEnabled = !!longFormMode;

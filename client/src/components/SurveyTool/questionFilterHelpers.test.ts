@@ -443,6 +443,21 @@ describe('questionFilterHelpers status state patches', () => {
     expect(buildQuestionFilterTopQuestionsCountPatch(5)).toEqual({
       pendingTopQuestionsCount: 5,
     });
+    expect(buildQuestionFilterTopQuestionsCountPatch('7')).toEqual({
+      pendingTopQuestionsCount: 7,
+    });
+    expect(buildQuestionFilterTopQuestionsCountPatch(0)).toEqual({
+      pendingTopQuestionsCount: 10,
+    });
+    expect(buildQuestionFilterTopQuestionsCountPatch(Number.NaN)).toEqual({
+      pendingTopQuestionsCount: 10,
+    });
+    expect(buildQuestionFilterTopQuestionsCountPatch('not-a-number')).toEqual({
+      pendingTopQuestionsCount: 10,
+    });
+    expect(buildQuestionFilterTopQuestionsCountPatch('0', 3)).toEqual({
+      pendingTopQuestionsCount: 3,
+    });
     expect(buildQuestionFilterRemoveTopQuestionsPatch()).toEqual({
       pendingShowTopQuestions: false,
       pendingShowTopQuestionsByResponses: false,

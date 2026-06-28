@@ -2175,13 +2175,15 @@ const contractScripts: any = {
   toCustomBlock: any = 'latest',
   onChunkProgress: any = null,
   onPartialData: any = null,
-  groupKeyOrCfg: any
+  groupKeyOrCfg: any,
+  opts: { forceArweaveFetch?: boolean } = {}
 ) {
   let resolvedFromBlockNum;
   let resolvedToBlockNum;
 
   try {
     const cfg    = resolveSession(groupKeyOrCfg || '');
+    const forceArweaveFetch = !!(opts && opts.forceArweaveFetch === true);
     const gAddrs = getSessionAddresses(cfg);
     const addr   = (gAddrs.surveys?.address);
     const chId   = (gAddrs.surveys?.chainId) || (cfg?.networkChainId) || undefined;
@@ -2272,6 +2274,7 @@ const contractScripts: any = {
         try {
           respData = await this.getResponse(providerName, responder, qId, groupKeyOrCfg, {
             _resolvedCfg: cfg,
+            forceArweaveFetch,
           });
         } catch (e: any) {
           contractsLog.warn('[getQuestionResponsesFullRange] individual response read failed; skipping', { responder, qId, error: e?.message });
@@ -2633,8 +2636,8 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
   const { baseKey } = resolveReadContext(groupKeyOrCfg);
   const modeTag = buildDecryptModeTag(opts);
   const failureModeTag = buildFailureModeTag(opts);
-  const inflightKey = `${baseKey}|${sId}|${modeTag}|${failureModeTag}`;
   const forceArweaveFetch = !!(opts && opts.forceArweaveFetch === true);
+  const inflightKey = `${baseKey}|${sId}|${modeTag}|${failureModeTag}|force:${forceArweaveFetch ? '1' : '0'}`;
 
   try {
     const result = await runInFlightCoalesced(
@@ -3280,7 +3283,7 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
     : 'question_response_payload';
   const forceArweaveFetch = !!opts?.forceArweaveFetch;
   const { baseKey } = resolveReadContext(groupKeyOrCfg);
-  const inflightKey = `${baseKey}|${responderLower}|${idB32}|strict:${throwOnError ? '1' : '0'}`;
+  const inflightKey = `${baseKey}|${responderLower}|${idB32}|strict:${throwOnError ? '1' : '0'}|force:${forceArweaveFetch ? '1' : '0'}`;
   const readE2EMockedViewedResponse = () => {
     if (typeof window === 'undefined') return null;
     if (globalThis.CE_E2E_LIT_MOCK !== true) return null;
@@ -3604,8 +3607,8 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
     const modeTag = buildDecryptModeTag(opts);
     const failureModeTag = buildFailureModeTag(opts);
     const arweaveReadModeTag = buildArweaveReadModeTag(opts);
-    const inflightKey = `${baseKey}|${qId}|${modeTag}|${failureModeTag}|${arweaveReadModeTag}`;
     const forceArweaveFetch = !!(opts && opts.forceArweaveFetch === true);
+    const inflightKey = `${baseKey}|${qId}|${modeTag}|${failureModeTag}|${arweaveReadModeTag}|force:${forceArweaveFetch ? '1' : '0'}`;
     try {
       const result = await runInFlightCoalesced(
         READ_INFLIGHT.questionData,
@@ -3706,8 +3709,8 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
     const { baseKey } = resolveReadContext(groupKeyOrCfg);
     const modeTag = buildDecryptModeTag(opts);
     const failureModeTag = buildFailureModeTag(opts);
-    const inflightKey = `${baseKey}|${sId}|${modeTag}|${failureModeTag}`;
     const forceArweaveFetch = !!(opts && opts.forceArweaveFetch === true);
+    const inflightKey = `${baseKey}|${sId}|${modeTag}|${failureModeTag}|force:${forceArweaveFetch ? '1' : '0'}`;
     try {
       const result = await runInFlightCoalesced(
         READ_INFLIGHT.surveyData,

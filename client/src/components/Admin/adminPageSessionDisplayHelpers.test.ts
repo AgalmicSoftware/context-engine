@@ -1,5 +1,7 @@
 import {
+  areAdminEncryptedEntriesEquivalent,
   buildAdminChainRegistryDisplay,
+  buildAdminEncryptedEntrySignature,
   buildSessionUrl,
   collectEncryptedEntries,
   getAdminSessionDisplayUrl,
@@ -75,5 +77,26 @@ describe('adminPageSessionDisplayHelpers', () => {
       'faucet.privateKey': 'cipher-faucet',
     });
     expect(collectEncryptedEntries(null)).toEqual({});
+  });
+
+  it('builds stable encrypted entry signatures for cloned envelopes', () => {
+    const first = {
+      b: 'ciphertext',
+      a: {
+        z: ['one', { c: true, b: false }],
+        y: 2,
+      },
+    };
+    const second = {
+      a: {
+        y: 2,
+        z: ['one', { b: false, c: true }],
+      },
+      b: 'ciphertext',
+    };
+
+    expect(buildAdminEncryptedEntrySignature(first)).toBe(buildAdminEncryptedEntrySignature(second));
+    expect(areAdminEncryptedEntriesEquivalent(first, second)).toBe(true);
+    expect(areAdminEncryptedEntriesEquivalent(first, { ...second, b: 'other' })).toBe(false);
   });
 });

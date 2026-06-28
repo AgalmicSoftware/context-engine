@@ -595,14 +595,15 @@ export const buildSingleGenerationPrompt = ({
     (transcriptMode ? 'transcript' : 'text');
 
   const multiSpeakerHint = overrides.multiSpeakerHintOverride || 'unknown';
+  const literalReplacement = (value: unknown) => () => toStr(value);
 
   return promptTemplate
-    .replace('<SourceDocContent>', toStr(sourceDocContent))
+    .replace('<SourceDocContent>', literalReplacement(sourceDocContent))
     .replace('<NumSeedStatements>', String(count))
     .replace('<Types>', typesStr)
-    .replace(/<DefaultTags>/g, defaultTagsStr)
-    .replace('<SourceType>', toStr(sourceType))
+    .replace(/<DefaultTags>/g, literalReplacement(defaultTagsStr))
+    .replace(/<SourceType>/g, literalReplacement(sourceType))
     .replace('<MultiSpeakerHint>', toStr(multiSpeakerHint))
-    .replace('<GroupCustomInstructions>', toStr(sessionInstructions))
+    .replace('<GroupCustomInstructions>', literalReplacement(sessionInstructions))
     .replace('<ClipDurationMinutes>', '');
 };

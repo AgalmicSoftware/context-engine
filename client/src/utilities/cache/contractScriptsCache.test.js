@@ -1,5 +1,7 @@
 import { ethers } from 'ethers';
 import {
+  ARWEAVE_TX_CACHE_MAX_ENTRIES,
+  ARWEAVE_TX_FAILURE_CACHE_MAX_ENTRIES,
   buildHashReadInflightKey,
   buildHashReadMemoKey,
   createContractScriptsCache,
@@ -9,6 +11,15 @@ import {
 } from './contractScriptsCache.js';
 
 const deepClone = (value) => JSON.parse(JSON.stringify(value));
+
+const buildTimestampedCacheEntries = (count, buildEntry) => (
+  Object.fromEntries(
+    Array.from({ length: count }, (_, index) => [
+      `tx-${index}`,
+      buildEntry(index),
+    ])
+  )
+);
 
 const buildSubjectConfig = () => ({
   resolveSession: (groupKeyOrCfg) => (
@@ -147,6 +158,30 @@ describe('contractScriptsCache helpers', () => {
     expect(task).toHaveBeenCalledTimes(2);
   });
 
+  it('keeps forced and non-forced Arweave tx work isolated', async () => {
+    const subject = createSubject();
+    const task = jest.fn(async () => new Promise((resolve) => setTimeout(() => resolve('ok'), 10)));
+
+    const [a, b] = await Promise.all([
+      subject.runArweaveTxFetchCoalesced({
+        chainId: 84532,
+        txId: 'tx-force-1',
+        forceFetch: false,
+        task,
+      }),
+      subject.runArweaveTxFetchCoalesced({
+        chainId: 84532,
+        txId: 'tx-force-1',
+        forceFetch: true,
+        task,
+      }),
+    ]);
+
+    expect(a).toBe('ok');
+    expect(b).toBe('ok');
+    expect(task).toHaveBeenCalledTimes(2);
+  });
+
   it('reads arweave tx cache entries only from the exact network key', async () => {
     const readCacheValue = {
       '084532': {
@@ -200,6 +235,110 @@ describe('contractScriptsCache helpers', () => {
     expect(updatedCache['84532'].arweaveTxCache['tx-1']).toMatchObject({
       text: 'fresh payload',
       contentType: 'application/json',
+    });
+  });
+
+  it('keeps the bounded Arweave tx cache at max size and prunes the oldest saved row', async () => {
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(5000);
+    const startingCache = {
+      84532: {
+        arweaveTxCache: buildTimestampedCacheEntries(
+          ARWEAVE_TX_CACHE_MAX_ENTRIES,
+          (index) => ({
+            text: `payload-${index}`,
+            contentType: 'text/plain',
+            savedAtMs: index + 1,
+          })
+        ),
+      },
+    };
+    let updatedCache = null;
+    const { createContractScriptsCache: isolatedFactory } = loadIsolatedModule({
+      updateCacheAtomicImpl: async (_namespace, _slug, updater) => {
+        updatedCache = updater(deepClone(startingCache));
+        return updatedCache;
+      },
+    });
+    const subject = createSubject(isolatedFactory);
+
+    try {
+      await subject.writeArweaveTxCacheEntry({
+        groupKeyOrCfg: '',
+        txId: 'tx-new',
+        text: 'fresh payload',
+        contentType: 'application/json',
+      });
+    } finally {
+      nowSpy.mockRestore();
+    }
+
+    expect(Object.keys(updatedCache['84532'].arweaveTxCache)).toHaveLength(ARWEAVE_TX_CACHE_MAX_ENTRIES);
+    expect(updatedCache['84532'].arweaveTxCache['tx-0']).toBeUndefined();
+    expect(updatedCache['84532'].arweaveTxCache['tx-1']).toMatchObject({
+      text: 'payload-1',
+      savedAtMs: 2,
+    });
+    expect(updatedCache['84532'].arweaveTxCache['tx-new']).toMatchObject({
+      text: 'fresh payload',
+      contentType: 'application/json',
+      savedAtMs: 5000,
+    });
+  });
+
+  it('keeps the bounded Arweave tx failure cache at max size and prunes the oldest failure row', async () => {
+    const startingCache = {
+      84532: {
+        arweaveTxFailureCache: buildTimestampedCacheEntries(
+          ARWEAVE_TX_FAILURE_CACHE_MAX_ENTRIES,
+          (index) => ({
+            attempts: 1,
+            firstFailedAtMs: index + 1,
+            lastFailedAtMs: index + 1,
+            nextRetryAtMs: index + 100,
+            lastStatus: 503,
+            state: 'transient',
+            message: `failure-${index}`,
+          })
+        ),
+      },
+    };
+    let updatedCache = null;
+    const { createContractScriptsCache: isolatedFactory } = loadIsolatedModule({
+      updateCacheAtomicImpl: async (_namespace, _slug, updater) => {
+        updatedCache = updater(deepClone(startingCache));
+        return updatedCache;
+      },
+    });
+    const subject = createSubject(isolatedFactory);
+
+    await subject.writeArweaveTxFailureCacheEntry({
+      groupKeyOrCfg: '',
+      txId: 'tx-new',
+      entry: {
+        attempts: 2,
+        firstFailedAtMs: 4000,
+        lastFailedAtMs: 5000,
+        nextRetryAtMs: 6000,
+        lastStatus: 504,
+        state: 'transient',
+        message: 'new failure',
+      },
+    });
+
+    expect(Object.keys(updatedCache['84532'].arweaveTxFailureCache)).toHaveLength(ARWEAVE_TX_FAILURE_CACHE_MAX_ENTRIES);
+    expect(updatedCache['84532'].arweaveTxFailureCache['tx-0']).toBeUndefined();
+    expect(updatedCache['84532'].arweaveTxFailureCache['tx-1']).toMatchObject({
+      message: 'failure-1',
+      lastFailedAtMs: 2,
+    });
+    expect(updatedCache['84532'].arweaveTxFailureCache['tx-new']).toMatchObject({
+      attempts: 2,
+      firstFailedAtMs: 4000,
+      lastFailedAtMs: 5000,
+      nextRetryAtMs: 6000,
+      lastStatus: 504,
+      state: 'transient',
+      message: 'new failure',
     });
   });
 });

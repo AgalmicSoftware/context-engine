@@ -4,12 +4,16 @@ import { Route, Routes } from 'react-router-dom';
 import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
 import DebateMap, {
   AtlasView,
+  buildExpandedHistoricalCaseBriefMap,
   buildHistoricalCaseBrief,
   buildHistoricalCompassPoints,
+  getAtlasLinkStableKey,
   getCompactTreeNodeLabel,
+  getDebateNodeStableKey,
   getPackedAtlasClickTarget,
   getPackedAtlasLabelFontSizePx,
   getPackedAtlasVerticalLiftPx,
+  getTopAtlasNodesByHeat,
   getTreeChildColumnCount,
   getTreeChildStaggerPx,
   getTreeSubtreeSpan,
@@ -76,12 +80,16 @@ jest.mock('../DemoViews/DebateHUD/PoliticalCompassView', () => ({
 
 const DebateMapComponent = DebateMap as React.ComponentType<any>;
 const AtlasViewComponent = AtlasView as React.ComponentType<any>;
+const buildExpandedHistoricalCaseBriefMapAny = buildExpandedHistoricalCaseBriefMap as any;
 const buildHistoricalCaseBriefAny = buildHistoricalCaseBrief as any;
 const buildHistoricalCompassPointsAny = buildHistoricalCompassPoints as any;
+const getAtlasLinkStableKeyAny = getAtlasLinkStableKey as any;
 const getCompactTreeNodeLabelAny = getCompactTreeNodeLabel as any;
+const getDebateNodeStableKeyAny = getDebateNodeStableKey as any;
 const getPackedAtlasClickTargetAny = getPackedAtlasClickTarget as any;
 const getPackedAtlasLabelFontSizePxAny = getPackedAtlasLabelFontSizePx as any;
 const getPackedAtlasVerticalLiftPxAny = getPackedAtlasVerticalLiftPx as any;
+const getTopAtlasNodesByHeatAny = getTopAtlasNodesByHeat as any;
 const getTreeChildColumnCountAny = getTreeChildColumnCount as any;
 const getTreeChildStaggerPxAny = getTreeChildStaggerPx as any;
 const getTreeSubtreeSpanAny = getTreeSubtreeSpan as any;
@@ -243,6 +251,18 @@ const getAtlasModalContent = (headingName: string | RegExp): HTMLElement => {
   return modalContent as HTMLElement;
 };
 
+const getAtlasModalNetVoteScore = (modalContent: HTMLElement): number => {
+  const score = modalContent.querySelector('[class*="netScoreValue"]');
+  if (!score) throw new Error('Expected atlas modal net vote score.');
+  return Number(score.textContent);
+};
+
+const getAtlasModalConfirmVoteButton = (modalContent: HTMLElement): HTMLElement => {
+  const confirmButton = modalContent.querySelector('[class*="confirmBtn"]');
+  if (!confirmButton) throw new Error('Expected atlas modal vote confirmation button.');
+  return confirmButton as HTMLElement;
+};
+
 const openHistoricalCaseBrief = async (nodeId: string) => {
   renderDemoAtlasNode(nodeId);
   fireEvent.click(await screen.findByRole('button', { name: /Historical Cases/i }));
@@ -253,6 +273,7 @@ describe('DebateMap', () => {
   afterEach(() => {
     mockNavigate.mockReset();
     mockedGetHistoricalFigureAvatarOrBlockie.mockClear();
+    localStorage.removeItem('bookmarkedNodes');
   });
 
   it('renders the standalone heading as Debate Map', () => {
@@ -286,6 +307,76 @@ describe('DebateMap', () => {
     );
 
     expect(getAtlasNodeElementById('0x1000000000000000000000000000000000000000000000000000000000000000', 'packed')).toBeTruthy();
+  });
+
+  it('ignores wrong-shaped bookmark storage before rendering bookmarkable list nodes', async () => {
+    localStorage.setItem('bookmarkedNodes', '{"bad":true}');
+
+    render(
+      <MemoryRouter>
+        <DebateMapComponent
+          account=""
+          provider=""
+          network={{ id: 84532 }}
+          activeSessionSlug=""
+          toggleLoginModal={jest.fn()}
+        />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(getDebateViewModeButton('list'));
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /^Debate Map$/i })).toBeInTheDocument();
+      expect(screen.getAllByTestId(E2E_TESTIDS.DEBATE_VIEW_MODE).length).toBeGreaterThan(0);
+    });
+  });
+
+  it('builds stable keys for reorderable atlas and list items', () => {
+    expect(getDebateNodeStableKeyAny({ id: 'node-id', name: 'Name' }, 'fallback')).toBe('node-id');
+    expect(getDebateNodeStableKeyAny({ name: 'Name' }, 'fallback')).toBe('Name');
+    expect(getDebateNodeStableKeyAny({}, 'fallback')).toBe('fallback');
+
+    expect(getAtlasLinkStableKeyAny({
+      sourceId: 'source-id',
+      targetId: 'target-id',
+      source: { x: 1, y: 2 },
+      target: { x: 3, y: 4 },
+    }, 0)).toBe('source-id->target-id');
+    expect(getAtlasLinkStableKeyAny({
+      source: { x: 1, y: 2 },
+      target: { x: 3, y: 4 },
+    }, 7)).toBe('coords:1.000:2.000:3.000:4.000:7');
+  });
+
+  it('finds top atlas nodes by heat without changing pre-order tie behavior', () => {
+    const topNodes = getTopAtlasNodesByHeatAny([
+      {
+        id: 'early-tie',
+        votes: { up: 5, down: 0 },
+        children: [
+          {
+            id: 'nested-high',
+            votes: { up: 9, down: 0 },
+          },
+        ],
+      },
+      {
+        id: 'comment-heavy',
+        votes: { up: 3, down: 0 },
+        comments: [{ id: 'c1' }, { id: 'c2' }, { id: 'c3' }],
+      },
+      {
+        id: 'late-tie',
+        votes: { up: 5, down: 0 },
+      },
+    ], 3);
+
+    expect(topNodes.map((node: any) => node.id)).toEqual([
+      'comment-heavy',
+      'nested-high',
+      'early-tie',
+    ]);
   });
 
   it('switches between circles and atlas from the main mode controls', () => {
@@ -462,6 +553,41 @@ describe('DebateMap', () => {
     expect(fallbackBrief.adversarialAttack.fallbackText).toMatch(/Loophole Finder case/i);
     expect(fallbackBrief.patchOptions).toEqual([]);
     expect(fallbackBrief.decisionPrompt).toMatch(/What patch closes the exploit in Privacy & Surveillance/i);
+  });
+
+  it('builds historical case briefs only for the expanded case key', () => {
+    const brief = buildHistoricalCaseBriefAny(
+      { title: 'Expanded case', summary: 'Expanded summary.' },
+      { name: 'Liability Frameworks' }
+    );
+    const buildBrief = jest.fn(() => brief);
+    const historicalCases = [
+      { id: 'collapsed-case', title: 'Collapsed case', summary: 'Collapsed summary.' },
+      { id: 'expanded-case', title: 'Expanded case', summary: 'Expanded summary.' },
+    ];
+
+    const collapsedBriefs = buildExpandedHistoricalCaseBriefMapAny(
+      historicalCases,
+      { id: 'node-a', name: 'Liability Frameworks' },
+      '',
+      buildBrief
+    );
+    expect(collapsedBriefs.size).toBe(0);
+    expect(buildBrief).not.toHaveBeenCalled();
+
+    const expandedBriefs = buildExpandedHistoricalCaseBriefMapAny(
+      historicalCases,
+      { id: 'node-a', name: 'Liability Frameworks' },
+      'expanded-case',
+      buildBrief
+    );
+
+    expect(buildBrief).toHaveBeenCalledTimes(1);
+    expect(buildBrief).toHaveBeenCalledWith(
+      historicalCases[1],
+      { id: 'node-a', name: 'Liability Frameworks' }
+    );
+    expect(expandedBriefs.get('expanded-case')).toBe(brief);
   });
 
   it('compacts long tree labels and child layouts for denser debate branches', () => {
@@ -860,6 +986,34 @@ describe('DebateMap', () => {
     expect(screen.getByRole('heading', { name: 'For' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Historical Cases/i })).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByRole('button', { name: 'View full brief' })).not.toBeInTheDocument();
+  });
+
+  it('preserves local atlas votes across demo-mode tree rebuilds', async () => {
+    renderDemoAtlasNode(liabilityFrameworksNodeId);
+
+    expect(await screen.findByRole('heading', { name: 'Liability Frameworks' })).toBeInTheDocument();
+    const modal = getAtlasModalContent('Liability Frameworks');
+    const initialScore = getAtlasModalNetVoteScore(modal);
+
+    fireEvent.click(within(modal).getByTitle('Cast Upvotes'));
+    fireEvent.change(within(modal).getByRole('spinbutton'), { target: { value: '3' } });
+    fireEvent.click(getAtlasModalConfirmVoteButton(modal));
+
+    await waitFor(() => {
+      expect(getAtlasModalNetVoteScore(getAtlasModalContent('Liability Frameworks'))).toBe(initialScore + 3);
+    });
+
+    const demoModeCheckbox = screen.getByLabelText(/Demo Mode/i);
+    fireEvent.click(demoModeCheckbox);
+    await waitFor(() => {
+      expect(demoModeCheckbox).not.toBeChecked();
+    });
+
+    fireEvent.click(demoModeCheckbox);
+    await waitFor(() => {
+      expect(demoModeCheckbox).toBeChecked();
+      expect(getAtlasModalNetVoteScore(getAtlasModalContent('Liability Frameworks'))).toBe(initialScore + 3);
+    });
   });
 
   it('renders enriched Loophole historical cases inside relevant atlas nodes in demo mode', async () => {

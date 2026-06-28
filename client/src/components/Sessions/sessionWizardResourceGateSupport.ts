@@ -56,6 +56,8 @@ type SessionWizardResolvedResourceGate = {
     chainIdConflicts: boolean;
     perMemberLimitConflicts: boolean;
   };
+  registryRepresentable: boolean;
+  registryUnsupportedReason: string;
 };
 
 export const buildSessionWizardGateOptions = (
@@ -165,6 +167,8 @@ export const resolveSessionWizardResourceGate = (
   const chainIdConflicts = chainIdSet.size > 1;
   const perMemberLimitConflicts = perMemberLimitSet.size > 1;
   const hasConflicts = modeConflicts || chainIdConflicts || perMemberLimitConflicts;
+  const hasAllMode = modeSet.has('all');
+  const hasUnrepresentableAllGroup = resolvedGateIds.length > 1 && hasAllMode;
   const mode = toStr(primaryGate?.mode).trim() === 'all' ? 'all' : 'any';
   const chainId = Number(primaryGate?.chainId || 0) || null;
   const perMemberLimit = Number(primaryGate?.perMemberLimit || 0) || 0;
@@ -182,5 +186,9 @@ export const resolveSessionWizardResourceGate = (
       chainIdConflicts,
       perMemberLimitConflicts,
     },
+    registryRepresentable: !hasConflicts && !hasUnrepresentableAllGroup,
+    registryUnsupportedReason: hasUnrepresentableAllGroup
+      ? 'multiple gates with All semantics cannot be encoded as one registry gate'
+      : '',
   };
 };
