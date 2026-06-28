@@ -177,7 +177,7 @@ const appendGateRecipient = ({
   fallbackChainId,
   resourceKey,
 }: AppendGateRecipientArgs): void => {
-  const payloads = [{
+  const payload = createLitRecipientFromGate({
     gate,
     fallbackChainId,
     resourceKey,
