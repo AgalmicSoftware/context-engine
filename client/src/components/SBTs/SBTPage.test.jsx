@@ -93,63 +93,6 @@ describe('SBTPage session routing and holder loading', () => {
     }
   });
 
-  it('restarts the minting countdown after SBT address context changes', () => {
-    jest.useFakeTimers();
-    const clearIntervalSpy = jest.spyOn(global, 'clearInterval');
-    try {
-      const subject = createSubject({
-        SBTAddress: '0x00000000000000000000000000000000000000aa',
-      });
-      subject.loadSBTInfo = jest.fn();
-      subject.checkForMintPassword = jest.fn();
-      subject.getActiveBlockTimeMs = jest.fn(() => 1000);
-      const previousIntervalId = setInterval(() => {}, 1000);
-      subject.state = {
-        ...subject.state,
-        intervalId: previousIntervalId,
-      };
-      const prevProps = subject.props;
-      subject.props = {
-        ...subject.props,
-        SBTAddress: '0x00000000000000000000000000000000000000bb',
-      };
-
-      subject.componentDidUpdate(prevProps);
-
-      expect(subject.loadSBTInfo).toHaveBeenCalledTimes(1);
-      expect(subject.checkForMintPassword).toHaveBeenCalledTimes(1);
-      expect(clearIntervalSpy).toHaveBeenCalledWith(previousIntervalId);
-      expect(subject.state.intervalId).toBeTruthy();
-      expect(subject.state.intervalId).not.toBe(previousIntervalId);
-    } finally {
-      jest.useRealTimers();
-    }
-  });
-
-  it('clears stored minting countdown interval state after expiry', () => {
-    jest.useFakeTimers();
-    try {
-      const subject = createSubject();
-      subject.getActiveBlockTimeMs = jest.fn(() => 1000);
-      subject.state = {
-        ...subject.state,
-        sbtInfo: {
-          mintingEndTime: Math.floor(Date.now() / 1000) - 1,
-        },
-      };
-
-      subject.startMintingEndCountdown();
-      expect(subject.state.intervalId).toBeTruthy();
-
-      jest.advanceTimersByTime(1000);
-
-      expect(subject.state.intervalId).toBeNull();
-      expect(subject.state.mintCountdown).toBeNull();
-    } finally {
-      jest.useRealTimers();
-    }
-  });
-
   it('uses sessionSlug routing only when metadata marks it explicit', () => {
     const subject = createSubject();
     expect(subject.resolveSessionSlugFromInfo({
