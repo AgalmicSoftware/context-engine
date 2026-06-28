@@ -182,19 +182,16 @@ export const ARWEAVE_TX_CACHE_MAX_ENTRIES = 1200;
 export const ARWEAVE_TX_FAILURE_CACHE_MAX_ENTRIES = 1200;
 export const HASH_MISS_SENTINEL = '__ce_hash_missing__';
 
-const pruneTimestampedRecord = (record: TimestampedRecord, { tsField, maxEntries }: PruneTimestampedOptions = {}) => {
+const pruneTimestampedRecord = (record, { tsField, maxEntries } = {}) => {
   if (!record || typeof record !== 'object') return record;
-  const timestampField = tsField || 'ts';
   const max = Math.max(0, Math.floor(Number(maxEntries) || 0));
   const keys = Object.keys(record);
   if (max <= 0 || keys.length <= max) return record;
   const sorted = keys
-    .map((key) => ({ key, ts: Number(record?.[key]?.[timestampField] || 0) }))
+    .map((key) => ({ key, ts: Number(record?.[key]?.[tsField] || 0) }))
     .sort((a, b) => a.ts - b.ts);
   for (let i = 0; i < sorted.length - max; i += 1) {
-    try {
-      delete record[sorted[i].key];
-    } catch (_) {}
+    try { delete record[sorted[i].key]; } catch (_) {}
   }
   return record;
 };
