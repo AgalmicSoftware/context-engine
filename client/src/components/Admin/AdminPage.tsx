@@ -749,9 +749,9 @@ const AdminPage = ({
     }
     // Do not auto-decrypt in /admin; decrypting triggers wallet popups. Users can decrypt on demand.
     const canPreserveUnlockedFields = walletReady && previousSessionKey === encryptedFieldsSessionKey;
-    setDecryptedFields((previous: AdminDecryptedFieldMap = {}) => {
-      const next: AdminDecryptedFieldMap = {};
-      Object.entries(entries).forEach(([key, envelope]) => {
+    setDecryptedFields((previous: Record<string, any> = {}) => {
+      const next: Record<string, any> = {};
+      Object.entries(entries).forEach(([key, envelope]: any) => {
         const previousEntry = previous?.[key];
         if (
           canPreserveUnlockedFields &&
