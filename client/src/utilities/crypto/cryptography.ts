@@ -731,15 +731,14 @@ const _getProvider = (providerLike: ProviderLike): Eip1193Provider => {
     }
 
     // Keep Web3Auth path for easy re-enable; no overhead without provider.
-    if (s === 'web3auth') {
-      if (window.web3authProvider) return window.web3authProvider;
-    } else if (window.ethereum) {
-      return window.ethereum;
+    if (typeof window !== 'undefined' && s === 'web3auth' && window.web3authProvider) {
+      return window.web3authProvider;
     }
-    if (window.ethereum) return window.ethereum;
   }
-  if (window.ethereum) return window.ethereum;
-  if (window.web3authProvider) return window.web3authProvider;
+  if (typeof window !== 'undefined') {
+    if (window.ethereum) return window.ethereum;
+    if (window.web3authProvider) return window.web3authProvider;
+  }
 
   return {
     request: async () => {
