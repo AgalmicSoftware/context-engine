@@ -987,10 +987,11 @@ const wrapLitGetKeyWithCache = (
 
     try {
       const value = await run;
+      const settledAt = Date.now();
       cacheLruSet(
         successCache,
         key,
-        { expiresAt: now + LIT_GETKEY_SUCCESS_TTL_MS, value },
+        { expiresAt: settledAt + LIT_GETKEY_SUCCESS_TTL_MS, value },
         LIT_GETKEY_SUCCESS_CACHE_MAX
       );
       negativeCache.delete(key);
