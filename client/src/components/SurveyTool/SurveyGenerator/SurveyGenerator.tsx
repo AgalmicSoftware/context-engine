@@ -820,22 +820,6 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
       }
     }
 
-    try {
-      const file = await fetchImageFromURL(rawUrl);
-      if (abortedRef.current) return;
-      const { validFiles } = queueAdditionalPhotoFiles([file]);
-      if (validFiles.length === 0) {
-        queueAdditionalUrlSource(rawUrl);
-        return;
-      }
-      setAdditionalUrlInput('');
-      setImagePickerStatusText('');
-      setImagePickerStatusTone('default');
-      return;
-    } catch (_err) {
-      if (abortedRef.current) return;
-    }
-
     queueAdditionalUrlSource(rawUrl);
   };
 
