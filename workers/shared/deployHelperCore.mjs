@@ -1,4 +1,8 @@
 import rpcDefaults from '../../client/src/variables/rpcDefaults.js';
+import {
+  STORAGE_BACKENDS,
+  normalizeStorageBackend,
+} from '../sessionCorsWorker/storageRefNormalization.js';
 import { buildSessionSecretsEnvelope } from './sessionSecretsEnvelope.mjs';
 
 const { getPathRpcUrl } = rpcDefaults;

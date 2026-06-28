@@ -236,7 +236,7 @@ Authenticated clients can use the worker as the session storage boundary:
 - `GET|POST /storage/read`: reads a Cloudflare object by opaque `storageRef.id` after the configured Cloudflare payload access check. Public-read sessions may be served anonymously; gated sessions require authenticated route preflight. It returns the payload bytes with `X-CE-Storage-Backend: cloudflare`, `X-CE-Payload-Access-Mode`, and no raw object keys.
 - `GET|POST /storage/list`: lists Cloudflare metadata/index rows for a resource such as `docsContext`, returning safe `storageRef` objects, tag metadata, and the configured payload access mode. Public-read sessions may list anonymously; gated sessions require authenticated route preflight.
 
-Cloudflare storage bindings are optional until a session selects `storageProfile.backend = "cloudflare"` at creation time in `/new`; backend mutation/migration is out of scope for now. This is payload storage for session context, docs, media, questions, surveys, responses, and generated artifacts; it is not user preference/profile storage. Tests use mocked R2/KV contracts; no Cloudflare credentials are needed for local verification. The worker accepts `CE_STORAGE_R2`/`STORAGE_R2`/`R2_BUCKET` for preferred blob storage and `CE_STORAGE_INDEX_KV`/`STORAGE_INDEX_KV`/`STORAGE_KV` for metadata indexes plus the KV-only payload fallback. Cloudflare refs must not include account IDs, bucket names, raw object keys, worker tokens, long-lived URLs, or secrets.
+Cloudflare storage bindings are optional until a session selects `storageProfile.backend = "cloudflare"` at creation time in `/new`; legacy doc-library configs with `docLibrary.provider = "cloudflare"` are also accepted by the worker for storage route compatibility. Backend mutation/migration is out of scope for now. This is payload storage for session context, docs, media, questions, surveys, responses, and generated artifacts; it is not user preference/profile storage. Tests use mocked R2/KV contracts; no Cloudflare credentials are needed for local verification. The worker accepts `CE_STORAGE_R2`/`STORAGE_R2`/`R2_BUCKET` for preferred blob storage and `CE_STORAGE_INDEX_KV`/`STORAGE_INDEX_KV`/`STORAGE_KV` for metadata indexes plus the KV-only payload fallback. One-click deploys that receive a Cloudflare storage profile bind the created session KV namespace as both `GROUP_KV` and `CE_STORAGE_INDEX_KV`, then persist a sanitized `storageProfile` in `session:{slug}:config`. If the deploy request explicitly asks for R2 storage, it must provide an existing bucket name so the helper can bind it as `CE_STORAGE_R2`; otherwise the helper fails before provisioning partial Cloudflare resources. Cloudflare refs must not include account IDs, bucket names, raw object keys, worker tokens, long-lived URLs, or secrets.
 
 `storageProfile.payloadAccessControl.mode` controls Cloudflare payload access:
 
@@ -250,10 +250,10 @@ Lit credentials are required only for `lit-arweave` storage or Cloudflare `lit_e
 
 KV:
 - `GROUP_KV`
-- `CE_STORAGE_INDEX_KV` (or `STORAGE_INDEX_KV` / `STORAGE_KV`) when Cloudflare payload storage uses KV metadata/index rows, and required for KV-only payload fallback.
+- `CE_STORAGE_INDEX_KV` (or `STORAGE_INDEX_KV` / `STORAGE_KV`) when Cloudflare payload storage uses KV metadata/index rows, and required for KV-only payload fallback. The deploy helper aliases the same newly created namespace as `GROUP_KV` and `CE_STORAGE_INDEX_KV` for Cloudflare-backed sessions.
 
 R2/D1:
-- `CE_STORAGE_R2` (or `STORAGE_R2` / `R2_BUCKET`) for preferred Cloudflare payload blobs.
+- `CE_STORAGE_R2` (or `STORAGE_R2` / `R2_BUCKET`) for preferred Cloudflare payload blobs. One-click deploys bind this only when the request supplies an existing R2 bucket name.
 - D1 may be linked for queryable metadata/indexes where a deployment models those indexes in D1 instead of KV; ordinary payload bytes should stay in R2.
 - Durable Objects are for signer/runtime coordination only, not ordinary session payload blobs.
 
