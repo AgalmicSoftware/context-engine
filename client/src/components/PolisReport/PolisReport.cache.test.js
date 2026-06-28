@@ -257,6 +257,42 @@ describe('PolisReport cache read options', () => {
     expect(JSON.stringify(computePolisConversationMath.mock.calls)).not.toContain('qFixture');
   });
 
+  it('excludes foreign-session real rows from built-in demo live report calculations', async () => {
+    const mixedQuestionResponses = {
+      qDemo: [
+        {
+          responder: '0xdemo',
+          questionId: 'qDemo',
+          response: JSON.stringify({
+            type: 'binary',
+            sessionSlug: 'demo',
+            prompt: 'Shared demo prompt',
+            answer: { value: 'Agree', encrypted: false },
+          }),
+        },
+        {
+          responder: '0xforeign',
+          questionId: 'qDemo',
+          response: JSON.stringify({
+            type: 'binary',
+            sessionSlug: 'test-2',
+            prompt: 'Shared demo prompt',
+            answer: { value: 'Disagree', encrypted: false },
+          }),
+        },
+      ],
+    };
+
+    const result = buildRatingMatrixFromRealData(mixedQuestionResponses, { sessionSlug: 'demo' });
+
+    expect(result.matrix).toEqual([[1]]);
+    expect(result.promptsMap).toEqual({ qDemo: 'Shared demo prompt' });
+    expect(result.questions).toEqual(['qDemo']);
+    expect(result.responders).toEqual(['0xdemo']);
+    expect(JSON.stringify(result)).not.toContain('0xforeign');
+    expect(JSON.stringify(result)).not.toContain('test-2');
+  });
+
   it('reads question and sbt caches with clone disabled during filter application', () => {
     const out = applyFilterStateToAggregator(
       { q1: [] },

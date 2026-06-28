@@ -41,6 +41,7 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { peekCacheSync } from '../../utilities/cache/cacheScripts.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
 import { isDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
+import { isResponseAllowedForSessionSlug } from '../../utilities/session/responseSessionScope.js';
 import {
   buildQuestionScanProgressDisplay,
   doesQuestionProgressMatchSlug,
@@ -936,7 +937,21 @@ function PolisQuestionHoverCard({
  *   answer { value: 'Agree' | 'Disagree' | 'Unsure' }, including
  *   legacy yes/no/0/1 encodings from older response payloads.
  ***************************************************************/
-function buildRatingMatrixFromRealData(realQR: PolisQuestionResponses | UnknownRecord): RatingMatrixBuildResult {
+function isPolisRealRowAllowedForSession(
+  row: PolisResponseRow,
+  parsedResponse: UnknownRecord | null,
+  sessionSlug: unknown = ''
+): boolean {
+  return (
+    isResponseAllowedForSessionSlug(row, sessionSlug) &&
+    isResponseAllowedForSessionSlug(parsedResponse, sessionSlug)
+  );
+}
+
+export function buildRatingMatrixFromRealData(
+  realQR: PolisQuestionResponses | UnknownRecord,
+  options: { sessionSlug?: unknown } = {}
+): RatingMatrixBuildResult {
   if (!realQR || typeof realQR !== 'object') {
     return { matrix: null, responders: [], questions: [], promptsMap: {} };
   }
@@ -956,6 +971,7 @@ function buildRatingMatrixFromRealData(realQR: PolisQuestionResponses | UnknownR
     for (const r of arr) {
       const parsed = safeJsonParse(r?.response);
       if (isPolisDemoFixturePayload(parsed)) continue;
+      if (!isPolisRealRowAllowedForSession(r, parsed, sessionSlug)) continue;
       if (parsed && typeof parsed === 'object' && parsed.type) {
         firstType = parsed.type;
         firstPrompt = parsed.prompt || '(No prompt)';
@@ -1016,6 +1032,7 @@ function buildRatingMatrixFromRealData(realQR: PolisQuestionResponses | UnknownR
       const parsed = safeJsonParse(r?.response);
       if (!parsed || parsed.type !== 'binary') continue;
       if (isPolisDemoFixturePayload(parsed)) continue;
+      if (!isPolisRealRowAllowedForSession(r, parsed, sessionSlug)) continue;
       const answer = asRecord(parsed.answer);
       if (answer.encrypted) continue;
 
