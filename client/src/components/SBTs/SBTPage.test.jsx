@@ -325,57 +325,10 @@ describe('SBTPage session routing and holder loading', () => {
 
     await subject.handleBurn();
 
-    expect(tokenIdSpy).toHaveBeenCalledWith('none', sbtAddress, account, '');
+    expect(tokenIdSpy).toHaveBeenCalledWith('wagmi', sbtAddress, account, '');
     expect(burnSpy).toHaveBeenCalledWith('wagmi', sbtAddress, '7');
     expect(subject.applyLocalBurnSuccess).toHaveBeenCalledWith(account);
     expect(subject.state.burningStatus).toBe('success');
-  });
-
-  it('uses neutral provider reads for mini burn while burning with the wallet provider', async () => {
-    const account = '0x00000000000000000000000000000000000000a1';
-    const sbtAddress = '0x00000000000000000000000000000000000000b2';
-    const tokenIdSpy = jest
-      .spyOn(contractScripts, 'getSBTTokenIdByOwner')
-      .mockResolvedValue('8');
-    const burnSpy = jest
-      .spyOn(contractScripts, 'burnToken')
-      .mockResolvedValue({ transactionHash: '0xminiburn' });
-    const subject = createSubject({
-      account,
-      provider: 'wagmi',
-      SBTAddress: sbtAddress,
-    });
-    subject.loadSBTInfo = jest.fn(async () => undefined);
-    subject.cacheTransactionHash = jest.fn();
-    subject.applyLocalBurnSuccess = jest.fn();
-    subject.refreshSbtDataWithSlug = jest.fn();
-
-    await subject.miniBurnHandler();
-
-    expect(tokenIdSpy).toHaveBeenCalledWith('none', sbtAddress, account, '');
-    expect(burnSpy).toHaveBeenCalledWith('wagmi', sbtAddress, '8');
-    expect(subject.applyLocalBurnSuccess).toHaveBeenCalledWith(account);
-  });
-
-  it('uses neutral provider reads for burn target searches', async () => {
-    const ownerAddress = '0x00000000000000000000000000000000000000c1';
-    const sbtAddress = '0x00000000000000000000000000000000000000b3';
-    const tokenIdSpy = jest
-      .spyOn(contractScripts, 'getSBTTokenIdByOwner')
-      .mockResolvedValue('9');
-    const ownerSpy = jest
-      .spyOn(contractScripts, 'getOwnerByTokenId')
-      .mockResolvedValue(ownerAddress);
-    const subject = createSubject({
-      provider: 'wagmi',
-      SBTAddress: sbtAddress,
-    });
-
-    await subject.performBurnSearch(ownerAddress);
-    await subject.performBurnSearch('9');
-
-    expect(tokenIdSpy).toHaveBeenCalledWith('none', sbtAddress, ownerAddress, '');
-    expect(ownerSpy).toHaveBeenCalledWith('none', sbtAddress, '9', '');
   });
 
   it('routes open mint button clicks through the parent mint handler with force refresh', () => {

@@ -800,7 +800,8 @@ export const resolveSbtPageBurnButtonState = ({
   const canOwnerBurn = !!userHasSBT && (
     burnAuth === 1 ||
     burnAuth === 2 ||
-    (burnAuth === 0 && !!adminAddr && adminAddr.toLowerCase() === userAddressLower)
+    (burnAuth === 0 && !!adminAddr && adminAddr.toLowerCase() === userAddressLower) ||
+    (burnAuth === 1 && !!userHasSBT)
   );
   return {
     canOwnerBurn,
