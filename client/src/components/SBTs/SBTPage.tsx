@@ -3507,9 +3507,8 @@ class SBTPage extends Component<any, any> {
     const bookmarksSlug = String(
       this.state?.resolvedSessionSlug ??
       this.props?.activeSessionSlug ??
-      this.props?.activeSessionSlug ??
       this.props?.sessionSlug ??
-      this.props?.sessionSlug ??
+      this.props?.slug ??
       ''
     );
 
