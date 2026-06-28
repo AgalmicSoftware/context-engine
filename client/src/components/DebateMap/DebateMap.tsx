@@ -235,6 +235,11 @@ interface HistoricalCaseBrief {
   precedentPressure: HistoricalFieldRow[];
 }
 
+type HistoricalCaseBriefBuilder = (
+  historicalCase: HistoricalCase,
+  content?: DebateNode,
+) => HistoricalCaseBrief;
+
 interface HistoricalCase {
   id?: string;
   title?: string;
@@ -262,6 +267,8 @@ interface HistoricalCase {
   precedent_pressure?: Record<string, unknown>;
   [key: string]: any;
 }
+
+const EMPTY_HISTORICAL_CASES: HistoricalCase[] = [];
 
 interface DebateNode {
   id?: string;
@@ -830,6 +837,36 @@ export const buildHistoricalCaseBrief = (
       { key: 'future_case_at_risk', label: 'Future case at risk' },
     ]),
   };
+};
+
+const getHistoricalCaseCardKey = (historicalCase: HistoricalCase, caseIndex: number): string => {
+  const title = String(historicalCase?.title || historicalCase?.id || '').trim();
+  return String(historicalCase?.id || `${title}-${caseIndex}`);
+};
+
+export const buildExpandedHistoricalCaseBriefMap = (
+  historicalCases: HistoricalCase[] = EMPTY_HISTORICAL_CASES,
+  content: DebateNode = {},
+  expandedCaseKey = '',
+  buildBrief: HistoricalCaseBriefBuilder = buildHistoricalCaseBrief,
+): Map<string, HistoricalCaseBrief> => {
+  const normalizedExpandedKey = String(expandedCaseKey || '').trim();
+  const briefMap = new Map<string, HistoricalCaseBrief>();
+  if (!normalizedExpandedKey) return briefMap;
+
+  historicalCases.forEach((historicalCase, caseIndex) => {
+    if (!historicalCase || typeof historicalCase !== 'object') return;
+
+    const title = String(historicalCase.title || historicalCase.id || '').trim();
+    if (!title) return;
+
+    const caseKey = getHistoricalCaseCardKey(historicalCase, caseIndex);
+    if (caseKey !== normalizedExpandedKey) return;
+
+    briefMap.set(caseKey, buildBrief(historicalCase, content));
+  });
+
+  return briefMap;
 };
 
 const getHistoricalCompassSpreadY = (name: string): number => (
@@ -2086,19 +2123,19 @@ const Modal = ({ isOpen, onClose, content, onVote, copied, onCopy, onTagClick }:
     };
   }, [content]);
 
-  const historicalCases = Array.isArray(content?.historicalCases) ? content.historicalCases : EMPTY_HISTORICAL_CASES;
-  const historicalCaseBriefContent = useMemo<DebateNode>(
-    () => ({
-      id: content?.id,
-      name: content?.name,
-      compass: content?.compass,
-    }),
-    [content?.id, content?.name, content?.compass],
-  );
-  const expandedHistoricalCaseBriefs = useMemo(
-    () => buildExpandedHistoricalCaseBriefMap(historicalCases, historicalCaseBriefContent, expandedHistoricalCaseId),
-    [expandedHistoricalCaseId, historicalCaseBriefContent, historicalCases],
-  );
+  const historicalCases = Array.isArray(content?.historicalCases)
+    ? content.historicalCases
+    : EMPTY_HISTORICAL_CASES;
+  const historicalCaseBriefContent = useMemo<DebateNode>(() => ({
+    id: content?.id,
+    name: content?.name,
+    compass: content?.compass,
+  }), [content?.id, content?.name, content?.compass]);
+  const expandedHistoricalCaseBriefs = useMemo(() => buildExpandedHistoricalCaseBriefMap(
+    historicalCases,
+    historicalCaseBriefContent,
+    expandedHistoricalCaseId,
+  ), [expandedHistoricalCaseId, historicalCaseBriefContent, historicalCases]);
 
   if (!isOpen || !content) return null;
 
@@ -2214,7 +2251,9 @@ const Modal = ({ isOpen, onClose, content, onVote, copied, onCopy, onTagClick }:
     if (!title) return null;
 
     const authors = normalizeHistoricalCaseTextList(historicalCase.authors);
-    const tagsList = Array.isArray(historicalCase.tags) ? historicalCase.tags.filter(Boolean) : [];
+    const tagsList = Array.isArray(historicalCase.tags)
+      ? historicalCase.tags.filter(Boolean)
+      : [];
     const caseKey = getHistoricalCaseCardKey(historicalCase, caseIndex);
     const isExpanded = expandedHistoricalCaseId === caseKey;
     const detailPanelId = `historical-case-${caseKey}`;
@@ -2225,21 +2264,9 @@ const Modal = ({ isOpen, onClose, content, onVote, copied, onCopy, onTagClick }:
       historicalCase.venue,
       historicalCase.year,
     ].filter(Boolean);
-    const normalizedBestPatch = brief
-      ? String(brief.bestPatch || '')
-          .trim()
-          .toLowerCase()
-      : '';
-    const hasBestPatchCard =
-      Boolean(normalizedBestPatch) &&
-      Boolean(
-        brief?.patchOptions.some(
-          (patch) =>
-            String(patch?.name || '')
-              .trim()
-              .toLowerCase() === normalizedBestPatch,
-        ),
-      );
+    const normalizedBestPatch = brief ? String(brief.bestPatch || '').trim().toLowerCase() : '';
+    const hasBestPatchCard = Boolean(normalizedBestPatch)
+      && Boolean(brief?.patchOptions.some((patch) => String(patch?.name || '').trim().toLowerCase() === normalizedBestPatch));
 
     return (
       <div
@@ -2277,7 +2304,11 @@ const Modal = ({ isOpen, onClose, content, onVote, copied, onCopy, onTagClick }:
             ) : null}
           </div>
         </div>
-        {historicalCase.summary ? <div className={styles.historicalCaseSummary}>{historicalCase.summary}</div> : null}
+        {historicalCase.summary ? (
+          <div className={styles.historicalCaseSummary}>
+            {historicalCase.summary}
+          </div>
+        ) : null}
         {isExpanded && brief && (
           <div
             id={detailPanelId}

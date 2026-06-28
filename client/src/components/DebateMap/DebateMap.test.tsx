@@ -655,7 +655,7 @@ describe('DebateMap', () => {
   it('builds historical case briefs only for the expanded case key', () => {
     const brief = buildHistoricalCaseBriefAny(
       { title: 'Expanded case', summary: 'Expanded summary.' },
-      { name: 'Liability Frameworks' },
+      { name: 'Liability Frameworks' }
     );
     const buildBrief = jest.fn(() => brief);
     const historicalCases = [
@@ -667,7 +667,7 @@ describe('DebateMap', () => {
       historicalCases,
       { id: 'node-a', name: 'Liability Frameworks' },
       '',
-      buildBrief,
+      buildBrief
     );
     expect(collapsedBriefs.size).toBe(0);
     expect(buildBrief).not.toHaveBeenCalled();
@@ -676,11 +676,14 @@ describe('DebateMap', () => {
       historicalCases,
       { id: 'node-a', name: 'Liability Frameworks' },
       'expanded-case',
-      buildBrief,
+      buildBrief
     );
 
     expect(buildBrief).toHaveBeenCalledTimes(1);
-    expect(buildBrief).toHaveBeenCalledWith(historicalCases[1], { id: 'node-a', name: 'Liability Frameworks' });
+    expect(buildBrief).toHaveBeenCalledWith(
+      historicalCases[1],
+      { id: 'node-a', name: 'Liability Frameworks' }
+    );
     expect(expandedBriefs.get('expanded-case')).toBe(brief);
   });
 
