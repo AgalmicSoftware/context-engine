@@ -4263,7 +4263,7 @@ const SessionWizard = ({
       }
       if (gate.registryRepresentable === false) {
         throw new Error(
-          `Resource "${key}" uses multiple gate groups with All semantics, which cannot be encoded on-chain. Pick one resource gate or use Any-mode gates only.`,
+          `Resource "${key}" uses multiple gate groups with All semantics, which cannot be encoded on-chain. Pick one resource gate or use Any-mode gates only.`
         );
       }
       const prev = gateSelections?.[key] || {};

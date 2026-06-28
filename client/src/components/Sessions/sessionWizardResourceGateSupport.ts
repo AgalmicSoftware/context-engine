@@ -30,6 +30,8 @@ type SessionWizardResolvedResourceGate = {
     chainIdConflicts: boolean;
     perMemberLimitConflicts: boolean;
   };
+  registryRepresentable: boolean;
+  registryUnsupportedReason: string;
 };
 
 export const buildSessionWizardGateOptions = (

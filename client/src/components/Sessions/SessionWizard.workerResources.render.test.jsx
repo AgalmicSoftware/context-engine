@@ -4,6 +4,7 @@ import {
   ethers,
   fireEvent,
   getWizardResourceCard,
+  mockRegisterSessionOnChain,
   renderLoggedInSessionWizard,
   renderSessionWizard,
   renderSessionWizardWithTooltipStore,
@@ -17,6 +18,11 @@ import {
 
 describe('SessionWizard worker resource rendering', () => {
   beforeEach(resetSessionWizardWorkerPanelTestState);
+
+  const openPublishSection = async () => {
+    fireEvent.click(screen.getByText('Publish').closest('button'));
+    return screen.findByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
+  };
 
   it('keeps session storage profile selection in advanced mode and defaults to Arweave', async () => {
     renderLoggedInSessionWizard();
@@ -49,6 +55,114 @@ describe('SessionWizard worker resource rendering', () => {
     fireEvent.click(screen.getByRole('radio', { name: 'Public read' }));
     expect(screen.getByRole('radio', { name: 'Public read' })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByText(/serves reads through the session worker without wallet auth/i)).toBeInTheDocument();
+  });
+
+  it('keeps Arweave storage choices separate from Cloudflare payload access controls', async () => {
+    renderLoggedInSessionWizard();
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    enableAdvancedMode();
+    fireEvent.click(screen.getByRole('button', { name: 'Session Storage expand' }));
+
+    expect(screen.getByRole('radio', { name: 'Arweave' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.queryByRole('radio', { name: 'Public read' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: 'Worker SBT gate' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: 'Lit encrypted' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Lit-Arweave' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('radio', { name: 'Lit-Arweave' })).toHaveAttribute('aria-checked', 'true');
+    });
+    expect(screen.getByText(/Lit-Arweave stores encrypted Arweave payloads/i)).toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: 'Public read' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Cloudflare stores canonical CE payloads/i)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Cloudflare' }));
+    expect(screen.getByRole('radio', { name: 'Worker SBT gate' })).toHaveAttribute('aria-checked', 'true');
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Arweave' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('radio', { name: 'Arweave' })).toHaveAttribute('aria-checked', 'true');
+    });
+    expect(screen.queryByRole('radio', { name: 'Public read' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Cloudflare stores canonical CE payloads/i)).not.toBeInTheDocument();
+  });
+
+  it('shows Lit-encrypted Cloudflare copy while keeping Arweave credentials in worker resources', async () => {
+    renderLoggedInSessionWizard();
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    enableAdvancedMode();
+    fireEvent.click(screen.getByRole('button', { name: 'Session Storage expand' }));
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Cloudflare' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Lit encrypted' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('radio', { name: 'Lit encrypted' })).toHaveAttribute('aria-checked', 'true');
+    });
+    expect(screen.getByText(/Lit-encrypted mode is configured for encrypted Cloudflare payload envelopes/i))
+      .toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
+
+    const arweaveCard = await waitFor(() => {
+      const card = getWizardResourceCard('arweave');
+      expect(card).toBeTruthy();
+      return card;
+    });
+    expect(within(arweaveCard).getByText('Arweave JWK *')).toBeInTheDocument();
+    expect(within(arweaveCard).getByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK)).toBeInTheDocument();
+  });
+
+  it('blocks publishing worker resources with unrepresentable All gate groups', async () => {
+    localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
+      draft: {
+        sessionName: 'Unrepresentable All Gates',
+        slug: 'unrepresentable-all-gates',
+        networkChainId: 11155420,
+      },
+      encryptionGates: [
+        {
+          id: 'gate-all-a',
+          label: 'All A',
+          mode: 'all',
+          chainId: 11155420,
+          sbts: [{ address: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', name: 'All A SBT' }],
+        },
+        {
+          id: 'gate-all-b',
+          label: 'All B',
+          mode: 'all',
+          chainId: 11155420,
+          sbts: [{ address: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', name: 'All B SBT' }],
+        },
+      ],
+      defaultGateId: 'gate-all-a',
+      resourceGateMap: {
+        ai: ['gate-all-a', 'gate-all-b'],
+      },
+    }));
+
+    renderLoggedInSessionWizard();
+    enableAdvancedMode();
+
+    const publishButton = await openPublishSection();
+    fireEvent.click(screen.getByLabelText('Advanced publish settings'));
+    fireEvent.change(screen.getByPlaceholderText(/ar:\/\/<txId>/i), {
+      target: { value: `ar://${'c'.repeat(43)}` },
+    });
+
+    await waitFor(() => {
+      expect(publishButton).not.toBeDisabled();
+    });
+
+    fireEvent.click(publishButton);
+
+    expect(await screen.findByText(/Resource "ai" uses multiple gate groups with All semantics/i)).toBeInTheDocument();
+    expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
   });
 
   it('hides Lit worker inputs for Cloudflare worker SBT gate mode and restores them for Lit encrypted mode', async () => {
