@@ -254,7 +254,39 @@ interface DisagreementRange {
 interface AtlasLink {
   source: { x: number; y: number };
   target: { x: number; y: number };
+  sourceId?: string;
+  targetId?: string;
 }
+
+export const getDebateNodeStableKey = (
+  node: Pick<DebateNode, 'id' | 'name'> | null | undefined,
+  fallback: string
+): string => {
+  const nodeId = String(node?.id || '').trim();
+  if (nodeId) return nodeId;
+  const nodeName = String(node?.name || '').trim();
+  if (nodeName) return nodeName;
+  return fallback;
+};
+
+const formatAtlasLinkCoordinate = (value: unknown): string => {
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? numericValue.toFixed(3) : '0.000';
+};
+
+export const getAtlasLinkStableKey = (link: AtlasLink, fallbackIndex: number): string => {
+  const sourceId = String(link?.sourceId || '').trim();
+  const targetId = String(link?.targetId || '').trim();
+  if (sourceId || targetId) return `${sourceId || 'source'}->${targetId || 'target'}`;
+  return [
+    'coords',
+    formatAtlasLinkCoordinate(link?.source?.x),
+    formatAtlasLinkCoordinate(link?.source?.y),
+    formatAtlasLinkCoordinate(link?.target?.x),
+    formatAtlasLinkCoordinate(link?.target?.y),
+    fallbackIndex,
+  ].join(':');
+};
 
 interface AtlasRenderNode extends DebateNode {
   x: number;
@@ -1475,7 +1507,9 @@ const OrbitalAtlasView = ({
           if (parent.id !== 'virtual-root') {
               links.push({
                   source: { x: parentX, y: parentY },
-                  target: { x: nodeX, y: nodeY }
+                  target: { x: nodeX, y: nodeY },
+                  sourceId: String(parent.id || '').trim(),
+                  targetId: String(child.id || '').trim(),
               });
           }
 
@@ -1547,7 +1581,7 @@ const OrbitalAtlasView = ({
 
       <svg className={styles.atlasSvgLayer}>
         {layout.links.map((link, i) => (
-          <line key={i} x1={cx + link.source.x} y1={cy + link.source.y} x2={cx + link.target.x} y2={cy + link.target.y} />
+          <line key={getAtlasLinkStableKey(link, i)} x1={cx + link.source.x} y1={cy + link.source.y} x2={cx + link.target.x} y2={cy + link.target.y} />
         ))}
       </svg>
 
@@ -1560,7 +1594,7 @@ const OrbitalAtlasView = ({
 
         return (
           <div
-            key={i}
+            key={getDebateNodeStableKey(node, `atlas-node-${i}`)}
             className={`${styles.atlasNode} ${styles[node.depthClass]} ${isHovered ? styles.hovered : ''}`}
             style={{
                 left: cx + node.x,
@@ -2830,7 +2864,7 @@ const TreeNode = ({
            >
               {sortedChildren.map((child: DebateNode, i: number) => (
                 <TreeNode
-                  key={i}
+                  key={getDebateNodeStableKey(child, `tree-child-${i}`)}
                   node={child}
                   depth={depth + 1}
                   parentPath={[...parentPath, node]}
@@ -3229,7 +3263,7 @@ const DebateMap = ({
         {visualMode === DEBATE_VISUAL_MODES.TREE && (
           <div className={styles.categorySelector}>
              {treeDataState.map((cat, i) => (
-               <button key={i} className={`${styles.categoryButton} ${selectedCategory?.id === cat.id ? styles.active : ''}`} onClick={() => handleCategoryClick(cat)}>{cat.name}</button>
+               <button key={getDebateNodeStableKey(cat, `category-${i}`)} className={`${styles.categoryButton} ${selectedCategory?.id === cat.id ? styles.active : ''}`} onClick={() => handleCategoryClick(cat)}>{cat.name}</button>
              ))}
           </div>
         )}
@@ -3238,7 +3272,7 @@ const DebateMap = ({
            {visualMode === DEBATE_VISUAL_MODES.LIST ? (
              <div className={styles.flatListContainer}>
                 {sortedNodes.map((node, i) => (
-                  <FlatNode key={i} node={node} parentPath={node.parentPath} onNodeClick={handleNodeClick} onBookmark={handleBookmark} bookmarkedNodes={bookmarkedNodes} />
+                  <FlatNode key={getDebateNodeStableKey(node, `list-node-${i}`)} node={node} parentPath={node.parentPath} onNodeClick={handleNodeClick} onBookmark={handleBookmark} bookmarkedNodes={bookmarkedNodes} />
                 ))}
              </div>
            ) : isAtlasVisualMode ? (
