@@ -175,7 +175,7 @@ test('worker serves the short Agent Village Wrapped skill route', async () => {
 
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
-  assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-agent-village-wrapped\/SKILL\.md/);
+  assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/d3a51ecdc72529fb1b13ed8124c8ec25ab37a09d\/workers\/agentBridgeWorker\/skills\/ce-agent-village-wrapped\/SKILL\.md/);
   assert.match(location, /v=2026-06-27-wrapped-v21-/);
 });
 
@@ -184,7 +184,7 @@ test('worker serves the short Agent Village Wrapped skill route to HEAD probes',
 
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
-  assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-agent-village-wrapped\/SKILL\.md/);
+  assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/d3a51ecdc72529fb1b13ed8124c8ec25ab37a09d\/workers\/agentBridgeWorker\/skills\/ce-agent-village-wrapped\/SKILL\.md/);
   assert.match(location, /v=2026-06-27-wrapped-v21-/);
 });
 
