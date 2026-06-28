@@ -1115,6 +1115,78 @@ describe('createSessionSbtCacheController', () => {
       }));
     });
 
+    it('completes full scan holder writes when user cache has malformed SBT rows', async () => {
+      const sbtAddress = '0x0000000000000000000000000000000000000f02';
+      const holder = '0x0000000000000000000000000000000000000abc';
+      const sbtMetadata = createCompleteSbtMetadata({
+        name: 'Full Scan Holder SBT',
+        creationBlock: 10,
+      });
+      const host = createMockHost({
+        currentPath: '/dashboard',
+        initialStorage: {
+          userCache: {
+            alpha: {
+              [holder]: {
+                11155420: {
+                  lastBlockScanned: 9,
+                  lastScanTimestamp: 1,
+                  data: {
+                    sbts: [
+                      { sbtInfo: { name: 'legacy row without address' } },
+                    ],
+                    createdSurveys: [],
+                    createdQuestions: [],
+                    surveyResponses: [],
+                    questionResponses: [],
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+      const controller = createSessionSbtCacheController(host);
+
+      contractScripts.getRelevantBlockWindowForFilter.mockResolvedValueOnce({ fromBlock: 10, toBlock: 12 });
+      contractScripts.getSbtsCreated.mockResolvedValueOnce([
+        { sbtAddress, creationBlock: 10 },
+      ]);
+      contractScripts.getSbtMetadata.mockResolvedValueOnce(sbtMetadata);
+      contractScripts.getSbtMintBurnCountsByAddress.mockResolvedValueOnce({
+        ok: true,
+        mintedCountByAddress: {
+          [holder]: 1,
+        },
+        burnedCountByAddress: {},
+        mintedEventCount: 1,
+        burnedEventCount: 0,
+      });
+
+      await controller.initializeSbtCacheForGroup('alpha', { mode: 'full' });
+
+      const storedUserCache = host.getStored('userCache', 'alpha');
+      const storedSbtCache = host.getStored('sbtCache', 'alpha');
+
+      expect(storedSbtCache[11155420]).toEqual(expect.objectContaining({
+        lastBlock: 12,
+        sbtList: expect.objectContaining({
+          [sbtAddress.toLowerCase()]: expect.objectContaining({
+            sbtAddress,
+            sbtInfo: expect.objectContaining({ name: 'Full Scan Holder SBT' }),
+          }),
+        }),
+      }));
+      expect(storedUserCache[holder][11155420].data.sbts).toEqual([
+        { sbtInfo: { name: 'legacy row without address' } },
+        {
+          sbtAddress,
+          sbtInfo: expect.objectContaining({ name: 'Full Scan Holder SBT' }),
+        },
+      ]);
+      expect(host.writeFlag).toHaveBeenCalledWith('sbt:fullScanInProgress', 'alpha', false);
+    });
+
     it('deduplicates concurrent light discovery calls for the same in-flight key', async () => {
       const host = createMockHost();
       const controller = createSessionSbtCacheController(host);

@@ -1275,7 +1275,8 @@ export const createSessionSbtCacheController = (host = {}) => {
                 if (!uData.sbts) uData.sbts = [];
 
                 // Idempotency check: Prevent duplicate SBT entries
-                if (!uData.sbts.some(s => s.sbtAddress.toLowerCase() === result.sbtAddress.toLowerCase())) {
+                const resultSbtAddressLower = String(result.sbtAddress || '').toLowerCase();
+                if (!uData.sbts.some(s => String(s?.sbtAddress || '').toLowerCase() === resultSbtAddressLower)) {
                   uData.sbts.push({
                     sbtAddress: result.sbtAddress,
                     sbtInfo: result.sbtInfo
