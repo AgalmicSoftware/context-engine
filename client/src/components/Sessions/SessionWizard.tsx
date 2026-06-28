@@ -3312,60 +3312,69 @@ const SessionWizard = ({
     return deployedDrafts;
   };
 
+  const resolveAvailableRegisterIdentity = async () => {
+    const registerIdentityDescriptor = resolveSessionWizardRegisterIdentityDescriptor({
+      draftSlug: draft.slug,
+      sessionId,
+      registryChainId,
+      sessionNetworkChainId: draft.networkChainId,
+      registryAddress,
+    });
+    if (registerIdentityDescriptor.status === 'blocked') {
+      throw new Error(registerIdentityDescriptor.statusMessage);
+    }
+    const {
+      registrySlug,
+      sessionIdHexValue,
+      registryChainIdValue,
+    } = registerIdentityDescriptor;
+    try {
+      const registerDuplicateCheckDescriptor = resolveSessionWizardRegisterDuplicateCheckDescriptor({
+        registryChainId: registryChainIdValue,
+        registrySlug,
+        sessionIdHexValue,
+      });
+      const registryRead = sessionRegistryUtils.getRegistryContract(
+        registerDuplicateCheckDescriptor.chainId,
+        null
+      ) as SessionRegistryReadContract | null;
+      if (registryRead) {
+        if (
+          registerDuplicateCheckDescriptor.shouldCheckSlug &&
+          typeof registryRead.sessionExists === 'function'
+        ) {
+          const slugExists = await registryRead.sessionExists(registerDuplicateCheckDescriptor.registrySlug);
+          if (slugExists) {
+            throw new Error(registerDuplicateCheckDescriptor.slugDuplicateMessage);
+          }
+        }
+        if (
+          registerDuplicateCheckDescriptor.shouldCheckSessionId &&
+          typeof registryRead.sessionIdExists === 'function'
+        ) {
+          const idExists = await registryRead.sessionIdExists(registerDuplicateCheckDescriptor.sessionIdHexValue);
+          if (idExists) {
+            throw new Error(registerDuplicateCheckDescriptor.sessionIdDuplicateMessage);
+          }
+        }
+      }
+    } catch (err) {
+      if (getSessionWizardErrorMessage(err)) throw err;
+    }
+    return registerIdentityDescriptor;
+  };
+
   const handleRegisterGroup = async ({
     metadataUriOverride,
     sessionFieldsOverride,
   }: SessionWizardRegisterGroupArgs = {}) => {
     try {
-      const registerIdentityDescriptor = resolveSessionWizardRegisterIdentityDescriptor({
-        draftSlug: draft.slug,
-        sessionId,
-        registryChainId,
-        sessionNetworkChainId: draft.networkChainId,
-        registryAddress,
-      });
-      if (registerIdentityDescriptor.status === 'blocked') {
-        throw new Error(registerIdentityDescriptor.statusMessage);
-      }
+      const registerIdentityDescriptor = await resolveAvailableRegisterIdentity();
       const {
         registrySlug,
         sessionIdHexValue,
         registryChainIdValue,
       } = registerIdentityDescriptor;
-      try {
-        const registerDuplicateCheckDescriptor = resolveSessionWizardRegisterDuplicateCheckDescriptor({
-          registryChainId: registryChainIdValue,
-          registrySlug,
-          sessionIdHexValue,
-        });
-        const registryRead = sessionRegistryUtils.getRegistryContract(
-          registerDuplicateCheckDescriptor.chainId,
-          null
-        ) as SessionRegistryReadContract | null;
-        if (registryRead) {
-          if (
-            registerDuplicateCheckDescriptor.shouldCheckSlug &&
-            typeof registryRead.sessionExists === 'function'
-          ) {
-            const slugExists = await registryRead.sessionExists(registerDuplicateCheckDescriptor.registrySlug);
-            if (slugExists) {
-              throw new Error(registerDuplicateCheckDescriptor.slugDuplicateMessage);
-            }
-          }
-          if (
-            registerDuplicateCheckDescriptor.shouldCheckSessionId &&
-            typeof registryRead.sessionIdExists === 'function'
-          ) {
-            const idExists = await registryRead.sessionIdExists(registerDuplicateCheckDescriptor.sessionIdHexValue);
-            if (idExists) {
-              throw new Error(registerDuplicateCheckDescriptor.sessionIdDuplicateMessage);
-            }
-          }
-        }
-      } catch (err) {
-        if (getSessionWizardErrorMessage(err)) throw err;
-      }
-
       const registerPreflightDescriptor = resolveSessionWizardRegisterPreflightDescriptor({
         providerLike: provider,
         registryChainId: registryChainIdValue,
@@ -3460,6 +3469,14 @@ const SessionWizard = ({
       if (publishStartPreflightDescriptor.statusMessage) {
         setStatus(publishStartPreflightDescriptor.statusMessage);
       }
+      return;
+    }
+    try {
+      await resolveAvailableRegisterIdentity();
+    } catch (err) {
+      const publishFailureSettlement = resolveSessionWizardPublishFailureSettlementDescriptor({ error: err });
+      setStatus(publishFailureSettlement.errorMessage);
+      setPublishStep(publishFailureSettlement.publishStep);
       return;
     }
     setPublishStep(0);

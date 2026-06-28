@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import {
   normalizeSparseSponsoredBundlePayload,
 } from '../../../utilities/arweave/sponsoredBundles.js';
@@ -174,6 +174,7 @@ const useSessionWizardWorkerDeploy = ({
     resolvedWalletAccountRef,
     sponsoredBundleAppliedBundleRef,
   } = refs;
+  const deployRequestInFlightRef = useRef(false);
 
   const resolveConnectedAdminAddress = useCallback(async () => {
     const runtime = readRuntime(runtimeRef);
@@ -210,6 +211,12 @@ const useSessionWizardWorkerDeploy = ({
   }, [resolvedWalletAccountRef, runtimeRef, setDeployForm]);
 
   const handleDeployWorker = useCallback(async (options: { forceSponsoredAutoDeploy?: boolean } = {}) => {
+    if (deployRequestInFlightRef.current) {
+      const inFlightMessage = 'Worker deploy already in progress.';
+      updateDeploymentState({ deployStatus: inFlightMessage });
+      return { ok: false, skipped: true, error: inFlightMessage };
+    }
+    deployRequestInFlightRef.current = true;
     let helperBase = '';
     const forceSponsoredAutoDeploy = options?.forceSponsoredAutoDeploy === true;
     let effectiveBundleMode = 'upload';
@@ -741,6 +748,7 @@ const useSessionWizardWorkerDeploy = ({
         error: errorMessage,
       };
     } finally {
+      deployRequestInFlightRef.current = false;
       updateDeploymentState({ deployInFlight: false });
     }
   }, [
