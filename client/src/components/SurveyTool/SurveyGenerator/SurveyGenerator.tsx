@@ -1233,7 +1233,9 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
       }
 
       const photoAnalysisBySourceId = await analyzeQueuedPhotoSources(effectiveSources);
+      if (abortedRef.current) return;
       const savedDocRefs = await saveQueuedSourcesToDocLibrary(effectiveSources, photoAnalysisBySourceId);
+      if (abortedRef.current) return;
       const savedDocRefsBySourceId = new Map(
         savedDocRefs
           .filter((entry: UploadedSourceDocRef) => entry?.sourceId)
