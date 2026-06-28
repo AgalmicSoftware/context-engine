@@ -22,6 +22,10 @@ import { deserializeFilterState } from '../../utilities/survey/filterStateUtils.
 import { notify } from '../../utilities/ui/notify.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
+  buildPublicRoute,
+  stripPublicUrlBasePath,
+} from '../../utilities/ui/publicUrl.js';
+import {
   resolveContractPageActiveSession,
   resolveContractPageReferrerSlug,
 } from './contractPageSessionResolution.js';
@@ -66,7 +70,7 @@ const buildContractsForViewer = buildContractViewerContracts as (options?: {
 
 export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }: ContractPageProps) => {
   // Parse potential slug/key from URL: /contracts/:slugOrKey
-  const path = (typeof window !== 'undefined' ? window.location.pathname : '') || '';
+  const path = stripPublicUrlBasePath((typeof window !== 'undefined' ? window.location.pathname : '') || '');
   const search = (typeof window !== 'undefined' ? window.location.search : '') || '';
   const parts = path.split('/').filter(Boolean);
   const urlSlugLike = parts[0] === 'contracts' && parts.length > 1 ? parts[1] : undefined;
@@ -100,8 +104,9 @@ export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }: Cont
     const nextUrl = new URL(window.location.href);
     let changed = false;
 
-    if (nextUrl.pathname !== '/contracts') {
-      nextUrl.pathname = '/contracts';
+    const contractsPath = buildPublicRoute('/contracts');
+    if (nextUrl.pathname !== contractsPath) {
+      nextUrl.pathname = contractsPath;
       changed = true;
     }
 
@@ -188,7 +193,7 @@ export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }: Cont
         ? {
             ...contract,
             extraAction: (
-              <button onClick={() => (window.location.href = sbtsListPath())} className={styles.backButton}>
+              <button onClick={() => (window.location.href = buildPublicRoute(sbtsListPath()))} className={styles.backButton}>
                 <FontAwesomeIcon icon={faExpand} /> {`${t('sbts')} list`}
               </button>
             ),

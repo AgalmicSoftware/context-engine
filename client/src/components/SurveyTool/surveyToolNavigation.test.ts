@@ -6,7 +6,14 @@ import {
 } from './surveyToolNavigation.js';
 
 describe('surveyToolNavigation', () => {
+  const originalPublicUrl = process.env.PUBLIC_URL;
+
   beforeEach(() => {
+    if (typeof originalPublicUrl === 'undefined') {
+      delete process.env.PUBLIC_URL;
+    } else {
+      process.env.PUBLIC_URL = originalPublicUrl;
+    }
     window.history.pushState({}, '', '/session/edge/questions');
   });
 
@@ -39,5 +46,13 @@ describe('surveyToolNavigation', () => {
 
     window.history.pushState({}, '', '/questions/results');
     expect(applyExistingGroupPrefix('/questions/results')).toBe('/questions/results');
+  });
+
+  it('preserves the configured PUBLIC_URL base when deriving grouped result routes', () => {
+    process.env.PUBLIC_URL = '/ce/';
+    window.history.pushState({}, '', '/ce/session/edge/questions');
+
+    expect(applyExistingGroupPrefix('/questions/results')).toBe('/ce/session/edge/questions/results');
+    expect(applyExistingGroupPrefix('/question/q1?session=other')).toBe('/ce/question/q1?session=other');
   });
 });

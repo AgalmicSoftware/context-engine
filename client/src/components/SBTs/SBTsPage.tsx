@@ -24,6 +24,10 @@ import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { readSessionScanScope, readSessionScanSlugs } from '../../utilities/session/sessionScanScope.js';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import { isCryptoMode, sbtsListPath, t } from '../../utilities/ui/terminology.js';
+import {
+  buildPublicRoute,
+  stripPublicUrlBasePath,
+} from '../../utilities/ui/publicUrl.js';
 import defaultSbtImage from '../../assets/img/ce_circuit_logo.png';
 import {
   asSBTsPageFeaturedProgress as asFeaturedProgress,
@@ -458,7 +462,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
    * Canonicalize to the active terminology-aware list path when a non-empty slug is known (no reload).
    */
   getResolvedRouting() {
-    const path = (typeof window !== 'undefined' ? window.location.pathname : '') || '';
+    const path = stripPublicUrlBasePath((typeof window !== 'undefined' ? window.location.pathname : '') || '');
     const parts = path.split('/').filter(Boolean);
     const onSbtsRoute = parts[0] === 'sbts' || parts[0] === 'groups';
     const urlSlugLike = onSbtsRoute && parts.length > 1 ? parts[1] : undefined;
@@ -502,7 +506,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
 
     // Canonicalize (silent) if we are on /sbts and have a non-empty slug to show
     if (!isCreateRoute && urlHasNoSlug && canonicalSlug) {
-      try { window.history.replaceState(null, '', `${sbtsListPath()}/${canonicalSlug}`); } catch (e) { sbtLog.warn('SBTsPage: fallback', e); }
+      try { window.history.replaceState(null, '', buildPublicRoute(`${sbtsListPath()}/${canonicalSlug}`)); } catch (e) { sbtLog.warn('SBTsPage: fallback', e); }
       return { canonicalSlug, urlHasNoSlug: false, onSbtsRoute, isCreateRoute }; // URL is now canonical
     }
 
@@ -531,7 +535,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
           <div className={styles.container}>
             <div className={styles.buttonRow}>
               <button
-                onClick={() => (window.location.href = sbtsListPath())}
+                onClick={() => (window.location.href = buildPublicRoute(sbtsListPath()))}
                 className={styles.backButton}
               >
                 <FontAwesomeIcon icon={faExpand} /> {`Back to ${t('sbts')}`}
@@ -767,7 +771,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
               {!hideMiniActionRow && (
                 <div className={styles.buttonRow}>
                   <button
-                    onClick={() => (window.location.href = sbtsListPath())}
+                    onClick={() => (window.location.href = buildPublicRoute(sbtsListPath()))}
                     className={styles.backButton}
                   >
                     <FontAwesomeIcon icon={faExpand} /> View All

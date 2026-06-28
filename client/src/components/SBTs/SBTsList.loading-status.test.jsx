@@ -203,6 +203,33 @@ describe('SBTsList selector and initial loading status', () => {
     }
   });
 
+  it('treats PUBLIC_URL-prefixed all-groups routes as aliases', async () => {
+    const previousUrl = window.location.pathname || '/';
+    const previousPublicUrl = process.env.PUBLIC_URL;
+    process.env.PUBLIC_URL = '/ce/';
+    window.history.replaceState({}, '', `/ce${sbtsListPath()}`);
+
+    try {
+      renderSBTsList({
+        allSessionsMode: undefined,
+        isSBTCacheReady: false,
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText(/^Sessions$/i)).toBeInTheDocument();
+      });
+
+      expect(screen.getByText(/Collecting Live/i)).toBeInTheDocument();
+    } finally {
+      if (typeof previousPublicUrl === 'undefined') {
+        delete process.env.PUBLIC_URL;
+      } else {
+        process.env.PUBLIC_URL = previousPublicUrl;
+      }
+      window.history.replaceState({}, '', previousUrl);
+    }
+  });
+
   it('exits initial loader when all-groups mode has no configured slugs', async () => {
     localStorage.clear();
     mockGetAllSessionEntries.mockReturnValue([]);
