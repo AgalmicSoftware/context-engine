@@ -3302,7 +3302,7 @@ class SBTPage extends Component<any, any> {
 
       if (!sbtAddressOriginalCase) return;
 
-      const tokenIdToBurn = await contractScriptsUntyped.getSBTTokenIdByOwner(this.props.provider, sbtAddressOriginalCase, this.props.account, this.getEffectiveSessionSlug());
+      const tokenIdToBurn = await contractScriptsUntyped.getSBTTokenIdByOwner('none', sbtAddressOriginalCase, this.props.account, this.getEffectiveSessionSlug());
       if (!tokenIdToBurn) {
         if (this._isMounted) this.setState(buildSbtPageBurnFailurePatch({ error: "No valid token ID found" }));
         return;
@@ -3357,7 +3357,7 @@ class SBTPage extends Component<any, any> {
       // Full address search
       if (input.startsWith('0x') && input.length === 42) {
         const tokenId = await contractScriptsUntyped.getSBTTokenIdByOwner(
-          this.props.provider,
+          'none',
           sbtAddressOriginalCase,
           input,
           this.getEffectiveSessionSlug()
@@ -3373,7 +3373,7 @@ class SBTPage extends Component<any, any> {
       // Numeric tokenId search
       else if (/^\d+$/.test(input)) {
         const address = await contractScriptsUntyped.getOwnerByTokenId(
-          this.props.provider,
+          'none',
           sbtAddressOriginalCase,
           input,
           this.getEffectiveSessionSlug()
@@ -3427,7 +3427,7 @@ class SBTPage extends Component<any, any> {
       tokenIdToBurn = burnSearchResultRecord.tokenId;
       burnedAddrLower = burnSearchResultRecord.address ? String(burnSearchResultRecord.address).toLowerCase() : null;
     } else if (isOwnerBurn) {
-      tokenIdToBurn = await contractScriptsUntyped.getSBTTokenIdByOwner(this.props.provider, sbtAddressOriginalCase, this.props.account, this.getEffectiveSessionSlug());
+      tokenIdToBurn = await contractScriptsUntyped.getSBTTokenIdByOwner('none', sbtAddressOriginalCase, this.props.account, this.getEffectiveSessionSlug());
       burnedAddrLower = userAddress;
       if (!tokenIdToBurn) {
         if (this._isMounted) this.setState(buildSbtPageBurnFailurePatch({ error: "No valid token ID found" }));
