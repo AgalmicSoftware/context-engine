@@ -86,6 +86,32 @@ describe('loginSettingsSponsoredStatusHelpers', () => {
     });
   });
 
+  it('does not mark active session sponsored from another session sponsor access result', () => {
+    const activeSession = { slug: 'active', label: 'Active session' };
+    const otherSponsorSession = { slug: 'other', label: 'Other session', isActive: false };
+    const card = buildLoginSettingsSponsorshipCard({
+      activeSession,
+      key: 'rpc',
+      sponsoredAccess: {
+        rpc: { status: 'granted' },
+      },
+      sponsorSessions: {
+        byResource: {
+          rpc: [otherSponsorSession],
+        },
+      },
+      title: 'RPC',
+    });
+
+    expect(card.status).toEqual({
+      label: 'Not sponsored',
+      tone: 'muted',
+      detail: 'No sponsor key is configured for the active session.',
+    });
+    expect(card.activeSponsorSession).toBeNull();
+    expect(card.otherSponsorSessions).toEqual([otherSponsorSession]);
+  });
+
   it('builds settings sponsorship cards in the existing resource order', () => {
     const cards = buildLoginSettingsSponsorshipCards({
       activeSession: { slug: '', label: 'General' },
