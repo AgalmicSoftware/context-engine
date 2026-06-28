@@ -3156,8 +3156,10 @@ class QuestionFilter extends React.Component<any, any> {
                   min="1"
                   value={pendingTopQuestionsCount}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                    const val = e.target.value ? parseInt(e.target.value, 10) : 1;
-                    this.setState(buildQuestionFilterTopQuestionsCountPatch(val), () => {
+                    this.setState(buildQuestionFilterTopQuestionsCountPatch(
+                      e.target.value,
+                      DEFAULT_TOP_QUESTIONS_COUNT
+                    ), () => {
                       if (this.state.pendingShowTopQuestions || this.state.pendingShowTopQuestionsByResponses) { // Use this.state for check
                         this.handleApplyFilters(true);
                       }
@@ -3185,8 +3187,10 @@ class QuestionFilter extends React.Component<any, any> {
                   min="1"
                   value={pendingTopQuestionsCount}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                    const val = e.target.value ? parseInt(e.target.value, 10) : 1;
-                    this.setState(buildQuestionFilterTopQuestionsCountPatch(val), () => {
+                    this.setState(buildQuestionFilterTopQuestionsCountPatch(
+                      e.target.value,
+                      DEFAULT_TOP_QUESTIONS_COUNT
+                    ), () => {
                       if (this.state.pendingShowTopQuestions || this.state.pendingShowTopQuestionsByResponses) { // Use this.state for check
                         this.handleApplyFilters(true);
                       }
