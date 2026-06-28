@@ -237,7 +237,9 @@ export function deserializeFilterStateStrict(base64UrlString: string | null | un
     throw new Error('Filter state string is empty.');
   }
 
-  let base64String = base64UrlString.replace(/-/g, '+').replace(/_/g, '/');
+  let base64String = base64UrlString
+    .replace(/-/g, '+')
+    .replace(/_/g, '/');
   const paddingLength = base64String.length % 4;
   if (paddingLength === 1) {
     throw new Error('Filter state string is malformed.');

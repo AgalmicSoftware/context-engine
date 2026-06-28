@@ -259,7 +259,39 @@ describe('QuestionFilter AI ranking lifecycle', () => {
     expect(combinedResult.finalQuestions.map((q: any) => q.id)).toEqual(['q3', 'q1']);
   });
 
-  it('refreshes combined AI ranking when a tag filter changes the candidate subset', async () => {
+  it('ranks within the filtered subset when AI combine global top results miss it', () => {
+    const questions = [
+      { id: 'q1', type: 'binary', tags: ['alpha'], prompt: 'Q1' },
+      { id: 'q2', type: 'rating', tags: ['beta'], prompt: 'Q2' },
+      { id: 'q3', type: 'binary', tags: ['alpha'], prompt: 'Q3' },
+      { id: 'q4', type: 'freeform', tags: ['beta'], prompt: 'Q4' },
+    ];
+    const instance = new QuestionFilter({
+      questions,
+      questionResponses: {},
+      questionResponsesNonce: 1,
+      questionsCacheNonce: 1,
+    });
+    instance.state = {
+      ...instance.state,
+      mergedQuestions: questions,
+      pendingSelectedTypes: ['binary'],
+      pendingSbtFilteredQuestions: [{ id: 'q1' }, { id: 'q3' }],
+      pendingShowTopQuestions: false,
+      pendingShowTopQuestionsByResponses: false,
+      selectedTags: ['alpha'],
+      aiSearchQuery: 'climate',
+      aiAppliedTopN: 2,
+      aiFilterApplied: true,
+      aiRankedQuestionIds: ['q4', 'q2', 'q3', 'q1'],
+      aiCombineWithOtherFilters: true,
+    };
+
+    const combinedResult = instance.buildFilterPipelineResult(true);
+    expect(combinedResult.finalQuestions.map((q: any) => q.id)).toEqual(['q3', 'q1']);
+  });
+
+  it('auto-reapplies AI when external filter state carries aiFilter + aiTopN', async () => {
     jest.useFakeTimers();
     const gateSpy = jest
       .spyOn(sponsoredAccessAny, 'resolveSponsoredGateStateForResource')

@@ -7,7 +7,20 @@ import styles from './QuestionFilter.module.scss';
 import SBTFilter from '../SBTs/SBTFilter';
 import GateTooltip from '../Gates/GateTooltip';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSpinner, faLock, faPlus } from '@fortawesome/free-solid-svg-icons';
+import {
+  faFilter,
+  faChevronDown,
+  faStar,
+  faRobot,
+  faSpinner,
+  faLock,
+  faTimes,
+  faClipboard,
+  faBookmark,
+  faCheck,
+  faQuestionCircle,
+  faPlus
+} from '@fortawesome/free-solid-svg-icons';
 import { serializeFilterState, deserializeFilterStateStrict } from '../../utilities/survey/filterStateUtils.js';
 import { isFreeformBlankAnswer } from '../../utilities/survey/freeformAnswerUtils.js';
 import { toStr } from '../../utilities/shared/primitives.js';
