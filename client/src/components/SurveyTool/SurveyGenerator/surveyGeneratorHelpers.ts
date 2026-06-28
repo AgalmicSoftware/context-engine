@@ -568,7 +568,7 @@ export const buildSingleGenerationPrompt = ({
     .replace('<NumSeedStatements>', String(count))
     .replace('<Types>', typesStr)
     .replace(/<DefaultTags>/g, literalReplacement(defaultTagsStr))
-    .replace(/<SourceType>/g, literalReplacement(sourceType))
+    .replace('<SourceType>', toStr(sourceType))
     .replace('<MultiSpeakerHint>', toStr(multiSpeakerHint))
     .replace('<GroupCustomInstructions>', literalReplacement(sessionInstructions))
     .replace('<ClipDurationMinutes>', '');
