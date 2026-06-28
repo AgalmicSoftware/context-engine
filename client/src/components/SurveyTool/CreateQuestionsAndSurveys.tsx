@@ -474,45 +474,6 @@ type CreateSurveyGateOptionsResult = {
 type CreateSurveyGateOptionsArgs = {
   isStandaloneQuestion?: unknown;
 };
-interface CreateQuestionsAndSurveysGateSbt {
-  address?: string;
-  name?: string;
-  [key: string]: unknown;
-}
-type CreateSurveyEncryptionTargets = {
-  survey: boolean;
-  questions: boolean;
-  questionTags: boolean;
-  docUrls: boolean;
-};
-type CreateSurveyEncryptionGatePolicyGate = UnknownRecord & {
-  chainId?: unknown;
-  color?: unknown;
-  gateId?: unknown;
-  label?: unknown;
-  litChain?: unknown;
-  mode?: unknown;
-  sbtAddress?: unknown;
-  sbtAddresses?: unknown;
-  type?: unknown;
-};
-type CreateSurveyEncryptionRecipient = {
-  accessControlConditions?: unknown;
-  chain?: unknown;
-  [key: string]: unknown;
-};
-type CreateSurveyEncryptionConfig =
-  | { enabled: false }
-  | { enabled: true; error: string }
-  | {
-    enabled: true;
-    status: 'lit-v1';
-    gate: CreateSurveyEncryptionGatePolicyGate | null;
-    gates: CreateSurveyEncryptionGatePolicyGate[];
-    recipients: CreateSurveyEncryptionRecipient[];
-    targets: CreateSurveyEncryptionTargets;
-  };
-
 interface CreateQuestionsAndSurveysProps {
   account?: string;
   provider?: unknown;

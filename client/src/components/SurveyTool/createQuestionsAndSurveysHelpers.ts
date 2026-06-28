@@ -179,25 +179,6 @@ type BuildCreateSurveyGateObjectsAndRecipientsArgs = {
   resolveLitChain?: (args: { chainId: number | null; litChain?: unknown }) => unknown;
 };
 
-type CreateSurveyEncryptionGateSbt = {
-  address?: string;
-  name?: string;
-  [key: string]: unknown;
-};
-type BuildCreateSurveyGateObjectsAndRecipientsArgs = {
-  buildSbtAccessControlConditions?: (args: {
-    sbtAddresses: string[];
-    chainId: number | null;
-    litChain: unknown;
-    mode: unknown;
-  }) => unknown;
-  chainIdFallback?: unknown;
-  gateIds?: unknown;
-  gateMap?: Record<string, unknown> | null;
-  normalizeKnownGateIds?: (value: unknown) => string[];
-  resolveLitChain?: (args: { chainId: number | null; litChain?: unknown }) => unknown;
-};
-
 export {
   buildCreateSurveyDocUrlClearPatch,
   buildCreateSurveyDocUrlErrorPatch,
