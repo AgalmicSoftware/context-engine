@@ -332,6 +332,23 @@ describe('DebateMap', () => {
     });
   });
 
+  it('builds stable keys for reorderable atlas and list items', () => {
+    expect(getDebateNodeStableKeyAny({ id: 'node-id', name: 'Name' }, 'fallback')).toBe('node-id');
+    expect(getDebateNodeStableKeyAny({ name: 'Name' }, 'fallback')).toBe('Name');
+    expect(getDebateNodeStableKeyAny({}, 'fallback')).toBe('fallback');
+
+    expect(getAtlasLinkStableKeyAny({
+      sourceId: 'source-id',
+      targetId: 'target-id',
+      source: { x: 1, y: 2 },
+      target: { x: 3, y: 4 },
+    }, 0)).toBe('source-id->target-id');
+    expect(getAtlasLinkStableKeyAny({
+      source: { x: 1, y: 2 },
+      target: { x: 3, y: 4 },
+    }, 7)).toBe('coords:1.000:2.000:3.000:4.000:7');
+  });
+
   it('switches between circles and atlas from the main mode controls', () => {
     render(
       <MemoryRouter>
