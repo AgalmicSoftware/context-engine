@@ -5742,7 +5742,7 @@ const handleDecryptQuestionAnswerInternal = async (questionId: any, fieldToDecry
     }
 
     const surveyIndex: any = context.surveyIndex;
-    const qid: any = normalizeQuestionIdKey(questionId);
+    const qid = normalizeQuestionIdKey(questionId);
     if (!qid) return false;
 
     try {
