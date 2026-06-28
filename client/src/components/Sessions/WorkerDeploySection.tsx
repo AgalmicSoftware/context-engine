@@ -25,6 +25,7 @@ type DeployForm = {
   workerName?: string;
   bundleUrl?: string;
   apiToken?: string;
+  accountId?: string;
   adminAddress?: string;
 };
 
@@ -154,153 +155,13 @@ const WorkerDeploySection = ({
     deployStatusText: '',
     isError: false,
   };
-  const cloudflareTokenTemplateHref = buildCloudflareTokenTemplateUrl({
-    slug: cloudflareTokenSlug,
-  });
-  const nativeDeployUrl = String(cloudflareNativeDeployUrl || '').trim();
-  const nativeSessionSlug = String(cloudflareTokenSlug || '').trim();
-  const nativeAdminAddress = String(deployForm.adminAddress || account || '').trim();
-  const nativeSetupIdentity = buildNativeSetupIdentity({
-    sessionSlug: nativeSessionSlug,
-    adminAddress: nativeAdminAddress,
-  });
-  const nativeVerificationIdentity = buildNativeVerificationIdentity({
-    workerUrl: displayedWorkerUrl,
-    sessionSlug: nativeSessionSlug,
-    adminAddress: nativeAdminAddress,
-  });
-  const previousNativeSetupIdentityRef = React.useRef(nativeSetupIdentity);
-  const previousNativeVerificationIdentityRef = React.useRef(nativeVerificationIdentity);
-  const currentNativeVerificationIdentityRef = React.useRef(nativeVerificationIdentity);
-  currentNativeVerificationIdentityRef.current = nativeVerificationIdentity;
-  const currentNativeSetupSecrets = nativeSetupSecretsIdentity === nativeSetupIdentity ? nativeSetupSecrets : null;
-  const nativeDeployReady = !!(nativeDeployUrl && currentNativeSetupSecrets && nativeSessionSlug && nativeAdminAddress);
-  const nativeVerificationIsCurrent =
-    nativeProgress === 'verified' && verifiedNativeIdentity === nativeVerificationIdentity;
-
-  React.useEffect(() => {
-    const setupIdentityChanged = previousNativeSetupIdentityRef.current !== nativeSetupIdentity;
-    const verificationIdentityChanged = previousNativeVerificationIdentityRef.current !== nativeVerificationIdentity;
-    previousNativeSetupIdentityRef.current = nativeSetupIdentity;
-    previousNativeVerificationIdentityRef.current = nativeVerificationIdentity;
-    if (!verificationIdentityChanged) return;
-
-    setVerifiedNativeIdentity('');
-    setCopiedNativeField('');
-    if (setupIdentityChanged) {
-      setNativeSetupSecrets(null);
-      setNativeSetupSecretsIdentity('');
-      setNativeSetupError('');
-      setNativeProgress('');
-      setNativeStatus('');
-      return;
-    }
-    setNativeProgress((progress) => (progress ? 'generated' : ''));
-    setNativeStatus((status) =>
-      status && currentNativeSetupSecrets
-        ? 'The Session Worker URL changed. Verify this exact Worker identity before deploying the session.'
-        : '',
-    );
-  }, [currentNativeSetupSecrets, nativeSetupIdentity, nativeVerificationIdentity]);
-
-  const generateNativeSetupSecrets = () => {
-    try {
-      setNativeSetupSecrets(createCloudflareNativeSetupSecrets());
-      setNativeSetupSecretsIdentity(nativeSetupIdentity);
-      setNativeSetupError('');
-      setNativeProgress('generated');
-      setNativeStatus('Setup values generated in this tab. Copy each value into Cloudflare.');
-      setCopiedNativeField('');
-      setVerifiedNativeIdentity('');
-    } catch {
-      setNativeSetupSecrets(null);
-      setNativeSetupSecretsIdentity('');
-      setNativeSetupError('Secure setup-secret generation failed.');
-    }
-  };
-  const copyNativeValue = async (label: string, value: string) => {
-    try {
-      if (!navigator.clipboard?.writeText) throw new Error('Clipboard is unavailable.');
-      await navigator.clipboard.writeText(value);
-      setCopiedNativeField(label);
-      setNativeStatus(`${label} copied. The value is not shown in this status message.`);
-    } catch {
-      setNativeStatus(`Could not copy ${label}. Select the field and copy it manually.`);
-    }
-  };
-  const verifyNativeDeployment = async () => {
-    const candidate = String(displayedWorkerUrl || '').trim();
-    if (!candidate) {
-      setNativeStatus('Paste the deployed Worker URL into the Worker URL field before verification.');
-      return;
-    }
-    if (!verifyNativeWorker) {
-      setNativeProgress('opened');
-      setNativeStatus('Session verification is unavailable. Keep this setup open and retry from the session wizard.');
-      return;
-    }
-    setNativeProgress('verifying');
-    setVerifiedNativeIdentity('');
-    setNativeStatus(
-      'Writing required session config and AI secrets, then verifying Worker reachability, browser origin access, and canonical config readback…',
-    );
-    const requestedIdentity = nativeVerificationIdentity;
-    try {
-      const bootstrap = await verifyNativeWorker({
-        sessionSlug: nativeSessionSlug,
-        workerQueryValue: candidate,
-      });
-      if (currentNativeVerificationIdentityRef.current !== requestedIdentity) return;
-      const returnedOrigin = normalizeNativeWorkerOrigin(bootstrap.workerOrigin);
-      if (
-        returnedOrigin !== normalizeNativeWorkerOrigin(candidate) ||
-        String(bootstrap.sessionSlug || '')
-          .trim()
-          .toLowerCase() !== nativeSessionSlug.toLowerCase()
-      ) {
-        setNativeProgress('generated');
-        setNativeStatus('Worker verification returned a different session identity. Check the Worker URL and retry.');
-        return;
-      }
-      setVerifiedNativeIdentity(requestedIdentity);
-      setNativeProgress('verified');
-      setNativeStatus(`Session Worker verified at revision ${bootstrap.configRevision}. You can deploy the session.`);
-      onNativeWorkerVerified?.(bootstrap);
-    } catch (error) {
-      if (currentNativeVerificationIdentityRef.current !== requestedIdentity) return;
-      setVerifiedNativeIdentity('');
-      setNativeProgress('opened');
-      setNativeStatus(
-        error instanceof TypeError
-          ? 'The Worker could not be reached, or its CORS policy rejected this browser origin. Check Cloudflare and retry.'
-          : 'Worker verification failed. Check the Worker URL and session identity, then retry.',
-      );
-    }
-  };
-  const renderCopyField = (label: string, value: string, testId: string) => (
-    <FormGroup>
-      <Label>{label}</Label>
-      <div className={styles.bundleFileInputRow}>
-        <Input value={value} readOnly autoComplete="off" data-testid={testId} />
-        <Button
-          type="button"
-          className={styles.secondaryButton}
-          data-testid={`ce-wizard-cloudflare-native-copy-${label.toLowerCase().replace(/_/g, '-')}`}
-          onClick={() => void copyNativeValue(label, value)}
-        >
-          {copiedNativeField === label ? 'Copied' : 'Copy'}
-        </Button>
-      </div>
-    </FormGroup>
-  );
   const updateApiToken = (nextApiToken: string) => {
     setDeployForm((prev) => {
-      const { accountId: _discardedAccountId, ...accountIndependentForm } = (prev || {}) as DeployForm & {
-        accountId?: string;
-      };
+      const previousToken = String(prev?.apiToken ?? '');
       return {
-        ...accountIndependentForm,
+        ...prev,
         apiToken: nextApiToken,
+        ...(previousToken !== nextApiToken ? { accountId: '' } : {}),
       };
     });
   };
@@ -624,7 +485,7 @@ const WorkerDeploySection = ({
                 type="password"
                 value={deployForm.apiToken ?? ''}
                 data-testid={E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN}
-                onChange={(e) => setDeployForm((prev) => ({ ...prev, apiToken: e.target.value }))}
+                onChange={(e) => updateApiToken(e.target.value)}
               />
               {!isNormalMode && showSponsoredDeployAccessNotice && (
                 <div className={styles.helperText}>

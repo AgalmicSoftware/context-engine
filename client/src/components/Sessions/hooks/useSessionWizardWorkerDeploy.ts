@@ -1,5 +1,7 @@
-import { useCallback, useRef, type MutableRefObject } from 'react';
-import { normalizeSparseSponsoredBundlePayload } from '../../../utilities/arweave/sponsoredBundles.js';
+import { useCallback, useRef } from 'react';
+import {
+  normalizeSparseSponsoredBundlePayload,
+} from '../../../utilities/arweave/sponsoredBundles.js';
 import { normalizeBlockLimitsForConfig } from '../../../utilities/session/blockLimits.js';
 import { buildSponsoredFlagFields as buildSponsoredSessionFlagFields } from '../../../utilities/session/sponsoredFlags.js';
 import { cryptoUtils } from '../../../utilities/crypto/cryptography.js';
@@ -204,9 +206,12 @@ const useSessionWizardWorkerDeploy = ({
   clearCachedWorkerSecretsAfterDeploy = () => undefined,
   verifyPublicWorkerDeployment = verifySessionWizardWorkerPublicDeployment,
 }: UseSessionWizardWorkerDeployOptions = {}) => {
-  const { runtimeRef, resolvedWalletAccountRef, sponsoredBundleAppliedBundleRef } = refs;
+  const {
+    runtimeRef,
+    resolvedWalletAccountRef,
+    sponsoredBundleAppliedBundleRef,
+  } = refs;
   const deployRequestInFlightRef = useRef(false);
-  const litBootstrapRecoveryRef = useRef<SessionWizardLitBootstrapRecovery | null>(null);
 
   const resolveConnectedAdminAddress = useCallback(async () => {
     const runtime = readRuntime(runtimeRef);
@@ -242,16 +247,31 @@ const useSessionWizardWorkerDeploy = ({
     return resolvedAddress;
   }, [resolvedWalletAccountRef, runtimeRef, setDeployForm]);
 
-  const handleDeployWorker = useCallback(
-    async (options: { forceSponsoredAutoDeploy?: boolean } = {}) => {
-      const runtimeAtStart = readRuntime(runtimeRef);
-      if (runtimeAtStart.workerCanonicalPublishCompleted === true) {
-        // Regression guard: publication rotates the form session ID. Checking the
-        // live identity here would let that new ID provision an unpublishable orphan.
-        const terminalMessage =
-          'This worker-canonical session is already published. Choose Create another session before deploying a new worker.';
-        updateDeploymentState({ deployStatus: terminalMessage });
-        return { ok: false, skipped: true, error: terminalMessage };
+  const handleDeployWorker = useCallback(async (options: { forceSponsoredAutoDeploy?: boolean } = {}) => {
+    if (deployRequestInFlightRef.current) {
+      const inFlightMessage = 'Worker deploy already in progress.';
+      updateDeploymentState({ deployStatus: inFlightMessage });
+      return { ok: false, skipped: true, error: inFlightMessage };
+    }
+    deployRequestInFlightRef.current = true;
+    let helperBase = '';
+    const forceSponsoredAutoDeploy = options?.forceSponsoredAutoDeploy === true;
+    let effectiveBundleMode = 'upload';
+    try {
+      const runtime = readRuntime(runtimeRef);
+      const currentDraft = (
+        runtime.draft &&
+        typeof runtime.draft === 'object'
+      ) ? runtime.draft : {};
+      const currentDeployForm = (
+        runtime.deployForm &&
+        typeof runtime.deployForm === 'object'
+      ) ? runtime.deployForm : {};
+      const rawSlug = toStr(currentDraft.slug).trim();
+      const slugValidationError = getSessionSlugValidationError(rawSlug);
+      if (slugValidationError) {
+        updateDeploymentState({ deployStatus: slugValidationError });
+        return { ok: false, error: slugValidationError };
       }
       if (deployRequestInFlightRef.current) {
         const inFlightMessage = 'Worker deploy already in progress.';
@@ -1225,6 +1245,7 @@ const useSessionWizardWorkerDeploy = ({
         error: errorMessage,
       };
     } finally {
+      deployRequestInFlightRef.current = false;
       updateDeploymentState({ deployInFlight: false });
     }
   }, [

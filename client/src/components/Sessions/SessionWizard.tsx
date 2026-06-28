@@ -3686,19 +3686,26 @@ const SessionWizard = ({
     if (registerIdentityDescriptor.status === 'blocked') {
       throw new Error(registerIdentityDescriptor.statusMessage);
     }
-    const { registrySlug, sessionIdHexValue, registryChainIdValue } = registerIdentityDescriptor;
-    const registerDuplicateCheckDescriptor = resolveSessionWizardRegisterDuplicateCheckDescriptor({
-      registryChainId: registryChainIdValue,
+    const {
       registrySlug,
       sessionIdHexValue,
-    });
+      registryChainIdValue,
+    } = registerIdentityDescriptor;
     try {
-      const registryRead = sessionRegistryPublishAdapter.getRegistryContract({
-        chainId: registerDuplicateCheckDescriptor.chainId,
-        providerLike: null,
-      }) as SessionRegistryReadContract | null;
+      const registerDuplicateCheckDescriptor = resolveSessionWizardRegisterDuplicateCheckDescriptor({
+        registryChainId: registryChainIdValue,
+        registrySlug,
+        sessionIdHexValue,
+      });
+      const registryRead = sessionRegistryUtils.getRegistryContract(
+        registerDuplicateCheckDescriptor.chainId,
+        null
+      ) as SessionRegistryReadContract | null;
       if (registryRead) {
-        if (registerDuplicateCheckDescriptor.shouldCheckSlug && typeof registryRead.sessionExists === 'function') {
+        if (
+          registerDuplicateCheckDescriptor.shouldCheckSlug &&
+          typeof registryRead.sessionExists === 'function'
+        ) {
           const slugExists = await registryRead.sessionExists(registerDuplicateCheckDescriptor.registrySlug);
           if (slugExists) {
             throw new Error(registerDuplicateCheckDescriptor.slugDuplicateMessage);
@@ -3715,11 +3722,7 @@ const SessionWizard = ({
         }
       }
     } catch (err) {
-      const message = getSessionWizardErrorMessage(err);
-      if (isSessionWizardRegisterDuplicatePreflightError(message, registerDuplicateCheckDescriptor)) throw err;
-      if (message) {
-        console.warn('SessionWizard: duplicate preflight check unavailable; continuing to publish flow', err);
-      }
+      if (getSessionWizardErrorMessage(err)) throw err;
     }
     return registerIdentityDescriptor;
   };
@@ -3731,7 +3734,11 @@ const SessionWizard = ({
   }: SessionWizardRegisterGroupArgs = {}) => {
     try {
       const registerIdentityDescriptor = await resolveAvailableRegisterIdentity();
-      const { registrySlug, sessionIdHexValue, registryChainIdValue } = registerIdentityDescriptor;
+      const {
+        registrySlug,
+        sessionIdHexValue,
+        registryChainIdValue,
+      } = registerIdentityDescriptor;
       const registerPreflightDescriptor = resolveSessionWizardRegisterPreflightDescriptor({
         providerLike: provider,
         registryChainId: registryChainIdValue,
@@ -3814,11 +3821,31 @@ const SessionWizard = ({
       setStatus('Choose a session mode before publishing.');
       return;
     }
-    const sessionModeValidation = validateSessionModeProfile(draft.sessionModeProfile as SessionModeProfile);
-    if (!sessionModeValidation.valid) {
-      setStatus(
-        `Fix the session hosting settings before publishing: ${sessionModeValidation.issues[0]?.message || 'Invalid session mode profile.'}`,
-      );
+    try {
+      await resolveAvailableRegisterIdentity();
+    } catch (err) {
+      const publishFailureSettlement = resolveSessionWizardPublishFailureSettlementDescriptor({ error: err });
+      setStatus(publishFailureSettlement.errorMessage);
+      setPublishStep(publishFailureSettlement.publishStep);
+      return;
+    }
+    setPublishStep(0);
+    setSessionUrl('');
+    setPublishedPendingSbtLinks([]);
+    const resolvedPublisher = await resolveConnectedAdminAddress();
+    const publishAdminPreflightDescriptor = resolveSessionWizardPublishAdminPreflightDescriptor({
+      resolvedPublisher,
+    });
+    if (publishAdminPreflightDescriptor.status === 'blocked') {
+      if (
+        publishAdminPreflightDescriptor.shouldOpenLoginModal &&
+        typeof toggleLoginModal === 'function'
+      ) {
+        toggleLoginModal(true);
+      }
+      if (publishAdminPreflightDescriptor.statusMessage) {
+        setStatus(publishAdminPreflightDescriptor.statusMessage);
+      }
       return;
     }
     if (publishRequestInFlightRef.current) {

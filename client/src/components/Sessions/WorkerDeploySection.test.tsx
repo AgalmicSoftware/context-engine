@@ -453,6 +453,50 @@ describe('WorkerDeploySection', () => {
     });
   });
 
+  it('clears the cached Cloudflare account id when the API token changes', () => {
+    const setDeployForm = jest.fn();
+
+    renderWorkerDeploySection({
+      deployForm: {
+        workerName: 'demo-worker',
+        bundleUrl: '',
+        apiToken: 'old-token',
+        accountId: 'cf-account-1',
+        adminAddress: '',
+      },
+      setDeployForm,
+    });
+
+    fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN), {
+      target: { value: 'new-token' },
+    });
+
+    expect(setDeployForm).toHaveBeenCalledWith(expect.any(Function));
+    const updater = setDeployForm.mock.calls[0][0];
+    expect(updater({
+      workerName: 'demo-worker',
+      apiToken: 'old-token',
+      accountId: 'cf-account-1',
+      adminAddress: '',
+    })).toEqual({
+      workerName: 'demo-worker',
+      apiToken: 'new-token',
+      accountId: '',
+      adminAddress: '',
+    });
+    expect(updater({
+      workerName: 'demo-worker',
+      apiToken: 'new-token',
+      accountId: 'cf-account-1',
+      adminAddress: '',
+    })).toEqual({
+      workerName: 'demo-worker',
+      apiToken: 'new-token',
+      accountId: 'cf-account-1',
+      adminAddress: '',
+    });
+  });
+
   it('renders deploy status from the display descriptor', () => {
     renderWorkerDeploySection({
       deployStatusDisplayState: {
