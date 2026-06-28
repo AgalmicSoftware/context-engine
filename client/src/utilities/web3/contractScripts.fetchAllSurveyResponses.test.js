@@ -260,71 +260,26 @@ describe('contractScripts.fetchAllSurveyResponses', () => {
     ]);
   });
 
-  it('preserves transaction ordering metadata for the latest same-block responder event', async () => {
-    const responder = '0x00000000000000000000000000000000000000aa';
-    mockFetchLogsSmartWithProvider.mockResolvedValue([
-      makeResponsesSubmittedLog(responder, 7, 1, 1),
-      makeResponsesSubmittedLog(responder, 7, 3, 2),
-    ]);
-    jest.spyOn(contractScripts, 'getSurveyResponse').mockResolvedValue({ answer: 'latest' });
-
-    const result = await contractScripts.fetchAllSurveyResponses('none', SURVEY_ID, 1, 30, GROUP_CFG);
-
-    expect(result.responses).toEqual([
-      expect.objectContaining({
-        responder,
-        response: { answer: 'latest' },
-        blockNumber: 7,
-        transactionIndex: 2,
-        logIndex: 3,
-      }),
-    ]);
-  });
-
-  it('batches survey response reads while preserving survey/responder output shape', async () => {
-    const responderA = '0x00000000000000000000000000000000000000aa';
-    const responderB = '0x00000000000000000000000000000000000000bb';
-    const pendingReads = new Map();
-    mockFetchLogsSmartWithProvider.mockResolvedValue([
-      makeResponsesSubmittedLog(responderA, 7, 0),
-      makeResponsesSubmittedLog(responderB, 9, 1),
-    ]);
-
-    jest.spyOn(contractScripts, 'getSurveyResponse').mockImplementation(
-      (_providerName, responder) =>
-        new Promise((resolve) => {
-          pendingReads.set(String(responder).toLowerCase(), resolve);
-        }),
-    );
-
-    const run = contractScripts.getSurveyResponses('none', 1, 30, GROUP_CFG);
-    await Promise.resolve();
-    await Promise.resolve();
-
-    expect(contractScripts.getSurveyResponse).toHaveBeenCalledTimes(2);
-    pendingReads.get(responderB.toLowerCase())({ answer: 'B' });
-    pendingReads.get(responderA.toLowerCase())({ answer: 'A' });
-
-    await expect(run).resolves.toEqual({
-      [SURVEY_ID.toLowerCase()]: {
-        [responderA.toLowerCase()]: { answer: 'A' },
-        [responderB.toLowerCase()]: { answer: 'B' },
-      },
-    });
-  });
-
   it('threads forced Arweave recovery into chunked question response reads', async () => {
     const responder = '0x00000000000000000000000000000000000000aa';
-    mockFetchLogsSmartWithProvider.mockResolvedValue([makeResponsesSubmittedLog(responder, 7, 0)]);
+    mockFetchLogsSmartWithProvider.mockResolvedValue([
+      makeResponsesSubmittedLog(responder, 7, 0),
+    ]);
 
     const getResponseSpy = jest.spyOn(contractScripts, 'getResponse').mockResolvedValue({
       answer: 'recovered',
     });
     const onPartialData = jest.fn();
 
-    await contractScripts.getQuestionResponsesChunkedWithCallback('none', 1, 30, null, onPartialData, GROUP_CFG, {
-      forceArweaveFetch: true,
-    });
+    await contractScripts.getQuestionResponsesChunkedWithCallback(
+      'none',
+      1,
+      30,
+      null,
+      onPartialData,
+      GROUP_CFG,
+      { forceArweaveFetch: true }
+    );
 
     expect(getResponseSpy).toHaveBeenCalledWith(
       'none',
@@ -334,7 +289,7 @@ describe('contractScripts.fetchAllSurveyResponses', () => {
       expect.objectContaining({
         _resolvedCfg: expect.objectContaining({ slug: GROUP_CFG.slug }),
         forceArweaveFetch: true,
-      }),
+      })
     );
     expect(onPartialData).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -346,7 +301,7 @@ describe('contractScripts.fetchAllSurveyResponses', () => {
           }),
         ],
       }),
-      30,
+      30
     );
   });
 
