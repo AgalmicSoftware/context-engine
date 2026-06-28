@@ -4,6 +4,7 @@ import { Route, Routes } from 'react-router-dom';
 import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
 import DebateMap, {
   AtlasView,
+  buildExpandedHistoricalCaseBriefMap,
   buildHistoricalCaseBrief,
   buildHistoricalCompassPoints,
   getAtlasLinkStableKey,
@@ -79,6 +80,7 @@ jest.mock('../DemoViews/DebateHUD/PoliticalCompassView', () => ({
 
 const DebateMapComponent = DebateMap as React.ComponentType<any>;
 const AtlasViewComponent = AtlasView as React.ComponentType<any>;
+const buildExpandedHistoricalCaseBriefMapAny = buildExpandedHistoricalCaseBriefMap as any;
 const buildHistoricalCaseBriefAny = buildHistoricalCaseBrief as any;
 const buildHistoricalCompassPointsAny = buildHistoricalCompassPoints as any;
 const getAtlasLinkStableKeyAny = getAtlasLinkStableKey as any;
@@ -551,6 +553,41 @@ describe('DebateMap', () => {
     expect(fallbackBrief.adversarialAttack.fallbackText).toMatch(/Loophole Finder case/i);
     expect(fallbackBrief.patchOptions).toEqual([]);
     expect(fallbackBrief.decisionPrompt).toMatch(/What patch closes the exploit in Privacy & Surveillance/i);
+  });
+
+  it('builds historical case briefs only for the expanded case key', () => {
+    const brief = buildHistoricalCaseBriefAny(
+      { title: 'Expanded case', summary: 'Expanded summary.' },
+      { name: 'Liability Frameworks' }
+    );
+    const buildBrief = jest.fn(() => brief);
+    const historicalCases = [
+      { id: 'collapsed-case', title: 'Collapsed case', summary: 'Collapsed summary.' },
+      { id: 'expanded-case', title: 'Expanded case', summary: 'Expanded summary.' },
+    ];
+
+    const collapsedBriefs = buildExpandedHistoricalCaseBriefMapAny(
+      historicalCases,
+      { id: 'node-a', name: 'Liability Frameworks' },
+      '',
+      buildBrief
+    );
+    expect(collapsedBriefs.size).toBe(0);
+    expect(buildBrief).not.toHaveBeenCalled();
+
+    const expandedBriefs = buildExpandedHistoricalCaseBriefMapAny(
+      historicalCases,
+      { id: 'node-a', name: 'Liability Frameworks' },
+      'expanded-case',
+      buildBrief
+    );
+
+    expect(buildBrief).toHaveBeenCalledTimes(1);
+    expect(buildBrief).toHaveBeenCalledWith(
+      historicalCases[1],
+      { id: 'node-a', name: 'Liability Frameworks' }
+    );
+    expect(expandedBriefs.get('expanded-case')).toBe(brief);
   });
 
   it('compacts long tree labels and child layouts for denser debate branches', () => {
