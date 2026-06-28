@@ -3456,13 +3456,18 @@ class SBTPage extends Component<any, any> {
   };
 
 
-  copyToClipboard = (text: unknown, addressType: unknown): void => {
-    navigator.clipboard.writeText(String(text ?? '')).then(() => {
+  copyToClipboard = async (text: unknown, addressType: unknown): Promise<void> => {
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('Clipboard write is unavailable');
+      await navigator.clipboard.writeText(String(text ?? ''));
       notify.success('Copied to clipboard');
       if (this._isMounted) this.setState(buildSbtPageCopiedAddressPatch({ addressType }), () => {
         setTimeout(() => { if (this._isMounted) this.setState(buildSbtPageCopiedAddressPatch()) }, 2500);
       });
-    });
+    } catch (error: unknown) {
+      sbtLog.warn('SBTPage clipboard write failed', error);
+      notify.warn('Copy failed');
+    }
   };
 
   bookmarkSBT = (): void => {
@@ -3858,19 +3863,22 @@ class SBTPage extends Component<any, any> {
     });
   };
 
-  copyErrorToClipboard = (): void => {
+  copyErrorToClipboard = async (): Promise<void> => {
     const raw = resolveSbtPageCopyableErrorText(this.state.error);
     if (!raw) return;
     try {
-      navigator.clipboard.writeText(raw).then(() => {
-        notify.success('Copied to clipboard');
-        if (this._isMounted) {
-          this.setState(buildSbtPageCopiedErrorPatch({ copied: true }), () => {
-            setTimeout(() => { if (this._isMounted) this.setState(buildSbtPageCopiedErrorPatch()); }, 2000);
-          });
-        }
-      });
-    } catch (e) { void e; notify.warn('Copy failed'); }
+      if (!navigator.clipboard?.writeText) throw new Error('Clipboard write is unavailable');
+      await navigator.clipboard.writeText(raw);
+      notify.success('Copied to clipboard');
+      if (this._isMounted) {
+        this.setState(buildSbtPageCopiedErrorPatch({ copied: true }), () => {
+          setTimeout(() => { if (this._isMounted) this.setState(buildSbtPageCopiedErrorPatch()); }, 2000);
+        });
+      }
+    } catch (error: unknown) {
+      sbtLog.warn('SBTPage error clipboard write failed', error);
+      notify.warn('Copy failed');
+    }
   };
 
 
