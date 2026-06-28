@@ -865,7 +865,12 @@ export async function sendPortoTransaction(txRequest: AnyObj): Promise<any> {
     });
     return out;
   };
-  const isReplacementUnderpricedError = (error: any): boolean => {
+  const classifyRecoverableSendError = (error: any): {
+    replacementUnderpriced: boolean;
+    nonceTooLow: boolean;
+    alreadyKnown: boolean;
+    recoverable: boolean;
+  } => {
     const blob = collectErrorFragments(error)
       .join(' ')
       .toLowerCase();
@@ -890,7 +895,7 @@ export async function sendPortoTransaction(txRequest: AnyObj): Promise<any> {
       replacementUnderpriced,
       nonceTooLow,
       alreadyKnown,
-      recoverable: replacementUnderpriced || nonceTooLow,
+      recoverable: replacementUnderpriced || nonceTooLow || alreadyKnown,
     };
   };
   const parseHexToBigInt = (value: any): bigint | null => {
