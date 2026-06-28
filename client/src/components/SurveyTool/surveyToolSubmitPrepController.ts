@@ -152,7 +152,13 @@ export const verifyEncryptionIntegrity = (
     const answer = stateToCheck.answers ? stateToCheck.answers[qId] : null;
     const additional = stateToCheck.additionalComments ? stateToCheck.additionalComments[qId] : null;
 
-    if (answer && answer.encrypted && !answer.encryptedPortion && answer.value !== '*') {
+    if (
+      answer &&
+      answer.encrypted &&
+      !answer.encryptedPortion &&
+      answer.value !== '*' &&
+      hasMeaningfulFieldValue(answer)
+    ) {
       failures.push(`Verification failed: Answer for ${qId} marked encrypted but has no encryptedPortion.`);
       verificationPassed = false;
     }
