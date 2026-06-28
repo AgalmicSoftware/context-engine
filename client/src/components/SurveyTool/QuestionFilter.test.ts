@@ -506,6 +506,41 @@ describe('QuestionFilter encrypted count gate tooltip integration', () => {
     expect(responseStatusHeader).not.toBeNull();
   });
 
+  it('hides response-status summary chips while AI override owns the results', () => {
+    const instance = new QuestionFilter({
+      questions: [{ id: 'q1', prompt: 'Q1', type: 'freeform' }],
+      questionResponses: {},
+      network: { id: 84532 },
+      resultsMode: true,
+      filterModalOpen: true,
+      isQuestionCacheReady: true,
+      isSBTCacheReady: true,
+      account: '0xabc',
+    });
+
+    instance.state = {
+      ...instance.state,
+      aiAppliedTopN: 5,
+      aiCombineWithOtherFilters: false,
+      aiFilterApplied: true,
+      aiSearchQuery: 'priority topics',
+      filterByResponded: true,
+      filteredQuestionsCount: 1,
+    };
+
+    let summaryItems = instance.getFilterSummaryItems();
+    expect(summaryItems.find((item: any) => item.type === 'ai')).toBeTruthy();
+    expect(summaryItems.find((item: any) => item.label === 'Responded')).toBeUndefined();
+
+    instance.state = {
+      ...instance.state,
+      aiCombineWithOtherFilters: true,
+    };
+
+    summaryItems = instance.getFilterSummaryItems();
+    expect(summaryItems.find((item: any) => item.label === 'Responded')).toBeTruthy();
+  });
+
   it('shows visible group-loading status while SBT cache is still hydrating', () => {
     const instance = new QuestionFilter({
       questions: [{ id: 'q1', prompt: 'Q1', type: 'freeform' }],

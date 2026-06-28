@@ -2912,10 +2912,11 @@ class QuestionFilter extends React.Component<any, any> {
 
     const hasConnectedAccount = toStr(this.props.account).trim() !== '';
     const bothResponseChecked = this.state.filterByResponded && this.state.filterByNotResponded;
-    const isAiOverrideModeActive =
+    const isAiOverrideModeActive = (
       !!this.state.aiFilterApplied &&
       toStr(this.state.aiSearchQuery).trim() !== '' &&
-      !this.state.aiCombineWithOtherFilters;
+      !this.state.aiCombineWithOtherFilters
+    );
     if (hasConnectedAccount && !isAiOverrideModeActive && this.state.filterByResponded && !bothResponseChecked) {
       items.push({
         type: 'responseStatus',
