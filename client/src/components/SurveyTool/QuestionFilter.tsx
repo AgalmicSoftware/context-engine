@@ -2639,7 +2639,7 @@ class QuestionFilter extends React.Component<any, any> {
     }
 
     try {
-      const deserializedState = deserializeFilterState(filterString) as unknown as UnknownRecord;
+      const deserializedState = deserializeFilterStateStrict(filterString) as unknown as UnknownRecord;
       if (!deserializedState) {
         throw new Error("Invalid filter string.");
       }
