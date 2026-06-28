@@ -158,10 +158,11 @@ const WorkerDeploySection = ({
   const updateApiToken = (nextApiToken: string) => {
     setDeployForm((prev) => {
       const previousToken = String(prev?.apiToken ?? '');
+      const shouldClearAccountId = !!previousToken && previousToken !== nextApiToken;
       return {
         ...prev,
         apiToken: nextApiToken,
-        ...(previousToken !== nextApiToken ? { accountId: '' } : {}),
+        ...(shouldClearAccountId ? { accountId: '' } : {}),
       };
     });
   };

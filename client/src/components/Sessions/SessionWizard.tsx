@@ -1274,6 +1274,7 @@ const SessionWizard = ({
       workerSecretsEnabled,
       effectivePersistWorkerSecrets,
       workerSecrets,
+      deployForm,
       deployComplete,
       deployWorkerUrl,
       workerRequirementProof,

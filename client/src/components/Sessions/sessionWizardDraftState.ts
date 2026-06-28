@@ -236,6 +236,7 @@ export const buildSessionWizardCacheWritePayload = ({
   workerSecretsEnabled = true,
   effectivePersistWorkerSecrets = false,
   workerSecrets = {},
+  deployForm = {},
   deployComplete = false,
   deployWorkerUrl = '',
   provisionedSponsoredContext = null,
@@ -249,6 +250,17 @@ export const buildSessionWizardCacheWritePayload = ({
   Object.keys(workerSecretsRecord).forEach((key) => {
     redactedSecrets[key] = workerSecretsRecord[key] ? '[redacted]' : '';
   });
+  const deployFormRecord = (
+    deployForm &&
+    typeof deployForm === 'object' &&
+    !Array.isArray(deployForm)
+  ) ? deployForm as AnyRecord : {};
+  const durableDeployForm = {
+    workerName: toStr(deployFormRecord.workerName || '').trim(),
+    adminAddress: toStr(deployFormRecord.adminAddress || '').trim() || undefined,
+    accountId: toStr(deployFormRecord.accountId || '').trim(),
+    bundleUrl: toStr(deployFormRecord.bundleUrl || '').trim(),
+  };
 
   return {
     sessionId,
@@ -271,6 +283,7 @@ export const buildSessionWizardCacheWritePayload = ({
     workerSecretsEnabled,
     persistWorkerSecrets: !!effectivePersistWorkerSecrets,
     workerSecrets: effectivePersistWorkerSecrets ? workerSecretsRecord : redactedSecrets,
+    deployForm: durableDeployForm,
     deployComplete,
     deployWorkerUrl,
     provisionedSponsoredContext,

@@ -591,6 +591,13 @@ describe('sessionWizardDraftState', () => {
         apiToken: 'secret',
         optional: '',
       },
+      deployForm: {
+        apiToken: 'cf-secret',
+        workerName: ' worker ',
+        adminAddress: ' 0xAdmin ',
+        accountId: ' account ',
+        bundleUrl: ' https://bundle.example/worker.js ',
+      },
     });
 
     expect(payload).toEqual(expect.objectContaining({
@@ -602,7 +609,14 @@ describe('sessionWizardDraftState', () => {
         apiToken: '[redacted]',
         optional: '',
       },
+      deployForm: {
+        workerName: 'worker',
+        adminAddress: '0xAdmin',
+        accountId: 'account',
+        bundleUrl: 'https://bundle.example/worker.js',
+      },
     }));
+    expect(payload.deployForm.apiToken).toBeUndefined();
   });
 
   it('keeps worker secrets only when local secret persistence is explicitly enabled', () => {
