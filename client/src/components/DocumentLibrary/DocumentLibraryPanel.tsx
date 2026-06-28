@@ -668,6 +668,7 @@ export default function DocumentLibraryPanel({
 
     // Reset per-context encryption overrides so each session/group starts from defaults.
     userEncryptionOverrideRef.current = false;
+    setCustomGateMode('any');
 
     // Prevent accidental re-use of a prior group's custom audience list when the
     // panel is reused across navigation.
