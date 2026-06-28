@@ -329,6 +329,45 @@ describe('QuestionFilter session resolution', () => {
     expect(configSpy).toHaveBeenCalledWith('missing-session-slug');
     expect(configSpy).not.toHaveBeenCalledWith('');
   });
+
+  it('passes resolved session warm-start props into the SBT filter section', () => {
+    const sessionConfig = { slug: 'edge', networkChainId: 84532 };
+    const ensureLightSbtUniverse = jest.fn();
+    const instance = new QuestionFilter({
+      activeSessionSlug: 'edge',
+      sessionSlug: 'alpha',
+      sessionConfig,
+      ensureLightSbtUniverse,
+      questions: [],
+      questionResponses: {},
+      network: { id: 84532 },
+      filterModalOpen: true,
+      isQuestionCacheReady: true,
+      isSurveyCacheReady: true,
+      isSBTCacheReady: true,
+    });
+
+    instance.buildFilterPipelineResult = jest.fn(() => ({
+      finalQuestions: [],
+      count: 0,
+    }));
+    instance.getAllTagsWithCounts = jest.fn(() => []);
+    instance.getAiAccessState = jest.fn(() => ({
+      enabled: false,
+      localKeyAvailable: false,
+    }));
+
+    const tree = instance.render();
+    const sbtFilterNode = findElement(
+      tree,
+      (element) => element?.props?.mode === 'creator' && element?.props?.autoExpand === true
+    );
+
+    expect(sbtFilterNode).toBeTruthy();
+    expect(sbtFilterNode?.props.sessionSlug).toBe('edge');
+    expect(sbtFilterNode?.props.sessionConfig).toBe(sessionConfig);
+    expect(sbtFilterNode?.props.ensureLightSbtUniverse).toBe(ensureLightSbtUniverse);
+  });
 });
 
 describe('QuestionFilter encrypted count gate tooltip integration', () => {

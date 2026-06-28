@@ -174,7 +174,9 @@ type QuestionFilterSessionProps = UnknownRecord & {
     [key: string]: unknown;
   } | null;
   provider?: unknown;
+  sessionConfig?: unknown;
   sessionSlug?: unknown;
+  ensureLightSbtUniverse?: unknown;
   storageKeyPrefix?: unknown;
 };
 type QuestionFilterAiRequestOptions = {

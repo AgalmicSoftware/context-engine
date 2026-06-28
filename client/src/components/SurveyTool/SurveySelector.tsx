@@ -1686,6 +1686,8 @@ export class SurveySelector extends Component<any, any> {
               preventUrlChange={this.props.preventUrlChange}
               sessionSlug={this.props.sessionSlug}
               activeSessionSlug={getActiveSessionSlugFromProps(this.props)}
+              sessionConfig={this.props.sessionConfig}
+              ensureLightSbtUniverse={this.props.ensureLightSbtUniverse}
               // Do not drop the pin at the results layer; otherwise /session pages
               // silently fan out to broader scan scope when opening results.
               sessionSlugPinned={this.props.sessionSlugPinned}

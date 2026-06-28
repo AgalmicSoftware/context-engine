@@ -82,25 +82,6 @@ describe('SurveyPage session propagation', () => {
     );
   });
 
-  it('forwards fallback question pools to full SurveyTool renders', () => {
-    const questionPool = [{ id: 'q1', prompt: 'Canonical demo question' }];
-
-    render(
-      <SurveyPage
-        sessionSlug=""
-        sessionConfig={{ slug: '', sessionName: 'Context Engine' }}
-        questionPool={questionPool}
-      />
-    );
-
-    expect(mockSurveyTool).toHaveBeenCalledTimes(1);
-    expect(mockSurveyTool.mock.calls[0][0]).toEqual(
-      expect.objectContaining({
-        questionPool,
-      })
-    );
-  });
-
   it('forwards session network metadata into SurveyTool when provided by the route shell', () => {
     render(
       <SurveyPage

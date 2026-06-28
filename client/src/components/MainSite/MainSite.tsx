@@ -6015,6 +6015,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
               sessionSlug={isQuestionsListRoute ? effectivePageSlug : undefined}
               sessionSlugPinned={questionRouteSession.sessionSlugPinned}
               sessionConfig={effectivePageSessionCfg}
+              ensureLightSbtUniverse={this.ensureLightSbtUniverse}
               {...surveyCacheViewProps}
               refreshSurveyResponsesByID={pageRefreshSurveyResponsesByID}
               refreshQuestionMetadata={pageRefreshQuestionMetadata}
@@ -6112,6 +6113,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
             sessionSlug={effectiveQuestionSlug}
             sessionSlugPinned={questionSlugPinned}
             sessionConfig={questionSessionCfg}
+            ensureLightSbtUniverse={this.ensureLightSbtUniverse}
             {...questionCacheViewProps}
             refreshSurveyResponsesByID={(id: string) => this.refreshSurveyResponsesByIDForGroup(effectiveQuestionSlug!, id)}
             refreshQuestionMetadata={() => this.refreshQuestionMetadataForGroup(effectiveQuestionSlug!)}
