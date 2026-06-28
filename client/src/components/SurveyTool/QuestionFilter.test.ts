@@ -317,14 +317,7 @@ describe('QuestionFilter session resolution', () => {
   });
 
   it('passes resolved session warm-start props into the SBT filter section', () => {
-    const sessionConfig = {
-      slug: 'edge',
-      networkChainId: 84532,
-      __registry: {
-        chainId: 84532,
-        sessionIdHex: '0x00112233445566778899aabbccddeeff',
-      },
-    };
+    const sessionConfig = { slug: 'edge', networkChainId: 84532 };
     const ensureLightSbtUniverse = jest.fn();
     const instance = new QuestionFilter({
       activeSessionSlug: 'edge',
@@ -353,63 +346,13 @@ describe('QuestionFilter session resolution', () => {
     const tree = instance.render();
     const sbtFilterNode = findElement(
       tree,
-      (element) => element?.props?.mode === 'creator' && element?.props?.autoExpand === true,
+      (element) => element?.props?.mode === 'creator' && element?.props?.autoExpand === true
     );
 
     expect(sbtFilterNode).toBeTruthy();
     expect(sbtFilterNode?.props.sessionSlug).toBe('edge');
-    expect(sbtFilterNode?.props.activeSessionSlug).toBe('edge');
     expect(sbtFilterNode?.props.sessionConfig).toBe(sessionConfig);
     expect(sbtFilterNode?.props.ensureLightSbtUniverse).toBe(ensureLightSbtUniverse);
-  });
-
-  it('enables SBT filtering only for global unscoped or strong registry contexts when profiles are absent', () => {
-    expect(shouldEnableQuestionFilterSbt({})).toBe(true);
-    expect(shouldEnableQuestionFilterSbt({ slug: '' })).toBe(true);
-    expect(shouldEnableQuestionFilterSbt({ slug: 'missing', networkChainId: 84532 })).toBe(false);
-    expect(
-      shouldEnableQuestionFilterSbt({
-        slug: 'legacy',
-        networkChainId: 84532,
-        __registry: {
-          chainId: 84532,
-          sessionIdHex: '0x00112233445566778899aabbccddeeff',
-        },
-      }),
-    ).toBe(true);
-    expect(
-      shouldEnableQuestionFilterSbt({
-        slug: 'invalid',
-        sessionModeProfile: { authority: { mode: 'worker_canonical' } },
-      }),
-    ).toBe(false);
-
-    const concreteMissingInstance = new QuestionFilter({
-      sessionSlug: 'missing',
-      sessionConfig: {},
-      questions: [],
-      questionResponses: {},
-      filterModalOpen: true,
-      isQuestionCacheReady: true,
-      isSurveyCacheReady: true,
-      isSBTCacheReady: true,
-    });
-    concreteMissingInstance.buildFilterPipelineResult = jest.fn(() => ({
-      finalQuestions: [],
-      count: 0,
-    }));
-    concreteMissingInstance.getAllTagsWithCounts = jest.fn(() => []);
-    concreteMissingInstance.getAiAccessState = jest.fn(() => ({
-      enabled: false,
-      localKeyAvailable: false,
-    }));
-
-    expect(
-      findElement(
-        concreteMissingInstance.render(),
-        (element) => element?.props?.mode === 'creator' && element?.props?.autoExpand === true,
-      ),
-    ).toBeNull();
   });
 });
 

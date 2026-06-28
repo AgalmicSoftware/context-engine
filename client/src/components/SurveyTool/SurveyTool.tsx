@@ -448,6 +448,8 @@ const renderSurveyToolContent = ({
           preventUrlChange={props.preventUrlChange}
           sessionSlug={toolSessionSlug}
           activeSessionSlug={activeSessionSlug}
+          sessionConfig={props.sessionConfig}
+          ensureLightSbtUniverse={props.ensureLightSbtUniverse}
           sessionSlugPinned={props.sessionSlugPinned}
           hideEmbeddedDebugUi={props.hideEmbeddedDebugUi}
         />

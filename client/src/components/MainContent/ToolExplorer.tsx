@@ -249,44 +249,23 @@ const ToolExplorer = (props: ToolExplorerProps) => {
     }
   }, [expandedDemoCard, props.demoSurfaceMode]);
 
-  const expandedChildProps = expandedComponent
-    ? {
-        ...expandedComponent.data,
-        account: props.account,
-        provider: props.provider,
-        litHooks: props.litHooks,
-        activeSessionSlug: props.activeSessionSlug,
-        sessionConfig: getSessionConfigBySlug(props.activeSessionSlug || '') || null,
-        ensureLightSbtUniverse: props.ensureLightSbtUniverse,
-        loginComplete: props.loginComplete,
-        toggleLoginModal: props.toggleLoginModal,
-        network: props.network,
-        isSBTCacheReady: props.isSBTCacheReady,
-        isSurveyCacheReady: props.isSurveyCacheReady,
-        isQuestionCacheReady: props.isQuestionCacheReady,
-        ...(expandedToolName === 'Questions'
-          ? {
-              preventUrlChange: true,
-            }
-          : {}),
-        ...(expandedToolName === 'Debate Tree' ? { demoMode: demoSurfaceEnabled } : {}),
-        ...(showGroupsHeaderActions
-          ? {
-              hideMiniActionRow: true,
-              showCreateGroupAboveFeatured: true,
-              showCreateGroupExternal: showEmbeddedCreateGroup,
-              onCreateGroupToggleExternal: toggleEmbeddedCreateGroup,
-            }
-          : {}),
-        ...(showDataHeaderActions
-          ? {
-              explorerMode: dataToolMode,
-              demoSurfaceMode: props.demoSurfaceMode,
-              sessionOverrideSlug: dataSessionOverrideSlug,
-              sessionOverrideTouched: dataSessionOverrideTouched,
-              hideInternalSessionSelector: true,
-            }
-          : {}),
+  const expandedChildProps = expandedComponent ? {
+    ...expandedComponent.data,
+    account: props.account,
+    provider: props.provider,
+    litHooks: props.litHooks,
+    activeSessionSlug: props.activeSessionSlug,
+    sessionConfig: getSessionConfigBySlug(props.activeSessionSlug || '') || null,
+    ensureLightSbtUniverse: props.ensureLightSbtUniverse,
+    loginComplete: props.loginComplete,
+    toggleLoginModal: props.toggleLoginModal,
+    network: props.network,
+    isSBTCacheReady: props.isSBTCacheReady,
+    isSurveyCacheReady: props.isSurveyCacheReady,
+    isQuestionCacheReady: props.isQuestionCacheReady,
+    ...(expandedToolName === 'Questions'
+      ? {
+        preventUrlChange: true,
       }
     : null;
 

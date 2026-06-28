@@ -438,12 +438,45 @@ type SurveyResultsDemoViewOption = {
   key: string;
   label: string;
 };
-type SurveyResultsHtmlReportSectionAvailability = {
-  argumentMap: boolean;
-  atlas: boolean;
-  report: boolean;
-  riskMatrix: boolean;
-  snapshotJson: boolean;
+export type SurveyResultsProps = SurveyResultsRecord & {
+  account?: string;
+  activeSessionSlug?: string;
+  defaultTags?: unknown[];
+  ensureLightSbtUniverse?: unknown;
+  filterState?: SurveyResultsFilterState | null;
+  filteredQuestionsCount?: number | null;
+  isOpen?: boolean;
+  isQuestionCacheReady?: boolean;
+  isResponsesCacheReady?: boolean;
+  isSBTCacheReady?: boolean;
+  isSurveyCacheReady?: boolean;
+  lit?: SurveyResultsLitHooks | null;
+  litHooks?: SurveyResultsLitHooks | null;
+  loginComplete?: boolean;
+  network?: (SurveyResultsRecord & { id?: unknown }) | null;
+  networkChainId?: number | string | null;
+  onClose?: () => void;
+  onCountUpdate?: (count: unknown) => void;
+  onFilterChange?: (filterState: SurveyResultsFilterState) => void;
+  onFilterStateChangeForUrlUpdate?: (filterState: SurveyResultsFilterState) => void;
+  preventUrlChange?: boolean;
+  profile?: unknown;
+  provider?: unknown;
+  questionResponsesNonce?: unknown;
+  questionScanProgress?: unknown;
+  questionsCacheNonce?: unknown;
+  refreshQuestionMetadata?: () => unknown;
+  refreshQuestionResponses?: () => unknown;
+  refreshSurveyResponsesByID?: (surveyId: string) => unknown;
+  sbtCacheRevision?: unknown;
+  sessionConfig?: unknown;
+  sessionName?: string;
+  sessionSlug?: string;
+  sessionSlugPinned?: boolean;
+  sessionState?: unknown;
+  setFilterLoading?: (loading: unknown) => void;
+  surveyId?: string;
+  viewMode?: string;
 };
 type SurveyResultsHtmlReportSectionKey = keyof SurveyResultsHtmlReportSectionAvailability;
 type SurveyResultsHtmlReportSectionRow = {
@@ -5112,27 +5145,128 @@ const normalizedFilteredQuestionsCount = Math.min(
   displayedTotalQuestionsCount,
   Math.max(0, Number(displayedFilteredQuestionsCount) || 0)
 );
-const normalizedFilteredResponsesCount = Math.min(
-  displayedTotalResponsesCount,
-  Math.max(0, Number(filteredResponsesCount) || 0)
-);
-
-// Compact sync status display
-let syncStatusText = '';
-let isSyncingOrLoading = true;
-
-if (showQuestionSpinner || showResponseSpinner) {
-  syncStatusText = 'Loading...';
-} else if (isSynced) {
-  syncStatusText = 'In Sync';
-  isSyncingOrLoading = false;
-} else {
-  syncStatusText = 'Syncing...';
-}
-const showLongSyncNotice =
-  isSyncingOrLoading &&
-  this._syncLoadingStartedAt !== null &&
-  Date.now() - this._syncLoadingStartedAt >= 15000;
+const filterInput = cacheControllerSnapshot.filterInput;
+const syncStatusNode = renderSurveyResultsSyncStatusPanel({
+  syncStatusDisplay: cacheReadinessDisplay.syncStatusDisplay,
+  syncDetailsOpen: !!stateRef.current.syncDetailsOpen,
+  syncDetailsStyle: resolveSurveyResultsSyncDetailsStyle(stateRef.current.syncDetailsOpen),
+  onToggleSyncDetails: () =>
+    setState(asSurveyResultsStateUpdater((prevState) => buildSurveyResultsBooleanTogglePatch({
+      prevState,
+      stateKey: 'syncDetailsOpen',
+    }))),
+  onManualRefresh: () => handleManualRefresh(),
+  miniBarSpinnerStyle: SURVEY_RESULTS_MINI_BAR_SPINNER_STYLE,
+  miniProgressStyle: SURVEY_RESULTS_MINI_PROGRESS_STYLE,
+  remainingSpinnerStyle: SURVEY_RESULTS_SYNC_REMAINING_SPINNER_STYLE,
+});
+const filterControlsNode = renderSurveyResultsFilterExportControls({
+  activeSessionSlug: filterInput.activeSessionSlug,
+  aggregateQuestionResponses: stateRef.current.aggregateQuestionResponses,
+  currentSurveyIdForUrl: filterInput.currentSurveyIdForUrl,
+  currentViewModeForUrl: filterInput.currentViewModeForUrl,
+  defaultTags: propsRef.current.defaultTags,
+  ensureLightSbtUniverse: propsRef.current.ensureLightSbtUniverse,
+  exportControlsDisplay,
+  filterState: filterInput.filterState,
+  isFilterActive,
+  isQuestionCacheReady: filterInput.isQuestionCacheReady,
+  isSBTCacheReady: filterInput.isSBTCacheReady,
+  network: propsRef.current.network,
+  onClearFilters: handleClearFiltersFromParent,
+  onDownload: downloadCSV,
+  onExportHtmlReport: openHtmlReportExportModal,
+  onExportTypeChange: handleExportTypeChange,
+  onFilterActivityChange: handleFilterActivityChange,
+  onQuestionFilter: handleQuestionFilter,
+  onQuestionFilterCountUpdate: handleQuestionFilterCountUpdate,
+  onSbtFilter: handleFilteredResponses,
+  onSetFilterLoading: stableSetFilterLoadingRef.current,
+  onToggleExportArea: toggleExportArea,
+  onToggleQuestionFilter: toggleQuestionFilter,
+  provider: propsRef.current.provider,
+  questionFilterQuestions,
+  questionFilterRef: questionFilterRef,
+  questionResponses: stateRef.current.questionResponses,
+  questionResponsesNonce: filterInput.questionResponsesNonce,
+  questionsCacheNonce: filterInput.questionsCacheNonce,
+  responses: stateRef.current.responses,
+  sbtCacheRevision: filterInput.sbtCacheRevision,
+  sessionConfig: propsRef.current.sessionConfig,
+  sessionSlug: propsRef.current.sessionSlug,
+  showQuestionFilter: filterInput.showQuestionFilter,
+  storageKeyPrefix: filterInput.storageKeyPrefix,
+  styleMap: styles,
+  surveyViewMode,
+  viewMode,
+});
+const displayPanelsProps: SurveyResultsDisplayPanelsArgs = {
+  account: propsRef.current.account,
+  activeQuestionToggles: stateRef.current.activeQuestionToggles,
+  activeToggles: stateRef.current.activeToggles,
+  alertMessage,
+  applyDecryptedOverrideToResponse: applyDecryptedOverrideToResponse,
+  cacheReadinessDisplay,
+  currentSurveyId,
+  effectiveSlug: slug,
+  filterControlsNode,
+  filterLoading,
+  getFallbackQuestion: getStableFallbackQuestion,
+  getLockedResponseKey: getLockedResponseKey,
+  getResponseCardProps: getSurveyResultsResponseCardProps,
+  lockedResponsesBannerNode: SurveyResultsLockedResponsesBanner({
+    decrypting: !!stateRef.current.lockedResponsesDecrypting,
+    isOpen: !!stateRef.current.lockedResponseDetailsOpen,
+    lockedModel: lockedResponsesModel,
+    onDecrypt: handleDecryptLockedResponses,
+  }),
+  network: propsRef.current.network,
+  onSurveyViewModeKeyDown: handleSurveyViewModeKeyDown,
+  onSurveyViewModeToggle: handleSurveyViewModeToggle,
+  onToggleQuestionList: () => toggleQuestionSummary('__questionList__'),
+  onToggleResponse: toggleResponse,
+  preNetworkQuestions,
+  questionModeEntries,
+  questionResponsesNonce: propsRef.current.questionResponsesNonce,
+  questionsCacheNonce: propsRef.current.questionsCacheNonce,
+  renderQuestionSummary: (qId, arr) => renderQuestionSummary(qId, arr, preNetworkQuestions),
+  renderQuestionTable: () => renderQuestionIDsTable(
+    sbtFilteredAggregatorQuestionResponses,
+    preNetworkQuestions
+  ),
+  responses: sbtFilteredResponses,
+  sbtCacheRevision: propsRef.current.sbtCacheRevision,
+  styleMap: styles,
+  surveyAggregateEntries,
+  surveyViewMode,
+  tableWrapperRef: questionIdTableRef,
+  toggleKnobStyle: resolveSurveyResultsToggleKnobStyle(surveyViewMode === 'aggregate'),
+  trailingLabelStyle: SURVEY_RESULTS_TRAILING_LABEL_STYLE,
+  viewMode,
+};
+const demoSurfaceProps = isDemoAlternateResultsView
+  ? {
+      activeSlug: slug,
+      atlasNodeId: stateRef.current.demoResultsAtlasNodeId,
+      defaultTags: propsRef.current.defaultTags,
+      filterState: propsRef.current.filterState || stateRef.current.filterState,
+      isQuestionCacheReady: propsRef.current.isQuestionCacheReady,
+      isResponsesCacheReady: propsRef.current.isResponsesCacheReady,
+      network: propsRef.current.network,
+      networkChainId: propsRef.current.networkChainId,
+      onAtlasModalClose: handleDemoAtlasModalClose,
+      onAtlasNodeOpen: handleDemoAtlasOpen,
+      questionResponses: getMemoizedPolisQuestionResponses(
+        true,
+        stateRef.current.viewMode === 'survey' && stateRef.current.surveyViewMode === 'individuals'
+          ? getMemoizedIndividualsAggregator(stateRef.current.sbtFilteredResponses)
+          : (stateRef.current.sbtFilteredAggregatorQuestionResponses || {})
+      ),
+      questionResponsesNonce: propsRef.current.questionResponsesNonce,
+      questionScanProgress: propsRef.current.questionScanProgress,
+      viewKey: demoResultsViewMode,
+    }
+  : null;
 
 return (
   <>

@@ -1679,6 +1679,8 @@ export class SurveySelector extends Component<any, any> {
               preventUrlChange={this.props.preventUrlChange}
               sessionSlug={this.props.sessionSlug}
               activeSessionSlug={getActiveSessionSlugFromProps(this.props)}
+              sessionConfig={this.props.sessionConfig}
+              ensureLightSbtUniverse={this.props.ensureLightSbtUniverse}
               // Do not drop the pin at the results layer; otherwise /session pages
               // silently fan out to broader scan scope when opening results.
               sessionSlugPinned={this.props.sessionSlugPinned}
@@ -1722,10 +1724,10 @@ export class SurveySelector extends Component<any, any> {
             isSurveyCacheReady={this.props.isSurveyCacheReady}
             isSBTCacheReady={this.props.isSBTCacheReady}
             // Ref and handler for clear button
-            questionFilterRef={this.questionFilterRef}
-            onFilterActivityChange={this.handleFilterActivityChange}
-            sessionSlug={this.props.sessionSlug}
-            activeSessionSlug={activeSessionSlug}
+	            questionFilterRef={this.questionFilterRef}
+	            onFilterActivityChange={this.handleFilterActivityChange}
+	            sessionSlug={this.props.sessionSlug}
+	            activeSessionSlug={activeSessionSlug}
             sessionConfig={this.props.sessionConfig}
             ensureLightSbtUniverse={this.props.ensureLightSbtUniverse}
             ensureQuestionCached={this.props.ensureQuestionCached}
@@ -2023,37 +2025,37 @@ export class QuestionsDashboard extends Component<any, any> {
       <div className={styles.questionsDashboard}>
         <div className={styles.questionsHeader}></div>
 
-        <QuestionFilter
-          ref={this.props.questionFilterRef}
-          onFilterActivityChange={this.props.onFilterActivityChange}
-          filterModalOpen={this.props.filterModalOpen}
-          toggleFilterModal={this.props.toggleFilterModal}
-          questions={this.state.questions}
-          questionResponses={this.state.questionResponses}
-          provider={this.props.provider}
-          network={this.props.network}
-          onFilter={this.handleFilteredQuestions}
-          onCountUpdate={this.props.onFilteredQuestionCountUpdate}
-          setFilterLoading={this.setFilterLoading}
-          defaultFilterState={this.props.defaultFilterState}
-          // Pass the active filterState so the component can initialize correctly from URL
-          filterState={this.props.filterState}
-          defaultFeaturedSBTs={this.props.defaultFeaturedSBTs}
-          activeSessionSlug={getActiveSessionSlugFromProps(this.props)}
-          sessionSlug={this.props.sessionSlug}
-          sessionConfig={this.props.sessionConfig}
-          ensureLightSbtUniverse={this.props.ensureLightSbtUniverse}
-          isQuestionCacheReady={this.props.isQuestionCacheReady}
-          isSurveyCacheReady={this.props.isSurveyCacheReady}
-          isSBTCacheReady={this.props.isSBTCacheReady}
-          currentViewModeForUrl={'questions'}
-          currentSurveyIdForUrl={null}
-          questionResponsesNonce={this.props.questionResponsesNonce}
-          questionsCacheNonce={this.props.questionsCacheNonce}
-          defaultTags={this.props.defaultTags}
-          /* Ensure per-group storage for filter prefs */
-          storageKeyPrefix={buildQuestionFilterStorageKeyPrefix(this.props, resolveEffectiveSlug(this.props))}
-        />
+      <QuestionFilter
+        ref={this.props.questionFilterRef}
+        onFilterActivityChange={this.props.onFilterActivityChange}
+        filterModalOpen={this.props.filterModalOpen}
+        toggleFilterModal={this.props.toggleFilterModal}
+        questions={this.state.questions}
+        questionResponses={this.state.questionResponses}
+        provider={this.props.provider}
+        network={this.props.network}
+        onFilter={this.handleFilteredQuestions}
+        onCountUpdate={this.props.onFilteredQuestionCountUpdate}
+        setFilterLoading={this.setFilterLoading}
+        defaultFilterState={this.props.defaultFilterState}
+        // Pass the active filterState so the component can initialize correctly from URL
+        filterState={this.props.filterState}
+        defaultFeaturedSBTs={this.props.defaultFeaturedSBTs}
+        activeSessionSlug={getActiveSessionSlugFromProps(this.props)}
+        sessionSlug={this.props.sessionSlug}
+        sessionConfig={this.props.sessionConfig}
+        ensureLightSbtUniverse={this.props.ensureLightSbtUniverse}
+        isQuestionCacheReady={this.props.isQuestionCacheReady}
+        isSurveyCacheReady={this.props.isSurveyCacheReady}
+        isSBTCacheReady={this.props.isSBTCacheReady}
+        currentViewModeForUrl={'questions'}
+        currentSurveyIdForUrl={null}
+        questionResponsesNonce={this.props.questionResponsesNonce}
+        questionsCacheNonce={this.props.questionsCacheNonce}
+        defaultTags={this.props.defaultTags}
+        /* Ensure per-group storage for filter prefs */
+        storageKeyPrefix={buildQuestionFilterStorageKeyPrefix(this.props, resolveEffectiveSlug(this.props))}
+      />
 
         {filterLoading ? (
           <div className={styles.loadingContainer}>

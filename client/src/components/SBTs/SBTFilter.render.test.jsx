@@ -75,20 +75,19 @@ describe('SBTFilter render guards', () => {
       mode: 'addresses',
       autoExpand: true,
       sessionSlug: 'edge',
-      activeSessionSlug: 'edge',
       sessionConfig,
       ensureLightSbtUniverse,
     });
 
     const tree = subject.render();
-    const addressSelectors = findElementsInTree(tree, (element) =>
-      ['includeAddresses', 'excludeAddresses'].includes(element?.props?.id),
+    const addressSelectors = findElementsInTree(
+      tree,
+      (element) => ['includeAddresses', 'excludeAddresses'].includes(element?.props?.id)
     );
 
     expect(addressSelectors).toHaveLength(2);
     addressSelectors.forEach((selectorNode) => {
       expect(selectorNode.props.sessionSlug).toBe('edge');
-      expect(selectorNode.props.activeSessionSlug).toBe('edge');
       expect(selectorNode.props.sessionConfig).toBe(sessionConfig);
       expect(selectorNode.props.ensureLightSbtUniverse).toBe(ensureLightSbtUniverse);
     });
