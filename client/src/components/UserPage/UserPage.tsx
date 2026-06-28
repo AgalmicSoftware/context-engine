@@ -2700,8 +2700,10 @@ class UserPage extends Component<any, any> {
   //        COPY / BOOKMARK / COLLAPSE / USERNAME
   // -----------------------------------------------------------
 
-  copyToClipboard = (): void => {
-    navigator.clipboard.writeText(this.props.viewAddress).then(() => {
+  copyToClipboard = async (): Promise<void> => {
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('Clipboard write is unavailable');
+      await navigator.clipboard.writeText(this.props.viewAddress);
       notify.success('Copied to clipboard');
       if (this._isMounted) {
         this.setState(buildUserPageCopiedStatePatch({ copied: true }), () => {
@@ -2712,7 +2714,10 @@ class UserPage extends Component<any, any> {
           }, 2500);
         });
       }
-    });
+    } catch (error: unknown) {
+      accountLog.warn('UserPage address clipboard write failed:', error);
+      notify.error('Could not copy address');
+    }
   }
 
   toggleCollapse = (): void => {
