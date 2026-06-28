@@ -369,7 +369,7 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
 
   assert.match(wrapped, /name:\s+agent-village-wrapped/);
   assert.match(wrapped, /^# Agent Village Wrapped Runtime/m);
-  assert.match(wrapped, /\*\*Skill version:\*\* 2026-06-27 \(wrapped-v19\)/);
+  assert.match(wrapped, /\*\*Skill version:\*\* 2026-06-27 \(wrapped-v20\)/);
   assert.match(wrapped, /Use this skill only to run Agent Village Wrapped/);
   assert.match(wrapped, /Do not use the broader\s+`context-engine` skill/);
   assert.match(wrapped, /memory\/context-engine-state\.json/);
@@ -384,14 +384,19 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.match(wrapped, /\/telegram\/agent\/api\/invite\/onboard/);
   assert.doesNotMatch(wrapped, /Telegram User ID:/);
   assert.match(wrapped, /GET `\/telegram\/agent\/api\/agent-village-wrapped\/skill-version`/);
-  assert.match(wrapped, /version `wrapped-v19`/);
+  assert.match(wrapped, /version `wrapped-v20`/);
   assert.match(wrapped, /Quiet Lifecycle/);
   assert.match(wrapped, /Create one fresh `run_id` for the whole run/);
   assert.match(wrapped, /Do not discover files, inspect logs\/configs\/sessions/);
+  assert.match(wrapped, /Use one private helper script for the run after credential resolution/);
+  assert.match(wrapped, /Use one private helper script for the rest of the run/);
+  assert.match(wrapped, /Helper stdout may contain only\s+one compact final JSON object/);
   assert.match(wrapped, /Internal prediction\s+calls may return compact JSON keyed by local index/);
   assert.match(wrapped, /never print that JSON to\s+chat or stdout/);
   assert.match(wrapped, /Fetch all statement pages silently/);
-  assert.match(wrapped, /Do not print statements, options,\s+schemas, ids, payloads, prediction JSON/);
+  assert.match(wrapped, /\/telegram\/agent\/api\/agent-only\/statements\?limit=10/);
+  assert.match(wrapped, /Do not print statements, options,\s+schemas, ids, payloads, prediction\s+JSON/);
+  assert.doesNotMatch(wrapped, /compact direct HTTP calls/);
   assert.doesNotMatch(wrapped, /vote status/);
   assert.doesNotMatch(wrapped, /## No Balance Check/);
   assert.doesNotMatch(wrapped, /skill_view|skills_list|search_files|session_search|mcp_index|hermes insights|\/opt\/hermes/i);
@@ -461,7 +466,7 @@ test('Telegram agent handoff exposes the dedicated Agent Village Wrapped skill m
 
   assert.equal(response.status, 200);
   assert.equal(body.ok, true);
-  assert.equal(body.version, '2026-06-27 (wrapped-v19)');
+  assert.equal(body.version, '2026-06-27 (wrapped-v20)');
   assert.equal(body.protocolVersion, '2026-06-16 (v41)');
   assert.equal(body.skill, 'agent-village-wrapped');
   assert.equal(body.skillUrl, 'https://example.test/skills/agent-village-wrapped/SKILL.md');
@@ -491,7 +496,7 @@ test('Telegram agent handoff serves a dedicated Agent Village Wrapped skill redi
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
   assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-agent-village-wrapped\/SKILL\.md/);
-  assert.match(location, /v=2026-06-27-wrapped-v19-/);
+  assert.match(location, /v=2026-06-27-wrapped-v20-/);
 });
 
 test('Telegram agent handoff serves a short Agent Village Wrapped skill alias', async () => {
@@ -503,7 +508,7 @@ test('Telegram agent handoff serves a short Agent Village Wrapped skill alias', 
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
   assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-agent-village-wrapped\/SKILL\.md/);
-  assert.match(location, /v=2026-06-27-wrapped-v19-/);
+  assert.match(location, /v=2026-06-27-wrapped-v20-/);
 });
 
 test('Telegram agent handoff serves a short Agent Village Wrapped skill alias to HEAD probes', async () => {
@@ -515,7 +520,7 @@ test('Telegram agent handoff serves a short Agent Village Wrapped skill alias to
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
   assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-agent-village-wrapped\/SKILL\.md/);
-  assert.match(location, /v=2026-06-27-wrapped-v19-/);
+  assert.match(location, /v=2026-06-27-wrapped-v20-/);
 });
 
 test('Agent-only start payload exposes configurable visual defaults', async () => {
@@ -2016,7 +2021,8 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   assert.match(wrapped.image_view_id, /^[0-9a-f]{32}$/);
   assert.equal(wrapped.image_url, `https://bridge.example/telegram/agent/api/agent-only/wrapped-image/view/${wrapped.image_view_id}`);
   assert.match(wrapped.image_prompt_hash, /^sha256:[0-9a-f]{32}$/);
-  assert.equal(typeof wrapped.prompt, 'string');
+  assert.equal(Object.hasOwn(wrapped, 'prompt'), false);
+  assert.equal(typeof openAiRequestForm.get('prompt'), 'string');
   assert.equal(openAiRequestForm.get('model'), 'gpt-image-2');
   assert.equal(openAiRequestForm.get('output_format'), 'png');
   const logoReference = openAiRequestForm.get('image');

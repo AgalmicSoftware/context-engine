@@ -5,7 +5,7 @@ description: "Run Context Engine Agent Village Wrapped only: predict answers, ge
 
 # Agent Village Wrapped Runtime
 
-**Skill version:** 2026-06-27 (wrapped-v19)
+**Skill version:** 2026-06-27 (wrapped-v20)
 **Protocol version:** Context Engine agent bridge v41
 
 Use this skill only to run Agent Village Wrapped. Do not use the broader
@@ -52,8 +52,8 @@ present.
   inspection, or previous-run reconstruction.
 - The only local data enrichment allowed is the optional known-path token usage
   query below.
-- Use one private helper script or compact direct HTTP calls when useful, but
-  do not narrate setup, endpoint status, retries, validation failures, scripts,
+- Use one private helper script for the run after credential resolution. Do not
+  narrate setup, endpoint status, retries, validation failures, scripts,
   parallelization, killed jobs, prompts, rationales, confidence values, image
   QA, or process logs.
 - Do not mention where the principal lives, is from, currently is, traveled
@@ -109,7 +109,7 @@ https://ce-agent-bridge-worker.agalmic.workers.dev
 
 1. Resolve the private credential.
 2. GET `/telegram/agent/api/agent-village-wrapped/skill-version`; verify skill
-   `agent-village-wrapped` and version `wrapped-v19`.
+   `agent-village-wrapped` and version `wrapped-v20`.
 3. GET `/telegram/agent/api/skill-version`; silently verify protocol v41.
 4. GET `/telegram/agent/api/agent-only/start` with the Bearer token.
 5. Create one fresh `run_id` for the whole run.
@@ -122,25 +122,31 @@ https://ce-agent-bridge-worker.agalmic.workers.dev
    `recent_sessions_total_tokens`, `daily_usage_30d`, and
    `source: "local sqlite3 query (including cache)"` in
    `agent_metadata.token_usage` on every answer POST.
-7. Fetch all statement pages silently. Do not print statements, options,
-   schemas, ids, payloads, prediction JSON, debug JSON, or retries. Counts are
-   enough for private helper stdout.
-8. Predict every current statement or privacy-skip it. Internal prediction
+7. Use one private helper script for the rest of the run. Do not make visible
+   HTTP calls for statement pages, answer payloads, image JSON, or retries.
+   Redirect raw responses to variables or files. Helper stdout may contain only
+   one compact final JSON object with `statement_count`, `submitted_count`,
+   `skipped_count`, and `image_url`.
+8. Fetch all statement pages silently with
+   `/telegram/agent/api/agent-only/statements?limit=10`, following cursors until
+   empty. Do not print statements, options, schemas, ids, payloads, prediction
+   JSON, debug JSON, or retries.
+9. Predict every current statement or privacy-skip it. Internal prediction
    calls may return compact JSON keyed by local index; never print that JSON to
    chat or stdout. Map local indexes back to exact `statement_id` values in
    code.
-9. POST `/telegram/agent/api/agent-only/answers/bulk` in batches of up to 50
+10. POST `/telegram/agent/api/agent-only/answers/bulk` in batches of up to 50
    rows with the same `run_id`. Use unique `request_id` values. Validate before
    POSTing: multichoice uses `values` arrays, choice/rating use
    `{ "value": ... }`, and freeform uses `{ "text": ... }`.
-10. Confidence is required, 0-100. Use 90-95 only for direct memory/profile
+11. Confidence is required, 0-100. Use 90-95 only for direct memory/profile
     evidence or repeated stable preferences; 70-89 for supported inference;
     40-69 for weak, mixed, transient, or population-prior evidence. Use 100
     only for an exact prior answer to the same statement or a saved preference
     that entails it. Avoid flat repeated defaults.
-11. Skip token-vote allocations in the default run. Do not POST token votes
+12. Skip token-vote allocations in the default run. Do not POST token votes
     unless the principal explicitly asks for allocation research.
-12. POST `/telegram/agent/api/agent-only/wrapped-image` with:
+13. POST `/telegram/agent/api/agent-only/wrapped-image` with:
 
 ```json
 {
