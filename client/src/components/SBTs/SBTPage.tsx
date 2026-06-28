@@ -3409,13 +3409,15 @@ class SBTPage extends Component<any, any> {
 
     const userAddress = this.props.account.toLowerCase();
     const adminAddr = String(sbtInfoRecord.admin || sbtInfoRecord.admin_ || '');
-    const isAdminBurn = this.state.userIsSbtAdmin && (sbtInfoRecord.burnAuth === 0 || sbtInfoRecord.burnAuth === 2);
+    const burnAuthNumber = Number(sbtInfoRecord.burnAuth);
+    const burnAuth = Number.isFinite(burnAuthNumber) ? burnAuthNumber : Number.NaN;
+    const isAdminBurn = this.state.userIsSbtAdmin && (burnAuth === 0 || burnAuth === 2);
     const isOwnerBurn = this.state.userHasSBT &&
       (
-        sbtInfoRecord.burnAuth === 1 ||
-        sbtInfoRecord.burnAuth === 2 ||
-        (sbtInfoRecord.burnAuth === 0 && adminAddr && adminAddr.toLowerCase() === userAddress) ||
-        (sbtInfoRecord.burnAuth === 1 && this.state.userHasSBT)
+        burnAuth === 1 ||
+        burnAuth === 2 ||
+        (burnAuth === 0 && adminAddr && adminAddr.toLowerCase() === userAddress) ||
+        (burnAuth === 1 && this.state.userHasSBT)
       );
 
     let tokenIdToBurn: unknown;
@@ -3431,7 +3433,7 @@ class SBTPage extends Component<any, any> {
         if (this._isMounted) this.setState(buildSbtPageBurnFailurePatch({ error: "No valid token ID found" }));
         return;
       }
-    } else if (this.state.userIsSbtAdmin && (sbtInfoRecord.burnAuth === 0 || sbtInfoRecord.burnAuth === 2) && !burnSearchResult) {
+    } else if (this.state.userIsSbtAdmin && (burnAuth === 0 || burnAuth === 2) && !burnSearchResult) {
       if (this._isMounted) this.setState(buildSbtPageBurnFailurePatch({ error: "Admin burn requires specifying token ID or owner." }));
       return;
     } else {

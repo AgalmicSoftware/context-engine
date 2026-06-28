@@ -297,6 +297,40 @@ describe('SBTPage session routing and holder loading', () => {
     expect(subject.handleBurn).toHaveBeenCalledTimes(1);
   });
 
+  it('allows owner burn when burnAuth is a numeric string', async () => {
+    const account = '0x00000000000000000000000000000000000000a1';
+    const sbtAddress = '0x00000000000000000000000000000000000000b1';
+    const tokenIdSpy = jest
+      .spyOn(contractScripts, 'getSBTTokenIdByOwner')
+      .mockResolvedValue('7');
+    const burnSpy = jest
+      .spyOn(contractScripts, 'burnToken')
+      .mockResolvedValue({ transactionHash: '0xburn' });
+    const subject = createSubject({
+      account,
+      provider: 'wagmi',
+      SBTAddress: sbtAddress,
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        burnAuth: '1',
+      },
+      userHasSBT: true,
+    };
+    subject.loadSBTInfo = jest.fn(async () => undefined);
+    subject.cacheTransactionHash = jest.fn();
+    subject.applyLocalBurnSuccess = jest.fn();
+    subject.refreshSbtDataWithSlug = jest.fn();
+
+    await subject.handleBurn();
+
+    expect(tokenIdSpy).toHaveBeenCalledWith('wagmi', sbtAddress, account, '');
+    expect(burnSpy).toHaveBeenCalledWith('wagmi', sbtAddress, '7');
+    expect(subject.applyLocalBurnSuccess).toHaveBeenCalledWith(account);
+    expect(subject.state.burningStatus).toBe('success');
+  });
+
   it('routes open mint button clicks through the parent mint handler with force refresh', () => {
     const subject = createSubject({
       account: '0x00000000000000000000000000000000000000a1',
