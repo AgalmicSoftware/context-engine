@@ -177,12 +177,6 @@ type BuildCreateSurveyGateObjectsAndRecipientsArgs = {
   resolveLitChain?: (args: { chainId: number | null; litChain?: unknown }) => unknown;
 };
 
-type CreateSurveyEncryptionGateSbt = {
-  address?: string;
-  name?: string;
-  [key: string]: unknown;
-};
-
 export {
   buildCreateSurveyDocUrlClearPatch,
   buildCreateSurveyDocUrlErrorPatch,
@@ -573,52 +567,6 @@ export const buildCreateSurveyQuestionListPatch = (questions: unknown) => ({
 export const buildCreateSurveyQuestionListValidationPatch = (questions: unknown) => ({
   questions: Array.isArray(questions) ? questions : [],
   formValidationError: '',
-});
-
-export const buildCreateSurveyEncryptionGateSeedPatch = ({
-  addresses = [],
-  encryptionGateMode = 'any',
-}: {
-  addresses?: unknown;
-  encryptionGateMode?: unknown;
-} = {}) => ({
-  encryptionGateSBTs: (Array.isArray(addresses) ? addresses : []).map((addr) => ({
-    address: addr,
-    name: addr,
-  })),
-  encryptionGateMode: String(encryptionGateMode || 'any'),
-});
-
-export const addCreateSurveyEncryptionGateSbt = (
-  encryptionGateSBTs: Iterable<CreateSurveyEncryptionGateSbt> | null | undefined,
-  sbt: CreateSurveyEncryptionGateSbt
-) => [
-  ...((encryptionGateSBTs || []) as Iterable<CreateSurveyEncryptionGateSbt>),
-  sbt,
-];
-
-export const removeCreateSurveyEncryptionGateSbt = (
-  encryptionGateSBTs: CreateSurveyEncryptionGateSbt[] | null | undefined,
-  address: unknown
-) => {
-  const addrLower = String(address).toLowerCase();
-  return ((encryptionGateSBTs || []) as CreateSurveyEncryptionGateSbt[]).filter(
-    (sbt) => String(sbt.address || '').toLowerCase() !== addrLower
-  );
-};
-
-export const buildCreateSurveyEncryptionTogglePatch = ({
-  checked = false,
-  name = '',
-}: {
-  checked?: unknown;
-  name?: unknown;
-} = {}) => ({
-  [String(name || '')]: checked === true,
-});
-
-export const buildCreateSurveyEncryptionGateModePatch = (encryptionGateMode: unknown) => ({
-  encryptionGateMode: String(encryptionGateMode ?? ''),
 });
 
 export const buildCreateSurveyNetworkSwitchPatch = (needsNetworkSwitch: unknown) => ({

@@ -49,14 +49,6 @@ import { getEffectiveAiConfig } from '../../utilities/ai/aiSettings.js';
 import { seedGenPrompt } from '../../prompts/seedGenPrompt.js';
 import { JsonButtonRow, JsonPanel, JsonToggleButton } from '../Shared/Json/JsonControls';
 import GateMultiSelectLock from '../Gates/GateMultiSelectLock';
-import {
-  getGateSbtAddresses,
-  normalizeGateMode,
-  resolveSponsoredGateStateForResource,
-  SPONSORED_GATE_STATES,
-} from '../../utilities/web3/sponsoredAccess.js';
-import { resolveEncryptionGate } from '../../utilities/crypto/encryptionGates.js';
-import { buildUploadGatePolicy } from '../../utilities/crypto/litGatePolicy.js';
 import { createLogger } from 'utilities/logging.js';
 import { buildQuestionRoutePath } from '../../utilities/survey/questionRouting.js';
 import { validateNoLockedPlaintextInPayload } from '../../utilities/arweave/noLeakPayloads.js';
@@ -98,9 +90,6 @@ import {
   buildCreateSurveyDocUrlErrorPatch,
   buildCreateSurveyDocUrlInputPatch,
   buildCreateSurveyDocumentUrlsPatch,
-  buildCreateSurveyEncryptionGateModePatch,
-  buildCreateSurveyEncryptionGateSeedPatch,
-  buildCreateSurveyEncryptionTogglePatch,
   buildCreateSurveyFocusTargetPatch,
   buildCreateSurveyHashPatch,
   buildCreateSurveyMountSubmitResetPatch,
@@ -129,7 +118,6 @@ import {
   buildCreateSurveySurveyLockGateIdsPatch,
   buildCreateSurveyTitleChangePatch,
   buildCreateSurveyValidationErrorPatch,
-  addCreateSurveyEncryptionGateSbt,
   combineLitRecipientAccessControlConditions,
   formatAiPromptModelLabel,
   generateSingleQuestionTagsPrompt,
@@ -144,7 +132,6 @@ import {
   normalizePayloadQuestionOptions,
   normalizeTagList,
   removeDuplicateCreateSurveyQuestions,
-  removeCreateSurveyEncryptionGateSbt,
   resolvePayloadSingleSelect,
   resolveQuestionSingleSelect,
 } from './createQuestionsAndSurveysHelpers.js';
@@ -292,9 +279,6 @@ type CreateSurveyAiRequestOptions = {
   };
   sessionConfig: CreateSurveyResolvedSessionConfig;
   sessionSlug: string;
-};
-type CreateSurveyGateSeedOptions = {
-  preferDefault?: boolean;
 };
 type CreateSurveySubmittedSurveyCacheArgs = {
   sourceDocumentUrls?: unknown;
@@ -501,45 +485,6 @@ type CreateSurveyGateOptionsResult = {
 type CreateSurveyGateOptionsArgs = {
   isStandaloneQuestion?: unknown;
 };
-interface CreateQuestionsAndSurveysGateSbt {
-  address?: string;
-  name?: string;
-  [key: string]: unknown;
-}
-type CreateSurveyEncryptionTargets = {
-  survey: boolean;
-  questions: boolean;
-  questionTags: boolean;
-  docUrls: boolean;
-};
-type CreateSurveyEncryptionGatePolicyGate = UnknownRecord & {
-  chainId?: unknown;
-  color?: unknown;
-  gateId?: unknown;
-  label?: unknown;
-  litChain?: unknown;
-  mode?: unknown;
-  sbtAddress?: unknown;
-  sbtAddresses?: unknown;
-  type?: unknown;
-};
-type CreateSurveyEncryptionRecipient = {
-  accessControlConditions?: unknown;
-  chain?: unknown;
-  [key: string]: unknown;
-};
-type CreateSurveyEncryptionConfig =
-  | { enabled: false }
-  | { enabled: true; error: string }
-  | {
-    enabled: true;
-    status: 'lit-v1';
-    gate: CreateSurveyEncryptionGatePolicyGate | null;
-    gates: CreateSurveyEncryptionGatePolicyGate[];
-    recipients: CreateSurveyEncryptionRecipient[];
-    targets: CreateSurveyEncryptionTargets;
-  };
-
 interface CreateQuestionsAndSurveysProps {
   account?: string;
   provider?: unknown;
@@ -607,12 +552,6 @@ interface CreateQuestionsAndSurveysState {
   showClearFormConfirm: boolean;
   surveyLockGateIds: string[];
   openLockKey: string;
-  encryptSurvey?: boolean;
-  encryptQuestions?: boolean;
-  encryptQuestionTags?: boolean;
-  encryptDocUrls?: boolean;
-  encryptionGateSBTs?: CreateQuestionsAndSurveysGateSbt[];
-  encryptionGateMode?: string;
   [key: string]: unknown;
 }
 
@@ -758,7 +697,6 @@ export const buildCreateSurveyDraftStorageKey = (sessionSlug: unknown = ''): str
 
 class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps, CreateQuestionsAndSurveysState> {
   _isMounted: boolean = false;
-  _encryptionGateTouched: boolean = false;
   _cacheWatchTimer: ReturnType<typeof setInterval> | null = null;
   _cacheWatchUnsubscribe: (() => void) | null = null;
   _cacheWatchCoalescer: CacheUpdateCoalescerLike | null = null;
@@ -1708,116 +1646,6 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     this.setState(buildCreateSurveyHashPatch(newHash));
   };
 
-  getEncryptionConfig = (): CreateSurveyEncryptionConfig => {
-    const {
-      encryptSurvey,
-      encryptQuestions,
-      encryptQuestionTags,
-      encryptDocUrls,
-      encryptionGateSBTs,
-      encryptionGateMode,
-      isStandaloneQuestion
-    } = this.state;
-
-    const targets = {
-      survey: !isStandaloneQuestion && !!encryptSurvey,
-      questions: !!encryptQuestions,
-      questionTags: !!encryptQuestions && !!encryptQuestionTags,
-      docUrls: !isStandaloneQuestion && !!encryptDocUrls
-    };
-
-    const enabled = targets.survey || targets.questions || targets.questionTags || targets.docUrls;
-    if (!enabled) return { enabled: false };
-
-    const sessionConfig = this.getResolvedSessionConfig();
-    const chainId = this.resolveSessionChainId(sessionConfig);
-    const manualSbtAddresses = (Array.isArray(encryptionGateSBTs) ? encryptionGateSBTs : [])
-      .map((sbt) => sbt.address)
-      .filter((address): address is string => Boolean(address));
-    const manualGate: CreateSurveyEncryptionGatePolicyGate | null = manualSbtAddresses.length
-      ? {
-          type: 'sbt',
-          sbtAddresses: manualSbtAddresses,
-          chainId,
-          mode: encryptionGateMode || 'any',
-        }
-      : null;
-    const gatePolicy = buildUploadGatePolicy({
-      cfg: sessionConfig,
-      targets,
-      isStandaloneQuestion,
-      fallbackChainId: chainId,
-      manualGate,
-    });
-    const gates = Array.isArray(gatePolicy?.gates)
-      ? gatePolicy.gates as CreateSurveyEncryptionGatePolicyGate[]
-      : [];
-    const recipients = Array.isArray(gatePolicy?.recipients)
-      ? gatePolicy.recipients as CreateSurveyEncryptionRecipient[]
-      : [];
-    if (!recipients.length) {
-      return { enabled: true, error: `Select at least one ${t('sbt')} to define the encryption ${t('gateLower')}.` };
-    }
-
-    return {
-      enabled: true,
-      status: 'lit-v1',
-      gate: gates[0] || manualGate || null,
-      gates,
-      recipients,
-      targets
-    };
-  };
-
-  seedEncryptionGateFromConfig = (
-    props: CreateQuestionsAndSurveysProps = this.props,
-    options: CreateSurveyGateSeedOptions = {}
-  ): void => {
-    const preferDefault = !!options.preferDefault;
-    const sessionConfig = this.getSessionConfig(props);
-    const activeSlug = this.getActiveSessionSlug(props);
-    const configSlug = typeof sessionConfig.slug === 'string'
-      ? normalizeSessionSlug(sessionConfig.slug)
-      : null;
-    if (activeSlug != null && configSlug != null && activeSlug !== configSlug) return;
-    if (this._encryptionGateTouched) return;
-    if ((this.state.encryptionGateSBTs || []).length > 0) return;
-    const cfg = sessionConfig;
-    let preferredResources: string[];
-    if (preferDefault) {
-      preferredResources = this.state.isStandaloneQuestion
-        ? ['default', 'questionResponses', 'lit']
-        : ['default', 'surveyResponses', 'docUrls', 'lit'];
-    } else {
-      preferredResources = this.state.isStandaloneQuestion
-        ? ['questionResponses', 'default', 'lit']
-        : ['surveyResponses', 'docUrls', 'default', 'lit'];
-    }
-    let fallbackGate: unknown = null;
-    let encounteredExplicitOpen = false;
-    for (const resourceKey of preferredResources) {
-      const gateState = resolveSponsoredGateStateForResource(cfg, resourceKey);
-      if (gateState?.status === SPONSORED_GATE_STATES.OPEN) {
-        encounteredExplicitOpen = true;
-        break;
-      }
-      if (gateState?.gate) {
-        fallbackGate = gateState.gate;
-        break;
-      }
-    }
-    if (encounteredExplicitOpen) return;
-    const contentGate = resolveEncryptionGate(cfg);
-    const gate = fallbackGate || contentGate;
-    const addresses = getGateSbtAddresses(gate);
-    if (!addresses.length) return;
-    const nextMode = normalizeGateMode(gate) || 'any';
-    this.setState(buildCreateSurveyEncryptionGateSeedPatch({
-      addresses,
-      encryptionGateMode: nextMode,
-    }), this.saveToLocalStorage);
-  };
-
   toggleStandaloneQuestion: () => void = () => {
     this.setState((prev: CreateQuestionsAndSurveysState) => buildCreateSurveyStandaloneToggleState(prev), () => {
       this.updateSurveyHash();
@@ -1827,43 +1655,6 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
 
   toggleAutoTool: () => void = () => {
     this.setState(buildCreateSurveyAutoToolTogglePatch(this.state));
-  };
-
-  handleEncryptionToggle: (event: CreateSurveyCheckboxChangeEvent) => void = (event) => {
-    const { name, checked } = event.target;
-    this.setState(buildCreateSurveyEncryptionTogglePatch({ checked, name }), () => {
-      this.saveToLocalStorage();
-      const shouldSeedDefaultGate = !!checked && (
-        name === 'encryptSurvey' ||
-        name === 'encryptQuestions' ||
-        name === 'encryptDocUrls'
-      );
-      if (shouldSeedDefaultGate) {
-        this.seedEncryptionGateFromConfig(this.props, { preferDefault: true });
-      }
-    });
-  };
-
-  handleAddEncryptionGateSbt: (sbt: CreateQuestionsAndSurveysGateSbt | null | undefined) => void = (sbt) => {
-    if (!sbt || !sbt.address) return;
-    this._encryptionGateTouched = true;
-    this.setState((prev: CreateQuestionsAndSurveysState) => ({
-      encryptionGateSBTs: addCreateSurveyEncryptionGateSbt(prev.encryptionGateSBTs, sbt),
-    }), this.saveToLocalStorage);
-  };
-
-  handleRemoveEncryptionGateSbt: (address: unknown) => void = (address) => {
-    if (!address) return;
-    this._encryptionGateTouched = true;
-    this.setState((prev: CreateQuestionsAndSurveysState) => ({
-      encryptionGateSBTs: removeCreateSurveyEncryptionGateSbt(prev.encryptionGateSBTs, address),
-    }), this.saveToLocalStorage);
-  };
-
-  handleEncryptionGateModeChange: (event: CreateSurveyInputValueEvent) => void = (event) => {
-    const next = event.target.value;
-    this._encryptionGateTouched = true;
-    this.setState(buildCreateSurveyEncryptionGateModePatch(next), this.saveToLocalStorage);
   };
 
   handleAssociatedSurveyIdChange: (index: number, val: unknown) => void = (index, val) => {

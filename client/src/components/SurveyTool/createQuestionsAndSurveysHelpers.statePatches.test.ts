@@ -14,9 +14,6 @@ import {
   buildCreateSurveyDocUrlErrorPatch,
   buildCreateSurveyDocUrlInputPatch,
   buildCreateSurveyDocumentUrlsPatch,
-  buildCreateSurveyEncryptionGateModePatch,
-  buildCreateSurveyEncryptionGateSeedPatch,
-  buildCreateSurveyEncryptionTogglePatch,
   buildCreateSurveyFocusTargetPatch,
   buildCreateSurveyHashPatch,
   buildCreateSurveyMountSubmitResetPatch,
@@ -96,25 +93,6 @@ describe('createQuestionsAndSurveysHelpers state patches', () => {
     });
     expect(buildCreateSurveyQuestionListPatch('bad')).toEqual({
       questions: [],
-    });
-    expect(buildCreateSurveyEncryptionGateSeedPatch({
-      addresses: ['0xA', '0xB'],
-      encryptionGateMode: 'all',
-    })).toEqual({
-      encryptionGateSBTs: [
-        { address: '0xA', name: '0xA' },
-        { address: '0xB', name: '0xB' },
-      ],
-      encryptionGateMode: 'all',
-    });
-    expect(buildCreateSurveyEncryptionTogglePatch({
-      checked: true,
-      name: 'encryptSurvey',
-    })).toEqual({
-      encryptSurvey: true,
-    });
-    expect(buildCreateSurveyEncryptionGateModePatch('any')).toEqual({
-      encryptionGateMode: 'any',
     });
     expect(buildCreateSurveyNetworkSwitchPatch(1)).toEqual({
       needsNetworkSwitch: true,
