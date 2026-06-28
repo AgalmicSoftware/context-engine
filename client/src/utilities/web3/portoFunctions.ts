@@ -929,6 +929,49 @@ export async function sendPortoTransaction(txRequest: AnyObj): Promise<any> {
     }
     return null;
   };
+  const parseFeeToBigInt = (value: any): bigint | null => {
+    if (value == null || value === '') return null;
+    if (typeof value === 'bigint') return value >= 0n ? value : null;
+    if (typeof value === 'number') {
+      if (!Number.isFinite(value) || value < 0) return null;
+      return BigInt(Math.trunc(value));
+    }
+    if (typeof value === 'object') {
+      if (typeof value.toBigInt === 'function') {
+        try {
+          const parsed = value.toBigInt();
+          return typeof parsed === 'bigint' && parsed >= 0n ? parsed : null;
+        } catch (_) {}
+      }
+      const hexLike = value._hex || value.hex;
+      if (typeof hexLike === 'string') {
+        const parsedHex = parseHexToBigInt(hexLike);
+        if (parsedHex != null && parsedHex >= 0n) return parsedHex;
+      }
+      if (typeof value.toString === 'function' && value.toString !== Object.prototype.toString) {
+        try {
+          return parseFeeToBigInt(value.toString());
+        } catch (_) {
+          return null;
+        }
+      }
+      return null;
+    }
+    const raw = String(value || '').trim();
+    if (!raw) return null;
+    if (/^0x[0-9a-f]+$/i.test(raw)) {
+      const parsedHex = parseHexToBigInt(raw);
+      return parsedHex != null && parsedHex >= 0n ? parsedHex : null;
+    }
+    if (/^\d+$/.test(raw)) {
+      try {
+        return BigInt(raw);
+      } catch (_) {
+        return null;
+      }
+    }
+    return null;
+  };
   const bumpByPercent = (value: any, percent: any): bigint | null => {
     const base = (typeof value === 'bigint') ? value : null;
     if (!base || base <= 0n) return null;
@@ -1031,18 +1074,44 @@ export async function sendPortoTransaction(txRequest: AnyObj): Promise<any> {
         txPayload.gasPrice = baselineGasPrice;
       }
       if (attempt > 1) {
-        const priorAttemptedGasPrice = typeof txPayload.gasPrice === 'bigint' && txPayload.gasPrice > 0n
-          ? txPayload.gasPrice
-          : baselineGasPrice;
-        const latestGasPrice = await readGasPrice();
-        baselineGasPrice = maxBigInt(baselineGasPrice, latestGasPrice);
-        const bumpedGasPrice = bumpByPercent(baselineGasPrice, 100 + (attempt * 25));
-        const retryGasPrice = maxBigInt(
-          maxBigInt(bumpedGasPrice, minRetryGasPriceWei),
-          priorAttemptedGasPrice
-        );
-        if (retryGasPrice) {
-          txPayload.gasPrice = retryGasPrice;
+        if (useEip1559Fees) {
+          const priorAttemptedMaxFee = typeof txPayload.maxFeePerGas === 'bigint' && txPayload.maxFeePerGas > 0n
+            ? txPayload.maxFeePerGas
+            : baselineMaxFeePerGas;
+          const priorAttemptedPriorityFee = typeof txPayload.maxPriorityFeePerGas === 'bigint' && txPayload.maxPriorityFeePerGas > 0n
+            ? txPayload.maxPriorityFeePerGas
+            : baselineMaxPriorityFeePerGas;
+          const latestGasPrice = await readGasPrice();
+          baselineMaxFeePerGas = maxBigInt(baselineMaxFeePerGas, latestGasPrice);
+          const bumpedMaxFee = bumpByPercent(baselineMaxFeePerGas, 100 + (attempt * 25));
+          const retryMaxFee = maxBigInt(
+            maxBigInt(bumpedMaxFee, minRetryGasPriceWei),
+            priorAttemptedMaxFee
+          );
+          if (retryMaxFee) {
+            txPayload.maxFeePerGas = retryMaxFee;
+          }
+          if (typeof baselineMaxPriorityFeePerGas === 'bigint' && baselineMaxPriorityFeePerGas > 0n) {
+            const bumpedPriorityFee = bumpByPercent(baselineMaxPriorityFeePerGas, 100 + (attempt * 25));
+            const retryPriorityFee = maxBigInt(bumpedPriorityFee, priorAttemptedPriorityFee);
+            if (retryPriorityFee) {
+              txPayload.maxPriorityFeePerGas = retryPriorityFee;
+            }
+          }
+        } else {
+          const priorAttemptedGasPrice = typeof txPayload.gasPrice === 'bigint' && txPayload.gasPrice > 0n
+            ? txPayload.gasPrice
+            : baselineGasPrice;
+          const latestGasPrice = await readGasPrice();
+          baselineGasPrice = maxBigInt(baselineGasPrice, latestGasPrice);
+          const bumpedGasPrice = bumpByPercent(baselineGasPrice, 100 + (attempt * 25));
+          const retryGasPrice = maxBigInt(
+            maxBigInt(bumpedGasPrice, minRetryGasPriceWei),
+            priorAttemptedGasPrice
+          );
+          if (retryGasPrice) {
+            txPayload.gasPrice = retryGasPrice;
+          }
         }
         portoLog.warn('[PORTO_RPC] Retrying transaction with bumped fee', {
           attempt,
