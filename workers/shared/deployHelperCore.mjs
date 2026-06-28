@@ -1,4 +1,8 @@
 import rpcDefaults from '../../client/src/variables/rpcDefaults.js';
+import {
+  STORAGE_BACKENDS,
+  normalizeStorageBackend,
+} from '../sessionCorsWorker/storageRefNormalization.js';
 import { buildSessionSecretsEnvelope } from './sessionSecretsEnvelope.mjs';
 
 const { getPathRpcUrl } = rpcDefaults;
@@ -19,8 +23,43 @@ export const DEPLOY_HELPER_ORIGINS_KEY = 'deploy-helper:origins';
 
 const TRUE_STRINGS = new Set(['1', 'true', 'yes', 'on']);
 const FALSE_STRINGS = new Set(['0', 'false', 'no', 'off']);
+const STORAGE_RESOURCE_STAGES = Object.freeze({
+  ACTIVE: 'active',
+  STAGED: 'staged',
+});
+const DEFAULT_STORAGE_RESOURCES = Object.freeze({
+  docsContext: STORAGE_RESOURCE_STAGES.ACTIVE,
+  questions: STORAGE_RESOURCE_STAGES.STAGED,
+  surveys: STORAGE_RESOURCE_STAGES.STAGED,
+  responses: STORAGE_RESOURCE_STAGES.STAGED,
+  generatedArtifacts: STORAGE_RESOURCE_STAGES.STAGED,
+  media: STORAGE_RESOURCE_STAGES.STAGED,
+  images: STORAGE_RESOURCE_STAGES.STAGED,
+});
+const DEFAULT_PAYLOAD_ACCESS_RESOURCES = Object.freeze({
+  docsContext: 'docUploads',
+  questions: 'questionResponses',
+  surveys: 'surveyResponses',
+  responses: 'questionResponses',
+  generatedArtifacts: 'surveyResponses',
+  media: 'docUploads',
+  images: 'docUploads',
+});
+const DEFAULT_CLOUDFLARE_PRIMITIVES = Object.freeze({
+  r2: ['session_context_payloads', 'question_payloads', 'survey_payloads', 'response_payloads', 'media_blob_payloads'],
+  d1: ['metadata_indexes', 'audit_events', 'queryable_records'],
+  kv: ['metadata_indexes', 'short_lived_action_ids', 'webhook_replay_cache', 'ephemeral_start_params'],
+  durableObjects: ['signer_runtime_coordination_only', 'coordination_locks'],
+});
+const PAYLOAD_ACCESS_MODES = Object.freeze({
+  PUBLIC_READ: 'public_read',
+  WORKER_SBT_GATE: 'worker_sbt_gate',
+  LIT_ENCRYPTED: 'lit_encrypted',
+});
+const R2_BUCKET_NAME_RE = /^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/;
 
 export const toStr = (val) => (typeof val === 'string' ? val : val == null ? '' : String(val));
+const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
 export const hasScheme = (value) => /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(value);
 export const ensureHttpUrl = (raw) => {
   const trimmed = toStr(raw).trim();
@@ -265,6 +304,187 @@ export const sanitizeBlockLimits = (incoming) => {
   };
 };
 
+const normalizeResourceStage = (value, fallback) => {
+  const normalized = toStr(value).trim().toLowerCase();
+  if (normalized === STORAGE_RESOURCE_STAGES.ACTIVE) return STORAGE_RESOURCE_STAGES.ACTIVE;
+  if (normalized === STORAGE_RESOURCE_STAGES.STAGED) return STORAGE_RESOURCE_STAGES.STAGED;
+  return fallback;
+};
+
+const normalizePayloadAccessMode = (value) => {
+  const normalized = toStr(value).trim().toLowerCase();
+  if (normalized === PAYLOAD_ACCESS_MODES.PUBLIC_READ || normalized === 'public' || normalized === 'public-read') {
+    return PAYLOAD_ACCESS_MODES.PUBLIC_READ;
+  }
+  if (normalized === PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED) return PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED;
+  return PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE;
+};
+
+const normalizeStorageProfileInput = (incoming) => {
+  if (incoming == null) return null;
+  if (isObj(incoming)) return incoming;
+  const trimmed = toStr(incoming).trim();
+  return trimmed ? { backend: trimmed } : null;
+};
+
+export const normalizeDeployStorageProfile = (incoming) => {
+  const raw = normalizeStorageProfileInput(incoming);
+  if (!raw) return null;
+  const backend = normalizeStorageBackend(raw.backend || raw.profile || raw.storageProfile);
+  const rawResources = isObj(raw.resources) ? raw.resources : {};
+  const defaultCanonicalStage = backend === STORAGE_BACKENDS.CLOUDFLARE
+    ? STORAGE_RESOURCE_STAGES.ACTIVE
+    : STORAGE_RESOURCE_STAGES.STAGED;
+  const docsContext = normalizeResourceStage(rawResources.docsContext || raw.docsContext, STORAGE_RESOURCE_STAGES.ACTIVE);
+  const profile = {
+    type: 'session_storage_profile',
+    version: 'session-storage-profile-v1',
+    backend,
+    sessionOwned: true,
+    telegramOwned: false,
+    resources: {
+      ...DEFAULT_STORAGE_RESOURCES,
+      docsContext,
+      questions: normalizeResourceStage(rawResources.questions || raw.questions, defaultCanonicalStage),
+      surveys: normalizeResourceStage(rawResources.surveys || raw.surveys, defaultCanonicalStage),
+      responses: normalizeResourceStage(rawResources.responses || raw.responses, defaultCanonicalStage),
+      generatedArtifacts: normalizeResourceStage(
+        rawResources.generatedArtifacts || raw.generatedArtifacts,
+        defaultCanonicalStage
+      ),
+      media: normalizeResourceStage(rawResources.media || raw.media, defaultCanonicalStage),
+      images: normalizeResourceStage(rawResources.images || raw.images, defaultCanonicalStage),
+    },
+    sbtGatedAccess: {
+      uploads: 'session_worker_gate',
+      snippets: 'session_worker_gate',
+      shortLivedReads: 'session_worker_gate',
+      downloads: 'session_worker_gate',
+      litRequired: 'payload_encrypted_only',
+    },
+    cloudflare: null,
+  };
+  if (backend !== STORAGE_BACKENDS.CLOUDFLARE) return profile;
+
+  const rawCloudflare = isObj(raw.cloudflare) ? raw.cloudflare : {};
+  const rawAccess = isObj(raw.payloadAccessControl) ? raw.payloadAccessControl : {};
+  const accessMode = normalizePayloadAccessMode(
+    rawAccess.mode ||
+    rawCloudflare.payloadAccessMode ||
+    raw.payloadAccessMode ||
+    raw.accessControlMode
+  );
+  const litEncrypted = accessMode === PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED;
+  const publicRead = accessMode === PAYLOAD_ACCESS_MODES.PUBLIC_READ;
+  profile.payloadAccessControl = {
+    mode: accessMode,
+    enforcement: litEncrypted
+      ? 'lit_access_control_conditions'
+      : (publicRead ? 'session_worker_public_read' : 'session_worker_sbt_gate'),
+    litRequired: litEncrypted,
+    label: litEncrypted
+      ? 'Lit-encrypted Cloudflare payloads'
+      : (publicRead ? 'Public-read Cloudflare payloads' : 'Worker-enforced SBT access control'),
+    resources: {
+      ...DEFAULT_PAYLOAD_ACCESS_RESOURCES,
+      ...(isObj(rawAccess.resources) ? rawAccess.resources : {}),
+    },
+  };
+  profile.sbtGatedAccess = {
+    ...profile.sbtGatedAccess,
+    litRequired: litEncrypted
+      ? 'required_for_cloudflare_payload_encryption'
+      : (publicRead ? 'not_required_public_read' : 'not_required_worker_enforced'),
+  };
+  profile.cloudflare = {
+    primitives: DEFAULT_CLOUDFLARE_PRIMITIVES,
+    payloadAccessMode: accessMode,
+    credentialSource: 'worker_secret_or_cloudflare_binding',
+    exposesAccountId: false,
+    exposesBucketName: false,
+    exposesWorkerToken: false,
+    exposesRawStoragePath: false,
+    exposesLongLivedUrl: false,
+  };
+  return profile;
+};
+
+const firstTrimmed = (...values) => {
+  for (const value of values) {
+    const trimmed = toStr(value).trim();
+    if (trimmed) return trimmed;
+  }
+  return '';
+};
+
+const resolveRequestedR2BucketName = (incoming) => {
+  const raw = normalizeStorageProfileInput(incoming);
+  if (!raw) return '';
+  const cloudflare = isObj(raw.cloudflare) ? raw.cloudflare : {};
+  const r2 = isObj(cloudflare.r2) ? cloudflare.r2 : {};
+  return firstTrimmed(
+    raw.r2BucketName,
+    raw.r2Bucket,
+    raw.bucketName,
+    raw.bucket,
+    cloudflare.r2BucketName,
+    cloudflare.r2Bucket,
+    cloudflare.bucketName,
+    cloudflare.bucket,
+    r2.bucketName,
+    r2.bucket
+  );
+};
+
+const truthyR2Marker = (value) => {
+  if (value === true) return true;
+  const normalized = toStr(value).trim().toLowerCase();
+  return normalized === 'r2' || TRUE_STRINGS.has(normalized);
+};
+
+const hasExplicitR2Request = (incoming, bucketName = '') => {
+  if (bucketName) return true;
+  const raw = normalizeStorageProfileInput(incoming);
+  if (!raw) return false;
+  const cloudflare = isObj(raw.cloudflare) ? raw.cloudflare : {};
+  return truthyR2Marker(raw.useR2) ||
+    truthyR2Marker(raw.payloadStorage) ||
+    truthyR2Marker(raw.storageLayer) ||
+    truthyR2Marker(cloudflare.useR2) ||
+    truthyR2Marker(cloudflare.payloadStorage) ||
+    truthyR2Marker(cloudflare.storageLayer) ||
+    truthyR2Marker(cloudflare.r2);
+};
+
+export const resolveDeployStorageBindingPlan = (incoming, storageProfile) => {
+  if (!storageProfile || storageProfile.backend !== STORAGE_BACKENDS.CLOUDFLARE) {
+    return { ok: true, r2BucketName: '', requiresStorageIndexKv: false };
+  }
+  const r2BucketName = resolveRequestedR2BucketName(incoming);
+  if (r2BucketName && (
+    !R2_BUCKET_NAME_RE.test(r2BucketName) ||
+    r2BucketName.includes('..') ||
+    r2BucketName.includes('-.') ||
+    r2BucketName.includes('.-')
+  )) {
+    return {
+      ok: false,
+      error: 'Invalid Cloudflare R2 bucket name. Use the existing bucket name without URLs, paths, or credentials.',
+    };
+  }
+  if (hasExplicitR2Request(incoming, r2BucketName) && !r2BucketName) {
+    return {
+      ok: false,
+      error: 'Cloudflare R2 storage requires r2BucketName when R2 is explicitly requested.',
+    };
+  }
+  return {
+    ok: true,
+    r2BucketName,
+    requiresStorageIndexKv: true,
+  };
+};
+
 export const normalizeEmbeddedDeployHelperEnabled = (
   value,
   fallback = DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED
@@ -430,6 +650,13 @@ export const executeDeployHelperRequest = async ({
     });
   }
 
+  const rawStorageProfile = body?.storageProfile ?? body?.storageBackend ?? null;
+  const storageProfile = normalizeDeployStorageProfile(rawStorageProfile);
+  const storageBindingPlan = resolveDeployStorageBindingPlan(rawStorageProfile, storageProfile);
+  if (!storageBindingPlan.ok) {
+    return buildFailure(400, { error: storageBindingPlan.error });
+  }
+
   const accountLookup = await resolveDeploymentAccountId({
     body: {
       ...body,
@@ -532,6 +759,12 @@ export const executeDeployHelperRequest = async ({
     main_module: 'worker.mjs',
     bindings: [
       { name: 'GROUP_KV', type: 'kv_namespace', namespace_id: kvId },
+      ...(storageBindingPlan.requiresStorageIndexKv
+        ? [{ name: 'CE_STORAGE_INDEX_KV', type: 'kv_namespace', namespace_id: kvId }]
+        : []),
+      ...(storageBindingPlan.r2BucketName
+        ? [{ name: 'CE_STORAGE_R2', type: 'r2_bucket', bucket_name: storageBindingPlan.r2BucketName }]
+        : []),
       { name: 'DEFAULT_SESSION_SLUG', type: 'plain_text', text: sessionSlug },
       { name: 'DEPLOY_HELPER_ENABLED', type: 'plain_text', text: embeddedDeployHelperEnabled ? '1' : '0' },
     ],
@@ -593,6 +826,9 @@ export const executeDeployHelperRequest = async ({
     faucet,
     embeddedDeployHelperEnabled,
   };
+  if (storageProfile) {
+    config.storageProfile = storageProfile;
+  }
   const blockLimits = sanitizeBlockLimits(body?.blockLimits);
   if (blockLimits) {
     config.blockLimits = blockLimits;

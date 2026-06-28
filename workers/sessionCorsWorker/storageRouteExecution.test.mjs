@@ -279,6 +279,54 @@ test('storageRoute can use KV-only Cloudflare payload storage when R2 is unavail
   assert.doesNotMatch(JSON.stringify(listed), /ce-storage-payload|bucket|token|secret/i);
 });
 
+test('storageRoute accepts deploy-helper KV alias bindings for Cloudflare payload storage', async () => {
+  const kv = createMockKv();
+  const env = { GROUP_KV: kv, CE_STORAGE_INDEX_KV: kv };
+  const uploadResponse = await storageRoute({
+    path: '/storage/upload',
+    method: 'POST',
+    request: new Request('https://worker.example/storage/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        data: { prompt: 'Aliased KV storage works', ok: true },
+        contentType: 'application/json',
+        resource: 'questions',
+      }),
+    }),
+    env,
+    config: CLOUDFLARE_WORKER_GATE_CONFIG,
+    slug: 'session-a',
+    uploaderAddress: '0xabc',
+    baseHeaders: {},
+    deps: {
+      json,
+      randomBytes: fixedRandomBytes,
+      now: () => Date.parse('2026-01-02T03:04:05.000Z'),
+    },
+  });
+
+  assert.equal(uploadResponse.status, 200);
+  const uploadBody = await readJson(uploadResponse);
+  assert.equal(uploadBody.storageRef.backend, 'cloudflare');
+  assert.equal(kv.store.has(`ce-storage-payload:session-a:${uploadBody.storageRef.id}`), true);
+
+  const readResponse = await storageRoute({
+    path: '/storage/read',
+    method: 'GET',
+    request: new Request(`https://worker.example/storage/read?id=${uploadBody.storageRef.id}`),
+    env,
+    config: CLOUDFLARE_WORKER_GATE_CONFIG,
+    slug: 'session-a',
+    uploaderAddress: '0xabc',
+    baseHeaders: {},
+    deps: { json },
+  });
+
+  assert.equal(readResponse.status, 200);
+  assert.deepEqual(JSON.parse(await readResponse.text()), { prompt: 'Aliased KV storage works', ok: true });
+});
+
 test('storageRoute reads legacy KV payloads after an R2 binding is added', async () => {
   const kv = createMockKv();
   const uploadEnv = { CE_STORAGE_INDEX_KV: kv };
