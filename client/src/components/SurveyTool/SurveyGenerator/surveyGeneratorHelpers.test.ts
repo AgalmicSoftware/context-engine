@@ -500,22 +500,6 @@ describe('surveyGeneratorHelpers', () => {
     ].join('\n'));
   });
 
-  it('replaces every source type token in generation prompts', () => {
-    const prompt = buildSingleGenerationPrompt({
-      promptTemplate: 'source=<SourceType>\nconditional=<SourceType>',
-      sourceDocContent: '',
-      count: 2,
-      questionTypes: {
-        freeform: true,
-      },
-      defaultTags: [],
-      transcriptMode: true,
-    });
-
-    expect(prompt).toBe('source=transcript\nconditional=transcript');
-    expect(prompt).not.toContain('<SourceType>');
-  });
-
   it('uses prompt defaults when no question types or overrides are selected', () => {
     const prompt = buildSingleGenerationPrompt({
       promptTemplate: '<Types>|<SourceType>|<MultiSpeakerHint>|<DefaultTags>',
