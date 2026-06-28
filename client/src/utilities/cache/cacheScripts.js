@@ -154,6 +154,28 @@ const removeMirrorValue = (namespace, slug) => {
   bucket.delete(String(slug || ''));
 };
 
+const snapshotActiveOptimisticMirrorEntries = () => {
+  const entries = [];
+  optimisticWriteSeqByKey.forEach((seq, key) => {
+    if (!mirrorByKey.has(key)) return;
+    entries.push({
+      key,
+      seq,
+      value: cloneValue(mirrorByKey.get(key)),
+    });
+  });
+  return entries;
+};
+
+const restoreActiveOptimisticMirrorEntries = (entries = []) => {
+  entries.forEach(({ key, seq, value }) => {
+    if (optimisticWriteSeqByKey.get(key) !== seq) return;
+    const parsed = parseStorageKey(key);
+    if (!parsed || !isManagedNamespace(parsed.namespace)) return;
+    setMirrorValue(parsed.namespace, parsed.slug, value);
+  });
+};
+
 const emitUpdate = (payload = {}) => {
   subscribers.forEach((handler) => {
     try { handler(payload); } catch (e) { cacheLog.warn('cacheScripts: callback', e); }
@@ -359,15 +381,22 @@ const ensureBackendReady = async () => {
   return backendReadyPromise;
 };
 
-const hydrateMirrorFromIdb = async () => {
+const hydrateMirrorFromIdb = async ({ preserveOptimistic = false } = {}) => {
+  const optimisticSnapshots = preserveOptimistic
+    ? snapshotActiveOptimisticMirrorEntries()
+    : [];
   clearMirror();
   try {
     const all = await idbEntries(IDB_STORE);
     all.forEach(([key, value]) => {
       const parsed = parseStorageKey(key);
       if (!parsed || !isManagedNamespace(parsed.namespace)) return;
+      if (preserveOptimistic && optimisticWriteSeqByKey.has(key)) return;
       setMirrorValue(parsed.namespace, parsed.slug, value);
     });
+    if (preserveOptimistic) {
+      restoreActiveOptimisticMirrorEntries(optimisticSnapshots);
+    }
   } catch (e) {
     cacheLog.warn('[cacheScripts] Failed to hydrate mirror from IDB', e);
   }
@@ -491,7 +520,7 @@ const attemptIdbRecovery = async ({ force = false } = {}) => {
     noteIdbSuccess();
     cacheLog.warn('[cacheScripts] IndexedDB recovered; reconciling managed fallback cache keys');
     const managed = await migrateManagedKeysFromLocalStorage({ useIdb: true });
-    await hydrateMirrorFromIdb();
+    await hydrateMirrorFromIdb({ preserveOptimistic: true });
     const repairedFromLocal = hydrateMissingMirrorFromLocalStorage();
 
     cacheLog.log('[cacheScripts] IndexedDB recovery mirror hydration complete', {

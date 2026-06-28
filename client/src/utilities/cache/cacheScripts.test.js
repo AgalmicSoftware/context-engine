@@ -21,6 +21,14 @@ const shouldFail = (counterMap = {}, key = '') => {
   return true;
 };
 
+const waitForCondition = async (predicate, label = 'condition') => {
+  for (let i = 0; i < 20; i += 1) {
+    if (predicate()) return;
+    await Promise.resolve();
+  }
+  throw new Error(`Timed out waiting for ${label}`);
+};
+
 const loadCacheScripts = ({
   failProbe = false,
   failSetByKey = {},
@@ -597,6 +605,62 @@ describe('cacheScripts', () => {
     expect(cacheScripts.peekCacheSync('questionsCache', 'recover')).toEqual(merged);
     expect(idbState.get(key)).toEqual(merged);
     expect(localStorage.getItem(key)).toBeNull();
+  });
+
+  it('preserves optimistic mirror entries during IDB recovery hydration', async () => {
+    const forceFallbackKey = 'dg:questionsCache:force-recovery';
+    const optimisticKey = 'dg:questionsCache:optimistic-recovery';
+    const unrelatedKey = 'dg:sbtCache:recovery-unrelated';
+    const { cacheScripts, idb, idbState } = loadCacheScripts({
+      failSetByKey: { [forceFallbackKey]: 6 },
+    });
+    idbState.set(optimisticKey, { value: 0 });
+    idbState.set(unrelatedKey, { value: 'keep' });
+    await cacheScripts.initCacheManager();
+
+    await expect(cacheScripts.writeCache('questionsCache', 'force-recovery', { attempt: 1 })).resolves.toBe(false);
+    await expect(cacheScripts.writeCache('questionsCache', 'force-recovery', { attempt: 2 })).resolves.toBe(false);
+    await expect(cacheScripts.writeCache('questionsCache', 'force-recovery', { attempt: 3 })).resolves.toBe(true);
+
+    const baseEntries = idb.entries.getMockImplementation();
+    const baseSet = idb.set.getMockImplementation();
+    let recoveryEntriesRead = false;
+    let releaseOptimisticPersist;
+    const optimisticPersistGate = new Promise((resolve) => {
+      releaseOptimisticPersist = resolve;
+    });
+    idb.entries.mockImplementation(async (...args) => {
+      const result = await baseEntries(...args);
+      recoveryEntriesRead = true;
+      return result;
+    });
+    idb.set.mockImplementation(async (storageKey, value, store) => {
+      if (storageKey === optimisticKey && Number(value?.value) === 1) {
+        await optimisticPersistGate;
+      }
+      return baseSet(storageKey, value, store);
+    });
+
+    const pending = cacheScripts.writeCacheOptimistic('questionsCache', 'optimistic-recovery', { value: 1 });
+    expect(cacheScripts.peekCacheSync('questionsCache', 'optimistic-recovery')).toEqual({ value: 1 });
+
+    await waitForCondition(() => recoveryEntriesRead, 'recovery IDB entries read');
+    await Promise.resolve();
+
+    expect(cacheScripts.peekCacheSync('questionsCache', 'optimistic-recovery')).toEqual({ value: 1 });
+    expect(cacheScripts.listNamespaceEntriesSync('sbtCache')).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          namespace: 'sbtCache',
+          slug: 'recovery-unrelated',
+          value: { value: 'keep' },
+        }),
+      ])
+    );
+
+    releaseOptimisticPersist();
+    await expect(pending).resolves.toBe(true);
+    expect(idbState.get(optimisticKey)).toEqual({ value: 1 });
   });
 
   it('writeCacheOptimistic updates mirror immediately for non-awaited writes', async () => {
