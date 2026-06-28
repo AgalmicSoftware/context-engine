@@ -556,6 +556,94 @@ describe('SBTsList selector and initial loading status', () => {
     expect(screen.getByRole('button', { name: /Clear Cache/i })).not.toBeDisabled();
   });
 
+  it('shows full-page No Session as an additive list-scope selector without querying the synthetic slug', async () => {
+    mockReadSessionScanScope.mockReturnValue('list');
+    mockReadSessionScanSlugs.mockReturnValue(['alpha']);
+
+    const alphaAddress = '0x00000000000000000000000000000000000000a1';
+    const unassignedAddress = '0x00000000000000000000000000000000000000a9';
+    const alphaCache = {
+      '84532': {
+        sbtList: {
+          [alphaAddress.toLowerCase()]: {
+            sbtAddress: alphaAddress,
+            slug: 'alpha',
+            sbtInfo: {
+              name: 'Alpha Full Page Badge',
+              description: 'belongs to alpha',
+              sessionSlug: 'alpha',
+              sessionSlugExplicit: true,
+              mintingEndTime: 0,
+            },
+            mintedAddresses: [],
+            burnedAddresses: [],
+            countsLoaded: true,
+            blockNumber: 1100,
+          },
+          [unassignedAddress.toLowerCase()]: {
+            sbtAddress: unassignedAddress,
+            slug: 'alpha',
+            sbtInfo: {
+              name: 'Unassigned Full Page Badge',
+              description: 'no session association',
+              sessionSlug: '',
+              sessionSlugExplicit: true,
+              mintingEndTime: 0,
+            },
+            mintedAddresses: [],
+            burnedAddresses: [],
+            countsLoaded: true,
+            blockNumber: 1101,
+          },
+        },
+        lastBlock: 1101,
+      },
+    };
+
+    mockReadCache.mockImplementation(async (_namespace, slug) => {
+      const normalized = String(slug || '').trim().toLowerCase();
+      if (normalized === 'alpha') return alphaCache;
+      return { '84532': { sbtList: {}, lastBlock: 0 } };
+    });
+
+    const ensureLightSbtDiscovery = jest.fn().mockResolvedValue(undefined);
+    renderSBTsList({ ensureLightSbtDiscovery });
+
+    await waitFor(() => {
+      expect(screen.getByText('Alpha Full Page Badge')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Unassigned Full Page Badge')).not.toBeInTheDocument();
+
+    await openSessionSelector();
+    const alphaChip = await screen.findByTestId('session-chip-alpha');
+    const noSessionChip = await screen.findByTestId('session-chip-__no_session__');
+
+    expect(screen.getByRole('button', { name: 'No Session' })).toBeInTheDocument();
+    expect(alphaChip).toHaveAttribute('data-session-selected', 'true');
+    expect(noSessionChip).toHaveAttribute('data-session-selected', 'false');
+
+    fireEvent.click(noSessionChip);
+
+    await waitFor(() => {
+      expect(screen.getByText('Alpha Full Page Badge')).toBeInTheDocument();
+      expect(screen.getByText('Unassigned Full Page Badge')).toBeInTheDocument();
+    });
+    expect(alphaChip).toHaveAttribute('data-session-selected', 'true');
+    expect(noSessionChip).toHaveAttribute('data-session-selected', 'true');
+
+    fireEvent.click(noSessionChip);
+
+    await waitFor(() => {
+      expect(screen.getByText('Alpha Full Page Badge')).toBeInTheDocument();
+      expect(screen.queryByText('Unassigned Full Page Badge')).not.toBeInTheDocument();
+    });
+    expect(alphaChip).toHaveAttribute('data-session-selected', 'true');
+    expect(noSessionChip).toHaveAttribute('data-session-selected', 'false');
+
+    const calledSlugs = ensureLightSbtDiscovery.mock.calls.map(([slug]) => String(slug || ''));
+    expect(calledSlugs).not.toContain('__no_session__');
+  });
+
   it('filters session-id style private entries from all-groups slug discovery', async () => {
     const privateSessionIdSlug = '6cbb4a26-43f0-4478-ac5f-2e8703f8f3fb';
     mockGetAllSessionEntries.mockReturnValue([
