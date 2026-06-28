@@ -747,9 +747,7 @@ const _getProvider = (providerLike: ProviderLike): Eip1193Provider => {
     }
   }
   if (typeof window !== 'undefined') {
-    if (window.ethereum && typeof window.ethereum.request === 'function') {
-      return window.ethereum as Eip1193Provider;
-    }
+    if (window.ethereum) return window.ethereum;
     if (window.web3authProvider) return window.web3authProvider;
   }
 
