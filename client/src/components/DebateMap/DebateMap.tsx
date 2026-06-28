@@ -323,7 +323,39 @@ interface DisagreementRange {
 interface AtlasLink {
   source: { x: number; y: number };
   target: { x: number; y: number };
+  sourceId?: string;
+  targetId?: string;
 }
+
+export const getDebateNodeStableKey = (
+  node: Pick<DebateNode, 'id' | 'name'> | null | undefined,
+  fallback: string
+): string => {
+  const nodeId = String(node?.id || '').trim();
+  if (nodeId) return nodeId;
+  const nodeName = String(node?.name || '').trim();
+  if (nodeName) return nodeName;
+  return fallback;
+};
+
+const formatAtlasLinkCoordinate = (value: unknown): string => {
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? numericValue.toFixed(3) : '0.000';
+};
+
+export const getAtlasLinkStableKey = (link: AtlasLink, fallbackIndex: number): string => {
+  const sourceId = String(link?.sourceId || '').trim();
+  const targetId = String(link?.targetId || '').trim();
+  if (sourceId || targetId) return `${sourceId || 'source'}->${targetId || 'target'}`;
+  return [
+    'coords',
+    formatAtlasLinkCoordinate(link?.source?.x),
+    formatAtlasLinkCoordinate(link?.source?.y),
+    formatAtlasLinkCoordinate(link?.target?.x),
+    formatAtlasLinkCoordinate(link?.target?.y),
+    fallbackIndex,
+  ].join(':');
+};
 
 interface AtlasRenderNode extends DebateNode {
   x: number;
@@ -1452,10 +1484,19 @@ const OrbitalAtlasView = ({
           });
         }
 
-        if (level < 3) {
-          processRing(child, nodeX, nodeY, 0, 0, level + 1);
-        }
-      });
+          if (parent.id !== 'virtual-root') {
+              links.push({
+                  source: { x: parentX, y: parentY },
+                  target: { x: nodeX, y: nodeY },
+                  sourceId: String(parent.id || '').trim(),
+                  targetId: String(child.id || '').trim(),
+              });
+          }
+
+          if (level < 3) {
+             processRing(child, nodeX, nodeY, 0, 0, level + 1);
+          }
+       });
     };
 
     processRing(centerNode, 0, 0, 0, Math.PI * 2, 1);
@@ -1527,13 +1568,7 @@ const OrbitalAtlasView = ({
 
       <svg className={styles.atlasSvgLayer}>
         {layout.links.map((link, i) => (
-          <line
-            key={getAtlasLinkStableKey(link, i)}
-            x1={cx + link.source.x}
-            y1={cy + link.source.y}
-            x2={cx + link.target.x}
-            y2={cy + link.target.y}
-          />
+          <line key={getAtlasLinkStableKey(link, i)} x1={cx + link.source.x} y1={cy + link.source.y} x2={cx + link.target.x} y2={cy + link.target.y} />
         ))}
       </svg>
 
@@ -2782,26 +2817,26 @@ const TreeNode = ({
 
       {hasChildren && !isCollapsed && (
         <div className={styles.orgChildrenContainer}>
-          <div
-            className={styles.orgChildrenRow}
-            style={childrenRowStyle}
-            data-ce-org-total-columns={totalChildColumns || 1}
-          >
-            {sortedChildren.map((child: DebateNode, i: number) => (
-              <TreeNode
-                key={getDebateNodeStableKey(child, `tree-child-${i}`)}
-                node={child}
-                depth={depth + 1}
-                parentPath={[...parentPath, node]}
-                onNodeClick={onNodeClick}
-                onBookmark={onBookmark}
-                bookmarkedNodes={bookmarkedNodes}
-                onSuggestNode={onSuggestNode}
-                staggerOffsetPx={getTreeChildStaggerPx(depth + 1, i, childColumns)}
-                branchSpan={childBranchSpans[i] || 1}
-              />
-            ))}
-          </div>
+           <div
+             className={styles.orgChildrenRow}
+             style={childrenRowStyle}
+             data-ce-org-total-columns={totalChildColumns || 1}
+           >
+              {sortedChildren.map((child: DebateNode, i: number) => (
+                <TreeNode
+                  key={getDebateNodeStableKey(child, `tree-child-${i}`)}
+                  node={child}
+                  depth={depth + 1}
+                  parentPath={[...parentPath, node]}
+                  onNodeClick={onNodeClick}
+                  onBookmark={onBookmark}
+                  bookmarkedNodes={bookmarkedNodes}
+                  onSuggestNode={onSuggestNode}
+                  staggerOffsetPx={getTreeChildStaggerPx(depth + 1, i, childColumns)}
+                  branchSpan={childBranchSpans[i] || 1}
+                />
+              ))}
+           </div>
         </div>
       )}
     </div>
@@ -3240,60 +3275,57 @@ const DebateMap = ({
 
         {visualMode === DEBATE_VISUAL_MODES.TREE && (
           <div className={styles.categorySelector}>
-            {treeDataState.map((cat, i) => (
-              <button
-                key={getDebateNodeStableKey(cat, `category-${i}`)}
-                className={`${styles.categoryButton} ${selectedCategory?.id === cat.id ? styles.active : ''}`}
-                onClick={() => handleCategoryClick(cat)}
-              >
-                {cat.name}
-              </button>
-            ))}
+             {treeDataState.map((cat, i) => (
+               <button key={getDebateNodeStableKey(cat, `category-${i}`)} className={`${styles.categoryButton} ${selectedCategory?.id === cat.id ? styles.active : ''}`} onClick={() => handleCategoryClick(cat)}>{cat.name}</button>
+             ))}
           </div>
         )}
 
         <div className={styles.nodesContainer}>
-          {visualMode === DEBATE_VISUAL_MODES.LIST ? (
-            <div className={styles.flatListContainer}>
-              {sortedNodes.map((node, i) => (
-                <FlatNode
-                  key={getDebateNodeStableKey(node, `list-node-${i}`)}
-                  node={node}
-                  parentPath={node.parentPath}
-                  onNodeClick={handleNodeClick}
-                  onBookmark={handleBookmark}
-                  bookmarkedNodes={bookmarkedNodes}
-                />
-              ))}
-            </div>
-          ) : isAtlasVisualMode ? (
-            <AtlasView data={treeDataState} onNodeClick={handleNodeClick} atlasLayoutMode={atlasViewLayoutMode} />
-          ) : (
-            <div className={styles.orgChartContainer} ref={treeContainerRef}>
-              {selectedCategory ? (
-                <div className={styles.orgChartFitStage} style={treeFitHeight ? { height: treeFitHeight } : undefined}>
-                  <div
-                    ref={treeContentRef}
-                    className={treeRootClassName}
-                    style={treeRootStyle}
-                    data-ce-tree-scale={treeFitScale.toFixed(3)}
-                  >
-                    <TreeNode
-                      node={selectedCategory}
-                      depth={0}
-                      parentPath={[]}
-                      onNodeClick={handleNodeClick}
-                      onBookmark={handleBookmark}
-                      bookmarkedNodes={bookmarkedNodes}
-                      onSuggestNode={handleSuggestNode}
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className={styles.emptyState}>Select a category above to view the Policy Org Chart</div>
-              )}
-            </div>
-          )}
+           {visualMode === DEBATE_VISUAL_MODES.LIST ? (
+             <div className={styles.flatListContainer}>
+                {sortedNodes.map((node, i) => (
+                  <FlatNode key={getDebateNodeStableKey(node, `list-node-${i}`)} node={node} parentPath={node.parentPath} onNodeClick={handleNodeClick} onBookmark={handleBookmark} bookmarkedNodes={bookmarkedNodes} />
+                ))}
+             </div>
+           ) : isAtlasVisualMode ? (
+             <AtlasView
+               data={treeDataState}
+               onNodeClick={handleNodeClick}
+               atlasLayoutMode={atlasViewLayoutMode}
+             />
+           ) : (
+             <div
+               className={styles.orgChartContainer}
+               ref={treeContainerRef}
+             >
+                {selectedCategory ? (
+                   <div
+                     className={styles.orgChartFitStage}
+                     style={treeFitHeight ? { height: treeFitHeight } : undefined}
+                   >
+                     <div
+                       ref={treeContentRef}
+                       className={treeRootClassName}
+                       style={treeRootStyle}
+                       data-ce-tree-scale={treeFitScale.toFixed(3)}
+                     >
+                       <TreeNode
+                          node={selectedCategory}
+                          depth={0}
+                          parentPath={[]}
+                          onNodeClick={handleNodeClick}
+                          onBookmark={handleBookmark}
+                          bookmarkedNodes={bookmarkedNodes}
+                          onSuggestNode={handleSuggestNode}
+                       />
+                     </div>
+                   </div>
+                ) : (
+                   <div className={styles.emptyState}>Select a category above to view the Policy Org Chart</div>
+                )}
+             </div>
+           )}
         </div>
 
         <Modal
