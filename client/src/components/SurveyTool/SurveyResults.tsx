@@ -91,7 +91,8 @@ import {
   type SurveyResultsIndividualAggregator,
   type SurveyResultsStringifiedAggregator,
 } from './surveyResultsHelpers.js';
-import { readSessionScanScope, readSessionScanSlugs } from '../../utilities/session/sessionScanScope.js';
+import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
+import { isResponseAllowedForSessionSlug } from '../../utilities/session/responseSessionScope.js';
 import {
   readSessionScanScope,
   readSessionScanSlugs,
@@ -2054,15 +2055,19 @@ const isDemoPolisFixtureResponse = (responseData: unknown): boolean => (
 );
 
 const filterLiveQuestionResponses = (
-  questionResponses: SurveyResultsQuestionResponsesByQuestion = {}
+  questionResponses: SurveyResultsQuestionResponsesByQuestion = {},
+  options: { sessionSlug?: unknown } = {}
 ): SurveyResultsQuestionResponsesByQuestion => {
   const out: SurveyResultsQuestionResponsesByQuestion = {};
+  const requiredSessionSlug = normalizeSessionSlug(options.sessionSlug || '');
   Object.entries(questionResponses || {}).forEach(([qId, responderMap]) => {
     const questionId = String(qId || '').trim().toLowerCase();
     if (!questionId || !responderMap || typeof responderMap !== 'object') return;
     const kept: SurveyResultsQuestionResponsesByResponder = {};
     Object.entries(responderMap).forEach(([responder, responseData]) => {
-      if (isDemoPolisFixtureResponse(parseResponse(responseData))) return;
+      const parsedResponse = parseResponse(responseData);
+      if (isDemoPolisFixtureResponse(parsedResponse)) return;
+      if (!isResponseAllowedForSessionSlug(parsedResponse, requiredSessionSlug)) return;
       kept[responder] = responseData;
     });
     if (Object.keys(kept).length > 0) out[questionId] = kept;
@@ -2238,7 +2243,11 @@ async function fetchQuestionModeResponses(): Promise<void> {
 const netIdStr = String(propsRef.current.network?.id ?? propsRef.current.networkChainId ?? '');
 if (!netIdStr) return;
 const questionNetCache = await getScopedQuestionNetworkData('questions') as SurveyResultsScopedQuestionNetworkData;
-	const partialQR: SurveyResultsQuestionResponsesByQuestion = filterLiveQuestionResponses(questionNetCache?.questionResponses || {});
+  const strictQuestionResponseSlug = isDemoSessionSlug(getEffectiveSlug()) ? getEffectiveSlug() : '';
+  const partialQR: SurveyResultsQuestionResponsesByQuestion = filterLiveQuestionResponses(
+    questionNetCache?.questionResponses || {},
+    { sessionSlug: strictQuestionResponseSlug }
+  );
   const liveQuestionIds = new Set(Object.keys(partialQR).map((qid) => String(qid || '').trim().toLowerCase()));
 	const allQuestions = filterLiveQuestionMetadata(questionNetCache?.questions || {}, liveQuestionIds);
 	const aggregatorMap: Record<string, unknown> = {};

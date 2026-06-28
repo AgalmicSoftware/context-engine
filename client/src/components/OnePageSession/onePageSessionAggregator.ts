@@ -1,4 +1,5 @@
 import { createLogger } from 'utilities/logging.js';
+import { isResponseAllowedForSessionSlug } from '../../utilities/session/responseSessionScope.js';
 
 const demoLog = createLogger('demo');
 const AGGREGATOR_PARSE_MEMO_MAX = 3000;
@@ -176,6 +177,7 @@ export function buildAggregatorFromLocalCache(networkObj: any, opts: any = {}) {
       }
       if (!parsed) return;
       if (isDemoPolisFixtureResponse(parsed)) return;
+      if (!isResponseAllowedForSessionSlug(parsed, sessionSlug)) return;
 
       const isBinary = parsed?.type === 'binary';
       const ans = parsed?.answer;

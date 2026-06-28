@@ -549,8 +549,19 @@ describe('SurveyResults session resolution', () => {
               },
             },
           },
-        };
-      });
+          questionResponses: {
+            qDemo: {
+              '0xdemo': { answer: { value: 'demo', encrypted: false }, sessionSlug: 'demo' },
+              '0xforeign': { answer: { value: 'foreign', encrypted: false }, sessionSlug: 'test-2' },
+            },
+            qLeakedExplicit: { '0xalpha': { answer: { value: 'alpha', encrypted: false } } },
+            qLeakedLegacy: { '0xlegacy': { answer: { value: 'legacy', encrypted: false } } },
+          },
+        }),
+      },
+    });
+    jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
+    jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['demo', 'alpha']);
 
       const subject = createSubject({
         sessionSlug: 'demo',
@@ -572,15 +583,10 @@ describe('SurveyResults session resolution', () => {
         viewMode: 'questions',
       };
 
-      await subject.fetchQuestionModeResponses();
-
-      expect(Object.keys(subject.state.aggregatorQuestionResponses)).toEqual(['qdemo']);
-      expect(Object.keys(subject.state.questionResponses)).toEqual(['qdemo']);
-      expect(subject.state.totalQuestionsCount).toBe(1);
-      expect(subject.state.totalResponsesCount).toBe(1);
-    } finally {
-      window.history.replaceState({}, '', priorUrl);
-    }
+    expectPromptAbsent('Wrong session question');
+    expectPromptAbsent('Legacy leaked question');
+    expect(screen.queryByText(/foreign/i)).not.toBeInTheDocument();
+    expectQuestionResponseCounts(1, 1);
   });
 
   it('keeps empty built-in demo raw results from inflating with fixture responses', async () => {
