@@ -1009,7 +1009,7 @@ const wrapLitGetKeyWithCache = (
         successCache,
         key,
         { expiresAt: settledAt + LIT_GETKEY_SUCCESS_TTL_MS, value },
-        LIT_GETKEY_SUCCESS_CACHE_MAX,
+        LIT_GETKEY_SUCCESS_CACHE_MAX
       );
       negativeCache.delete(key);
       return value;
