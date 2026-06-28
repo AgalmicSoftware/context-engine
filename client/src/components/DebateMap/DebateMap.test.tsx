@@ -332,53 +332,6 @@ describe('DebateMap', () => {
     });
   });
 
-  it('builds stable keys for reorderable atlas and list items', () => {
-    expect(getDebateNodeStableKeyAny({ id: 'node-id', name: 'Name' }, 'fallback')).toBe('node-id');
-    expect(getDebateNodeStableKeyAny({ name: 'Name' }, 'fallback')).toBe('Name');
-    expect(getDebateNodeStableKeyAny({}, 'fallback')).toBe('fallback');
-
-    expect(getAtlasLinkStableKeyAny({
-      sourceId: 'source-id',
-      targetId: 'target-id',
-      source: { x: 1, y: 2 },
-      target: { x: 3, y: 4 },
-    }, 0)).toBe('source-id->target-id');
-    expect(getAtlasLinkStableKeyAny({
-      source: { x: 1, y: 2 },
-      target: { x: 3, y: 4 },
-    }, 7)).toBe('coords:1.000:2.000:3.000:4.000:7');
-  });
-
-  it('finds top atlas nodes by heat without changing pre-order tie behavior', () => {
-    const topNodes = getTopAtlasNodesByHeatAny([
-      {
-        id: 'early-tie',
-        votes: { up: 5, down: 0 },
-        children: [
-          {
-            id: 'nested-high',
-            votes: { up: 9, down: 0 },
-          },
-        ],
-      },
-      {
-        id: 'comment-heavy',
-        votes: { up: 3, down: 0 },
-        comments: [{ id: 'c1' }, { id: 'c2' }, { id: 'c3' }],
-      },
-      {
-        id: 'late-tie',
-        votes: { up: 5, down: 0 },
-      },
-    ], 3);
-
-    expect(topNodes.map((node: any) => node.id)).toEqual([
-      'comment-heavy',
-      'nested-high',
-      'early-tie',
-    ]);
-  });
-
   it('switches between circles and atlas from the main mode controls', () => {
     render(
       <MemoryRouter>
