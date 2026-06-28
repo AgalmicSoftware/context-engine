@@ -443,6 +443,36 @@ describe('DebateMap', () => {
     }, 7)).toBe('coords:1.000:2.000:3.000:4.000:7');
   });
 
+  it('finds top atlas nodes by heat without changing pre-order tie behavior', () => {
+    const topNodes = getTopAtlasNodesByHeatAny([
+      {
+        id: 'early-tie',
+        votes: { up: 5, down: 0 },
+        children: [
+          {
+            id: 'nested-high',
+            votes: { up: 9, down: 0 },
+          },
+        ],
+      },
+      {
+        id: 'comment-heavy',
+        votes: { up: 3, down: 0 },
+        comments: [{ id: 'c1' }, { id: 'c2' }, { id: 'c3' }],
+      },
+      {
+        id: 'late-tie',
+        votes: { up: 5, down: 0 },
+      },
+    ], 3);
+
+    expect(topNodes.map((node: any) => node.id)).toEqual([
+      'comment-heavy',
+      'nested-high',
+      'early-tie',
+    ]);
+  });
+
   it('switches between circles and atlas from the main mode controls', () => {
     render(
       <MemoryRouter>

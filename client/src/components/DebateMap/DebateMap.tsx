@@ -379,6 +379,12 @@ interface FlattenedDebateNode extends DebateNode {
   parentPath: DebateNode[];
 }
 
+interface AtlasTopNodeCandidate {
+  node: DebateNode;
+  heat: number;
+  order: number;
+}
+
 interface AtlasViewProps {
   data: DebateNode[];
   onNodeClick: (node: DebateNode) => void;
@@ -1131,7 +1137,7 @@ export const getTopAtlasNodesByHeat = (nodes: DebateNode[] = [], limit = 3): Deb
       heat: calculateHeat(node),
       order: visitOrder,
     });
-    topCandidates.sort((a, b) => b.heat - a.heat || a.order - b.order);
+    topCandidates.sort((a, b) => (b.heat - a.heat) || (a.order - b.order));
     if (topCandidates.length > maxNodes) {
       topCandidates.length = maxNodes;
     }
