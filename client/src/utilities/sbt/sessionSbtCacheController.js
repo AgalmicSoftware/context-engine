@@ -510,7 +510,7 @@ export const createSessionSbtCacheController = (host = {}) => {
                 netCache.sbtList[lower] = withSessionScopedSbtCacheBinding({
                   ...freshExisting,
                   sbtAddress: addr,
-                  sbtInfo: sbtInfo || freshExisting.sbtInfo || null,
+                  sbtInfo: storedInfo,
                   slug,
                   blockNumber: refreshed ? baseTo : (freshExisting.blockNumber || 0),
                 }, slug);
@@ -645,20 +645,16 @@ export const createSessionSbtCacheController = (host = {}) => {
         cache = dgRead('sbtCache', slug) || {};
         if (cache[networkID]) {
           if (unresolvedHydrationAddressSet.size > 0) {
-            emitMainSiteSbtDebug(
-              'warn',
-              '[ensureLightSbtDiscovery] leaving watermark behind failed hydration targets',
-              {
-                slug,
-                networkID,
-                baseTo,
-                unresolvedHydrationCount: unresolvedHydrationAddressSet.size,
-                unresolvedHydrationAddresses: Array.from(unresolvedHydrationAddressSet),
-              },
-            );
+            emitMainSiteSbtDebug('warn', '[ensureLightSbtDiscovery] leaving watermark behind failed hydration targets', {
+              slug,
+              networkID,
+              baseTo,
+              unresolvedHydrationCount: unresolvedHydrationAddressSet.size,
+              unresolvedHydrationAddresses: Array.from(unresolvedHydrationAddressSet),
+            });
           } else {
             cache[networkID].lastBlock = baseTo;
-            await writeSbtCache(slug, cache);
+            await dgWrite('sbtCache', slug, cache);
           }
         }
 

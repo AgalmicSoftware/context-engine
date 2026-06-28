@@ -955,10 +955,10 @@ describe('createSessionSbtCacheController', () => {
 
       await controller.ensureLightSbtDiscovery('alpha');
 
-      expect(host.getStored('sbtCache', 'alpha')).toEqual(expect.objectContaining({
-        11155420: expect.objectContaining({
-          sbtList: expect.objectContaining({
-            [sbtAddress.toLowerCase()]: expect.objectContaining({
+    expect(host.getStored('sbtCache', 'alpha')).toEqual(expect.objectContaining({
+      11155420: expect.objectContaining({
+        sbtList: expect.objectContaining({
+          [sbtAddress.toLowerCase()]: expect.objectContaining({
               sessionSlug: 'alpha',
               sessionSlugExplicit: true,
               sbtInfo: expect.objectContaining({
@@ -1084,6 +1084,61 @@ describe('createSessionSbtCacheController', () => {
                 tokenUriMetadataFetched: true,
                 sessionSlug: 'alpha',
                 sessionSlugExplicit: false,
+              }),
+            }),
+          }),
+        }),
+      }));
+    });
+
+    it('keeps light discovery watermark behind failed metadata hydration so later runs retry', async () => {
+      const sbtAddress = '0x0000000000000000000000000000000000000f01';
+      const hydratedMetadata = createCompleteSbtMetadata({
+        name: 'Hydrated After Retry',
+        description: 'Recovered description',
+        image: 'ar://retry-image',
+        tokenUriMetadataFetched: true,
+      });
+      const host = createMockHost();
+      const controller = createSessionSbtCacheController(host);
+
+      contractScripts.getAllSbtAddressesCached.mockReset();
+      contractScripts.getAllSbtAddressesCached.mockResolvedValue([sbtAddress]);
+      contractScripts.getSbtMetadata
+        .mockRejectedValueOnce(new Error('metadata gateway down'))
+        .mockResolvedValueOnce(hydratedMetadata);
+
+      await controller.ensureLightSbtDiscovery('alpha');
+
+      const afterFailure = host.getStored('sbtCache', 'alpha');
+      expect(afterFailure[11155420].lastBlock).toBe(9);
+      expect(afterFailure[11155420].sbtList[sbtAddress.toLowerCase()]).toEqual(expect.objectContaining({
+        sbtAddress,
+        sbtInfo: null,
+      }));
+
+      await controller.ensureLightSbtDiscovery('alpha');
+
+      expect(contractScripts.getSbtMetadata).toHaveBeenCalledTimes(2);
+      expect(contractScripts.getAllSbtAddressesCached).toHaveBeenNthCalledWith(
+        2,
+        'none',
+        'alpha',
+        expect.objectContaining({
+          fromBlock: 10,
+          toBlock: 12,
+        })
+      );
+      expect(host.getStored('sbtCache', 'alpha')).toEqual(expect.objectContaining({
+        11155420: expect.objectContaining({
+          lastBlock: 12,
+          sbtList: expect.objectContaining({
+            [sbtAddress.toLowerCase()]: expect.objectContaining({
+              sbtInfo: expect.objectContaining({
+                name: 'Hydrated After Retry',
+                description: 'Recovered description',
+                image: 'ar://retry-image',
+                tokenUriMetadataFetched: true,
               }),
             }),
           }),
