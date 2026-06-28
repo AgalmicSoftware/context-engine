@@ -7,6 +7,7 @@ import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
 import { analyzeUserOpinions } from 'utilities/ai/aiScripts.js';
 import { ethers } from 'ethers';
+import { notify } from '../../utilities/ui/notify.js';
 
 jest.mock('../../utilities/crypto/litProtocol.js', () => ({
   getGlobalLitHooks: jest.fn(() => null),
@@ -196,6 +197,35 @@ const treeHasText = (node, text) => {
 const normalizeChildrenArray = (value) => (
   Array.isArray(value) ? value : [value].filter(Boolean)
 );
+
+describe('UserPage clipboard helpers', () => {
+  it('does not mark the address copied when clipboard write rejects', async () => {
+    const instance = makeInstance();
+    const originalClipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+    const writeText = jest.fn().mockRejectedValue(new Error('clipboard denied'));
+    const errorSpy = jest.spyOn(notify, 'error').mockImplementation(() => undefined);
+    const successSpy = jest.spyOn(notify, 'success').mockImplementation(() => undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+
+    try {
+      await instance.copyToClipboard();
+
+      expect(writeText).toHaveBeenCalledWith('0x00000000000000000000000000000000000000aa');
+      expect(errorSpy).toHaveBeenCalledWith('Could not copy address');
+      expect(successSpy).not.toHaveBeenCalled();
+      expect(instance.state.copied).not.toBe(true);
+    } finally {
+      if (originalClipboardDescriptor) {
+        Object.defineProperty(navigator, 'clipboard', originalClipboardDescriptor);
+      } else {
+        delete navigator.clipboard;
+      }
+    }
+  });
+});
 
 describe('UserPage analyze action boundary', () => {
   it('routes header analyze clicks through the parent-owned analyze handler with preserved args', () => {
