@@ -329,7 +329,7 @@ describe('cryptoUtils Lit multi-gate envelopes', () => {
     };
 
     await expect(cryptoUtils.decryptEnvelopeValue(JSON.stringify(litEnvelope))).rejects.toThrow(
-      'Lit recipient missing ciphertext.'
+      'Lit recipient missing ciphertext or encryptedSymmetricKey.'
     );
 
     const selfEnvelope = {
@@ -340,6 +340,35 @@ describe('cryptoUtils Lit multi-gate envelopes', () => {
     await expect(cryptoUtils.decryptEnvelopeValue(JSON.stringify(selfEnvelope))).rejects.toThrow(
       'Self-EIP712 recipient missing wrap_iv or wrapped_cek.'
     );
+  });
+
+  it('parses encryptedSymmetricKey-only Lit recipients while decrypting through self recipients', async () => {
+    const providerDecrypt = makeProvider(SIG_A);
+    const baseEnvelope = JSON.parse(await makeEnvelopeJson());
+    const litEnvelope = {
+      ...baseEnvelope,
+      recipients: [
+        ...baseEnvelope.recipients,
+        {
+          type: 'lit-sbt-v1',
+          lit: {
+            encryptedSymmetricKey: 'lit-symmetric-key',
+            chain: 'baseSepolia',
+          },
+        },
+      ],
+    };
+    const getKey = jest.fn();
+
+    const value = await cryptoUtils.decryptEnvelopeValue(JSON.stringify(litEnvelope), {
+      providerLike: providerDecrypt,
+      account: ACCOUNT,
+      chainId: CHAIN_ID,
+      litOpts: { getKey },
+    });
+
+    expect(value).toBe('secret-value');
+    expect(getKey).not.toHaveBeenCalled();
   });
 
   it('rejects malformed commitment hashes', async () => {
