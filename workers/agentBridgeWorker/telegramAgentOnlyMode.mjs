@@ -68,7 +68,7 @@ Answer for your principal, not yourself. Keep the credential secret; send it onl
 
 Quiet lifecycle. Use one private helper script after credential resolution. Do not make visible HTTP calls for statement pages, answer payloads, image JSON, or retries. Redirect raw responses to variables or files. Helper stdout may contain only one compact final JSON object with statement_count, submitted_count, skipped_count, and image_url.
 
-GET /telegram/agent/api/agent-only/statements?limit=10 and follow cursor pagination until cursor is empty; do not stop after page one. Save window_id. If window_state is not_open, stop.
+GET /telegram/agent/api/agent-only/statements?limit=5&compact=1 and follow cursor pagination until cursor is empty; do not stop after page one. Save window_id. If window_state is not_open, stop. Compact, low-output execution is the default path.
 
 Create one fresh run_id for the full run. Optional token_usage before answering: make at most one quiet known-path SQLite attempt against state.db and /opt/data/state.db. Use Python sqlite3 only if immediately available. Use cutoff int(time.time()) - 2592000. Sum COALESCE(input_tokens,0) + COALESCE(output_tokens,0) + COALESCE(cache_read_tokens,0) + COALESCE(cache_write_tokens,0) from sessions where started_at >= cutoff and source = 'telegram'; group daily_usage_30d by date(CAST(started_at AS INTEGER), 'unixepoch', 'localtime'). Do not assume a precomputed aggregate column exists; do not use SQL datetime string filters against started_at. Do not discover files, inspect logs/configs/sessions, install tools, or run runtime-insights commands. Never print rows or command output. If unavailable or unclear, omit token_usage and continue. When available, include recent_sessions_total_tokens, daily_usage_30d, and source: "local sqlite3 query (including cache)" in agent_metadata.token_usage on every answer POST.
 
@@ -1094,12 +1094,38 @@ function statementCursorForSeenIds(seenQuestionIds = [], activeQuestionIds = [])
   return seenActiveIds.length >= activeIds.length ? '' : base64UrlEncode(JSON.stringify({ v: 2, seen: seenActiveIds }));
 }
 
+function compactStatementAnswerSchema(schema = {}) {
+  const source = schema && typeof schema === 'object' && !Array.isArray(schema) ? schema : {};
+  const kind = safeString(source.kind);
+  const compact = kind ? { kind } : {};
+  const compactValue = (value) => String(value ?? '').trim();
+  if (Array.isArray(source.values)) compact.values = source.values.map(compactValue).filter(Boolean);
+  if (Array.isArray(source.options)) compact.options = source.options.map(compactValue).filter(Boolean);
+  const selectionMode = safeString(source.selectionMode || source.selection_mode);
+  if (selectionMode) compact.selectionMode = selectionMode;
+  for (const key of ['minSelections', 'maxSelections', 'min', 'max', 'step', 'maxChars']) {
+    if (source[key] !== undefined && source[key] !== null && source[key] !== '') compact[key] = source[key];
+  }
+  return compact;
+}
+
+function compactAgentOnlyStatement(statement = {}, absoluteIndex = 0) {
+  return {
+    index: absoluteIndex,
+    statement_id: safeString(statement.statement_id),
+    question_type: normalizeQuestionTypeForSnapshot(statement.question_type || statement.questionType),
+    text: safeString(statement.text),
+    answer_schema: compactStatementAnswerSchema(statement.answer_schema),
+  };
+}
+
 export async function getAgentOnlyStatementsPage({
   env = {},
   sessionSlug = '',
   now = null,
   cursor = '',
   limit = 50,
+  compact = false,
 } = {}) {
   const loaded = await loadAgentOnlyModeConfig({ env, sessionSlug });
   const nowMs = Date.parse(nowIso(now));
@@ -1132,7 +1158,13 @@ export async function getAgentOnlyStatementsPage({
     : allStatements.slice(offset);
   const rawStatements = pageSource.slice(0, pageLimit);
   const statements = rawStatements
-    .map((statement) => ({ ...statement, window_id: materialized.snapshot.windowId }));
+    .map((statement, pageIndex) => {
+      if (!compact) return { ...statement, window_id: materialized.snapshot.windowId };
+      const absoluteIndex = allStatements.findIndex((candidate) => (
+        safeString(candidate?.statement_id) === safeString(statement?.statement_id)
+      ));
+      return compactAgentOnlyStatement(statement, absoluteIndex >= 0 ? absoluteIndex : offset + pageIndex);
+    });
   const servedIds = rawStatements.map((statement) => safeString(statement?.statement_id)).filter(Boolean);
   const nextSeenIds = seenQuestionIds.length
     ? [...seenQuestionIds, ...servedIds]
@@ -3280,10 +3312,6 @@ export async function generateAgentOnlyWrappedImage({
       } : {
         image_save_reason: savedImage.reason || 'wrapped_image_save_failed',
       }),
-      ...(body.include_prompt === true || body.includePrompt === true ? {
-        prompt: storyboardPrompt,
-        storyboard_prompt: storyboardPrompt,
-      } : {}),
     };
     assertNoSecretShape({ ...payload, image_base64: '[image omitted]' }, 'Agent-only wrapped story response metadata must not serialize secrets.');
     return payload;
@@ -3382,7 +3410,6 @@ export async function generateAgentOnlyWrappedImage({
     } : {
       image_save_reason: savedImage.reason || 'wrapped_image_save_failed',
     }),
-    ...(body.include_prompt === true || body.includePrompt === true ? { prompt } : {}),
   };
   assertNoSecretShape({ ...payload, image_base64: '[image omitted]' }, 'Agent-only wrapped image response metadata must not serialize secrets.');
   return payload;

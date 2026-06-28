@@ -369,7 +369,7 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
 
   assert.match(wrapped, /name:\s+agent-village-wrapped/);
   assert.match(wrapped, /^# Agent Village Wrapped Runtime/m);
-  assert.match(wrapped, /\*\*Skill version:\*\* 2026-06-27 \(wrapped-v21\)/);
+  assert.match(wrapped, /\*\*Skill version:\*\* 2026-06-27 \(wrapped-v22\)/);
   assert.match(wrapped, /Use this skill only to run Agent Village Wrapped/);
   assert.match(wrapped, /Do not use the broader\s+`context-engine` skill/);
   assert.match(wrapped, /memory\/context-engine-state\.json/);
@@ -384,7 +384,7 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.match(wrapped, /\/telegram\/agent\/api\/invite\/onboard/);
   assert.doesNotMatch(wrapped, /Telegram User ID:/);
   assert.match(wrapped, /GET `\/telegram\/agent\/api\/agent-village-wrapped\/skill-version`/);
-  assert.match(wrapped, /version `wrapped-v21`/);
+  assert.match(wrapped, /version `wrapped-v22`/);
   assert.match(wrapped, /Quiet Lifecycle/);
   assert.match(wrapped, /Create one fresh `run_id` for the whole run/);
   assert.match(wrapped, /Do not discover files, inspect logs\/configs\/sessions/);
@@ -394,8 +394,9 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.match(wrapped, /Internal prediction\s+calls may return compact JSON keyed by local index/);
   assert.match(wrapped, /never print that JSON to\s+chat or stdout/);
   assert.match(wrapped, /Fetch all statement pages silently/);
-  assert.match(wrapped, /\/telegram\/agent\/api\/agent-only\/statements\?limit=10/);
-  assert.match(wrapped, /Do not print statements, options,\s+schemas, ids, payloads, prediction\s+JSON/);
+  assert.match(wrapped, /\/telegram\/agent\/api\/agent-only\/statements\?limit=5&compact=1/);
+  assert.match(wrapped, /compact, low-output\s+execution as the default/);
+  assert.match(wrapped, /Do not print statements, options,\s+schemas, ids,\s+payloads, prediction\s+JSON/);
   assert.doesNotMatch(wrapped, /compact direct HTTP calls/);
   assert.doesNotMatch(wrapped, /vote status/);
   assert.doesNotMatch(wrapped, /## No Balance Check/);
@@ -476,7 +477,7 @@ test('Telegram agent handoff exposes the dedicated Agent Village Wrapped skill m
 
   assert.equal(response.status, 200);
   assert.equal(body.ok, true);
-  assert.equal(body.version, '2026-06-27 (wrapped-v21)');
+  assert.equal(body.version, '2026-06-27 (wrapped-v22)');
   assert.equal(body.protocolVersion, '2026-06-16 (v41)');
   assert.equal(body.skill, 'agent-village-wrapped');
   assert.equal(body.skillUrl, 'https://example.test/skills/agent-village-wrapped/SKILL.md');
@@ -506,7 +507,7 @@ test('Telegram agent handoff serves a dedicated Agent Village Wrapped skill redi
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
   assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/d3a51ecdc72529fb1b13ed8124c8ec25ab37a09d\/workers\/agentBridgeWorker\/skills\/ce-agent-village-wrapped\/SKILL\.md/);
-  assert.match(location, /v=2026-06-27-wrapped-v21-/);
+  assert.match(location, /v=2026-06-27-wrapped-v22-/);
 });
 
 test('Telegram agent handoff serves a short Agent Village Wrapped skill alias', async () => {
@@ -518,7 +519,7 @@ test('Telegram agent handoff serves a short Agent Village Wrapped skill alias', 
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
   assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/d3a51ecdc72529fb1b13ed8124c8ec25ab37a09d\/workers\/agentBridgeWorker\/skills\/ce-agent-village-wrapped\/SKILL\.md/);
-  assert.match(location, /v=2026-06-27-wrapped-v21-/);
+  assert.match(location, /v=2026-06-27-wrapped-v22-/);
 });
 
 test('Telegram agent handoff serves a short Agent Village Wrapped skill alias to HEAD probes', async () => {
@@ -530,7 +531,7 @@ test('Telegram agent handoff serves a short Agent Village Wrapped skill alias to
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
   assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/d3a51ecdc72529fb1b13ed8124c8ec25ab37a09d\/workers\/agentBridgeWorker\/skills\/ce-agent-village-wrapped\/SKILL\.md/);
-  assert.match(location, /v=2026-06-27-wrapped-v21-/);
+  assert.match(location, /v=2026-06-27-wrapped-v22-/);
 });
 
 test('Agent-only start payload exposes configurable visual defaults', async () => {
@@ -1772,6 +1773,30 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   assert.equal(statements.statements.length, 2);
   assert.ok(statements.cursor);
   assert.equal(JSON.stringify(statements).includes('eval_type'), false);
+
+  const compactStatementsResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/agent-only/statements?sessionSlug=alpha&limit=2&compact=1&createdAt=2026-06-12T15%3A06%3A00.000Z', {
+      token: agentOnlyToken.token,
+    }),
+    env,
+  });
+  const compactStatements = await jsonBody(compactStatementsResponse);
+  assert.equal(compactStatementsResponse.status, 200);
+  assert.equal(compactStatements.window_id, 'w-2026-06-12');
+  assert.equal(compactStatements.statements.length, 2);
+  assert.ok(compactStatements.cursor);
+  assert.deepEqual(Object.keys(compactStatements.statements[0]).sort(), [
+    'answer_schema',
+    'index',
+    'question_type',
+    'statement_id',
+    'text',
+  ]);
+  assert.equal(compactStatements.statements[0].index, 0);
+  assert.equal(typeof compactStatements.statements[0].text, 'string');
+  assert.equal(typeof compactStatements.statements[0].answer_schema.kind, 'string');
+  assert.equal(JSON.stringify(compactStatements).includes('eval_type'), false);
+  assert.equal(Object.hasOwn(compactStatements.statements[0], 'window_id'), false);
 
   const clientClockResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/agent-only/statements?sessionSlug=alpha&limit=2&createdAt=2026-06-15T15%3A30%3A00.000Z', {

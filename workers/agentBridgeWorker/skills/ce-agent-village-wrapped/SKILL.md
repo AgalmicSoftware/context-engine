@@ -5,7 +5,7 @@ description: "Run Context Engine Agent Village Wrapped only: predict answers, ge
 
 # Agent Village Wrapped Runtime
 
-**Skill version:** 2026-06-27 (wrapped-v21)
+**Skill version:** 2026-06-27 (wrapped-v22)
 **Protocol version:** Context Engine agent bridge v41
 
 Use this skill only to run Agent Village Wrapped. Do not use the broader
@@ -109,7 +109,7 @@ https://ce-agent-bridge-worker.agalmic.workers.dev
 
 1. Resolve the private credential.
 2. GET `/telegram/agent/api/agent-village-wrapped/skill-version`; verify skill
-   `agent-village-wrapped` and version `wrapped-v21`.
+   `agent-village-wrapped` and version `wrapped-v22`.
 3. GET `/telegram/agent/api/skill-version`; silently verify protocol v41.
 4. GET `/telegram/agent/api/agent-only/start` with the Bearer token.
 5. Create one fresh `run_id` for the whole run.
@@ -134,9 +134,10 @@ https://ce-agent-bridge-worker.agalmic.workers.dev
    one compact final JSON object with `statement_count`, `submitted_count`,
    `skipped_count`, and `image_url`.
 8. Fetch all statement pages silently with
-   `/telegram/agent/api/agent-only/statements?limit=10`, following cursors until
-   empty. Do not print statements, options, schemas, ids, payloads, prediction
-   JSON, debug JSON, or retries.
+   `/telegram/agent/api/agent-only/statements?limit=5&compact=1`, following
+   cursors until empty. Do not print statements, options, schemas, ids,
+   payloads, prediction JSON, debug JSON, or retries. Treat compact, low-output
+   execution as the default, not a fallback.
 9. Predict every current statement or privacy-skip it. Internal prediction
    calls may return compact JSON keyed by local index; never print that JSON to
    chat or stdout. Map local indexes back to exact `statement_id` values in

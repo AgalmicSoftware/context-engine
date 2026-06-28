@@ -208,7 +208,8 @@ test('start payload pins path-only endpoints and instruction size', () => {
   assert.match(payload.instructions, /"run_id": "<fresh_run_id>"/);
   assert.match(payload.instructions, /Use one private helper script after credential resolution/);
   assert.match(payload.instructions, /Helper stdout may contain only one compact final JSON object/);
-  assert.match(payload.instructions, /\/telegram\/agent\/api\/agent-only\/statements\?limit=10/);
+  assert.match(payload.instructions, /\/telegram\/agent\/api\/agent-only\/statements\?limit=5&compact=1/);
+  assert.match(payload.instructions, /Compact, low-output execution is the default path/);
   assert.doesNotMatch(payload.instructions, /compact direct HTTP calls/);
   assert.match(payload.instructions, /unique request_id values/);
   assert.match(payload.instructions, /Internal prediction calls may return compact JSON keyed by local index/);

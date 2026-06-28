@@ -126,7 +126,7 @@ const DEFAULT_AGENT_RAW_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSo
 const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-06-16 (v41)';
 const DEFAULT_AGENT_VILLAGE_WRAPPED_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/wrapped';
 const DEFAULT_AGENT_VILLAGE_WRAPPED_RAW_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/d3a51ecdc72529fb1b13ed8124c8ec25ab37a09d/workers/agentBridgeWorker/skills/ce-agent-village-wrapped/SKILL.md';
-const CE_AGENT_VILLAGE_WRAPPED_SKILL_VERSION = '2026-06-27 (wrapped-v21)';
+const CE_AGENT_VILLAGE_WRAPPED_SKILL_VERSION = '2026-06-27 (wrapped-v22)';
 const MINI_APP_QUESTION_VOTE_KV_PREFIX = 'telegram:mini-app-question-vote:v1:';
 const AGENT_QUESTION_VOTE_DECISION_KV_PREFIX = 'telegram:agent-question-vote-decision:v1:';
 const ANSWER_DRAFT_KV_PREFIX = 'telegram:answer-draft:';
@@ -721,6 +721,7 @@ function inputFromRequest(request, body = {}) {
     topN: Object.hasOwn(body, 'topN') ? body.topN : url.searchParams.get('topN'),
     cursor: safeString(body.cursor || url.searchParams.get('cursor')),
     windowId: safeString(body.windowId || body.window_id || url.searchParams.get('windowId') || url.searchParams.get('window')),
+    compact: Object.hasOwn(body, 'compact') ? body.compact : url.searchParams.get('compact'),
     format: safeString(body.format || url.searchParams.get('format')),
     queueKey: safeString(body.queueKey || url.searchParams.get('queueKey')),
     advance: Object.hasOwn(body, 'advance') ? body.advance : url.searchParams.get('advance'),
@@ -3110,6 +3111,7 @@ async function handleAgentOnlyStatementsRequest({
     sessionSlug: context.session.sessionSlug,
     cursor: input.cursor,
     limit: input.limit,
+    compact: normalizeBoolean(input.compact, false) || lower(input.format) === 'compact',
     now: agentOnlyRequestNow(env),
   });
   const status = page.ok === false ? (page.status || 500) : 200;
