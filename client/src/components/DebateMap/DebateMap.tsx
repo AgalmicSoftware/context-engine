@@ -310,6 +310,12 @@ interface FlattenedDebateNode extends DebateNode {
   parentPath: DebateNode[];
 }
 
+interface AtlasTopNodeCandidate {
+  node: DebateNode;
+  heat: number;
+  order: number;
+}
+
 interface AtlasViewProps {
   data: DebateNode[];
   onNodeClick: (node: DebateNode) => void;
@@ -1168,15 +1174,39 @@ const getAtlasCommentCount = (node: DebateNode): number => (
   (node.questions ? node.questions.length : 0) + (node.comments ? node.comments.length : 0)
 );
 
-const flattenAtlasNodes = (nodes: DebateNode[] = []): DebateNode[] => {
-  let res: DebateNode[] = [];
-  nodes.forEach((node) => {
-    res.push(node);
-    if (Array.isArray(node?.children) && node.children.length > 0) {
-      res = res.concat(flattenAtlasNodes(node.children));
+export const getTopAtlasNodesByHeat = (nodes: DebateNode[] = [], limit = 3): DebateNode[] => {
+  const maxNodes = Math.max(0, Math.floor(Number(limit) || 0));
+  if (maxNodes === 0) return [];
+
+  const topCandidates: AtlasTopNodeCandidate[] = [];
+  let visitOrder = 0;
+
+  const remember = (node: DebateNode) => {
+    topCandidates.push({
+      node,
+      heat: calculateHeat(node),
+      order: visitOrder,
+    });
+    topCandidates.sort((a, b) => (b.heat - a.heat) || (a.order - b.order));
+    if (topCandidates.length > maxNodes) {
+      topCandidates.length = maxNodes;
     }
-  });
-  return res;
+  };
+
+  const visit = (items: DebateNode[] = []) => {
+    items.forEach((node) => {
+      remember(node);
+      visitOrder += 1;
+
+      if (Array.isArray(node?.children) && node.children.length > 0) {
+        visit(node.children);
+      }
+    });
+  };
+
+  visit(nodes);
+
+  return topCandidates.map((candidate) => candidate.node);
 };
 
 const getAtlasCenterNode = (atlasRoot: DebateNode | null, data: DebateNode[]): DebateNode => (
@@ -1341,11 +1371,7 @@ const useAtlasNavigationState = (data: DebateNode[], onNodeClick: (node: DebateN
     atlasRootId ? findAtlasNodeById(data, atlasRootId) : null
   ), [atlasRootId, data]);
 
-  const topNodes = useMemo(() => (
-    flattenAtlasNodes(data)
-      .sort((a, b) => calculateHeat(b) - calculateHeat(a))
-      .slice(0, 3)
-  ), [data]);
+  const topNodes = useMemo(() => getTopAtlasNodesByHeat(data, 3), [data]);
 
   const handleAtlasNodeClick = useCallback((node: AtlasRenderNode | DebateNode) => {
     if (!node || node.id === 'virtual-root') return;
