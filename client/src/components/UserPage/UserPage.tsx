@@ -2804,9 +2804,7 @@ class UserPage extends Component<any, any> {
       if (!this._isMounted) return;
       if (!network?.id) {
         this.setState({
-          ...buildUserPageUsernameErrorStatePatch({
-            usernameError: 'Cannot persist username: network information is missing.',
-          }),
+          ...buildUserPageUsernameErrorStatePatch({ usernameError: "Cannot persist username: network information is missing." }),
           isEditingUsername: true,
         });
         return;
@@ -2815,7 +2813,7 @@ class UserPage extends Component<any, any> {
       try {
         localStorage.setItem(`userPageUsername_${networkID}_${viewAddress.toLowerCase()}`, newUsernameToSet);
       } catch (error) {
-        accountLog.error('Error saving username to localStorage:', error);
+        accountLog.error("Error saving username to localStorage:", error);
         if (this._isMounted) {
           this.setState({
             ...buildUserPageUsernameErrorStatePatch({ usernameError: 'Failed to save username locally.' }),
