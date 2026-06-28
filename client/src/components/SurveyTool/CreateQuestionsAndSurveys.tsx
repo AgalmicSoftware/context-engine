@@ -742,6 +742,23 @@ export const buildCreateSurveyDraftStorageKey = (sessionSlug: unknown = ''): str
   return normalizedSlug ? `${CREATE_SURVEY_DRAFT_KEY_PREFIX}${normalizedSlug}` : CREATE_SURVEY_DRAFT_LEGACY_KEY;
 };
 
+const getCreateSurveyDraftStorage = (): Storage | null => {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) return window.localStorage;
+  } catch (_) {}
+  try {
+    if (typeof localStorage !== 'undefined') return localStorage;
+  } catch (_) {}
+  return null;
+};
+
+export const buildCreateSurveyDraftStorageKey = (sessionSlug: unknown = ''): string => {
+  const normalizedSlug = normalizeSessionSlug(String(sessionSlug || ''));
+  return normalizedSlug
+    ? `${CREATE_SURVEY_DRAFT_KEY_PREFIX}${normalizedSlug}`
+    : CREATE_SURVEY_DRAFT_LEGACY_KEY;
+};
+
 class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps, CreateQuestionsAndSurveysState> {
   _isMounted: boolean = false;
   _cacheWatchTimer: ReturnType<typeof setInterval> | null = null;
@@ -1275,8 +1292,9 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
           return false;
         }
         delete parsedSurvey._sessionSlug;
-        const autoPopulateState =
-          typeof parsedSurvey.autoPopulateAiTags === 'boolean' ? parsedSurvey.autoPopulateAiTags : true;
+        const autoPopulateState = typeof parsedSurvey.autoPopulateAiTags === 'boolean'
+          ? parsedSurvey.autoPopulateAiTags
+          : true;
 
         // Drop legacy encryption toggles from older drafts.
         delete parsedSurvey.encryptSurvey;

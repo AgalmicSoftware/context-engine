@@ -1,4 +1,5 @@
 import CreateQuestionsAndSurveys, {
+  buildCreateSurveyDraftStorageKey,
   hasSubmittedResourcesInManagedCache,
   readManagedCacheSnapshot,
   sanitizeDocumentUrls,
@@ -99,6 +100,7 @@ const nodeHasClassName = (node: TreeNode, className: string): boolean => {
 
 export {
   CreateQuestionsAndSurveys,
+  buildCreateSurveyDraftStorageKey,
   hasSubmittedResourcesInManagedCache,
   readManagedCacheSnapshot,
   sanitizeDocumentUrls,
