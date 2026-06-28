@@ -597,7 +597,7 @@ describe('SBTsList selector and initial loading status', () => {
     const alphaAddress = '0x00000000000000000000000000000000000000a1';
     const unassignedAddress = '0x00000000000000000000000000000000000000a9';
     const alphaCache = {
-      84532: {
+      '84532': {
         sbtList: {
           [alphaAddress.toLowerCase()]: {
             sbtAddress: alphaAddress,
@@ -635,11 +635,9 @@ describe('SBTsList selector and initial loading status', () => {
     };
 
     mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '')
-        .trim()
-        .toLowerCase();
+      const normalized = String(slug || '').trim().toLowerCase();
       if (normalized === 'alpha') return alphaCache;
-      return { 84532: { sbtList: {}, lastBlock: 0 } };
+      return { '84532': { sbtList: {}, lastBlock: 0 } };
     });
 
     const ensureLightSbtDiscovery = jest.fn().mockResolvedValue(undefined);
