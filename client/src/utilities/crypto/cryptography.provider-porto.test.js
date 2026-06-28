@@ -6,6 +6,14 @@ jest.mock('../web3/portoFunctions.js', () => ({
   createPortoProviderMock: (...args) => mockCreatePortoProvider(...args),
 }));
 
+const setWindowProvider = (key, value) => {
+  Object.defineProperty(window, key, {
+    configurable: true,
+    writable: true,
+    value,
+  });
+};
+
 describe('cryptoUtils Porto provider bootstrap', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -13,9 +21,13 @@ describe('cryptoUtils Porto provider bootstrap', () => {
     try {
       delete window.__portoMockProvider;
       delete window.__ceCreatePortoProviderMock;
+      delete window.ethereum;
+      delete window.web3authProvider;
     } catch (_) {
       window.__portoMockProvider = undefined;
       window.__ceCreatePortoProviderMock = undefined;
+      window.ethereum = undefined;
+      window.web3authProvider = undefined;
     }
   });
 
