@@ -606,6 +606,13 @@ describe('sbtPageActionDisplayHelpers', () => {
     });
     expect(resolveSbtPageMintActionPlan({
       nowSeconds: 100,
+      sbtInfo: { mintingEndTime: 100 },
+    })).toEqual({
+      blockedReason: 'mint-ended',
+      shouldRenderMintButton: false,
+    });
+    expect(resolveSbtPageMintActionPlan({
+      nowSeconds: 100,
       sbtInfo: null,
     })).toEqual({
       blockedReason: 'missing-sbt',

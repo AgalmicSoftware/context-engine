@@ -1281,7 +1281,7 @@ export const resolveSbtPageMintActionPlan = ({
     };
   }
   const mintingEndTime = (sbtInfo as { mintingEndTime?: unknown })?.mintingEndTime;
-  if (mintingEndTime !== 0 && Number(mintingEndTime) < Number(nowSeconds || 0)) {
+  if (mintingEndTime !== 0 && Number(mintingEndTime) <= Number(nowSeconds || 0)) {
     return {
       blockedReason: 'mint-ended',
       shouldRenderMintButton: false,
