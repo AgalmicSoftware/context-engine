@@ -10,9 +10,86 @@ import {
   createReadCachePayload,
   setupSBTPageTestLifecycle,
 } from './SBTPage.testUtils';
+import {
+  SbtPageBurnActionSurface,
+  SbtPageMintActionSurface,
+} from './SbtPageFullActionButtons';
+import SbtPageMintInputAction from './SbtPageMintInputAction';
+import SbtPageStatusActionButton from './SbtPageStatusActionButton';
+import { notify } from '../../utilities/ui/notify.js';
+
+const renderBurnActionSurfaceTree = (tree) => {
+  const surface = findElementInTree(tree, (node) => node?.type === SbtPageBurnActionSurface);
+  expect(surface).not.toBeNull();
+  return SbtPageBurnActionSurface(surface.props);
+};
+
+const renderMintActionSurfaceTree = (tree) => {
+  const surface = findElementInTree(tree, (node) => node?.type === SbtPageMintActionSurface);
+  expect(surface).not.toBeNull();
+  return SbtPageMintActionSurface(surface.props);
+};
 
 describe('SBTPage session routing and holder loading', () => {
   setupSBTPageTestLifecycle();
+
+  it('does not mark an address copied when clipboard write rejects', async () => {
+    const subject = createSubject();
+    const originalClipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+    const writeText = jest.fn().mockRejectedValue(new Error('clipboard denied'));
+    const warnSpy = jest.spyOn(notify, 'warn').mockImplementation(() => undefined);
+    const successSpy = jest.spyOn(notify, 'success').mockImplementation(() => undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+
+    try {
+      await subject.copyToClipboard('0x0000000000000000000000000000000000000001', 'admin');
+
+      expect(writeText).toHaveBeenCalledWith('0x0000000000000000000000000000000000000001');
+      expect(warnSpy).toHaveBeenCalledWith('Copy failed');
+      expect(successSpy).not.toHaveBeenCalled();
+      expect(subject.state.copiedAddress).toBeNull();
+    } finally {
+      if (originalClipboardDescriptor) {
+        Object.defineProperty(navigator, 'clipboard', originalClipboardDescriptor);
+      } else {
+        delete navigator.clipboard;
+      }
+    }
+  });
+
+  it('does not mark an error copied when error clipboard write rejects', async () => {
+    const subject = createSubject();
+    subject.state = {
+      ...subject.state,
+      error: 'Mint failed: denied',
+    };
+    const originalClipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+    const writeText = jest.fn().mockRejectedValue(new Error('clipboard denied'));
+    const warnSpy = jest.spyOn(notify, 'warn').mockImplementation(() => undefined);
+    const successSpy = jest.spyOn(notify, 'success').mockImplementation(() => undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+
+    try {
+      await subject.copyErrorToClipboard();
+
+      expect(writeText).toHaveBeenCalledWith('Mint failed: denied');
+      expect(warnSpy).toHaveBeenCalledWith('Copy failed');
+      expect(successSpy).not.toHaveBeenCalled();
+      expect(subject.state.copiedError).not.toBe(true);
+    } finally {
+      if (originalClipboardDescriptor) {
+        Object.defineProperty(navigator, 'clipboard', originalClipboardDescriptor);
+      } else {
+        delete navigator.clipboard;
+      }
+    }
+  });
 
   it('uses sessionSlug routing only when metadata marks it explicit', () => {
     const subject = createSubject();
