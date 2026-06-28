@@ -740,7 +740,7 @@ describe('createSessionSurveyCacheController', () => {
         initialStorage: {
           surveysCache: {
             alpha: {
-              11155420: {
+              '11155420': {
                 surveysLatestBlock: 6,
                 surveys: {
                   surv1: { creationBlock: 5 },
@@ -769,7 +769,9 @@ describe('createSessionSurveyCacheController', () => {
       contractScripts.fetchUserSubmittedSurveyIDs.mockResolvedValue([]);
       contractScripts.fetchAllSurveyResponses
         .mockRejectedValueOnce(new Error('survey rpc down'))
-        .mockResolvedValueOnce([{ responder: '0xBEEF', response: secondResponse }]);
+        .mockResolvedValueOnce([
+          { responder: '0xBEEF', response: secondResponse },
+        ]);
 
       await controller.initializeSurveyCacheForGroup('alpha');
 
@@ -777,8 +779,22 @@ describe('createSessionSurveyCacheController', () => {
       const storedUserCache = host.getStored('userCache', 'alpha');
 
       expect(contractScripts.fetchAllSurveyResponses).toHaveBeenCalledTimes(2);
-      expect(contractScripts.fetchAllSurveyResponses).toHaveBeenNthCalledWith(1, 'none', 'surv1', 5, 12, 'alpha');
-      expect(contractScripts.fetchAllSurveyResponses).toHaveBeenNthCalledWith(2, 'none', 'surv2', 7, 12, 'alpha');
+      expect(contractScripts.fetchAllSurveyResponses).toHaveBeenNthCalledWith(
+        1,
+        'none',
+        'surv1',
+        5,
+        12,
+        'alpha'
+      );
+      expect(contractScripts.fetchAllSurveyResponses).toHaveBeenNthCalledWith(
+        2,
+        'none',
+        'surv2',
+        7,
+        12,
+        'alpha'
+      );
       expect(storedSurveyCache['11155420'].surveyResponses.surv1).toEqual({
         '0xold': { choice: 'old' },
       });

@@ -1041,16 +1041,13 @@ export const createSessionSurveyCacheController = (
                 `Fetching/updating responses for survey ${surveyIDLower}, from block ${startBlock} up to ${latestBlock} (group=${slug})`,
               );
               try {
-                const preFetchResponses = { ...(currentNetworkCache.surveyResponses[surveyIDLower] || {}) };
-                const surveyResponseBatch = normalizeSurveyResponseBatchResult(
-                  await surveyContractScripts.fetchAllSurveyResponses(
-                    'none',
-                    surveyIDLower,
-                    startBlock,
-                    latestBlock,
-                    slug,
-                  ),
-                );
+                const surveyResponseBatch = normalizeSurveyResponseBatchResult(await surveyContractScripts.fetchAllSurveyResponses(
+                  'none',
+                  surveyIDLower,
+                  startBlock,
+                  latestBlock,
+                  slug
+                ));
 
                 if (!currentNetworkCache.surveyResponses[surveyIDLower]) {
                   currentNetworkCache.surveyResponses[surveyIDLower] = {};
@@ -1061,37 +1058,13 @@ export const createSessionSurveyCacheController = (
 
                   const uData = ensureUserNode(responderAddr, latestBlock);
                   if (!uData.surveyResponses) uData.surveyResponses = [];
-                  const nextUserResponse: SurveyResponseUserEntry = {
-                    surveyId: surveyIDLower,
-                    responder: responderAddr,
-                    response: item.response,
-                    blockNumber: item.blockNumber,
-                    transactionIndex: item.transactionIndex ?? item.txIndex ?? item.txi,
-                    logIndex: item.logIndex,
-                    timestamp: item.timestamp,
-                  };
-                  const existingResponseIndex = uData.surveyResponses.findIndex(
-                    (response) => response.surveyId === surveyIDLower,
-                  );
-                  if (existingResponseIndex === -1) {
-                    uData.surveyResponses.push(nextUserResponse);
+                  if (!uData.surveyResponses.some((response) => response.surveyId === surveyIDLower)) {
+                    uData.surveyResponses.push({
+                      surveyId: surveyIDLower,
+                      responder: responderAddr,
+                      response: item.response,
+                    });
                     userCacheModified = true;
-                    touchedUserNodes.add(responderAddr);
-                  } else {
-                    const existingResponse = uData.surveyResponses[existingResponseIndex];
-                    if (
-                      isResponseRecencyNewer(
-                        toResponseRecencyPair(nextUserResponse, nextUserResponse.response),
-                        toResponseRecencyPair(existingResponse, existingResponse.response),
-                      )
-                    ) {
-                      uData.surveyResponses[existingResponseIndex] = {
-                        ...existingResponse,
-                        ...nextUserResponse,
-                      };
-                      userCacheModified = true;
-                      touchedUserNodes.add(responderAddr);
-                    }
                   }
                 }
                 currentNetworkCache.surveyResponsesLatestBlock[surveyIDLower] = resolveSurveyResponseWatermark({
@@ -1099,11 +1072,6 @@ export const createSessionSurveyCacheController = (
                   latestBlock,
                   hadPartialFailure: surveyResponseBatch.hadPartialFailure,
                   lowestFailedBlock: surveyResponseBatch.lowestFailedBlock,
-                });
-                responseDeltas.set(surveyIDLower, {
-                  preFetchResponses,
-                  fetchedResponses: surveyResponseBatch.responses,
-                  safeResponseWatermark: currentNetworkCache.surveyResponsesLatestBlock[surveyIDLower],
                 });
               } catch (error: unknown) {
                 mainSiteLog.warn('Error fetching survey responses; leaving watermark unchanged', {
