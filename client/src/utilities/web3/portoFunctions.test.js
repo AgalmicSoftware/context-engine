@@ -291,6 +291,40 @@ describe('sendPortoTransaction nonce retry behavior', () => {
     ).toHaveLength(1);
   });
 
+  it.each([
+    ['nonce too low'],
+    ['already known'],
+  ])('retries recoverable duplicate send errors: %s', async (message) => {
+    let attempt = 0;
+    const { porto, requestMock, sendTransactionMock } = loadPortoHarness({
+      sendTransactionImpl: async () => {
+        attempt += 1;
+        if (attempt === 1) {
+          throw new Error(message);
+        }
+        return '0xrecoverablehash';
+      },
+    });
+    seedLegacyPortoSession();
+    globalThis.CE_PORTO_SEND_RETRY_ATTEMPTS = '2';
+    globalThis.CE_PORTO_SEND_RETRY_BASE_DELAY_MS = '1';
+    await porto.restoreSession();
+
+    const txHash = await porto.sendPortoTransaction({
+      to: TARGET_ADDRESS,
+      value: '0x0',
+      data: '0x',
+    });
+
+    expect(txHash).toBe('0xrecoverablehash');
+    expect(sendTransactionMock).toHaveBeenCalledTimes(2);
+    expect(Object.prototype.hasOwnProperty.call(sendTransactionMock.mock.calls[0][0], 'nonce')).toBe(false);
+    expect(sendTransactionMock.mock.calls[1][0].nonce).toBe(2n);
+    expect(
+      requestMock.mock.calls.filter(([req]) => req?.method === 'eth_getTransactionCount')
+    ).toHaveLength(1);
+  });
+
   it('does not lower the retry gas price when replacement gas price reads drop', async () => {
     let attempt = 0;
     let gasPriceReads = 0;
