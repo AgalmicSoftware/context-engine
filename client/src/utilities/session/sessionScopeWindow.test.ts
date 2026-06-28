@@ -20,10 +20,16 @@ jest.mock('../logging.js', () => ({
 
 describe('sessionScopeWindow', () => {
   const mockedStore = store as unknown as { getState: jest.Mock };
+  const originalPublicUrl = process.env.PUBLIC_URL;
 
   beforeEach(() => {
     mockedStore.getState.mockReset();
     window.history.replaceState({}, '', '/');
+    if (typeof originalPublicUrl === 'undefined') {
+      delete process.env.PUBLIC_URL;
+    } else {
+      process.env.PUBLIC_URL = originalPublicUrl;
+    }
   });
 
   it('resolves active session scope from store, route path, and query hints', () => {
@@ -46,6 +52,21 @@ describe('sessionScopeWindow', () => {
     window.history.replaceState({}, '', '/surveys?session=alpha');
     expect(readActiveSessionSlugForScope()).toEqual({
       activeSlug: 'alpha',
+      activeSlugFromRoute: true,
+    });
+  });
+
+  it('strips PUBLIC_URL before resolving the active session route slug', () => {
+    process.env.PUBLIC_URL = '/ce/';
+    mockedStore.getState.mockReturnValue({
+      sessionState: {
+        activeSessionSlug: 'general',
+      },
+    });
+    window.history.replaceState({}, '', '/ce/session/edge');
+
+    expect(readActiveSessionSlugForScope()).toEqual({
+      activeSlug: 'edge',
       activeSlugFromRoute: true,
     });
   });

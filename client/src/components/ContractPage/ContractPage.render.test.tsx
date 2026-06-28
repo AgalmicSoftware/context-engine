@@ -1,7 +1,10 @@
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import { ContractPage } from './ContractPage';
-import { getContractViewerSourceTestId } from './contractMetadata.js';
+import {
+  buildContractsPageHref,
+  getContractViewerSourceTestId,
+} from './contractMetadata.js';
 import { buildContractViewerContracts } from './contractViewerUtils.js';
 
 const mockGetSessionConfigBySlug = jest.fn();

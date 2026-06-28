@@ -2,23 +2,18 @@
  * @module components/MainSite/urlUtils
  */
 
-import { buildPublicRoute as buildSharedPublicRoute, readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
+import {
+  buildPublicRoute as buildSharedPublicRoute,
+  readPublicUrlBasePath,
+  stripPublicUrlBasePath,
+} from '../../utilities/ui/publicUrl.js';
 import { isRouteResponderAddress } from './mainSiteUtils.js';
 
 export const getConfiguredPublicBasePath = (): string => readPublicUrlBasePath();
 
 export const buildPublicRoute = (pathname = ''): string => buildSharedPublicRoute(pathname);
 
-export const stripConfiguredPublicBasePath = (pathname = ''): string => {
-  const rawPath = String(pathname || '').trim();
-  const basePath = getConfiguredPublicBasePath();
-  if (!rawPath || !basePath || basePath === '/') return rawPath;
-  if (rawPath === basePath || rawPath === `${basePath}/`) return '/';
-  if (rawPath.startsWith(`${basePath}/`)) {
-    return rawPath.slice(basePath.length) || '/';
-  }
-  return rawPath;
-};
+export const stripConfiguredPublicBasePath = (pathname = ''): string => stripPublicUrlBasePath(pathname);
 
 export const buildPublicUrl = (pathname = '', search = '', hash = ''): string => {
   const normalizedSearch = search

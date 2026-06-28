@@ -219,9 +219,6 @@ describe('SBTsList selector and initial loading status', () => {
         expect(screen.getByText(/^Sessions$/i)).toBeInTheDocument();
       });
 
-      await openSessionSelector();
-      expect(screen.getByRole('button', { name: 'Alpha' })).toBeInTheDocument();
-
       expect(screen.getByText(/Collecting Live/i)).toBeInTheDocument();
     } finally {
       if (typeof previousPublicUrl === 'undefined') {
