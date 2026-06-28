@@ -1549,7 +1549,10 @@ const parseEnvelope = (jsonStr: string): Envelope => {
   if (!ctBytes || ctBytes.length === 0) throw new Error('Envelope ciphertext is empty after decode.');
   for (const r of env.recipients) {
     if (!r || !r.type) throw new Error('Envelope recipient missing type.');
-    if (r.type === 'lit-sbt-v1' && (!r.lit || (!r.lit.ciphertext && !r.lit.encryptedSymmetricKey))) {
+    if (
+      r.type === 'lit-sbt-v1' &&
+      (!r.lit || (!r.lit.ciphertext && !r.lit.encryptedSymmetricKey))
+    ) {
       throw new Error('Lit recipient missing ciphertext or encryptedSymmetricKey.');
     }
     if (r.type === 'self-eip712-v1' && (!r.wrap_iv || !r.wrapped_cek)) {
