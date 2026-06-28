@@ -19,6 +19,8 @@ export const normalizePositiveInt = (value: unknown, fallback: number): number =
   return parsed;
 };
 
+const DEFAULT_TOP_QUESTIONS_COUNT = 10;
+
 export const normalizeAiIdList = (ids: unknown = []): string[] => {
   const source = Array.isArray(ids) ? ids : [];
   const seen = new Set<string>();
@@ -312,8 +314,11 @@ export const buildQuestionFilterSelectedTagsPatch = (selectedTags: unknown) => (
   selectedTags,
 });
 
-export const buildQuestionFilterTopQuestionsCountPatch = (pendingTopQuestionsCount: unknown) => ({
-  pendingTopQuestionsCount,
+export const buildQuestionFilterTopQuestionsCountPatch = (
+  pendingTopQuestionsCount: unknown,
+  fallback = DEFAULT_TOP_QUESTIONS_COUNT
+) => ({
+  pendingTopQuestionsCount: normalizePositiveInt(pendingTopQuestionsCount, fallback),
 });
 
 export const buildQuestionFilterRemoveTopQuestionsPatch = () => ({
