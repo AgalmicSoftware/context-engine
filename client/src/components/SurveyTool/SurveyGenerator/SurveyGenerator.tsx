@@ -789,7 +789,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
         type: 'url',
         value: rawUrl,
         name: rawUrl,
-      },
+      }
     ]);
     setError('');
     setAdditionalUrlInput('');
@@ -818,6 +818,22 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
         setError(getSurveyGeneratorErrorMessage(err, 'Image URL could not be loaded.'));
         return;
       }
+    }
+
+    try {
+      const file = await fetchImageFromURL(rawUrl);
+      if (abortedRef.current) return;
+      const { validFiles } = queueAdditionalPhotoFiles([file]);
+      if (validFiles.length === 0) {
+        queueAdditionalUrlSource(rawUrl);
+        return;
+      }
+      setAdditionalUrlInput('');
+      setImagePickerStatusText('');
+      setImagePickerStatusTone('default');
+      return;
+    } catch (_err) {
+      if (abortedRef.current) return;
     }
 
     queueAdditionalUrlSource(rawUrl);
