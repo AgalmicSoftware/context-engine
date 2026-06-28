@@ -37,6 +37,7 @@ type AtlasLayoutMode = 'orbital' | 'packed';
 type DebateVisualMode = 'circles' | 'atlas' | 'tree' | 'list';
 type VoteDirection = 'up' | 'down';
 type DemoModeProp = boolean | { tools?: unknown; [key: string]: unknown };
+type LocalVoteDeltas = Record<string, Record<VoteDirection, number>>;
 
 interface DebateVoteTotals {
   up?: number | string;
@@ -986,6 +987,39 @@ const calculateNetUpvotes = (votes?: DebateVoteTotals | null): number => {
   const up = parseInt(String(votes.up || 0), 10);
   const down = parseInt(String(votes.down || 0), 10);
   return up - down;
+};
+
+const applyLocalVoteDeltasToTree = (
+  nodes: DebateNode[],
+  deltas: LocalVoteDeltas,
+): DebateNode[] => {
+  if (!deltas || Object.keys(deltas).length === 0) return nodes;
+
+  return nodes.map((node) => {
+    const nodeId = String(node?.id || '').trim();
+    const delta = nodeId ? deltas[nodeId] : undefined;
+    const nextChildren = Array.isArray(node.children)
+      ? applyLocalVoteDeltasToTree(node.children, deltas)
+      : node.children;
+
+    if (!delta) {
+      return nextChildren === node.children ? node : { ...node, children: nextChildren };
+    }
+
+    const current = node.votes || {};
+    const currentUp = parseInt(String(current.up || 0), 10) || 0;
+    const currentDown = parseInt(String(current.down || 0), 10) || 0;
+
+    return {
+      ...node,
+      children: nextChildren,
+      votes: {
+        ...current,
+        up: currentUp + (delta.up || 0),
+        down: currentDown + (delta.down || 0),
+      },
+    };
+  });
 };
 
 const TREE_LABEL_REPLACEMENTS: Array<[RegExp, string]> = [
@@ -2918,6 +2952,7 @@ const DebateMap = ({
   const [bookmarkedNodes, setBookmarkedNodes] = useState<string[]>([]);
   const [demoMode, setDemoMode] = useState(() => initialDemoEnabled);
   const [treeDataState, setTreeDataState] = useState<DebateNode[]>(() => buildAtlasTreeData(initialDemoEnabled));
+  const [localVoteDeltas, setLocalVoteDeltas] = useState<LocalVoteDeltas>({});
   const [nodeTypeFilter, setNodeTypeFilter] = useState('all');
   const [copied, setCopied] = useState(false);
 
@@ -2934,6 +2969,11 @@ const DebateMap = ({
 
   // Ref to track if we've already handled the deep link for the current ID
   const hasHandledDeepLink = useRef(false);
+  const localVoteDeltasRef = useRef<LocalVoteDeltas>({});
+
+  useEffect(() => {
+    localVoteDeltasRef.current = localVoteDeltas;
+  }, [localVoteDeltas]);
 
   // --- NODE ID PARSING (Fallback to manual URL check for wildcard routes) ---
   const effectiveNodeId = useMemo(() => {
@@ -2954,7 +2994,10 @@ const DebateMap = ({
   }, []);
 
   useEffect(() => {
-    setTreeDataState(buildAtlasTreeData(demoMode));
+    setTreeDataState(applyLocalVoteDeltasToTree(
+      buildAtlasTreeData(demoMode),
+      localVoteDeltasRef.current,
+    ));
   }, [demoMode]);
 
   useEffect(() => {
@@ -3048,9 +3091,25 @@ const DebateMap = ({
   }, [activeSessionSlug, navigate]);
 
   const handleVote = useCallback((nodeId: string, voteType: VoteDirection, count = 1) => {
+    const normalizedNodeId = String(nodeId || '').trim();
+    if (!normalizedNodeId) return;
+
+    setLocalVoteDeltas(prev => {
+      const existing = prev[normalizedNodeId] || { up: 0, down: 0 };
+      const next = {
+        ...prev,
+        [normalizedNodeId]: {
+          ...existing,
+          [voteType]: (existing[voteType] || 0) + count,
+        },
+      };
+      localVoteDeltasRef.current = next;
+      return next;
+    });
+
     setTreeDataState(prev => {
       const update = (nodes: DebateNode[]): DebateNode[] => nodes.map((node) => {
-         if (node.id === nodeId) {
+         if (String(node.id || '').trim() === normalizedNodeId) {
            const current = node.votes || {};
            const val = parseInt(String(current[voteType] || 0), 10);
            return { ...node, votes: { ...current, [voteType]: val + count }};
