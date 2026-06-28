@@ -722,6 +722,8 @@ const RECENT_QUESTION_PAYLOADS_TTL_MS = 12 * 60 * 60 * 1000;
 // every access causes `componentDidUpdate` to think the config changed and can create
 // an infinite update loop.
 const EMPTY_SESSION_CONFIG: CreateSurveySessionConfigLike = {};
+const CREATE_SURVEY_DRAFT_LEGACY_KEY = 'unfinishedSurvey';
+const CREATE_SURVEY_DRAFT_KEY_PREFIX = `${CREATE_SURVEY_DRAFT_LEGACY_KEY}:`;
 const CREATE_SURVEY_DRAFT_SAVE_DEBOUNCE_MS = 180;
 const CREATE_SURVEY_COPY_SUCCESS_KEYS = Object.freeze([
   'copySurveyIdSuccess',
@@ -736,6 +738,23 @@ const isCreateSurveyCopySuccessStateKey = (
   typeof stateKey === 'string' &&
   (CREATE_SURVEY_COPY_SUCCESS_KEYS as readonly string[]).includes(stateKey)
 );
+
+const getCreateSurveyDraftStorage = (): Storage | null => {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) return window.localStorage;
+  } catch (_) {}
+  try {
+    if (typeof localStorage !== 'undefined') return localStorage;
+  } catch (_) {}
+  return null;
+};
+
+export const buildCreateSurveyDraftStorageKey = (sessionSlug: unknown = ''): string => {
+  const normalizedSlug = normalizeSessionSlug(String(sessionSlug || ''));
+  return normalizedSlug
+    ? `${CREATE_SURVEY_DRAFT_KEY_PREFIX}${normalizedSlug}`
+    : CREATE_SURVEY_DRAFT_LEGACY_KEY;
+};
 
 class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps, CreateQuestionsAndSurveysState> {
   _isMounted: boolean = false;
@@ -886,7 +905,19 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   }
 
   clearUnfinishedSurveyDraft: () => void = () => {
-    localStorage.removeItem('unfinishedSurvey');
+    const storage = getCreateSurveyDraftStorage();
+    if (storage) {
+      const sessionSlug = normalizeSessionSlug(this.getActiveSessionSlug() || '');
+      const draftKey = buildCreateSurveyDraftStorageKey(sessionSlug);
+      try {
+        storage.removeItem(draftKey);
+        if (draftKey !== CREATE_SURVEY_DRAFT_LEGACY_KEY) {
+          storage.removeItem(CREATE_SURVEY_DRAFT_LEGACY_KEY);
+        }
+      } catch (error: unknown) {
+        surveyLog.warn('[CreateQuestionsAndSurveys] Failed to clear saved survey draft:', error);
+      }
+    }
     this._lastSavedUnfinishedSurveyJson = null;
   };
 
@@ -1269,10 +1300,40 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   };
 
   loadFromLocalStorage: () => boolean = () => {
-    const savedSurvey = localStorage.getItem('unfinishedSurvey');
+    const storage = getCreateSurveyDraftStorage();
+    if (!storage) return false;
+    const activeSessionSlug = normalizeSessionSlug(this.getActiveSessionSlug() || '');
+    const scopedDraftKey = buildCreateSurveyDraftStorageKey(activeSessionSlug);
+    let draftKey = scopedDraftKey;
+    let savedSurvey: string | null = null;
+    try {
+      savedSurvey = storage.getItem(scopedDraftKey);
+      if (!savedSurvey && !activeSessionSlug) {
+        draftKey = CREATE_SURVEY_DRAFT_LEGACY_KEY;
+        savedSurvey = storage.getItem(CREATE_SURVEY_DRAFT_LEGACY_KEY);
+      }
+    } catch (error: unknown) {
+      surveyLog.warn('[CreateQuestionsAndSurveys] Failed to read saved survey draft:', error);
+      return false;
+    }
     if (savedSurvey) {
       try {
         const parsedSurvey = JSON.parse(savedSurvey);
+        const draftSessionSlug = normalizeSessionSlug(String(parsedSurvey?._sessionSlug || ''));
+        if (activeSessionSlug && draftSessionSlug && draftSessionSlug !== activeSessionSlug) {
+          surveyLog.warn('[CreateQuestionsAndSurveys] Ignoring saved survey draft for another session.', {
+            activeSessionSlug,
+            draftSessionSlug,
+          });
+          return false;
+        }
+        if (!activeSessionSlug && draftSessionSlug) {
+          surveyLog.warn('[CreateQuestionsAndSurveys] Ignoring session-scoped survey draft outside a session.', {
+            draftSessionSlug,
+          });
+          return false;
+        }
+        delete parsedSurvey._sessionSlug;
         const autoPopulateState = typeof parsedSurvey.autoPopulateAiTags === 'boolean'
           ? parsedSurvey.autoPopulateAiTags
           : true;
@@ -1344,7 +1405,10 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
         return true;
       } catch (error: unknown) {
         surveyLog.error('[CreateQuestionsAndSurveys] Error parsing saved survey from localStorage:', error);
-        this.clearUnfinishedSurveyDraft();
+        try {
+          storage.removeItem(draftKey);
+        } catch (_) {}
+        this._lastSavedUnfinishedSurveyJson = null;
       }
     }
     return false;
@@ -1371,8 +1435,16 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       clearTimeout(this._draftSaveTimer);
       this._draftSaveTimer = null;
     }
+    const storage = getCreateSurveyDraftStorage();
+    if (!storage) return;
     if (!this.props.preformedQuestions || this.props.preformedQuestions.length === 0) {
-      const stateToSave: Partial<CreateQuestionsAndSurveysState> = { ...this.state };
+      const sessionSlug = normalizeSessionSlug(this.getActiveSessionSlug() || '');
+      const stateToSave: Partial<CreateQuestionsAndSurveysState> & { _sessionSlug?: string } = { ...this.state };
+      if (sessionSlug) {
+        stateToSave._sessionSlug = sessionSlug;
+      } else {
+        delete stateToSave._sessionSlug;
+      }
       if (stateToSave.questions && Array.isArray(stateToSave.questions)) {
         stateToSave.questions = stateToSave.questions.map((question) => {
           const { uiKey, aiGeneratedTagsFromSource, ...restOfQuestion } = question;
@@ -1394,8 +1466,16 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       if (serializedDraft === this._lastSavedUnfinishedSurveyJson) {
         return;
       }
-      localStorage.setItem('unfinishedSurvey', serializedDraft);
-      this._lastSavedUnfinishedSurveyJson = serializedDraft;
+      try {
+        const draftKey = buildCreateSurveyDraftStorageKey(sessionSlug);
+        storage.setItem(draftKey, serializedDraft);
+        if (draftKey !== CREATE_SURVEY_DRAFT_LEGACY_KEY) {
+          storage.removeItem(CREATE_SURVEY_DRAFT_LEGACY_KEY);
+        }
+        this._lastSavedUnfinishedSurveyJson = serializedDraft;
+      } catch (error: unknown) {
+        surveyLog.warn('[CreateQuestionsAndSurveys] Failed to save survey draft:', error);
+      }
     }
   };
 

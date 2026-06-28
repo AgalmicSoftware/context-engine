@@ -19,6 +19,7 @@ import {
   subscribeCacheUpdatesMock,
   treeHasText,
   writeCacheOptimisticMock,
+  buildCreateSurveyDraftStorageKey,
   hasSubmittedResourcesInManagedCache,
   readManagedCacheSnapshot,
   sanitizeDocumentUrls,
@@ -28,6 +29,7 @@ import {
 describe('CreateQuestionsAndSurveys managed cache reads', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    try { localStorage.clear(); } catch (_) {}
   });
 
   afterEach(() => {
@@ -165,6 +167,135 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
         value: originalClipboard,
       });
     }
+  });
+
+  it('saves unfinished survey drafts under the active session key', () => {
+    const instance = makeInstance({ activeSessionSlug: 'alpha' });
+    instance.state = {
+      ...instance.state,
+      title: 'Alpha draft',
+      documentURLs: ['https://example.com/alpha-doc'],
+      questions: [{
+        id: 'q-alpha',
+        type: 'freeform',
+        prompt: 'Alpha prompt?',
+        tags: ['alpha'],
+      }],
+    };
+
+    instance.saveToLocalStorage({ immediate: true });
+
+    const rawScopedDraft = localStorage.getItem(buildCreateSurveyDraftStorageKey('alpha'));
+    expect(localStorage.getItem('unfinishedSurvey')).toBeNull();
+    expect(rawScopedDraft).not.toBeNull();
+    expect(JSON.parse(rawScopedDraft || '{}')).toEqual(expect.objectContaining({
+      _sessionSlug: 'alpha',
+      title: 'Alpha draft',
+      documentURLs: ['https://example.com/alpha-doc'],
+    }));
+  });
+
+  it('restores unfinished survey drafts only for the matching active session', () => {
+    localStorage.setItem(buildCreateSurveyDraftStorageKey('alpha'), JSON.stringify({
+      _sessionSlug: 'alpha',
+      title: 'Alpha draft',
+      isStandaloneQuestion: true,
+      questions: [{
+        id: 'q-alpha',
+        type: 'freeform',
+        prompt: 'Alpha prompt?',
+        tags: ['alpha'],
+      }],
+    }));
+    localStorage.setItem(buildCreateSurveyDraftStorageKey('beta'), JSON.stringify({
+      _sessionSlug: 'alpha',
+      title: 'Mismatched draft',
+      questions: [{
+        id: 'q-mismatch',
+        type: 'freeform',
+        prompt: 'Wrong prompt?',
+        tags: ['wrong'],
+      }],
+    }));
+
+    const betaInstance = makeInstance({ activeSessionSlug: 'beta' });
+    betaInstance.updateSurveyHash = jest.fn();
+    expect(betaInstance.loadFromLocalStorage()).toBe(false);
+    expect(betaInstance.state.title).toBe('');
+    expect(betaInstance.updateSurveyHash).not.toHaveBeenCalled();
+
+    const alphaInstance = makeInstance({ activeSessionSlug: 'alpha' });
+    alphaInstance.updateSurveyHash = jest.fn();
+    expect(alphaInstance.loadFromLocalStorage()).toBe(true);
+    expect(alphaInstance.state.title).toBe('Alpha draft');
+    expect(alphaInstance.state.questions).toEqual([
+      expect.objectContaining({
+        id: 'q-alpha',
+        prompt: 'Alpha prompt?',
+        tags: ['alpha'],
+      }),
+    ]);
+    expect(alphaInstance.updateSurveyHash).toHaveBeenCalled();
+  });
+
+  it('loads legacy unscoped drafts only outside an active session', () => {
+    localStorage.setItem('unfinishedSurvey', JSON.stringify({
+      title: 'Legacy draft',
+      isStandaloneQuestion: true,
+      questions: [{
+        id: 'q-legacy',
+        type: 'freeform',
+        prompt: 'Legacy prompt?',
+        tags: ['legacy'],
+      }],
+    }));
+
+    const scopedInstance = makeInstance({ activeSessionSlug: 'beta' });
+    scopedInstance.updateSurveyHash = jest.fn();
+    expect(scopedInstance.loadFromLocalStorage()).toBe(false);
+    expect(scopedInstance.state.title).toBe('');
+    expect(scopedInstance.updateSurveyHash).not.toHaveBeenCalled();
+
+    const unscopedInstance = makeInstance({ activeSessionSlug: '' });
+    unscopedInstance.updateSurveyHash = jest.fn();
+    expect(unscopedInstance.loadFromLocalStorage()).toBe(true);
+    expect(unscopedInstance.state.title).toBe('Legacy draft');
+    expect(unscopedInstance.state.questions).toEqual([
+      expect.objectContaining({
+        id: 'q-legacy',
+        prompt: 'Legacy prompt?',
+        tags: ['legacy'],
+      }),
+    ]);
+    expect(unscopedInstance.updateSurveyHash).toHaveBeenCalled();
+  });
+
+  it('treats draft storage read and write failures as no-ops', () => {
+    const readFailure = jest.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('blocked read');
+    });
+    const readInstance = makeInstance({ activeSessionSlug: 'alpha' });
+    expect(readInstance.loadFromLocalStorage()).toBe(false);
+    readFailure.mockRestore();
+
+    const writeFailure = jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('blocked write');
+    });
+    const writeInstance = makeInstance({ activeSessionSlug: 'alpha' });
+    writeInstance.state = {
+      ...writeInstance.state,
+      title: 'No-op draft',
+      questions: [{
+        id: 'q-no-op',
+        type: 'freeform',
+        prompt: 'No-op prompt?',
+        tags: [],
+      }],
+    };
+
+    expect(() => writeInstance.saveToLocalStorage({ immediate: true })).not.toThrow();
+    expect((writeInstance as any)._lastSavedUnfinishedSurveyJson).toBeNull();
+    writeFailure.mockRestore();
   });
 
   it('blocks submit when any question prompt is blank after trim', async () => {
