@@ -434,6 +434,7 @@ export const createSessionSbtCacheController = (host = {}) => {
         let lastHydrationUnits = 0;
         const queuedHydrationAddresses = [];
         const queuedHydrationAddressSet = new Set();
+        const unresolvedHydrationAddressSet = new Set();
         const BATCH = 8;
         let hydrationDrainPromise = null;
 
@@ -502,11 +503,17 @@ export const createSessionSbtCacheController = (host = {}) => {
 
               for (const { addr, lower, sbtInfo, refreshed } of results) {
                 const freshExisting = netCache.sbtList[lower] || {};
+                const storedInfo = sbtInfo || freshExisting.sbtInfo || null;
+                if (!hasCoreSbtMetadata(storedInfo)) {
+                  unresolvedHydrationAddressSet.add(lower);
+                } else {
+                  unresolvedHydrationAddressSet.delete(lower);
+                }
 
                 netCache.sbtList[lower] = withSessionScopedSbtCacheBinding({
                   ...freshExisting,
                   sbtAddress: addr,
-                  sbtInfo: sbtInfo || freshExisting.sbtInfo || null,
+                  sbtInfo: storedInfo,
                   slug,
                   blockNumber: refreshed ? baseTo : (freshExisting.blockNumber || 0),
                 }, slug);
@@ -640,8 +647,18 @@ export const createSessionSbtCacheController = (host = {}) => {
         // Waterline only at top-level (Re-read one last time to be safe)
         cache = dgRead('sbtCache', slug) || {};
         if (cache[networkID]) {
+          if (unresolvedHydrationAddressSet.size > 0) {
+            emitMainSiteSbtDebug('warn', '[ensureLightSbtDiscovery] leaving watermark behind failed hydration targets', {
+              slug,
+              networkID,
+              baseTo,
+              unresolvedHydrationCount: unresolvedHydrationAddressSet.size,
+              unresolvedHydrationAddresses: Array.from(unresolvedHydrationAddressSet),
+            });
+          } else {
             cache[networkID].lastBlock = baseTo;
             await dgWrite('sbtCache', slug, cache);
+          }
         }
 
         setState(prev => ({ sbtCacheRevision: prev.sbtCacheRevision + 1 }));
@@ -649,6 +666,7 @@ export const createSessionSbtCacheController = (host = {}) => {
           slug,
           networkID,
           hydratedTargetCount,
+          unresolvedHydrationCount: unresolvedHydrationAddressSet.size,
           finalCachedAddressCount: Object.keys(cache?.[networkID]?.sbtList || {}).length,
           lastBlock: cache?.[networkID]?.lastBlock || baseTo,
         });
