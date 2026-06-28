@@ -333,7 +333,6 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
       this._applyFilterRunSeq = effectiveRunId;
       this._activeApplyFilterRunId = effectiveRunId;
     }
-    this.setFilterLoading(true);
     try {
       const { items, mode, provider, network, isQuestionCacheReady, isSBTCacheReady } = this.props;
       const slug = this.props.sessionSlug || '';
@@ -402,6 +401,8 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
         // Means we already applied these exact filters; avoid re-render loops
         return false;
       }
+
+      this.setFilterLoading(true);
 
       if (this.isLatestApplyRun(effectiveRunId)) {
         this.setState(buildSbtFilterLastAppliedSnapshotPatch({ snapshot: newFilterSnapshot }));
