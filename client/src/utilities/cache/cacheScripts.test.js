@@ -650,7 +650,7 @@ describe('cacheScripts', () => {
           slug: 'recovery-unrelated',
           value: { value: 'keep' },
         }),
-      ]),
+      ])
     );
 
     releaseOptimisticPersist();

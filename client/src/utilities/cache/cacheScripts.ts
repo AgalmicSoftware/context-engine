@@ -237,8 +237,8 @@ const removeMirrorValue = (namespace: unknown, slug: unknown): void => {
   bucket.delete(String(slug || ''));
 };
 
-const snapshotActiveOptimisticMirrorEntries = (): ActiveOptimisticMirrorEntry[] => {
-  const entries: ActiveOptimisticMirrorEntry[] = [];
+const snapshotActiveOptimisticMirrorEntries = () => {
+  const entries = [];
   optimisticWriteSeqByKey.forEach((seq, key) => {
     if (!mirrorByKey.has(key)) return;
     entries.push({
@@ -250,12 +250,18 @@ const snapshotActiveOptimisticMirrorEntries = (): ActiveOptimisticMirrorEntry[] 
   return entries;
 };
 
-const restoreActiveOptimisticMirrorEntries = (entries: ActiveOptimisticMirrorEntry[] = []): void => {
+const restoreActiveOptimisticMirrorEntries = (entries = []) => {
   entries.forEach(({ key, seq, value }) => {
     if (optimisticWriteSeqByKey.get(key) !== seq) return;
     const parsed = parseStorageKey(key);
     if (!parsed || !isManagedNamespace(parsed.namespace)) return;
     setMirrorValue(parsed.namespace, parsed.slug, value);
+  });
+};
+
+const emitUpdate = (payload = {}) => {
+  subscribers.forEach((handler) => {
+    try { handler(payload); } catch (e) { cacheLog.warn('cacheScripts: callback', e); }
   });
 };
 
@@ -472,12 +478,10 @@ const ensureBackendReady = async (): Promise<void> => {
   return backendReadyPromise;
 };
 
-const hydrateMirrorFromIdb = async ({
-  preserveOptimistic = false,
-}: {
-  preserveOptimistic?: boolean;
-} = {}): Promise<void> => {
-  const optimisticSnapshots = preserveOptimistic ? snapshotActiveOptimisticMirrorEntries() : [];
+const hydrateMirrorFromIdb = async ({ preserveOptimistic = false } = {}) => {
+  const optimisticSnapshots = preserveOptimistic
+    ? snapshotActiveOptimisticMirrorEntries()
+    : [];
   clearMirror();
   try {
     const all = await idbEntries(IDB_STORE);
@@ -485,7 +489,7 @@ const hydrateMirrorFromIdb = async ({
       const storageKey = String(key || '');
       const parsed = parseStorageKey(storageKey);
       if (!parsed || !isManagedNamespace(parsed.namespace)) return;
-      if (preserveOptimistic && optimisticWriteSeqByKey.has(storageKey)) return;
+      if (preserveOptimistic && optimisticWriteSeqByKey.has(key)) return;
       setMirrorValue(parsed.namespace, parsed.slug, value);
     });
     if (preserveOptimistic) {
