@@ -2,6 +2,7 @@ import {
   buildSurveyQuestionDecryptExecutionPlan,
   buildSurveyQuestionDecryptRequestPlan,
 } from './surveyQuestionDecryptRequestPlan';
+import { normalizeQuestionIdKey } from './surveyToolSignatures';
 
 export const buildEmptyQuestionDecryptSlice = () => ({
   answers: {},
@@ -1449,20 +1450,21 @@ export const finalizeQuestionDecryptAttempt = async (
     decryptQuestionRatingEnvelopes,
   } = {},
 ) => {
+  const qid = normalizeQuestionIdKey(questionId);
   const decryptedStateSlice = await decryptSingleField(
     baselineForDecrypt,
-    questionId,
+    qid,
     fieldToDecrypt,
     opts,
   );
 
   const producedAnswer = !!(
     decryptedStateSlice.answers &&
-    decryptedStateSlice.answers[questionId]
+    decryptedStateSlice.answers[qid]
   );
   const producedAdditional = !!(
     decryptedStateSlice.additionalComments &&
-    decryptedStateSlice.additionalComments[questionId]
+    decryptedStateSlice.additionalComments[qid]
   );
   const didUpdate = producedAnswer || producedAdditional;
 
