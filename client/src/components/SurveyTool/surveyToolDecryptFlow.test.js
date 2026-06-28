@@ -1289,25 +1289,23 @@ describe('surveyToolDecryptFlow', () => {
       decryptedConviction: 9,
     });
 
-    await expect(
-      finalizeQuestionDecryptAttempt(
-        {
-          questionId: 'Q1',
-          fieldToDecrypt: 'both',
-          baselineForDecrypt: { answers: { q1: { value: '*', encrypted: true } } },
-          ratingEnvelopes: { importanceEncrypted: 'imp-env' },
-          account: '0xabc',
-          providerLike: { provider: true },
-          chainId: 84532,
-          lit: { getKey: jest.fn() },
-          opts: { providerKind: 'browser' },
-        },
-        {
-          decryptSingleField,
-          decryptQuestionRatingEnvelopes,
-        },
-      ),
-    ).resolves.toEqual({
+    await expect(finalizeQuestionDecryptAttempt(
+      {
+        questionId: 'Q1',
+        fieldToDecrypt: 'both',
+        baselineForDecrypt: { answers: { q1: { value: '*', encrypted: true } } },
+        ratingEnvelopes: { importanceEncrypted: 'imp-env' },
+        account: '0xabc',
+        providerLike: { provider: true },
+        chainId: 84532,
+        lit: { getKey: jest.fn() },
+        opts: { providerKind: 'browser' },
+      },
+      {
+        decryptSingleField,
+        decryptQuestionRatingEnvelopes,
+      },
+    )).resolves.toEqual({
       decryptedStateSlice: {
         answers: { q1: { value: 'clear answer' } },
         additionalComments: { q1: { value: 'clear notes' } },

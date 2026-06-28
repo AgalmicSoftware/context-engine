@@ -7154,7 +7154,9 @@ export interface SurveyQuestions {
       return false;
     }
 
-    const surveyIndex = context.surveyIndex;
+    const surveyIndex: any = context.surveyIndex;
+    const qid: any = normalizeQuestionIdKey(questionId);
+    if (!qid) return false;
 
     try {
       // If we're viewing someone else's response (via /question/:id/:responder or /survey/:id?address=),
@@ -7163,16 +7165,16 @@ export interface SurveyQuestions {
         effectiveResponseOverride,
         hasResponseOverride,
         isViewedResponseMode,
-      } = this.resolveQuestionDecryptHandlingMode({
-        questionId,
+      }: any = resolveQuestionDecryptHandlingMode({
+        questionId: qid,
         responseOverride,
         viewerAccount: context.account,
         viewedResponder: context.responder || '',
       });
       if (isViewedResponseMode) {
         if (!hasResponseOverride) return false;
-        return await this.handleDecryptViewedResponseField(
-          questionId,
+        return await handleDecryptViewedResponseField(
+          qid,
           fieldToDecrypt,
           effectiveResponseOverride
         );
@@ -7184,7 +7186,7 @@ export interface SurveyQuestions {
         ratingEnvelopes: latestRatingEnvs,
       } = await this.prepareSelfQuestionDecryptState({
         surveyIndex,
-        questionId,
+        questionId: qid,
         fieldToDecrypt,
         responseOverride: effectiveResponseOverride,
         userAnswers: this.state.userAnswers,
@@ -7196,8 +7198,9 @@ export interface SurveyQuestions {
         return false;
       }
 
-      const preparedAttempt = this.prepareQuestionDecryptAttempt({
-        questionId,
+      const attemptStatus: any = (startQuestionDecryptAttemptStatusHelper as any)({
+        host: engine,
+        questionId: qid,
         fieldToDecrypt,
         baselineForDecrypt,
       });
@@ -7225,8 +7228,8 @@ export interface SurveyQuestions {
         didUpdate,
         decryptedImportance,
         decryptedConviction,
-      } = await this.finalizeQuestionDecryptAttempt({
-        questionId,
+      }: any = await finalizeQuestionDecryptAttempt({
+        questionId: qid,
         fieldToDecrypt,
         baselineForDecrypt,
         ratingEnvelopes: latestRatingEnvs,
@@ -7236,45 +7239,32 @@ export interface SurveyQuestions {
         lit,
         opts,
       });
-      if (!this.isDecryptContextCurrent(context)) {
-        if (this.canUpdateStateForAsyncSnapshot(context)) {
-          this.setState((prev) => this.buildQuestionDecryptStaleState(prev, questionId, fieldToDecrypt, decryptAttemptToken));
-        }
-        return false;
-      }
-      if (!this.ownsQuestionDecryptBusyTokens(keysToMark, decryptAttemptToken)) {
-        this.setState((prev) => this.buildQuestionDecryptStaleState(prev, questionId, fieldToDecrypt, decryptAttemptToken));
-        return false;
-      }
-
-      this.clearQuestionDecryptBusyTokens(keysToMark, decryptAttemptToken);
-      this.setState((prevState) => this.buildSelfQuestionDecryptSuccessState(prevState, {
-        surveyIndex,
-        questionId,
-        clearMode,
-        didUpdate,
-        baselineSlice,
-        decryptedStateSlice,
-        decryptedImportance,
-        decryptedConviction,
-      }), () => {
-        this.updateJsonPreview && this.updateJsonPreview();
-        this.persistDraftSafely && this.persistDraftSafely(0);
+      const completionStatus: any = (applyQuestionDecryptCompletionStatusHelper as any)({
+        host: engine,
+        context,
+        questionId: qid,
+        fieldToDecrypt,
+        decryptAttemptToken,
+        keysToMark: attemptStatus.keysToMark,
+        successStateKind: 'self',
+        successStateOptions: { surveyIndex, questionId: qid, clearMode: attemptStatus.clearMode, didUpdate, baselineSlice, decryptedStateSlice, decryptedImportance, decryptedConviction },
+        onSuccessStateApplied: () => {
+          updateJsonPreview && updateJsonPreview();
+          persistDraftSafely && persistDraftSafely(0);
+        },
       });
 
       return didUpdate;
     } catch (error) {
       surveyLog.error(`Error decrypting ${fieldToDecrypt} for ${questionId}`, error);
-      if (!this.isDecryptContextCurrent(context)) {
-        if (decryptAttemptToken != null && this.canUpdateStateForAsyncSnapshot(context)) {
-          this.setState((prev) => this.buildQuestionDecryptStaleState(prev, questionId, fieldToDecrypt, decryptAttemptToken));
-        }
-        return false;
-      }
-      this.setState((prev) => (
-        this.buildQuestionDecryptFailureStateForAttempt(prev, questionId, fieldToDecrypt, error.message, decryptAttemptToken)
-      ));
-      return false;
+      return (applyQuestionDecryptFailureStatusHelper as any)({
+        host: engine,
+        context,
+        questionId: qid,
+        fieldToDecrypt,
+        decryptAttemptToken,
+        error,
+      });
     }
   };
 
