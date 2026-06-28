@@ -2176,7 +2176,7 @@ const contractScripts: any = {
   onChunkProgress: any = null,
   onPartialData: any = null,
   groupKeyOrCfg: any,
-  opts: { forceArweaveFetch?: boolean } = {}
+  opts: any = {}
 ) {
   let resolvedFromBlockNum;
   let resolvedToBlockNum;
