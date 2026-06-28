@@ -7,7 +7,7 @@ import {
   readPublicUrlBasePath,
   stripPublicUrlBasePath,
 } from '../../utilities/ui/publicUrl.js';
-import { isRouteResponderAddress } from '../../utilities/session/mainSiteUtils.js';
+import { isRouteResponderAddress } from './mainSiteUtils.js';
 
 export const getConfiguredPublicBasePath = (): string => readPublicUrlBasePath();
 

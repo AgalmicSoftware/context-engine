@@ -32,7 +32,10 @@ import { resolveAdminCapabilities } from '../Admin/adminPageHelpers';
 import { GROUP_CREATION_POLICIES, resolveGroupCreationPolicy } from '../../utilities/session/groupCreationPolicy';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import { isCryptoMode, sbtsListPath, t } from '../../utilities/ui/terminology.js';
-import { buildPublicRoute, stripPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
+import {
+  buildPublicRoute,
+  stripPublicUrlBasePath,
+} from '../../utilities/ui/publicUrl.js';
 import defaultSbtImage from '../../assets/img/ce_circuit_logo.png';
 import {
   asSBTsPageFeaturedProgress as asFeaturedProgress,
@@ -586,31 +589,8 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
 
     // Canonicalize (silent) if we are on /sbts and have a non-empty slug to show
     if (!isCreateRoute && urlHasNoSlug && canonicalSlug) {
-      try {
-        const activeGroupCapabilities = resolveSessionCapabilityProjection(activeGroup);
-        const canonicalPath =
-          activeGroupCapabilities.profileValid && activeGroupCapabilities.isWorkerCanonical
-            ? workerGroupNavigationPort.buildPath({
-                groupId:
-                  typeof window !== 'undefined'
-                    ? workerGroupNavigationPort.readGroupIdFromHash(window.location.hash)
-                    : '',
-                rootPath: parts[0] === 'sbts' ? '/sbts' : '/groups',
-                sessionSlug: canonicalSlug,
-              })
-            : buildPublicRoute(`${sbtsListPath()}/${canonicalSlug}`);
-        window.history.replaceState(null, '', canonicalPath);
-      } catch (e) {
-        sbtLog.warn('SBTsPage: fallback', e);
-      }
-      return {
-        activeGroup,
-        canonicalSlug,
-        urlHasNoSlug: false,
-        onSbtsRoute,
-        isCreateRoute,
-        sessionConfigError: '',
-      }; // URL is now canonical
+      try { window.history.replaceState(null, '', buildPublicRoute(`${sbtsListPath()}/${canonicalSlug}`)); } catch (e) { sbtLog.warn('SBTsPage: fallback', e); }
+      return { canonicalSlug, urlHasNoSlug: false, onSbtsRoute, isCreateRoute }; // URL is now canonical
     }
 
     return { activeGroup, canonicalSlug, urlHasNoSlug, onSbtsRoute, isCreateRoute, sessionConfigError: '' };
@@ -976,16 +956,15 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
             </div>
           )}
 
-          <div className={styles.container}>
-            {!hideMiniActionRow && (
-              <div className={styles.buttonRow}>
-                <button
-                  onClick={() => (window.location.href = buildPublicRoute(sbtsListPath()))}
-                  className={styles.backButton}
-                >
-                  <FontAwesomeIcon icon={faExpand} /> View All
-                </button>
-                {canCreateForSession ? (
+            <div className={styles.container}>
+              {!hideMiniActionRow && (
+                <div className={styles.buttonRow}>
+                  <button
+                    onClick={() => (window.location.href = buildPublicRoute(sbtsListPath()))}
+                    className={styles.backButton}
+                  >
+                    <FontAwesomeIcon icon={faExpand} /> View All
+                  </button>
                   <button
                     className={styles.showResultsButton}
                     onClick={this.toggleCreateGroup}

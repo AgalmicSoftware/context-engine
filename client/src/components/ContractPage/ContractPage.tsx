@@ -22,8 +22,14 @@ import { faExpand, faCaretDown, faCaretUp, faCopy, faCheck } from '@fortawesome/
 import { deserializeFilterState } from '../../utilities/survey/filterStateUtils.js'; // Added import
 import { notify } from '../../utilities/ui/notify.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { buildPublicRoute, stripPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
-import { resolveContractPageActiveSession, resolveContractPageReferrerSlug } from './contractPageSessionResolution.js';
+import {
+  buildPublicRoute,
+  stripPublicUrlBasePath,
+} from '../../utilities/ui/publicUrl.js';
+import {
+  resolveContractPageActiveSession,
+  resolveContractPageReferrerSlug,
+} from './contractPageSessionResolution.js';
 import ContractViewer, { type ContractViewerContract } from './ContractViewer';
 import { normalizeContractKeyParam } from './contractMetadata.js';
 import { buildContractViewerContracts } from './contractViewerUtils.js';
@@ -183,10 +189,7 @@ export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }: Cont
         ? {
             ...contract,
             extraAction: (
-              <button
-                onClick={() => (window.location.href = buildPublicRoute(sbtsListPath()))}
-                className={styles.backButton}
-              >
+              <button onClick={() => (window.location.href = buildPublicRoute(sbtsListPath()))} className={styles.backButton}>
                 <FontAwesomeIcon icon={faExpand} /> {`${t('sbts')} list`}
               </button>
             ),

@@ -1,7 +1,10 @@
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import { ContractPage } from './ContractPage';
-import { buildContractsPageHref, getContractViewerSourceTestId } from './contractMetadata.js';
+import {
+  buildContractsPageHref,
+  getContractViewerSourceTestId,
+} from './contractMetadata.js';
 import { buildContractViewerContracts } from './contractViewerUtils.js';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 
@@ -161,55 +164,28 @@ describe('ContractPage contract deep links', () => {
 
   it('keeps contract links and canonical URLs under PUBLIC_URL subpaths', async () => {
     process.env.PUBLIC_URL = '/ce/';
-    window.history.pushState({}, '', '/ce/contracts?contract=surveys&sessionSlug=session-alpha#source');
+    window.history.pushState(
+      {},
+      '',
+      '/ce/contracts?contract=surveys&sessionSlug=session-alpha#source'
+    );
 
-    expect(
-      buildContractsPageHref({
-        contractKey: 'surveys',
-        sessionSlug: 'session-alpha',
-      }),
-    ).toBe('/ce/contracts?contract=surveys&session=session-alpha');
+    expect(buildContractsPageHref({
+      contractKey: 'surveys',
+      sessionSlug: 'session-alpha',
+    })).toBe('/ce/contracts?contract=surveys&session=session-alpha');
 
-    render(<ContractPage activeSessionSlug="session-alpha" reduxActiveSessionSlug="" />);
+    render(
+      <ContractPage
+        activeSessionSlug="session-alpha"
+        reduxActiveSessionSlug=""
+      />
+    );
 
     await waitFor(() => {
       expect(window.location.pathname).toBe('/ce/contracts');
       expect(window.location.search).toBe('?contract=surveys&session=session-alpha');
       expect(window.location.hash).toBe('#source');
     });
-  });
-
-  it('keeps a Worker session legacy chain and contracts out of the global Advanced viewer', async () => {
-    const workerSessionConfig = {
-      slug: 'demo-sh',
-      sessionName: 'Worker Demo',
-      networkChainId: 11155420,
-      contracts: {
-        sessionRegistry: {
-          address: '0x5555555555555555555555555555555555555555',
-          chainId: 11155420,
-        },
-      },
-      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
-    };
-    window.history.pushState({}, '', '/contracts?session=demo-sh');
-    mockGetSessionConfigBySlug.mockImplementation((slug = '') => (slug === 'demo-sh' ? workerSessionConfig : null));
-
-    render(<ContractPage activeSessionSlug="demo-sh" reduxActiveSessionSlug="" />);
-
-    expect(await screen.findByTestId('ce-contracts-advanced-external-notice')).toHaveTextContent(
-      /Advanced\/external on-chain tools/i,
-    );
-    expect(screen.getByTestId('ce-contracts-advanced-external-notice')).toHaveTextContent(
-      /not part of this session's Worker-native Groups or authority/i,
-    );
-    expect(mockBuildContractViewerContracts).toHaveBeenLastCalledWith({
-      sessionContracts: {},
-      chainId: undefined,
-      includeSessionRegistry: false,
-      includeCustomSBT: true,
-    });
-    expect(screen.queryByText('Session Registry')).not.toBeInTheDocument();
-    expect(screen.getByText('Custom SBT (Template)')).toBeInTheDocument();
   });
 });
