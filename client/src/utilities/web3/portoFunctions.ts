@@ -1000,10 +1000,16 @@ export async function sendPortoTransaction(txRequest: AnyObj): Promise<any> {
         txPayload.gasPrice = baselineGasPrice;
       }
       if (attempt > 1) {
+        const priorAttemptedGasPrice = typeof txPayload.gasPrice === 'bigint' && txPayload.gasPrice > 0n
+          ? txPayload.gasPrice
+          : baselineGasPrice;
         const latestGasPrice = await readGasPrice();
-        if (latestGasPrice) baselineGasPrice = latestGasPrice;
+        baselineGasPrice = maxBigInt(baselineGasPrice, latestGasPrice);
         const bumpedGasPrice = bumpByPercent(baselineGasPrice, 100 + (attempt * 25));
-        const retryGasPrice = maxBigInt(bumpedGasPrice, minRetryGasPriceWei);
+        const retryGasPrice = maxBigInt(
+          maxBigInt(bumpedGasPrice, minRetryGasPriceWei),
+          priorAttemptedGasPrice
+        );
         if (retryGasPrice) {
           txPayload.gasPrice = retryGasPrice;
         }

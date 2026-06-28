@@ -291,6 +291,48 @@ describe('sendPortoTransaction nonce retry behavior', () => {
     ).toHaveLength(1);
   });
 
+  it('does not lower the retry gas price when replacement gas price reads drop', async () => {
+    let attempt = 0;
+    let gasPriceReads = 0;
+    const { porto, requestMock, sendTransactionMock } = loadPortoHarness({
+      sendTransactionImpl: async () => {
+        attempt += 1;
+        if (attempt === 1) {
+          throw new Error('replacement transaction underpriced');
+        }
+        return '0xretryhash';
+      },
+    });
+    requestMock.mockImplementation(async ({ method }) => {
+      if (method === 'eth_gasPrice') {
+        gasPriceReads += 1;
+        return gasPriceReads === 1 ? '0x64' : '0x32';
+      }
+      if (method === 'eth_getTransactionCount') return '0x2';
+      return null;
+    });
+    seedLegacyPortoSession();
+    globalThis.CE_PORTO_SEND_RETRY_ATTEMPTS = '2';
+    globalThis.CE_PORTO_SEND_RETRY_BASE_DELAY_MS = '1';
+    globalThis.CE_PORTO_SEND_MIN_RETRY_GWEI = '0';
+    await porto.restoreSession();
+
+    const txHash = await porto.sendPortoTransaction({
+      to: TARGET_ADDRESS,
+      value: '0x0',
+      data: '0x',
+    });
+
+    expect(txHash).toBe('0xretryhash');
+    expect(sendTransactionMock).toHaveBeenCalledTimes(2);
+    const firstPayload = sendTransactionMock.mock.calls[0][0];
+    const retryPayload = sendTransactionMock.mock.calls[1][0];
+    expect(firstPayload.gasPrice).toBe(100n);
+    expect(retryPayload.gasPrice).toBe(150n);
+    expect(retryPayload.gasPrice).toBeGreaterThan(firstPayload.gasPrice);
+    expect(gasPriceReads).toBe(2);
+  });
+
   it('uses selector-aware high fallback gas for addSurvey when estimateGas fails', async () => {
     const { porto, sendTransactionMock } = loadPortoHarness({
       estimateGasImpl: async () => {
