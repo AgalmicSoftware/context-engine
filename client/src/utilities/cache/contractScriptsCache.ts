@@ -775,15 +775,11 @@ export const createContractScriptsCache = ({
     });
   };
 
-  const buildArweaveTxFetchInflightKey = ({ chainId, txId, forceFetch = false }: ArweaveInflightKeyInput) =>
-    `${Number(chainId || 0)}|${String(txId || '').trim()}|force:${forceFetch ? '1' : '0'}`;
+  const buildArweaveTxFetchInflightKey = ({ chainId, txId, forceFetch = false }) => (
+    `${Number(chainId || 0)}|${String(txId || '').trim()}|force:${forceFetch ? '1' : '0'}`
+  );
 
-  const runArweaveTxFetchCoalesced = async <T>({
-    chainId,
-    txId,
-    forceFetch = false,
-    task,
-  }: ArweaveInflightRunInput<T>) => {
+  const runArweaveTxFetchCoalesced = async ({ chainId, txId, forceFetch = false, task }) => {
     const inflightKey = buildArweaveTxFetchInflightKey({ chainId, txId, forceFetch });
     if (ARWEAVE_TX_FETCH_INFLIGHT.has(inflightKey)) {
       return ARWEAVE_TX_FETCH_INFLIGHT.get(inflightKey);
