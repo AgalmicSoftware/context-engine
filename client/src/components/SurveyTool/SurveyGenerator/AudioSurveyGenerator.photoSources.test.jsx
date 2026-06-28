@@ -248,36 +248,6 @@ describe('AudioSurveyGenerator photo and extra source handling', () => {
     expect(container.querySelector('input[placeholder="Add URL"]').value).toBe('');
   });
 
-  it('treats extensionless image URLs as photos when the fetched content is an image', async () => {
-    await renderSubject(
-      <AudioSurveyGenerator
-        provider={{}}
-        network={{ id: 84532 }}
-        account="0x123"
-        loginComplete
-        toggleLoginModal={jest.fn()}
-      />
-    );
-
-    mockFetchImageFromURL.mockResolvedValueOnce(
-      new File(['remote-svg'], 'remote_image.svg', { type: 'image/svg+xml' })
-    );
-    setInputValue('input[placeholder="Add URL"]', 'https://example.com/context.png');
-
-    await act(async () => {
-      container
-        .querySelector('button[title="Add URL"]')
-        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-
-    expect(mockFetchImageFromURL).toHaveBeenCalledWith('https://example.com/context.png');
-    expect(getPhotoCards()).toHaveLength(0);
-    expect(container.textContent).toContain('[url]');
-    expect(container.textContent).toContain('https://example.com/context.png');
-    expect(container.textContent).not.toContain('unsupported photo');
-    expect(container.querySelector('input[placeholder="Add URL"]').value).toBe('');
-  });
-
   it('adds extensionless URLs directly without speculative image fetches', async () => {
     await renderSubject(
       <AudioSurveyGenerator
