@@ -132,6 +132,14 @@ const log = createLogger('general');
 type AdminSecrets = Record<string, string>;
 type AdminSecretKeySet = Set<string>;
 type AdminOpenSecretCards = Record<string, boolean>;
+type AdminDecryptedFieldEntry = {
+  value?: unknown;
+  status?: string;
+  encryptedAvailable?: boolean;
+  envelope?: unknown;
+  [key: string]: unknown;
+};
+type AdminDecryptedFieldMap = Record<string, AdminDecryptedFieldEntry>;
 type AdminMetadataBlockLimitsDraft = {
   start: string;
   end: string;
@@ -727,9 +735,9 @@ const AdminPageRuntime = ({
     }
     // Do not auto-decrypt in /admin; decrypting triggers wallet popups. Users can decrypt on demand.
     const canPreserveUnlockedFields = walletReady && previousSessionKey === encryptedFieldsSessionKey;
-    setDecryptedFields((previous: Record<string, any> = {}) => {
-      const next: Record<string, any> = {};
-      Object.entries(entries).forEach(([key, envelope]: any) => {
+    setDecryptedFields((previous: AdminDecryptedFieldMap = {}) => {
+      const next: AdminDecryptedFieldMap = {};
+      Object.entries(entries).forEach(([key, envelope]) => {
         const previousEntry = previous?.[key];
         if (
           canPreserveUnlockedFields &&

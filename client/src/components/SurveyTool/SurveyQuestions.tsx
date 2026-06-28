@@ -7155,7 +7155,7 @@ export interface SurveyQuestions {
     }
 
     const surveyIndex: any = context.surveyIndex;
-    const qid: any = normalizeQuestionIdKey(questionId);
+    const qid = normalizeQuestionIdKey(questionId);
     if (!qid) return false;
 
     try {
