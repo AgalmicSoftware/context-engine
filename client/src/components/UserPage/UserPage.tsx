@@ -2771,24 +2771,29 @@ class UserPage extends Component<any, any> {
     const { account, viewAddress, network } = this.props;
 
     if (account && viewAddress && account.toLowerCase() === viewAddress.toLowerCase()) {
-      if (this._isMounted) {
-        // Optimistically update and close edit mode
-        this.setState(buildUserPageUsernameSaveStatePatch({ username: newUsernameToSet }));
-        if (network?.id) {
-          const networkID = network.id.toString();
-          try {
-            localStorage.setItem(`userPageUsername_${networkID}_${viewAddress.toLowerCase()}`, newUsernameToSet);
-          } catch (error) {
-            accountLog.error("Error saving username to localStorage:", error);
-            if (this._isMounted) {
-                this.setState(buildUserPageUsernameErrorStatePatch({ usernameError: 'Failed to save username locally.' }));
-            }
-          }
-        } else {
-          if (this._isMounted) {
-            this.setState(buildUserPageUsernameErrorStatePatch({ usernameError: "Cannot persist username: network information is missing." }));
-          }
+      if (!this._isMounted) return;
+      if (!network?.id) {
+        this.setState({
+          ...buildUserPageUsernameErrorStatePatch({ usernameError: "Cannot persist username: network information is missing." }),
+          isEditingUsername: true,
+        });
+        return;
+      }
+      const networkID = network.id.toString();
+      try {
+        localStorage.setItem(`userPageUsername_${networkID}_${viewAddress.toLowerCase()}`, newUsernameToSet);
+      } catch (error) {
+        accountLog.error("Error saving username to localStorage:", error);
+        if (this._isMounted) {
+          this.setState({
+            ...buildUserPageUsernameErrorStatePatch({ usernameError: 'Failed to save username locally.' }),
+            isEditingUsername: true,
+          });
         }
+        return;
+      }
+      if (this._isMounted) {
+        this.setState(buildUserPageUsernameSaveStatePatch({ username: newUsernameToSet }));
       }
     } else {
       if (this._isMounted) {
