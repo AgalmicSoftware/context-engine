@@ -6,7 +6,9 @@ import DebateMap, {
   AtlasView,
   buildHistoricalCaseBrief,
   buildHistoricalCompassPoints,
+  getAtlasLinkStableKey,
   getCompactTreeNodeLabel,
+  getDebateNodeStableKey,
   getPackedAtlasClickTarget,
   getPackedAtlasLabelFontSizePx,
   getPackedAtlasVerticalLiftPx,
@@ -78,7 +80,9 @@ const DebateMapComponent = DebateMap as React.ComponentType<any>;
 const AtlasViewComponent = AtlasView as React.ComponentType<any>;
 const buildHistoricalCaseBriefAny = buildHistoricalCaseBrief as any;
 const buildHistoricalCompassPointsAny = buildHistoricalCompassPoints as any;
+const getAtlasLinkStableKeyAny = getAtlasLinkStableKey as any;
 const getCompactTreeNodeLabelAny = getCompactTreeNodeLabel as any;
+const getDebateNodeStableKeyAny = getDebateNodeStableKey as any;
 const getPackedAtlasClickTargetAny = getPackedAtlasClickTarget as any;
 const getPackedAtlasLabelFontSizePxAny = getPackedAtlasLabelFontSizePx as any;
 const getPackedAtlasVerticalLiftPxAny = getPackedAtlasVerticalLiftPx as any;
@@ -310,6 +314,23 @@ describe('DebateMap', () => {
       expect(screen.getByRole('heading', { name: /^Debate Map$/i })).toBeInTheDocument();
       expect(screen.getAllByTestId(E2E_TESTIDS.DEBATE_VIEW_MODE).length).toBeGreaterThan(0);
     });
+  });
+
+  it('builds stable keys for reorderable atlas and list items', () => {
+    expect(getDebateNodeStableKeyAny({ id: 'node-id', name: 'Name' }, 'fallback')).toBe('node-id');
+    expect(getDebateNodeStableKeyAny({ name: 'Name' }, 'fallback')).toBe('Name');
+    expect(getDebateNodeStableKeyAny({}, 'fallback')).toBe('fallback');
+
+    expect(getAtlasLinkStableKeyAny({
+      sourceId: 'source-id',
+      targetId: 'target-id',
+      source: { x: 1, y: 2 },
+      target: { x: 3, y: 4 },
+    }, 0)).toBe('source-id->target-id');
+    expect(getAtlasLinkStableKeyAny({
+      source: { x: 1, y: 2 },
+      target: { x: 3, y: 4 },
+    }, 7)).toBe('coords:1.000:2.000:3.000:4.000:7');
   });
 
   it('switches between circles and atlas from the main mode controls', () => {
