@@ -765,37 +765,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
     }
   }
 
-  const addAdditionalUrl = async () => {
-    const rawUrl = toStr(additionalUrlInput).trim();
-    if (!rawUrl) return;
-
-    if (isLikelyImageUrl(rawUrl)) {
-      try {
-        const file = await fetchImageFromURL(rawUrl);
-        if (abortedRef.current) return;
-        queueAdditionalPhotoFiles([file]);
-        setAdditionalUrlInput('');
-        setImagePickerStatusText('');
-        setImagePickerStatusTone('default');
-        return;
-      } catch (err: unknown) {
-        setError(getSurveyGeneratorErrorMessage(err, 'Image URL could not be loaded.'));
-        return;
-      }
-    }
-
-    try {
-      const file = await fetchImageFromURL(rawUrl);
-      if (abortedRef.current) return;
-      queueAdditionalPhotoFiles([file]);
-      setAdditionalUrlInput('');
-      setImagePickerStatusText('');
-      setImagePickerStatusTone('default');
-      return;
-    } catch (_err) {
-      if (abortedRef.current) return;
-    }
-
+  const queueAdditionalUrlSource = (rawUrl: string) => {
     setAdditionalSources((prev) => [
       ...prev,
       {
@@ -809,6 +779,48 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
     setAdditionalUrlInput('');
     setImagePickerStatusText('');
     setImagePickerStatusTone('default');
+  };
+
+  const addAdditionalUrl = async () => {
+    const rawUrl = toStr(additionalUrlInput).trim();
+    if (!rawUrl) return;
+
+    if (isLikelyImageUrl(rawUrl)) {
+      try {
+        const file = await fetchImageFromURL(rawUrl);
+        if (abortedRef.current) return;
+        const { validFiles } = queueAdditionalPhotoFiles([file]);
+        if (validFiles.length === 0) {
+          queueAdditionalUrlSource(rawUrl);
+          return;
+        }
+        setAdditionalUrlInput('');
+        setImagePickerStatusText('');
+        setImagePickerStatusTone('default');
+        return;
+      } catch (err: unknown) {
+        setError(getSurveyGeneratorErrorMessage(err, 'Image URL could not be loaded.'));
+        return;
+      }
+    }
+
+    try {
+      const file = await fetchImageFromURL(rawUrl);
+      if (abortedRef.current) return;
+      const { validFiles } = queueAdditionalPhotoFiles([file]);
+      if (validFiles.length === 0) {
+        queueAdditionalUrlSource(rawUrl);
+        return;
+      }
+      setAdditionalUrlInput('');
+      setImagePickerStatusText('');
+      setImagePickerStatusTone('default');
+      return;
+    } catch (_err) {
+      if (abortedRef.current) return;
+    }
+
+    queueAdditionalUrlSource(rawUrl);
   };
 
   const handleUrlKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
