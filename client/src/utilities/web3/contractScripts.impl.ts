@@ -2175,7 +2175,8 @@ const contractScripts: any = {
   toCustomBlock: any = 'latest',
   onChunkProgress: any = null,
   onPartialData: any = null,
-  groupKeyOrCfg: any
+  groupKeyOrCfg: any,
+  opts: any = {}
 ) {
   let resolvedFromBlockNum;
   let resolvedToBlockNum;
@@ -2273,6 +2274,7 @@ const contractScripts: any = {
         try {
           respData = await this.getResponse(providerName, responder, qId, groupKeyOrCfg, {
             _resolvedCfg: cfg,
+            forceArweaveFetch,
           });
         } catch (e: any) {
           contractsLog.warn('[getQuestionResponsesFullRange] individual response read failed; skipping', { responder, qId, error: e?.message });
