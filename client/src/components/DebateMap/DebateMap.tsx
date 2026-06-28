@@ -231,6 +231,21 @@ interface AtlasDimensions {
   h: number;
 }
 
+const parseBookmarkedNodeStorage = (saved: string | null): string[] => {
+  if (!saved) return [];
+  try {
+    const parsed = JSON.parse(saved);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((value): value is string => typeof value === 'string')
+      .map((value) => value.trim())
+      .filter(Boolean);
+  } catch (e) {
+    uiLog.warn('DebateMap: ignoring invalid bookmarkedNodes storage', e);
+    return [];
+  }
+};
+
 interface DisagreementRange {
   min: number;
   max: number;
@@ -2901,7 +2916,7 @@ const DebateMap = ({
 
   useEffect(() => {
     const saved = localStorage.getItem('bookmarkedNodes');
-    if (saved) setBookmarkedNodes(JSON.parse(saved));
+    setBookmarkedNodes(parseBookmarkedNodeStorage(saved));
   }, []);
 
   useEffect(() => {
