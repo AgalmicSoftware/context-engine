@@ -230,6 +230,7 @@ type QuestionFilterPipelineMemo = {
   aiAppliedTopN: number;
   aiCombineWithOtherFilters: boolean;
   aiRankedIdsSignature: string;
+  aiLastAppliedSignature: string;
   questionResponsesNonceKey: unknown;
   questionsCacheNonceKey: unknown;
   result: QuestionFilterPipelineResult;
@@ -763,6 +764,12 @@ class QuestionFilter extends React.Component<any, any> {
     }, 0);
   };
 
+  queueCombinedAiRefreshIfNeeded = (reason: unknown): void => {
+    if (!this.state.aiCombineWithOtherFilters) return;
+    if (!String(this.state.aiSearchQuery || '').trim()) return;
+    this.queueAutoApplyAiFilter(reason);
+  };
+
   async componentDidMount() {
     this._isMounted = true;
     this.syncAiApplyingElapsedTimer();
@@ -1102,6 +1109,7 @@ class QuestionFilter extends React.Component<any, any> {
               this.saveFilterStateToLocalStorage();
             }
             this.handleApplyFilters(true);
+            this.queueCombinedAiRefreshIfNeeded('update:account-disconnect');
           }
         );
         return;
@@ -1897,6 +1905,7 @@ class QuestionFilter extends React.Component<any, any> {
     const aiCombineWithOtherFilters = !!this.state.aiCombineWithOtherFilters;
     const aiRankedQuestionIds = normalizeAiIdList(this.state.aiRankedQuestionIds || []);
     const aiRankedIdsSignature = stableSerializeSmallObject(aiRankedQuestionIds, 8192);
+    const aiLastAppliedSignature = String(this.state.aiLastAppliedSignature || '');
     const hasSbtFilter = sbtFilteredQuestions !== null;
     const hasTypeFilter = (selectedTypes || []).length > 0;
     const hasTagFilter = (selectedTags || []).length > 0;
@@ -1953,6 +1962,7 @@ class QuestionFilter extends React.Component<any, any> {
       memo.aiAppliedTopN === aiAppliedTopN &&
       memo.aiCombineWithOtherFilters === aiCombineWithOtherFilters &&
       memo.aiRankedIdsSignature === aiRankedIdsSignature &&
+      memo.aiLastAppliedSignature === aiLastAppliedSignature &&
       memo.questionResponsesNonceKey === questionResponsesNonceKey &&
       memo.questionsCacheNonceKey === questionsCacheNonceKey
     ) {
@@ -1982,6 +1992,7 @@ class QuestionFilter extends React.Component<any, any> {
         aiAppliedTopN,
         aiCombineWithOtherFilters,
         aiRankedIdsSignature,
+        aiLastAppliedSignature,
         questionResponsesNonceKey,
         questionsCacheNonceKey,
         result,
@@ -2008,7 +2019,16 @@ class QuestionFilter extends React.Component<any, any> {
       : this.getQuestionsSubsetBeforeAi(usePendingState);
     let finalQuestions: QuestionFilterQuestionRecord[] = baseQuestions;
 
-    if (hasAiFilter) {
+    let shouldApplyAiFilter = hasAiFilter;
+    if (hasAiFilter && aiCombineWithOtherFilters) {
+      const currentCombinedAiSignature = this.buildAiApplySignature({
+        queryOverride: aiSearchQuery,
+        candidateQuestions: baseQuestions,
+      });
+      shouldApplyAiFilter = !!currentCombinedAiSignature && aiLastAppliedSignature === currentCombinedAiSignature;
+    }
+
+    if (shouldApplyAiFilter) {
       finalQuestions = this.applyAISearchFilter(
         finalQuestions,
         aiSearchQuery,
@@ -2082,6 +2102,7 @@ class QuestionFilter extends React.Component<any, any> {
       aiAppliedTopN,
       aiCombineWithOtherFilters,
       aiRankedIdsSignature,
+      aiLastAppliedSignature,
       questionResponsesNonceKey,
       questionsCacheNonceKey,
       result,
@@ -2132,6 +2153,7 @@ class QuestionFilter extends React.Component<any, any> {
       },
       () => {
         this.handleApplyFilters(true);
+        this.queueCombinedAiRefreshIfNeeded('sbt-filter-change');
       }
     );
 
@@ -2215,6 +2237,7 @@ class QuestionFilter extends React.Component<any, any> {
     this.setState(buildQuestionFilterAiCombinePatch(checked), () => {
       if (this.state.aiFilterApplied && String(this.state.aiSearchQuery || '').trim()) {
         this.handleApplyFilters(true);
+        this.queueCombinedAiRefreshIfNeeded('ai-combine-toggle');
       }
     });
   };
@@ -2515,6 +2538,7 @@ class QuestionFilter extends React.Component<any, any> {
     }
     this.setState(buildQuestionFilterPendingSelectedTypesPatch(newSelectedTypes), () => {
       this.handleApplyFilters(true);
+      this.queueCombinedAiRefreshIfNeeded('type-filter-change');
     });
   };
 
@@ -2532,6 +2556,7 @@ class QuestionFilter extends React.Component<any, any> {
     this.setState(buildQuestionFilterSelectedTagsPatch(updatedTags), () => {
       // Re-apply filters live so counts/lists update immediately
       this.handleApplyFilters(true);
+      this.queueCombinedAiRefreshIfNeeded('tag-filter-change');
     });
   };
 
@@ -2778,6 +2803,7 @@ class QuestionFilter extends React.Component<any, any> {
       buildQuestionFilterPendingSelectedTypesPatch(newPending),
       () => {
         this.handleApplyFilters(true);
+        this.queueCombinedAiRefreshIfNeeded('type-filter-remove');
       }
     );
   };
@@ -2788,6 +2814,7 @@ class QuestionFilter extends React.Component<any, any> {
       buildQuestionFilterSelectedTagsPatch(newTags),
       () => {
         this.handleApplyFilters(true);
+        this.queueCombinedAiRefreshIfNeeded('tag-filter-remove');
       }
     );
   };
@@ -3367,7 +3394,10 @@ class QuestionFilter extends React.Component<any, any> {
                   checked={this.state.filterByResponded}
                   onChange={() => this.setState(
                     (prev: { filterByResponded?: unknown }) => ({ filterByResponded: !prev.filterByResponded }),
-                    () => this.handleApplyFilters(true)
+                    () => {
+                      this.handleApplyFilters(true);
+                      this.queueCombinedAiRefreshIfNeeded('response-status-filter-change');
+                    }
                   )}
                   disabled={isOtherFiltersDisabled}
                 />
@@ -3379,7 +3409,10 @@ class QuestionFilter extends React.Component<any, any> {
                   checked={this.state.filterByNotResponded}
                   onChange={() => this.setState(
                     (prev: { filterByNotResponded?: unknown }) => ({ filterByNotResponded: !prev.filterByNotResponded }),
-                    () => this.handleApplyFilters(true)
+                    () => {
+                      this.handleApplyFilters(true);
+                      this.queueCombinedAiRefreshIfNeeded('response-status-filter-change');
+                    }
                   )}
                   disabled={isOtherFiltersDisabled}
                 />
