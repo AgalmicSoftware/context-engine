@@ -207,6 +207,27 @@ const createIndexedDbMock = (sessionRecord, options = {}) => ({
   }),
 });
 
+const createFailingIndexedDbMock = (error = new Error('IndexedDB unavailable')) => ({
+  open: jest.fn(() => {
+    const request = {
+      onsuccess: null,
+      onerror: null,
+      onupgradeneeded: null,
+      result: null,
+      error: null,
+    };
+
+    setTimeout(() => {
+      request.error = error;
+      if (typeof request.onerror === 'function') {
+        request.onerror({ target: request });
+      }
+    }, 0);
+
+    return request;
+  }),
+});
+
 const bufferToBase64Url = (buffer) => {
   const bytes = new Uint8Array(buffer);
   let binary = '';
@@ -705,6 +726,60 @@ describe('Porto key derivation migration', () => {
 
     expect(privateKeyToAccountMock.mock.calls.map(([privateKey]) => privateKey)).toEqual([HKDF_PRIVATE_KEY]);
     expect(address).toBe(HKDF_ADDRESS);
+  });
+
+  it('clears stale legacy storage after persisting a selected passkey account switch', async () => {
+    Object.defineProperty(window, 'PublicKeyCredential', {
+      value: function PublicKeyCredential() {},
+      configurable: true,
+    });
+    setCredentialsMock({
+      getImpl: async () => ({ rawId: RAW_ID }),
+    });
+
+    let persistedRecord = null;
+    Object.defineProperty(globalThis, 'indexedDB', {
+      value: createIndexedDbMock({
+        credentialId: 'stored-cred',
+        address: LEGACY_ADDRESS,
+        encryptedPrivateKey: 'encrypted-old-key',
+        encryptedPrivateKeyIv: 'encrypted-old-iv',
+      }, {
+        onPut: (record) => {
+          persistedRecord = record;
+        },
+      }),
+      configurable: true,
+    });
+    localStorage.setItem(
+      PORTO_STORAGE_KEY,
+      JSON.stringify({
+        credentialId: 'legacy-cred',
+        address: LEGACY_ADDRESS,
+        privateKey: PRIVATE_KEY,
+      })
+    );
+
+    const { porto } = loadPortoHarness({
+      privateKeyToAccountImpl: () => makeSignerAccount(HKDF_ADDRESS),
+    });
+
+    await expect(porto.loginWithPorto()).resolves.toBe(HKDF_ADDRESS);
+    expect(persistedRecord).toEqual(expect.objectContaining({
+      address: HKDF_ADDRESS,
+    }));
+    expect(localStorage.getItem(PORTO_STORAGE_KEY)).toBeNull();
+
+    Object.defineProperty(globalThis, 'indexedDB', {
+      value: createFailingIndexedDbMock(),
+      configurable: true,
+    });
+    const { porto: reloadedPorto, createWalletClientMock } = loadPortoHarness({
+      privateKeyToAccountImpl: () => makeSignerAccount(LEGACY_ADDRESS),
+    });
+
+    await expect(reloadedPorto.restoreSession({ requireSigner: false })).resolves.toBeNull();
+    expect(createWalletClientMock).not.toHaveBeenCalled();
   });
 
   it('blocks stale Porto sends while a different selected passkey account is being persisted', async () => {
