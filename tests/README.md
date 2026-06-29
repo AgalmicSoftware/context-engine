@@ -1,20 +1,23 @@
-# Tests Directory
+# tests/
 
-This directory consolidates test entry points using symlinks to test files that remain co-located in their original locations.
+This is the source-of-truth home for root-level JavaScript test harnesses that
+are not practical to colocate with client, worker, or script sources.
 
 ## Path roles
 
-- `script/` contains Foundry Solidity deploy scripts.
+- `foundry/script/` contains Foundry Solidity deploy scripts.
+- `foundry/test/` contains Forge Solidity suites.
 - `scripts/` contains JS/Python tooling, E2E runners, audits, and automation.
-- `test/` remains the source-of-truth location for Foundry Solidity tests, alongside some root Node-side tests.
-- `tests/` is the index/symlink surface exposed through entries such as `contracts/`, `e2e/`, and `e2e-lib/`.
+- `tests/root/` contains root Node/Jest tests for workers, deploy helpers, and compatibility harnesses.
+- `tests/helpers/` contains helper modules shared by `tests/root/`.
 
 If you are deciding where to add new files:
 
-- add new Solidity deploy scripts to `script/`
+- add new Solidity deploy scripts to `foundry/script/`
+- add new Forge tests to `foundry/test/`
 - add new JS/Python automation to `scripts/`
-- add new root-level Foundry / Node test sources to `test/`
-- do not treat `tests/` as the primary source-of-truth home unless a specific workflow requires the indexed view
+- add new root-level Node/Jest test sources to `tests/root/`
+- add shared root test helpers to `tests/helpers/`
 
 ## How to run
 
@@ -28,8 +31,9 @@ If you are deciding where to add new files:
 - Solidity: `npm run test:contracts`
 - E2E: `npm run ai:test-*`
 
-## Why files are not moved
+## Why Foundry still has singular names
 
-- Co-location keeps E2E scripts near supporting automation code in `scripts/`.
-- React unit tests stay co-located with client app code so components, fixtures, and helpers remain close to the behavior they cover.
-- Forge convention keeps Solidity tests in `test/` as `.t.sol` files.
+Foundry's default vocabulary is singular: `script/` for Solidity deploy scripts
+and `test/` for Forge suites. This repo keeps those conventional names one
+level down under `foundry/` while using plural root-level `scripts/` and
+`tests/` for the broader JavaScript/tooling surface.

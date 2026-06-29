@@ -61,7 +61,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
     }
   };
 
-  expectFile('test/deployHelperOrigins.test.mjs');
+  expectFile('tests/root/deployHelperOrigins.test.mjs');
   expectFile('scripts/worker-bundle.mjs');
   expectFile('scripts/deploy-helper-deploy.mjs');
   expectFile('scripts/run-node-tests.js');
@@ -94,8 +94,8 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('test:contracts', 'CustomSBTInvariantTest');
   expectScriptContains('test:node', 'scripts/run-node-tests.js');
   expectScriptContains('test:root:jest', '--testMatch');
-  expectScriptContains('test:root:jest', '../test/sessionCorsWorker.auth.test.js');
-  expectScriptContains('test:root:jest', '../test/deployHelper.worker.test.js');
+  expectScriptContains('test:root:jest', '../tests/root/sessionCorsWorker.auth.test.js');
+  expectScriptContains('test:root:jest', '../tests/root/deployHelper.worker.test.js');
   expectScriptContains('test:worker:session-cors', 'npm --prefix workers/sessionCorsWorker test');
   expectScriptContains('test:e2e', 'npm run -s test:e2e:smoke');
   expectScriptContains('test:e2e:quick', 'npm run -s test:e2e:smoke');

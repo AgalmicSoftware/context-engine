@@ -26,7 +26,7 @@ const babelJestOptions = {
 };
 
 module.exports = {
-  roots: ['<rootDir>/src', '<rootDir>/../test'],
+  roots: ['<rootDir>/src', '<rootDir>/../tests/root'],
   testEnvironment: 'jsdom',
   setupFiles: ['<rootDir>/scripts/jest/jsdomPolyfills.js'],
   setupFilesAfterEnv: ['<rootDir>/src/setupTests.js'],

@@ -76,7 +76,7 @@ npm run test:client
 ```
 
 `npm run test:wiring` also runs `scripts/verify-test-inventory.js`. That
-inventory check keeps root `test/*.test.*` files classified as one of:
+inventory check keeps root `tests/root/*.test.*` files classified as one of:
 
 - public-safe Node tests run by `npm run test:node`
 - public-safe Jest tests run by `npm run test:root:jest`
