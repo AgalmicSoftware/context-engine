@@ -584,14 +584,51 @@ async function persistPortoSession(session: PortoSession | null | undefined): Pr
   }
 }
 
+async function readPersistedPortoSessionAddress(): Promise<string> {
+  try {
+    const record = await readPortoSessionRecord();
+    if (
+      record &&
+      record.credentialId &&
+      record.address &&
+      record.encryptedPrivateKey &&
+      record.encryptedPrivateKeyIv
+    ) {
+      const recordAddress = normalizePortoAddress(record.address);
+      if (recordAddress) return recordAddress;
+    }
+  } catch (_) {
+    // Fall through to the legacy record; persistence failure handling still decides whether to adopt.
+  }
+
+  try {
+    const stored = localStorage.getItem(PORTO_STORAGE_KEY);
+    if (!stored) return '';
+    const session = JSON.parse(stored);
+    if (!session?.credentialId || !session?.privateKey || !session?.address) return '';
+    return normalizePortoAddress(session?.address);
+  } catch (_) {
+    return '';
+  }
+}
+
 async function activatePortoSession(nextSession: PortoSession, signerAccount: unknown): Promise<string> {
   const prevAddress = normalizePortoAddress(currentSession?.address);
   const nextAddress = normalizePortoAddress(nextSession.address);
-  const accountChanged = !!(prevAddress && nextAddress && prevAddress !== nextAddress);
   const transitionRevision = beginPortoSessionTransition();
-  if (accountChanged) portoAccountSwitchInProgress = true;
+  let accountChanged = false;
 
   try {
+    const persistedAddress = await readPersistedPortoSessionAddress();
+    accountChanged = !!(
+      nextAddress &&
+      (
+        (prevAddress && prevAddress !== nextAddress) ||
+        (persistedAddress && persistedAddress !== nextAddress)
+      )
+    );
+    if (accountChanged) portoAccountSwitchInProgress = true;
+
     const persisted = await persistPortoSession(nextSession);
     if (accountChanged && !persisted) throw new Error('Failed to persist selected Porto passkey session.');
 
