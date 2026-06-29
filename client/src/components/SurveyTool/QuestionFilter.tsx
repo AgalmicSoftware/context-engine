@@ -2647,15 +2647,16 @@ class QuestionFilter extends React.Component<any, any> {
         throw new Error("Invalid filter string.");
       }
 
-      const newState: QuestionFilterMutableStatePatch = {};
+      const selectedTypes = normalizeFilterSelectionList(deserializedState.questionTypes);
+      const selectedTags = normalizeFilterSelectionList(deserializedState.selectedTags);
+      const sbtFilterLocalState = normalizeSbtFilterLocalState(deserializedState.sbtFilter);
+      const newState: QuestionFilterMutableStatePatch = {
+        selectedTypes,
+        pendingSelectedTypes: selectedTypes,
+        selectedTags,
+        sbtFilterLocalState,
+      };
       // Map deserialized state to component's state structure
-      if (deserializedState.questionTypes) {
-        newState.selectedTypes = deserializedState.questionTypes;
-        newState.pendingSelectedTypes = deserializedState.questionTypes;
-      }
-      if (deserializedState.selectedTags) {
-        newState.selectedTags = deserializedState.selectedTags;
-      }
       if (deserializedState.responseStatus) {
         const responseStatus = toUnknownRecord(deserializedState.responseStatus);
         const responseStatusState = normalizeResponseStatusFilterState({
@@ -2668,9 +2669,6 @@ class QuestionFilter extends React.Component<any, any> {
       } else {
         newState.filterByResponded = false;
         newState.filterByNotResponded = false;
-      }
-      if (deserializedState.sbtFilter) {
-        newState.sbtFilterLocalState = deserializedState.sbtFilter;
       }
       if (typeof deserializedState.aiFilter === 'string') {
         const aiQuery = deserializedState.aiFilter;
@@ -2693,13 +2691,15 @@ class QuestionFilter extends React.Component<any, any> {
         newState.aiRankedQuestionIds = [];
         newState.aiApplyError = '';
       }
-      if (deserializedState.topQuestions) {
+      if (deserializedState.topQuestions && typeof deserializedState.topQuestions === 'object') {
         const { count, by } = toUnknownRecord(deserializedState.topQuestions);
-        newState.topQuestionsCount = count || DEFAULT_TOP_QUESTIONS_COUNT;
-        newState.pendingTopQuestionsCount = count || DEFAULT_TOP_QUESTIONS_COUNT;
+        newState.topQuestionsCount = typeof count === 'number' ? count : DEFAULT_TOP_QUESTIONS_COUNT;
+        newState.pendingTopQuestionsCount = typeof count === 'number' ? count : DEFAULT_TOP_QUESTIONS_COUNT;
         if (by === 'importance') {
             newState.showTopQuestions = true;
             newState.pendingShowTopQuestions = true;
+            newState.sortByImportance = true;
+            newState.pendingSortByImportance = true;
             newState.showTopQuestionsByResponses = false;
             newState.pendingShowTopQuestionsByResponses = false;
         } else if (by === 'responses') {
@@ -2707,12 +2707,25 @@ class QuestionFilter extends React.Component<any, any> {
             newState.pendingShowTopQuestionsByResponses = true;
             newState.showTopQuestions = false;
             newState.pendingShowTopQuestions = false;
+            newState.sortByImportance = false;
+            newState.pendingSortByImportance = false;
         } else {
             newState.showTopQuestions = false;
             newState.pendingShowTopQuestions = false;
             newState.showTopQuestionsByResponses = false;
             newState.pendingShowTopQuestionsByResponses = false;
+            newState.sortByImportance = false;
+            newState.pendingSortByImportance = false;
         }
+      } else {
+        newState.topQuestionsCount = DEFAULT_TOP_QUESTIONS_COUNT;
+        newState.pendingTopQuestionsCount = DEFAULT_TOP_QUESTIONS_COUNT;
+        newState.showTopQuestions = false;
+        newState.pendingShowTopQuestions = false;
+        newState.showTopQuestionsByResponses = false;
+        newState.pendingShowTopQuestionsByResponses = false;
+        newState.sortByImportance = false;
+        newState.pendingSortByImportance = false;
       }
 
       this.setState(newState, () => {

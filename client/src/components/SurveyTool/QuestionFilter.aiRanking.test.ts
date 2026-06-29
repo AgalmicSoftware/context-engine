@@ -4,6 +4,7 @@ import {
 import * as aiScripts from '../../utilities/ai/aiScripts.js';
 import * as aiSettings from '../../utilities/ai/aiSettings.js';
 import * as sponsoredAccess from '../../utilities/web3/sponsoredAccess.js';
+import { serializeFilterState } from '../../utilities/survey/filterStateUtils.js';
 
 jest.mock('../SBTs/SBTFilter', () => () => null);
 jest.mock('../Shared/AudioInput/AudioInput', () => () => null);
@@ -249,6 +250,65 @@ describe('QuestionFilter AI ranking lifecycle', () => {
 
     const combinedResult = instance.buildFilterPipelineResult(true);
     expect(combinedResult.finalQuestions.map((q: any) => q.id)).toEqual(['q3', 'q1']);
+  });
+
+  it('clears stale manual-load filters when the loaded filter omits those families', () => {
+    const instance = new QuestionFilter({
+      questionResponses: {},
+      account: '0xabc',
+    });
+    instance.handleApplyFilters = jest.fn();
+    instance.queueAutoApplyAiFilter = jest.fn();
+    instance.setState = jest.fn((next, cb) => {
+      const patch = typeof next === 'function' ? next(instance.state, instance.props) : next;
+      instance.state = { ...instance.state, ...(patch || {}) };
+      if (typeof cb === 'function') cb();
+      return patch;
+    });
+    const aiOnlyFilter = serializeFilterState({
+      aiFilter: 'water',
+      aiTopN: 1,
+      aiCombine: true,
+      questionTypes: [],
+      selectedTags: [],
+      sbtFilter: null,
+      topQuestions: null,
+      responseStatus: null,
+    });
+    instance.state = {
+      ...instance.state,
+      filterUrlInput: aiOnlyFilter,
+      selectedTypes: ['rating'],
+      pendingSelectedTypes: ['rating'],
+      selectedTags: ['stale'],
+      sbtFilterLocalState: { selectedSBTs: [{ address: '0x1' }] },
+      showTopQuestions: true,
+      pendingShowTopQuestions: true,
+      showTopQuestionsByResponses: false,
+      pendingShowTopQuestionsByResponses: false,
+      sortByImportance: true,
+      pendingSortByImportance: true,
+      topQuestionsCount: 3,
+      pendingTopQuestionsCount: 3,
+    };
+
+    instance.handleLoadFilter();
+
+    expect(instance.state.selectedTypes).toEqual([]);
+    expect(instance.state.pendingSelectedTypes).toEqual([]);
+    expect(instance.state.selectedTags).toEqual([]);
+    expect(instance.state.sbtFilterLocalState).toBeNull();
+    expect(instance.state.showTopQuestions).toBe(false);
+    expect(instance.state.pendingShowTopQuestions).toBe(false);
+    expect(instance.state.sortByImportance).toBe(false);
+    expect(instance.state.pendingSortByImportance).toBe(false);
+    expect(instance.state.topQuestionsCount).toBe(10);
+    expect(instance.state.pendingTopQuestionsCount).toBe(10);
+    expect(instance.state.aiSearchQuery).toBe('water');
+    expect(instance.state.aiAppliedTopN).toBe(1);
+    expect(instance.state.aiCombineWithOtherFilters).toBe(true);
+    expect(instance.handleApplyFilters).toHaveBeenCalledWith(true);
+    expect(instance.queueAutoApplyAiFilter).toHaveBeenCalledWith('load-filter-input');
   });
 
   it('auto-reapplies AI when external filter state carries aiFilter + aiTopN', async () => {
