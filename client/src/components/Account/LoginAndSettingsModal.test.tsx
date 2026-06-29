@@ -264,6 +264,45 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     });
   });
 
+  it('does not let stale Porto sign-in completion overwrite a Wagmi login', async () => {
+    let resolveLogin!: (value: string) => void;
+    mockedPortoFunctions.loginWithPorto.mockImplementationOnce(
+      () => new Promise<string>((resolve) => { resolveLogin = resolve; })
+    );
+    const props = buildProps({
+      account: '',
+      provider: 'none',
+      wagmiAddress: '',
+    });
+    const subject = mountClassSubject(new LoginAndSettingsModalSubject(props));
+
+    const signInPromise = subject.handlePortoSignIn();
+    subject.props = {
+      ...subject.props,
+      wagmiAddress: WAGMI_ADDRESS,
+      wagmiNetwork: { id: 84532, chainId: 84532, name: 'Base Sepolia' },
+    };
+    await subject.updateStateUponWagmiLogin();
+    resolveLogin(ALT_PASSKEY_ADDRESS);
+    await signInPromise;
+
+    expect(mockedPortoFunctions.loginWithPorto).toHaveBeenCalledTimes(1);
+    expect(props.changeAccount).toHaveBeenCalledTimes(1);
+    expect(props.changeAccount).toHaveBeenCalledWith(expect.objectContaining({
+      account: WAGMI_ADDRESS,
+      provider: 'wagmi',
+    }));
+    expect(props.changeAccount).not.toHaveBeenCalledWith(expect.objectContaining({
+      account: ALT_PASSKEY_ADDRESS,
+      provider: 'porto_passkey',
+    }));
+    expect(props.updateLoginInfo).toHaveBeenLastCalledWith({
+      loginInProgress: false,
+      loginComplete: true,
+      provider: 'wagmi',
+    });
+  });
+
   it('does not prefetch worker auth when loginComplete flips true after restore', () => {
     const prevProps = buildProps({
       account: PASSKEY_ADDRESS,
