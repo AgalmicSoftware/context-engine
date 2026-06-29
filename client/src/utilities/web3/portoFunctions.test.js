@@ -778,6 +778,7 @@ describe('Porto key derivation migration', () => {
 
     const encrypted = await encryptStoredPrivateKey(PRIVATE_KEY, CREDENTIAL_ID);
     let releaseGet = () => {};
+    let getCallCount = 0;
     const getStarted = new Promise((resolve) => {
       Object.defineProperty(globalThis, 'indexedDB', {
         value: createIndexedDbMock({
@@ -787,6 +788,8 @@ describe('Porto key derivation migration', () => {
           encryptedPrivateKeyIv: encrypted.encryptedPrivateKeyIv,
         }, {
           waitForGet: () => {
+            getCallCount += 1;
+            if (getCallCount > 1) return Promise.resolve();
             resolve();
             return new Promise((getResolve) => {
               releaseGet = getResolve;
@@ -811,6 +814,37 @@ describe('Porto key derivation migration', () => {
     expect(await porto.createPortoProviderMock().request({ method: 'eth_accounts', params: [] })).toEqual([TARGET_ADDRESS]);
     expect(createWalletClientMock).toHaveBeenCalledTimes(1);
     expect(createWalletClientMock.mock.calls[0][0].account.address).toBe(TARGET_ADDRESS);
+  });
+
+  it('fails closed when an unhydrated saved account differs and selected-session persistence fails', async () => {
+    Object.defineProperty(window, 'PublicKeyCredential', {
+      value: function PublicKeyCredential() {},
+      configurable: true,
+    });
+    setCredentialsMock({
+      getImpl: async () => ({ id: 'assertion', rawId: RAW_ID }),
+    });
+
+    const encrypted = await encryptStoredPrivateKey(PRIVATE_KEY, CREDENTIAL_ID);
+    Object.defineProperty(globalThis, 'indexedDB', {
+      value: createIndexedDbMock({
+        credentialId: CREDENTIAL_ID,
+        address: BASE_ADDRESS,
+        encryptedPrivateKey: encrypted.encryptedPrivateKey,
+        encryptedPrivateKeyIv: encrypted.encryptedPrivateKeyIv,
+      }, {
+        waitForPut: () => Promise.reject(new Error('put failed')),
+      }),
+      configurable: true,
+    });
+
+    const { porto, createWalletClientMock } = loadPortoHarness({
+      privateKeyToAccountImpl: () => makeSignerAccount(TARGET_ADDRESS),
+    });
+
+    await expect(porto.loginWithPorto()).rejects.toThrow('Failed to persist selected Porto passkey session.');
+    expect(await porto.createPortoProviderMock().request({ method: 'eth_accounts', params: [] })).toEqual([]);
+    expect(createWalletClientMock).not.toHaveBeenCalled();
   });
 
   it('propagates HKDF failures during login instead of silently falling back', async () => {
