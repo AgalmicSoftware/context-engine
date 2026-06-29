@@ -5,6 +5,7 @@ import {
   readPublicUrlBasePath,
   readSafeInternalReturnTo,
   readWindowLocationPath,
+  stripPublicUrlBasePath,
 } from './publicUrl.js';
 
 describe('readPublicUrlBasePath', () => {
@@ -38,6 +39,16 @@ describe('buildPublicRoute', () => {
 
   it('falls back to the site root when no pathname or PUBLIC_URL is provided', () => {
     expect(buildPublicRoute('', { env: {} })).toBe('/');
+  });
+});
+
+describe('stripPublicUrlBasePath', () => {
+  it('removes the configured base path while preserving query strings and hashes', () => {
+    const proc = { env: { PUBLIC_URL: '/ce/' } };
+
+    expect(stripPublicUrlBasePath('/ce/session/edge?tab=1#top', proc)).toBe('/session/edge?tab=1#top');
+    expect(stripPublicUrlBasePath('/ce', proc)).toBe('/');
+    expect(stripPublicUrlBasePath('/session/edge', proc)).toBe('/session/edge');
   });
 });
 

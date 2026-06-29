@@ -1,5 +1,7 @@
 import {
   applySessionWizardMetadataUploadGuards,
+  buildSessionWizardSecretFieldGateErrorMessage,
+  getSessionWizardMetadataSecretFieldGateKeys,
   normalizeSessionWizardDefaultFeaturedSbtMetadata,
   resolveSessionWizardMetadataPayloadBase,
 } from './sessionWizardMetadataPayload';
@@ -101,7 +103,6 @@ describe('applySessionWizardMetadataUploadGuards', () => {
         sessionInfo: { ciphertext: 'public-ish' },
       },
       encryptedFieldGates: {
-        'faucet.privateKey': 'gate-secret',
         sessionInfo: 'gate-public-ish',
       },
       lit: {
@@ -143,5 +144,26 @@ describe('applySessionWizardMetadataUploadGuards', () => {
       ai: '10',
       txGas: '2',
     });
+  });
+
+  it('rejects secret field gates before upload guard stripping can hide them', () => {
+    const metadata = {
+      encryptedFieldGates: {
+        'arweave.jwk': 'gate-secret',
+        sessionInfo: 'gate-public-ish',
+      },
+      arweave: {
+        jwk: 'secret-jwk',
+      },
+    };
+
+    expect(getSessionWizardMetadataSecretFieldGateKeys(metadata)).toEqual(['arweave.jwk']);
+    expect(buildSessionWizardSecretFieldGateErrorMessage(['arweave.jwk'])).toBe(
+      'Worker secret fields cannot be locked in public metadata: arweave.jwk. Store secrets in the Worker panel instead.'
+    );
+    expect(() => applySessionWizardMetadataUploadGuards({ metadata })).toThrow(
+      'Worker secret fields cannot be locked in public metadata: arweave.jwk. Store secrets in the Worker panel instead.'
+    );
+    expect(metadata.arweave).toEqual({ jwk: 'secret-jwk' });
   });
 });

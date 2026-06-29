@@ -5742,6 +5742,8 @@ const handleDecryptQuestionAnswerInternal = async (questionId: any, fieldToDecry
     }
 
     const surveyIndex: any = context.surveyIndex;
+    const qid = normalizeQuestionIdKey(questionId);
+    if (!qid) return false;
 
     try {
       // If we're viewing someone else's response (via /question/:id/:responder or /survey/:id?address=),
@@ -5751,7 +5753,7 @@ const handleDecryptQuestionAnswerInternal = async (questionId: any, fieldToDecry
         hasResponseOverride,
         isViewedResponseMode,
       }: any = resolveQuestionDecryptHandlingMode({
-        questionId,
+        questionId: qid,
         responseOverride,
         viewerAccount: context.account,
         viewedResponder: context.responder || '',
@@ -5759,7 +5761,7 @@ const handleDecryptQuestionAnswerInternal = async (questionId: any, fieldToDecry
       if (isViewedResponseMode) {
         if (!hasResponseOverride) return false;
         return await handleDecryptViewedResponseField(
-          questionId,
+          qid,
           fieldToDecrypt,
           effectiveResponseOverride
         );
@@ -5771,7 +5773,7 @@ const handleDecryptQuestionAnswerInternal = async (questionId: any, fieldToDecry
         ratingEnvelopes: latestRatingEnvs,
       }: any = await prepareSelfQuestionDecryptState({
         surveyIndex,
-        questionId,
+        questionId: qid,
         fieldToDecrypt,
         responseOverride: effectiveResponseOverride,
         userAnswers: stateRef.current.userAnswers,
@@ -5785,7 +5787,7 @@ const handleDecryptQuestionAnswerInternal = async (questionId: any, fieldToDecry
 
       const attemptStatus: any = (startQuestionDecryptAttemptStatusHelper as any)({
         host: engine,
-        questionId,
+        questionId: qid,
         fieldToDecrypt,
         baselineForDecrypt,
       });
@@ -5798,7 +5800,7 @@ const handleDecryptQuestionAnswerInternal = async (questionId: any, fieldToDecry
         decryptedImportance,
         decryptedConviction,
       }: any = await finalizeQuestionDecryptAttempt({
-        questionId,
+        questionId: qid,
         fieldToDecrypt,
         baselineForDecrypt,
         ratingEnvelopes: latestRatingEnvs,
@@ -5811,12 +5813,12 @@ const handleDecryptQuestionAnswerInternal = async (questionId: any, fieldToDecry
       const completionStatus: any = (applyQuestionDecryptCompletionStatusHelper as any)({
         host: engine,
         context,
-        questionId,
+        questionId: qid,
         fieldToDecrypt,
         decryptAttemptToken,
         keysToMark: attemptStatus.keysToMark,
         successStateKind: 'self',
-        successStateOptions: { surveyIndex, questionId, clearMode: attemptStatus.clearMode, didUpdate, baselineSlice, decryptedStateSlice, decryptedImportance, decryptedConviction },
+        successStateOptions: { surveyIndex, questionId: qid, clearMode: attemptStatus.clearMode, didUpdate, baselineSlice, decryptedStateSlice, decryptedImportance, decryptedConviction },
         onSuccessStateApplied: () => {
           updateJsonPreview && updateJsonPreview();
           persistDraftSafely && persistDraftSafely(0);
@@ -5830,7 +5832,7 @@ const handleDecryptQuestionAnswerInternal = async (questionId: any, fieldToDecry
       return (applyQuestionDecryptFailureStatusHelper as any)({
         host: engine,
         context,
-        questionId,
+        questionId: qid,
         fieldToDecrypt,
         decryptAttemptToken,
         error,

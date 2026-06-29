@@ -477,6 +477,45 @@ describe('surveyGeneratorHelpers', () => {
     ].join('\n'));
   });
 
+  it('inserts user prompt replacements literally when values contain dollar tokens', () => {
+    const prompt = buildSingleGenerationPrompt({
+      promptTemplate: [
+        '<SourceDocContent>',
+        '<DefaultTags>',
+        '<GroupCustomInstructions>',
+      ].join('\n'),
+      sourceDocContent: "source $& $$ $` $'",
+      count: 3,
+      questionTypes: {
+        binary: true,
+      },
+      defaultTags: ['$& default', '$$ tag'],
+      sessionInstructions: "instructions $& $$ $` $'",
+    });
+
+    expect(prompt).toBe([
+      "source $& $$ $` $'",
+      '$& default, $$ tag',
+      "instructions $& $$ $` $'",
+    ].join('\n'));
+  });
+
+  it('replaces every source type token in generation prompts', () => {
+    const prompt = buildSingleGenerationPrompt({
+      promptTemplate: 'source=<SourceType>\nconditional=<SourceType>',
+      sourceDocContent: '',
+      count: 2,
+      questionTypes: {
+        freeform: true,
+      },
+      defaultTags: [],
+      transcriptMode: true,
+    });
+
+    expect(prompt).toBe('source=transcript\nconditional=transcript');
+    expect(prompt).not.toContain('<SourceType>');
+  });
+
   it('uses prompt defaults when no question types or overrides are selected', () => {
     const prompt = buildSingleGenerationPrompt({
       promptTemplate: '<Types>|<SourceType>|<MultiSpeakerHint>|<DefaultTags>',

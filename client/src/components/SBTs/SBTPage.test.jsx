@@ -18,6 +18,7 @@ import {
 } from './SbtPageFullActionButtons';
 import SbtPageMintInputAction from './SbtPageMintInputAction';
 import SbtPageStatusActionButton from './SbtPageStatusActionButton';
+import { notify } from '../../utilities/ui/notify.js';
 
 const renderBurnActionSurfaceTree = (tree) => {
   const surface = findElementInTree(tree, (node) => node?.type === SbtPageBurnActionSurface);
@@ -33,6 +34,121 @@ const renderMintActionSurfaceTree = (tree) => {
 
 describe('SBTPage session routing and holder loading', () => {
   setupSBTPageTestLifecycle();
+
+  it('does not mark an address copied when clipboard write rejects', async () => {
+    const subject = createSubject();
+    const originalClipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+    const writeText = jest.fn().mockRejectedValue(new Error('clipboard denied'));
+    const warnSpy = jest.spyOn(notify, 'warn').mockImplementation(() => undefined);
+    const successSpy = jest.spyOn(notify, 'success').mockImplementation(() => undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+
+    try {
+      await subject.copyToClipboard('0x0000000000000000000000000000000000000001', 'admin');
+
+      expect(writeText).toHaveBeenCalledWith('0x0000000000000000000000000000000000000001');
+      expect(warnSpy).toHaveBeenCalledWith('Copy failed');
+      expect(successSpy).not.toHaveBeenCalled();
+      expect(subject.state.copiedAddress).toBeNull();
+    } finally {
+      if (originalClipboardDescriptor) {
+        Object.defineProperty(navigator, 'clipboard', originalClipboardDescriptor);
+      } else {
+        delete navigator.clipboard;
+      }
+    }
+  });
+
+  it('does not mark an error copied when error clipboard write rejects', async () => {
+    const subject = createSubject();
+    subject.state = {
+      ...subject.state,
+      error: 'Mint failed: denied',
+    };
+    const originalClipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+    const writeText = jest.fn().mockRejectedValue(new Error('clipboard denied'));
+    const warnSpy = jest.spyOn(notify, 'warn').mockImplementation(() => undefined);
+    const successSpy = jest.spyOn(notify, 'success').mockImplementation(() => undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+
+    try {
+      await subject.copyErrorToClipboard();
+
+      expect(writeText).toHaveBeenCalledWith('Mint failed: denied');
+      expect(warnSpy).toHaveBeenCalledWith('Copy failed');
+      expect(successSpy).not.toHaveBeenCalled();
+      expect(subject.state.copiedError).not.toBe(true);
+    } finally {
+      if (originalClipboardDescriptor) {
+        Object.defineProperty(navigator, 'clipboard', originalClipboardDescriptor);
+      } else {
+        delete navigator.clipboard;
+      }
+    }
+  });
+
+  it('restarts the minting countdown after SBT address context changes', () => {
+    jest.useFakeTimers();
+    const clearIntervalSpy = jest.spyOn(global, 'clearInterval');
+    try {
+      const subject = createSubject({
+        SBTAddress: '0x00000000000000000000000000000000000000aa',
+      });
+      subject.loadSBTInfo = jest.fn();
+      subject.checkForMintPassword = jest.fn();
+      subject.getActiveBlockTimeMs = jest.fn(() => 1000);
+      const previousIntervalId = setInterval(() => {}, 1000);
+      subject.state = {
+        ...subject.state,
+        intervalId: previousIntervalId,
+      };
+      const prevProps = subject.props;
+      subject.props = {
+        ...subject.props,
+        SBTAddress: '0x00000000000000000000000000000000000000bb',
+      };
+
+      subject.componentDidUpdate(prevProps);
+
+      expect(subject.loadSBTInfo).toHaveBeenCalledTimes(1);
+      expect(subject.checkForMintPassword).toHaveBeenCalledTimes(1);
+      expect(clearIntervalSpy).toHaveBeenCalledWith(previousIntervalId);
+      expect(subject.state.intervalId).toBeTruthy();
+      expect(subject.state.intervalId).not.toBe(previousIntervalId);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('clears stored minting countdown interval state after expiry', () => {
+    jest.useFakeTimers();
+    try {
+      const subject = createSubject();
+      subject.getActiveBlockTimeMs = jest.fn(() => 1000);
+      subject.state = {
+        ...subject.state,
+        sbtInfo: {
+          mintingEndTime: Math.floor(Date.now() / 1000) - 1,
+        },
+      };
+
+      subject.startMintingEndCountdown();
+      expect(subject.state.intervalId).toBeTruthy();
+
+      jest.advanceTimersByTime(1000);
+
+      expect(subject.state.intervalId).toBeNull();
+      expect(subject.state.mintCountdown).toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 
   it('uses sessionSlug routing only when metadata marks it explicit', () => {
     const subject = createSubject();
@@ -179,6 +295,87 @@ describe('SBTPage session routing and holder loading', () => {
     expect(burnButton).not.toBeNull();
     burnButton.props.onClick({ preventDefault: jest.fn() });
     expect(subject.handleBurn).toHaveBeenCalledTimes(1);
+  });
+
+  it('allows owner burn when burnAuth is a numeric string', async () => {
+    const account = '0x00000000000000000000000000000000000000a1';
+    const sbtAddress = '0x00000000000000000000000000000000000000b1';
+    const tokenIdSpy = jest
+      .spyOn(contractScripts, 'getSBTTokenIdByOwner')
+      .mockResolvedValue('7');
+    const burnSpy = jest
+      .spyOn(contractScripts, 'burnToken')
+      .mockResolvedValue({ transactionHash: '0xburn' });
+    const subject = createSubject({
+      account,
+      provider: 'wagmi',
+      SBTAddress: sbtAddress,
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        burnAuth: '1',
+      },
+      userHasSBT: true,
+    };
+    subject.loadSBTInfo = jest.fn(async () => undefined);
+    subject.cacheTransactionHash = jest.fn();
+    subject.applyLocalBurnSuccess = jest.fn();
+    subject.refreshSbtDataWithSlug = jest.fn();
+
+    await subject.handleBurn();
+
+    expect(tokenIdSpy).toHaveBeenCalledWith('none', sbtAddress, account, '');
+    expect(burnSpy).toHaveBeenCalledWith('wagmi', sbtAddress, '7');
+    expect(subject.applyLocalBurnSuccess).toHaveBeenCalledWith(account);
+    expect(subject.state.burningStatus).toBe('success');
+  });
+
+  it('uses neutral provider reads for mini burn while burning with the wallet provider', async () => {
+    const account = '0x00000000000000000000000000000000000000a1';
+    const sbtAddress = '0x00000000000000000000000000000000000000b2';
+    const tokenIdSpy = jest
+      .spyOn(contractScripts, 'getSBTTokenIdByOwner')
+      .mockResolvedValue('8');
+    const burnSpy = jest
+      .spyOn(contractScripts, 'burnToken')
+      .mockResolvedValue({ transactionHash: '0xminiburn' });
+    const subject = createSubject({
+      account,
+      provider: 'wagmi',
+      SBTAddress: sbtAddress,
+    });
+    subject.loadSBTInfo = jest.fn(async () => undefined);
+    subject.cacheTransactionHash = jest.fn();
+    subject.applyLocalBurnSuccess = jest.fn();
+    subject.refreshSbtDataWithSlug = jest.fn();
+
+    await subject.miniBurnHandler();
+
+    expect(tokenIdSpy).toHaveBeenCalledWith('none', sbtAddress, account, '');
+    expect(burnSpy).toHaveBeenCalledWith('wagmi', sbtAddress, '8');
+    expect(subject.applyLocalBurnSuccess).toHaveBeenCalledWith(account);
+  });
+
+  it('uses neutral provider reads for burn target searches', async () => {
+    const ownerAddress = '0x00000000000000000000000000000000000000c1';
+    const sbtAddress = '0x00000000000000000000000000000000000000b3';
+    const tokenIdSpy = jest
+      .spyOn(contractScripts, 'getSBTTokenIdByOwner')
+      .mockResolvedValue('9');
+    const ownerSpy = jest
+      .spyOn(contractScripts, 'getOwnerByTokenId')
+      .mockResolvedValue(ownerAddress);
+    const subject = createSubject({
+      provider: 'wagmi',
+      SBTAddress: sbtAddress,
+    });
+
+    await subject.performBurnSearch(ownerAddress);
+    await subject.performBurnSearch('9');
+
+    expect(tokenIdSpy).toHaveBeenCalledWith('none', sbtAddress, ownerAddress, '');
+    expect(ownerSpy).toHaveBeenCalledWith('none', sbtAddress, '9', '');
   });
 
   it('routes open mint button clicks through the parent mint handler with force refresh', () => {

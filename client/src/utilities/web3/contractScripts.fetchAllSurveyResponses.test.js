@@ -265,6 +265,51 @@ describe('contractScripts.fetchAllSurveyResponses', () => {
     ]);
   });
 
+  it('threads forced Arweave recovery into chunked question response reads', async () => {
+    const responder = '0x00000000000000000000000000000000000000aa';
+    mockFetchLogsSmartWithProvider.mockResolvedValue([
+      makeResponsesSubmittedLog(responder, 7, 0),
+    ]);
+
+    const getResponseSpy = jest.spyOn(contractScripts, 'getResponse').mockResolvedValue({
+      answer: 'recovered',
+    });
+    const onPartialData = jest.fn();
+
+    await contractScripts.getQuestionResponsesChunkedWithCallback(
+      'none',
+      1,
+      30,
+      null,
+      onPartialData,
+      GROUP_CFG,
+      { forceArweaveFetch: true }
+    );
+
+    expect(getResponseSpy).toHaveBeenCalledWith(
+      'none',
+      responder,
+      QUESTION_ID.toLowerCase(),
+      GROUP_CFG,
+      expect.objectContaining({
+        _resolvedCfg: expect.objectContaining({ slug: GROUP_CFG.slug }),
+        forceArweaveFetch: true,
+      })
+    );
+    expect(onPartialData).toHaveBeenCalledWith(
+      expect.objectContaining({
+        [QUESTION_ID.toLowerCase()]: [
+          expect.objectContaining({
+            responder,
+            response: { answer: 'recovered' },
+            blockNumber: 7,
+          }),
+        ],
+      }),
+      30
+    );
+  });
+
   it('drops terminal read failures without setting a partial-failure signal', async () => {
     const responderA = '0x00000000000000000000000000000000000000aa';
     const responderB = '0x00000000000000000000000000000000000000bb';

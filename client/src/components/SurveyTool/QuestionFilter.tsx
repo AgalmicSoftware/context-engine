@@ -31,7 +31,7 @@ import {
   faQuestionCircle,
   faPlus
 } from '@fortawesome/free-solid-svg-icons';
-import { serializeFilterState, deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
+import { serializeFilterState, deserializeFilterStateStrict } from '../../utilities/survey/filterStateUtils.js';
 import { isFreeformBlankAnswer } from '../../utilities/survey/freeformAnswerUtils.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 
@@ -174,7 +174,9 @@ type QuestionFilterSessionProps = UnknownRecord & {
     [key: string]: unknown;
   } | null;
   provider?: unknown;
+  sessionConfig?: unknown;
   sessionSlug?: unknown;
+  ensureLightSbtUniverse?: unknown;
   storageKeyPrefix?: unknown;
 };
 type QuestionFilterAiRequestOptions = {
@@ -1542,6 +1544,11 @@ class QuestionFilter extends React.Component<any, any> {
 
   syncExternalFilterState(nextFilterState: unknown): void {
     if (!nextFilterState || typeof nextFilterState !== 'object') {
+      this.invalidatePendingAiApply();
+      this.setState(this.getDefaultFilterStatePatch(), () => {
+        this.handleApplyFilters(true);
+        this.checkIfCurrentFilterIsBookmarked();
+      });
       return;
     }
     const filterState = nextFilterState as UnknownRecord;
@@ -2632,7 +2639,7 @@ class QuestionFilter extends React.Component<any, any> {
     }
 
     try {
-      const deserializedState = deserializeFilterState(filterString) as unknown as UnknownRecord;
+      const deserializedState = deserializeFilterStateStrict(filterString) as unknown as UnknownRecord;
       if (!deserializedState) {
         throw new Error("Invalid filter string.");
       }
@@ -2850,7 +2857,12 @@ class QuestionFilter extends React.Component<any, any> {
 
     const hasConnectedAccount = toStr(this.props.account).trim() !== '';
     const bothResponseChecked = this.state.filterByResponded && this.state.filterByNotResponded;
-    if (hasConnectedAccount && this.state.filterByResponded && !bothResponseChecked) {
+    const isAiOverrideModeActive = (
+      !!this.state.aiFilterApplied &&
+      toStr(this.state.aiSearchQuery).trim() !== '' &&
+      !this.state.aiCombineWithOtherFilters
+    );
+    if (hasConnectedAccount && !isAiOverrideModeActive && this.state.filterByResponded && !bothResponseChecked) {
       items.push({
         type: 'responseStatus',
         label: 'Responded',
@@ -2859,7 +2871,7 @@ class QuestionFilter extends React.Component<any, any> {
         }
       });
     }
-    if (hasConnectedAccount && this.state.filterByNotResponded && !bothResponseChecked) {
+    if (hasConnectedAccount && !isAiOverrideModeActive && this.state.filterByNotResponded && !bothResponseChecked) {
       items.push({
         type: 'responseStatus',
         label: 'Not responded',
@@ -3087,6 +3099,9 @@ class QuestionFilter extends React.Component<any, any> {
       ? 'Disabled by “Top X questions” selection.'
       : 'Disabled by AI Top-N override. Enable “Combine with other filters” to intersect.';
     const aiAccessState = this.getAiAccessState();
+    const sbtSessionContext = resolveEffectiveSessionContext(this.props);
+    const sbtFilterSessionSlug = sbtSessionContext.sessionSlug || resolveEffectiveSlug(this.props);
+    const sbtFilterSessionConfig = this.props.sessionConfig || sbtSessionContext.sessionConfig || {};
     const aiSectionDisabled = isTopQuestionsModeActive;
     const aiControlsDisabled = isTopQuestionsModeActive || !aiAccessState.enabled || aiApplying;
     const aiApplyButtonLabel = aiApplying
@@ -3143,8 +3158,10 @@ class QuestionFilter extends React.Component<any, any> {
                   min="1"
                   value={pendingTopQuestionsCount}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                    const val = e.target.value ? parseInt(e.target.value, 10) : 1;
-                    this.setState(buildQuestionFilterTopQuestionsCountPatch(val), () => {
+                    this.setState(buildQuestionFilterTopQuestionsCountPatch(
+                      e.target.value,
+                      DEFAULT_TOP_QUESTIONS_COUNT
+                    ), () => {
                       if (this.state.pendingShowTopQuestions || this.state.pendingShowTopQuestionsByResponses) { // Use this.state for check
                         this.handleApplyFilters(true);
                       }
@@ -3172,8 +3189,10 @@ class QuestionFilter extends React.Component<any, any> {
                   min="1"
                   value={pendingTopQuestionsCount}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                    const val = e.target.value ? parseInt(e.target.value, 10) : 1;
-                    this.setState(buildQuestionFilterTopQuestionsCountPatch(val), () => {
+                    this.setState(buildQuestionFilterTopQuestionsCountPatch(
+                      e.target.value,
+                      DEFAULT_TOP_QUESTIONS_COUNT
+                    ), () => {
                       if (this.state.pendingShowTopQuestions || this.state.pendingShowTopQuestionsByResponses) { // Use this.state for check
                         this.handleApplyFilters(true);
                       }
@@ -3389,6 +3408,9 @@ class QuestionFilter extends React.Component<any, any> {
                 isSurveyCacheReady={this.props.isSurveyCacheReady}
                 isSBTCacheReady={this.props.isSBTCacheReady}
                 sbtCacheRevision={this.props.sbtCacheRevision}
+                sessionSlug={sbtFilterSessionSlug}
+                sessionConfig={sbtFilterSessionConfig}
+                ensureLightSbtUniverse={this.props.ensureLightSbtUniverse}
               />
 	            ),
 	            isOtherFiltersDisabled || !this.props.isSBTCacheReady, // Pass disabled state

@@ -1,5 +1,6 @@
 import {
   deserializeFilterState,
+  deserializeFilterStateStrict,
   serializeFilterState,
   type SurveyFilterState,
 } from './filterStateUtils';
@@ -144,5 +145,25 @@ describe('filterStateUtils', () => {
     const decoded = deserializeFilterState('not-valid-base64');
     expect(decoded).toEqual(defaultState);
     spy.mockRestore();
+  });
+
+  it('strict deserialization throws on malformed input', () => {
+    expect(() => deserializeFilterStateStrict('not-valid-base64')).toThrow();
+  });
+
+  it('strict deserialization preserves valid filter state normalization', () => {
+    const encoded = serializeFilterState({
+      ...defaultState,
+      aiFilter: 'climate',
+      aiTopN: '5',
+      aiCombine: true,
+    });
+
+    expect(deserializeFilterStateStrict(encoded)).toEqual({
+      ...defaultState,
+      aiFilter: 'climate',
+      aiTopN: 5,
+      aiCombine: true,
+    });
   });
 });

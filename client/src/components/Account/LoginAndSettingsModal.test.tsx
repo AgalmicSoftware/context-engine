@@ -459,6 +459,46 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     expect(subject.state.walletBalanceWei.eq(ethers.BigNumber.from(0))).toBe(true);
   });
 
+  it('does not repeat automatic faucet sends for the same low-balance context', async () => {
+    const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps({
+      account: WAGMI_ADDRESS,
+      activeSessionSlug: 'edge',
+      loginComplete: true,
+      provider: 'wagmi',
+      wagmiBalance: { data: { value: 0n } },
+    })));
+    subject.autoSendTestFunds = jest.fn();
+    subject.loadAiSettings = jest.fn();
+    subject.loadResourceKeys = jest.fn();
+    subject.loadSponsoredAccess = jest.fn();
+    subject.syncPortoChain = jest.fn();
+
+    await subject.checkAndSendTestFundsIfNeeded();
+    await subject.checkAndSendTestFundsIfNeeded();
+
+    expect(subject.autoSendTestFunds).toHaveBeenCalledTimes(1);
+    expect(subject.state.autoSendTriggered).toBe(true);
+
+    const checkAndSendTestFundsIfNeeded = subject.checkAndSendTestFundsIfNeeded;
+    const prevProps = subject.props;
+    const prevState = { ...subject.state };
+    subject.checkAndSendTestFundsIfNeeded = jest.fn();
+    subject.props = {
+      ...subject.props,
+      activeSessionSlug: 'demo',
+    };
+
+    subject.componentDidUpdate(prevProps, prevState);
+
+    expect(subject.state.autoSendTriggered).toBe(false);
+
+    subject.checkAndSendTestFundsIfNeeded = checkAndSendTestFundsIfNeeded;
+    await subject.checkAndSendTestFundsIfNeeded();
+
+    expect(subject.autoSendTestFunds).toHaveBeenCalledTimes(2);
+    expect(subject.state.autoSendTriggered).toBe(true);
+  });
+
   it('treats equivalent wagmi BigNumber balance snapshots as unchanged', () => {
     const prevProps = buildProps({
       account: WAGMI_ADDRESS,

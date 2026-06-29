@@ -209,6 +209,43 @@ describe('OnePageSession helpers', () => {
       expect(Object.keys(map).sort()).toEqual(['qLegacyBucket', 'qLocal']);
       expect(JSON.stringify(map).toLowerCase()).not.toContain(leakedResponder);
     });
+
+    it('rejects explicitly foreign real response bindings from the demo aggregator', () => {
+      const networkObj = {
+        questions: {
+          qDemo: {
+            id: 'qDemo',
+            type: 'binary',
+            sessionSlug: 'demo',
+            sessionSlugExplicit: true,
+          },
+        },
+        questionResponses: {
+          qDemo: {
+            '0xDemo': JSON.stringify({
+              type: 'binary',
+              sessionSlug: 'demo',
+              answer: { value: 'Agree', encrypted: false },
+            }),
+            '0xLegacyDemo': JSON.stringify({
+              type: 'binary',
+              answer: { value: 'Unsure', encrypted: false },
+            }),
+            '0xForeign': JSON.stringify({
+              type: 'binary',
+              sessionSlug: 'test-2',
+              answer: { value: 'Disagree', encrypted: false },
+            }),
+          },
+        },
+      };
+
+      const { map } = buildAggregatorFromLocalCache(networkObj, { sessionSlug: 'demo' });
+
+      expect(map.qDemo.map((row) => row.responder).sort()).toEqual(['0xDemo', '0xLegacyDemo']);
+      expect(JSON.stringify(map)).not.toContain('0xForeign');
+      expect(JSON.stringify(map)).not.toContain('test-2');
+    });
   });
 
   describe('computeAggregatorSourceSnapshotSignature', () => {

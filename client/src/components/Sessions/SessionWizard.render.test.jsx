@@ -834,6 +834,43 @@ describe('SessionWizard rendered validation', () => {
     expect(await screen.findByText(REQUIRED_SESSION_SLUG_ERROR)).toBeInTheDocument();
   });
 
+  it('checks session slug collisions before publish upload or register side effects', async () => {
+    const { arweaveScripts } = require('../../utilities/arweave/arweaveScripts.js');
+    let publishClicked = false;
+    mockSessionExists.mockImplementation(async () => publishClicked);
+
+    renderLoggedInSessionWizard();
+    enableAdvancedMode();
+    const sessionNameInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    const slugInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG);
+
+    fireEvent.change(sessionNameInput, {
+      target: { value: 'Duplicate Session' },
+    });
+    fireEvent.change(slugInput, {
+      target: { value: 'duplicate-session' },
+    });
+    await createPendingFeaturedDraft();
+
+    fireEvent.click(screen.getByText('Publish').closest('button'));
+    const publishButton = await screen.findByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
+    fireEvent.click(screen.getByLabelText('Advanced publish settings'));
+    fireEvent.change(screen.getByPlaceholderText(/ar:\/\/<txId>/i), {
+      target: { value: `ar://${'a'.repeat(43)}` },
+    });
+    await waitFor(() => {
+      expect(publishButton).not.toBeDisabled();
+    });
+    publishClicked = true;
+    fireEvent.click(publishButton);
+
+    expect(await screen.findByText('Session slug already exists on-chain: duplicate-session')).toBeInTheDocument();
+    expect(mockSessionExists).toHaveBeenCalledWith('duplicate-session');
+    expect(mockCreateSBT).not.toHaveBeenCalled();
+    expect(arweaveScripts.uploadDataToArweave).not.toHaveBeenCalled();
+    expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
+  });
+
   it('shows and clears the reserved slug error in the rendered form', async () => {
     renderSessionWizard();
     enableAdvancedMode();

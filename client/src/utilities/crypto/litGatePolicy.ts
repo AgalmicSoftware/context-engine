@@ -177,22 +177,19 @@ const appendGateRecipient = ({
   fallbackChainId,
   resourceKey,
 }: AppendGateRecipientArgs): void => {
-  const payloads = [{
+  const payload = createLitRecipientFromGate({
     gate,
     fallbackChainId,
     resourceKey,
-  }]
-    .map((params) => createLitRecipientFromGate(params))
-    .filter((payload) => payload != null);
-  payloads.forEach((payload) => {
-    const gateKey = buildGateDedupeKey(payload.gate);
-    const recipientKey = buildRecipientDedupeKey(payload.recipient);
-    if (gateDedupe.has(gateKey) || dedupe.has(recipientKey)) return;
-    gateDedupe.add(gateKey);
-    dedupe.add(recipientKey);
-    out.gates.push(payload.gate);
-    out.recipients.push(payload.recipient);
   });
+  if (!payload) return;
+  const gateKey = buildGateDedupeKey(payload.gate);
+  const recipientKey = buildRecipientDedupeKey(payload.recipient);
+  if (gateDedupe.has(gateKey) || dedupe.has(recipientKey)) return;
+  gateDedupe.add(gateKey);
+  dedupe.add(recipientKey);
+  out.gates.push(payload.gate);
+  out.recipients.push(payload.recipient);
 };
 
 export const buildResponseGatePolicy = ({

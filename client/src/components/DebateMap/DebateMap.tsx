@@ -37,6 +37,7 @@ type AtlasLayoutMode = 'orbital' | 'packed';
 type DebateVisualMode = 'circles' | 'atlas' | 'tree' | 'list';
 type VoteDirection = 'up' | 'down';
 type DemoModeProp = boolean | { tools?: unknown; [key: string]: unknown };
+type LocalVoteDeltas = Record<string, Record<VoteDirection, number>>;
 
 interface DebateVoteTotals {
   up?: number | string;
@@ -165,6 +166,11 @@ interface HistoricalCaseBrief {
   precedentPressure: HistoricalFieldRow[];
 }
 
+type HistoricalCaseBriefBuilder = (
+  historicalCase: HistoricalCase,
+  content?: DebateNode,
+) => HistoricalCaseBrief;
+
 interface HistoricalCase {
   id?: string;
   title?: string;
@@ -192,6 +198,8 @@ interface HistoricalCase {
   precedent_pressure?: Record<string, unknown>;
   [key: string]: any;
 }
+
+const EMPTY_HISTORICAL_CASES: HistoricalCase[] = [];
 
 interface DebateNode {
   id?: string;
@@ -231,6 +239,21 @@ interface AtlasDimensions {
   h: number;
 }
 
+const parseBookmarkedNodeStorage = (saved: string | null): string[] => {
+  if (!saved) return [];
+  try {
+    const parsed = JSON.parse(saved);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((value): value is string => typeof value === 'string')
+      .map((value) => value.trim())
+      .filter(Boolean);
+  } catch (e) {
+    uiLog.warn('DebateMap: ignoring invalid bookmarkedNodes storage', e);
+    return [];
+  }
+};
+
 interface DisagreementRange {
   min: number;
   max: number;
@@ -239,7 +262,39 @@ interface DisagreementRange {
 interface AtlasLink {
   source: { x: number; y: number };
   target: { x: number; y: number };
+  sourceId?: string;
+  targetId?: string;
 }
+
+export const getDebateNodeStableKey = (
+  node: Pick<DebateNode, 'id' | 'name'> | null | undefined,
+  fallback: string
+): string => {
+  const nodeId = String(node?.id || '').trim();
+  if (nodeId) return nodeId;
+  const nodeName = String(node?.name || '').trim();
+  if (nodeName) return nodeName;
+  return fallback;
+};
+
+const formatAtlasLinkCoordinate = (value: unknown): string => {
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? numericValue.toFixed(3) : '0.000';
+};
+
+export const getAtlasLinkStableKey = (link: AtlasLink, fallbackIndex: number): string => {
+  const sourceId = String(link?.sourceId || '').trim();
+  const targetId = String(link?.targetId || '').trim();
+  if (sourceId || targetId) return `${sourceId || 'source'}->${targetId || 'target'}`;
+  return [
+    'coords',
+    formatAtlasLinkCoordinate(link?.source?.x),
+    formatAtlasLinkCoordinate(link?.source?.y),
+    formatAtlasLinkCoordinate(link?.target?.x),
+    formatAtlasLinkCoordinate(link?.target?.y),
+    fallbackIndex,
+  ].join(':');
+};
 
 interface AtlasRenderNode extends DebateNode {
   x: number;
@@ -260,6 +315,12 @@ interface PackedAtlasLayoutNode {
 
 interface FlattenedDebateNode extends DebateNode {
   parentPath: DebateNode[];
+}
+
+interface AtlasTopNodeCandidate {
+  node: DebateNode;
+  heat: number;
+  order: number;
 }
 
 interface AtlasViewProps {
@@ -709,6 +770,36 @@ export const buildHistoricalCaseBrief = (
   };
 };
 
+const getHistoricalCaseCardKey = (historicalCase: HistoricalCase, caseIndex: number): string => {
+  const title = String(historicalCase?.title || historicalCase?.id || '').trim();
+  return String(historicalCase?.id || `${title}-${caseIndex}`);
+};
+
+export const buildExpandedHistoricalCaseBriefMap = (
+  historicalCases: HistoricalCase[] = EMPTY_HISTORICAL_CASES,
+  content: DebateNode = {},
+  expandedCaseKey = '',
+  buildBrief: HistoricalCaseBriefBuilder = buildHistoricalCaseBrief,
+): Map<string, HistoricalCaseBrief> => {
+  const normalizedExpandedKey = String(expandedCaseKey || '').trim();
+  const briefMap = new Map<string, HistoricalCaseBrief>();
+  if (!normalizedExpandedKey) return briefMap;
+
+  historicalCases.forEach((historicalCase, caseIndex) => {
+    if (!historicalCase || typeof historicalCase !== 'object') return;
+
+    const title = String(historicalCase.title || historicalCase.id || '').trim();
+    if (!title) return;
+
+    const caseKey = getHistoricalCaseCardKey(historicalCase, caseIndex);
+    if (caseKey !== normalizedExpandedKey) return;
+
+    briefMap.set(caseKey, buildBrief(historicalCase, content));
+  });
+
+  return briefMap;
+};
+
 const getHistoricalCompassSpreadY = (name: string): number => (
   ((getNameHash(name) * 37) % 1000) / 999
 );
@@ -941,6 +1032,39 @@ const calculateNetUpvotes = (votes?: DebateVoteTotals | null): number => {
   return up - down;
 };
 
+const applyLocalVoteDeltasToTree = (
+  nodes: DebateNode[],
+  deltas: LocalVoteDeltas,
+): DebateNode[] => {
+  if (!deltas || Object.keys(deltas).length === 0) return nodes;
+
+  return nodes.map((node) => {
+    const nodeId = String(node?.id || '').trim();
+    const delta = nodeId ? deltas[nodeId] : undefined;
+    const nextChildren = Array.isArray(node.children)
+      ? applyLocalVoteDeltasToTree(node.children, deltas)
+      : node.children;
+
+    if (!delta) {
+      return nextChildren === node.children ? node : { ...node, children: nextChildren };
+    }
+
+    const current = node.votes || {};
+    const currentUp = parseInt(String(current.up || 0), 10) || 0;
+    const currentDown = parseInt(String(current.down || 0), 10) || 0;
+
+    return {
+      ...node,
+      children: nextChildren,
+      votes: {
+        ...current,
+        up: currentUp + (delta.up || 0),
+        down: currentDown + (delta.down || 0),
+      },
+    };
+  });
+};
+
 const TREE_LABEL_REPLACEMENTS: Array<[RegExp, string]> = [
   [/\bPre-deployment\b/gi, 'Pre-deploy.'],
   [/\bEvaluations\b/gi, 'Evals'],
@@ -1087,15 +1211,39 @@ const getAtlasCommentCount = (node: DebateNode): number => (
   (node.questions ? node.questions.length : 0) + (node.comments ? node.comments.length : 0)
 );
 
-const flattenAtlasNodes = (nodes: DebateNode[] = []): DebateNode[] => {
-  let res: DebateNode[] = [];
-  nodes.forEach((node) => {
-    res.push(node);
-    if (Array.isArray(node?.children) && node.children.length > 0) {
-      res = res.concat(flattenAtlasNodes(node.children));
+export const getTopAtlasNodesByHeat = (nodes: DebateNode[] = [], limit = 3): DebateNode[] => {
+  const maxNodes = Math.max(0, Math.floor(Number(limit) || 0));
+  if (maxNodes === 0) return [];
+
+  const topCandidates: AtlasTopNodeCandidate[] = [];
+  let visitOrder = 0;
+
+  const remember = (node: DebateNode) => {
+    topCandidates.push({
+      node,
+      heat: calculateHeat(node),
+      order: visitOrder,
+    });
+    topCandidates.sort((a, b) => (b.heat - a.heat) || (a.order - b.order));
+    if (topCandidates.length > maxNodes) {
+      topCandidates.length = maxNodes;
     }
-  });
-  return res;
+  };
+
+  const visit = (items: DebateNode[] = []) => {
+    items.forEach((node) => {
+      remember(node);
+      visitOrder += 1;
+
+      if (Array.isArray(node?.children) && node.children.length > 0) {
+        visit(node.children);
+      }
+    });
+  };
+
+  visit(nodes);
+
+  return topCandidates.map((candidate) => candidate.node);
 };
 
 const getAtlasCenterNode = (atlasRoot: DebateNode | null, data: DebateNode[]): DebateNode => (
@@ -1260,11 +1408,7 @@ const useAtlasNavigationState = (data: DebateNode[], onNodeClick: (node: DebateN
     atlasRootId ? findAtlasNodeById(data, atlasRootId) : null
   ), [atlasRootId, data]);
 
-  const topNodes = useMemo(() => (
-    flattenAtlasNodes(data)
-      .sort((a, b) => calculateHeat(b) - calculateHeat(a))
-      .slice(0, 3)
-  ), [data]);
+  const topNodes = useMemo(() => getTopAtlasNodesByHeat(data, 3), [data]);
 
   const handleAtlasNodeClick = useCallback((node: AtlasRenderNode | DebateNode) => {
     if (!node || node.id === 'virtual-root') return;
@@ -1460,7 +1604,9 @@ const OrbitalAtlasView = ({
           if (parent.id !== 'virtual-root') {
               links.push({
                   source: { x: parentX, y: parentY },
-                  target: { x: nodeX, y: nodeY }
+                  target: { x: nodeX, y: nodeY },
+                  sourceId: String(parent.id || '').trim(),
+                  targetId: String(child.id || '').trim(),
               });
           }
 
@@ -1532,7 +1678,7 @@ const OrbitalAtlasView = ({
 
       <svg className={styles.atlasSvgLayer}>
         {layout.links.map((link, i) => (
-          <line key={i} x1={cx + link.source.x} y1={cy + link.source.y} x2={cx + link.target.x} y2={cy + link.target.y} />
+          <line key={getAtlasLinkStableKey(link, i)} x1={cx + link.source.x} y1={cy + link.source.y} x2={cx + link.target.x} y2={cy + link.target.y} />
         ))}
       </svg>
 
@@ -1545,7 +1691,7 @@ const OrbitalAtlasView = ({
 
         return (
           <div
-            key={i}
+            key={getDebateNodeStableKey(node, `atlas-node-${i}`)}
             className={`${styles.atlasNode} ${styles[node.depthClass]} ${isHovered ? styles.hovered : ''}`}
             style={{
                 left: cx + node.x,
@@ -2037,6 +2183,20 @@ const Modal = ({
     };
   }, [content]);
 
+  const historicalCases = Array.isArray(content?.historicalCases)
+    ? content.historicalCases
+    : EMPTY_HISTORICAL_CASES;
+  const historicalCaseBriefContent = useMemo<DebateNode>(() => ({
+    id: content?.id,
+    name: content?.name,
+    compass: content?.compass,
+  }), [content?.id, content?.name, content?.compass]);
+  const expandedHistoricalCaseBriefs = useMemo(() => buildExpandedHistoricalCaseBriefMap(
+    historicalCases,
+    historicalCaseBriefContent,
+    expandedHistoricalCaseId,
+  ), [expandedHistoricalCaseId, historicalCaseBriefContent, historicalCases]);
+
   if (!isOpen || !content) return null;
 
   const questions = Array.isArray(content.questions) ? content.questions : [];
@@ -2051,7 +2211,6 @@ const Modal = ({
   const hasArguments = Boolean(argumentData);
   const totalArgumentCount = proArguments.length + conArguments.length;
   const questionCount = questions.length;
-  const historicalCases = Array.isArray(content.historicalCases) ? content.historicalCases : [];
   const historicalCaseCount = historicalCases.length;
   const compassTitle = content?.compass?.xAxis?.label || content?.name || 'Compass';
 
@@ -2177,19 +2336,19 @@ const Modal = ({
     const tagsList = Array.isArray(historicalCase.tags)
       ? historicalCase.tags.filter(Boolean)
       : [];
-    const caseKey = historicalCase.id || `${title}-${caseIndex}`;
+    const caseKey = getHistoricalCaseCardKey(historicalCase, caseIndex);
     const isExpanded = expandedHistoricalCaseId === caseKey;
     const detailPanelId = `historical-case-${caseKey}`;
-    const brief = buildHistoricalCaseBrief(historicalCase, content);
+    const brief = isExpanded ? expandedHistoricalCaseBriefs.get(caseKey) : null;
     const metaBits = [
       historicalCase.category,
       authors.length > 0 ? authors.join(', ') : '',
       historicalCase.venue,
       historicalCase.year,
     ].filter(Boolean);
-    const normalizedBestPatch = String(brief.bestPatch || '').trim().toLowerCase();
+    const normalizedBestPatch = brief ? String(brief.bestPatch || '').trim().toLowerCase() : '';
     const hasBestPatchCard = Boolean(normalizedBestPatch)
-      && brief.patchOptions.some((patch) => String(patch?.name || '').trim().toLowerCase() === normalizedBestPatch);
+      && Boolean(brief?.patchOptions.some((patch) => String(patch?.name || '').trim().toLowerCase() === normalizedBestPatch));
 
     return (
       <div
@@ -2238,7 +2397,7 @@ const Modal = ({
             {historicalCase.summary}
           </div>
         ) : null}
-        {isExpanded && (
+        {isExpanded && brief && (
           <div
             id={detailPanelId}
             className={styles.historicalCaseDetail}
@@ -2815,7 +2974,7 @@ const TreeNode = ({
            >
               {sortedChildren.map((child: DebateNode, i: number) => (
                 <TreeNode
-                  key={i}
+                  key={getDebateNodeStableKey(child, `tree-child-${i}`)}
                   node={child}
                   depth={depth + 1}
                   parentPath={[...parentPath, node]}
@@ -2869,6 +3028,7 @@ const DebateMap = ({
   const [bookmarkedNodes, setBookmarkedNodes] = useState<string[]>([]);
   const [demoMode, setDemoMode] = useState(() => initialDemoEnabled);
   const [treeDataState, setTreeDataState] = useState<DebateNode[]>(() => buildAtlasTreeData(initialDemoEnabled));
+  const [localVoteDeltas, setLocalVoteDeltas] = useState<LocalVoteDeltas>({});
   const [nodeTypeFilter, setNodeTypeFilter] = useState('all');
   const [copied, setCopied] = useState(false);
 
@@ -2885,6 +3045,11 @@ const DebateMap = ({
 
   // Ref to track if we've already handled the deep link for the current ID
   const hasHandledDeepLink = useRef(false);
+  const localVoteDeltasRef = useRef<LocalVoteDeltas>({});
+
+  useEffect(() => {
+    localVoteDeltasRef.current = localVoteDeltas;
+  }, [localVoteDeltas]);
 
   // --- NODE ID PARSING (Fallback to manual URL check for wildcard routes) ---
   const effectiveNodeId = useMemo(() => {
@@ -2901,11 +3066,14 @@ const DebateMap = ({
 
   useEffect(() => {
     const saved = localStorage.getItem('bookmarkedNodes');
-    if (saved) setBookmarkedNodes(JSON.parse(saved));
+    setBookmarkedNodes(parseBookmarkedNodeStorage(saved));
   }, []);
 
   useEffect(() => {
-    setTreeDataState(buildAtlasTreeData(demoMode));
+    setTreeDataState(applyLocalVoteDeltasToTree(
+      buildAtlasTreeData(demoMode),
+      localVoteDeltasRef.current,
+    ));
   }, [demoMode]);
 
   useEffect(() => {
@@ -2999,9 +3167,25 @@ const DebateMap = ({
   }, [activeSessionSlug, navigate]);
 
   const handleVote = useCallback((nodeId: string, voteType: VoteDirection, count = 1) => {
+    const normalizedNodeId = String(nodeId || '').trim();
+    if (!normalizedNodeId) return;
+
+    setLocalVoteDeltas(prev => {
+      const existing = prev[normalizedNodeId] || { up: 0, down: 0 };
+      const next = {
+        ...prev,
+        [normalizedNodeId]: {
+          ...existing,
+          [voteType]: (existing[voteType] || 0) + count,
+        },
+      };
+      localVoteDeltasRef.current = next;
+      return next;
+    });
+
     setTreeDataState(prev => {
       const update = (nodes: DebateNode[]): DebateNode[] => nodes.map((node) => {
-         if (node.id === nodeId) {
+         if (String(node.id || '').trim() === normalizedNodeId) {
            const current = node.votes || {};
            const val = parseInt(String(current[voteType] || 0), 10);
            return { ...node, votes: { ...current, [voteType]: val + count }};
@@ -3214,7 +3398,7 @@ const DebateMap = ({
         {visualMode === DEBATE_VISUAL_MODES.TREE && (
           <div className={styles.categorySelector}>
              {treeDataState.map((cat, i) => (
-               <button key={i} className={`${styles.categoryButton} ${selectedCategory?.id === cat.id ? styles.active : ''}`} onClick={() => handleCategoryClick(cat)}>{cat.name}</button>
+               <button key={getDebateNodeStableKey(cat, `category-${i}`)} className={`${styles.categoryButton} ${selectedCategory?.id === cat.id ? styles.active : ''}`} onClick={() => handleCategoryClick(cat)}>{cat.name}</button>
              ))}
           </div>
         )}
@@ -3223,7 +3407,7 @@ const DebateMap = ({
            {visualMode === DEBATE_VISUAL_MODES.LIST ? (
              <div className={styles.flatListContainer}>
                 {sortedNodes.map((node, i) => (
-                  <FlatNode key={i} node={node} parentPath={node.parentPath} onNodeClick={handleNodeClick} onBookmark={handleBookmark} bookmarkedNodes={bookmarkedNodes} />
+                  <FlatNode key={getDebateNodeStableKey(node, `list-node-${i}`)} node={node} parentPath={node.parentPath} onNodeClick={handleNodeClick} onBookmark={handleBookmark} bookmarkedNodes={bookmarkedNodes} />
                 ))}
              </div>
            ) : isAtlasVisualMode ? (

@@ -1,7 +1,10 @@
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import { ContractPage } from './ContractPage';
-import { getContractViewerSourceTestId } from './contractMetadata.js';
+import {
+  buildContractsPageHref,
+  getContractViewerSourceTestId,
+} from './contractMetadata.js';
 import { buildContractViewerContracts } from './contractViewerUtils.js';
 
 const mockGetSessionConfigBySlug = jest.fn();
@@ -27,6 +30,7 @@ jest.mock('./contractViewerUtils.js', () => ({
 const mockBuildContractViewerContracts = buildContractViewerContracts as jest.Mock;
 
 describe('ContractPage contract deep links', () => {
+  const originalPublicUrl = process.env.PUBLIC_URL;
   const sessionConfig = {
     slug: 'session-alpha',
     sessionName: 'Session Alpha',
@@ -56,6 +60,11 @@ describe('ContractPage contract deep links', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    if (typeof originalPublicUrl === 'undefined') {
+      delete process.env.PUBLIC_URL;
+    } else {
+      process.env.PUBLIC_URL = originalPublicUrl;
+    }
     window.history.pushState({}, '', '/contracts?contract=sessionRegistry');
     mockGetSessionConfigBySlug.mockImplementation((slug = '') => (
       slug === 'session-alpha' ? sessionConfig : null
@@ -150,5 +159,32 @@ describe('ContractPage contract deep links', () => {
     } finally {
       window.HTMLElement.prototype.scrollIntoView = originalScrollIntoView;
     }
+  });
+
+  it('keeps contract links and canonical URLs under PUBLIC_URL subpaths', async () => {
+    process.env.PUBLIC_URL = '/ce/';
+    window.history.pushState(
+      {},
+      '',
+      '/ce/contracts?contract=surveys&sessionSlug=session-alpha#source'
+    );
+
+    expect(buildContractsPageHref({
+      contractKey: 'surveys',
+      sessionSlug: 'session-alpha',
+    })).toBe('/ce/contracts?contract=surveys&session=session-alpha');
+
+    render(
+      <ContractPage
+        activeSessionSlug="session-alpha"
+        reduxActiveSessionSlug=""
+      />
+    );
+
+    await waitFor(() => {
+      expect(window.location.pathname).toBe('/ce/contracts');
+      expect(window.location.search).toBe('?contract=surveys&session=session-alpha');
+      expect(window.location.hash).toBe('#source');
+    });
   });
 });

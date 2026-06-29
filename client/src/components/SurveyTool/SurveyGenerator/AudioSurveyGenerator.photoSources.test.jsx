@@ -218,7 +218,7 @@ describe('AudioSurveyGenerator photo and extra source handling', () => {
     expect(container.textContent).toContain('remote_image.png');
   });
 
-  it('treats extensionless image URLs as photos when the fetched content is an image', async () => {
+  it('keeps unsupported fetched image subtypes as URL sources', async () => {
     await renderSubject(
       <AudioSurveyGenerator
         provider={{}}
@@ -230,8 +230,35 @@ describe('AudioSurveyGenerator photo and extra source handling', () => {
     );
 
     mockFetchImageFromURL.mockResolvedValueOnce(
-      new File(['remote-image'], 'remote_asset.webp', { type: 'image/webp' })
+      new File(['remote-svg'], 'remote_image.svg', { type: 'image/svg+xml' })
     );
+    setInputValue('input[placeholder="Add URL"]', 'https://example.com/context.png');
+
+    await act(async () => {
+      container
+        .querySelector('button[title="Add URL"]')
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(mockFetchImageFromURL).toHaveBeenCalledWith('https://example.com/context.png');
+    expect(getPhotoCards()).toHaveLength(0);
+    expect(container.textContent).toContain('[url]');
+    expect(container.textContent).toContain('https://example.com/context.png');
+    expect(container.textContent).not.toContain('unsupported photo');
+    expect(container.querySelector('input[placeholder="Add URL"]').value).toBe('');
+  });
+
+  it('adds extensionless URLs directly without speculative image fetches', async () => {
+    await renderSubject(
+      <AudioSurveyGenerator
+        provider={{}}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+      />
+    );
+
     setInputValue('input[placeholder="Add URL"]', 'https://example.com/assets/render?id=123');
 
     await act(async () => {
@@ -240,9 +267,35 @@ describe('AudioSurveyGenerator photo and extra source handling', () => {
         .dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
-    expect(mockFetchImageFromURL).toHaveBeenCalledWith('https://example.com/assets/render?id=123');
-    expect(getPhotoCards()).toHaveLength(1);
-    expect(container.textContent).toContain('remote_asset.webp');
+    expect(mockFetchImageFromURL).not.toHaveBeenCalled();
+    expect(getPhotoCards()).toHaveLength(0);
+    expect(container.textContent).toContain('[url]');
+    expect(container.textContent).toContain('https://example.com/assets/render?id=123');
+  });
+
+  it('does not download ordinary article URLs through the image worker', async () => {
+    await renderSubject(
+      <AudioSurveyGenerator
+        provider={{}}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+      />
+    );
+
+    setInputValue('input[placeholder="Add URL"]', 'https://example.com/articles/policy-context');
+
+    await act(async () => {
+      container
+        .querySelector('button[title="Add URL"]')
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(mockFetchImageFromURL).not.toHaveBeenCalled();
+    expect(getPhotoCards()).toHaveLength(0);
+    expect(container.textContent).toContain('[url]');
+    expect(container.textContent).toContain('https://example.com/articles/policy-context');
   });
 
   it('keeps Add mode on a single URL entry path', async () => {

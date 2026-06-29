@@ -177,12 +177,6 @@ type BuildCreateSurveyGateObjectsAndRecipientsArgs = {
   resolveLitChain?: (args: { chainId: number | null; litChain?: unknown }) => unknown;
 };
 
-type CreateSurveyEncryptionGateSbt = {
-  address?: string;
-  name?: string;
-  [key: string]: unknown;
-};
-
 export {
   buildCreateSurveyDocUrlClearPatch,
   buildCreateSurveyDocUrlErrorPatch,
@@ -573,52 +567,6 @@ export const buildCreateSurveyQuestionListPatch = (questions: unknown) => ({
 export const buildCreateSurveyQuestionListValidationPatch = (questions: unknown) => ({
   questions: Array.isArray(questions) ? questions : [],
   formValidationError: '',
-});
-
-export const buildCreateSurveyEncryptionGateSeedPatch = ({
-  addresses = [],
-  encryptionGateMode = 'any',
-}: {
-  addresses?: unknown;
-  encryptionGateMode?: unknown;
-} = {}) => ({
-  encryptionGateSBTs: (Array.isArray(addresses) ? addresses : []).map((addr) => ({
-    address: addr,
-    name: addr,
-  })),
-  encryptionGateMode: String(encryptionGateMode || 'any'),
-});
-
-export const addCreateSurveyEncryptionGateSbt = (
-  encryptionGateSBTs: Iterable<CreateSurveyEncryptionGateSbt> | null | undefined,
-  sbt: CreateSurveyEncryptionGateSbt
-) => [
-  ...((encryptionGateSBTs || []) as Iterable<CreateSurveyEncryptionGateSbt>),
-  sbt,
-];
-
-export const removeCreateSurveyEncryptionGateSbt = (
-  encryptionGateSBTs: CreateSurveyEncryptionGateSbt[] | null | undefined,
-  address: unknown
-) => {
-  const addrLower = String(address).toLowerCase();
-  return ((encryptionGateSBTs || []) as CreateSurveyEncryptionGateSbt[]).filter(
-    (sbt) => String(sbt.address || '').toLowerCase() !== addrLower
-  );
-};
-
-export const buildCreateSurveyEncryptionTogglePatch = ({
-  checked = false,
-  name = '',
-}: {
-  checked?: unknown;
-  name?: unknown;
-} = {}) => ({
-  [String(name || '')]: checked === true,
-});
-
-export const buildCreateSurveyEncryptionGateModePatch = (encryptionGateMode: unknown) => ({
-  encryptionGateMode: String(encryptionGateMode ?? ''),
 });
 
 export const buildCreateSurveyNetworkSwitchPatch = (needsNetworkSwitch: unknown) => ({
@@ -1160,6 +1108,43 @@ export const normalizeAddressList = (values: unknown[] = []) => {
     out.push(address);
   });
   return out;
+};
+
+const getCreateSurveySbtAddressKey = (value: unknown): string => {
+  if (!value || typeof value !== 'object') return '';
+  const record = value as UnknownRecord;
+  return String(record.address || record.sbtAddress || '').trim().toLowerCase();
+};
+
+export const addCreateSurveyEncryptionGateSbt = <
+  TSbt extends UnknownRecord = UnknownRecord
+>(
+  selectedSbts: unknown = [],
+  sbt: unknown = null
+): TSbt[] => {
+  const current = Array.isArray(selectedSbts) ? selectedSbts as TSbt[] : [];
+  if (!sbt || typeof sbt !== 'object' || Array.isArray(sbt)) return [...current];
+  const nextSbt = sbt as TSbt;
+  const nextAddress = getCreateSurveySbtAddressKey(nextSbt);
+  if (
+    nextAddress &&
+    current.some((entry) => getCreateSurveySbtAddressKey(entry) === nextAddress)
+  ) {
+    return [...current];
+  }
+  return [...current, nextSbt];
+};
+
+export const removeCreateSurveyEncryptionGateSbt = <
+  TSbt extends UnknownRecord = UnknownRecord
+>(
+  selectedSbts: unknown = [],
+  address: unknown = ''
+): TSbt[] => {
+  const current = Array.isArray(selectedSbts) ? selectedSbts as TSbt[] : [];
+  const addressKey = String(address || '').trim().toLowerCase();
+  if (!addressKey) return [...current];
+  return current.filter((entry) => getCreateSurveySbtAddressKey(entry) !== addressKey);
 };
 
 export const normalizeTagList = (values: unknown = []) => (

@@ -427,6 +427,89 @@ describe('QuestionFilter cache helpers', () => {
     expect(instance.handleApplyFilters).not.toHaveBeenCalled();
   });
 
+  it('resets stale filters when external filter state is cleared to null', () => {
+    const instance = new QuestionFilter({
+      questions: [{ id: 'q1', prompt: 'Q1' }],
+      questionResponses: {},
+      filterState: {
+        questionTypes: ['binary'],
+        selectedTags: ['alpha'],
+      },
+      isQuestionCacheReady: true,
+    });
+
+    instance.handleApplyFilters = jest.fn();
+    instance.checkIfCurrentFilterIsBookmarked = jest.fn();
+    instance.setState = jest.fn((next, cb) => {
+      const patch = typeof next === 'function' ? next(instance.state, instance.props) : next;
+      instance.state = { ...instance.state, ...(patch || {}) };
+      if (typeof cb === 'function') cb();
+      return patch;
+    });
+    instance.state = {
+      ...instance.state,
+      selectedTypes: ['binary'],
+      pendingSelectedTypes: ['binary'],
+      selectedTags: ['alpha'],
+      aiSearchQuery: 'stale query',
+      aiDraftQuery: 'stale query',
+      aiAppliedTopN: 3,
+      aiFilterApplied: true,
+      aiRankedQuestionIds: ['q1'],
+      aiCombineWithOtherFilters: true,
+    };
+
+    instance.syncExternalFilterState(null);
+
+    expect(instance.state.selectedTypes).toEqual([]);
+    expect(instance.state.pendingSelectedTypes).toEqual([]);
+    expect(instance.state.selectedTags).toEqual([]);
+    expect(instance.state.aiSearchQuery).toBe('');
+    expect(instance.state.aiFilterApplied).toBe(false);
+    expect(instance.state.aiRankedQuestionIds).toEqual([]);
+    expect(instance.handleApplyFilters).toHaveBeenCalledWith(true);
+    expect(instance.checkIfCurrentFilterIsBookmarked).toHaveBeenCalled();
+  });
+
+  it('rejects malformed pasted filter strings without resetting current filters', () => {
+    const alertSpy = jest.spyOn(window, 'alert').mockImplementation(() => {});
+    const instance = new QuestionFilter({
+      questions: [{ id: 'q1', prompt: 'Q1' }],
+      questionResponses: {},
+      filterState: {},
+      isQuestionCacheReady: true,
+    });
+
+    instance.handleApplyFilters = jest.fn();
+    instance.queueAutoApplyAiFilter = jest.fn();
+    instance.setState = jest.fn((next, cb) => {
+      const patch = typeof next === 'function' ? next(instance.state, instance.props) : next;
+      instance.state = { ...instance.state, ...(patch || {}) };
+      if (typeof cb === 'function') cb();
+      return patch;
+    });
+    instance.state = {
+      ...instance.state,
+      filterUrlInput: 'not-valid-base64',
+      selectedTypes: ['binary'],
+      pendingSelectedTypes: ['binary'],
+      selectedTags: ['alpha'],
+    };
+
+    try {
+      instance.handleLoadFilter();
+
+      expect(alertSpy).toHaveBeenCalledWith('Could not load filter from the provided string. Please check the format.');
+      expect(instance.state.selectedTypes).toEqual(['binary']);
+      expect(instance.state.pendingSelectedTypes).toEqual(['binary']);
+      expect(instance.state.selectedTags).toEqual(['alpha']);
+      expect(instance.handleApplyFilters).not.toHaveBeenCalled();
+      expect(instance.queueAutoApplyAiFilter).not.toHaveBeenCalled();
+    } finally {
+      alertSpy.mockRestore();
+    }
+  });
+
   it('skips response sync when response ref changes but payload is unchanged', () => {
     const sharedQuestions = [{ id: 'q1', prompt: 'Q1' }];
     const currentResponses = { q1: { '0x1': '{"type":"binary","answer":{"value":"yes"}}' } };

@@ -865,16 +865,38 @@ export async function sendPortoTransaction(txRequest: AnyObj): Promise<any> {
     });
     return out;
   };
-  const isReplacementUnderpricedError = (error: any): boolean => {
+  const classifyRecoverableSendError = (error: unknown): {
+    replacementUnderpriced: boolean;
+    nonceTooLow: boolean;
+    alreadyKnown: boolean;
+    recoverable: boolean;
+  } => {
     const blob = collectErrorFragments(error)
       .join(' ')
       .toLowerCase();
-    return (
+    const replacementUnderpriced = (
       blob.includes('replacement transaction underpriced')
       || blob.includes('replacement fee too low')
       || blob.includes('replacement_underpriced')
       || (blob.includes('replacement') && (blob.includes('underpriced') || blob.includes('fee too low')))
     );
+    const nonceTooLow = (
+      blob.includes('nonce too low')
+      || blob.includes('nonce_too_low')
+      || (blob.includes('nonce') && blob.includes('too low'))
+    );
+    const alreadyKnown = (
+      blob.includes('already known')
+      || blob.includes('already_known')
+      || blob.includes('known transaction')
+      || blob.includes('transaction already imported')
+    );
+    return {
+      replacementUnderpriced,
+      nonceTooLow,
+      alreadyKnown,
+      recoverable: replacementUnderpriced || nonceTooLow,
+    };
   };
   const parseHexToBigInt = (value: any): bigint | null => {
     const raw = String(value || '').trim();
@@ -902,6 +924,49 @@ export async function sendPortoTransaction(txRequest: AnyObj): Promise<any> {
       } catch (_) {
         return null;
       }
+    }
+    if (/^\d+$/.test(raw)) {
+      try {
+        return BigInt(raw);
+      } catch (_) {
+        return null;
+      }
+    }
+    return null;
+  };
+  const parseFeeToBigInt = (value: any): bigint | null => {
+    if (value == null || value === '') return null;
+    if (typeof value === 'bigint') return value >= 0n ? value : null;
+    if (typeof value === 'number') {
+      if (!Number.isFinite(value) || value < 0) return null;
+      return BigInt(Math.trunc(value));
+    }
+    if (typeof value === 'object') {
+      if (typeof value.toBigInt === 'function') {
+        try {
+          const parsed = value.toBigInt();
+          return typeof parsed === 'bigint' && parsed >= 0n ? parsed : null;
+        } catch (_) {}
+      }
+      const hexLike = value._hex || value.hex;
+      if (typeof hexLike === 'string') {
+        const parsedHex = parseHexToBigInt(hexLike);
+        if (parsedHex != null && parsedHex >= 0n) return parsedHex;
+      }
+      if (typeof value.toString === 'function' && value.toString !== Object.prototype.toString) {
+        try {
+          return parseFeeToBigInt(value.toString());
+        } catch (_) {
+          return null;
+        }
+      }
+      return null;
+    }
+    const raw = String(value || '').trim();
+    if (!raw) return null;
+    if (/^0x[0-9a-f]+$/i.test(raw)) {
+      const parsedHex = parseHexToBigInt(raw);
+      return parsedHex != null && parsedHex >= 0n ? parsedHex : null;
     }
     if (/^\d+$/.test(raw)) {
       try {
@@ -983,7 +1048,14 @@ export async function sendPortoTransaction(txRequest: AnyObj): Promise<any> {
         if (!gas || shouldReestimate) gas = fallback;
       }
     }
-    let baselineGasPrice = await readGasPrice();
+    const callerGasPrice = parseFeeToBigInt(txRequest?.gasPrice);
+    const callerMaxFeePerGas = parseFeeToBigInt(txRequest?.maxFeePerGas);
+    const callerMaxPriorityFeePerGas = parseFeeToBigInt(txRequest?.maxPriorityFeePerGas);
+    const useEip1559Fees = typeof callerMaxFeePerGas === 'bigint' && callerMaxFeePerGas > 0n;
+    const networkGasPrice = useEip1559Fees ? null : await readGasPrice();
+    let baselineGasPrice = useEip1559Fees ? null : maxBigInt(callerGasPrice, networkGasPrice);
+    let baselineMaxFeePerGas = useEip1559Fees ? callerMaxFeePerGas : null;
+    let baselineMaxPriorityFeePerGas = useEip1559Fees ? callerMaxPriorityFeePerGas : null;
     let replacementNonce = parseNonceToBigInt(txRequest?.nonce);
     let lastError: any = null;
     for (let attempt = 1; attempt <= sendAttempts; attempt += 1) {
@@ -996,21 +1068,62 @@ export async function sendPortoTransaction(txRequest: AnyObj): Promise<any> {
         kzg: undefined,
         ...(replacementNonce != null ? { nonce: replacementNonce } : {}),
       };
-      if (typeof baselineGasPrice === 'bigint' && baselineGasPrice > 0n) {
+      if (useEip1559Fees) {
+        if (typeof baselineMaxFeePerGas === 'bigint' && baselineMaxFeePerGas > 0n) {
+          txPayload.maxFeePerGas = baselineMaxFeePerGas;
+        }
+        if (typeof baselineMaxPriorityFeePerGas === 'bigint' && baselineMaxPriorityFeePerGas > 0n) {
+          txPayload.maxPriorityFeePerGas = baselineMaxPriorityFeePerGas;
+        }
+      } else if (typeof baselineGasPrice === 'bigint' && baselineGasPrice > 0n) {
         txPayload.gasPrice = baselineGasPrice;
       }
       if (attempt > 1) {
-        const latestGasPrice = await readGasPrice();
-        if (latestGasPrice) baselineGasPrice = latestGasPrice;
-        const bumpedGasPrice = bumpByPercent(baselineGasPrice, 100 + (attempt * 25));
-        const retryGasPrice = maxBigInt(bumpedGasPrice, minRetryGasPriceWei);
-        if (retryGasPrice) {
-          txPayload.gasPrice = retryGasPrice;
+        if (useEip1559Fees) {
+          const priorAttemptedMaxFee = typeof txPayload.maxFeePerGas === 'bigint' && txPayload.maxFeePerGas > 0n
+            ? txPayload.maxFeePerGas
+            : baselineMaxFeePerGas;
+          const priorAttemptedPriorityFee = typeof txPayload.maxPriorityFeePerGas === 'bigint' && txPayload.maxPriorityFeePerGas > 0n
+            ? txPayload.maxPriorityFeePerGas
+            : baselineMaxPriorityFeePerGas;
+          const latestGasPrice = await readGasPrice();
+          baselineMaxFeePerGas = maxBigInt(baselineMaxFeePerGas, latestGasPrice);
+          const bumpedMaxFee = bumpByPercent(baselineMaxFeePerGas, 100 + (attempt * 25));
+          const retryMaxFee = maxBigInt(
+            maxBigInt(bumpedMaxFee, minRetryGasPriceWei),
+            priorAttemptedMaxFee
+          );
+          if (retryMaxFee) {
+            txPayload.maxFeePerGas = retryMaxFee;
+          }
+          if (typeof baselineMaxPriorityFeePerGas === 'bigint' && baselineMaxPriorityFeePerGas > 0n) {
+            const bumpedPriorityFee = bumpByPercent(baselineMaxPriorityFeePerGas, 100 + (attempt * 25));
+            const retryPriorityFee = maxBigInt(bumpedPriorityFee, priorAttemptedPriorityFee);
+            if (retryPriorityFee) {
+              txPayload.maxPriorityFeePerGas = retryPriorityFee;
+            }
+          }
+        } else {
+          const priorAttemptedGasPrice = typeof txPayload.gasPrice === 'bigint' && txPayload.gasPrice > 0n
+            ? txPayload.gasPrice
+            : baselineGasPrice;
+          const latestGasPrice = await readGasPrice();
+          baselineGasPrice = maxBigInt(baselineGasPrice, latestGasPrice);
+          const bumpedGasPrice = bumpByPercent(baselineGasPrice, 100 + (attempt * 25));
+          const retryGasPrice = maxBigInt(
+            maxBigInt(bumpedGasPrice, minRetryGasPriceWei),
+            priorAttemptedGasPrice
+          );
+          if (retryGasPrice) {
+            txPayload.gasPrice = retryGasPrice;
+          }
         }
         portoLog.warn('[PORTO_RPC] Retrying transaction with bumped fee', {
           attempt,
           nonce: replacementNonce != null ? replacementNonce.toString() : null,
           gasPrice: txPayload.gasPrice ? txPayload.gasPrice.toString() : null,
+          maxFeePerGas: txPayload.maxFeePerGas ? txPayload.maxFeePerGas.toString() : null,
+          maxPriorityFeePerGas: txPayload.maxPriorityFeePerGas ? txPayload.maxPriorityFeePerGas.toString() : null,
         });
       }
       try {
@@ -1019,24 +1132,38 @@ export async function sendPortoTransaction(txRequest: AnyObj): Promise<any> {
         return hash;
       } catch (error: any) {
         lastError = error;
-        const replacementUnderpriced = isReplacementUnderpricedError(error);
+        const recoverableSendError = classifyRecoverableSendError(error);
         portoLog.warn('[PORTO_RPC] sendTransaction attempt failed', {
           attempt,
-          replacementUnderpriced,
+          replacementUnderpriced: recoverableSendError.replacementUnderpriced,
+          nonceTooLow: recoverableSendError.nonceTooLow,
+          alreadyKnown: recoverableSendError.alreadyKnown,
+          recoverable: recoverableSendError.recoverable,
           message: error?.shortMessage || error?.message || String(error),
         });
-        if (replacementUnderpriced && replacementNonce == null) {
-          replacementNonce = await readPendingNonce();
-          if (replacementNonce != null) {
-            portoLog.warn('[PORTO_RPC] Pinned retry nonce after first failure', {
-              nonce: replacementNonce.toString(),
-            });
+        if (recoverableSendError.recoverable) {
+          const shouldRefreshNonce = recoverableSendError.nonceTooLow || replacementNonce == null;
+          if (shouldRefreshNonce) {
+            const pendingNonce = await readPendingNonce();
+            if (pendingNonce != null) {
+              replacementNonce = pendingNonce;
+              portoLog.warn('[PORTO_RPC] Pinned retry nonce after recoverable send failure', {
+                nonce: replacementNonce.toString(),
+              });
+            }
           }
         }
-        if (!replacementUnderpriced || attempt >= sendAttempts) {
+        if (!recoverableSendError.recoverable || attempt >= sendAttempts) {
           throw error;
         }
-        if (typeof txPayload.gasPrice === 'bigint' && txPayload.gasPrice > 0n) {
+        if (useEip1559Fees) {
+          if (typeof txPayload.maxFeePerGas === 'bigint' && txPayload.maxFeePerGas > 0n) {
+            baselineMaxFeePerGas = txPayload.maxFeePerGas;
+          }
+          if (typeof txPayload.maxPriorityFeePerGas === 'bigint' && txPayload.maxPriorityFeePerGas > 0n) {
+            baselineMaxPriorityFeePerGas = txPayload.maxPriorityFeePerGas;
+          }
+        } else if (typeof txPayload.gasPrice === 'bigint' && txPayload.gasPrice > 0n) {
           baselineGasPrice = txPayload.gasPrice;
         }
         // Short backoff so pending nonce/gas price can settle before replacement retry.

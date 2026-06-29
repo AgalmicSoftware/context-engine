@@ -378,4 +378,80 @@ describe('AdminPage rendered interactions', () => {
     expect(sessionSelect).toHaveValue('edge');
   });
 
+  it('preserves decrypted encrypted fields across equivalent registry cache refreshes', async () => {
+    const { encryptedFieldsUtils } = require('../../utilities/crypto/encryptedFields.js');
+    const firstEnvelope = {
+      ciphertext: 'cipher-openai',
+      metadata: {
+        chainId: 84532,
+        resource: 'admin',
+      },
+      recipients: [
+        {
+          type: 'lit',
+          lit: {
+            ciphertext: 'wrapped-key',
+            chain: 'baseSepolia',
+          },
+        },
+      ],
+    };
+    const clonedEnvelope = {
+      recipients: [
+        {
+          lit: {
+            chain: 'baseSepolia',
+            ciphertext: 'wrapped-key',
+          },
+          type: 'lit',
+        },
+      ],
+      metadata: {
+        resource: 'admin',
+        chainId: 84532,
+      },
+      ciphertext: 'cipher-openai',
+    };
+    encryptedFieldsUtils.resolveEncryptedValue.mockResolvedValue({
+      value: 'admin-openai-secret',
+      status: 'encrypted',
+      encryptedAvailable: true,
+    });
+    sessionEntries = [[
+      'edge',
+      buildSessionConfig({
+        encryptedFields: {
+          'ai.providers.openai.apiKey': firstEnvelope,
+        },
+      }),
+    ]];
+
+    await renderAdminPage();
+
+    const decryptButton = (await screen.findAllByRole('button', { name: 'Decrypt' }))
+      .find((button) => button.getAttribute('title') === 'Decrypt fields (wallet signature prompts)');
+    expect(decryptButton).toBeTruthy();
+    fireEvent.click(decryptButton);
+
+    expect(await screen.findByText('admin-openai-secret')).toBeInTheDocument();
+    expect(encryptedFieldsUtils.resolveEncryptedValue).toHaveBeenCalledTimes(1);
+
+    sessionEntries = [[
+      'edge',
+      buildSessionConfig({
+        encryptedFields: {
+          'ai.providers.openai.apiKey': clonedEnvelope,
+        },
+      }),
+    ]];
+    act(() => {
+      window.dispatchEvent(new Event(SESSION_REGISTRY_CACHE_UPDATED_EVENT));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('admin-openai-secret')).toBeInTheDocument();
+    });
+    expect(encryptedFieldsUtils.resolveEncryptedValue).toHaveBeenCalledTimes(1);
+  });
+
 });

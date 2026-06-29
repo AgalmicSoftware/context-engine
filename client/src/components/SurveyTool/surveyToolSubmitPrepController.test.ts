@@ -338,6 +338,23 @@ describe('surveyToolSubmitPrepController', () => {
       expect(result.failures).toHaveLength(0);
     });
 
+    it('passes for empty default-gated encrypted answer without encryptedPortion', () => {
+      const slice = makeSlice({
+        answers: {
+          q1: {
+            encrypted: true,
+            encryptionAudience: 'gate',
+            value: '',
+          },
+        },
+      });
+
+      const result = verifyEncryptionIntegrity(slice);
+
+      expect(result.passed).toBe(true);
+      expect(result.failures).toHaveLength(0);
+    });
+
     it('passes for empty encrypted additional comment without encryptedPortion', () => {
       const slice = makeSlice({
         answers: {

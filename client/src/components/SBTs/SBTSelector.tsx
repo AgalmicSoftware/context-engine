@@ -1735,11 +1735,17 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
       }));
       return;
     }
-    if (this.hasSelectedOrPendingSbtAddress(customAddressLower)) return;
 
-    this._pendingSelectedSbtAddresses.add(customAddressLower);
+    const initialSelectionKey = buildSbtLookupKey({
+      address: customAddressLower,
+      chainId: this.getSessionNetworkId(this.getEffectiveSessionSlug()),
+    }) || customAddressLower;
+    if (this.hasSelectedOrPendingSbtKey(initialSelectionKey)) return;
+
+    let customSelectionKey = initialSelectionKey;
+    this._pendingSelectedSbtKeys.add(initialSelectionKey);
     try {
-      if (this.getSelectedSbtAddressSet().has(customAddressLower)) return;
+      if (this.getSelectedSbtKeySet().has(initialSelectionKey)) return;
 
       // Fetch metadata
       let sbtName = customAddressLower;
@@ -1788,11 +1794,17 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
         resolvedSlug,
         sbtInfo,
       });
-      if (this.getSelectedSbtAddressSet().has(customAddressLower)) return;
+      customSelectionKey = getSelectableSbtKey(customSBT) || initialSelectionKey;
+      if (customSelectionKey !== initialSelectionKey) {
+        if (this.hasSelectedOrPendingSbtKey(customSelectionKey)) return;
+        this._pendingSelectedSbtKeys.add(customSelectionKey);
+      }
+      if (this.getSelectedSbtKeySet().has(customSelectionKey)) return;
       this.setState(buildSbtSelectorCustomAddressClearPatch());
       this.props.onAddSBT(customSBT);
     } finally {
-      this._pendingSelectedSbtAddresses.delete(customAddressLower);
+      this._pendingSelectedSbtKeys.delete(initialSelectionKey);
+      this._pendingSelectedSbtKeys.delete(customSelectionKey);
     }
   };
 

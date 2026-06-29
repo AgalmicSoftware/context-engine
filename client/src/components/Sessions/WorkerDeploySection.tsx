@@ -19,6 +19,7 @@ type DeployForm = {
   workerName?: string;
   bundleUrl?: string;
   apiToken?: string;
+  accountId?: string;
   adminAddress?: string;
 };
 
@@ -100,6 +101,17 @@ const WorkerDeploySection = ({
     deployButtonDisabled: false,
     deployStatusText: '',
     isError: false,
+  };
+  const updateApiToken = (nextApiToken: string) => {
+    setDeployForm((prev) => {
+      const previousToken = String(prev?.apiToken ?? '');
+      const shouldClearAccountId = !!previousToken && previousToken !== nextApiToken;
+      return {
+        ...prev,
+        apiToken: nextApiToken,
+        ...(shouldClearAccountId ? { accountId: '' } : {}),
+      };
+    });
   };
 
   if (workerMode === 'default') {
@@ -278,7 +290,7 @@ const WorkerDeploySection = ({
                 type="password"
                 value={deployForm.apiToken ?? ''}
                 data-testid={E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN}
-                onChange={(e) => setDeployForm((prev) => ({ ...prev, apiToken: e.target.value }))}
+                onChange={(e) => updateApiToken(e.target.value)}
               />
               {!isNormalMode && showSponsoredDeployAccessNotice && (
                 <div className={styles.helperText}>

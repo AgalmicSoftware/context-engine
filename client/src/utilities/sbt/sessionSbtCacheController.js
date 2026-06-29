@@ -434,6 +434,7 @@ export const createSessionSbtCacheController = (host = {}) => {
         let lastHydrationUnits = 0;
         const queuedHydrationAddresses = [];
         const queuedHydrationAddressSet = new Set();
+        const unresolvedHydrationAddressSet = new Set();
         const BATCH = 8;
         let hydrationDrainPromise = null;
 
@@ -502,11 +503,17 @@ export const createSessionSbtCacheController = (host = {}) => {
 
               for (const { addr, lower, sbtInfo, refreshed } of results) {
                 const freshExisting = netCache.sbtList[lower] || {};
+                const storedInfo = sbtInfo || freshExisting.sbtInfo || null;
+                if (!hasCoreSbtMetadata(storedInfo)) {
+                  unresolvedHydrationAddressSet.add(lower);
+                } else {
+                  unresolvedHydrationAddressSet.delete(lower);
+                }
 
                 netCache.sbtList[lower] = withSessionScopedSbtCacheBinding({
                   ...freshExisting,
                   sbtAddress: addr,
-                  sbtInfo: sbtInfo || freshExisting.sbtInfo || null,
+                  sbtInfo: storedInfo,
                   slug,
                   blockNumber: refreshed ? baseTo : (freshExisting.blockNumber || 0),
                 }, slug);
@@ -640,8 +647,18 @@ export const createSessionSbtCacheController = (host = {}) => {
         // Waterline only at top-level (Re-read one last time to be safe)
         cache = dgRead('sbtCache', slug) || {};
         if (cache[networkID]) {
+          if (unresolvedHydrationAddressSet.size > 0) {
+            emitMainSiteSbtDebug('warn', '[ensureLightSbtDiscovery] leaving watermark behind failed hydration targets', {
+              slug,
+              networkID,
+              baseTo,
+              unresolvedHydrationCount: unresolvedHydrationAddressSet.size,
+              unresolvedHydrationAddresses: Array.from(unresolvedHydrationAddressSet),
+            });
+          } else {
             cache[networkID].lastBlock = baseTo;
             await dgWrite('sbtCache', slug, cache);
+          }
         }
 
         setState(prev => ({ sbtCacheRevision: prev.sbtCacheRevision + 1 }));
@@ -649,6 +666,7 @@ export const createSessionSbtCacheController = (host = {}) => {
           slug,
           networkID,
           hydratedTargetCount,
+          unresolvedHydrationCount: unresolvedHydrationAddressSet.size,
           finalCachedAddressCount: Object.keys(cache?.[networkID]?.sbtList || {}).length,
           lastBlock: cache?.[networkID]?.lastBlock || baseTo,
         });
@@ -985,6 +1003,7 @@ export const createSessionSbtCacheController = (host = {}) => {
 
       // Discovery: new SBTs from factory since our last watermark
       let newSbtsEventsFromDiscovery = [];
+      let discoveryScanSucceeded = true;
       const fromBlockForSbtDiscovery = overallLastBlockProcessedByNetwork + 1;
       if (fromBlockForSbtDiscovery <= baseTo) {
         try {
@@ -1011,6 +1030,7 @@ export const createSessionSbtCacheController = (host = {}) => {
             await new Promise(resolve => setTimeout(resolve, API_CALL_DELAY));
           }
         } catch (discErr) {
+          discoveryScanSucceeded = false;
           mainSiteLog.error("Error during SBT discovery scan:", discErr);
         }
       } else {
@@ -1257,7 +1277,8 @@ export const createSessionSbtCacheController = (host = {}) => {
                 if (!uData.sbts) uData.sbts = [];
 
                 // Idempotency check: Prevent duplicate SBT entries
-                if (!uData.sbts.some(s => s.sbtAddress.toLowerCase() === result.sbtAddress.toLowerCase())) {
+                const resultSbtAddressLower = String(result.sbtAddress || '').toLowerCase();
+                if (!uData.sbts.some(s => String(s?.sbtAddress || '').toLowerCase() === resultSbtAddressLower)) {
                   uData.sbts.push({
                     sbtAddress: result.sbtAddress,
                     sbtInfo: result.sbtInfo
@@ -1274,7 +1295,9 @@ export const createSessionSbtCacheController = (host = {}) => {
       }
 
       updateFullScanProgress(fullScanTotalUnits, true);
-      currentNetworkCache.lastBlock = baseTo;
+      currentNetworkCache.lastBlock = discoveryScanSucceeded
+        ? baseTo
+        : overallLastBlockProcessedByNetwork;
       currentNetworkCache.sbtList = finalProcessedSbtsMap;
       dgWrite('sbtCache', slug, globalCache);
 
@@ -1283,11 +1306,20 @@ export const createSessionSbtCacheController = (host = {}) => {
         dgWrite('userCache', slug, userCache);
       }
 
-      writeFlag('sbt:deferredFullScanNeeded', slug, false);
+      writeFlag('sbt:deferredFullScanNeeded', slug, !discoveryScanSucceeded);
       writeFlag('sbt:partialReady', slug, true);
 
       setState(prev => ({ isSBTCacheReady: true, sbtCacheRevision: prev.sbtCacheRevision + 1 }));
-      mainSiteLog.log('initializeSbtCacheForGroup: Full discovery & processing complete.');
+      if (discoveryScanSucceeded) {
+        mainSiteLog.log('initializeSbtCacheForGroup: Full discovery & processing complete.');
+      } else {
+        mainSiteLog.warn('initializeSbtCacheForGroup: Full scan persisted existing SBT updates but left discovery watermark behind after a factory scan failure.', {
+          slug,
+          networkID,
+          lastBlock: overallLastBlockProcessedByNetwork,
+          retryToBlock: baseTo,
+        });
+      }
     } finally {
       writeFlag('sbt:fullScanInProgress', slug, false);
       clearSbtLiveProgress(slug, liveProgressToken);

@@ -731,15 +731,14 @@ const _getProvider = (providerLike: ProviderLike): Eip1193Provider => {
     }
 
     // Keep Web3Auth path for easy re-enable; no overhead without provider.
-    if (s === 'web3auth') {
-      if (window.web3authProvider) return window.web3authProvider;
-    } else if (window.ethereum) {
-      return window.ethereum;
+    if (typeof window !== 'undefined' && s === 'web3auth' && window.web3authProvider) {
+      return window.web3authProvider;
     }
-    if (window.ethereum) return window.ethereum;
   }
-  if (window.ethereum) return window.ethereum;
-  if (window.web3authProvider) return window.web3authProvider;
+  if (typeof window !== 'undefined') {
+    if (window.ethereum) return window.ethereum;
+    if (window.web3authProvider) return window.web3authProvider;
+  }
 
   return {
     request: async () => {
@@ -1171,7 +1170,10 @@ async function addTopLevelPoseidonIfRequired(
     } else if (kind === 'binary') {
       nonEmpty = v === 'Agree' || v === 'Unsure' || v === 'Disagree';
     } else if (kind === 'rating') {
-      const n = Number(v);
+      const hasRatingValue = typeof v === 'string'
+        ? v.trim().length > 0
+        : v !== null && v !== undefined;
+      const n = hasRatingValue ? Number(v) : NaN;
       nonEmpty = Number.isFinite(n);
     } else if (kind === 'multichoice') {
       nonEmpty = Array.isArray(v) && v.length > 0;
@@ -1520,8 +1522,11 @@ const parseEnvelope = (jsonStr: string): Envelope => {
   if (!ctBytes || ctBytes.length === 0) throw new Error('Envelope ciphertext is empty after decode.');
   for (const r of env.recipients) {
     if (!r || !r.type) throw new Error('Envelope recipient missing type.');
-    if (r.type === 'lit-sbt-v1' && (!r.lit || !r.lit.ciphertext)) {
-      throw new Error('Lit recipient missing ciphertext.');
+    if (
+      r.type === 'lit-sbt-v1' &&
+      (!r.lit || (!r.lit.ciphertext && !r.lit.encryptedSymmetricKey))
+    ) {
+      throw new Error('Lit recipient missing ciphertext or encryptedSymmetricKey.');
     }
     if (r.type === 'self-eip712-v1' && (!r.wrap_iv || !r.wrapped_cek)) {
       throw new Error('Self-EIP712 recipient missing wrap_iv or wrapped_cek.');
