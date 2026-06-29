@@ -711,9 +711,12 @@ class QuestionFilter extends React.Component<any, any> {
     return subset;
   };
 
-  getAiRankingCandidates = (): QuestionFilterQuestionRecord[] => (
-    Array.isArray(this.state.mergedQuestions) ? this.state.mergedQuestions as QuestionFilterQuestionRecord[] : []
-  );
+  getAiRankingCandidates = (): QuestionFilterQuestionRecord[] => {
+    if (this.state.aiCombineWithOtherFilters) {
+      return this.getQuestionsSubsetBeforeAi(true);
+    }
+    return Array.isArray(this.state.mergedQuestions) ? this.state.mergedQuestions as QuestionFilterQuestionRecord[] : [];
+  };
 
   buildAiApplySignature = ({
     stateIn = this.state,

@@ -117,6 +117,69 @@ describe('QuestionFilter AI ranking lifecycle', () => {
     rankSpy.mockRestore();
   });
 
+  it('applies AI ranking only to the prefiltered subset when combine is enabled', async () => {
+    const gateSpy = jest.spyOn(sponsoredAccessAny, 'resolveSponsoredGateStateForResource')
+      .mockReturnValue({ status: sponsoredAccess.SPONSORED_GATE_STATES.OPEN });
+    const localSpy = jest.spyOn(aiSettings, 'getLocalAiSettings').mockReturnValue({ providers: {} });
+    const rankSpy = jest.spyOn(aiScripts, 'rankQuestionsAI').mockResolvedValue(['q3', 'q1']);
+
+    const questions = [
+      { id: 'q1', type: 'binary', tags: ['alpha'], prompt: 'Q1' },
+      { id: 'q2', type: 'rating', tags: ['alpha'], prompt: 'Q2' },
+      { id: 'q3', type: 'binary', tags: ['alpha'], prompt: 'Q3' },
+      { id: 'q4', type: 'binary', tags: ['beta'], prompt: 'Q4' },
+    ];
+    const instance = new QuestionFilter({
+      activeSessionSlug: 'edge',
+      questions,
+      questionResponses: {},
+      network: { id: 84532 },
+      provider: 'wagmi',
+      account: '0xabc',
+    });
+    instance._isMounted = true;
+    instance.handleApplyFilters = jest.fn();
+    instance.setState = jest.fn((next, cb) => {
+      const patch = typeof next === 'function' ? next(instance.state, instance.props) : next;
+      instance.state = { ...instance.state, ...(patch || {}) };
+      if (typeof cb === 'function') cb();
+      return patch;
+    });
+    instance.state = {
+      ...instance.state,
+      mergedQuestions: questions,
+      selectedTags: ['alpha'],
+      pendingSelectedTypes: ['binary'],
+      pendingSbtFilteredQuestions: null,
+      pendingShowTopQuestions: false,
+      pendingShowTopQuestionsByResponses: false,
+      aiDraftQuery: 'climate',
+      aiRankingCount: 2,
+      aiCombineWithOtherFilters: true,
+    };
+
+    await instance.handleApplyAIFilter({ auto: false, source: 'test' });
+
+    expect(rankSpy).toHaveBeenCalledTimes(1);
+    expect(rankSpy).toHaveBeenCalledWith(
+      'climate',
+      [
+        expect.objectContaining({ id: 'q1' }),
+        expect.objectContaining({ id: 'q3' }),
+      ],
+      2,
+      expect.objectContaining({
+        sessionSlug: 'edge',
+      })
+    );
+    expect(instance.state.aiRankedQuestionIds).toEqual(['q3', 'q1']);
+    expect(instance.state.aiFilterApplied).toBe(true);
+
+    gateSpy.mockRestore();
+    localSpy.mockRestore();
+    rankSpy.mockRestore();
+  });
+
   it('uses AI override by default and intersects when combine is enabled', () => {
     const questions = [
       { id: 'q1', type: 'binary', tags: ['alpha'], prompt: 'Q1' },
