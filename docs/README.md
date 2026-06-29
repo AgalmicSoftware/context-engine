@@ -35,8 +35,6 @@ Session, gates, and the Worker:
 - `docs/session-creation-guide.md`: End-to-end setup guide for creating a session from `/new`, including the "what a new session needs" checklist, sponsored bundle handoff, worker deploy paths, on-chain registration, and `/admin` verification.
 - `docs/posts.md`: Public `/posts` route, root `posts/` Markdown authoring, and `ce-viz` exhibit blocks.
 - `docs/session-listening-mode.md`: `?mode=listening` pile-adjacent microphone workflow, rolling 3-minute transcription, local recovery metadata, and question-generation output.
-- `docs/session-demo-progressive-loading-prd.md`: PRD for rendering questions as soon as the first question is hydrated, showing compact scan progress while remaining blocks load, warming Demo targets from `/about`, and future Cloudflare-hosted session snapshots.
-- `docs/session-results-html-report-prd.md`: PRD for exporting point-in-time session results as an HTML viewer, static HTML, or PDF report with redacted snapshots, downloader metadata, optional AI-derived analysis sections, and embedded snapshot JSON.
 - `docs/standard-sponsored-links-fixture.md`: Temporary tracked fixture for publishing a small set of public sponsored setup links with minimal onboarding friction.
 - `docs/session-registry.md`: SessionRegistry migration and on-chain gate authority model.
 - `docs/session-cors-worker.md`: Cloudflare `sessionCorsWorker` behavior, endpoints, KV layouts, and wizard flow.
