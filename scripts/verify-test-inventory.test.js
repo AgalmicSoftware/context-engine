@@ -13,7 +13,7 @@ const {
 } = require('./testInventoryConfig');
 const { verifyTestInventory } = require('./verify-test-inventory');
 
-const PRIVATE_STRIPPED_TEST_FIXTURE = 'test/private-runtime.private.test.mjs';
+const PRIVATE_STRIPPED_TEST_FIXTURE = 'tests/root/private-runtime.private.test.mjs';
 
 function writeFile(rootDir, relativePath, content = '// fixture\n') {
   const absolutePath = path.join(rootDir, relativePath);
@@ -82,10 +82,10 @@ test('verifyTestInventory tolerates stripped public copies without private runti
 test('verifyTestInventory flags unclassified root tests', () => {
   withTempRepo((rootDir) => {
     writeInventoryFixture(rootDir);
-    writeFile(rootDir, 'test/new-unwired.test.js');
+    writeFile(rootDir, 'tests/root/new-unwired.test.js');
 
     assert.deepEqual(verifyTestInventory(rootDir), [
-      'unclassified root test files: test/new-unwired.test.js',
+      'unclassified root test files: tests/root/new-unwired.test.js',
     ]);
   });
 });

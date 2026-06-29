@@ -57,7 +57,7 @@ function collectNodeTestFiles(rootDir = path.resolve(__dirname, '..'), options =
   });
 
   files.push(
-    ...readOptionalTestDir(rootDir, 'test')
+    ...readOptionalTestDir(rootDir, path.join('tests', 'root'))
       .filter((relativePath) => ROOT_PRIVATE_STRIPPED_TEST_FILE_RE.test(relativePath)),
   );
   files.push(...readOptionalTestDir(rootDir, 'scripts'));

@@ -70,7 +70,7 @@ test('public-release style copies without .git still pass wiring checks', () => 
           'test:contracts':
             'forge test --match-contract "^(SurveysTest|CustomSBTTest|SessionRegistryTest|SurveysFuzzTest|CustomSBTFuzzTest|SessionRegistryFuzzTest|CustomSBTInvariantTest)$"',
           'test:root:jest':
-            "cd client && npm test -- --watchAll=false --runInBand --testMatch '<rootDir>/../test/deployHelper.worker.test.js' '<rootDir>/../test/sessionCorsWorker.auth.test.js'",
+            "cd client && npm test -- --watchAll=false --runInBand --testMatch '<rootDir>/../tests/root/deployHelper.worker.test.js' '<rootDir>/../tests/root/sessionCorsWorker.auth.test.js'",
           'test:worker:session-cors': 'npm --prefix workers/sessionCorsWorker test',
           'test:node': 'node scripts/run-node-tests.js',
           'test:e2e': 'npm run -s test:e2e:smoke',

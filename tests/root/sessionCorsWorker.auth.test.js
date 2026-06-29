@@ -7,7 +7,6 @@ import {
   makeJsonRequest,
   decodeTokenPayload,
   buildSiweMessage,
-  installSessionCoordinatorBinding,
 } from '../helpers/sessionCorsWorkerTestUtils.mjs';
 
 describe('sessionCorsWorker auth routes', () => {

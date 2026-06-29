@@ -3,7 +3,6 @@ import sessionCorsWorker, { workerAuthGateUtils } from '../../workers/sessionCor
 import {
   buildRpcFetchMock,
   createMemoryKv,
-  installSessionCoordinatorBinding,
 } from '../helpers/sessionCorsWorkerTestUtils.mjs';
 
 const REGISTRY_ABI = [

@@ -1,9 +1,6 @@
 import { ethers } from 'ethers';
 import { webcrypto } from 'crypto';
-import sessionCorsWorker, {
-  SessionWriteCoordinator,
-} from '../../workers/sessionCorsWorker/worker.js';
-import { getSessionSecrets } from '../../workers/sessionCorsWorker/sessionConfigSecretsStore.js';
+import sessionCorsWorker from '../../workers/sessionCorsWorker/worker.js';
 import {
   buildRpcFetchMock,
   createMemoryKv,

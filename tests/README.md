@@ -7,7 +7,7 @@ are not practical to colocate with client, worker, or script sources.
 
 - `foundry/script/` contains Foundry Solidity deploy scripts.
 - `foundry/test/` contains Forge Solidity suites.
-- `scripts/` contains JS/Python tooling, audits, and supported automation.
+- `scripts/` contains JS/Python tooling, E2E runners, audits, and automation.
 - `tests/root/` contains root Node/Jest tests for workers, deploy helpers, and compatibility harnesses.
 - `tests/helpers/` contains helper modules shared by `tests/root/`.
 
@@ -32,6 +32,7 @@ If you are deciding where to add new files:
 
 ## Why Foundry still has singular names
 
-- Co-location keeps E2E scripts near supporting automation code in `scripts/`.
-- React unit tests stay co-located with client app code so components, fixtures, and helpers remain close to the behavior they cover.
-- Forge convention keeps Solidity tests in `test/` as `.t.sol` files.
+Foundry's default vocabulary is singular: `script/` for Solidity deploy scripts
+and `test/` for Forge suites. This repo keeps those conventional names one
+level down under `foundry/` while using plural root-level `scripts/` and
+`tests/` for the broader JavaScript/tooling surface.

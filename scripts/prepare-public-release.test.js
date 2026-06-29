@@ -96,7 +96,7 @@ test('prepare-public-release strips private surfaces without publishing an inven
     writeFile(sourceDir, path.join('contextEngine-cc', 'server.mjs'), 'private runtime server\n');
     writeFile(sourceDir, path.join('contextEngine-cc', 'package.json'), '{"private":true}\n');
     writeFile(sourceDir, path.join('contextEngine-cc', 'public', 'js', 'sessionSlugs.mjs'), 'export default [];\n');
-    writeFile(sourceDir, path.join('test', 'private-runtime.private.test.mjs'), 'private companion service worker test\n');
+    writeFile(sourceDir, path.join('tests', 'root', 'private-runtime.private.test.mjs'), 'private companion service worker test\n');
     writeFile(sourceDir, path.join('docs', 'agent-native-contract.md'), 'private agent contract\n');
     writeFile(sourceDir, path.join('docs', 'agent-native-bridge.md'), 'private agent bridge\n');
     writeFile(sourceDir, path.join('client', 'public', 'skill.md'), 'private agent skill\n');
@@ -156,7 +156,7 @@ test('prepare-public-release strips private surfaces without publishing an inven
     assert.equal(fs.existsSync(path.join(outputDir, 'contextEngine-cc')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'contextEngine-cc', 'server.mjs')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'contextEngine-cc', 'package.json')), false);
-    assert.equal(fs.existsSync(path.join(outputDir, 'test', 'private-runtime.private.test.mjs')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'tests', 'root', 'private-runtime.private.test.mjs')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'agent-native-contract.md')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'agent-native-bridge.md')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'client', 'public', 'skill.md')), false);

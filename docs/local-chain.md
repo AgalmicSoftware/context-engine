@@ -53,7 +53,19 @@ verification, and production build):
 npm run verify:release
 ```
 
-You can run the public contract and client suites separately:
+To run the extended local gate that adds the Anvil-backed Surveys + SBT integration on top of `test:ci`:
+
+```bash
+npm run tests
+```
+
+To run the Surveys + SBT contractScripts integration test against Anvil (in `tests/root/contractScripts.surveys-sbt.test.js`, proxied via `client/src/utilities/web3/contractScripts.surveys-sbt.proxy.test.js`):
+
+```bash
+npm run test:surveys-sbt
+```
+
+You can still run each suite separately:
 
 ```bash
 npm run test:contracts
