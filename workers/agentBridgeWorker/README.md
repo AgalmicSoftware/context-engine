@@ -20,7 +20,7 @@
 - For larger events, `AGENT_BRIDGE_ASYNC_SUBMIT_ENABLED=true` plus an
   `AGENT_RESPONSE_QUEUE` binding accepts submit records into KV with
   `submit_queued` status and settles them through the Worker queue consumer.
-  See [Telegram Cloudflare 500-User Scale PRD](../../docs/telegram-cloudflare-500-user-scale-prd.md).
+  See [Telegram Cloudflare 500-User Scale PRD](../../TODO/PRDs/625_moved-from-docs-telegram-cloudflare-500-user-scale.md).
 
 ## Managed Demo Accounts
 
