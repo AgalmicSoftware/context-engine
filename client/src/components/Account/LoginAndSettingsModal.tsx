@@ -88,6 +88,7 @@ import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
 import { getWorkerSessionToken, clearAllWorkerSessionTokens } from '../../utilities/worker/workerAuth.js';
 import { resolveActiveSessionSlug } from '../../utilities/session/sessionNaming.js';
 import { markUserExplicitlyDisconnected } from '../../utilities/web3/wagmiDisconnectState.js';
+import { notify } from '../../utilities/ui/notify.js';
 import {
   normalizeSessionScanScope,
   normalizeSessionScanSlugs,
@@ -120,6 +121,7 @@ import {
 } from './loginSettingsAiDisplayHelpers';
 
 const accountLog = createLogger('account');
+const normalizeAccountForComparison = (value: unknown): string => String(value || '').trim().toLowerCase();
 type AccountUserPageProps = {
   viewAddress?: string;
   account?: string;
@@ -312,6 +314,8 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   _sponsoredReqId: number = 0;
   _cacheClearInFlight: boolean = false;
   _testFundsRequestId: number = 0;
+  _portoSessionRestoreReqId: number = 0;
+  _portoSessionActionId: number = 0;
 
   getListModePrimarySessionSlug = (state: Partial<LoginAndSettingsModalState> = this.state) => {
     const scope = this.getSessionScanScopeValue(state);
@@ -401,10 +405,17 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
 
     // Porto session rehydration
     const portoNetwork = this.getPortoNetwork();
+    const portoRestoreReqId = this._portoSessionRestoreReqId + 1;
+    this._portoSessionRestoreReqId = portoRestoreReqId;
+    const portoActionIdAtRestoreStart = this._portoSessionActionId;
     const restoredAddress = await portoFunctions.restoreSession({ requireSigner: false });
     if (!this._isMounted) return;
 
-    if (restoredAddress) {
+    const restoreStillCurrent = (
+      portoRestoreReqId === this._portoSessionRestoreReqId &&
+      portoActionIdAtRestoreStart === this._portoSessionActionId
+    );
+    if (restoredAddress && restoreStillCurrent) {
        accountLog.log("Restored Porto Session:", restoredAddress);
        const web3info = {
         account: restoredAddress,
@@ -676,7 +687,17 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
 
   // Porto / passkey handlers
 
+  startPortoSessionAction = (): number => {
+    this._portoSessionActionId += 1;
+    return this._portoSessionActionId;
+  };
+
+  isCurrentPortoSessionAction = (actionId: number): boolean => (
+    this._isMounted && actionId === this._portoSessionActionId
+  );
+
   handlePortoSignUp = async () => {
+    const portoActionId = this.startPortoSessionAction();
     this.props.updateLoginInfo({
       loginInProgress: true,
       loginComplete: false,
@@ -686,14 +707,17 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     try {
       const portoNetwork = this.getPortoNetwork();
       const address = await portoFunctions.authenticatePorto();
+      if (!this.isCurrentPortoSessionAction(portoActionId)) return;
       this._finalizePortoLogin(address, portoNetwork);
     } catch (error) {
       accountLog.error("Porto Sign Up Error:", error);
+      if (!this.isCurrentPortoSessionAction(portoActionId)) return;
       this.props.updateLoginInfo({ loginInProgress: false, loginComplete: false, provider: null });
     }
   };
 
   handlePortoSignIn = async () => {
+    const portoActionId = this.startPortoSessionAction();
     this.props.updateLoginInfo({
       loginInProgress: true,
       loginComplete: false,
@@ -703,15 +727,25 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     try {
       const portoNetwork = this.getPortoNetwork();
       const address = await portoFunctions.loginWithPorto();
+      if (!this.isCurrentPortoSessionAction(portoActionId)) return;
       this._finalizePortoLogin(address, portoNetwork);
     } catch (error) {
       accountLog.error("Porto Sign In Error:", error);
+      if (!this.isCurrentPortoSessionAction(portoActionId)) return;
       this.props.updateLoginInfo({ loginInProgress: false, loginComplete: false, provider: null });
     }
   };
 
   _finalizePortoLogin = (address: any, targetNetwork: any = null) => {
       const portoNetwork = this.getPortoNetwork(targetNetwork);
+      const previousPortoAccount = this.props.provider === 'porto_passkey'
+        ? normalizeAccountForComparison(this.props.account)
+        : '';
+      const nextPortoAccount = normalizeAccountForComparison(address);
+      if (previousPortoAccount && nextPortoAccount && previousPortoAccount !== nextPortoAccount) {
+        clearAllWorkerSessionTokens();
+        notify.info('Passkey account switched.');
+      }
       const web3info = {
         account: address,
         provider: 'porto_passkey',
@@ -728,6 +762,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   };
 
   handleLogout = async () => {
+    this._portoSessionActionId += 1;
     if (this.props.provider === 'porto_passkey') {
        portoFunctions.logoutPorto();
     }
@@ -2545,6 +2580,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     }
 
     if (this.state.wagmiLoginUpdateNeeded && wagmiAddr && !reduxIsWagmi) {
+      this.startPortoSessionAction();
       this.setState({ wagmiLoginUpdateNeeded: false });
       this.props.updateLoginInfo({ loginInProgress: true, loginComplete: false, provider: 'wagmi' });
       try {
@@ -2564,6 +2600,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     }
 
     if (!wagmiAddr && this.props.provider === 'wagmi') {
+      this.startPortoSessionAction();
       this.props.updateLoginInfo({ loginInProgress: false, loginComplete: false, provider: null });
       this.props.changeAccount({});
       this.setState({ wagmiLoginUpdateNeeded: false });

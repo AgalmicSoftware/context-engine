@@ -781,6 +781,7 @@ const SessionWizard = ({
   const [adminUrlStatus, setAdminUrlStatus] = useState('');
   const [publishStep, setPublishStep] = useState(0); // 0=idle, 1=deploying sbts/uploading, 2=uploading, 3=registering, 4=done
   const [publishBusy, setPublishBusy] = useState(false);
+  const publishRequestInFlightRef = useRef(false);
   const [publishStepElapsedMs, setPublishStepElapsedMs] = useState(0);
   const [wizardMode, setWizardMode] = useState('normal');
   const [registryChainId, setRegistryChainId] = useState<number>(() => {
@@ -3436,6 +3437,12 @@ const SessionWizard = ({
   };
 
   const handlePublish = async () => {
+    if (publishRequestInFlightRef.current) {
+      setStatus('Publish already in progress.');
+      return;
+    }
+    publishRequestInFlightRef.current = true;
+    try {
     const publishStartPreflightDescriptor = resolveSessionWizardPublishStartPreflightDescriptor({
       publishBusy,
       draftSlug: draft?.slug,
@@ -3579,6 +3586,9 @@ const SessionWizard = ({
       setPublishStep(publishFailureSettlement.publishStep);
     } finally {
       setPublishBusy(false);
+    }
+    } finally {
+      publishRequestInFlightRef.current = false;
     }
   };
 

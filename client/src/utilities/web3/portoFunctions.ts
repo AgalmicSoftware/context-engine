@@ -106,6 +106,10 @@ export function getPortoChain(): any {
 let currentSession: PortoSession | null = null;
 let currentSessionSignerAccount: any = null;
 let viemWalletClient: any = null;
+let portoAccountSwitchInProgress = false;
+let portoSessionTransitionInProgress = false;
+let portoSessionRevision = 0;
+let suppressedPersistedPortoSessionAddress = '';
 let sessionKeyEnabled = typeof PORTO_SESSION_KEY_ENABLED === 'boolean'
   ? PORTO_SESSION_KEY_ENABLED
   : true;
@@ -196,6 +200,14 @@ const resolvePortoRelayUrls = (chain: any, primaryUrl: string): string[] => uniq
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 const normalizePortoAddress = (value: unknown): string => String(value || '').trim().toLowerCase();
+const getErrorMessage = (error: unknown): string => (
+  error && typeof error === 'object' && 'message' in error
+    ? String((error as { message?: unknown }).message || error)
+    : String(error || '')
+);
+const toUnknownRecord = (value: unknown): Record<string, unknown> => (
+  value && typeof value === 'object' ? value as Record<string, unknown> : {}
+);
 const hasCurrentPortoSessionMetadata = (): boolean => (
   !!currentSession &&
   typeof currentSession === 'object' &&
@@ -206,6 +218,46 @@ const hasCurrentPortoSessionSigner = (): boolean => (
   !!currentSessionSignerAccount ||
   !!viemWalletClient ||
   (typeof currentSession?.privateKey === 'string' && currentSession.privateKey.length > 0)
+);
+
+const clearCurrentPortoSigner = (): void => { currentSessionSignerAccount = null; viemWalletClient = null; };
+const clearCurrentPortoSession = (): void => {
+  currentSession = null;
+  clearCurrentPortoSigner();
+};
+const bumpPortoSessionRevision = (): number => {
+  portoSessionRevision += 1;
+  return portoSessionRevision;
+};
+const isPortoSessionTransitionInProgress = (): boolean => (
+  portoAccountSwitchInProgress || portoSessionTransitionInProgress
+);
+const beginPortoSessionTransition = (): number => {
+  const revision = bumpPortoSessionRevision();
+  portoSessionTransitionInProgress = true;
+  clearCurrentPortoSigner();
+  return revision;
+};
+const finishPortoSessionTransition = (revision: number): void => {
+  if (portoSessionRevision === revision) {
+    portoSessionTransitionInProgress = false;
+  }
+};
+const restoreWasSuperseded = (revisionAtStart: number): boolean => (
+  isPortoSessionTransitionInProgress() || revisionAtStart !== portoSessionRevision
+);
+const currentPortoAddressOrNull = (): string | null => (
+  currentSession ? currentSession.address : null
+);
+const suppressPersistedPortoSessionAddress = (address: unknown): void => {
+  suppressedPersistedPortoSessionAddress = normalizePortoAddress(address);
+};
+const clearSuppressedPersistedPortoSessionAddress = (): void => {
+  suppressedPersistedPortoSessionAddress = '';
+};
+const isSuppressedPersistedPortoSessionAddress = (address: unknown): boolean => (
+  !!suppressedPersistedPortoSessionAddress &&
+  normalizePortoAddress(address) === suppressedPersistedPortoSessionAddress
 );
 
 const buildHydratedPortoSession = ({ credentialId, address }: Partial<PortoSession> = {}): PortoSession | null => {
@@ -227,9 +279,9 @@ const adoptHydratedPortoSession = (session: Partial<PortoSession> | null | undef
   const prevAddress = normalizePortoAddress(currentSession?.address);
   const nextAddress = normalizePortoAddress(nextSession.address);
   currentSession = nextSession;
+  bumpPortoSessionRevision();
   if (prevAddress && prevAddress !== nextAddress) {
-    currentSessionSignerAccount = null;
-    viemWalletClient = null;
+    clearCurrentPortoSigner();
   }
   return currentSession.address;
 };
@@ -343,6 +395,19 @@ async function deletePortoSessionRecord(): Promise<void> {
       reject(tx.error);
     };
   });
+}
+
+async function clearPersistedPortoSessionBestEffort(): Promise<void> {
+  try {
+    localStorage.removeItem(PORTO_STORAGE_KEY);
+  } catch (e) {
+    portoLog.warn('portoFunctions: fallback', e);
+  }
+  try {
+    await deletePortoSessionRecord();
+  } catch (e) {
+    portoLog.error("Failed to clear Porto session:", e);
+  }
 }
 
 async function derivePortoSessionKey(credentialId: string): Promise<CryptoKey> {
@@ -533,19 +598,23 @@ function _initViemClient(): void {
   }
 }
 
-async function _saveSession(): Promise<boolean> {
-  if (!currentSession) return false;
-  let privateKey: any = currentSession.privateKey;
+async function persistPortoSession(session: PortoSession | null | undefined): Promise<boolean> {
+  if (!session) return false;
+  let privateKey: string | null = typeof session.privateKey === 'string'
+    ? session.privateKey
+    : null;
 
   try {
-    const encrypted = await encryptPrivateKey(privateKey, currentSession.credentialId);
+    if (!privateKey) throw new Error('Missing Porto session private key.');
+    const encrypted = await encryptPrivateKey(privateKey, session.credentialId);
     await writePortoSessionRecord({
       version: PORTO_SESSION_RECORD_VERSION,
-      credentialId: currentSession.credentialId,
-      address: currentSession.address,
+      credentialId: session.credentialId,
+      address: session.address,
       encryptedPrivateKey: encrypted.data,
       encryptedPrivateKeyIv: encrypted.iv
     });
+    localStorage.removeItem(PORTO_STORAGE_KEY);
     return true;
   } catch (e) {
     portoLog.error("Failed to persist Porto session:", e);
@@ -553,6 +622,185 @@ async function _saveSession(): Promise<boolean> {
   } finally {
     privateKey = null;
   }
+}
+
+async function readPersistedPortoSessionAddress(): Promise<string> {
+  try {
+    const record = await readPortoSessionRecord();
+    if (
+      record &&
+      record.credentialId &&
+      record.address &&
+      record.encryptedPrivateKey &&
+      record.encryptedPrivateKeyIv
+    ) {
+      const recordAddress = normalizePortoAddress(record.address);
+      if (recordAddress) return recordAddress;
+    }
+  } catch (_) {
+    // Fall through to the legacy record; persistence failure handling still decides whether to adopt.
+  }
+
+  try {
+    const stored = localStorage.getItem(PORTO_STORAGE_KEY);
+    if (!stored) return '';
+    const session = JSON.parse(stored);
+    if (!session?.credentialId || !session?.privateKey || !session?.address) return '';
+    return normalizePortoAddress(session?.address);
+  } catch (_) {
+    return '';
+  }
+}
+
+async function activatePortoSession(nextSession: PortoSession, signerAccount: unknown): Promise<string> {
+  const prevAddress = normalizePortoAddress(currentSession?.address);
+  const nextAddress = normalizePortoAddress(nextSession.address);
+  const transitionRevision = beginPortoSessionTransition();
+  let accountChanged = false;
+
+  try {
+    const persistedAddress = await readPersistedPortoSessionAddress();
+    accountChanged = !!(
+      nextAddress &&
+      (
+        (prevAddress && prevAddress !== nextAddress) ||
+        (persistedAddress && persistedAddress !== nextAddress)
+      )
+    );
+    if (accountChanged) portoAccountSwitchInProgress = true;
+
+    const persisted = await persistPortoSession(nextSession);
+    if (accountChanged && !persisted) {
+      suppressPersistedPortoSessionAddress(persistedAddress || prevAddress);
+      clearCurrentPortoSession();
+      await clearPersistedPortoSessionBestEffort();
+      throw new Error('Failed to persist selected Porto passkey session.');
+    }
+
+    clearSuppressedPersistedPortoSessionAddress();
+    currentSession = nextSession;
+    currentSessionSignerAccount = signerAccount;
+    _initViemClient();
+    return currentSession.address;
+  } finally {
+    if (accountChanged) portoAccountSwitchInProgress = false;
+    finishPortoSessionTransition(transitionRevision);
+  }
+}
+
+const adoptRestoredPortoSession = (
+  restoredSession: PortoSession,
+  signerAccount: unknown
+): string | null => {
+  currentSession = restoredSession;
+  currentSessionSignerAccount = signerAccount;
+  bumpPortoSessionRevision();
+  _initViemClient();
+  return currentSession.address;
+};
+
+const getSupersededRestoreAddress = (): string | null => (
+  isPortoSessionTransitionInProgress() ? null : currentPortoAddressOrNull()
+);
+
+const shouldAbortPortoRestore = (revisionAtStart: number): boolean => (
+  restoreWasSuperseded(revisionAtStart)
+);
+
+const finishAbortedPortoRestore = (): string | null => (
+  getSupersededRestoreAddress()
+);
+
+async function restoreEncryptedPortoSessionRecord(
+  record: PortoSessionRecord,
+  requireSigner: boolean,
+  revisionAtStart: number
+): Promise<string | null> {
+  if (!requireSigner) {
+    if (shouldAbortPortoRestore(revisionAtStart)) return finishAbortedPortoRestore();
+    const hydratedAddress = adoptHydratedPortoSession({
+      credentialId: record.credentialId,
+      address: record.address,
+    });
+    if (hydratedAddress) return hydratedAddress;
+  }
+
+  try {
+    try {
+      await promptForPasskey(record.credentialId);
+    } catch (e: unknown) {
+      portoLog.warn('Porto session restore blocked — passkey assertion failed:', getErrorMessage(e) || e);
+      return null;
+    }
+
+    if (shouldAbortPortoRestore(revisionAtStart)) return finishAbortedPortoRestore();
+    let privateKey: string | null = await decryptPrivateKey(
+      record.encryptedPrivateKey,
+      record.encryptedPrivateKeyIv,
+      record.credentialId
+    );
+    try {
+      if (shouldAbortPortoRestore(revisionAtStart)) return finishAbortedPortoRestore();
+      const restoredSession = buildValidatedPortoSession({
+        credentialId: record.credentialId,
+        address: record.address,
+        privateKey
+      });
+      if (!restoredSession) {
+        portoLog.warn('Discarding invalid Porto session record: stored address does not match private key.');
+      } else {
+        return adoptRestoredPortoSession(restoredSession, privateKeyToAccount(privateKey as any));
+      }
+    } finally {
+      privateKey = null;
+    }
+  } catch (e) {
+    portoLog.error("Failed to decrypt Porto session:", e);
+  }
+  return null;
+}
+
+async function restoreLegacyPortoSession(
+  session: unknown,
+  requireSigner: boolean,
+  revisionAtStart: number
+): Promise<string | null> {
+  const sessionRecord = toUnknownRecord(session);
+  const restoredSession = buildValidatedPortoSession(sessionRecord);
+  if (restoredSession) {
+    if (!requireSigner) {
+      if (shouldAbortPortoRestore(revisionAtStart)) return finishAbortedPortoRestore();
+      const hydratedAddress = adoptHydratedPortoSession({
+        credentialId: restoredSession.credentialId,
+        address: restoredSession.address,
+      });
+      if (hydratedAddress) return hydratedAddress;
+    }
+
+    try {
+      await promptForPasskey(restoredSession.credentialId);
+    } catch (e: unknown) {
+      portoLog.warn('Porto session restore blocked — passkey assertion failed:', getErrorMessage(e) || e);
+      return null;
+    }
+
+    if (shouldAbortPortoRestore(revisionAtStart)) return finishAbortedPortoRestore();
+    const persisted = await persistPortoSession(restoredSession);
+    if (shouldAbortPortoRestore(revisionAtStart)) return finishAbortedPortoRestore();
+    if (persisted) {
+      localStorage.removeItem(PORTO_STORAGE_KEY);
+    }
+    return adoptRestoredPortoSession(restoredSession, privateKeyToAccount(restoredSession.privateKey as any));
+  }
+  if (sessionRecord.address || sessionRecord.privateKey || sessionRecord.credentialId) {
+    portoLog.warn('Discarding invalid legacy Porto session: stored address does not match private key.');
+    localStorage.removeItem(PORTO_STORAGE_KEY);
+  }
+  return null;
+}
+
+function getPortoSessionInProgressError(): Error {
+  return new Error('Porto account switch is in progress. Retry after the selected passkey account finishes connecting.');
 }
 
 const PORTO_KDF_SALT = new TextEncoder().encode('contextengine.xyz:porto:v1');
@@ -623,16 +871,13 @@ export async function authenticatePorto(): Promise<string> {
     try {
       const account = privateKeyToAccount(privateKey as any);
 
-      currentSession = {
+      const nextSession = {
         credentialId: bufferToBase64URL(credential.rawId),
         address: account.address, // Use the real address derived from the key
         privateKey: privateKey    // Store for signing
       };
 
-      await _saveSession();
-      currentSessionSignerAccount = account;
-      _initViemClient();
-      return currentSession.address;
+      return activatePortoSession(nextSession, account);
     } finally {
       privateKey = null;
     }
@@ -670,16 +915,13 @@ export async function loginWithPorto(): Promise<string> {
     try {
       const newAccount = privateKeyToAccount(newPrivateKey as any);
 
-      currentSession = {
+      const nextSession = {
         credentialId: bufferToBase64URL(credential.rawId),
         address: newAccount.address,
         privateKey: newPrivateKey
       };
 
-      await _saveSession();
-      currentSessionSignerAccount = newAccount;
-      _initViemClient();
-      return currentSession.address;
+      return activatePortoSession(nextSession, newAccount);
     } finally {
       newPrivateKey = null;
     }
@@ -690,6 +932,8 @@ export async function loginWithPorto(): Promise<string> {
 }
 
 export async function restoreSession(options: RestoreSessionOptions = {}): Promise<string | null> {
+  if (isPortoSessionTransitionInProgress()) return null;
+  const revisionAtStart = portoSessionRevision;
   const requireSigner = options?.requireSigner !== false;
   try {
     if (hasCurrentPortoSessionMetadata() && (!requireSigner || hasCurrentPortoSessionSigner())) {
@@ -710,82 +954,34 @@ export async function restoreSession(options: RestoreSessionOptions = {}): Promi
       record.encryptedPrivateKey &&
       record.encryptedPrivateKeyIv
     ) {
-      if (!requireSigner) {
-        const hydratedAddress = adoptHydratedPortoSession({
-          credentialId: record.credentialId,
-          address: record.address,
-        });
-        if (hydratedAddress) return hydratedAddress;
+      if (isSuppressedPersistedPortoSessionAddress(record.address)) {
+        await clearPersistedPortoSessionBestEffort();
+        return null;
       }
-
-      try {
-        try {
-          await promptForPasskey(record.credentialId);
-        } catch (e: any) {
-          portoLog.warn('Porto session restore blocked — passkey assertion failed:', e?.message || e);
-          return null;
-        }
-
-        let privateKey: string | null = await decryptPrivateKey(
-          record.encryptedPrivateKey,
-          record.encryptedPrivateKeyIv,
-          record.credentialId
-        );
-        try {
-          const restoredSession = buildValidatedPortoSession({
-            credentialId: record.credentialId,
-            address: record.address,
-            privateKey
-          });
-          if (!restoredSession) {
-            portoLog.warn('Discarding invalid Porto session record: stored address does not match private key.');
-          } else {
-            currentSession = restoredSession;
-            currentSessionSignerAccount = privateKeyToAccount(privateKey as any);
-            _initViemClient();
-            return currentSession.address;
-          }
-        } finally {
-          privateKey = null;
-        }
-      } catch (e) {
-        portoLog.error("Failed to decrypt Porto session:", e);
-      }
+      const restoredAddress = await restoreEncryptedPortoSessionRecord(
+        record,
+        requireSigner,
+        revisionAtStart
+      );
+      if (restoredAddress) return restoredAddress;
+      if (shouldAbortPortoRestore(revisionAtStart)) return finishAbortedPortoRestore();
     }
 
     const stored = localStorage.getItem(PORTO_STORAGE_KEY);
     if (stored) {
-      const session: any = JSON.parse(stored);
-      const restoredSession = buildValidatedPortoSession(session);
-      if (restoredSession) {
-        if (!requireSigner) {
-          const hydratedAddress = adoptHydratedPortoSession({
-            credentialId: restoredSession.credentialId,
-            address: restoredSession.address,
-          });
-          if (hydratedAddress) return hydratedAddress;
-        }
-
-        try {
-          await promptForPasskey(restoredSession.credentialId);
-        } catch (e: any) {
-          portoLog.warn('Porto session restore blocked — passkey assertion failed:', e?.message || e);
-          return null;
-        }
-
-        currentSession = restoredSession;
-        const persisted = await _saveSession();
-        if (persisted) {
-          localStorage.removeItem(PORTO_STORAGE_KEY);
-        }
-        currentSessionSignerAccount = privateKeyToAccount(restoredSession.privateKey as any);
-        _initViemClient();
-        return currentSession.address;
+      const session = JSON.parse(stored) as unknown;
+      const sessionRecord = toUnknownRecord(session);
+      if (isSuppressedPersistedPortoSessionAddress(sessionRecord.address)) {
+        await clearPersistedPortoSessionBestEffort();
+        return null;
       }
-      if (session && (session.address || session.privateKey || session.credentialId)) {
-        portoLog.warn('Discarding invalid legacy Porto session: stored address does not match private key.');
-        localStorage.removeItem(PORTO_STORAGE_KEY);
-      }
+      const restoredAddress = await restoreLegacyPortoSession(
+        session,
+        requireSigner,
+        revisionAtStart
+      );
+      if (restoredAddress) return restoredAddress;
+      if (shouldAbortPortoRestore(revisionAtStart)) return finishAbortedPortoRestore();
     }
   } catch (e) {
     portoLog.error("Failed to restore Porto session:", e);
@@ -794,19 +990,17 @@ export async function restoreSession(options: RestoreSessionOptions = {}): Promi
 }
 
 export function logoutPorto(): void {
-  try {
-    localStorage.removeItem(PORTO_STORAGE_KEY);
-  } catch (e) { portoLog.warn('portoFunctions: fallback', e); }
-  deletePortoSessionRecord().catch((e) => {
-    portoLog.error("Failed to clear Porto session:", e);
-  });
-  currentSession = null;
-  currentSessionSignerAccount = null;
-  viemWalletClient = null;
+  portoAccountSwitchInProgress = false;
+  portoSessionTransitionInProgress = false;
+  clearSuppressedPersistedPortoSessionAddress();
+  bumpPortoSessionRevision();
+  void clearPersistedPortoSessionBestEffort();
+  clearCurrentPortoSession();
 }
 
 export function getPortoAddress(): string | null {
-  return currentSession ? currentSession.address : null;
+  if (isPortoSessionTransitionInProgress()) return null;
+  return currentPortoAddressOrNull();
 }
 
 export function setPortoSessionKeyEnabled(enabled: any): void {
@@ -825,12 +1019,23 @@ export function hasPortoSessionSigner(): boolean {
 }
 
 export function isPortoAutoSignReady(): boolean {
-  return !!(sessionKeyEnabled && hasCurrentPortoSessionMetadata() && hasCurrentPortoSessionSigner());
+  return !!(
+    !isPortoSessionTransitionInProgress() &&
+    sessionKeyEnabled &&
+    hasCurrentPortoSessionMetadata() &&
+    hasCurrentPortoSessionSigner()
+  );
 }
 
 export async function sendPortoTransaction(txRequest: AnyObj): Promise<any> {
+  if (isPortoSessionTransitionInProgress()) {
+    throw getPortoSessionInProgressError();
+  }
   if (!viemWalletClient) {
     await restoreSession({ requireSigner: true });
+  }
+  if (isPortoSessionTransitionInProgress()) {
+    throw getPortoSessionInProgressError();
   }
   if (!viemWalletClient) throw new Error("Porto client not initialized");
 

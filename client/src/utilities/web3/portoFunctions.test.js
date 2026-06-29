@@ -115,7 +115,7 @@ const ensureWebCrypto = () => {
   }
 };
 
-const createIndexedDbMock = (sessionRecord) => ({
+const createIndexedDbMock = (sessionRecord, options = {}) => ({
   open: jest.fn(() => {
     const request = {
       onsuccess: null,
@@ -139,22 +139,50 @@ const createIndexedDbMock = (sessionRecord) => ({
             objectStore: jest.fn(() => ({
               get: jest.fn(() => {
                 const getRequest = { onsuccess: null, onerror: null, result: sessionRecord, error: null };
-                setTimeout(() => {
+                const completeGet = () => {
                   if (typeof getRequest.onsuccess === 'function') {
                     getRequest.onsuccess({ target: getRequest });
                   }
                   if (typeof tx.oncomplete === 'function') {
                     tx.oncomplete();
                   }
-                }, 0);
+                };
+                if (typeof options.waitForGet === 'function') {
+                  options.waitForGet().then(completeGet, (error) => {
+                    tx.error = error;
+                    getRequest.error = error;
+                    if (typeof getRequest.onerror === 'function') {
+                      getRequest.onerror({ target: getRequest });
+                    }
+                    if (typeof tx.onerror === 'function') {
+                      tx.onerror({ target: tx });
+                    }
+                  });
+                  return getRequest;
+                }
+                setTimeout(completeGet, 0);
                 return getRequest;
               }),
-              put: jest.fn(() => {
-                setTimeout(() => {
+              put: jest.fn((record, key) => {
+                if (typeof options.onPut === 'function') {
+                  options.onPut(record, key);
+                }
+                const completePut = () => {
                   if (typeof tx.oncomplete === 'function') {
                     tx.oncomplete();
                   }
-                }, 0);
+                };
+                if (typeof options.waitForPut === 'function') {
+                  options.waitForPut(record, key).then(completePut, (error) => {
+                    tx.error = error;
+                    if (typeof tx.onerror === 'function') {
+                      tx.onerror({ target: tx });
+                    }
+                  });
+                  return undefined;
+                }
+                setTimeout(completePut, 0);
+                return undefined;
               }),
               delete: jest.fn(() => {
                 setTimeout(() => {
@@ -172,6 +200,27 @@ const createIndexedDbMock = (sessionRecord) => ({
       request.result = db;
       if (typeof request.onsuccess === 'function') {
         request.onsuccess({ target: { result: db } });
+      }
+    }, 0);
+
+    return request;
+  }),
+});
+
+const createFailingIndexedDbMock = (error = new Error('IndexedDB unavailable')) => ({
+  open: jest.fn(() => {
+    const request = {
+      onsuccess: null,
+      onerror: null,
+      onupgradeneeded: null,
+      result: null,
+      error: null,
+    };
+
+    setTimeout(() => {
+      request.error = error;
+      if (typeof request.onerror === 'function') {
+        request.onerror({ target: request });
       }
     }, 0);
 
@@ -677,6 +726,244 @@ describe('Porto key derivation migration', () => {
 
     expect(privateKeyToAccountMock.mock.calls.map(([privateKey]) => privateKey)).toEqual([HKDF_PRIVATE_KEY]);
     expect(address).toBe(HKDF_ADDRESS);
+  });
+
+  it('clears stale legacy storage after persisting a selected passkey account switch', async () => {
+    Object.defineProperty(window, 'PublicKeyCredential', {
+      value: function PublicKeyCredential() {},
+      configurable: true,
+    });
+    setCredentialsMock({
+      getImpl: async () => ({ rawId: RAW_ID }),
+    });
+
+    let persistedRecord = null;
+    Object.defineProperty(globalThis, 'indexedDB', {
+      value: createIndexedDbMock({
+        credentialId: 'stored-cred',
+        address: LEGACY_ADDRESS,
+        encryptedPrivateKey: 'encrypted-old-key',
+        encryptedPrivateKeyIv: 'encrypted-old-iv',
+      }, {
+        onPut: (record) => {
+          persistedRecord = record;
+        },
+      }),
+      configurable: true,
+    });
+    localStorage.setItem(
+      PORTO_STORAGE_KEY,
+      JSON.stringify({
+        credentialId: 'legacy-cred',
+        address: LEGACY_ADDRESS,
+        privateKey: PRIVATE_KEY,
+      })
+    );
+
+    const { porto } = loadPortoHarness({
+      privateKeyToAccountImpl: () => makeSignerAccount(HKDF_ADDRESS),
+    });
+
+    await expect(porto.loginWithPorto()).resolves.toBe(HKDF_ADDRESS);
+    expect(persistedRecord).toEqual(expect.objectContaining({
+      address: HKDF_ADDRESS,
+    }));
+    expect(localStorage.getItem(PORTO_STORAGE_KEY)).toBeNull();
+
+    Object.defineProperty(globalThis, 'indexedDB', {
+      value: createFailingIndexedDbMock(),
+      configurable: true,
+    });
+    const { porto: reloadedPorto, createWalletClientMock } = loadPortoHarness({
+      privateKeyToAccountImpl: () => makeSignerAccount(LEGACY_ADDRESS),
+    });
+
+    await expect(reloadedPorto.restoreSession({ requireSigner: false })).resolves.toBeNull();
+    expect(createWalletClientMock).not.toHaveBeenCalled();
+  });
+
+  it('blocks stale Porto sends while a different selected passkey account is being persisted', async () => {
+    Object.defineProperty(window, 'PublicKeyCredential', {
+      value: function PublicKeyCredential() {},
+      configurable: true,
+    });
+    setCredentialsMock({
+      getImpl: async () => ({ id: 'assertion', rawId: RAW_ID }),
+    });
+
+    const encrypted = await encryptStoredPrivateKey(PRIVATE_KEY, CREDENTIAL_ID);
+    let releasePut;
+    const putStarted = new Promise((resolve) => {
+      Object.defineProperty(globalThis, 'indexedDB', {
+        value: createIndexedDbMock({
+          credentialId: CREDENTIAL_ID,
+          address: BASE_ADDRESS,
+          encryptedPrivateKey: encrypted.encryptedPrivateKey,
+          encryptedPrivateKeyIv: encrypted.encryptedPrivateKeyIv,
+        }, {
+          waitForPut: () => {
+            resolve();
+            return new Promise((putResolve) => {
+              releasePut = putResolve;
+            });
+          },
+        }),
+        configurable: true,
+      });
+    });
+
+    let accountCallCount = 0;
+    const { porto, createWalletClientMock, sendTransactionMock } = loadPortoHarness({
+      privateKeyToAccountImpl: () => {
+        accountCallCount += 1;
+        return makeSignerAccount(accountCallCount >= 3 ? TARGET_ADDRESS : BASE_ADDRESS);
+      },
+    });
+
+    const restoredAddress = await porto.restoreSession();
+    expect(restoredAddress).toBe(BASE_ADDRESS);
+    expect(await porto.createPortoProviderMock().request({ method: 'eth_accounts', params: [] })).toEqual([BASE_ADDRESS]);
+
+    const loginPromise = porto.loginWithPorto();
+    await putStarted;
+
+    expect(await porto.createPortoProviderMock().request({ method: 'eth_accounts', params: [] })).toEqual([]);
+    await expect(porto.sendPortoTransaction({
+      to: TARGET_ADDRESS,
+      value: '0x0',
+      data: '0x',
+    })).rejects.toThrow('Porto account switch is in progress');
+    expect(sendTransactionMock).not.toHaveBeenCalled();
+
+    releasePut();
+    await expect(loginPromise).resolves.toBe(TARGET_ADDRESS);
+    expect(await porto.createPortoProviderMock().request({ method: 'eth_accounts', params: [] })).toEqual([TARGET_ADDRESS]);
+    expect(createWalletClientMock).toHaveBeenCalledTimes(2);
+    expect(createWalletClientMock.mock.calls[1][0].account.address).toBe(TARGET_ADDRESS);
+  });
+
+  it('does not let an in-flight metadata restore re-adopt the saved account after passkey login', async () => {
+    Object.defineProperty(window, 'PublicKeyCredential', {
+      value: function PublicKeyCredential() {},
+      configurable: true,
+    });
+    setCredentialsMock({
+      getImpl: async () => ({ id: 'assertion', rawId: RAW_ID }),
+    });
+
+    const encrypted = await encryptStoredPrivateKey(PRIVATE_KEY, CREDENTIAL_ID);
+    let releaseGet = () => {};
+    let getCallCount = 0;
+    const getStarted = new Promise((resolve) => {
+      Object.defineProperty(globalThis, 'indexedDB', {
+        value: createIndexedDbMock({
+          credentialId: CREDENTIAL_ID,
+          address: BASE_ADDRESS,
+          encryptedPrivateKey: encrypted.encryptedPrivateKey,
+          encryptedPrivateKeyIv: encrypted.encryptedPrivateKeyIv,
+        }, {
+          waitForGet: () => {
+            getCallCount += 1;
+            if (getCallCount > 1) return Promise.resolve();
+            resolve();
+            return new Promise((getResolve) => {
+              releaseGet = getResolve;
+            });
+          },
+        }),
+        configurable: true,
+      });
+    });
+
+    const { porto, createWalletClientMock } = loadPortoHarness({
+      privateKeyToAccountImpl: () => makeSignerAccount(TARGET_ADDRESS),
+    });
+
+    const restorePromise = porto.restoreSession({ requireSigner: false });
+    await getStarted;
+
+    await expect(porto.loginWithPorto()).resolves.toBe(TARGET_ADDRESS);
+    releaseGet();
+
+    await expect(restorePromise).resolves.toBe(TARGET_ADDRESS);
+    expect(await porto.createPortoProviderMock().request({ method: 'eth_accounts', params: [] })).toEqual([TARGET_ADDRESS]);
+    expect(createWalletClientMock).toHaveBeenCalledTimes(1);
+    expect(createWalletClientMock.mock.calls[0][0].account.address).toBe(TARGET_ADDRESS);
+  });
+
+  it('fails closed when an unhydrated saved account differs and selected-session persistence fails', async () => {
+    Object.defineProperty(window, 'PublicKeyCredential', {
+      value: function PublicKeyCredential() {},
+      configurable: true,
+    });
+    setCredentialsMock({
+      getImpl: async () => ({ id: 'assertion', rawId: RAW_ID }),
+    });
+
+    const encrypted = await encryptStoredPrivateKey(PRIVATE_KEY, CREDENTIAL_ID);
+    Object.defineProperty(globalThis, 'indexedDB', {
+      value: createIndexedDbMock({
+        credentialId: CREDENTIAL_ID,
+        address: BASE_ADDRESS,
+        encryptedPrivateKey: encrypted.encryptedPrivateKey,
+        encryptedPrivateKeyIv: encrypted.encryptedPrivateKeyIv,
+      }, {
+        waitForPut: () => Promise.reject(new Error('put failed')),
+      }),
+      configurable: true,
+    });
+
+    const { porto, createWalletClientMock } = loadPortoHarness({
+      privateKeyToAccountImpl: () => makeSignerAccount(TARGET_ADDRESS),
+    });
+
+    await expect(porto.loginWithPorto()).rejects.toThrow('Failed to persist selected Porto passkey session.');
+    expect(await porto.createPortoProviderMock().request({ method: 'eth_accounts', params: [] })).toEqual([]);
+    expect(createWalletClientMock).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when a hydrated saved account differs and selected-session persistence fails', async () => {
+    Object.defineProperty(window, 'PublicKeyCredential', {
+      value: function PublicKeyCredential() {},
+      configurable: true,
+    });
+    setCredentialsMock({
+      getImpl: async () => ({ id: 'assertion', rawId: RAW_ID }),
+    });
+
+    const encrypted = await encryptStoredPrivateKey(PRIVATE_KEY, CREDENTIAL_ID);
+    Object.defineProperty(globalThis, 'indexedDB', {
+      value: createIndexedDbMock({
+        credentialId: CREDENTIAL_ID,
+        address: BASE_ADDRESS,
+        encryptedPrivateKey: encrypted.encryptedPrivateKey,
+        encryptedPrivateKeyIv: encrypted.encryptedPrivateKeyIv,
+      }, {
+        waitForPut: () => Promise.reject(new Error('put failed')),
+      }),
+      configurable: true,
+    });
+
+    let accountCallCount = 0;
+    const { porto, createWalletClientMock, sendTransactionMock } = loadPortoHarness({
+      privateKeyToAccountImpl: () => {
+        accountCallCount += 1;
+        return makeSignerAccount(accountCallCount >= 3 ? TARGET_ADDRESS : BASE_ADDRESS);
+      },
+    });
+
+    await expect(porto.restoreSession()).resolves.toBe(BASE_ADDRESS);
+    expect(await porto.createPortoProviderMock().request({ method: 'eth_accounts', params: [] })).toEqual([BASE_ADDRESS]);
+
+    await expect(porto.loginWithPorto()).rejects.toThrow('Failed to persist selected Porto passkey session.');
+    expect(await porto.createPortoProviderMock().request({ method: 'eth_accounts', params: [] })).toEqual([]);
+    await expect(porto.sendPortoTransaction({
+      to: TARGET_ADDRESS,
+      value: '0x0',
+      data: '0x',
+    })).rejects.toThrow('Porto client not initialized');
+    expect(sendTransactionMock).not.toHaveBeenCalled();
+    expect(createWalletClientMock).toHaveBeenCalledTimes(1);
   });
 
   it('propagates HKDF failures during login instead of silently falling back', async () => {
