@@ -2580,6 +2580,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     }
 
     if (this.state.wagmiLoginUpdateNeeded && wagmiAddr && !reduxIsWagmi) {
+      this.startPortoSessionAction();
       this.setState({ wagmiLoginUpdateNeeded: false });
       this.props.updateLoginInfo({ loginInProgress: true, loginComplete: false, provider: 'wagmi' });
       try {
@@ -2599,6 +2600,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     }
 
     if (!wagmiAddr && this.props.provider === 'wagmi') {
+      this.startPortoSessionAction();
       this.props.updateLoginInfo({ loginInProgress: false, loginComplete: false, provider: null });
       this.props.changeAccount({});
       this.setState({ wagmiLoginUpdateNeeded: false });
