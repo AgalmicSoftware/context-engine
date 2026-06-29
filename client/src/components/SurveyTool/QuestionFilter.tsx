@@ -3412,6 +3412,7 @@ class QuestionFilter extends React.Component<any, any> {
                 isSBTCacheReady={this.props.isSBTCacheReady}
                 sbtCacheRevision={this.props.sbtCacheRevision}
                 sessionSlug={sbtFilterSessionSlug}
+                activeSessionSlug={sbtFilterSessionSlug}
                 sessionConfig={sbtFilterSessionConfig}
                 ensureLightSbtUniverse={this.props.ensureLightSbtUniverse}
               />
