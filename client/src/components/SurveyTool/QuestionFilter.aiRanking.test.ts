@@ -373,6 +373,92 @@ describe('QuestionFilter AI ranking lifecycle', () => {
     }
   });
 
+  it('refreshes AI ranking against the full pool when combined mode is disabled', async () => {
+    jest.useFakeTimers();
+    const gateSpy = jest.spyOn(sponsoredAccessAny, 'resolveSponsoredGateStateForResource')
+      .mockReturnValue({ status: sponsoredAccess.SPONSORED_GATE_STATES.OPEN });
+    const localSpy = jest.spyOn(aiSettings, 'getLocalAiSettings').mockReturnValue({ providers: {} });
+    const rankSpy = jest.spyOn(aiScripts, 'rankQuestionsAI').mockResolvedValue(['q4', 'q2', 'q3', 'q1']);
+
+    const questions = [
+      { id: 'q1', type: 'binary', tags: ['alpha'], prompt: 'Q1' },
+      { id: 'q2', type: 'rating', tags: ['beta'], prompt: 'Q2' },
+      { id: 'q3', type: 'binary', tags: ['alpha'], prompt: 'Q3' },
+      { id: 'q4', type: 'freeform', tags: ['beta'], prompt: 'Q4' },
+    ];
+    const instance = new QuestionFilter({
+      activeSessionSlug: 'edge',
+      questions,
+      questionResponses: {},
+      network: { id: 84532 },
+      provider: 'wagmi',
+    });
+    instance._isMounted = true;
+    instance.setState = jest.fn((next, cb) => {
+      const patch = typeof next === 'function' ? next(instance.state, instance.props) : next;
+      instance.state = { ...instance.state, ...(patch || {}) };
+      if (typeof cb === 'function') cb();
+      return patch;
+    });
+    instance.state = {
+      ...instance.state,
+      mergedQuestions: questions,
+      pendingSelectedTypes: ['binary'],
+      pendingSbtFilteredQuestions: null,
+      pendingShowTopQuestions: false,
+      pendingShowTopQuestionsByResponses: false,
+      selectedTags: ['alpha'],
+      aiSearchQuery: 'climate',
+      aiDraftQuery: 'climate',
+      aiRankingCount: 4,
+      aiAppliedTopN: 4,
+      aiFilterApplied: true,
+      aiRankedQuestionIds: ['q3', 'q1'],
+      aiCombineWithOtherFilters: true,
+    };
+    instance.state.aiLastAppliedSignature = instance.buildAiApplySignature({
+      queryOverride: 'climate',
+      candidateQuestions: [questions[0], questions[2]],
+    });
+
+    try {
+      instance.handleAiCombineWithFiltersChange({ target: { checked: false } });
+
+      expect(rankSpy).not.toHaveBeenCalled();
+      jest.runAllTimers();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(rankSpy).toHaveBeenCalledTimes(1);
+      expect(rankSpy).toHaveBeenCalledWith(
+        'climate',
+        [
+          expect.objectContaining({ id: 'q1' }),
+          expect.objectContaining({ id: 'q2' }),
+          expect.objectContaining({ id: 'q3' }),
+          expect.objectContaining({ id: 'q4' }),
+        ],
+        4,
+        expect.objectContaining({
+          sessionSlug: 'edge',
+        })
+      );
+      expect(instance.state.aiCombineWithOtherFilters).toBe(false);
+      expect(instance.state.aiRankedQuestionIds).toEqual(['q4', 'q2', 'q3', 'q1']);
+      expect(instance.buildFilterPipelineResult(true).finalQuestions.map((q: any) => q.id)).toEqual([
+        'q4',
+        'q2',
+        'q3',
+        'q1',
+      ]);
+    } finally {
+      gateSpy.mockRestore();
+      localSpy.mockRestore();
+      rankSpy.mockRestore();
+      jest.useRealTimers();
+    }
+  });
+
   it('clears stale manual-load filters when the loaded filter omits those families', () => {
     const instance = new QuestionFilter({
       questionResponses: {},

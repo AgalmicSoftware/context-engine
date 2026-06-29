@@ -2237,7 +2237,7 @@ class QuestionFilter extends React.Component<any, any> {
     this.setState(buildQuestionFilterAiCombinePatch(checked), () => {
       if (this.state.aiFilterApplied && String(this.state.aiSearchQuery || '').trim()) {
         this.handleApplyFilters(true);
-        this.queueCombinedAiRefreshIfNeeded('ai-combine-toggle');
+        this.queueAutoApplyAiFilter('ai-combine-toggle');
       }
     });
   };
