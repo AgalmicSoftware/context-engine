@@ -44,6 +44,8 @@ jest.mock('../../utilities/web3/portoFunctions.js', () => ({
   getPortoChain: jest.fn(() => null),
   setPortoChain: jest.fn(),
   restoreSession: jest.fn(async () => null),
+  authenticatePorto: jest.fn(async () => '0x1111111111111111111111111111111111111111'),
+  loginWithPorto: jest.fn(async () => '0x1111111111111111111111111111111111111111'),
   logoutPorto: jest.fn(),
 }));
 
@@ -205,6 +207,33 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
       loginComplete: true,
       provider: 'porto_passkey',
     });
+  });
+
+  it('does not let pending Porto restore overwrite explicit sign-in', async () => {
+    let resolveRestore!: (value: string | null) => void;
+    mockedPortoFunctions.restoreSession.mockImplementationOnce(
+      () => new Promise<string | null>((resolve) => { resolveRestore = resolve; })
+    );
+    mockedPortoFunctions.loginWithPorto.mockResolvedValueOnce(ALT_PASSKEY_ADDRESS);
+    const props = buildProps({
+      provider: 'none',
+    });
+    const subject = mountClassSubject(new LoginAndSettingsModalSubject(props));
+
+    const mountPromise = subject.componentDidMount();
+    await subject.handlePortoSignIn();
+    resolveRestore(PASSKEY_ADDRESS);
+    await mountPromise;
+
+    expect(mockedPortoFunctions.loginWithPorto).toHaveBeenCalledTimes(1);
+    expect(props.changeAccount).toHaveBeenCalledTimes(1);
+    expect(props.changeAccount).toHaveBeenCalledWith(expect.objectContaining({
+      account: ALT_PASSKEY_ADDRESS,
+      provider: 'porto_passkey',
+    }));
+    expect(props.changeAccount).not.toHaveBeenCalledWith(expect.objectContaining({
+      account: PASSKEY_ADDRESS,
+    }));
   });
 
   it('does not prefetch worker auth when loginComplete flips true after restore', () => {

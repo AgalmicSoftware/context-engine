@@ -314,6 +314,8 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   _sponsoredReqId: number = 0;
   _cacheClearInFlight: boolean = false;
   _testFundsRequestId: number = 0;
+  _portoSessionRestoreReqId: number = 0;
+  _portoSessionActionId: number = 0;
 
   getListModePrimarySessionSlug = (state: Partial<LoginAndSettingsModalState> = this.state) => {
     const scope = this.getSessionScanScopeValue(state);
@@ -403,10 +405,17 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
 
     // Porto session rehydration
     const portoNetwork = this.getPortoNetwork();
+    const portoRestoreReqId = this._portoSessionRestoreReqId + 1;
+    this._portoSessionRestoreReqId = portoRestoreReqId;
+    const portoActionIdAtRestoreStart = this._portoSessionActionId;
     const restoredAddress = await portoFunctions.restoreSession({ requireSigner: false });
     if (!this._isMounted) return;
 
-    if (restoredAddress) {
+    const restoreStillCurrent = (
+      portoRestoreReqId === this._portoSessionRestoreReqId &&
+      portoActionIdAtRestoreStart === this._portoSessionActionId
+    );
+    if (restoredAddress && restoreStillCurrent) {
        accountLog.log("Restored Porto Session:", restoredAddress);
        const web3info = {
         account: restoredAddress,
@@ -679,6 +688,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   // Porto / passkey handlers
 
   handlePortoSignUp = async () => {
+    this._portoSessionActionId += 1;
     this.props.updateLoginInfo({
       loginInProgress: true,
       loginComplete: false,
@@ -696,6 +706,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   };
 
   handlePortoSignIn = async () => {
+    this._portoSessionActionId += 1;
     this.props.updateLoginInfo({
       loginInProgress: true,
       loginComplete: false,
@@ -738,6 +749,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   };
 
   handleLogout = async () => {
+    this._portoSessionActionId += 1;
     if (this.props.provider === 'porto_passkey') {
        portoFunctions.logoutPorto();
     }
