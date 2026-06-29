@@ -42,7 +42,7 @@ export type SurveyResultsDisplayPanelsArgs = {
   onSurveyViewModeKeyDown: (event: React.KeyboardEvent<HTMLElement>) => void;
   onSurveyViewModeToggle: () => void;
   onToggleQuestionList: () => void;
-  onToggleResponse: (index: number) => void;
+  onToggleResponse: (responseId: string) => void;
   preNetworkQuestions?: Record<string, SurveyResultsIndividualQuestionRecord>;
   questionModeEntries?: SurveyResultsEntry[];
   questionResponsesNonce?: unknown;

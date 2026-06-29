@@ -235,7 +235,7 @@ describe('SurveyResultsDisplayPanels', () => {
     const tree = renderSurveyResultsDisplayPanels({
       ...baseProps,
       account: '0xabc',
-      activeToggles: { 0: true },
+      activeToggles: { 'survey-1:0xabc': true },
       applyDecryptedOverrideToResponse,
       getLockedResponseKey,
       getResponseCardProps,
