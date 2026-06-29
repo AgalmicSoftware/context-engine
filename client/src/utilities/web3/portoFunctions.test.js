@@ -115,7 +115,7 @@ const ensureWebCrypto = () => {
   }
 };
 
-const createIndexedDbMock = (sessionRecord) => ({
+const createIndexedDbMock = (sessionRecord, options = {}) => ({
   open: jest.fn(() => {
     const request = {
       onsuccess: null,
@@ -149,12 +149,26 @@ const createIndexedDbMock = (sessionRecord) => ({
                 }, 0);
                 return getRequest;
               }),
-              put: jest.fn(() => {
-                setTimeout(() => {
+              put: jest.fn((record, key) => {
+                if (typeof options.onPut === 'function') {
+                  options.onPut(record, key);
+                }
+                const completePut = () => {
                   if (typeof tx.oncomplete === 'function') {
                     tx.oncomplete();
                   }
-                }, 0);
+                };
+                if (typeof options.waitForPut === 'function') {
+                  options.waitForPut(record, key).then(completePut, (error) => {
+                    tx.error = error;
+                    if (typeof tx.onerror === 'function') {
+                      tx.onerror({ target: tx });
+                    }
+                  });
+                  return undefined;
+                }
+                setTimeout(completePut, 0);
+                return undefined;
               }),
               delete: jest.fn(() => {
                 setTimeout(() => {
@@ -677,6 +691,66 @@ describe('Porto key derivation migration', () => {
 
     expect(privateKeyToAccountMock.mock.calls.map(([privateKey]) => privateKey)).toEqual([HKDF_PRIVATE_KEY]);
     expect(address).toBe(HKDF_ADDRESS);
+  });
+
+  it('blocks stale Porto sends while a different selected passkey account is being persisted', async () => {
+    Object.defineProperty(window, 'PublicKeyCredential', {
+      value: function PublicKeyCredential() {},
+      configurable: true,
+    });
+    setCredentialsMock({
+      getImpl: async () => ({ id: 'assertion', rawId: RAW_ID }),
+    });
+
+    const encrypted = await encryptStoredPrivateKey(PRIVATE_KEY, CREDENTIAL_ID);
+    let releasePut;
+    const putStarted = new Promise((resolve) => {
+      Object.defineProperty(globalThis, 'indexedDB', {
+        value: createIndexedDbMock({
+          credentialId: CREDENTIAL_ID,
+          address: BASE_ADDRESS,
+          encryptedPrivateKey: encrypted.encryptedPrivateKey,
+          encryptedPrivateKeyIv: encrypted.encryptedPrivateKeyIv,
+        }, {
+          waitForPut: () => {
+            resolve();
+            return new Promise((putResolve) => {
+              releasePut = putResolve;
+            });
+          },
+        }),
+        configurable: true,
+      });
+    });
+
+    let accountCallCount = 0;
+    const { porto, createWalletClientMock, sendTransactionMock } = loadPortoHarness({
+      privateKeyToAccountImpl: () => {
+        accountCallCount += 1;
+        return makeSignerAccount(accountCallCount >= 3 ? TARGET_ADDRESS : BASE_ADDRESS);
+      },
+    });
+
+    const restoredAddress = await porto.restoreSession();
+    expect(restoredAddress).toBe(BASE_ADDRESS);
+    expect(await porto.createPortoProviderMock().request({ method: 'eth_accounts', params: [] })).toEqual([BASE_ADDRESS]);
+
+    const loginPromise = porto.loginWithPorto();
+    await putStarted;
+
+    expect(await porto.createPortoProviderMock().request({ method: 'eth_accounts', params: [] })).toEqual([]);
+    await expect(porto.sendPortoTransaction({
+      to: TARGET_ADDRESS,
+      value: '0x0',
+      data: '0x',
+    })).rejects.toThrow('Porto account switch is in progress');
+    expect(sendTransactionMock).not.toHaveBeenCalled();
+
+    releasePut();
+    await expect(loginPromise).resolves.toBe(TARGET_ADDRESS);
+    expect(await porto.createPortoProviderMock().request({ method: 'eth_accounts', params: [] })).toEqual([TARGET_ADDRESS]);
+    expect(createWalletClientMock).toHaveBeenCalledTimes(2);
+    expect(createWalletClientMock.mock.calls[1][0].account.address).toBe(TARGET_ADDRESS);
   });
 
   it('propagates HKDF failures during login instead of silently falling back', async () => {
