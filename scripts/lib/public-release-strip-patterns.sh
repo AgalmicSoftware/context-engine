@@ -54,7 +54,6 @@ scripts/vendor-cecc-ethers-bundle.js
 scripts/build_external_llm_prompt.py
 tests/root/*.private.test.*
 artifacts
-tests/artifacts
 private-pack.manifest.json
 Demo Integration Package
 whitepaper/Slides.pdf
