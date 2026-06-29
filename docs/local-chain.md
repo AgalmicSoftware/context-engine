@@ -25,7 +25,7 @@ active contracts directly.
 ## Architecture
 
 *   **Node:** `anvil` (spins up a local RPC at `http://127.0.0.1:8545`).
-*   **Deploy:** `forge script` (compiles contracts and deploys them to Anvil). The local deploy script lives at `script/DeployLocal.s.sol`.
+*   **Deploy:** `forge script` (compiles contracts and deploys them to Anvil). The local deploy script lives at `foundry/script/DeployLocal.s.sol`.
 *   **Bridge:** The deployment script writes addresses to `client/src/variables/local-contracts.json` (Surveys, SBTFactory, SessionRegistry).
 *   **Client:** The React app detects this JSON file and overrides the production config when running in local mode.
 
@@ -59,7 +59,7 @@ To run the extended local gate that adds the Anvil-backed Surveys + SBT integrat
 npm run tests
 ```
 
-To run the Surveys + SBT contractScripts integration test against Anvil (in `test/contractScripts.surveys-sbt.test.js`, proxied via `client/src/utilities/web3/contractScripts.surveys-sbt.proxy.test.js`):
+To run the Surveys + SBT contractScripts integration test against Anvil (in `tests/root/contractScripts.surveys-sbt.test.js`, proxied via `client/src/utilities/web3/contractScripts.surveys-sbt.proxy.test.js`):
 
 ```bash
 npm run test:surveys-sbt
@@ -73,7 +73,7 @@ npm run test:surveys-sbt
 npm run test:client
 ```
 
-`npm run test:contracts` runs the Foundry suites for `test/Surveys.t.sol`, `test/CustomSBT.t.sol`, and `test/SessionRegistry.t.sol`.
+`npm run test:contracts` runs the Foundry suites for `foundry/test/Surveys.t.sol`, `foundry/test/CustomSBT.t.sol`, and `foundry/test/SessionRegistry.t.sol`.
 
 ## Manual Development
 

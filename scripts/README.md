@@ -2,9 +2,10 @@
 
 JS/Python tooling, automation, audits, seeders, and E2E runners live here.
 
-This directory is intentionally separate from the repo-root `script/` directory:
+This directory is intentionally separate from the Foundry Solidity script
+directory:
 
-- `script/` = Foundry Solidity deploy scripts
+- `foundry/script/` = Foundry Solidity deploy scripts
 - `scripts/` = Node/Python/shell tooling and workflow automation
 
 Common contents here include:
@@ -36,5 +37,7 @@ npm run deploy-helper:deploy -- \
 When `--allowed-origins` is omitted, the deploy-helper publish script seeds the stable hosted/local bootstrap origins used by `/new`.
 For self-hosted app origins, pass `--allowed-origins` explicitly because the CLI cannot infer the current browser host.
 
-If you are looking for Solidity deployment entry points, use [`../script/`](../script/) instead.
-If you are looking for source-of-truth Foundry or root Node tests, use [`../test/`](../test/) instead.
+If you are looking for Solidity deployment entry points, use
+[`../foundry/script/`](../foundry/script/) instead.
+If you are looking for Forge tests, use [`../foundry/test/`](../foundry/test/).
+If you are looking for root Node/Jest tests, use [`../tests/root/`](../tests/root/).
