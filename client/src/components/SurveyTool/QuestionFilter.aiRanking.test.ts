@@ -212,12 +212,24 @@ describe('QuestionFilter AI ranking lifecycle', () => {
     const overrideResult = instance.buildFilterPipelineResult(true);
     expect(overrideResult.finalQuestions.map((q: any) => q.id)).toEqual(['q4', 'q3']);
 
+    const combinedCandidates = [
+      expect.objectContaining({ id: 'q1' }),
+      expect.objectContaining({ id: 'q3' }),
+    ];
     instance.state = {
       ...instance.state,
       aiCombineWithOtherFilters: true,
+      aiLastAppliedSignature: instance.buildAiApplySignature({
+        queryOverride: 'climate',
+        candidateQuestions: [
+          questions[0],
+          questions[2],
+        ],
+      }),
     };
     const combinedResult = instance.buildFilterPipelineResult(true);
     expect(combinedResult.finalQuestions.map((q: any) => q.id)).toEqual(['q3', 'q1']);
+    expect(instance.getAiRankingCandidates()).toEqual(combinedCandidates);
   });
 
   it('ranks within the filtered subset when AI combine global top results miss it', () => {
@@ -244,12 +256,121 @@ describe('QuestionFilter AI ranking lifecycle', () => {
       aiSearchQuery: 'climate',
       aiAppliedTopN: 2,
       aiFilterApplied: true,
-      aiRankedQuestionIds: ['q4', 'q2', 'q3', 'q1'],
+      aiRankedQuestionIds: ['q3', 'q1'],
       aiCombineWithOtherFilters: true,
     };
+    instance.state.aiLastAppliedSignature = instance.buildAiApplySignature({
+      queryOverride: 'climate',
+      candidateQuestions: [
+        questions[0],
+        questions[2],
+      ],
+    });
 
     const combinedResult = instance.buildFilterPipelineResult(true);
     expect(combinedResult.finalQuestions.map((q: any) => q.id)).toEqual(['q3', 'q1']);
+  });
+
+  it('refreshes combined AI ranking when a tag filter changes the candidate subset', async () => {
+    jest.useFakeTimers();
+    const gateSpy = jest.spyOn(sponsoredAccessAny, 'resolveSponsoredGateStateForResource')
+      .mockReturnValue({ status: sponsoredAccess.SPONSORED_GATE_STATES.OPEN });
+    const localSpy = jest.spyOn(aiSettings, 'getLocalAiSettings').mockReturnValue({ providers: {} });
+    const rankSpy = jest.spyOn(aiScripts, 'rankQuestionsAI').mockResolvedValue(['q4', 'q2']);
+    const onFilter = jest.fn();
+
+    const questions = [
+      { id: 'q1', type: 'binary', tags: ['alpha'], prompt: 'Q1' },
+      { id: 'q2', type: 'rating', tags: ['beta'], prompt: 'Q2' },
+      { id: 'q3', type: 'binary', tags: ['alpha'], prompt: 'Q3' },
+      { id: 'q4', type: 'freeform', tags: ['beta'], prompt: 'Q4' },
+    ];
+    const instance = new QuestionFilter({
+      activeSessionSlug: 'edge',
+      questions,
+      questionResponses: {},
+      network: { id: 84532 },
+      provider: 'wagmi',
+      onFilter,
+    });
+    instance._isMounted = true;
+    instance.setState = jest.fn((next, cb) => {
+      const patch = typeof next === 'function' ? next(instance.state, instance.props) : next;
+      instance.state = { ...instance.state, ...(patch || {}) };
+      if (typeof cb === 'function') cb();
+      return patch;
+    });
+    instance.state = {
+      ...instance.state,
+      mergedQuestions: questions,
+      pendingSelectedTypes: [],
+      pendingSbtFilteredQuestions: null,
+      pendingShowTopQuestions: false,
+      pendingShowTopQuestionsByResponses: false,
+      selectedTags: [],
+      aiSearchQuery: 'climate',
+      aiDraftQuery: 'climate',
+      aiRankingCount: 2,
+      aiAppliedTopN: 2,
+      aiFilterApplied: true,
+      aiRankedQuestionIds: ['q1'],
+      aiCombineWithOtherFilters: true,
+    };
+    instance.state.aiLastAppliedSignature = instance.buildAiApplySignature({
+      queryOverride: 'climate',
+      candidateQuestions: questions,
+    });
+
+    try {
+      instance.handleTagSelection('beta');
+
+      expect(rankSpy).not.toHaveBeenCalled();
+      expect(onFilter).toHaveBeenLastCalledWith(
+        [
+          expect.objectContaining({ id: 'q2' }),
+          expect.objectContaining({ id: 'q4' }),
+        ],
+        expect.objectContaining({
+          aiFilter: 'climate',
+          aiCombine: true,
+          selectedTags: ['beta'],
+        })
+      );
+
+      jest.runAllTimers();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(rankSpy).toHaveBeenCalledTimes(1);
+      expect(rankSpy).toHaveBeenCalledWith(
+        'climate',
+        [
+          expect.objectContaining({ id: 'q2' }),
+          expect.objectContaining({ id: 'q4' }),
+        ],
+        2,
+        expect.objectContaining({
+          sessionSlug: 'edge',
+        })
+      );
+      expect(instance.state.aiRankedQuestionIds).toEqual(['q4', 'q2']);
+      expect(onFilter).toHaveBeenLastCalledWith(
+        [
+          expect.objectContaining({ id: 'q4' }),
+          expect.objectContaining({ id: 'q2' }),
+        ],
+        expect.objectContaining({
+          aiFilter: 'climate',
+          aiCombine: true,
+          selectedTags: ['beta'],
+        })
+      );
+    } finally {
+      gateSpy.mockRestore();
+      localSpy.mockRestore();
+      rankSpy.mockRestore();
+      jest.useRealTimers();
+    }
   });
 
   it('clears stale manual-load filters when the loaded filter omits those families', () => {
