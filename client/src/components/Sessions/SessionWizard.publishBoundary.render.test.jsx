@@ -166,6 +166,48 @@ describe('SessionWizard publish boundary rendering', () => {
     });
   });
 
+  it('ignores same-tick publish re-entry while registration is already in flight', async () => {
+    const manualMetadataUri = `ar://${'e'.repeat(43)}`;
+    let resolveRegister = () => {};
+    const registerPromise = new Promise((resolve) => {
+      resolveRegister = resolve;
+    });
+    mockRegisterSessionOnChain.mockImplementation(async () => registerPromise);
+
+    renderLoggedInSessionWizard();
+    enableAdvancedMode();
+
+    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
+      target: { value: 'Manual Metadata Reentry Boundary Session' },
+    });
+    await chooseCustomWorkerWithoutDeploy();
+
+    const publishButton = await openPublishSection();
+    fireEvent.click(screen.getByLabelText('Advanced publish settings'));
+    fireEvent.change(screen.getByPlaceholderText(/ar:\/\/<txId>/i), {
+      target: { value: manualMetadataUri },
+    });
+
+    await waitFor(() => {
+      expect(publishButton).not.toBeDisabled();
+    });
+
+    fireEvent.click(publishButton);
+    fireEvent.click(publishButton);
+
+    await waitFor(() => {
+      expect(mockRegisterSessionOnChain).toHaveBeenCalledTimes(1);
+    });
+
+    await act(async () => {
+      resolveRegister({ txs: [] });
+      await registerPromise;
+    });
+    await waitFor(() => {
+      expect(publishButton).not.toBeDisabled();
+    });
+  });
+
   it('passes manual metadata through the register boundary with pinned register args', async () => {
     const manualMetadataUri = `ar://${'b'.repeat(43)}`;
     mockRegisterSessionOnChain.mockImplementation(async (args) => {
