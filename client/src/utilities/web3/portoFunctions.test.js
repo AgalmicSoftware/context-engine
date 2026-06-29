@@ -847,6 +847,50 @@ describe('Porto key derivation migration', () => {
     expect(createWalletClientMock).not.toHaveBeenCalled();
   });
 
+  it('fails closed when a hydrated saved account differs and selected-session persistence fails', async () => {
+    Object.defineProperty(window, 'PublicKeyCredential', {
+      value: function PublicKeyCredential() {},
+      configurable: true,
+    });
+    setCredentialsMock({
+      getImpl: async () => ({ id: 'assertion', rawId: RAW_ID }),
+    });
+
+    const encrypted = await encryptStoredPrivateKey(PRIVATE_KEY, CREDENTIAL_ID);
+    Object.defineProperty(globalThis, 'indexedDB', {
+      value: createIndexedDbMock({
+        credentialId: CREDENTIAL_ID,
+        address: BASE_ADDRESS,
+        encryptedPrivateKey: encrypted.encryptedPrivateKey,
+        encryptedPrivateKeyIv: encrypted.encryptedPrivateKeyIv,
+      }, {
+        waitForPut: () => Promise.reject(new Error('put failed')),
+      }),
+      configurable: true,
+    });
+
+    let accountCallCount = 0;
+    const { porto, createWalletClientMock, sendTransactionMock } = loadPortoHarness({
+      privateKeyToAccountImpl: () => {
+        accountCallCount += 1;
+        return makeSignerAccount(accountCallCount >= 3 ? TARGET_ADDRESS : BASE_ADDRESS);
+      },
+    });
+
+    await expect(porto.restoreSession()).resolves.toBe(BASE_ADDRESS);
+    expect(await porto.createPortoProviderMock().request({ method: 'eth_accounts', params: [] })).toEqual([BASE_ADDRESS]);
+
+    await expect(porto.loginWithPorto()).rejects.toThrow('Failed to persist selected Porto passkey session.');
+    expect(await porto.createPortoProviderMock().request({ method: 'eth_accounts', params: [] })).toEqual([]);
+    await expect(porto.sendPortoTransaction({
+      to: TARGET_ADDRESS,
+      value: '0x0',
+      data: '0x',
+    })).rejects.toThrow('Porto client not initialized');
+    expect(sendTransactionMock).not.toHaveBeenCalled();
+    expect(createWalletClientMock).toHaveBeenCalledTimes(1);
+  });
+
   it('propagates HKDF failures during login instead of silently falling back', async () => {
     const hkdfError = new Error('HKDF failed');
     importKeySpy = jest.spyOn(window.crypto.subtle, 'importKey').mockRejectedValue(hkdfError);

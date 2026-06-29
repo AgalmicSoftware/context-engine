@@ -687,8 +687,17 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
 
   // Porto / passkey handlers
 
-  handlePortoSignUp = async () => {
+  startPortoSessionAction = (): number => {
     this._portoSessionActionId += 1;
+    return this._portoSessionActionId;
+  };
+
+  isCurrentPortoSessionAction = (actionId: number): boolean => (
+    this._isMounted && actionId === this._portoSessionActionId
+  );
+
+  handlePortoSignUp = async () => {
+    const portoActionId = this.startPortoSessionAction();
     this.props.updateLoginInfo({
       loginInProgress: true,
       loginComplete: false,
@@ -698,15 +707,17 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     try {
       const portoNetwork = this.getPortoNetwork();
       const address = await portoFunctions.authenticatePorto();
+      if (!this.isCurrentPortoSessionAction(portoActionId)) return;
       this._finalizePortoLogin(address, portoNetwork);
     } catch (error) {
       accountLog.error("Porto Sign Up Error:", error);
+      if (!this.isCurrentPortoSessionAction(portoActionId)) return;
       this.props.updateLoginInfo({ loginInProgress: false, loginComplete: false, provider: null });
     }
   };
 
   handlePortoSignIn = async () => {
-    this._portoSessionActionId += 1;
+    const portoActionId = this.startPortoSessionAction();
     this.props.updateLoginInfo({
       loginInProgress: true,
       loginComplete: false,
@@ -716,9 +727,11 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     try {
       const portoNetwork = this.getPortoNetwork();
       const address = await portoFunctions.loginWithPorto();
+      if (!this.isCurrentPortoSessionAction(portoActionId)) return;
       this._finalizePortoLogin(address, portoNetwork);
     } catch (error) {
       accountLog.error("Porto Sign In Error:", error);
+      if (!this.isCurrentPortoSessionAction(portoActionId)) return;
       this.props.updateLoginInfo({ loginInProgress: false, loginComplete: false, provider: null });
     }
   };
