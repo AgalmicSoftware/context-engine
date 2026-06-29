@@ -200,6 +200,14 @@ const resolvePortoRelayUrls = (chain: any, primaryUrl: string): string[] => uniq
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 const normalizePortoAddress = (value: unknown): string => String(value || '').trim().toLowerCase();
+const getErrorMessage = (error: unknown): string => (
+  error && typeof error === 'object' && 'message' in error
+    ? String((error as { message?: unknown }).message || error)
+    : String(error || '')
+);
+const toUnknownRecord = (value: unknown): Record<string, unknown> => (
+  value && typeof value === 'object' ? value as Record<string, unknown> : {}
+);
 const hasCurrentPortoSessionMetadata = (): boolean => (
   !!currentSession &&
   typeof currentSession === 'object' &&
@@ -592,9 +600,12 @@ function _initViemClient(): void {
 
 async function persistPortoSession(session: PortoSession | null | undefined): Promise<boolean> {
   if (!session) return false;
-  let privateKey: any = session.privateKey;
+  let privateKey: string | null = typeof session.privateKey === 'string'
+    ? session.privateKey
+    : null;
 
   try {
+    if (!privateKey) throw new Error('Missing Porto session private key.');
     const encrypted = await encryptPrivateKey(privateKey, session.credentialId);
     await writePortoSessionRecord({
       version: PORTO_SESSION_RECORD_VERSION,
@@ -716,8 +727,8 @@ async function restoreEncryptedPortoSessionRecord(
   try {
     try {
       await promptForPasskey(record.credentialId);
-    } catch (e: any) {
-      portoLog.warn('Porto session restore blocked — passkey assertion failed:', e?.message || e);
+    } catch (e: unknown) {
+      portoLog.warn('Porto session restore blocked — passkey assertion failed:', getErrorMessage(e) || e);
       return null;
     }
 
@@ -749,11 +760,12 @@ async function restoreEncryptedPortoSessionRecord(
 }
 
 async function restoreLegacyPortoSession(
-  session: any,
+  session: unknown,
   requireSigner: boolean,
   revisionAtStart: number
 ): Promise<string | null> {
-  const restoredSession = buildValidatedPortoSession(session);
+  const sessionRecord = toUnknownRecord(session);
+  const restoredSession = buildValidatedPortoSession(sessionRecord);
   if (restoredSession) {
     if (!requireSigner) {
       if (shouldAbortPortoRestore(revisionAtStart)) return finishAbortedPortoRestore();
@@ -766,8 +778,8 @@ async function restoreLegacyPortoSession(
 
     try {
       await promptForPasskey(restoredSession.credentialId);
-    } catch (e: any) {
-      portoLog.warn('Porto session restore blocked — passkey assertion failed:', e?.message || e);
+    } catch (e: unknown) {
+      portoLog.warn('Porto session restore blocked — passkey assertion failed:', getErrorMessage(e) || e);
       return null;
     }
 
@@ -779,7 +791,7 @@ async function restoreLegacyPortoSession(
     }
     return adoptRestoredPortoSession(restoredSession, privateKeyToAccount(restoredSession.privateKey as any));
   }
-  if (session && (session.address || session.privateKey || session.credentialId)) {
+  if (sessionRecord.address || sessionRecord.privateKey || sessionRecord.credentialId) {
     portoLog.warn('Discarding invalid legacy Porto session: stored address does not match private key.');
     localStorage.removeItem(PORTO_STORAGE_KEY);
   }
@@ -956,8 +968,9 @@ export async function restoreSession(options: RestoreSessionOptions = {}): Promi
 
     const stored = localStorage.getItem(PORTO_STORAGE_KEY);
     if (stored) {
-      const session: any = JSON.parse(stored);
-      if (isSuppressedPersistedPortoSessionAddress(session?.address)) {
+      const session = JSON.parse(stored) as unknown;
+      const sessionRecord = toUnknownRecord(session);
+      if (isSuppressedPersistedPortoSessionAddress(sessionRecord.address)) {
         await clearPersistedPortoSessionBestEffort();
         return null;
       }
