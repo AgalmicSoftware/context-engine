@@ -109,6 +109,7 @@ let viemWalletClient: any = null;
 let portoAccountSwitchInProgress = false;
 let portoSessionTransitionInProgress = false;
 let portoSessionRevision = 0;
+let suppressedPersistedPortoSessionAddress = '';
 let sessionKeyEnabled = typeof PORTO_SESSION_KEY_ENABLED === 'boolean'
   ? PORTO_SESSION_KEY_ENABLED
   : true;
@@ -212,6 +213,10 @@ const hasCurrentPortoSessionSigner = (): boolean => (
 );
 
 const clearCurrentPortoSigner = (): void => { currentSessionSignerAccount = null; viemWalletClient = null; };
+const clearCurrentPortoSession = (): void => {
+  currentSession = null;
+  clearCurrentPortoSigner();
+};
 const bumpPortoSessionRevision = (): number => {
   portoSessionRevision += 1;
   return portoSessionRevision;
@@ -235,6 +240,16 @@ const restoreWasSuperseded = (revisionAtStart: number): boolean => (
 );
 const currentPortoAddressOrNull = (): string | null => (
   currentSession ? currentSession.address : null
+);
+const suppressPersistedPortoSessionAddress = (address: unknown): void => {
+  suppressedPersistedPortoSessionAddress = normalizePortoAddress(address);
+};
+const clearSuppressedPersistedPortoSessionAddress = (): void => {
+  suppressedPersistedPortoSessionAddress = '';
+};
+const isSuppressedPersistedPortoSessionAddress = (address: unknown): boolean => (
+  !!suppressedPersistedPortoSessionAddress &&
+  normalizePortoAddress(address) === suppressedPersistedPortoSessionAddress
 );
 
 const buildHydratedPortoSession = ({ credentialId, address }: Partial<PortoSession> = {}): PortoSession | null => {
@@ -372,6 +387,19 @@ async function deletePortoSessionRecord(): Promise<void> {
       reject(tx.error);
     };
   });
+}
+
+async function clearPersistedPortoSessionBestEffort(): Promise<void> {
+  try {
+    localStorage.removeItem(PORTO_STORAGE_KEY);
+  } catch (e) {
+    portoLog.warn('portoFunctions: fallback', e);
+  }
+  try {
+    await deletePortoSessionRecord();
+  } catch (e) {
+    portoLog.error("Failed to clear Porto session:", e);
+  }
 }
 
 async function derivePortoSessionKey(credentialId: string): Promise<CryptoKey> {
@@ -630,8 +658,14 @@ async function activatePortoSession(nextSession: PortoSession, signerAccount: un
     if (accountChanged) portoAccountSwitchInProgress = true;
 
     const persisted = await persistPortoSession(nextSession);
-    if (accountChanged && !persisted) throw new Error('Failed to persist selected Porto passkey session.');
+    if (accountChanged && !persisted) {
+      suppressPersistedPortoSessionAddress(persistedAddress || prevAddress);
+      clearCurrentPortoSession();
+      await clearPersistedPortoSessionBestEffort();
+      throw new Error('Failed to persist selected Porto passkey session.');
+    }
 
+    clearSuppressedPersistedPortoSessionAddress();
     currentSession = nextSession;
     currentSessionSignerAccount = signerAccount;
     _initViemClient();
@@ -907,6 +941,10 @@ export async function restoreSession(options: RestoreSessionOptions = {}): Promi
       record.encryptedPrivateKey &&
       record.encryptedPrivateKeyIv
     ) {
+      if (isSuppressedPersistedPortoSessionAddress(record.address)) {
+        await clearPersistedPortoSessionBestEffort();
+        return null;
+      }
       const restoredAddress = await restoreEncryptedPortoSessionRecord(
         record,
         requireSigner,
@@ -919,6 +957,10 @@ export async function restoreSession(options: RestoreSessionOptions = {}): Promi
     const stored = localStorage.getItem(PORTO_STORAGE_KEY);
     if (stored) {
       const session: any = JSON.parse(stored);
+      if (isSuppressedPersistedPortoSessionAddress(session?.address)) {
+        await clearPersistedPortoSessionBestEffort();
+        return null;
+      }
       const restoredAddress = await restoreLegacyPortoSession(
         session,
         requireSigner,
@@ -936,15 +978,10 @@ export async function restoreSession(options: RestoreSessionOptions = {}): Promi
 export function logoutPorto(): void {
   portoAccountSwitchInProgress = false;
   portoSessionTransitionInProgress = false;
+  clearSuppressedPersistedPortoSessionAddress();
   bumpPortoSessionRevision();
-  try {
-    localStorage.removeItem(PORTO_STORAGE_KEY);
-  } catch (e) { portoLog.warn('portoFunctions: fallback', e); }
-  deletePortoSessionRecord().catch((e) => {
-    portoLog.error("Failed to clear Porto session:", e);
-  });
-  currentSession = null;
-  clearCurrentPortoSigner();
+  void clearPersistedPortoSessionBestEffort();
+  clearCurrentPortoSession();
 }
 
 export function getPortoAddress(): string | null {

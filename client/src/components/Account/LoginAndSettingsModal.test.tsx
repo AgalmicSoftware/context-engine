@@ -236,6 +236,34 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     }));
   });
 
+  it('does not let stale Porto sign-in completion overwrite logout', async () => {
+    let resolveLogin!: (value: string) => void;
+    mockedPortoFunctions.loginWithPorto.mockImplementationOnce(
+      () => new Promise<string>((resolve) => { resolveLogin = resolve; })
+    );
+    const props = buildProps({
+      provider: 'none',
+    });
+    const subject = mountClassSubject(new LoginAndSettingsModalSubject(props));
+
+    const signInPromise = subject.handlePortoSignIn();
+    await subject.handleLogout();
+    resolveLogin(ALT_PASSKEY_ADDRESS);
+    await signInPromise;
+
+    expect(mockedPortoFunctions.loginWithPorto).toHaveBeenCalledTimes(1);
+    expect(props.changeAccount).toHaveBeenCalledTimes(1);
+    expect(props.changeAccount).toHaveBeenCalledWith({});
+    expect(props.changeAccount).not.toHaveBeenCalledWith(expect.objectContaining({
+      account: ALT_PASSKEY_ADDRESS,
+    }));
+    expect(props.updateLoginInfo).not.toHaveBeenLastCalledWith({
+      loginInProgress: false,
+      loginComplete: true,
+      provider: 'porto_passkey',
+    });
+  });
+
   it('does not prefetch worker auth when loginComplete flips true after restore', () => {
     const prevProps = buildProps({
       account: PASSKEY_ADDRESS,
