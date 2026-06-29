@@ -88,6 +88,7 @@ import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
 import { getWorkerSessionToken, clearAllWorkerSessionTokens } from '../../utilities/worker/workerAuth.js';
 import { resolveActiveSessionSlug } from '../../utilities/session/sessionNaming.js';
 import { markUserExplicitlyDisconnected } from '../../utilities/web3/wagmiDisconnectState.js';
+import { notify } from '../../utilities/ui/notify.js';
 import {
   normalizeSessionScanScope,
   normalizeSessionScanSlugs,
@@ -120,6 +121,7 @@ import {
 } from './loginSettingsAiDisplayHelpers';
 
 const accountLog = createLogger('account');
+const normalizeAccountForComparison = (value: unknown): string => String(value || '').trim().toLowerCase();
 type AccountUserPageProps = {
   viewAddress?: string;
   account?: string;
@@ -712,6 +714,14 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
 
   _finalizePortoLogin = (address: any, targetNetwork: any = null) => {
       const portoNetwork = this.getPortoNetwork(targetNetwork);
+      const previousPortoAccount = this.props.provider === 'porto_passkey'
+        ? normalizeAccountForComparison(this.props.account)
+        : '';
+      const nextPortoAccount = normalizeAccountForComparison(address);
+      if (previousPortoAccount && nextPortoAccount && previousPortoAccount !== nextPortoAccount) {
+        clearAllWorkerSessionTokens();
+        notify.info('Passkey account switched.');
+      }
       const web3info = {
         account: address,
         provider: 'porto_passkey',

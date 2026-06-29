@@ -15,6 +15,7 @@ import {
   getWorkerSessionToken,
   clearAllWorkerSessionTokens,
 } from '../../utilities/worker/workerAuth.js';
+import { notify } from '../../utilities/ui/notify.js';
 import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
 import { baseSepolia, getDefaultHttpRpc } from '../../variables/chains.js';
 
@@ -82,6 +83,12 @@ jest.mock('../../utilities/worker/workerAuth.js', () => ({
   clearAllWorkerSessionTokens: jest.fn(),
 }));
 
+jest.mock('../../utilities/ui/notify.js', () => ({
+  notify: {
+    info: jest.fn(),
+  },
+}));
+
 jest.mock('../../utilities/session/sessionScanScope.js', () => ({
   normalizeSessionScanScope: jest.fn((value) => value || 'all'),
   normalizeSessionScanSlugs: jest.fn((value) => value || []),
@@ -107,6 +114,7 @@ const mockedGetAllSessionSlugs = getAllSessionSlugs as any;
 const mockedGetSessionConfigBySlugOrDefault = getSessionConfigBySlugOrDefault as any;
 const mockedGetSessionNetwork = getSessionNetwork as any;
 const mockedSessionScanScope = sessionScanScope as any;
+const mockedNotify = notify as any;
 
 const buildProps = (overrides: Record<string, any> = {}) => ({
   changeAccount: jest.fn(),
@@ -440,6 +448,28 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
 
     expect(mockedPortoFunctions.logoutPorto).toHaveBeenCalledTimes(1);
     expect(localStorage.getItem('ce:userDisconnected')).toBeNull();
+  });
+
+  it('clears worker tokens and notifies when Porto sign-in switches passkey accounts', () => {
+    const props = buildProps({
+      account: PASSKEY_ADDRESS,
+      provider: 'porto_passkey',
+    });
+    const subject = new LoginAndSettingsModalSubject(props);
+
+    subject._finalizePortoLogin(ALT_PASSKEY_ADDRESS, { id: 84532, chainId: 84532, name: 'Base Sepolia' });
+
+    expect(clearAllWorkerSessionTokens).toHaveBeenCalledTimes(1);
+    expect(mockedNotify.info).toHaveBeenCalledWith('Passkey account switched.');
+    expect(props.changeAccount).toHaveBeenCalledWith(expect.objectContaining({
+      account: ALT_PASSKEY_ADDRESS,
+      provider: 'porto_passkey',
+    }));
+    expect(props.updateLoginInfo).toHaveBeenCalledWith({
+      loginInProgress: false,
+      loginComplete: true,
+      provider: 'porto_passkey',
+    });
   });
 
   it('uses wagmi balance props for faucet checks without Redux balance state', async () => {
