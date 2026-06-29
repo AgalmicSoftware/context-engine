@@ -3614,9 +3614,9 @@ setState(asSurveyResultsStateUpdater((prevState) => buildSurveyResultsKeyedToggl
 })));
 };
 
-const toggleResponse = (index: unknown): void => {
+const toggleResponse = (responseId: unknown): void => {
 setState(asSurveyResultsStateUpdater((prevState) => buildSurveyResultsKeyedTogglePatch({
-  itemKey: index,
+  itemKey: responseId,
   mapKey: 'activeToggles',
   prevState,
 })));
