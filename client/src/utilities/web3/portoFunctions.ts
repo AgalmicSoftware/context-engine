@@ -106,6 +106,7 @@ export function getPortoChain(): any {
 let currentSession: PortoSession | null = null;
 let currentSessionSignerAccount: any = null;
 let viemWalletClient: any = null;
+let portoAccountSwitchInProgress = false;
 let sessionKeyEnabled = typeof PORTO_SESSION_KEY_ENABLED === 'boolean'
   ? PORTO_SESSION_KEY_ENABLED
   : true;
@@ -208,6 +209,8 @@ const hasCurrentPortoSessionSigner = (): boolean => (
   (typeof currentSession?.privateKey === 'string' && currentSession.privateKey.length > 0)
 );
 
+const clearCurrentPortoSigner = (): void => { currentSessionSignerAccount = null; viemWalletClient = null; };
+
 const buildHydratedPortoSession = ({ credentialId, address }: Partial<PortoSession> = {}): PortoSession | null => {
   const normalizedCredentialId = String(credentialId || '').trim();
   const rawAddress = String(address || '').trim();
@@ -228,8 +231,7 @@ const adoptHydratedPortoSession = (session: Partial<PortoSession> | null | undef
   const nextAddress = normalizePortoAddress(nextSession.address);
   currentSession = nextSession;
   if (prevAddress && prevAddress !== nextAddress) {
-    currentSessionSignerAccount = null;
-    viemWalletClient = null;
+    clearCurrentPortoSigner();
   }
   return currentSession.address;
 };
@@ -533,16 +535,16 @@ function _initViemClient(): void {
   }
 }
 
-async function _saveSession(): Promise<boolean> {
-  if (!currentSession) return false;
-  let privateKey: any = currentSession.privateKey;
+async function persistPortoSession(session: PortoSession | null | undefined): Promise<boolean> {
+  if (!session) return false;
+  let privateKey: any = session.privateKey;
 
   try {
-    const encrypted = await encryptPrivateKey(privateKey, currentSession.credentialId);
+    const encrypted = await encryptPrivateKey(privateKey, session.credentialId);
     await writePortoSessionRecord({
       version: PORTO_SESSION_RECORD_VERSION,
-      credentialId: currentSession.credentialId,
-      address: currentSession.address,
+      credentialId: session.credentialId,
+      address: session.address,
       encryptedPrivateKey: encrypted.data,
       encryptedPrivateKeyIv: encrypted.iv
     });
@@ -552,6 +554,27 @@ async function _saveSession(): Promise<boolean> {
     return false;
   } finally {
     privateKey = null;
+  }
+}
+
+async function _saveSession(): Promise<boolean> { return persistPortoSession(currentSession); }
+
+async function activatePortoSession(nextSession: PortoSession, signerAccount: unknown): Promise<string> {
+  const prevAddress = normalizePortoAddress(currentSession?.address);
+  const nextAddress = normalizePortoAddress(nextSession.address);
+  const accountChanged = !!(prevAddress && nextAddress && prevAddress !== nextAddress);
+  if (accountChanged) { portoAccountSwitchInProgress = true; clearCurrentPortoSigner(); }
+
+  try {
+    const persisted = await persistPortoSession(nextSession);
+    if (accountChanged && !persisted) throw new Error('Failed to persist selected Porto passkey session.');
+
+    currentSession = nextSession;
+    currentSessionSignerAccount = signerAccount;
+    _initViemClient();
+    return currentSession.address;
+  } finally {
+    if (accountChanged) portoAccountSwitchInProgress = false;
   }
 }
 
@@ -623,16 +646,13 @@ export async function authenticatePorto(): Promise<string> {
     try {
       const account = privateKeyToAccount(privateKey as any);
 
-      currentSession = {
+      const nextSession = {
         credentialId: bufferToBase64URL(credential.rawId),
         address: account.address, // Use the real address derived from the key
         privateKey: privateKey    // Store for signing
       };
 
-      await _saveSession();
-      currentSessionSignerAccount = account;
-      _initViemClient();
-      return currentSession.address;
+      return activatePortoSession(nextSession, account);
     } finally {
       privateKey = null;
     }
@@ -670,16 +690,13 @@ export async function loginWithPorto(): Promise<string> {
     try {
       const newAccount = privateKeyToAccount(newPrivateKey as any);
 
-      currentSession = {
+      const nextSession = {
         credentialId: bufferToBase64URL(credential.rawId),
         address: newAccount.address,
         privateKey: newPrivateKey
       };
 
-      await _saveSession();
-      currentSessionSignerAccount = newAccount;
-      _initViemClient();
-      return currentSession.address;
+      return activatePortoSession(nextSession, newAccount);
     } finally {
       newPrivateKey = null;
     }
@@ -690,6 +707,7 @@ export async function loginWithPorto(): Promise<string> {
 }
 
 export async function restoreSession(options: RestoreSessionOptions = {}): Promise<string | null> {
+  if (portoAccountSwitchInProgress) return null;
   const requireSigner = options?.requireSigner !== false;
   try {
     if (hasCurrentPortoSessionMetadata() && (!requireSigner || hasCurrentPortoSessionSigner())) {
@@ -794,6 +812,7 @@ export async function restoreSession(options: RestoreSessionOptions = {}): Promi
 }
 
 export function logoutPorto(): void {
+  portoAccountSwitchInProgress = false;
   try {
     localStorage.removeItem(PORTO_STORAGE_KEY);
   } catch (e) { portoLog.warn('portoFunctions: fallback', e); }
@@ -801,11 +820,11 @@ export function logoutPorto(): void {
     portoLog.error("Failed to clear Porto session:", e);
   });
   currentSession = null;
-  currentSessionSignerAccount = null;
-  viemWalletClient = null;
+  clearCurrentPortoSigner();
 }
 
 export function getPortoAddress(): string | null {
+  if (portoAccountSwitchInProgress) return null;
   return currentSession ? currentSession.address : null;
 }
 
@@ -829,6 +848,9 @@ export function isPortoAutoSignReady(): boolean {
 }
 
 export async function sendPortoTransaction(txRequest: AnyObj): Promise<any> {
+  if (portoAccountSwitchInProgress) {
+    throw new Error('Porto account switch is in progress. Retry after the selected passkey account finishes connecting.');
+  }
   if (!viemWalletClient) {
     await restoreSession({ requireSigner: true });
   }
