@@ -118,7 +118,7 @@ const main = async () => {
     predicted,
   }, null, 2));
 
-  run('forge', ['script', 'script/DeployAll.s.sol', '--tc', 'DeployAll', '--rpc-url', rpcUrl, '--broadcast'], {
+  run('forge', ['script', 'foundry/script/DeployAll.s.sol', '--tc', 'DeployAll', '--rpc-url', rpcUrl, '--broadcast'], {
     PRIVATE_KEY: privateKey,
   });
 

@@ -1,31 +1,31 @@
 'use strict';
 
 const ROOT_NODE_TEST_FILES = Object.freeze([
-  'test/arweave-metadata-uri.test.js',
-  'test/client.package.test.js',
-  'test/deployHelperOrigins.test.mjs',
-  'test/e2eTestIds.compat.test.js',
-  'test/rpcDefaults.compat.test.js',
-  'test/sessionCorsWorker.faucet-proof.test.mjs',
-  'test/sessionCorsWorker.package.test.js',
+  'tests/root/arweave-metadata-uri.test.js',
+  'tests/root/client.package.test.js',
+  'tests/root/deployHelperOrigins.test.mjs',
+  'tests/root/e2eTestIds.compat.test.js',
+  'tests/root/rpcDefaults.compat.test.js',
+  'tests/root/sessionCorsWorker.faucet-proof.test.mjs',
+  'tests/root/sessionCorsWorker.package.test.js',
 ]);
 
 const ROOT_JEST_TEST_FILES = Object.freeze([
-  'test/deployHelper.worker.test.js',
-  'test/sessionCorsWorker.admin.test.js',
-  'test/sessionCorsWorker.arweave.test.js',
-  'test/sessionCorsWorker.auth.test.js',
-  'test/sessionCorsWorker.authenticatedActions.test.js',
-  'test/sessionCorsWorker.authenticatedRoutes.test.js',
-  'test/sessionCorsWorker.gates.test.js',
-  'test/sessionCorsWorker.health.test.js',
+  'tests/root/deployHelper.worker.test.js',
+  'tests/root/sessionCorsWorker.admin.test.js',
+  'tests/root/sessionCorsWorker.arweave.test.js',
+  'tests/root/sessionCorsWorker.auth.test.js',
+  'tests/root/sessionCorsWorker.authenticatedActions.test.js',
+  'tests/root/sessionCorsWorker.authenticatedRoutes.test.js',
+  'tests/root/sessionCorsWorker.gates.test.js',
+  'tests/root/sessionCorsWorker.health.test.js',
 ]);
 
 const ROOT_LOCAL_CHAIN_TEST_FILES = Object.freeze([
-  'test/contractScripts.surveys-sbt.test.js',
+  'tests/root/contractScripts.surveys-sbt.test.js',
 ]);
 
-const ROOT_PRIVATE_STRIPPED_TEST_FILE_RE = /^test\/[^/]+\.private\.test\.(?:c?js|mjs)$/;
+const ROOT_PRIVATE_STRIPPED_TEST_FILE_RE = /^tests\/root\/[^/]+\.private\.test\.(?:c?js|mjs)$/;
 
 const ROOT_TEST_FILES = Object.freeze([
   ...ROOT_NODE_TEST_FILES,

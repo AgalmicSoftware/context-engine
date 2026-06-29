@@ -52,7 +52,7 @@ scripts/capture-ux-*
 scripts/run-agent-bridge-worker-tests.js
 scripts/vendor-cecc-ethers-bundle.js
 scripts/build_external_llm_prompt.py
-test/*.private.test.*
+tests/root/*.private.test.*
 artifacts
 tests/artifacts
 private-pack.manifest.json
@@ -79,7 +79,7 @@ docs/codebase-*.md
 docs/assets/codebase-*
 docs/*PRD*.md
 docs/*prd*.md
-test/*.private.test.*
+tests/root/*.private.test.*
 EOF
 }
 
@@ -127,7 +127,7 @@ scripts/lib/e2e
 scripts/start-playwright-server.js
 scripts/run-agent-bridge-worker-tests.js
 scripts/vendor-cecc-ethers-bundle.js
-test/*.private.test.*
+tests/root/*.private.test.*
 whitepaper/Slides.pdf
 whitepaper/IdeasMap.md
 EOF
