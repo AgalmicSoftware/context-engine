@@ -614,6 +614,7 @@ async function persistPortoSession(session: PortoSession | null | undefined): Pr
       encryptedPrivateKey: encrypted.data,
       encryptedPrivateKeyIv: encrypted.iv
     });
+    localStorage.removeItem(PORTO_STORAGE_KEY);
     return true;
   } catch (e) {
     portoLog.error("Failed to persist Porto session:", e);
