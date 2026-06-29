@@ -314,6 +314,7 @@ type SbtSelectorCallback<TValue> = {
   bivarianceHack(value: TValue): void;
 }['bivarianceHack'];
 type SbtSelectorProps = {
+  activeSessionSlug?: unknown;
   additionalSBTOptions?: unknown;
   autoDiscover?: boolean;
   chainId?: unknown;
