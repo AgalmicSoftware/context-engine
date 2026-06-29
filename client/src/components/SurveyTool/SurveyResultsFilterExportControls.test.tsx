@@ -173,6 +173,7 @@ describe('renderSurveyResultsFilterExportControls', () => {
       isSBTCacheReady: false,
       items: [{ responder: '0xaaa' }],
       mode: 'responder',
+      activeSessionSlug: 'demo',
       sessionConfig: expect.objectContaining({ slug: 'demo' }),
       sessionSlug: 'demo',
       ensureLightSbtUniverse: expect.any(Function),
