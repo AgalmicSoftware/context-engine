@@ -139,14 +139,28 @@ const createIndexedDbMock = (sessionRecord, options = {}) => ({
             objectStore: jest.fn(() => ({
               get: jest.fn(() => {
                 const getRequest = { onsuccess: null, onerror: null, result: sessionRecord, error: null };
-                setTimeout(() => {
+                const completeGet = () => {
                   if (typeof getRequest.onsuccess === 'function') {
                     getRequest.onsuccess({ target: getRequest });
                   }
                   if (typeof tx.oncomplete === 'function') {
                     tx.oncomplete();
                   }
-                }, 0);
+                };
+                if (typeof options.waitForGet === 'function') {
+                  options.waitForGet().then(completeGet, (error) => {
+                    tx.error = error;
+                    getRequest.error = error;
+                    if (typeof getRequest.onerror === 'function') {
+                      getRequest.onerror({ target: getRequest });
+                    }
+                    if (typeof tx.onerror === 'function') {
+                      tx.onerror({ target: tx });
+                    }
+                  });
+                  return getRequest;
+                }
+                setTimeout(completeGet, 0);
                 return getRequest;
               }),
               put: jest.fn((record, key) => {
@@ -751,6 +765,52 @@ describe('Porto key derivation migration', () => {
     expect(await porto.createPortoProviderMock().request({ method: 'eth_accounts', params: [] })).toEqual([TARGET_ADDRESS]);
     expect(createWalletClientMock).toHaveBeenCalledTimes(2);
     expect(createWalletClientMock.mock.calls[1][0].account.address).toBe(TARGET_ADDRESS);
+  });
+
+  it('does not let an in-flight metadata restore re-adopt the saved account after passkey login', async () => {
+    Object.defineProperty(window, 'PublicKeyCredential', {
+      value: function PublicKeyCredential() {},
+      configurable: true,
+    });
+    setCredentialsMock({
+      getImpl: async () => ({ id: 'assertion', rawId: RAW_ID }),
+    });
+
+    const encrypted = await encryptStoredPrivateKey(PRIVATE_KEY, CREDENTIAL_ID);
+    let releaseGet = () => {};
+    const getStarted = new Promise((resolve) => {
+      Object.defineProperty(globalThis, 'indexedDB', {
+        value: createIndexedDbMock({
+          credentialId: CREDENTIAL_ID,
+          address: BASE_ADDRESS,
+          encryptedPrivateKey: encrypted.encryptedPrivateKey,
+          encryptedPrivateKeyIv: encrypted.encryptedPrivateKeyIv,
+        }, {
+          waitForGet: () => {
+            resolve();
+            return new Promise((getResolve) => {
+              releaseGet = getResolve;
+            });
+          },
+        }),
+        configurable: true,
+      });
+    });
+
+    const { porto, createWalletClientMock } = loadPortoHarness({
+      privateKeyToAccountImpl: () => makeSignerAccount(TARGET_ADDRESS),
+    });
+
+    const restorePromise = porto.restoreSession({ requireSigner: false });
+    await getStarted;
+
+    await expect(porto.loginWithPorto()).resolves.toBe(TARGET_ADDRESS);
+    releaseGet();
+
+    await expect(restorePromise).resolves.toBe(TARGET_ADDRESS);
+    expect(await porto.createPortoProviderMock().request({ method: 'eth_accounts', params: [] })).toEqual([TARGET_ADDRESS]);
+    expect(createWalletClientMock).toHaveBeenCalledTimes(1);
+    expect(createWalletClientMock.mock.calls[0][0].account.address).toBe(TARGET_ADDRESS);
   });
 
   it('propagates HKDF failures during login instead of silently falling back', async () => {
