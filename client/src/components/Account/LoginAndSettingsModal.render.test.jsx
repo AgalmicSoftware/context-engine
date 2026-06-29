@@ -269,6 +269,14 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     localStorage.clear();
+    portoFunctions.authenticatePorto.mockReset();
+    portoFunctions.getPortoChain.mockReset();
+    portoFunctions.getPortoChain.mockReturnValue(null);
+    portoFunctions.loginWithPorto.mockReset();
+    portoFunctions.logoutPorto.mockReset();
+    portoFunctions.restoreSession.mockReset();
+    portoFunctions.restoreSession.mockResolvedValue(null);
+    portoFunctions.setPortoChain.mockReset();
     getAllSessionSlugs.mockReturnValue([]);
     getSessionConfigBySlugOrDefault.mockImplementation(() => ({}));
     checkSponsoredAccess.mockImplementation(async () => ({ status: 'unknown' }));
@@ -862,6 +870,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     portoFunctions.loginWithPorto.mockResolvedValue(PASSKEY_ADDRESS);
     const props = buildProps();
     const subject = new LoginAndSettingsModal(props);
+    subject._isMounted = true;
 
     render(subject.getModalDisplay());
     fireEvent.click(getPasskeyLoginButton());
@@ -894,6 +903,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     portoFunctions.loginWithPorto.mockRejectedValue(new Error('passkey rejected'));
     const props = buildProps();
     const subject = new LoginAndSettingsModal(props);
+    subject._isMounted = true;
 
     render(subject.getModalDisplay());
     fireEvent.click(getPasskeyLoginButton());
