@@ -27,6 +27,12 @@ The release-sanity gate also runs the full client Jest suite without coverage
 before build or deploy verification proceeds, so failing component and style
 regression tests are caught before push/deploy instead of only in main CI.
 
+GitHub Actions runs the same required gates as separate jobs so slow lanes are
+visible and the workflow does not fail at the timeout edge. The final `test` job
+is an aggregate status check that fails if any split lane fails, is canceled, or
+is skipped. Keep local `npm test` / `npm run test:ci` as the serial developer
+gate.
+
 ### Client-Only Tests
 
 ```bash

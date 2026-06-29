@@ -60,6 +60,11 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
       failures.push(`file must be removed: ${relativePath}`);
     }
   };
+  const expectWorkflowContains = (expected, description = expected) => {
+    if (!workflow.includes(expected)) {
+      failures.push(`CI workflow must include ${description}`);
+    }
+  };
 
   expectFile('tests/root/deployHelperOrigins.test.mjs');
   expectFile('scripts/worker-bundle.mjs');
@@ -125,15 +130,33 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('verify:release', 'npm --prefix client run build');
   expectScriptOmits('verify:release', 'NODE_OPTIONS=--openssl-legacy-provider');
 
-  if (!workflow.includes('run: npm run test:ci')) {
-    failures.push('CI workflow must execute "npm run test:ci"');
-  }
-  if (!workflow.includes('run: npm run worker:bundle')) {
-    failures.push('CI workflow must execute "npm run worker:bundle"');
-  }
-  if (!workflow.includes('run: npm run verify:worker-bundle')) {
-    failures.push('CI workflow must execute "npm run verify:worker-bundle"');
-  }
+  expectWorkflowContains('wiring-and-release:', 'the wiring-and-release job');
+  expectWorkflowContains('contracts:', 'the contracts job');
+  expectWorkflowContains('client:', 'the client job');
+  expectWorkflowContains('root-jest:', 'the root-jest job');
+  expectWorkflowContains('workers:', 'the workers job');
+  expectWorkflowContains('cecc-and-node:', 'the cecc-and-node job');
+  expectWorkflowContains('test:', 'the final aggregate test job');
+  expectWorkflowContains('run: npm run test:wiring', '"npm run test:wiring"');
+  expectWorkflowContains('run: npm run lint', '"npm run lint"');
+  expectWorkflowContains('run: npm run typecheck:client', '"npm run typecheck:client"');
+  expectWorkflowContains('run: npm run verify:public-release-surface', '"npm run verify:public-release-surface"');
+  expectWorkflowContains('run: npm run worker:bundle', '"npm run worker:bundle"');
+  expectWorkflowContains('run: npm run verify:worker-bundle', '"npm run verify:worker-bundle"');
+  expectWorkflowContains('run: npm --prefix client run build', '"npm --prefix client run build"');
+  expectWorkflowContains('run: npm run test:contracts', '"npm run test:contracts"');
+  expectWorkflowContains('run: npm run test:client', '"npm run test:client"');
+  expectWorkflowContains('run: npm run test:root:jest', '"npm run test:root:jest"');
+  expectWorkflowContains('run: npm run test:worker:session-cors', '"npm run test:worker:session-cors"');
+  expectWorkflowContains('run: npm run test:cc', '"npm run test:cc"');
+  expectWorkflowContains('run: npm run test:node', '"npm run test:node"');
+  expectWorkflowContains('run: npm run test:cache-guard', '"npm run test:cache-guard"');
+  expectWorkflowContains('uses: actions/upload-artifact@v4', 'client coverage artifact upload');
+  expectWorkflowContains('path: client/coverage/lcov.info', 'client coverage artifact path');
+  expectWorkflowContains('needs:', 'aggregate job dependency list');
+  expectWorkflowContains('if: ${{ always() }}', 'always-running aggregate test job');
+  expectWorkflowContains('WIRING_AND_RELEASE_RESULT:', 'aggregate wiring-and-release result check');
+  expectWorkflowContains('CECC_AND_NODE_RESULT:', 'aggregate cecc-and-node result check');
   if (!publishWorkflow.includes('run: npm run worker:bundle')) {
     failures.push('publish-worker-bundles workflow must execute "npm run worker:bundle"');
   }
