@@ -209,12 +209,6 @@
     },
     {
       "rule": "utilities-no-components",
-      "source": "client/src/utilities/session/sessionProfileScanController.ts",
-      "import": "../../components/MainSite/debugTelemetry.js",
-      "resolved": "client/src/components/MainSite/debugTelemetry"
-    },
-    {
-      "rule": "utilities-no-components",
       "source": "client/src/utilities/survey/sessionSurveyCacheController.ts",
       "import": "../../components/MainSite/metadataCacheEntryBuilders.js",
       "resolved": "client/src/components/MainSite/metadataCacheEntryBuilders"

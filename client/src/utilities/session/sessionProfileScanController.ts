@@ -28,7 +28,7 @@ import {
   emitProfileScanTelemetry as emitMainSiteProfileScanTelemetry,
   isProfileScanColdDiagEnabled as isMainSiteProfileScanColdDiagEnabled,
   isProfileScanTelemetryEnabled as isMainSiteProfileScanTelemetryEnabled,
-} from '../../components/MainSite/debugTelemetry.js';
+} from './profileScanTelemetry.js';
 import { shouldEnableSessionRegistryRefresh } from './mainSiteProgressHelpers.js';
 
 const mainSiteLog = createLogger('mainSite');

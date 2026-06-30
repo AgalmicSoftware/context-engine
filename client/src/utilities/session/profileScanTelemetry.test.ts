@@ -3,7 +3,7 @@ import {
   emitProfileScanTelemetry,
   isProfileScanColdDiagEnabled,
   isProfileScanTelemetryEnabled,
-} from './debugTelemetry';
+} from './profileScanTelemetry';
 
 jest.mock('utilities/logging.js', () => ({
   __esModule: true,
@@ -50,7 +50,7 @@ const createContext = (): TelemetryTestContext => {
   return context;
 };
 
-describe('debugTelemetry', () => {
+describe('profileScanTelemetry', () => {
   afterEach(() => {
     jest.restoreAllMocks();
     delete globals.CE_PROFILE_SCAN_TELEMETRY;
