@@ -6,8 +6,8 @@ import {
 import { normalizeSessionNaming } from './sessionMetadata.js';
 import { getDemoSessionMap } from './sessionDemoCompat.js';
 import { getUsableSessionWorkerUrl } from './sessionWorkerAvailability.js';
+import type { SessionConfigLike } from './sessionTypes.js';
 
-type SessionConfigLike = Record<string, unknown>;
 type ResolveSessionSlugAliasOptions = NonNullable<
   Parameters<typeof resolveSessionSlugAliasFromDemoSessions>[0]
 >;
