@@ -151,6 +151,8 @@ import {
 import type { SurveyResultsStateUpdate } from './surveyResultsState';
 import {
   SURVEY_RESULTS_HTML_REPORT_DEFAULT_SELECTED_SECTIONS as DEFAULT_HTML_REPORT_SELECTED_SECTIONS,
+  buildSurveyResultsFilteredQuestionIdsForExport,
+  buildSurveyResultsFilteredQuestionsForExport,
   buildSurveyResultsDemoAnalysisArtifact,
   buildSurveyResultsExportBaseFileName,
   buildSurveyResultsExportControlsDisplayDescriptor,
@@ -165,6 +167,7 @@ import {
   buildSurveyResultsHtmlReportModalClosePatch,
   buildSurveyResultsHtmlReportModalOpenPatch,
   buildSurveyResultsHtmlReportSectionTogglePatch,
+  type SurveyResultsQuestionExportRecord,
   type SurveyResultsHtmlReportSectionKey,
 } from './surveyResultsExportDisplayHelpers.js';
 import {
@@ -342,13 +345,6 @@ type SurveyResultsFiltersCache = SurveyResultsRecord & {
   bookmarkedFilters?: unknown;
 };
 export type SurveyResultsFilterState = SurveyResultsRecord;
-type SurveyResultsQuestionExportRecord = {
-  id: unknown;
-  options: unknown[];
-  prompt: unknown;
-  tags: unknown[];
-  type: unknown;
-};
 type SurveyResultsQuestionFilterQuestionsMemo = {
   questionResponsesRef: unknown;
   networkQuestionsRef: unknown;
@@ -2638,38 +2634,19 @@ return JSON.stringify(
 };
 
 const getFilteredQuestionIdsForExport = (): string[] => {
-const questionIds = new Set<string>();
-
-Object.keys(stateRef.current.sbtFilteredAggregatorQuestionResponses || {}).forEach((qId) => {
-  const normalized = String(qId || '').trim().toLowerCase();
-  if (normalized) questionIds.add(normalized);
+return buildSurveyResultsFilteredQuestionIdsForExport({
+  aggregatorQuestionResponses: stateRef.current.sbtFilteredAggregatorQuestionResponses,
+  filteredResponses: stateRef.current.sbtFilteredResponses as SurveyResultsSummaryResponseRow[],
+  getResponseQuestionId: (answer) => getResponseQuestionId(answer as SurveyResultsResponseRecord),
+  parseResponse: (response) => parseResponse(response) as SurveyResultsResponseRecord | null,
 });
-
-(stateRef.current.sbtFilteredResponses || []).forEach((response: SurveyResultsSummaryResponseRow) => {
-  const parsedResponse = parseResponse(response?.response);
-  const responseRows = Array.isArray(parsedResponse?.responses) ? parsedResponse.responses : [];
-  responseRows.forEach((answer: SurveyResultsResponseRecord) => {
-    const normalized = getResponseQuestionId(answer);
-    if (normalized) questionIds.add(String(normalized).toLowerCase());
-  });
-});
-
-return Array.from(questionIds);
 };
 
 const getFilteredQuestionsForExport = (): SurveyResultsQuestionExportRecord[] => {
 const networkQuestions = getNetworkQuestionsForCurrentContext() as Record<string, SurveyResultsRecord | undefined>;
-return getFilteredQuestionIdsForExport().map((qId) => {
-  const normalizedQuestionId = qId.toLowerCase();
-  const questionData = networkQuestions[normalizedQuestionId] || networkQuestions[qId] || {};
-
-  return {
-    id: questionData.id || qId,
-    prompt: questionData.prompt || '',
-    type: questionData.type || '',
-    tags: Array.isArray(questionData.tags) ? [...questionData.tags] : [],
-    options: Array.isArray(questionData.options) ? [...questionData.options] : [],
-  };
+return buildSurveyResultsFilteredQuestionsForExport({
+  networkQuestions,
+  questionIds: getFilteredQuestionIdsForExport(),
 });
 };
 
