@@ -71,6 +71,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFile('scripts/deploy-helper-deploy.mjs');
   expectFile('scripts/run-node-tests.js');
   expectFile('scripts/run-node-tests.test.js');
+  expectFile('scripts/check-type-debt-ratchet.mjs');
   expectFile('scripts/testInventoryConfig.js');
   expectFile('scripts/verify-test-inventory.js');
   expectFile('scripts/verify-test-inventory.test.js');
@@ -107,6 +108,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('test:e2e:smoke', 'npm run -s ai:test-nav:smoke');
   expectScriptContains('ai:test-nav:smoke', 'node scripts/vite-navigation-smoke.js');
   expectScriptContains('test:ci', 'npm run test:wiring');
+  expectScriptContains('test:ci', 'npm run type-debt:check');
   expectScriptContains('test:ci', 'npm run verify:release');
   expectScriptContains('test:ci', 'npm run test:root:jest');
   expectScriptContains('test:ci', 'npm run test:worker:session-cors');
@@ -138,6 +140,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectWorkflowContains('cecc-and-node:', 'the cecc-and-node job');
   expectWorkflowContains('test:', 'the final aggregate test job');
   expectWorkflowContains('run: npm run test:wiring', '"npm run test:wiring"');
+  expectWorkflowContains('run: npm run type-debt:check', '"npm run type-debt:check"');
   expectWorkflowContains('run: npm run lint', '"npm run lint"');
   expectWorkflowContains('run: npm run typecheck:client', '"npm run typecheck:client"');
   expectWorkflowContains('run: npm run verify:public-release-surface', '"npm run verify:public-release-surface"');
