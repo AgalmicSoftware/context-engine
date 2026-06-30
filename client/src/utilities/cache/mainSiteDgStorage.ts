@@ -4,7 +4,7 @@ import {
   removeCache,
   writeCacheOptimistic,
 } from '../../utilities/cache/cacheScripts.js';
-import { DG_MANAGED_CACHE_NAMES } from '../../components/MainSite/cacheConstants.js';
+import { DG_MANAGED_CACHE_NAMES } from './sessionCacheConstants.js';
 import {
   evictOldDgEntries,
   removeDgMetaTimestamp,

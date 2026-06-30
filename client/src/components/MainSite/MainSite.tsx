@@ -195,7 +195,7 @@ import {
 import {
   DG_PRIMARY_ROUTE_CACHE_NAMES,
   SESSION_FALLBACK_REDIRECT_STORAGE_KEY_PREFIX,
-} from './cacheConstants.js';
+} from '../../utilities/cache/sessionCacheConstants.js';
 import {
   buildMainSiteCacheManagerReadyStatePatch,
   buildMainSiteLitHooksStatePatch,

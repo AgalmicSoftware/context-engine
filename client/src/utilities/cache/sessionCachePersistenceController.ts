@@ -1,5 +1,5 @@
 import { readCache } from '../../utilities/cache/cacheScripts.js';
-import { DG_PRIMARY_ROUTE_CACHE_NAMES } from '../../components/MainSite/cacheConstants.js';
+import { DG_PRIMARY_ROUTE_CACHE_NAMES } from './sessionCacheConstants.js';
 import { normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
 import { createLogger } from 'utilities/logging.js';
 

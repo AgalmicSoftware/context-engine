@@ -62,7 +62,7 @@ jest.mock('../../components/MainSite/progressHelpers.js', () => ({
   shouldFlushCoalescedRun: jest.fn(() => false),
 }));
 
-jest.mock('../../components/MainSite/cacheConstants.js', () => ({
+jest.mock('../cache/sessionCacheConstants.js', () => ({
   __esModule: true,
   MASKED_Q_DECRYPT_BACKOFF_MAX: 12,
   MASKED_Q_DECRYPT_BACKOFF_TTL_MS: 30000,

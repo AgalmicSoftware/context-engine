@@ -27,7 +27,7 @@ import {
 import {
   MASKED_Q_DECRYPT_BACKOFF_MAX,
   MASKED_Q_DECRYPT_BACKOFF_TTL_MS,
-} from '../../components/MainSite/cacheConstants.js';
+} from '../cache/sessionCacheConstants.js';
 import {
   isMaskedQuestionPayload,
   pickBetterQuestionPayload,
