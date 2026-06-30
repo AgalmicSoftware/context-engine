@@ -829,7 +829,7 @@ describe('SurveyResults export/view controls', () => {
     // port note: the original awaited downloadHtmlReport() directly to assert the
     // 'Connect a wallet with permission...' alert; that direct-execution branch is
     // unreachable from the DOM (the download control is disabled) and the blocked
-    // alert string is pinned in surveyResultsExportDisplayHelpers.test.ts.
+    // alert string is pinned in surveyResultsHtmlReportDownloadAttempt.test.ts.
     expect(screen.getByText('Connect a wallet to download authenticated exports.')).toBeInTheDocument();
     expect(screen.getByText('Connect a wallet to enable download.')).toBeInTheDocument();
     const downloadButton = getDownloadReportButton();
@@ -857,7 +857,7 @@ describe('SurveyResults export/view controls', () => {
 
     // port note: the direct downloadHtmlReport() alert ('Generate selected analysis
     // views before downloading the report.') is unreachable while the control is
-    // disabled; the alert string is pinned in surveyResultsExportDisplayHelpers.test.ts.
+    // disabled; the alert string is pinned in surveyResultsHtmlReportDownloadAttempt.test.ts.
     const riskMatrixRow = getSectionRows().find((row) => row.label === 'Risk Matrix');
     expect(riskMatrixRow).toEqual({ availability: 'Unavailable', label: 'Risk Matrix', reason: 'Needs analysis' });
     expect(screen.getByText('Selected analysis sections need generated data before download.')).toBeInTheDocument();
@@ -887,7 +887,7 @@ describe('SurveyResults export/view controls', () => {
 
     // port note: the direct downloadHtmlReport() alert ('Select at least one available
     // report section before export.') is unreachable while the control is disabled; the
-    // alert string is pinned in surveyResultsExportDisplayHelpers.test.ts.
+    // alert string is pinned in surveyResultsHtmlReportDownloadAttempt.test.ts.
     const downloadButton = getDownloadReportButton();
     expect(downloadButton).toBeDisabled();
     fireEvent.click(downloadButton);
@@ -990,7 +990,7 @@ describe('SurveyResults export/view controls', () => {
 
     // port note: direct downloadHtmlReport() invocation while generating is unreachable
     // from the DOM (the control is disabled); the 'Wait for analysis generation...' blocked
-    // alert is pinned in surveyResultsExportDisplayHelpers.test.ts. The ported guard
+    // alert is pinned in surveyResultsHtmlReportDownloadAttempt.test.ts. The ported guard
     // asserts the pending-generation window produces no download side effects or alert.
     fireEvent.click(getDownloadReportButton());
     await flushMicrotasks();
@@ -2268,8 +2268,7 @@ describe('SurveyResults export/view controls', () => {
   it('rejects unknown export types through the invalid-export fallback', async () => {
     // port note: the export-type dropdown only offers valid types, so an unknown
     // exportType (legacy persisted state) cannot be reached through interaction; the
-    // 'Invalid export type selected.' fallback is pinned in
-    // surveyResultsExportController.test.ts and surveyResultsExportDisplayHelpers.test.ts.
+    // 'Invalid export type selected.' fallback is pinned in surveyResultsExportController.test.ts.
     // The ported guard proves every reachable export type downloads without the fallback.
     seedSingleBinaryQuestion({ slug: 'demo' });
     mountSurveyResults({ network: OP_NETWORK, sessionSlug: 'demo' });

@@ -2,9 +2,9 @@ import {
   buildSurveyResultsHtmlReportDownloadAttemptPlan,
   buildSurveyResultsHtmlReportDownloadFailurePatch,
   buildSurveyResultsHtmlReportDownloadSuccessPatch,
-} from './surveyResultsExportDisplayHelpers.js';
+} from './surveyResultsHtmlReportDownloadAttempt.js';
 
-describe('surveyResultsExportDisplayHelpers', () => {
+describe('surveyResultsHtmlReportDownloadAttempt', () => {
   it('describes HTML report download blocked states without applying parent state', () => {
     expect(buildSurveyResultsHtmlReportDownloadAttemptPlan({
       isAuthorized: false,
@@ -84,5 +84,4 @@ describe('surveyResultsExportDisplayHelpers', () => {
       alertMessage: 'Unable to export the HTML report.',
     });
   });
-
 });
