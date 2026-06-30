@@ -219,6 +219,35 @@ describe('canonicalSessionContext', () => {
     });
   });
 
+  it('keeps worker config authoritative over metadata-shaped worker fields in the effective config', () => {
+    const resolved = resolveCanonicalSessionContext({
+      requestedSlug: VALID_REGISTRY_SESSION.slug,
+      registrySession: VALID_REGISTRY_SESSION,
+      metadata: {
+        ...VALID_ARWEAVE_METADATA,
+        corsWorkerUrl: 'https://metadata-worker.example.com',
+        allowOrigins: ['https://metadata-origin.example.com'],
+        rpcEndpoint: 'https://metadata-rpc.example.com',
+        limits: { perWalletPerDay: 1 },
+      },
+      workerConfig: {
+        corsWorkerUrl: 'https://worker.example.com',
+        allowOrigins: ['https://worker-origin.example.com'],
+        rpcEndpoint: 'https://worker-rpc.example.com',
+        limits: { perWalletPerDay: 3 },
+      },
+      mode: 'on-chain',
+    });
+
+    expect(resolved.ok).toBe(true);
+    expect(resolved.context.effective).toMatchObject({
+      corsWorkerUrl: 'https://worker.example.com',
+      allowOrigins: ['https://worker-origin.example.com'],
+      rpcEndpoint: 'https://worker-rpc.example.com',
+      limits: { perWalletPerDay: 3 },
+    });
+  });
+
   it('prefers registry sessionIdHex over UUID-style sessionId values', () => {
     const resolved = resolveCanonicalSessionContext({
       requestedSlug: 'alpha',

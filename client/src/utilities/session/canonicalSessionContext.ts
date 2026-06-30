@@ -20,9 +20,9 @@ import { canonicalizeLegacySessionAlias } from './sessionDemoCompat.js';
 import { SESSION_WORKER_METADATA_ALIAS_KEYS } from './sessionWorkerUrlCompatibility.js';
 import type {
   LocalResourceOverrides,
-  SessionConfig,
+  SessionConfigLike,
   SessionIdentity,
-  SessionMetadata,
+  SessionMetadataRecord,
   SessionWorkerConfig,
   UnknownRecord,
 } from './sessionTypes.js';
@@ -40,7 +40,7 @@ type ResolveSessionConfigFromSourcesOptions = {
 };
 type SessionConfigResolution = {
   sessionSlug: string;
-  sessionConfig: SessionConfig | null;
+  sessionConfig: SessionConfigLike | null;
   sessionConfigSource: string;
   warnings: string[];
 };
@@ -55,7 +55,7 @@ type CanonicalSessionConfigResolution = {
   activeSessionSlug: string;
   requestedSessionSlug: string;
   sessionSlug: string;
-  sessionConfig: SessionConfig | null;
+  sessionConfig: SessionConfigLike | null;
   sessionConfigSource: string;
   warnings: string[];
   ok: boolean;
@@ -84,7 +84,7 @@ type CanonicalSessionContextResult = {
   ok: boolean;
   context: {
     identity: SessionIdentity;
-    metadata: SessionMetadata;
+    metadata: SessionMetadataRecord;
     worker: SessionWorkerConfig;
     local: LocalResourceOverrides;
     effective: UnknownRecord;
@@ -233,35 +233,35 @@ export const canonicalizeSessionSlug = (rawSlug: unknown): string => {
   return canonicalSlug;
 };
 
-const findDemoSessionConfigBySlug = (demoSessions: unknown, slugIn: unknown = ''): SessionConfig | null => {
+const findDemoSessionConfigBySlug = (demoSessions: unknown, slugIn: unknown = ''): SessionConfigLike | null => {
   const demo = isObj(demoSessions) ? demoSessions : {};
   const slug = canonicalizeSessionSlug(slugIn);
-  if (!slug) return isObj(demo.general) ? demo.general as SessionConfig : null;
+  if (!slug) return isObj(demo.general) ? demo.general as SessionConfigLike : null;
   const byKey = demo[slug];
-  if (isObj(byKey) && canonicalizeSessionSlug(byKey.slug || slug) === slug) return byKey as SessionConfig;
+  if (isObj(byKey) && canonicalizeSessionSlug(byKey.slug || slug) === slug) return byKey as SessionConfigLike;
   const bySlug = Object.values(demo).find((entry) => (
     isObj(entry) && canonicalizeSessionSlug(entry.slug || '') === slug
   ));
-  return isObj(bySlug) ? bySlug as SessionConfig : null;
+  return isObj(bySlug) ? bySlug as SessionConfigLike : null;
 };
 
 const findDemoSessionConfigByAlias = (
   demoSessions: unknown,
   slugIn: unknown = '',
   { allowSessionName = false }: { allowSessionName?: boolean } = {}
-): SessionConfig | null => {
+): SessionConfigLike | null => {
   const demo = isObj(demoSessions) ? demoSessions : {};
   const slug = canonicalizeSessionSlug(slugIn);
   const aliasToken = normalizeSessionAliasToken(slugIn);
   const entries = Object.entries(demo);
   for (const [key, entry] of entries) {
     if (!isObj(entry)) continue;
-    if (slug && canonicalizeSessionSlug(key) === slug) return entry as SessionConfig;
-    if (slug && canonicalizeSessionSlug(entry.slug || '') === slug) return entry as SessionConfig;
-    if (allowSessionName && slug && canonicalizeSessionSlug(entry.sessionName || '') === slug) return entry as SessionConfig;
-    if (aliasToken && normalizeSessionAliasToken(key) === aliasToken) return entry as SessionConfig;
-    if (aliasToken && normalizeSessionAliasToken(entry.slug || '') === aliasToken) return entry as SessionConfig;
-    if (allowSessionName && aliasToken && normalizeSessionAliasToken(entry.sessionName || '') === aliasToken) return entry as SessionConfig;
+    if (slug && canonicalizeSessionSlug(key) === slug) return entry as SessionConfigLike;
+    if (slug && canonicalizeSessionSlug(entry.slug || '') === slug) return entry as SessionConfigLike;
+    if (allowSessionName && slug && canonicalizeSessionSlug(entry.sessionName || '') === slug) return entry as SessionConfigLike;
+    if (aliasToken && normalizeSessionAliasToken(key) === aliasToken) return entry as SessionConfigLike;
+    if (aliasToken && normalizeSessionAliasToken(entry.slug || '') === aliasToken) return entry as SessionConfigLike;
+    if (allowSessionName && aliasToken && normalizeSessionAliasToken(entry.sessionName || '') === aliasToken) return entry as SessionConfigLike;
   }
   return null;
 };
@@ -299,7 +299,7 @@ export const resolveSessionConfigFromSources = ({
     if (isObj(cached)) {
       return {
         sessionSlug: slug,
-        sessionConfig: cached as SessionConfig,
+        sessionConfig: cached as SessionConfigLike,
         sessionConfigSource: 'registry',
         warnings: [],
       };
@@ -349,8 +349,8 @@ export const resolveCanonicalSessionConfig = ({
   );
 
   let sessionConfig =
-    (isObj(sourceObj.sessionConfig) ? sourceObj.sessionConfig as SessionConfig : null) ||
-    (isObj(defaultsObj.sessionConfig) ? defaultsObj.sessionConfig as SessionConfig : null);
+    (isObj(sourceObj.sessionConfig) ? sourceObj.sessionConfig as SessionConfigLike : null) ||
+    (isObj(defaultsObj.sessionConfig) ? defaultsObj.sessionConfig as SessionConfigLike : null);
   let sessionConfigSource = isObj(sourceObj.sessionConfig)
     ? 'provided'
     : (isObj(defaultsObj.sessionConfig) ? 'default' : 'missing');
@@ -359,13 +359,13 @@ export const resolveCanonicalSessionConfig = ({
   if (!sessionConfig && typeof resolveBySlug === 'function') {
     const resolved = resolveBySlug(requestedSlug);
     if (isObj(resolved)) {
-      sessionConfig = resolved as SessionConfig;
+      sessionConfig = resolved as SessionConfigLike;
       sessionConfigSource = 'resolved';
     }
   }
 
   if (!sessionConfig && isObj(fallbackConfig)) {
-    sessionConfig = fallbackConfig as SessionConfig;
+    sessionConfig = fallbackConfig as SessionConfigLike;
     sessionConfigSource = 'fallback';
   }
 
@@ -482,7 +482,7 @@ export const resolveCanonicalSessionContext = ({
     collectPrefixedErrors(errors, 'demo metadata', demoMetadataParsed.errors);
   }
 
-  let effectiveMetadata: SessionMetadata = {};
+  let effectiveMetadata: SessionMetadataRecord = {};
   let metadataProvenance = 'cache';
   if (metadataProvided && !metadataIsCache && isObj(metadata)) {
     effectiveMetadata = cloneValue(metadataParsed.metadata);
