@@ -99,6 +99,9 @@ import {
   buildPileQuestionPipelineState,
 } from './surveyPileQuestionFlow';
 import {
+  arePileQuestionListsEquivalent,
+} from './surveyPileQuestionListEquivalence';
+import {
   buildPileVisibleResponseSignature as buildPileVisibleResponseSignatureHelper,
 } from './surveyPileResponseSignature';
 import {
@@ -1011,20 +1014,15 @@ const syncCurrentPileQuestionsSignature = (engine: PileViewModeEngine, listIn: a
     return signature;
   };
 
-const areQuestionListsEquivalent = (engine: PileViewModeEngine, left: any = [], right: any = []) => {
-    if (left === right) return true;
-    if (!Array.isArray(left) || !Array.isArray(right)) return false;
-    if (left.length !== right.length) return false;
-    for (let i = 0; i < left.length; i += 1) {
-      const leftId = String(left[i]?.id || '').trim().toLowerCase();
-      const rightId = String(right[i]?.id || '').trim().toLowerCase();
-      if (leftId !== rightId) return false;
-      const leftSig = engine.getQuestionObjectSignature(left[i]);
-      const rightSig = engine.getQuestionObjectSignature(right[i]);
-      if (leftSig !== rightSig) return false;
-    }
-    return true;
-  };
+const areQuestionListsEquivalent = (
+  engine: PileViewModeEngine,
+  left: any = [],
+  right: any = []
+) => arePileQuestionListsEquivalent({
+  getQuestionObjectSignature: engine.getQuestionObjectSignature,
+  left,
+  right,
+});
 
 const isRecentRateLimit = (engine: PileViewModeEngine) => {
     try {
