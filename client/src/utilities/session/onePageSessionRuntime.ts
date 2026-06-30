@@ -9,16 +9,26 @@ type OnePageSessionTransactionResult = Record<string, unknown> & {
   transactionHash: string;
 };
 
+type OnePageSessionSbtMetadata = Record<string, unknown> & {
+  hasPasswordMint?: boolean;
+  image?: unknown;
+  maxTokens?: unknown;
+};
+
+type OnePageSessionBalance = {
+  gte: (value: unknown) => boolean;
+};
+
 type OnePageSessionContractRuntime = {
   claim: (...args: unknown[]) => Promise<OnePageSessionTransactionResult>;
   claimWithInvite: (...args: unknown[]) => Promise<OnePageSessionTransactionResult>;
   computeGroupPasswordHash: (input: unknown) => string;
   generateInvitePayloads: (...args: unknown[]) => Promise<OnePageSessionInvitePayload[]>;
-  getETHBalance?: (...args: unknown[]) => Promise<any>;
+  getETHBalance?: (...args: unknown[]) => Promise<OnePageSessionBalance>;
   getGroupPasswordHash: (...args: unknown[]) => Promise<string>;
   getMintedTokens: (...args: unknown[]) => Promise<unknown>;
-  getNativeBalance?: (...args: unknown[]) => Promise<any>;
-  getSbtMetadata: (...args: unknown[]) => Promise<any>;
+  getNativeBalance?: (...args: unknown[]) => Promise<OnePageSessionBalance>;
+  getSbtMetadata: (...args: unknown[]) => Promise<OnePageSessionSbtMetadata | null>;
   mintWithGroupSignature: (...args: unknown[]) => Promise<OnePageSessionTransactionResult>;
   signGroupMintAuthorization: (...args: unknown[]) => Promise<unknown>;
 };
@@ -34,7 +44,7 @@ export const getAllSessionSlugs = (...args: unknown[]): unknown[] => (
   contractNamedExports.getAllSessionSlugs(...args)
 );
 
-export const getSbtMetadata = (...args: unknown[]): Promise<any> => (
+export const getSbtMetadata = (...args: unknown[]): Promise<OnePageSessionSbtMetadata | null> => (
   contractRuntime.getSbtMetadata(...args)
 );
 
@@ -50,12 +60,12 @@ export const hasLegacyEthBalanceReader = (): boolean => (
   typeof contractRuntime.getETHBalance === 'function'
 );
 
-export const getNativeBalance = (...args: unknown[]): Promise<any> => (
-  contractRuntime.getNativeBalance?.(...args) ?? Promise.resolve(null)
+export const getNativeBalance = (...args: unknown[]): Promise<OnePageSessionBalance> => (
+  contractRuntime.getNativeBalance?.(...args) ?? Promise.resolve(null as unknown as OnePageSessionBalance)
 );
 
-export const getLegacyEthBalance = (...args: unknown[]): Promise<any> => (
-  contractRuntime.getETHBalance?.(...args) ?? Promise.resolve(null)
+export const getLegacyEthBalance = (...args: unknown[]): Promise<OnePageSessionBalance> => (
+  contractRuntime.getETHBalance?.(...args) ?? Promise.resolve(null as unknown as OnePageSessionBalance)
 );
 
 export const claimSbt = (...args: unknown[]): Promise<OnePageSessionTransactionResult> => (
