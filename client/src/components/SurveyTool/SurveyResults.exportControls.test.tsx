@@ -1,20 +1,57 @@
 import React from 'react';
-import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { resolveSurveyResultsToggleKnobStyle } from './SurveyResults';
-import type { SurveyResultsProps } from './SurveyResults';
 import styles from './SurveyResults.module.scss';
-import * as cacheScriptsModule from '../../utilities/cache/cacheScripts.js';
-import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
-import { renderSurveyResults } from './surveyResultsTestHarness';
 import { callAI } from '../../utilities/ai/aiScripts.js';
 import {
   SESSION_RESULTS_EXPORT_FORMAT_PDF,
   downloadSessionResultsHtmlReport,
   downloadSessionResultsPdfReport,
 } from '../../utilities/sessionResultsExport';
-
-const cacheScripts: any = cacheScriptsModule;
-const contractScripts: any = (contractScriptsModule as any).default;
+import {
+  BREAKDOWN_ANALYSIS_JSON,
+  OP_NETWORK,
+  RESPONDER_ONE,
+  RESPONDER_TWO,
+  RISK_MATRIX_ANALYSIS_JSON,
+  SURVEY_ID,
+  WALLET_ACCOUNT,
+  analysisArtifactsFromWrite,
+  analysisCachePeeks,
+  analysisCacheReads,
+  analysisCacheWrites,
+  cacheStore,
+  cacheStoreKey,
+  callAIPrompts,
+  clickExportDownload,
+  clickGenerateAnalysis,
+  createAnalysisArtifact,
+  createDeferred,
+  flushMicrotasks,
+  getDownloadReportButton,
+  getGenerateAnalysisButton,
+  getSectionRows,
+  installBrowserDownloadCapture,
+  latestBlockSpy,
+  mountSurveyResults,
+  openExportArea,
+  openHtmlReportModal,
+  peekSpy,
+  primeAnalysisArtifactCacheKey,
+  readBlobText,
+  readSpy,
+  resetSurveyResultsExportControlsHarness,
+  seedAnalysisEligibleSession,
+  seedQuestionsCache,
+  seedSingleBinaryQuestion,
+  selectExportType,
+  setAnalysisPeekError,
+  setAnalysisWriteErrors,
+  waitForAnalysisCacheWrites,
+  waitForAnalysisIdle,
+  waitForHydratedResponseCount,
+  writeSpy,
+} from './SurveyResults.exportControlsHarness';
 
 const mockSbtFilter = jest.fn((..._args: any[]) => null);
 jest.mock('../SBTs/SBTFilter', () => (props: any) => {
@@ -81,371 +118,14 @@ jest.mock('../MainContent/RiskMatrix', () => ({
   },
 }));
 
-const OP_NETWORK = { id: 11155420 };
-const WALLET_ACCOUNT = '0x9999999999999999999999999999999999999999';
-const SURVEY_ID = '0x1111111111111111111111111111111111111111111111111111111111111111';
-const RESPONDER_ONE = '0x1111111111111111111111111111111111111111';
-const RESPONDER_TWO = '0x2222222222222222222222222222222222222222';
-
-const cacheStoreKey = (namespace: unknown, slug: unknown = ''): string => (
-  `${String(namespace || '')}|${String(slug || '')}`
-);
-
-let cacheStore: Map<string, any>;
-let analysisPeekError: Error | null;
-let analysisWriteErrors: Error[];
-let peekSpy: jest.SpyInstance;
-let readSpy: jest.SpyInstance;
-let writeSpy: jest.SpyInstance;
-let listSpy: jest.SpyInstance;
-let latestBlockSpy: jest.SpyInstance;
-
-const installModuleBoundarySpies = (): void => {
-  peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation(
-    (namespace: any, slug: any = '') => {
-      if (analysisPeekError && String(namespace) === 'analysisCache') throw analysisPeekError;
-      const value = cacheStore.get(cacheStoreKey(namespace, slug));
-      return value === undefined ? null : value;
-    }
-  );
-  readSpy = jest.spyOn(cacheScripts, 'readCache').mockImplementation(
-    async (namespace: any, slug: any = '') => {
-      const value = cacheStore.get(cacheStoreKey(namespace, slug));
-      return value === undefined ? null : value;
-    }
-  );
-  writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockImplementation(
-    async (namespace: any, slug: any = '', value: any = null) => {
-      if (analysisWriteErrors.length > 0 && String(namespace) === 'analysisCache') {
-        throw analysisWriteErrors.shift();
-      }
-      cacheStore.set(cacheStoreKey(namespace, slug), value);
-      return true;
-    }
-  );
-  listSpy = jest.spyOn(cacheScripts, 'listNamespaceEntriesSync').mockImplementation(
-    (namespace: any) => {
-      const prefix = `${String(namespace)}|`;
-      return Array.from(cacheStore.entries())
-        .filter(([key]) => key.startsWith(prefix))
-        .map(([key, value]) => ({
-          key,
-          namespace: String(namespace),
-          slug: key.slice(prefix.length),
-          value,
-        }));
-    }
-  );
-  latestBlockSpy = jest.spyOn(contractScripts, 'getLatestBlockNumber').mockResolvedValue(1);
-};
-
-const createDeferred = <T,>() => {
-  let resolve!: (value: T | PromiseLike<T>) => void;
-  let reject!: (reason?: any) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  return { promise, reject, resolve };
-};
-
-const flushMicrotasks = async (cycles = 6): Promise<void> => {
-  for (let index = 0; index < cycles; index += 1) {
-    await act(async () => {
-      await Promise.resolve();
-    });
-  }
-};
-
-const createAnalysisArtifact = (inputSignature = 'input-sig') => ({
-  generatedAt: '2026-06-01T00:00:00.000Z',
-  inputSignature,
-  kind: 'ce_session_results_analysis_artifact',
-  participants: [],
-  sections: {
-    argumentMap: { available: true, debates: [] },
-    atlas: { available: true, edges: [], nodes: [] },
-    breakdown: { available: true, dimensions: [], groups: [], summary: {} },
-    riskMatrix: { available: true, categories: [], comments: [], heatmap: {}, scenarioLinks: [] },
-  },
-  source: 'ai-generated',
-  version: 1,
-});
-
-const mountSurveyResults = (props: SurveyResultsProps = {}) => renderSurveyResults({
-  filterState: {},
-  isOpen: true,
-  isQuestionCacheReady: true,
-  isResponsesCacheReady: true,
-  isSBTCacheReady: true,
-  preventUrlChange: true,
-  sessionSlugPinned: true,
-  viewMode: 'questions',
-  ...props,
-});
-
-type QuestionsCacheSeed = {
-  netId?: number;
-  questionResponses?: Record<string, Record<string, any>>;
-  questions?: Record<string, any>;
-  slug: string;
-};
-
-const seedQuestionsCache = ({
-  netId = 11155420,
-  questionResponses = {},
-  questions = {},
-  slug,
-}: QuestionsCacheSeed): void => {
-  cacheStore.set(cacheStoreKey('questionsCache', slug), {
-    [String(netId)]: {
-      questionResponses,
-      questions,
-      questionResponsesLatestBlock: 1,
-      questionsLatestBlock: 1,
-    },
-  });
-};
-
-const seedSingleBinaryQuestion = ({
-  netId = 11155420,
-  responder = '0xabc',
-  response = { answer: { encrypted: false, value: 'Agree' }, questionId: 'q1', timeStamp: '2026-05-01T00:00:00.000Z' },
-  prompt = 'Export this report?',
-  slug,
-}: {
-  netId?: number;
-  prompt?: string;
-  responder?: string;
-  response?: any;
-  slug: string;
-}): void => {
-  seedQuestionsCache({
-    netId,
-    questionResponses: { q1: { [responder]: response } },
-    questions: {
-      q1: {
-        id: 'q1',
-        options: ['Agree', 'Disagree'],
-        prompt,
-        type: 'binary',
-      },
-    },
-    slug,
-  });
-};
-
-/** Eligible analysis dataset: 2 questions, 3 responses, 2 participants. */
-const seedAnalysisEligibleSession = (slug: string, netId = 11155420): void => {
-  seedQuestionsCache({
-    netId,
-    questionResponses: {
-      q1: {
-        [RESPONDER_ONE]: { answer: { encrypted: false, value: 'Use a viewer.' }, questionId: 'q1', timeStamp: '2026-05-01T00:00:00.000Z' },
-        [RESPONDER_TWO]: { answer: { encrypted: false, value: 'Keep it private.' }, questionId: 'q1', timeStamp: '2026-05-02T00:00:00.000Z' },
-      },
-      q2: {
-        [RESPONDER_ONE]: { answer: { encrypted: false, value: 'Make PDF readable.' }, questionId: 'q2', timeStamp: '2026-05-03T00:00:00.000Z' },
-      },
-    },
-    questions: {
-      q1: { id: 'q1', prompt: 'What export should exist?', tags: ['exports'], type: 'freeform' },
-      q2: { id: 'q2', prompt: 'What risk matters?', tags: ['safety'], type: 'freeform' },
-    },
-    slug,
-  });
-};
-
-const waitForHydratedResponseCount = async (count: number): Promise<void> => {
-  await waitFor(() => {
-    const summary = document.querySelector('.filterSummaryText');
-    expect(summary).not.toBeNull();
-    expect(String(summary?.textContent || '')).toMatch(new RegExp(`Responses: ${count}(\\D|$)`));
-  });
-};
-
-const openExportArea = (): void => {
-  // No-op when the export area is already expanded (the collapsed toggle is gone).
-  const collapsedToggle = screen.queryByRole('button', { name: 'Export Data' });
-  if (collapsedToggle) fireEvent.click(collapsedToggle);
-};
-
-/** jsdom Blob has no .text(); read captured download blobs through FileReader. */
-const readBlobText = (blob: Blob): Promise<string> => new Promise((resolve, reject) => {
-  const reader = new FileReader();
-  reader.onload = () => resolve(String(reader.result || ''));
-  reader.onerror = () => reject(reader.error);
-  reader.readAsText(blob);
-});
-
-const openHtmlReportModal = async (): Promise<HTMLElement> => {
-  openExportArea();
-  fireEvent.click(screen.getByTestId('ce-surveyresults-export-html-report'));
-  return screen.findByTestId('ce-surveyresults-html-report-modal');
-};
-
-const getDownloadReportButton = (): HTMLElement => (
-  screen.getByTestId('ce-surveyresults-html-report-download')
-);
-const getGenerateAnalysisButton = (): HTMLElement => (
-  screen.getByTestId('ce-surveyresults-html-report-generate-analysis')
-);
-const clickGenerateAnalysis = (): void => {
-  fireEvent.click(getGenerateAnalysisButton());
-};
-
-const getSectionRows = (): Array<{ availability: string; label: string; reason: string }> => {
-  const table = document.querySelector('.htmlReportSectionTable');
-  expect(table).not.toBeNull();
-  return Array.from((table as HTMLElement).querySelectorAll('tbody tr')).map((row) => {
-    const cells = Array.from(row.querySelectorAll('td')).map((cell) => cell.textContent?.trim() || '');
-    return { availability: cells[2], label: cells[1], reason: cells[3] };
-  });
-};
-
-const analysisCachePeeks = (): any[][] => (
-  peekSpy.mock.calls.filter((call: any[]) => String(call[0]) === 'analysisCache')
-);
-const analysisCacheReads = (): any[][] => (
-  readSpy.mock.calls.filter((call: any[]) => String(call[0]) === 'analysisCache')
-);
-const analysisCacheWrites = (): any[][] => (
-  writeSpy.mock.calls.filter((call: any[]) => String(call[0]) === 'analysisCache')
-);
-const analysisArtifactsFromWrite = (writeIndex: number): Array<[string, any]> => {
-  const call = analysisCacheWrites()[writeIndex];
-  expect(call).toBeTruthy();
-  return Object.entries((call[2] || {}).sessionResultsAnalysis || {}) as Array<[string, any]>;
-};
-
-const callAIPrompts = (): string[] => (
-  (callAI as jest.Mock).mock.calls.map((call) => String(call[0]))
-);
-
-const waitForAnalysisCacheWrites = async (count: number): Promise<void> => {
-  await waitFor(() => expect(analysisCacheWrites()).toHaveLength(count));
-};
-const waitForAnalysisIdle = async (): Promise<void> => {
-  await waitFor(() => {
-    expect(getGenerateAnalysisButton()).not.toHaveTextContent(/Generating/);
-  });
-};
-
-const BREAKDOWN_ANALYSIS_JSON = JSON.stringify({
-  breakdown: {
-    dimensions: [],
-    groups: [{ id: 'group_1', label: 'Generated group' }],
-    summary: { overview: 'Generated analysis.' },
-  },
-});
-const RISK_MATRIX_ANALYSIS_JSON = JSON.stringify({
-  riskMatrix: {
-    categories: [{ id: 'risk_1', label: 'Generated risk' }],
-    comments: [],
-    heatmap: {},
-    scenarioLinks: [],
-  },
-});
-
-/**
- * Runs one real generation pass to discover the data-derived analysis cache
- * key + artifact, then resets the cache store and call records so a test can
- * seed the analysisCache under the exact computed key.
- */
-const primeAnalysisArtifactCacheKey = async (
-  mountProps: SurveyResultsProps,
-  seed: () => void
-): Promise<{ artifact: any; cacheKey: string }> => {
-  (callAI as jest.Mock).mockResolvedValue(BREAKDOWN_ANALYSIS_JSON);
-  seed();
-  const primed = mountSurveyResults(mountProps);
-  await waitForHydratedResponseCount(3);
-  await openHtmlReportModal();
-  clickGenerateAnalysis();
-  await waitForAnalysisCacheWrites(1);
-  await waitForAnalysisIdle();
-  const entries = analysisArtifactsFromWrite(0);
-  const [cacheKey, artifact] = entries[entries.length - 1];
-  primed.unmount();
-  cacheStore = new Map();
-  (callAI as jest.Mock).mockClear();
-  peekSpy.mockClear();
-  readSpy.mockClear();
-  writeSpy.mockClear();
-  listSpy.mockClear();
-  (downloadSessionResultsHtmlReport as jest.Mock).mockClear();
-  (downloadSessionResultsPdfReport as jest.Mock).mockClear();
-  return { artifact, cacheKey };
-};
-
-type BrowserDownloadCapture = {
-  anchor: HTMLAnchorElement;
-  anchorClickSpy: jest.SpyInstance;
-  appendChildSpy: jest.SpyInstance;
-  blobs: Blob[];
-  createObjectURLMock: jest.Mock;
-  removeChildSpy: jest.SpyInstance;
-  restore: () => void;
-};
-
-const installBrowserDownloadCapture = (): BrowserDownloadCapture => {
-  const originalCreateObjectURL = window.URL.createObjectURL;
-  const blobs: Blob[] = [];
-  const createObjectURLMock = jest.fn((blob: Blob) => {
-    blobs.push(blob);
-    return 'blob:test-export';
-  });
-  (window.URL as any).createObjectURL = createObjectURLMock;
-  const appendChildSpy = jest.spyOn(document.body, 'appendChild');
-  const removeChildSpy = jest.spyOn(document.body, 'removeChild');
-  const originalCreateElement = document.createElement.bind(document);
-  const anchor = originalCreateElement('a') as HTMLAnchorElement;
-  const anchorClickSpy = jest.spyOn(anchor, 'click').mockImplementation(() => {});
-  const createElementSpy = jest.spyOn(document, 'createElement').mockImplementation(((tagName: any, options: any) => (
-    String(tagName).toLowerCase() === 'a' ? anchor : originalCreateElement(tagName, options)
-  )) as any);
-  let restored = false;
-  const restore = () => {
-    if (restored) return;
-    restored = true;
-    createElementSpy.mockRestore();
-    anchorClickSpy.mockRestore();
-    removeChildSpy.mockRestore();
-    appendChildSpy.mockRestore();
-    if (originalCreateObjectURL) {
-      window.URL.createObjectURL = originalCreateObjectURL;
-    } else {
-      delete (window.URL as any).createObjectURL;
-    }
-  };
-  return { anchor, anchorClickSpy, appendChildSpy, blobs, createObjectURLMock, removeChildSpy, restore };
-};
-
-const selectExportType = (label: string): void => {
-  const menu = document.querySelector('.dropdown-menu');
-  expect(menu).not.toBeNull();
-  fireEvent.click(within(menu as HTMLElement).getByText(label));
-};
-
-const clickExportDownload = (): void => {
-  fireEvent.click(screen.getByRole('button', { name: 'Download' }));
-};
-
 beforeEach(() => {
-  cacheStore = new Map();
-  analysisPeekError = null;
-  analysisWriteErrors = [];
-  installModuleBoundarySpies();
+  resetSurveyResultsExportControlsHarness();
   mockSbtFilter.mockClear();
   mockPolisReport.mockClear();
   mockSingleQuestionResponse.mockClear();
   mockDemoAnalysisWorkspace.mockClear();
   mockDebateMap.mockClear();
   mockRiskMatrix.mockClear();
-  (downloadSessionResultsHtmlReport as jest.Mock).mockReset();
-  (downloadSessionResultsPdfReport as jest.Mock).mockReset();
-  (callAI as jest.Mock).mockReset();
-  window.localStorage.clear();
 });
 
 describe('SurveyResults export/view controls', () => {
@@ -1544,11 +1224,11 @@ describe('SurveyResults export/view controls', () => {
 
     await openHtmlReportModal();
     // Only the analysisCache read port throws; questionsCache reads keep working.
-    analysisPeekError = new Error('analysis cache read failed');
+    setAnalysisPeekError(new Error('analysis cache read failed'));
     clickGenerateAnalysis();
     await waitForAnalysisCacheWrites(1);
     await waitForAnalysisIdle();
-    analysisPeekError = null;
+    setAnalysisPeekError(null);
 
     expect(peekSpy).toHaveBeenCalledWith('analysisCache', 'read-error-session', { clone: false });
     expect(callAI).toHaveBeenCalledTimes(1);
@@ -1823,7 +1503,7 @@ describe('SurveyResults export/view controls', () => {
     await waitForHydratedResponseCount(3);
 
     await openHtmlReportModal();
-    analysisWriteErrors = [new Error('analysis write failed')];
+    setAnalysisWriteErrors([new Error('analysis write failed')]);
     clickGenerateAnalysis();
 
     // port note: the original asserted the write port rejects-and-rethrows when the cache
@@ -1865,7 +1545,7 @@ describe('SurveyResults export/view controls', () => {
     await waitForHydratedResponseCount(3);
 
     await openHtmlReportModal();
-    analysisWriteErrors = [new Error('cache write failed')];
+    setAnalysisWriteErrors([new Error('cache write failed')]);
     clickGenerateAnalysis();
 
     await screen.findByText('Unable to generate analysis views right now. Check AI settings and try again.');
