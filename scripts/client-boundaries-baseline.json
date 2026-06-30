@@ -89,12 +89,6 @@
     },
     {
       "rule": "route-page-no-low-level",
-      "source": "client/src/components/SBTs/SBTsPage.tsx",
-      "import": "../../utilities/web3/contractScripts.js",
-      "resolved": "client/src/utilities/web3/contractScripts"
-    },
-    {
-      "rule": "route-page-no-low-level",
       "source": "client/src/components/Sessions/SessionWizard.tsx",
       "import": "../../utilities/arweave/arweaveScripts.js",
       "resolved": "client/src/utilities/arweave/arweaveScripts"
