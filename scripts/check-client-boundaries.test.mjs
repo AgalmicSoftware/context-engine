@@ -63,6 +63,10 @@ test('resolveClientImport resolves local client imports and ignores packages', (
     resolveClientImport('client/src/components/Admin/AdminPage.tsx', '@/utilities/web3/sessionRegistry'),
     'client/src/utilities/web3/sessionRegistry'
   );
+  assert.equal(
+    resolveClientImport('client\\src\\components\\Admin\\AdminPage.tsx', '..\\..\\utilities\\web3\\index.ts'),
+    'client/src/utilities/web3/'
+  );
   assert.equal(resolveClientImport('client/src/components/Admin/AdminPage.tsx', 'react'), null);
 });
 
