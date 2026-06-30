@@ -5,7 +5,7 @@ import {
 } from '../../utilities/sessionResultsExport';
 import {
   SURVEY_RESULTS_HTML_REPORT_DEFAULT_SELECTED_SECTIONS,
-} from './surveyResultsExportDisplayHelpers.js';
+} from './surveyResultsHtmlReportSelection.js';
 import {
   SURVEY_RESULTS_EXPORT_TYPES,
 } from './surveyResultsExportPlans.js';
