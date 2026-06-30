@@ -6,7 +6,7 @@ import {
 
 import type {
   SurveyResultsHtmlReportAnalysisPayload,
-} from './surveyResultsExportDisplayHelpers';
+} from './surveyResultsHtmlReportModalDescriptor';
 
 export type SurveyResultsHtmlReportAnalysisControlsProps = {
   analysisPayload: SurveyResultsHtmlReportAnalysisPayload;
