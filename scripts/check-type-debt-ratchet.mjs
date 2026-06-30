@@ -59,6 +59,7 @@ const TEST_DIRECTORY_SEGMENTS = new Set([
 const TEST_FILE_PATTERN = /\.(?:test|spec)\.tsx?$/;
 const TEST_UTILITY_FILE_PATTERN =
   /(?:^|[._-])(?:test-?utils?|testing|fixtures?)(?:[._-]|\.)|(?:testFixtures|testUtils|testingUtils)/i;
+const TEST_HARNESS_FILE_PATTERN = /harness\.tsx?$/i;
 
 export const createZeroCounts = () => Object.fromEntries(
   TYPE_DEBT_PATTERNS.map(({ key }) => [key, 0]),
@@ -87,7 +88,7 @@ export const isProductionTypeScriptFile = (filePath) => {
     return false;
   }
 
-  if (TEST_UTILITY_FILE_PATTERN.test(basename)) {
+  if (TEST_UTILITY_FILE_PATTERN.test(basename) || TEST_HARNESS_FILE_PATTERN.test(basename)) {
     return false;
   }
 
