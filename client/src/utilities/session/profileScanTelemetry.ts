@@ -1,5 +1,5 @@
 /**
- * @module components/MainSite/debugTelemetry
+ * @module utilities/session/profileScanTelemetry
  */
 
 import { createLogger } from 'utilities/logging.js';
