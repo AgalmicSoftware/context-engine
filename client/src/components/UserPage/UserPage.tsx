@@ -183,12 +183,13 @@ import { getEffectiveAiConfig } from 'utilities/ai/aiSettings.js';
 import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
 import { createLogger } from 'utilities/logging.js';
 import {
+  checkSponsoredAccess,
   getDemoSessionConfigBySlug,
   getSessionConfigBySlug,
   getSessionConfigBySlugOrDefault,
   getSessionSlugByName,
   normalizeSessionSlug,
-} from '../../utilities/web3/contractScripts.js';
+} from '../../utilities/user/userPageRuntime.js';
 import {
   getAllowedSessionSlugs,
   readSessionScanScope,
@@ -203,7 +204,6 @@ import {
   writeCache,
 } from '../../utilities/cache/cacheScripts.js';
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
-import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
 import { getGlobalLitHooks } from '../../utilities/crypto/litProtocol.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
