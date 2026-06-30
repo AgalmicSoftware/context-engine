@@ -291,7 +291,7 @@ import {
   shouldClearQuestionProgressInFinalize,
   shouldCommitThrottledProgress,
   shouldFlushCoalescedRun,
-} from './progressHelpers.js';
+} from '../../utilities/session/mainSiteProgressHelpers.js';
 
 type SurveyGroupScanQueueOptions = {
   hintedSlug?: unknown;
@@ -315,7 +315,7 @@ export {
   SBT_LIGHT_DISCOVERY_HYDRATION_UNITS,
   SBT_FULL_SCAN_DISCOVERY_UNITS,
   SBT_FULL_SCAN_PROCESS_UNITS,
-} from './progressHelpers.js';
+} from '../../utilities/session/mainSiteProgressHelpers.js';
 
 const mainSiteLog = createLogger('mainSite');
 
