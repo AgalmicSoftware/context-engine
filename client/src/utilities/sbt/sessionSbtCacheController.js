@@ -8,7 +8,7 @@ import {
   emitMainSiteSbtDebug,
   hasCoreSbtMetadata,
   isForcedSbtSelectorDebugEnabled,
-} from '../../components/MainSite/mainSiteUtils.js';
+} from '../session/mainSiteUtils.js';
 import {
   mapSbtWorkProgressToBlock,
   SBT_FULL_SCAN_DISCOVERY_UNITS,
