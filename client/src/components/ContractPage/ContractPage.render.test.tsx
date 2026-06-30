@@ -13,11 +13,9 @@ const mockGetSessionConfigBySlugOrDefault = jest.fn();
 
 jest.mock('../../utilities/contracts/contractPageRuntime.js', () => ({
   __esModule: true,
-  default: {
-    hexToBase64url: jest.fn(() => ''),
-    base64urlToHex: jest.fn(() => ''),
-    base64urlToBase64: jest.fn(() => ''),
-  },
+  hexToBase64url: jest.fn(() => ''),
+  base64urlToHex: jest.fn(() => ''),
+  base64urlToBase64: jest.fn(() => ''),
   getSessionConfigBySlug: (...args: any[]) => mockGetSessionConfigBySlug(...args),
   getDemoSessionConfigBySlug: (...args: any[]) => mockGetDemoSessionConfigBySlug(...args),
   getSessionConfigBySlugOrDefault: (...args: any[]) => mockGetSessionConfigBySlugOrDefault(...args),

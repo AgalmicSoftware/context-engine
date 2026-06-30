@@ -4,12 +4,29 @@ import React, { Component } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCopy, faCheck, faSpinner, faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
 import { ethers } from 'ethers';
-import contractScripts from '../../utilities/sbt/sbtPageRuntime.js';
 import {
+  addHashedPasswords,
+  burnToken,
+  claim,
+  claimWithInvite,
+  claimWithPassword,
+  computeGroupPasswordHash,
+  generateInvitePayloads,
   getDemoSessionConfigBySlug,
+  getGroupPasswordHash,
+  getMintedTokens,
+  getOwnerByTokenId,
+  getReadProviderForGroup,
+  getSBTTokenIdByOwner,
+  getSbtHistorySummary,
+  getSbtMetadata,
   getSessionChainId,
   getSessionConfigBySlugOrDefault,
+  isPasswordValid,
+  mintWithGroupSignature,
   normalizeSessionSlug,
+  signGroupMintAuthorization,
+  startClaim,
 } from '../../utilities/sbt/sbtPageRuntime.js';
 import { getChainBlockTimeMs } from '../../variables/chains.js';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
@@ -190,17 +207,6 @@ const inviteLog = createLogger('inviteDebug');
 const encodeSbtPageGroupPassword = (code: string): string => (
   encodeSbtPageGroupPasswordForUrl(code, cryptoUtils)
 );
-type SbtPageContractScripts = {
-  computeGroupPasswordHash: (input: unknown) => string;
-  getGroupPasswordHash: (...args: unknown[]) => Promise<string>;
-  getMintedTokens: (...args: unknown[]) => Promise<unknown>;
-  getOwnerByTokenId: (...args: unknown[]) => Promise<unknown>;
-  getSBTTokenIdByOwner: (...args: unknown[]) => Promise<unknown>;
-  getSbtHistorySummary: (...args: unknown[]) => Promise<unknown>;
-  getSbtMetadata: (...args: unknown[]) => Promise<Record<string, unknown> | null | undefined>;
-  isPasswordValid: (...args: unknown[]) => Promise<boolean>;
-};
-const contractScriptsUntyped = contractScripts as unknown as SbtPageContractScripts;
 type SbtPasswordRecoveryCodeLookupArgs = {
   chainId?: unknown;
   sbtAddress?: unknown;
@@ -331,20 +337,6 @@ type SbtPagePreviousProps = Record<string, unknown> & {
   };
   sessionSlug?: unknown;
   slug?: unknown;
-};
-type SbtPageOwnerLookupScripts = {
-  getOwnerByTokenId: (
-    mode: unknown,
-    sbtAddress: unknown,
-    tokenId: unknown,
-    sessionSlug: unknown
-  ) => Promise<unknown>;
-};
-type SbtPageReadProviderScripts = {
-  getReadProviderForGroup: (
-    slug: unknown,
-    options?: unknown
-  ) => unknown;
 };
 type SbtPageMetadataInfoLike = Record<string, unknown> & {
   admin?: unknown;
@@ -926,7 +918,7 @@ class SBTPage extends Component<any, any> {
     let sbtInfo: SbtPageInfoState | null = this.state.sbtInfo;
     if (!sbtInfo || typeof sbtInfo !== 'object') {
       try {
-        sbtInfo = await contractScriptsUntyped.getSbtMetadata('none', currentSbtAddress, slug) as SbtPageInfoState | null;
+        sbtInfo = await getSbtMetadata('none', currentSbtAddress, slug) as SbtPageInfoState | null;
       } catch (_) {
         sbtInfo = null;
       }
@@ -947,7 +939,7 @@ class SBTPage extends Component<any, any> {
       return minted;
     }
 
-    const onchainGph = await contractScriptsUntyped.getGroupPasswordHash('none', currentSbtAddress, slug);
+    const onchainGph = await getGroupPasswordHash('none', currentSbtAddress, slug);
     if (!isUrlAutoMintTargetCurrent()) return false;
     if (onchainGph && onchainGph !== ethers.constants.HashZero) {
       const minted = await this.mintUnlimitedWithGroupPassword({
@@ -1257,7 +1249,7 @@ class SBTPage extends Component<any, any> {
     ) ? this.state.sbtInfo : null;
     if (!sbtInfo || typeof sbtInfo !== 'object') {
       try {
-        sbtInfo = await contractScriptsUntyped.getSbtMetadata('none', sbtAddress, slug);
+        sbtInfo = await getSbtMetadata('none', sbtAddress, slug);
       } catch (_) {
         sbtInfo = null;
       }
@@ -1274,7 +1266,7 @@ class SBTPage extends Component<any, any> {
     const sbtInfoRecord = isRecord(sbtInfo) ? sbtInfo : {};
     let onchainGph: unknown = null;
     try {
-      onchainGph = await contractScriptsUntyped.getGroupPasswordHash('none', sbtAddress, slug);
+      onchainGph = await getGroupPasswordHash('none', sbtAddress, slug);
     } catch (_) {
       onchainGph = null;
     }
@@ -1355,7 +1347,7 @@ class SBTPage extends Component<any, any> {
         sbtAddress: sbt,
         sessionSlug: slug,
       });
-      const tx = await contractScripts.claimWithInvite(
+      const tx = await claimWithInvite(
         this.props.provider,
         sbt,
         payload.nonce,
@@ -1426,7 +1418,7 @@ class SBTPage extends Component<any, any> {
 
       let onchainHash = options?.groupPasswordHashOverride || (sbtOverride ? null : this.state.groupPasswordHash) || null;
       if (!onchainHash) {
-        try { onchainHash = await contractScriptsUntyped.getGroupPasswordHash('none', sbt, slug); } catch (e) { sbtLog.warn('SBTPage: fallback', e); }
+        try { onchainHash = await getGroupPasswordHash('none', sbt, slug); } catch (e) { sbtLog.warn('SBTPage: fallback', e); }
       }
       if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
         return false;
@@ -1440,7 +1432,7 @@ class SBTPage extends Component<any, any> {
         });
         const localHash = walletScopeSbtAddress === null
           ? null
-          : contractScriptsUntyped.computeGroupPasswordHash({
+          : computeGroupPasswordHash({
               password,
               sbtAddress: walletScopeSbtAddress
             });
@@ -1473,7 +1465,7 @@ class SBTPage extends Component<any, any> {
         }
         let mintedTokens: unknown = null;
         try {
-          mintedTokens = await contractScriptsUntyped.getMintedTokens('none', sbt, slug);
+          mintedTokens = await getMintedTokens('none', sbt, slug);
         } catch (_) {
           mintedTokens = null;
         }
@@ -1504,7 +1496,7 @@ class SBTPage extends Component<any, any> {
         }
 
         const nonce = mintedBig.add(1).toString();
-        const invites = await contractScripts.generateInvitePayloads({
+        const invites = await generateInvitePayloads({
           password,
           sbtAddress: sbt,
           nonces: [nonce],
@@ -1535,7 +1527,7 @@ class SBTPage extends Component<any, any> {
 
         let mintedAfter: unknown = null;
         try {
-          mintedAfter = await contractScriptsUntyped.getMintedTokens('none', sbt, slug);
+          mintedAfter = await getMintedTokens('none', sbt, slug);
         } catch (_) {
           mintedAfter = null;
         }
@@ -1759,7 +1751,7 @@ class SBTPage extends Component<any, any> {
         const hashed = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(token));
         let ok = false;
         try {
-          ok = await contractScriptsUntyped.isPasswordValid(provider, sbtAddressOriginalCase, hashed, targetSlug);
+          ok = await isPasswordValid(provider, sbtAddressOriginalCase, hashed, targetSlug);
         } catch {
           ok = false;
         }
@@ -2017,11 +2009,10 @@ class SBTPage extends Component<any, any> {
     }
     const zero = String(ethers.constants.AddressZero || '').toLowerCase();
     const holders = new Set<string>();
-    const ownerLookupScripts = contractScripts as unknown as SbtPageOwnerLookupScripts;
     const probeOwnerByTokenId = async (tokenId: number): Promise<void> => {
       let owner: unknown = null;
       try {
-        owner = await ownerLookupScripts.getOwnerByTokenId('none', sbtAddress, tokenId, sessionSlug);
+        owner = await getOwnerByTokenId('none', sbtAddress, tokenId, sessionSlug);
       } catch (_) {
         owner = null;
       }
@@ -2136,8 +2127,7 @@ class SBTPage extends Component<any, any> {
         return info;
       }
       try {
-        const readProviderScripts = contractScripts as unknown as SbtPageReadProviderScripts;
-        const ro = readProviderScripts.getReadProviderForGroup(slugForRead, { contractKey: 'sbtFactory' });
+        const ro = getReadProviderForGroup(slugForRead, { contractKey: 'sbtFactory' });
         const c = new ethers.Contract(String(addr || ''), SBT_ABI_FRAG, ro as ethers.providers.Provider);
         const [max, burn, end, hasPw, adminAddr, ownerAddr] = await Promise.all([
           needMax ? withSoftReadTimeout(c.maxTokens(), null) : null,
@@ -2351,7 +2341,7 @@ class SBTPage extends Component<any, any> {
       ) {
         if (!isCurrentLoad()) return;
         try {
-          const directMetadata = await contractScriptsUntyped.getSbtMetadata(
+          const directMetadata = await getSbtMetadata(
             'none',
             sbtAddressOriginalCase,
             buildDirectMetadataContext(resolvedSlug, netIdStr, sbtInfo)
@@ -2408,7 +2398,7 @@ class SBTPage extends Component<any, any> {
         ) {
           if (!isCurrentLoad()) return;
           try {
-            const directMetadata = await contractScriptsUntyped.getSbtMetadata(
+            const directMetadata = await getSbtMetadata(
               'none',
               sbtAddressOriginalCase,
               buildDirectMetadataContext(resolvedSlug, netIdStr, sbtInfo)
@@ -2583,7 +2573,7 @@ class SBTPage extends Component<any, any> {
       });
       const groupPasswordHash = shouldReuseCachedGroupPasswordHash
         ? cachedGroupPasswordHash
-        : await contractScriptsUntyped.getGroupPasswordHash('none', sbtAddressOriginalCase, resolvedSlug);
+        : await getGroupPasswordHash('none', sbtAddressOriginalCase, resolvedSlug);
       if (!isCurrentLoad()) return;
       const {
         hasGroupHash,
@@ -2624,7 +2614,7 @@ class SBTPage extends Component<any, any> {
         setSummaryFallbacks(historySummary, 'summary-cache');
         if (mintedTokensOverride == null) {
           try {
-            const summaryRaw = await contractScriptsUntyped.getSbtHistorySummary('none', sbtAddressOriginalCase, resolvedSlug);
+            const summaryRaw = await getSbtHistorySummary('none', sbtAddressOriginalCase, resolvedSlug);
             if (!isCurrentLoad()) return;
             historySummary = normalizeSbtPageHistorySummary(summaryRaw) || historySummary;
             setSummaryFallbacks(historySummary, 'summary-group');
@@ -2640,7 +2630,7 @@ class SBTPage extends Component<any, any> {
         if (mintedTokensOverride == null && sbtInfo?.chainID != null) {
           try {
             const fallbackCfg = { networkChainId: Number(sbtInfo.chainID) };
-            const summaryRaw = await contractScriptsUntyped.getSbtHistorySummary('none', sbtAddressOriginalCase, fallbackCfg);
+            const summaryRaw = await getSbtHistorySummary('none', sbtAddressOriginalCase, fallbackCfg);
             if (!isCurrentLoad()) return;
             historySummary = normalizeSbtPageHistorySummary(summaryRaw) || historySummary;
             setSummaryFallbacks(historySummary, 'summary-chainId');
@@ -2660,7 +2650,7 @@ class SBTPage extends Component<any, any> {
         }
         if (mintedTokensOverride == null) {
           try {
-            const mintedTokensRaw = await contractScriptsUntyped.getMintedTokens('none', sbtAddressOriginalCase, resolvedSlug);
+            const mintedTokensRaw = await getMintedTokens('none', sbtAddressOriginalCase, resolvedSlug);
             if (!isCurrentLoad()) return;
             mintedTokensOverride = sanitizeSbtPageMintedTokensOverride(mintedTokensRaw);
             if (mintedTokensOverride != null) {
@@ -2674,7 +2664,7 @@ class SBTPage extends Component<any, any> {
         if (mintedTokensOverride == null && sbtInfo?.chainID != null) {
           try {
             const fallbackCfg = { networkChainId: Number(sbtInfo.chainID) };
-            const mintedTokensRaw = await contractScriptsUntyped.getMintedTokens('none', sbtAddressOriginalCase, fallbackCfg);
+            const mintedTokensRaw = await getMintedTokens('none', sbtAddressOriginalCase, fallbackCfg);
             if (!isCurrentLoad()) return;
             mintedTokensOverride = sanitizeSbtPageMintedTokensOverride(mintedTokensRaw);
             if (mintedTokensOverride != null) {
@@ -3042,7 +3032,7 @@ class SBTPage extends Component<any, any> {
       }
 
       sbtLog.log('[MANUAL-MINT] Reading on-chain groupPasswordHash...');
-      const onchain = await contractScriptsUntyped.getGroupPasswordHash('none', sbt, slug);
+      const onchain = await getGroupPasswordHash('none', sbt, slug);
       sbtLog.log('[MANUAL-MINT] On-chain groupPasswordHash:', onchain);
       if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
         return false;
@@ -3059,7 +3049,7 @@ class SBTPage extends Component<any, any> {
       });
       const local = walletScopeSbtAddress === null
         ? null
-        : contractScriptsUntyped.computeGroupPasswordHash({
+        : computeGroupPasswordHash({
             password,
             sbtAddress: walletScopeSbtAddress
       });
@@ -3083,7 +3073,7 @@ class SBTPage extends Component<any, any> {
       });
 
       sbtLog.log('[MANUAL-MINT] Signing authorization...');
-      const sig = await contractScripts.signGroupMintAuthorization({
+      const sig = await signGroupMintAuthorization({
         password,
         sbtAddress: sbt,
         userAddress: mintAccount,
@@ -3095,7 +3085,7 @@ class SBTPage extends Component<any, any> {
         return false;
       }
       sbtLog.log('[MANUAL-MINT] Sending transaction...');
-      const tx = await contractScripts.mintWithGroupSignature(this.props.provider, sbt, sig);
+      const tx = await mintWithGroupSignature(this.props.provider, sbt, sig);
       sbtLog.log('[MANUAL-MINT] Tx hash:', tx.transactionHash);
 
       await this.completeMintSuccessForTarget({
@@ -3169,7 +3159,7 @@ class SBTPage extends Component<any, any> {
           // isPasswordValid() is a free view call and saves two wasted txs on bad passwords.
           const hashedPassword = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(effectivePassword));
           try {
-            const isValid = await contractScriptsUntyped.isPasswordValid(
+            const isValid = await isPasswordValid(
               this.props.provider,
               sbtAddressOriginalCase,
               hashedPassword,
@@ -3203,7 +3193,7 @@ class SBTPage extends Component<any, any> {
             [effectivePassword, mintAccount]
           );
 
-          const tx = await contractScripts.startClaim(this.props.provider, sbtAddressOriginalCase, userCommit);
+          const tx = await startClaim(this.props.provider, sbtAddressOriginalCase, userCommit);
           if (
             this._isMounted &&
             this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })
@@ -3233,7 +3223,7 @@ class SBTPage extends Component<any, any> {
             sbtAddress: sbtAddressOriginalCase,
             sessionSlug: slug,
           });
-          const tx = await contractScripts.claimWithPassword(this.props.provider, sbtAddressOriginalCase, effectivePassword);
+          const tx = await claimWithPassword(this.props.provider, sbtAddressOriginalCase, effectivePassword);
           this.cacheTransactionHash(tx.transactionHash, mintAccountLower);
           await this.completeMintSuccessForTarget({
             accountLower: mintAccountLower,
@@ -3257,7 +3247,7 @@ class SBTPage extends Component<any, any> {
           sbtAddress: sbtAddressOriginalCase,
           sessionSlug: slug,
         });
-        const tx = await contractScripts.claim(this.props.provider, sbtAddressOriginalCase);
+        const tx = await claim(this.props.provider, sbtAddressOriginalCase);
         this.cacheTransactionHash(tx.transactionHash, mintAccountLower);
         await this.completeMintSuccessForTarget({
           accountLower: mintAccountLower,
@@ -3302,13 +3292,13 @@ class SBTPage extends Component<any, any> {
 
       if (!sbtAddressOriginalCase) return;
 
-      const tokenIdToBurn = await contractScriptsUntyped.getSBTTokenIdByOwner('none', sbtAddressOriginalCase, this.props.account, this.getEffectiveSessionSlug());
+      const tokenIdToBurn = await getSBTTokenIdByOwner('none', sbtAddressOriginalCase, this.props.account, this.getEffectiveSessionSlug());
       if (!tokenIdToBurn) {
         if (this._isMounted) this.setState(buildSbtPageBurnFailurePatch({ error: "No valid token ID found" }));
         return;
       }
 
-      const tx = await contractScripts.burnToken(this.props.provider, sbtAddressOriginalCase, tokenIdToBurn);
+      const tx = await burnToken(this.props.provider, sbtAddressOriginalCase, tokenIdToBurn);
       await this.loadSBTInfo(true);
       if (this._isMounted) this.setState(buildSbtPageBurnSuccessPatch({ txHash: tx.transactionHash }));
       this.cacheTransactionHash(tx.transactionHash);
@@ -3356,7 +3346,7 @@ class SBTPage extends Component<any, any> {
     try {
       // Full address search
       if (input.startsWith('0x') && input.length === 42) {
-        const tokenId = await contractScriptsUntyped.getSBTTokenIdByOwner(
+        const tokenId = await getSBTTokenIdByOwner(
           'none',
           sbtAddressOriginalCase,
           input,
@@ -3372,7 +3362,7 @@ class SBTPage extends Component<any, any> {
       }
       // Numeric tokenId search
       else if (/^\d+$/.test(input)) {
-        const address = await contractScriptsUntyped.getOwnerByTokenId(
+        const address = await getOwnerByTokenId(
           'none',
           sbtAddressOriginalCase,
           input,
@@ -3426,7 +3416,7 @@ class SBTPage extends Component<any, any> {
       tokenIdToBurn = burnSearchResultRecord.tokenId;
       burnedAddrLower = burnSearchResultRecord.address ? String(burnSearchResultRecord.address).toLowerCase() : null;
     } else if (isOwnerBurn) {
-      tokenIdToBurn = await contractScriptsUntyped.getSBTTokenIdByOwner('none', sbtAddressOriginalCase, this.props.account, this.getEffectiveSessionSlug());
+      tokenIdToBurn = await getSBTTokenIdByOwner('none', sbtAddressOriginalCase, this.props.account, this.getEffectiveSessionSlug());
       burnedAddrLower = userAddress;
       if (!tokenIdToBurn) {
         if (this._isMounted) this.setState(buildSbtPageBurnFailurePatch({ error: "No valid token ID found" }));
@@ -3442,7 +3432,7 @@ class SBTPage extends Component<any, any> {
 
     try {
       if (this._isMounted) this.setState(buildSbtPageBurnPendingPatch());
-      const tx = await contractScripts.burnToken(this.props.provider, sbtAddressOriginalCase, tokenIdToBurn);
+      const tx = await burnToken(this.props.provider, sbtAddressOriginalCase, tokenIdToBurn);
       await this.loadSBTInfo(true);
       if (this._isMounted) this.setState(buildSbtPageBurnSuccessPatch({
         resetBurnSearch: true,
@@ -3578,7 +3568,7 @@ class SBTPage extends Component<any, any> {
       const sbtAddressOriginalCase = resolveSbtAddressString(this.props.SBTAddress);
       if (!sbtAddressOriginalCase) return;
 
-      const tx = await contractScripts.addHashedPasswords(this.props.provider, sbtAddressOriginalCase, hashedPasswords);
+      const tx = await addHashedPasswords(this.props.provider, sbtAddressOriginalCase, hashedPasswords);
       sbtLog.log("addHashedPasswords transaction hash:", tx.transactionHash);
 
       this.cacheTransactionHash(tx.transactionHash);
@@ -3816,7 +3806,7 @@ class SBTPage extends Component<any, any> {
       return;
     }
 
-    const tx = await contractScripts.burnToken(this.props.provider, sbtAddressOriginalCaseForAdminBurn, burnSearchResultRecord?.tokenId);
+    const tx = await burnToken(this.props.provider, sbtAddressOriginalCaseForAdminBurn, burnSearchResultRecord?.tokenId);
     await this.loadSBTInfo(true);
     if (this._isMounted) this.setState(buildSbtPageBurnSuccessPatch({
       resetBurnSearch: true,
