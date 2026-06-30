@@ -10,7 +10,16 @@ import {
 import {
   buildSurveyResultsAlertMessagePatch,
 } from './surveyResultsHelpers';
+import {
+  SURVEY_RESULTS_HTML_REPORT_DEFAULT_SELECTED_SECTIONS,
+  normalizeSurveyResultsHtmlReportSelectedSections,
+} from './surveyResultsHtmlReportSelection';
 import type { ReactNode } from 'react';
+
+export {
+  SURVEY_RESULTS_HTML_REPORT_DEFAULT_SELECTED_SECTIONS,
+  normalizeSurveyResultsHtmlReportSelectedSections,
+} from './surveyResultsHtmlReportSelection';
 
 export type SurveyResultsHtmlReportSectionAvailability = {
   argumentMap: boolean;
@@ -113,14 +122,6 @@ export type SurveyResultsHtmlReportExportModalDescriptor = {
   snapshot: SessionResultsHtmlSnapshot;
 };
 
-export const SURVEY_RESULTS_HTML_REPORT_DEFAULT_SELECTED_SECTIONS: Required<SessionResultsSectionSelection> = Object.freeze({
-  argumentMap: false,
-  atlas: false,
-  report: true,
-  riskMatrix: false,
-  snapshotJson: true,
-});
-
 export const SURVEY_RESULTS_HTML_REPORT_ANALYSIS_SECTION_KEYS: readonly SurveyResultsHtmlReportSectionKey[] = Object.freeze([
   'argumentMap',
   'riskMatrix',
@@ -133,13 +134,6 @@ const HTML_REPORT_SECTION_LABELS: Record<SurveyResultsHtmlReportSectionKey, stri
   report: 'Report',
   riskMatrix: 'Risk Matrix',
   snapshotJson: 'Embedded Snapshot JSON',
-});
-
-const normalizeSurveyResultsHtmlReportSelectedSections = (
-  selectedSections: SessionResultsSectionSelection | null | undefined
-): Required<SessionResultsSectionSelection> => ({
-  ...SURVEY_RESULTS_HTML_REPORT_DEFAULT_SELECTED_SECTIONS,
-  ...(selectedSections || {}),
 });
 
 export const buildSurveyResultsHtmlReportModalOpenPatch = (
