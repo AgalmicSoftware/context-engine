@@ -61,7 +61,7 @@ export const CLIENT_BOUNDARY_RULES = Object.freeze({
   },
 });
 
-const normalizePath = (filePath) => filePath.split(path.sep).join('/');
+const normalizePath = (filePath) => filePath.split(/[\\/]+/).join('/');
 const startsWithPath = (filePath, prefix) => filePath === prefix || filePath.startsWith(prefix);
 const hasPathPrefix = (filePath, prefix) => (
   filePath === prefix.slice(0, -1) || filePath.startsWith(prefix)
@@ -154,16 +154,17 @@ export function extractImportSpecifiers(source) {
 
 export function resolveClientImport(sourceFile, specifier) {
   const normalizedSource = normalizePath(sourceFile);
+  const normalizedSpecifier = normalizePath(specifier);
   let resolved = null;
 
-  if (specifier.startsWith('.')) {
-    resolved = path.posix.normalize(path.posix.join(path.posix.dirname(normalizedSource), specifier));
-  } else if (specifier.startsWith(`${SOURCE_ROOT}/`)) {
-    resolved = specifier;
-  } else if (specifier.startsWith('src/')) {
-    resolved = `client/${specifier}`;
-  } else if (specifier.startsWith('@/')) {
-    resolved = `${SOURCE_ROOT}/${specifier.slice(2)}`;
+  if (normalizedSpecifier.startsWith('.')) {
+    resolved = path.posix.normalize(path.posix.join(path.posix.dirname(normalizedSource), normalizedSpecifier));
+  } else if (normalizedSpecifier.startsWith(`${SOURCE_ROOT}/`)) {
+    resolved = normalizedSpecifier;
+  } else if (normalizedSpecifier.startsWith('src/')) {
+    resolved = `client/${normalizedSpecifier}`;
+  } else if (normalizedSpecifier.startsWith('@/')) {
+    resolved = `${SOURCE_ROOT}/${normalizedSpecifier.slice(2)}`;
   }
 
   if (!resolved || !resolved.startsWith(`${SOURCE_ROOT}/`)) {
