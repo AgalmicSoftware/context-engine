@@ -200,7 +200,7 @@ import {
   buildMainSiteCacheManagerReadyStatePatch,
   buildMainSiteLitHooksStatePatch,
   isRouteResponderAddress,
-} from './mainSiteUtils.js';
+} from '../../utilities/session/mainSiteUtils.js';
 import {
   composeMainSiteAuthViewProps,
   composeMainSiteLoginViewProps,

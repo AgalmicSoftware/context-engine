@@ -39,7 +39,7 @@ jest.mock('../web3/contractScripts.js', () => {
   };
 });
 
-jest.mock('../../components/MainSite/mainSiteUtils', () => ({
+jest.mock('../session/mainSiteUtils', () => ({
   __esModule: true,
   emitMainSiteSbtDebug: jest.fn(),
   hasCoreSbtMetadata: jest.fn((info) => {
@@ -102,7 +102,7 @@ const {
   emitMainSiteSbtDebug,
   hasCoreSbtMetadata,
   isForcedSbtSelectorDebugEnabled,
-} = require('../../components/MainSite/mainSiteUtils');
+} = require('../session/mainSiteUtils');
 const {
   mergeSbtLiveProgressEntry,
   shouldCommitThrottledProgress,

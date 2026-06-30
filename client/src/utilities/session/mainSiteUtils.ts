@@ -1,5 +1,5 @@
 /**
- * @module components/MainSite/mainSiteUtils
+ * @module utilities/session/mainSiteUtils
  */
 
 import { ethers } from 'ethers';
