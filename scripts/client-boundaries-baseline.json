@@ -206,12 +206,6 @@
       "source": "client/src/components/UserPage/UserPage.tsx",
       "import": "../../utilities/web3/sponsoredAccess.js",
       "resolved": "client/src/utilities/web3/sponsoredAccess"
-    },
-    {
-      "rule": "utilities-no-components",
-      "source": "client/src/utilities/survey/sessionSurveyCacheController.ts",
-      "import": "../../components/MainSite/metadataCacheEntryBuilders.js",
-      "resolved": "client/src/components/MainSite/metadataCacheEntryBuilders"
     }
   ]
 }

@@ -64,7 +64,7 @@
   Test: `metadataSessionBinding.test.ts` (20 tests)
   Dependencies: `normalizeSessionSlug` (sessionNaming), `getSessionSlugByName` (sessionConfigResolvers)
   What stays in MainSite: `writeSurveyMetadataToCache`, `writeQuestionMetadataToCache`, `findGroupSlugForSurvey`, `findGroupSlugForQuestion`, `resolveGroupSlugForSbtAddress` (all call through forwarding wrappers)
-- `client/src/components/MainSite/metadataCacheEntryBuilders.ts`
+- `client/src/utilities/survey/metadataCacheEntryBuilders.ts`
   Pattern: Pure exported functions (no host DI)
   Exports: `prepareSurveyMetadataCacheEntry`, `prepareQuestionMetadataCacheEntry`
   Types: `PrepareSurveyMetadataCacheEntryArgs`, `PrepareQuestionMetadataCacheEntryArgs`
