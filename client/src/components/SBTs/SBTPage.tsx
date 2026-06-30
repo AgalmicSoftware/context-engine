@@ -4,13 +4,13 @@ import React, { Component } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCopy, faCheck, faSpinner, faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
 import { ethers } from 'ethers';
-import contractScripts from '../../utilities/web3/contractScripts.js';
+import contractScripts from '../../utilities/sbt/sbtPageRuntime.js';
 import {
   getDemoSessionConfigBySlug,
   getSessionChainId,
   getSessionConfigBySlugOrDefault,
   normalizeSessionSlug,
-} from '../../utilities/web3/contractScripts.js';
+} from '../../utilities/sbt/sbtPageRuntime.js';
 import { getChainBlockTimeMs } from '../../variables/chains.js';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import styles from './SBTPage.module.scss';
