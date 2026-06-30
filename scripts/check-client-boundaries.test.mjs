@@ -149,3 +149,56 @@ test('route/page low-level imports fail only when not present in the baseline', 
     assert.match(failedStderr.join('\n'), /new architecture boundary violation/);
   });
 });
+
+test('resolved baseline entries report ratchet-down guidance without failing', () => {
+  withTempRoot((rootDir) => {
+    const staleSource = 'client/src/components/Admin/AdminPage.tsx';
+    writeFile(
+      rootDir,
+      staleSource,
+      "import { getSession } from '../../utilities/web3/sessionRegistry';\n"
+    );
+    writeFile(
+      rootDir,
+      'client/src/components/Sponsor/SponsorPage.tsx',
+      "import { getWorkerUrl } from '../../utilities/worker/workerUrl';\n"
+    );
+    const baselineViolations = collectClientBoundaryViolations({ rootDir });
+    assert.equal(baselineViolations.length, 2);
+    writeBoundaryBaseline(baselineViolations, rootDir);
+
+    fs.rmSync(path.join(rootDir, staleSource), { force: true });
+
+    const stdout = [];
+    const stderr = [];
+    assert.equal(runClientBoundaryCheck({
+      rootDir,
+      stdout: (line) => stdout.push(line),
+      stderr: (line) => stderr.push(line),
+    }), 0);
+    assert.match(stdout.join('\n'), /Current violations: 1; baseline: 2; new: 0; resolved: 1\./);
+    assert.match(stdout.join('\n'), /Resolved baseline entries detected/);
+    assert.equal(stderr.length, 0);
+  });
+});
+
+test('new violation output includes rule, source, import, and resolved path', () => {
+  withTempRoot((rootDir) => {
+    writeFile(
+      rootDir,
+      'client/src/utilities/session/sessionHelpers.ts',
+      "import Widget from '../../components/Shared/Widget';\n"
+    );
+
+    const stderr = [];
+    assert.equal(runClientBoundaryCheck({
+      rootDir,
+      stdout: () => {},
+      stderr: (line) => stderr.push(line),
+    }), 1);
+    assert.match(
+      stderr.join('\n'),
+      /utilities-no-components: client\/src\/utilities\/session\/sessionHelpers\.ts imports \.\.\/\.\.\/components\/Shared\/Widget \(client\/src\/components\/Shared\/Widget\)/
+    );
+  });
+});
