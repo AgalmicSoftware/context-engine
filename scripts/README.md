@@ -29,7 +29,7 @@ Client boundary checker:
 npm run client-boundaries:check
 ```
 
-This compares conservative client import-boundary rules against `scripts/client-boundaries-baseline.json` and fails only for new violations. Use `node scripts/check-client-boundaries.mjs --write-baseline` after reviewed boundary cleanup removes or intentionally reclassifies entries.
+This compares conservative client import-boundary rules against `scripts/client-boundaries-baseline.json` and fails for new violations or duplicate baseline entries. Use `node scripts/check-client-boundaries.mjs --write-baseline` after reviewed boundary cleanup removes or intentionally reclassifies entries.
 
 The stripped public checkout keeps `scripts/vite-navigation-smoke.js` as the maintained local route/style smoke runner. Private full-workflow E2E files may be absent in this checkout; see [`../docs/e2e-commands.md`](../docs/e2e-commands.md) for the public smoke command and private-runner notes.
 

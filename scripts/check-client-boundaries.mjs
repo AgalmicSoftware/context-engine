@@ -330,6 +330,22 @@ export function compareToBaseline(currentViolations, baselineViolations) {
   };
 }
 
+export function findDuplicateBaselineViolations(baselineViolations) {
+  const seenIds = new Set();
+  const duplicates = [];
+
+  for (const violation of baselineViolations) {
+    const id = violationId(violation);
+    if (seenIds.has(id)) {
+      duplicates.push(violation);
+    } else {
+      seenIds.add(id);
+    }
+  }
+
+  return duplicates.sort(compareViolations);
+}
+
 function countByRule(violations) {
   const counts = {};
   for (const violation of violations) {
@@ -378,19 +394,21 @@ export function runClientBoundaryCheck({
   const baseline = readBoundaryBaseline(rootDir);
   const baselineViolations = Array.isArray(baseline.violations) ? baseline.violations : [];
   const comparison = compareToBaseline(violations, baselineViolations);
+  const duplicateBaselineViolations = findDuplicateBaselineViolations(baselineViolations);
   const result = {
     mode: baseline.mode || 'fail-on-new-violation',
     filesRoot: SOURCE_ROOT,
     totalViolations: violations.length,
     countsByRule: countByRule(violations),
     baselineViolations: baselineViolations.length,
+    duplicateBaselineViolations,
     newViolations: comparison.newViolations,
     resolvedViolations: comparison.resolvedViolations,
   };
 
   if (args.has('--json')) {
     stdout(JSON.stringify(result, null, 2));
-    return comparison.newViolations.length > 0 ? 1 : 0;
+    return comparison.newViolations.length > 0 || duplicateBaselineViolations.length > 0 ? 1 : 0;
   }
 
   stdout(`Client boundary check scanned ${SOURCE_ROOT}.`);
@@ -405,6 +423,12 @@ export function runClientBoundaryCheck({
 
   if (comparison.resolvedViolations.length > 0) {
     stdout('Resolved baseline entries detected. Run --write-baseline after reviewing the cleanup.');
+  }
+
+  if (duplicateBaselineViolations.length > 0) {
+    stderr('Client boundary check failed: duplicate baseline entry/entries found.');
+    duplicateBaselineViolations.forEach((violation) => stderr(`- ${formatViolation(violation)}`));
+    return 1;
   }
 
   if (comparison.newViolations.length > 0) {

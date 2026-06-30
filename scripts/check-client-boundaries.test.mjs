@@ -8,6 +8,7 @@ import {
   collectClientBoundaryViolations,
   compareToBaseline,
   extractImportSpecifiers,
+  findDuplicateBaselineViolations,
   isProductionClientSourceFile,
   isRouteOrPageCode,
   readBoundaryBaseline,
@@ -147,6 +148,58 @@ test('route/page low-level imports fail only when not present in the baseline', 
       stderr: (line) => failedStderr.push(line),
     }), 1);
     assert.match(failedStderr.join('\n'), /new architecture boundary violation/);
+  });
+});
+
+test('duplicate baseline entries fail even when the current violation is baselined', () => {
+  withTempRoot((rootDir) => {
+    writeFile(
+      rootDir,
+      'client/src/components/Admin/AdminPage.tsx',
+      "import { getSession } from '../../utilities/web3/sessionRegistry';\n"
+    );
+    const violations = collectClientBoundaryViolations({ rootDir });
+    assert.equal(violations.length, 1);
+    writeBoundaryBaseline([violations[0], violations[0]], rootDir);
+
+    assert.deepEqual(findDuplicateBaselineViolations(readBoundaryBaseline(rootDir).violations), [
+      violations[0],
+    ]);
+
+    const stderr = [];
+    assert.equal(runClientBoundaryCheck({
+      rootDir,
+      stdout: () => {},
+      stderr: (line) => stderr.push(line),
+    }), 1);
+    assert.match(stderr.join('\n'), /duplicate baseline entry/);
+    assert.match(stderr.join('\n'), /route-page-no-low-level/);
+  });
+});
+
+test('json output includes duplicate baseline entries and exits nonzero', () => {
+  withTempRoot((rootDir) => {
+    writeFile(
+      rootDir,
+      'client/src/components/Admin/AdminPage.tsx',
+      "import { getSession } from '../../utilities/web3/sessionRegistry';\n"
+    );
+    const violations = collectClientBoundaryViolations({ rootDir });
+    writeBoundaryBaseline([violations[0], violations[0]], rootDir);
+
+    const stdout = [];
+    const stderr = [];
+    assert.equal(runClientBoundaryCheck({
+      rootDir,
+      argv: ['--json'],
+      stdout: (line) => stdout.push(line),
+      stderr: (line) => stderr.push(line),
+    }), 1);
+
+    const result = JSON.parse(stdout.join('\n'));
+    assert.deepEqual(result.duplicateBaselineViolations, [violations[0]]);
+    assert.equal(result.newViolations.length, 0);
+    assert.equal(stderr.length, 0);
   });
 });
 
