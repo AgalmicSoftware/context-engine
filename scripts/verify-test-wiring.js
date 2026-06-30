@@ -71,6 +71,9 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFile('scripts/deploy-helper-deploy.mjs');
   expectFile('scripts/run-node-tests.js');
   expectFile('scripts/run-node-tests.test.js');
+  expectFile('scripts/check-client-boundaries.mjs');
+  expectFile('scripts/check-client-boundaries.test.mjs');
+  expectFile('scripts/client-boundaries-baseline.json');
   expectFile('scripts/check-type-debt-ratchet.mjs');
   expectFile('scripts/testInventoryConfig.js');
   expectFile('scripts/verify-test-inventory.js');
@@ -99,6 +102,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('test:contracts', 'SessionRegistryFuzzTest');
   expectScriptContains('test:contracts', 'CustomSBTInvariantTest');
   expectScriptContains('test:node', 'scripts/run-node-tests.js');
+  expectScriptContains('client-boundaries:check', 'scripts/check-client-boundaries.mjs');
   expectScriptContains('test:root:jest', '--testMatch');
   expectScriptContains('test:root:jest', '../tests/root/sessionCorsWorker.auth.test.js');
   expectScriptContains('test:root:jest', '../tests/root/deployHelper.worker.test.js');
@@ -113,6 +117,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('test:ci', 'npm run test:root:jest');
   expectScriptContains('test:ci', 'npm run test:worker:session-cors');
   expectScriptContains('test:ci', 'npm run test:node');
+  expectScriptContains('test:wiring', 'client-boundaries:check');
   expectScriptContains('test:wiring', 'scripts/verify-test-inventory.js');
   expectScriptContains('tests', 'npm run test:ci');
   expectScriptContains('tests', 'npm run test:surveys-sbt');

@@ -23,6 +23,14 @@ npm run type-debt:check
 
 This counts production `client/src` TS/TSX `@ts-nocheck` and explicit-`any` markers against `scripts/type-debt-baseline.json`. Tests, test utilities, and `*Harness.ts(x)` files are excluded. Use `node scripts/check-type-debt-ratchet.mjs --write-baseline` only after intentional cleanup or a reviewed baseline change.
 
+Client boundary checker:
+
+```bash
+npm run client-boundaries:check
+```
+
+This compares conservative client import-boundary rules against `scripts/client-boundaries-baseline.json` and fails only for new violations. Use `node scripts/check-client-boundaries.mjs --write-baseline` after reviewed boundary cleanup removes or intentionally reclassifies entries.
+
 The stripped public checkout keeps `scripts/vite-navigation-smoke.js` as the maintained local route/style smoke runner. Private full-workflow E2E files may be absent in this checkout; see [`../docs/e2e-commands.md`](../docs/e2e-commands.md) for the public smoke command and private-runner notes.
 
 Deploy-helper quick command:
