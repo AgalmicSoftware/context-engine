@@ -143,18 +143,6 @@
     },
     {
       "rule": "route-page-no-low-level",
-      "source": "client/src/components/TagPage/TagPage.tsx",
-      "import": "../../utilities/web3/contractScripts.js",
-      "resolved": "client/src/utilities/web3/contractScripts"
-    },
-    {
-      "rule": "route-page-no-low-level",
-      "source": "client/src/components/TagPage/TagPage.tsx",
-      "import": "../../utilities/web3/sessionRegistry.js",
-      "resolved": "client/src/utilities/web3/sessionRegistry"
-    },
-    {
-      "rule": "route-page-no-low-level",
       "source": "client/src/components/UserPage/UserPage.tsx",
       "import": "../../utilities/web3/contractScripts.js",
       "resolved": "client/src/utilities/web3/contractScripts"
