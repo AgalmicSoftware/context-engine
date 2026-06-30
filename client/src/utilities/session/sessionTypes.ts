@@ -129,3 +129,7 @@ export interface LocalResourceOverrides {
   arweave: { useLocal: boolean; jwk: string };
   faucet: { useLocal: boolean; privateKey: string };
 }
+
+export type SessionConfigLike = SessionConfig;
+export type SessionMetadataRecord = SessionMetadata;
+export type WorkerConfigRecord = SessionWorkerConfigCacheRecord;

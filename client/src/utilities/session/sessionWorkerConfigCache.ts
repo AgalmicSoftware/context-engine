@@ -6,13 +6,13 @@ import {
 import { normalizeSessionIdHex } from '../shared/primitives.js';
 import { normalizeWorkerUrl } from '../worker/workerUrl.js';
 import type {
-  SessionConfig,
+  SessionConfigLike,
   SessionWorkerConfig,
-  SessionWorkerConfigCacheRecord,
   SessionWorkerConfigFieldPresence,
   SessionWorkerConfigReplica,
   SessionWorkerConfigReplicaMeta,
   UnknownRecord,
+  WorkerConfigRecord,
 } from './sessionTypes.js';
 
 type WorkerConfig = SessionWorkerConfig;
@@ -22,7 +22,6 @@ type CacheIdentity = {
   sessionIdHex: string;
   registryChainId: number | null;
 };
-type WorkerConfigRecord = SessionWorkerConfigCacheRecord;
 type WorkerConfigStore = {
   v: number;
   bySession: Record<string, WorkerConfigRecord>;
@@ -197,7 +196,7 @@ const getSessionIdentityFromConfig = (sessionConfig: unknown = null): CacheIdent
     ),
   };
 };
-const readRegistrySessionConfigBySlug = (slugIn: unknown = ''): SessionConfig | null => {
+const readRegistrySessionConfigBySlug = (slugIn: unknown = ''): SessionConfigLike | null => {
   if (typeof window === 'undefined') return null;
   try {
     const parsed = JSON.parse(localStorage.getItem(REGISTRY_CACHE_KEY) || 'null');
@@ -206,7 +205,7 @@ const readRegistrySessionConfigBySlug = (slugIn: unknown = ''): SessionConfig | 
       ? parsed.sessions
       : (isObj(parsed.groups) ? parsed.groups : {});
     const slug = canonicalizeSessionSlug(slugIn);
-    return isObj(sessions[slug]) ? sessions[slug] as SessionConfig : null;
+    return isObj(sessions[slug]) ? sessions[slug] as SessionConfigLike : null;
   } catch (_) {
     return null;
   }
