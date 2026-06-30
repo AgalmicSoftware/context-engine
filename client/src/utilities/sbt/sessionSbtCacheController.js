@@ -16,7 +16,7 @@ import {
   SBT_LIGHT_DISCOVERY_HYDRATION_UNITS,
   SBT_LIGHT_DISCOVERY_SCAN_UNITS,
   SBT_PROGRESS_FINAL_TAIL_BLOCKS,
-} from '../../components/MainSite/progressHelpers.js';
+} from '../session/mainSiteProgressHelpers.js';
 import {
   normalizeSbtCountMap,
   sumSbtCountMap,

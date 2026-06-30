@@ -54,7 +54,7 @@ jest.mock('../session/sessionQuestionDecryption.js', () => ({
   hasMaskedQuestionPayloadImproved: jest.fn(),
 }));
 
-jest.mock('../../components/MainSite/progressHelpers.js', () => ({
+jest.mock('../session/mainSiteProgressHelpers.js', () => ({
   __esModule: true,
   buildQuestionReadyStatePatch: jest.fn(),
   shouldClearQuestionProgressInFinalize: jest.fn(),
@@ -102,7 +102,7 @@ const {
   shouldClearQuestionProgressInFinalize,
   shouldCommitThrottledProgress,
   shouldFlushCoalescedRun,
-} = require('../../components/MainSite/progressHelpers.js');
+} = require('../session/mainSiteProgressHelpers.js');
 const {
   isMaskedQuestionPayload,
   pickBetterQuestionPayload,

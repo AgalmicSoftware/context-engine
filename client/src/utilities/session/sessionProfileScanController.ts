@@ -29,7 +29,7 @@ import {
   isProfileScanColdDiagEnabled as isMainSiteProfileScanColdDiagEnabled,
   isProfileScanTelemetryEnabled as isMainSiteProfileScanTelemetryEnabled,
 } from '../../components/MainSite/debugTelemetry.js';
-import { shouldEnableSessionRegistryRefresh } from '../../components/MainSite/progressHelpers.js';
+import { shouldEnableSessionRegistryRefresh } from './mainSiteProgressHelpers.js';
 
 const mainSiteLog = createLogger('mainSite');
 

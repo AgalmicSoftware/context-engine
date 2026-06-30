@@ -209,39 +209,9 @@
     },
     {
       "rule": "utilities-no-components",
-      "source": "client/src/utilities/sbt/sbtLiveProgressController.ts",
-      "import": "../../components/MainSite/progressHelpers.js",
-      "resolved": "client/src/components/MainSite/progressHelpers"
-    },
-    {
-      "rule": "utilities-no-components",
-      "source": "client/src/utilities/sbt/sessionSbtCacheController.js",
-      "import": "../../components/MainSite/progressHelpers.js",
-      "resolved": "client/src/components/MainSite/progressHelpers"
-    },
-    {
-      "rule": "utilities-no-components",
       "source": "client/src/utilities/session/sessionProfileScanController.ts",
       "import": "../../components/MainSite/debugTelemetry.js",
       "resolved": "client/src/components/MainSite/debugTelemetry"
-    },
-    {
-      "rule": "utilities-no-components",
-      "source": "client/src/utilities/session/sessionProfileScanController.ts",
-      "import": "../../components/MainSite/progressHelpers.js",
-      "resolved": "client/src/components/MainSite/progressHelpers"
-    },
-    {
-      "rule": "utilities-no-components",
-      "source": "client/src/utilities/survey/sessionQuestionCacheController.ts",
-      "import": "../../components/MainSite/progressHelpers.js",
-      "resolved": "client/src/components/MainSite/progressHelpers"
-    },
-    {
-      "rule": "utilities-no-components",
-      "source": "client/src/utilities/survey/sessionResponseHydrationController.ts",
-      "import": "../../components/MainSite/progressHelpers.js",
-      "resolved": "client/src/components/MainSite/progressHelpers"
     },
     {
       "rule": "utilities-no-components",

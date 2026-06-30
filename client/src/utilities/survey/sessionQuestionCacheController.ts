@@ -23,7 +23,7 @@ import {
   shouldClearQuestionProgressInFinalize,
   shouldCommitThrottledProgress,
   shouldFlushCoalescedRun,
-} from '../../components/MainSite/progressHelpers.js';
+} from '../session/mainSiteProgressHelpers.js';
 import {
   MASKED_Q_DECRYPT_BACKOFF_MAX,
   MASKED_Q_DECRYPT_BACKOFF_TTL_MS,

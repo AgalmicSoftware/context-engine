@@ -1,5 +1,5 @@
 /**
- * @module MainSite/progressHelpers
+ * @module utilities/session/mainSiteProgressHelpers
  */
 
 export const SBT_PROGRESS_MIN_INTERVAL_MS = 250;

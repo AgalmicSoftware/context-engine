@@ -7,9 +7,9 @@ import {
   shouldCommitThrottledProgress,
   shouldEnableSessionRegistryRefresh,
   shouldFlushCoalescedRun,
-} from './progressHelpers.js';
+} from './mainSiteProgressHelpers.js';
 
-describe('progressHelpers', () => {
+describe('mainSiteProgressHelpers', () => {
   it('flushes coalesced runs only when dirty and thresholds are met', () => {
     expect(shouldFlushCoalescedRun({ dirty: false, force: true })).toBe(false);
     expect(shouldFlushCoalescedRun({ dirty: true, force: true })).toBe(true);
