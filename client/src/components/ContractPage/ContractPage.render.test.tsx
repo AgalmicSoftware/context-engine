@@ -11,7 +11,7 @@ const mockGetSessionConfigBySlug = jest.fn();
 const mockGetDemoSessionConfigBySlug = jest.fn();
 const mockGetSessionConfigBySlugOrDefault = jest.fn();
 
-jest.mock('../../utilities/web3/contractScripts.js', () => ({
+jest.mock('../../utilities/contracts/contractPageRuntime.js', () => ({
   __esModule: true,
   default: {
     hexToBase64url: jest.fn(() => ''),
