@@ -7,31 +7,30 @@ import CEDateTimeInput from '../Shared/CEDateTimeInput';
 import {
   USE_ONCHAIN_SESSION_REGISTRY,
 } from '../../variables/appConfig.js';
-import { corsProxyUtils } from '../../utilities/worker/corsProxy.js';
-import { buildSignedAdminActionAuth, buildSignedBootstrapAdminAuth } from '../../utilities/worker/workerAuth.js';
 import {
+  buildSignedAdminActionAuth,
+  buildSignedBootstrapAdminAuth,
+  buildSponsoredBundlePlaintext,
+  corsProxyUtils,
   fetchSessionFromRegistry,
+  generateSponsoredBundleSecret,
+  hasSponsoredBundleFields,
   loadSessionRegistryCache,
+  normalizeArweaveUrl,
+  normalizeWorkerUrl,
   SESSION_REGISTRY_CACHE_UPDATED_EVENT,
   sessionRegistryStore,
   sessionRegistryUtils,
+  uploadSponsoredBundle,
   upsertSessionRegistryCache,
-} from '../../utilities/web3/sessionRegistry.js';
+} from '../../utilities/sponsor/sponsorPageRuntime.js';
 import {
   getUsableSessionWorkerUrl,
   hasUsableSessionWorkerConfig,
 } from '../../utilities/session/sessionWorkerAvailability.js';
-import { normalizeWorkerUrl } from '../../utilities/worker/workerUrl.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { toStr, normalizeSlug as canonicalizeSlug } from '../../utilities/shared/primitives.js';
 import { notify } from '../../utilities/ui/notify.js';
-import {
-  buildSponsoredBundlePlaintext,
-  generateSponsoredBundleSecret,
-  hasSponsoredBundleFields,
-  uploadSponsoredBundle,
-} from '../../utilities/arweave/sponsoredBundles.js';
-import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 
 const buildSignedBootstrapAdminAuthUntyped = buildSignedBootstrapAdminAuth as any;
 const uploadSponsoredBundleUntyped = uploadSponsoredBundle as any;
