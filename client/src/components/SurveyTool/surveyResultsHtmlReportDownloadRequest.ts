@@ -8,10 +8,16 @@ import {
   type SessionResultsSectionSelection,
 } from '../../utilities/sessionResultsExport';
 import {
-  buildSurveyResultsHtmlReportDownloadAttemptPlan,
   buildSurveyResultsHtmlReportReadinessPlan,
-  type SurveyResultsHtmlReportDownloadAttemptPlan,
-  type SurveyResultsHtmlReportReadinessPlan,
+} from './surveyResultsHtmlReportReadiness';
+import {
+  buildSurveyResultsHtmlReportDownloadAttemptPlan,
+} from './surveyResultsExportDisplayHelpers.js';
+import type {
+  SurveyResultsHtmlReportReadinessPlan,
+} from './surveyResultsHtmlReportReadiness';
+import type {
+  SurveyResultsHtmlReportDownloadAttemptPlan,
 } from './surveyResultsExportDisplayHelpers.js';
 
 export type SurveyResultsHtmlReportDownloadKind = 'html' | 'pdf';
