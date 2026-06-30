@@ -61,7 +61,7 @@ jest.mock('../../variables/chains.js', () => ({
   getSessionRegistryChainIds: jest.fn(() => [84532]),
 }));
 
-jest.mock('../../components/MainSite/debugTelemetry.js', () => ({
+jest.mock('./profileScanTelemetry.js', () => ({
   __esModule: true,
   emitProfileScanColdDiag: jest.fn(),
   emitProfileScanTelemetry: jest.fn(),
@@ -82,7 +82,7 @@ const registryBootstrapModule = require('../../utilities/session/registryBootstr
 const contractScriptsModule = require('../../utilities/web3/contractScripts.js');
 const sessionRegistryModule = require('../../utilities/web3/sessionRegistry.js');
 const chainsModule = require('../../variables/chains.js');
-const debugTelemetryModule = require('../../components/MainSite/debugTelemetry.js');
+const debugTelemetryModule = require('./profileScanTelemetry.js');
 const progressHelpersModule = require('./mainSiteProgressHelpers.js');
 
 const VALID_RETRY_ADDRESS = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
