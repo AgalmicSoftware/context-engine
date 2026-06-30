@@ -4,7 +4,7 @@ import contractScripts, {
   getDemoSessionConfigBySlug,
   getSessionConfigBySlug,
   getSessionConfigBySlugOrDefault,
-} from '../../utilities/web3/contractScripts.js'; // smart contract info: addresses & content
+} from '../../utilities/contracts/contractPageRuntime.js'; // smart contract info: addresses & content
 import { seedGenPrompt } from '../../prompts/seedGenPrompt.js';
 import { aiRewritePrompt } from '../../prompts/aiRewritePrompt.js';
 import { audioSummaryPrompt } from '../../prompts/audioSummaryPrompt.js';
