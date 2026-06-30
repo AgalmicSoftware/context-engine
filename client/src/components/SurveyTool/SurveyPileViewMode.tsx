@@ -99,6 +99,9 @@ import {
   buildPileQuestionPipelineState,
 } from './surveyPileQuestionFlow';
 import {
+  buildPileVisibleResponseSignature as buildPileVisibleResponseSignatureHelper,
+} from './surveyPileResponseSignature';
+import {
   buildPileCachePrefillStatePlan,
   executeEnsureVisiblePileResponseState,
   executePileInitializeResponseState,
@@ -979,38 +982,21 @@ const getPileVisibleQuestionIds = (engine: PileViewModeEngine, listIn: any = [],
     return Array.from(new Set(ids));
   };
 
-const buildPileVisibleResponseSignature = (engine: PileViewModeEngine, questionResponses: any = {}, visibleIds: any = [], accountIn: any = engine.props?.account) => {
-    const responderLower = String(accountIn || '').trim().toLowerCase();
-    const ids = Array.isArray(visibleIds)
-      ? visibleIds.map((id: any) => normalizeQuestionIdKey(id)).filter(Boolean)
-      : [];
-    if (!responderLower || ids.length === 0) {
-      return `${responderLower ? 'acct' : 'anon'}:${ids.length}:0`;
-    }
-    const responsesMap = (questionResponses && typeof questionResponses === 'object')
-      ? questionResponses
-      : {};
-    let hash = 2166136261;
-    let filled = 0;
-    ids.forEach((qid: any) => {
-      hash = engine.mixQuestionListHash(hash, `q:${qid}`);
-      const byResponder = responsesMap[qid];
-      const rawResponse = (byResponder && typeof byResponder === 'object')
-        ? byResponder[responderLower]
-        : undefined;
-      if (rawResponse === undefined) {
-        hash = engine.mixQuestionListHash(hash, 'r:__none__');
-        return;
-      }
-      filled += 1;
-      if (typeof rawResponse === 'string') {
-        hash = engine.mixQuestionListHash(hash, `s:${rawResponse.length}:${rawResponse}`);
-        return;
-      }
-      hash = engine.mixQuestionListHash(hash, `o:${buildSliceToken(rawResponse)}`);
-    });
-    return `${ids.length}:${filled}:${hash >>> 0}`;
-  };
+const buildPileVisibleResponseSignature = (
+  engine: PileViewModeEngine,
+  questionResponses: any = {},
+  visibleIds: any = [],
+  accountIn: any = engine.props?.account
+) => buildPileVisibleResponseSignatureHelper({
+  account: accountIn,
+  deps: {
+    buildSliceToken,
+    mixQuestionListHash: engine.mixQuestionListHash,
+    normalizeQuestionIdKey,
+  },
+  questionResponses,
+  visibleIds,
+});
 
 const syncCurrentPileQuestionsSignature = (engine: PileViewModeEngine, listIn: any = engine.state?.pileQuestions) => {
     const list = Array.isArray(listIn) ? listIn : [];
