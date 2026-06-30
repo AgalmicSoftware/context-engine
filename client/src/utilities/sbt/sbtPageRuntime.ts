@@ -33,28 +33,77 @@ type SbtPageContractRuntime = {
 
 const contractScriptsRuntime = contractScripts as unknown as SbtPageContractRuntime;
 
-const sbtPageRuntime: SbtPageContractRuntime = {
-  addHashedPasswords: (...args) => contractScriptsRuntime.addHashedPasswords(...args),
-  burnToken: (...args) => contractScriptsRuntime.burnToken(...args),
-  claim: (...args) => contractScriptsRuntime.claim(...args),
-  claimWithInvite: (...args) => contractScriptsRuntime.claimWithInvite(...args),
-  claimWithPassword: (...args) => contractScriptsRuntime.claimWithPassword(...args),
-  computeGroupPasswordHash: (input) => contractScriptsRuntime.computeGroupPasswordHash(input),
-  generateInvitePayloads: (...args) => contractScriptsRuntime.generateInvitePayloads(...args),
-  getGroupPasswordHash: (...args) => contractScriptsRuntime.getGroupPasswordHash(...args),
-  getMintedTokens: (...args) => contractScriptsRuntime.getMintedTokens(...args),
-  getOwnerByTokenId: (...args) => contractScriptsRuntime.getOwnerByTokenId(...args),
-  getReadProviderForGroup: (...args) => contractScriptsRuntime.getReadProviderForGroup(...args),
-  getSBTTokenIdByOwner: (...args) => contractScriptsRuntime.getSBTTokenIdByOwner(...args),
-  getSbtHistorySummary: (...args) => contractScriptsRuntime.getSbtHistorySummary(...args),
-  getSbtMetadata: (...args) => contractScriptsRuntime.getSbtMetadata(...args),
-  isPasswordValid: (...args) => contractScriptsRuntime.isPasswordValid(...args),
-  mintWithGroupSignature: (...args) => contractScriptsRuntime.mintWithGroupSignature(...args),
-  signGroupMintAuthorization: (...args) => contractScriptsRuntime.signGroupMintAuthorization(...args),
-  startClaim: (...args) => contractScriptsRuntime.startClaim(...args),
-};
+export const addHashedPasswords = (...args: unknown[]): Promise<SbtPageTransactionResult> => (
+  contractScriptsRuntime.addHashedPasswords(...args)
+);
 
-export default sbtPageRuntime;
+export const burnToken = (...args: unknown[]): Promise<SbtPageTransactionResult> => (
+  contractScriptsRuntime.burnToken(...args)
+);
+
+export const claim = (...args: unknown[]): Promise<SbtPageTransactionResult> => (
+  contractScriptsRuntime.claim(...args)
+);
+
+export const claimWithInvite = (...args: unknown[]): Promise<SbtPageTransactionResult> => (
+  contractScriptsRuntime.claimWithInvite(...args)
+);
+
+export const claimWithPassword = (...args: unknown[]): Promise<SbtPageTransactionResult> => (
+  contractScriptsRuntime.claimWithPassword(...args)
+);
+
+export const computeGroupPasswordHash = (input: unknown): string => (
+  contractScriptsRuntime.computeGroupPasswordHash(input)
+);
+
+export const generateInvitePayloads = (...args: unknown[]): Promise<SbtPageInvitePayload[]> => (
+  contractScriptsRuntime.generateInvitePayloads(...args)
+);
+
+export const getGroupPasswordHash = (...args: unknown[]): Promise<string> => (
+  contractScriptsRuntime.getGroupPasswordHash(...args)
+);
+
+export const getMintedTokens = (...args: unknown[]): Promise<unknown> => (
+  contractScriptsRuntime.getMintedTokens(...args)
+);
+
+export const getOwnerByTokenId = (...args: unknown[]): Promise<unknown> => (
+  contractScriptsRuntime.getOwnerByTokenId(...args)
+);
+
+export const getReadProviderForGroup = (...args: unknown[]): unknown => (
+  contractScriptsRuntime.getReadProviderForGroup(...args)
+);
+
+export const getSBTTokenIdByOwner = (...args: unknown[]): Promise<unknown> => (
+  contractScriptsRuntime.getSBTTokenIdByOwner(...args)
+);
+
+export const getSbtHistorySummary = (...args: unknown[]): Promise<unknown> => (
+  contractScriptsRuntime.getSbtHistorySummary(...args)
+);
+
+export const getSbtMetadata = (...args: unknown[]): Promise<Record<string, unknown> | null | undefined> => (
+  contractScriptsRuntime.getSbtMetadata(...args)
+);
+
+export const isPasswordValid = (...args: unknown[]): Promise<boolean> => (
+  contractScriptsRuntime.isPasswordValid(...args)
+);
+
+export const mintWithGroupSignature = (...args: unknown[]): Promise<SbtPageTransactionResult> => (
+  contractScriptsRuntime.mintWithGroupSignature(...args)
+);
+
+export const signGroupMintAuthorization = (...args: unknown[]): Promise<unknown> => (
+  contractScriptsRuntime.signGroupMintAuthorization(...args)
+);
+
+export const startClaim = (...args: unknown[]): Promise<SbtPageTransactionResult> => (
+  contractScriptsRuntime.startClaim(...args)
+);
 
 export {
   getDemoSessionConfigBySlug,

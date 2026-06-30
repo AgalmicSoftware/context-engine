@@ -11,11 +11,13 @@ export {
   fetchSessionFromRegistry,
   loadSessionRegistryCache,
   SESSION_REGISTRY_CACHE_UPDATED_EVENT,
-  sessionRegistryStore,
-  sessionRegistryUtils,
   upsertSessionRegistryCache,
 } from '../web3/sessionRegistry.js';
-export {
+import {
+  sessionRegistryStore,
+  sessionRegistryUtils,
+} from '../web3/sessionRegistry.js';
+import {
   corsProxyUtils,
 } from '../worker/corsProxy.js';
 export {
@@ -25,3 +27,17 @@ export {
 export {
   normalizeWorkerUrl,
 } from '../worker/workerUrl.js';
+
+export const getAllSessionRegistryEntries = (): unknown[] => (
+  sessionRegistryStore.getAllSessionEntries()
+);
+
+export const normalizeSessionIdHex = (value: unknown): string => (
+  sessionRegistryUtils.normalizeSessionIdHex(value)
+);
+
+export const resolveCorsProxyUrl = (...args: Parameters<typeof corsProxyUtils.resolveCorsProxyUrl>): Promise<{
+  url?: unknown;
+} | null | undefined> => (
+  corsProxyUtils.resolveCorsProxyUrl(...args)
+);
