@@ -102,6 +102,9 @@ import {
   buildPileVisibleResponseSignature as buildPileVisibleResponseSignatureHelper,
 } from './surveyPileResponseSignature';
 import {
+  buildPileVisibleQuestionIds,
+} from './surveyPileVisibleQuestionIds';
+import {
   buildPileCachePrefillStatePlan,
   executeEnsureVisiblePileResponseState,
   executePileInitializeResponseState,
@@ -967,20 +970,15 @@ const buildQuestionListSignature = (engine: PileViewModeEngine, list: any = []) 
     return signature;
   };
 
-const getPileVisibleQuestionIds = (engine: PileViewModeEngine, listIn: any = [], activeIndexIn: any = 0) => {
-    const list = Array.isArray(listIn) ? listIn : [];
-    if (list.length === 0) return [];
-    const activeIndex = Math.max(0, Number(activeIndexIn || 0));
-    const startIdx = Math.max(0, activeIndex - 2);
-    const endIdx = Math.min(list.length, activeIndex + 3);
-    const ids: string[] = [];
-    for (let idx = startIdx; idx < endIdx; idx += 1) {
-      const qid = normalizeQuestionIdKey(list[idx]?.id);
-      if (!qid) continue;
-      ids.push(qid);
-    }
-    return Array.from(new Set(ids));
-  };
+const getPileVisibleQuestionIds = (
+  _engine: PileViewModeEngine,
+  listIn: any = [],
+  activeIndexIn: any = 0
+) => buildPileVisibleQuestionIds({
+  activePileIndex: activeIndexIn,
+  normalizeQuestionIdKey,
+  pileQuestions: listIn,
+});
 
 const buildPileVisibleResponseSignature = (
   engine: PileViewModeEngine,
