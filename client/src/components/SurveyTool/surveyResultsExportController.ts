@@ -4,7 +4,7 @@ import {
   type SurveyResultsExportDownloadPlan,
   type SurveyResultsExportGenerationPlan,
   type SurveyResultsExportGeneratorKey,
-} from './surveyResultsExportDisplayHelpers.js';
+} from './surveyResultsExportPlans.js';
 
 export type SurveyResultsExportDownloadRequest = {
   fileContent: string;
