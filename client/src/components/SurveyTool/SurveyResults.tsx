@@ -151,7 +151,6 @@ import {
 import type { SurveyResultsStateUpdate } from './surveyResultsState';
 import {
   SURVEY_RESULTS_HTML_REPORT_DEFAULT_SELECTED_SECTIONS as DEFAULT_HTML_REPORT_SELECTED_SECTIONS,
-  buildSurveyResultsDemoAnalysisArtifact,
   buildSurveyResultsHtmlReportAnalysisDemoReadyPatch,
   buildSurveyResultsHtmlReportAnalysisEligibilityBlockedPatch,
   buildSurveyResultsHtmlReportAnalysisErrorPatch,
@@ -165,6 +164,9 @@ import {
   buildSurveyResultsHtmlReportSectionTogglePatch,
   type SurveyResultsHtmlReportSectionKey,
 } from './surveyResultsExportDisplayHelpers.js';
+import {
+  buildSurveyResultsDemoAnalysisArtifact,
+} from './surveyResultsDemoAnalysisArtifact.js';
 import {
   buildSurveyResultsExportBaseFileName,
   buildSurveyResultsExportControlsDisplayDescriptor,
