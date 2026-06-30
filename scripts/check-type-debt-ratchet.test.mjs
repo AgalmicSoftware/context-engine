@@ -55,6 +55,8 @@ test('isProductionTypeScriptFile excludes tests and test utilities', () => {
   assert.equal(isProductionTypeScriptFile('client/src/__tests__/App.tsx'), false);
   assert.equal(isProductionTypeScriptFile('client/src/testing/render.tsx'), false);
   assert.equal(isProductionTypeScriptFile('client/src/utilities/testUtils.ts'), false);
+  assert.equal(isProductionTypeScriptFile('client/src/components/WidgetHarness.tsx'), false);
+  assert.equal(isProductionTypeScriptFile('client/src/components/SurveyResults.exportControlsHarness.ts'), false);
   assert.equal(isProductionTypeScriptFile('client/src/utilities/e2eTestIds.ts'), true);
   assert.equal(isProductionTypeScriptFile('scripts/check-type-debt-ratchet.mjs'), false);
 });
@@ -64,6 +66,7 @@ test('collectTypeDebt only scans tracked production TS and TSX source files', ()
     writeFile(rootDir, 'client/src/components/Production.tsx', 'const value: any = input as any;\n');
     writeFile(rootDir, 'client/src/components/Production.test.tsx', 'const value: any = input as any;\n');
     writeFile(rootDir, 'client/src/utilities/testUtils.ts', 'const value: any = input as any;\n');
+    writeFile(rootDir, 'client/src/components/ProductionHarness.tsx', 'const value: any = input as any;\n');
     writeFile(rootDir, 'client/src/components/Production.jsx', 'const value = input;\n');
     execFileSync('git', ['add', 'client/src'], { cwd: rootDir, stdio: 'ignore' });
 
