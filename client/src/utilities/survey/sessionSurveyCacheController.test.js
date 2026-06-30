@@ -33,7 +33,7 @@ jest.mock('../../components/MainSite/metadataCacheEntryBuilders.js', () => ({
   prepareSurveyMetadataCacheEntry: jest.fn(),
 }));
 
-jest.mock('../../components/MainSite/metadataSessionBinding.js', () => ({
+jest.mock('../session/metadataSessionBinding.js', () => ({
   __esModule: true,
   resolveScopedMetadataSessionSlug: jest.fn(),
 }));
@@ -51,7 +51,7 @@ const {
 } = require('../../components/MainSite/metadataCacheEntryBuilders.js');
 const {
   resolveScopedMetadataSessionSlug,
-} = require('../../components/MainSite/metadataSessionBinding.js');
+} = require('../session/metadataSessionBinding.js');
 
 const deepClone = (value) => (
   value == null ? value : JSON.parse(JSON.stringify(value))

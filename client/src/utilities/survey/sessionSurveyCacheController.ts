@@ -5,7 +5,7 @@ import {
   shouldStopPendingMetadataRetry,
 } from '../arweave/arweaveRetryHelpers.js';
 import { prepareSurveyMetadataCacheEntry } from '../../components/MainSite/metadataCacheEntryBuilders.js';
-import { resolveScopedMetadataSessionSlug } from '../../components/MainSite/metadataSessionBinding.js';
+import { resolveScopedMetadataSessionSlug } from '../session/metadataSessionBinding.js';
 import {
   normalizeSurveyResponseBatchResult,
   resolveSurveyResponseWatermark,

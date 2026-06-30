@@ -176,7 +176,7 @@ import {
   resolveScopedMetadataSessionSlug as resolveScopedMetadataSessionSlugFn,
   type BuildEnvelopeOptions,
   type MetadataRecord,
-} from './metadataSessionBinding.js';
+} from '../../utilities/session/metadataSessionBinding.js';
 import {
   findGroupSlugForQuestion as findGroupSlugForQuestionFn,
   findGroupSlugForSurvey as findGroupSlugForSurveyFn,
