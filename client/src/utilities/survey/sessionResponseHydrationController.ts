@@ -11,7 +11,7 @@ import {
   readSessionScanMaxBlockRange,
 } from '../session/sessionScanScope.js';
 import { resolvePersistedQuestionResponsesWatermark } from './questionResponsesWatermark.js';
-import { shouldFlushCoalescedRun } from '../../components/MainSite/progressHelpers.js';
+import { shouldFlushCoalescedRun } from '../session/mainSiteProgressHelpers.js';
 
 type CacheRecord = Record<string, unknown>;
 type StateRecord = {

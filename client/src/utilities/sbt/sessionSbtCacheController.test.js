@@ -68,7 +68,7 @@ jest.mock('../session/mainSiteUtils', () => ({
   isForcedSbtSelectorDebugEnabled: jest.fn(() => false),
 }));
 
-jest.mock('../../components/MainSite/progressHelpers', () => ({
+jest.mock('../session/mainSiteProgressHelpers', () => ({
   __esModule: true,
   mapSbtWorkProgressToBlock: jest.fn(({
     baseFrom = 0,
@@ -106,7 +106,7 @@ const {
 const {
   mergeSbtLiveProgressEntry,
   shouldCommitThrottledProgress,
-} = require('../../components/MainSite/progressHelpers');
+} = require('../session/mainSiteProgressHelpers');
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
