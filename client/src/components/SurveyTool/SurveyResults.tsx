@@ -166,8 +166,10 @@ import {
 import {
   buildSurveyResultsHtmlReportDownloadFailurePatch,
   buildSurveyResultsHtmlReportDownloadSuccessPatch,
-  type SurveyResultsHtmlReportSectionKey,
 } from './surveyResultsExportDisplayHelpers.js';
+import type {
+  SurveyResultsHtmlReportSectionKey,
+} from './surveyResultsHtmlReportReadiness.js';
 import {
   buildSurveyResultsDemoAnalysisArtifact,
 } from './surveyResultsDemoAnalysisArtifact.js';
