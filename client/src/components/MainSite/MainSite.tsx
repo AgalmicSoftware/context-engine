@@ -191,7 +191,7 @@ import {
   prepareQuestionMetadataCacheEntry as prepareQuestionMetadataCacheEntryFn,
   type QuestionMetadataCacheEntry,
   type SurveyMetadataCacheEntry,
-} from './metadataCacheEntryBuilders.js';
+} from '../../utilities/survey/metadataCacheEntryBuilders.js';
 import {
   DG_PRIMARY_ROUTE_CACHE_NAMES,
   SESSION_FALLBACK_REDIRECT_STORAGE_KEY_PREFIX,

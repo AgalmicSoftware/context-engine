@@ -1,12 +1,12 @@
-import { getSessionSlugByName } from '../../utilities/web3/sessionConfigResolvers.js';
-import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
+import { getSessionSlugByName } from '../web3/sessionConfigResolvers.js';
+import { normalizeSessionSlug } from '../session/sessionNaming.js';
 import {
   prepareQuestionMetadataCacheEntry,
   prepareSurveyMetadataCacheEntry,
 } from './metadataCacheEntryBuilders.js';
 
-jest.mock('../../utilities/web3/sessionConfigResolvers.js', () => {
-  const actual = jest.requireActual('../../utilities/web3/sessionConfigResolvers.js');
+jest.mock('../web3/sessionConfigResolvers.js', () => {
+  const actual = jest.requireActual('../web3/sessionConfigResolvers.js');
   return {
     __esModule: true,
     ...actual,
