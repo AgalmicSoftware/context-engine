@@ -151,8 +151,6 @@ import {
 import type { SurveyResultsStateUpdate } from './surveyResultsState';
 import {
   SURVEY_RESULTS_HTML_REPORT_DEFAULT_SELECTED_SECTIONS as DEFAULT_HTML_REPORT_SELECTED_SECTIONS,
-  buildSurveyResultsFilteredQuestionIdsForExport,
-  buildSurveyResultsFilteredQuestionsForExport,
   buildSurveyResultsDemoAnalysisArtifact,
   buildSurveyResultsExportBaseFileName,
   buildSurveyResultsExportControlsDisplayDescriptor,
@@ -167,9 +165,13 @@ import {
   buildSurveyResultsHtmlReportModalClosePatch,
   buildSurveyResultsHtmlReportModalOpenPatch,
   buildSurveyResultsHtmlReportSectionTogglePatch,
-  type SurveyResultsQuestionExportRecord,
   type SurveyResultsHtmlReportSectionKey,
 } from './surveyResultsExportDisplayHelpers.js';
+import {
+  buildSurveyResultsFilteredQuestionIdsForExport,
+  buildSurveyResultsFilteredQuestionsForExport,
+  type SurveyResultsQuestionExportRecord,
+} from './surveyResultsExportRows.js';
 import {
   buildSurveyResultsCacheReadinessDisplayPlan,
 } from './surveyResultsCacheReadinessDisplayPlan';
