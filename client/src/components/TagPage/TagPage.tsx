@@ -18,8 +18,8 @@ import {
   getAllSessionSlugs,
   getDemoSessionConfigBySlug,
   getSessionConfigBySlug as getStrictSessionConfigBySlug,
-} from '../../utilities/web3/contractScripts.js';
-import { SESSION_REGISTRY_CACHE_UPDATED_EVENT } from '../../utilities/web3/sessionRegistry.js';
+  SESSION_REGISTRY_CACHE_UPDATED_EVENT,
+} from '../../utilities/tags/tagPageRuntime.js';
 import { normalizeGlobalSessionSelection } from '../../utilities/session/globalSessionState.js';
 import { parseQuestionSessionSlugFromSearch } from '../../utilities/survey/questionRouting.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
