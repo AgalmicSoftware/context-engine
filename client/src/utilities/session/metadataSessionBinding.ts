@@ -1,5 +1,5 @@
-import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
-import { getSessionSlugByName } from '../../utilities/web3/sessionConfigResolvers.js';
+import { normalizeSessionSlug } from './sessionNaming.js';
+import { getSessionSlugByName } from '../web3/sessionConfigResolvers.js';
 
 export type MetadataSessionAuthority = 'explicit' | 'name' | 'fallback';
 
