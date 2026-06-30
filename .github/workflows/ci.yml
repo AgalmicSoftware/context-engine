@@ -44,6 +44,9 @@ jobs:
       - name: Check test and release wiring
         run: npm run test:wiring
 
+      - name: Check type debt ratchet
+        run: npm run type-debt:check
+
       - name: Lint client
         run: npm run lint
 
