@@ -209,21 +209,9 @@
     },
     {
       "rule": "utilities-no-components",
-      "source": "client/src/utilities/cache/mainSiteDgStorage.ts",
-      "import": "../../components/MainSite/mainSiteUtils.js",
-      "resolved": "client/src/components/MainSite/mainSiteUtils"
-    },
-    {
-      "rule": "utilities-no-components",
       "source": "client/src/utilities/sbt/sbtLiveProgressController.ts",
       "import": "../../components/MainSite/progressHelpers.js",
       "resolved": "client/src/components/MainSite/progressHelpers"
-    },
-    {
-      "rule": "utilities-no-components",
-      "source": "client/src/utilities/sbt/sessionSbtCacheController.js",
-      "import": "../../components/MainSite/mainSiteUtils.js",
-      "resolved": "client/src/components/MainSite/mainSiteUtils"
     },
     {
       "rule": "utilities-no-components",

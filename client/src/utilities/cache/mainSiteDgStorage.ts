@@ -15,7 +15,7 @@ import {
   bumpMainSitePerfCounter,
   getMainSitePerfNow,
   isMainSitePerfCountersEnabled,
-} from '../../components/MainSite/mainSiteUtils.js';
+} from '../session/mainSiteUtils.js';
 
 export interface MainSiteDgStorage {
   key: (name: string, slug: string) => string;
