@@ -311,7 +311,7 @@ export function writeBoundaryBaseline(violations, rootDir = DEFAULT_ROOT_DIR) {
   const baseline = {
     version: 1,
     mode: 'fail-on-new-violation',
-    note: 'Existing route/page low-level imports are allowed only as a baseline; new violations fail the boundary check.',
+    note: 'Existing legacy boundary violations are allowed only as a baseline; new violations fail the boundary check.',
     violations,
   };
   const baselinePath = path.join(rootDir, BASELINE_PATH);
