@@ -81,8 +81,11 @@ npm run test:node
 npm run test:client
 ```
 
-`npm run test:wiring` also runs `scripts/verify-test-inventory.js`. That
-inventory check keeps root `tests/root/*.test.*` files classified as one of:
+`npm run test:wiring` also runs `scripts/verify-test-inventory.js` and the
+client architecture boundary checker. The boundary checker runs in
+fail-on-new-violation mode against `scripts/client-boundaries-baseline.json`, so
+existing legacy imports stay visible while new direct violations fail the gate.
+The inventory check keeps root `tests/root/*.test.*` files classified as one of:
 
 - public-safe Node tests run by `npm run test:node`
 - public-safe Jest tests run by `npm run test:root:jest`
