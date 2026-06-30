@@ -1,0 +1,295 @@
+{
+  "version": 1,
+  "mode": "fail-on-new-violation",
+  "note": "Existing route/page low-level imports are allowed only as a baseline; new violations fail the boundary check.",
+  "violations": [
+    {
+      "rule": "route-page-no-low-level",
+      "source": "client/src/components/Admin/AdminPage.tsx",
+      "import": "../../utilities/arweave/arweaveScripts.js",
+      "resolved": "client/src/utilities/arweave/arweaveScripts"
+    },
+    {
+      "rule": "route-page-no-low-level",
+      "source": "client/src/components/Admin/AdminPage.tsx",
+      "import": "../../utilities/arweave/arweaveUrls.js",
+      "resolved": "client/src/utilities/arweave/arweaveUrls"
+    },
+    {
+      "rule": "route-page-no-low-level",
+      "source": "client/src/components/Admin/AdminPage.tsx",
+      "import": "../../utilities/web3/sessionRegistry.js",
+      "resolved": "client/src/utilities/web3/sessionRegistry"
+    },
+    {
+      "rule": "route-page-no-low-level",
+      "source": "client/src/components/Admin/AdminPage.tsx",
+      "import": "../../utilities/worker/corsProxy.js",
+      "resolved": "client/src/utilities/worker/corsProxy"
+    },
+    {
+      "rule": "route-page-no-low-level",
+      "source": "client/src/components/Admin/AdminPage.tsx",
+      "import": "../../utilities/worker/workerAuth.js",
+      "resolved": "client/src/utilities/worker/workerAuth"
+    },
+    {
+      "rule": "route-page-no-low-level",
+      "source": "client/src/components/Admin/AdminPage.tsx",
+      "import": "../../utilities/worker/workerCorsOrigins.js",
+      "resolved": "client/src/utilities/worker/workerCorsOrigins"
+    },
+    {
+      "rule": "route-page-no-low-level",
+      "source": "client/src/components/App.tsx",
+      "import": "../utilities/web3/rpcReadCache.js",
+      "resolved": "client/src/utilities/web3/rpcReadCache"
+    },
+    {
+      "rule": "route-page-no-low-level",
+      "source": "client/src/components/App.tsx",
+      "import": "../utilities/web3/rpcSelection.js",
+      "resolved": "client/src/utilities/web3/rpcSelection"
+    },
+    {
+      "rule": "route-page-no-low-level",
+      "source": "client/src/components/App.tsx",
+      "import": "../utilities/web3/wagmiDisconnectState.js",
+      "resolved": "client/src/utilities/web3/wagmiDisconnectState"
+    },
+    {
+      "rule": "route-page-no-low-level",
+      "source": "client/src/components/ContractPage/ContractPage.tsx",
+      "import": "../../utilities/web3/contractScripts.js",
+      "resolved": "client/src/utilities/web3/contractScripts"
+    },
+    {
+      "rule": "route-page-no-low-level",
+      "source": "client/src/components/MainSite/MainSite.tsx",
+      "import": "../../utilities/arweave/arweaveRetryHelpers.js",
+      "resolved": "client/src/utilities/arweave/arweaveRetryHelpers"
+    },
+    {
+      "rule": "route-page-no-low-level",
+      "source": "client/src/components/MainSite/MainSite.tsx",
+      "import": "../../utilities/arweave/arweaveUrls.js",
+      "resolved": "client/src/utilities/arweave/arweaveUrls"
+    },
+    {
+      "rule": "route-page-no-low-level",
+      "source": "client/src/components/MainSite/MainSite.tsx",
+      "import": "../../utilities/web3/contractScripts.js",
+      "resolved": "client/src/utilities/web3/contractScripts"
+    },
+    {
+      "rule": "route-page-no-low-level",
+      "source": "client/src/components/MainSite/MainSite.tsx",
+      "import": "../../utilities/web3/sessionRegistry.js",
+      "resolved": "client/src/utilities/web3/sessionRegistry"
+    },
+    {
+      "rule": "route-page-no-low-level",
+      "source": "client/src/components/OnePageSession/OnePageSession.tsx",
+      "import": "../../utilities/web3/contractScripts.js",
+      "resolved": "client/src/utilities/web3/contractScripts"
+    },
+    {
+      "rule": "route-page-no-low-level",
+      "source": "client/src/components/SBTs/SBTPage.tsx",
+      "import": "../../utilities/web3/contractScripts.js",
+      "resolved": "client/src/utilities/web3/contractScripts"
+    },
+    {
+      "rule": "route-page-no-low-level",
+      "source": "client/src/components/SBTs/SBTsPage.tsx",
+      "import": "../../utilities/web3/contractScripts.js",
+      "resolved": "client/src/utilities/web3/contractScripts"
+    },
+    {
+      "rule": "route-page-no-low-level",
+      "source": "client/src/components/Sessions/SessionWizard.tsx",
+      "import": "../../utilities/arweave/arweaveScripts.js",
+      "resolved": "client/src/utilities/arweave/arweaveScripts"
+    },
+    {
+      "rule": "route-page-no-low-level",
+      "source": "client/src/components/Sessions/SessionWizard.tsx",
+      "import": "../../utilities/arweave/publishUploadAuth.js",
+      "resolved": "client/src/utilities/arweave/publishUploadAuth"
+    },
+    {
+      "rule": "route-page-no-low-level",
+      "source": "client/src/components/Sessions/SessionWizard.tsx",
+      "import": "../../utilities/arweave/sponsoredBundles.js",
+      "resolved": "client/src/utilities/arweave/sponsoredBundles"
+    },
+    {
+      "rule": "route-page-no-low-level",
+      "source": "client/src/components/Sessions/SessionWizard.tsx",
+      "import": "../../utilities/web3/contractScripts.js",
+      "resolved": "client/src/utilities/web3/contractScripts"
+    },
+    {
+      "rule": "route-page-no-low-level",
+      "source": "client/src/components/Sessions/SessionWizard.tsx",
+      "import": "../../utilities/web3/sbtFactoryReceipt.js",
+      "resolved": "client/src/utilities/web3/sbtFactoryReceipt"
+    },
+    {
+      "rule": "route-page-no-low-level",
+      "source": "client/src/components/Sessions/SessionWizard.tsx",
+      "import": "../../utilities/web3/sessionRegistry.js",
+      "resolved": "client/src/utilities/web3/sessionRegistry"
+    },
+    {
+      "rule": "route-page-no-low-level",
+      "source": "client/src/components/Sessions/SessionWizard.tsx",
+      "import": "../../utilities/worker/workerAuth.js",
+      "resolved": "client/src/utilities/worker/workerAuth"
+    },
+    {
+      "rule": "route-page-no-low-level",
+      "source": "client/src/components/Sponsor/SponsorPage.tsx",
+      "import": "../../utilities/arweave/arweaveUrls.js",
+      "resolved": "client/src/utilities/arweave/arweaveUrls"
+    },
+    {
+      "rule": "route-page-no-low-level",
+      "source": "client/src/components/Sponsor/SponsorPage.tsx",
+      "import": "../../utilities/arweave/sponsoredBundles.js",
+      "resolved": "client/src/utilities/arweave/sponsoredBundles"
+    },
+    {
+      "rule": "route-page-no-low-level",
+      "source": "client/src/components/Sponsor/SponsorPage.tsx",
+      "import": "../../utilities/web3/sessionRegistry.js",
+      "resolved": "client/src/utilities/web3/sessionRegistry"
+    },
+    {
+      "rule": "route-page-no-low-level",
+      "source": "client/src/components/Sponsor/SponsorPage.tsx",
+      "import": "../../utilities/worker/corsProxy.js",
+      "resolved": "client/src/utilities/worker/corsProxy"
+    },
+    {
+      "rule": "route-page-no-low-level",
+      "source": "client/src/components/Sponsor/SponsorPage.tsx",
+      "import": "../../utilities/worker/workerAuth.js",
+      "resolved": "client/src/utilities/worker/workerAuth"
+    },
+    {
+      "rule": "route-page-no-low-level",
+      "source": "client/src/components/Sponsor/SponsorPage.tsx",
+      "import": "../../utilities/worker/workerUrl.js",
+      "resolved": "client/src/utilities/worker/workerUrl"
+    },
+    {
+      "rule": "route-page-no-low-level",
+      "source": "client/src/components/TagPage/TagPage.tsx",
+      "import": "../../utilities/web3/contractScripts.js",
+      "resolved": "client/src/utilities/web3/contractScripts"
+    },
+    {
+      "rule": "route-page-no-low-level",
+      "source": "client/src/components/TagPage/TagPage.tsx",
+      "import": "../../utilities/web3/sessionRegistry.js",
+      "resolved": "client/src/utilities/web3/sessionRegistry"
+    },
+    {
+      "rule": "route-page-no-low-level",
+      "source": "client/src/components/UserPage/UserPage.tsx",
+      "import": "../../utilities/web3/contractScripts.js",
+      "resolved": "client/src/utilities/web3/contractScripts"
+    },
+    {
+      "rule": "route-page-no-low-level",
+      "source": "client/src/components/UserPage/UserPage.tsx",
+      "import": "../../utilities/web3/sponsoredAccess.js",
+      "resolved": "client/src/utilities/web3/sponsoredAccess"
+    },
+    {
+      "rule": "utilities-no-components",
+      "source": "client/src/utilities/cache/mainSiteDgStorage.ts",
+      "import": "../../components/MainSite/cacheConstants.js",
+      "resolved": "client/src/components/MainSite/cacheConstants"
+    },
+    {
+      "rule": "utilities-no-components",
+      "source": "client/src/utilities/cache/mainSiteDgStorage.ts",
+      "import": "../../components/MainSite/mainSiteUtils.js",
+      "resolved": "client/src/components/MainSite/mainSiteUtils"
+    },
+    {
+      "rule": "utilities-no-components",
+      "source": "client/src/utilities/cache/mainSiteDgStorage.ts",
+      "import": "../../components/MainSite/storageEviction.js",
+      "resolved": "client/src/components/MainSite/storageEviction"
+    },
+    {
+      "rule": "utilities-no-components",
+      "source": "client/src/utilities/cache/sessionCachePersistenceController.ts",
+      "import": "../../components/MainSite/cacheConstants.js",
+      "resolved": "client/src/components/MainSite/cacheConstants"
+    },
+    {
+      "rule": "utilities-no-components",
+      "source": "client/src/utilities/sbt/sbtLiveProgressController.ts",
+      "import": "../../components/MainSite/progressHelpers.js",
+      "resolved": "client/src/components/MainSite/progressHelpers"
+    },
+    {
+      "rule": "utilities-no-components",
+      "source": "client/src/utilities/sbt/sessionSbtCacheController.js",
+      "import": "../../components/MainSite/mainSiteUtils.js",
+      "resolved": "client/src/components/MainSite/mainSiteUtils"
+    },
+    {
+      "rule": "utilities-no-components",
+      "source": "client/src/utilities/sbt/sessionSbtCacheController.js",
+      "import": "../../components/MainSite/progressHelpers.js",
+      "resolved": "client/src/components/MainSite/progressHelpers"
+    },
+    {
+      "rule": "utilities-no-components",
+      "source": "client/src/utilities/session/sessionProfileScanController.ts",
+      "import": "../../components/MainSite/debugTelemetry.js",
+      "resolved": "client/src/components/MainSite/debugTelemetry"
+    },
+    {
+      "rule": "utilities-no-components",
+      "source": "client/src/utilities/session/sessionProfileScanController.ts",
+      "import": "../../components/MainSite/progressHelpers.js",
+      "resolved": "client/src/components/MainSite/progressHelpers"
+    },
+    {
+      "rule": "utilities-no-components",
+      "source": "client/src/utilities/survey/sessionQuestionCacheController.ts",
+      "import": "../../components/MainSite/cacheConstants.js",
+      "resolved": "client/src/components/MainSite/cacheConstants"
+    },
+    {
+      "rule": "utilities-no-components",
+      "source": "client/src/utilities/survey/sessionQuestionCacheController.ts",
+      "import": "../../components/MainSite/progressHelpers.js",
+      "resolved": "client/src/components/MainSite/progressHelpers"
+    },
+    {
+      "rule": "utilities-no-components",
+      "source": "client/src/utilities/survey/sessionResponseHydrationController.ts",
+      "import": "../../components/MainSite/progressHelpers.js",
+      "resolved": "client/src/components/MainSite/progressHelpers"
+    },
+    {
+      "rule": "utilities-no-components",
+      "source": "client/src/utilities/survey/sessionSurveyCacheController.ts",
+      "import": "../../components/MainSite/metadataCacheEntryBuilders.js",
+      "resolved": "client/src/components/MainSite/metadataCacheEntryBuilders"
+    },
+    {
+      "rule": "utilities-no-components",
+      "source": "client/src/utilities/survey/sessionSurveyCacheController.ts",
+      "import": "../../components/MainSite/metadataSessionBinding.js",
+      "resolved": "client/src/components/MainSite/metadataSessionBinding"
+    }
+  ]
+}

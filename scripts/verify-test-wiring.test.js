@@ -43,6 +43,7 @@ test('public-release style copies without .git still pass wiring checks', () => 
             "cd client && npm test -- --watchAll=false --runInBand --testMatch '<rootDir>/../tests/root/deployHelper.worker.test.js' '<rootDir>/../tests/root/sessionCorsWorker.auth.test.js'",
           'test:worker:session-cors': 'npm --prefix workers/sessionCorsWorker test',
           'test:node': 'node scripts/run-node-tests.js',
+          'client-boundaries:check': 'node scripts/check-client-boundaries.mjs',
           'test:e2e': 'npm run -s test:e2e:smoke',
           'test:e2e:quick': 'npm run -s test:e2e:smoke',
           'test:e2e:smoke': 'npm run -s ai:test-nav:smoke',
@@ -50,7 +51,7 @@ test('public-release style copies without .git still pass wiring checks', () => 
           'type-debt:check': 'node scripts/check-type-debt-ratchet.mjs',
           'test:ci':
             'npm run test:wiring && npm run type-debt:check && npm run verify:release && npm run test:root:jest && npm run test:worker:session-cors && npm run test:node',
-          'test:wiring': 'node scripts/verify-test-wiring.js && node scripts/verify-test-inventory.js',
+          'test:wiring': 'node scripts/verify-test-wiring.js && node scripts/verify-test-inventory.js && npm run -s client-boundaries:check',
           tests: 'npm run test:ci && npm run test:surveys-sbt',
           'test:client': 'npm test -- --coverage',
           'test:release:client':
@@ -137,6 +138,9 @@ test('public-release style copies without .git still pass wiring checks', () => 
       'scripts/deploy-helper-deploy.mjs',
       'scripts/run-node-tests.js',
       'scripts/run-node-tests.test.js',
+      'scripts/check-client-boundaries.mjs',
+      'scripts/check-client-boundaries.test.mjs',
+      'scripts/client-boundaries-baseline.json',
       'scripts/check-type-debt-ratchet.mjs',
       'scripts/testInventoryConfig.js',
       'scripts/verify-test-inventory.js',
