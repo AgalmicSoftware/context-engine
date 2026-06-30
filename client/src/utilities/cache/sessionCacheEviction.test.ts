@@ -3,7 +3,7 @@ import {
   removeDgMetaTimestamp,
   trimLargeArrays,
   updateDgMetaTimestamp,
-} from './storageEviction';
+} from './sessionCacheEviction';
 
 jest.mock('utilities/logging.js', () => ({
   __esModule: true,
@@ -18,7 +18,7 @@ const readStoredMeta = (): Record<string, unknown> => (
   JSON.parse(localStorage.getItem(DG_META_STORAGE_KEY) || '{}') as Record<string, unknown>
 );
 
-describe('storageEviction', () => {
+describe('sessionCacheEviction', () => {
   afterEach(() => {
     jest.restoreAllMocks();
     localStorage.clear();

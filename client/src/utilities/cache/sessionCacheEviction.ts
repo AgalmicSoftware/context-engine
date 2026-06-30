@@ -1,5 +1,5 @@
 /**
- * @module components/MainSite/storageEviction
+ * @module utilities/cache/sessionCacheEviction
  */
 
 import { createLogger } from 'utilities/logging.js';

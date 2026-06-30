@@ -10,7 +10,7 @@ import {
   removeDgMetaTimestamp,
   trimLargeArrays,
   updateDgMetaTimestamp,
-} from '../../components/MainSite/storageEviction.js';
+} from './sessionCacheEviction.js';
 import {
   bumpMainSitePerfCounter,
   getMainSitePerfNow,
