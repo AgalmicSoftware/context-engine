@@ -128,18 +128,6 @@
       "source": "client/src/components/Sessions/SessionWizard.tsx",
       "import": "../../utilities/worker/workerAuth.js",
       "resolved": "client/src/utilities/worker/workerAuth"
-    },
-    {
-      "rule": "route-page-no-low-level",
-      "source": "client/src/components/UserPage/UserPage.tsx",
-      "import": "../../utilities/web3/contractScripts.js",
-      "resolved": "client/src/utilities/web3/contractScripts"
-    },
-    {
-      "rule": "route-page-no-low-level",
-      "source": "client/src/components/UserPage/UserPage.tsx",
-      "import": "../../utilities/web3/sponsoredAccess.js",
-      "resolved": "client/src/utilities/web3/sponsoredAccess"
     }
   ]
 }
