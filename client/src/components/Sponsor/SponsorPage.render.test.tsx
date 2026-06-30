@@ -262,6 +262,44 @@ describe('SponsorPage', () => {
     });
   });
 
+  it('fetches a requested registry session that is missing from the local cache and selects it', async () => {
+    const otherConfig = buildSessionConfig({
+      slug: 'other',
+      sessionName: 'Other Session',
+      __registry: { sessionIdHex: '0xother-session-id' },
+    });
+    const fetchedConfig = buildSessionConfig({
+      sessionName: 'Fetched Edge Session',
+    });
+    sessionEntries = [['other', otherConfig]];
+    mockFetchSessionFromRegistry.mockResolvedValueOnce(fetchedConfig);
+    mockUpsertSessionRegistryCache.mockImplementationOnce(({ config }: any) => {
+      sessionEntries = [
+        ['other', otherConfig],
+        ['edge', config],
+      ];
+    });
+
+    await renderSponsorPage({
+      initialSessionId: 'edge-session-id',
+      initialRegistryChainId: 'chain-84532',
+    });
+
+    await waitFor(() => {
+      expect(mockFetchSessionFromRegistry).toHaveBeenCalledWith(expect.objectContaining({
+        chainId: 84532,
+        sessionId: '0xedge-session-id',
+        slug: '',
+        bootstrapRpc: true,
+      }));
+    });
+    expect(mockUpsertSessionRegistryCache).toHaveBeenCalledWith({ config: fetchedConfig });
+    await waitFor(() => {
+      expect(screen.getByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('edge');
+    });
+    expect(screen.getByRole('option', { name: 'Fetched Edge Session' })).toBeInTheDocument();
+  });
+
   it('ignores late mount-time session loads after the page unmounts', async () => {
     const deferredRegistryLoad = createDeferred();
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
