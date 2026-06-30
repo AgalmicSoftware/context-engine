@@ -149,42 +149,6 @@
     },
     {
       "rule": "route-page-no-low-level",
-      "source": "client/src/components/Sponsor/SponsorPage.tsx",
-      "import": "../../utilities/arweave/arweaveUrls.js",
-      "resolved": "client/src/utilities/arweave/arweaveUrls"
-    },
-    {
-      "rule": "route-page-no-low-level",
-      "source": "client/src/components/Sponsor/SponsorPage.tsx",
-      "import": "../../utilities/arweave/sponsoredBundles.js",
-      "resolved": "client/src/utilities/arweave/sponsoredBundles"
-    },
-    {
-      "rule": "route-page-no-low-level",
-      "source": "client/src/components/Sponsor/SponsorPage.tsx",
-      "import": "../../utilities/web3/sessionRegistry.js",
-      "resolved": "client/src/utilities/web3/sessionRegistry"
-    },
-    {
-      "rule": "route-page-no-low-level",
-      "source": "client/src/components/Sponsor/SponsorPage.tsx",
-      "import": "../../utilities/worker/corsProxy.js",
-      "resolved": "client/src/utilities/worker/corsProxy"
-    },
-    {
-      "rule": "route-page-no-low-level",
-      "source": "client/src/components/Sponsor/SponsorPage.tsx",
-      "import": "../../utilities/worker/workerAuth.js",
-      "resolved": "client/src/utilities/worker/workerAuth"
-    },
-    {
-      "rule": "route-page-no-low-level",
-      "source": "client/src/components/Sponsor/SponsorPage.tsx",
-      "import": "../../utilities/worker/workerUrl.js",
-      "resolved": "client/src/utilities/worker/workerUrl"
-    },
-    {
-      "rule": "route-page-no-low-level",
       "source": "client/src/components/TagPage/TagPage.tsx",
       "import": "../../utilities/web3/contractScripts.js",
       "resolved": "client/src/utilities/web3/contractScripts"
