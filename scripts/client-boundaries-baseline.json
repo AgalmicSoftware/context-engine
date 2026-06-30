@@ -210,12 +210,6 @@
     {
       "rule": "utilities-no-components",
       "source": "client/src/utilities/cache/mainSiteDgStorage.ts",
-      "import": "../../components/MainSite/cacheConstants.js",
-      "resolved": "client/src/components/MainSite/cacheConstants"
-    },
-    {
-      "rule": "utilities-no-components",
-      "source": "client/src/utilities/cache/mainSiteDgStorage.ts",
       "import": "../../components/MainSite/mainSiteUtils.js",
       "resolved": "client/src/components/MainSite/mainSiteUtils"
     },
@@ -224,12 +218,6 @@
       "source": "client/src/utilities/cache/mainSiteDgStorage.ts",
       "import": "../../components/MainSite/storageEviction.js",
       "resolved": "client/src/components/MainSite/storageEviction"
-    },
-    {
-      "rule": "utilities-no-components",
-      "source": "client/src/utilities/cache/sessionCachePersistenceController.ts",
-      "import": "../../components/MainSite/cacheConstants.js",
-      "resolved": "client/src/components/MainSite/cacheConstants"
     },
     {
       "rule": "utilities-no-components",
@@ -260,12 +248,6 @@
       "source": "client/src/utilities/session/sessionProfileScanController.ts",
       "import": "../../components/MainSite/progressHelpers.js",
       "resolved": "client/src/components/MainSite/progressHelpers"
-    },
-    {
-      "rule": "utilities-no-components",
-      "source": "client/src/utilities/survey/sessionQuestionCacheController.ts",
-      "import": "../../components/MainSite/cacheConstants.js",
-      "resolved": "client/src/components/MainSite/cacheConstants"
     },
     {
       "rule": "utilities-no-components",
