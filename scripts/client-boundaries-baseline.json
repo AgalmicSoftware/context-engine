@@ -215,12 +215,6 @@
     },
     {
       "rule": "utilities-no-components",
-      "source": "client/src/utilities/cache/mainSiteDgStorage.ts",
-      "import": "../../components/MainSite/storageEviction.js",
-      "resolved": "client/src/components/MainSite/storageEviction"
-    },
-    {
-      "rule": "utilities-no-components",
       "source": "client/src/utilities/sbt/sbtLiveProgressController.ts",
       "import": "../../components/MainSite/progressHelpers.js",
       "resolved": "client/src/components/MainSite/progressHelpers"
