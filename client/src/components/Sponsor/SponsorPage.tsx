@@ -11,16 +11,16 @@ import {
   buildSignedAdminActionAuth,
   buildSignedBootstrapAdminAuth,
   buildSponsoredBundlePlaintext,
-  corsProxyUtils,
   fetchSessionFromRegistry,
   generateSponsoredBundleSecret,
+  getAllSessionRegistryEntries,
   hasSponsoredBundleFields,
   loadSessionRegistryCache,
   normalizeArweaveUrl,
+  normalizeSessionIdHex,
   normalizeWorkerUrl,
+  resolveCorsProxyUrl,
   SESSION_REGISTRY_CACHE_UPDATED_EVENT,
-  sessionRegistryStore,
-  sessionRegistryUtils,
   uploadSponsoredBundle,
   upsertSessionRegistryCache,
 } from '../../utilities/sponsor/sponsorPageRuntime.js';
@@ -311,7 +311,7 @@ const SponsorPage = ({
   const workerUrlOverrideDirtyRef = useRef<any>(false);
   const createRequestSeqRef = useRef(0);
   const requestedSessionRaw = toStr(initialSessionId).trim();
-  const requestedSessionIdHex = sessionRegistryUtils.normalizeSessionIdHex(requestedSessionRaw);
+  const requestedSessionIdHex = normalizeSessionIdHex(requestedSessionRaw);
   const requestedSessionSlug = requestedSessionIdHex ? '' : normalizeSlug(requestedSessionRaw);
   const requestedChainId = parseChainIdInput(initialRegistryChainId) || null;
 
@@ -328,7 +328,7 @@ const SponsorPage = ({
   }, [persistBundleDraft, bundleForm, expiresAt]);
 
   const syncSessionsFromRegistryCache = useCallback(({ isCancelled }: any = {}) => {
-    const cached = sessionRegistryStore.getAllSessionEntries();
+    const cached = getAllSessionRegistryEntries();
     const nextSessions = Array.isArray(cached) ? cached : [];
     if (typeof isCancelled === 'function' && isCancelled()) return nextSessions;
     setSessions(nextSessions);
@@ -389,7 +389,7 @@ const SponsorPage = ({
         });
         if (config) {
           upsertSessionRegistryCache({ config });
-          const refreshed = sessionRegistryStore.getAllSessionEntries();
+          const refreshed = getAllSessionRegistryEntries();
           setSessions(refreshed || []);
           setSelectedSlug(normalizeSlug((config as any).slug));
         }
@@ -440,7 +440,7 @@ const SponsorPage = ({
     if (!requestedSessionRaw) return null;
     if (requestedSessionIdHex) {
       return sessionsForChain.find(([, cfg]: any) => {
-        const cfgId = sessionRegistryUtils.normalizeSessionIdHex(cfg?.__registry?.sessionIdHex || cfg?.sessionId);
+        const cfgId = normalizeSessionIdHex(cfg?.__registry?.sessionIdHex || cfg?.sessionId);
         return cfgId && cfgId === requestedSessionIdHex;
       }) || null;
     }
@@ -521,7 +521,7 @@ const SponsorPage = ({
           throw new Error(`Session not found on chain ${requestedChainId}: ${requestedSessionRaw}`);
         }
         upsertSessionRegistryCache({ config });
-        const refreshed = sessionRegistryStore.getAllSessionEntries();
+        const refreshed = getAllSessionRegistryEntries();
         if (cancelled) return;
         setSessions(refreshed || []);
         setSelectedSlug(normalizeSlug((config as any).slug));
@@ -629,7 +629,7 @@ const SponsorPage = ({
       }
       let resolved;
       try {
-        resolved = await corsProxyUtils.resolveCorsProxyUrl({
+        resolved = await resolveCorsProxyUrl({
           sessionSlug: selectedSlug,
           sessionConfig: selectedConfig,
           context: { account: '', providerLike: null },
