@@ -12,13 +12,13 @@ import {
 } from './surveyResultsHtmlReportReadiness';
 import {
   buildSurveyResultsHtmlReportDownloadAttemptPlan,
-} from './surveyResultsExportDisplayHelpers.js';
+} from './surveyResultsHtmlReportDownloadAttempt.js';
 import type {
   SurveyResultsHtmlReportReadinessPlan,
 } from './surveyResultsHtmlReportReadiness';
 import type {
   SurveyResultsHtmlReportDownloadAttemptPlan,
-} from './surveyResultsExportDisplayHelpers.js';
+} from './surveyResultsHtmlReportDownloadAttempt.js';
 
 export type SurveyResultsHtmlReportDownloadKind = 'html' | 'pdf';
 
