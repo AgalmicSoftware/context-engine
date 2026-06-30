@@ -28,7 +28,7 @@ jest.mock('../arweave/arweaveRetryHelpers.js', () => ({
   shouldStopPendingMetadataRetry: jest.fn(),
 }));
 
-jest.mock('../../components/MainSite/metadataCacheEntryBuilders.js', () => ({
+jest.mock('./metadataCacheEntryBuilders.js', () => ({
   __esModule: true,
   prepareSurveyMetadataCacheEntry: jest.fn(),
 }));
@@ -48,7 +48,7 @@ const {
 } = require('../arweave/arweaveRetryHelpers.js');
 const {
   prepareSurveyMetadataCacheEntry,
-} = require('../../components/MainSite/metadataCacheEntryBuilders.js');
+} = require('./metadataCacheEntryBuilders.js');
 const {
   resolveScopedMetadataSessionSlug,
 } = require('../session/metadataSessionBinding.js');
