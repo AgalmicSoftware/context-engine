@@ -14,6 +14,7 @@ import {
   readBoundaryBaseline,
   resolveClientImport,
   runClientBoundaryCheck,
+  violationId,
   writeBoundaryBaseline,
 } from './check-client-boundaries.mjs';
 
@@ -104,6 +105,42 @@ test('collectClientBoundaryViolations enforces stable non-baselined boundaries',
     );
 
     const violations = collectClientBoundaryViolations({ rootDir });
+    assert.deepEqual(violations.map((violation) => violation.rule), [
+      'domains-no-components',
+      'ui-no-route-runtime',
+      'utilities-no-components',
+    ]);
+  });
+});
+
+test('collectClientBoundaryViolations returns stable sorted results from unsorted file lists', () => {
+  withTempRoot((rootDir) => {
+    const domainFile = 'client/src/domains/surveys/surveyModel.ts';
+    const uiFile = 'client/src/components/ui/IconButton.tsx';
+    const utilityFile = 'client/src/utilities/session/sessionHelpers.ts';
+    writeFile(
+      rootDir,
+      utilityFile,
+      "import Widget from '../../components/Shared/Widget';\n"
+    );
+    writeFile(
+      rootDir,
+      uiFile,
+      "import MainSite from '../MainSite/MainSite';\n"
+    );
+    writeFile(
+      rootDir,
+      domainFile,
+      "import SurveyTool from '../../components/SurveyTool/SurveyTool';\n"
+    );
+
+    const violations = collectClientBoundaryViolations({
+      rootDir,
+      listFiles: () => [utilityFile, uiFile, domainFile],
+    });
+    const violationIds = violations.map(violationId);
+
+    assert.deepEqual(violationIds, [...violationIds].sort());
     assert.deepEqual(violations.map((violation) => violation.rule), [
       'domains-no-components',
       'ui-no-route-runtime',
