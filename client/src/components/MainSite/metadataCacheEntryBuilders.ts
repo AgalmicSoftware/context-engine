@@ -2,7 +2,7 @@ import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
 import {
   buildMetadataSessionCacheEnvelope,
   type MetadataRecord,
-} from './metadataSessionBinding.js';
+} from '../../utilities/session/metadataSessionBinding.js';
 
 export type MetadataEntry = MetadataRecord;
 export type SurveyMetadataCacheEntry = MetadataEntry & {

@@ -57,7 +57,7 @@
   Purpose: encrypted session info/name/header refresh, Lit decrypt attempt tracking, per-slug override patch creation, and cleanup of decrypt-attempt state
   Test: `sessionMetaController.test.js`
 
-- `client/src/components/MainSite/metadataSessionBinding.ts`
+- `client/src/utilities/session/metadataSessionBinding.ts`
   Pattern: Pure exported functions (no host DI)
   Exports: `resolveMetadataSessionBinding`, `resolveMetadataSessionSlug`, `resolveScopedMetadataSessionSlug`, `buildMetadataSessionCacheEnvelope`
   Types: `MetadataSessionAuthority`, `MetadataSessionBinding`, `MetadataSessionCacheEnvelope`, `BuildEnvelopeOptions`
@@ -69,7 +69,7 @@
   Exports: `prepareSurveyMetadataCacheEntry`, `prepareQuestionMetadataCacheEntry`
   Types: `PrepareSurveyMetadataCacheEntryArgs`, `PrepareQuestionMetadataCacheEntryArgs`
   Test: `metadataCacheEntryBuilders.test.ts`
-  Dependencies: `buildMetadataSessionCacheEnvelope` (metadataSessionBinding), `normalizeSessionSlug` (sessionNaming)
+  Dependencies: `buildMetadataSessionCacheEnvelope` (`utilities/session/metadataSessionBinding.ts`), `normalizeSessionSlug` (sessionNaming)
   What stays in MainSite: `writeSurveyMetadataToCache` (DG write, bucket init), `writeQuestionMetadataToCache` (DG write, bucket init)
 - `client/src/components/MainSite/sbtRoutePathHelpers.ts`
   Pattern: Pure exported functions (no host DI)
@@ -194,7 +194,7 @@ All extracted controllers use a factory-function + host-DI pattern (or pure expo
 - `syncLitHooks` (1501-1536)
 - `getSessionInfoForGroup` / `getSessionNameForGroup` / `getSessionHeaderForGroup` (1538-1567) — forwarding wrappers → `sessionDisplayHelpers.ts`
 - `refreshSessionInfo` / `refreshSessionMetaFields` (1569-1573) — forwarding wrappers → `sessionMetaController.ts`
-- `resolveMetadataSessionBinding`, `resolveMetadataSessionSlug`, `resolveScopedMetadataSessionSlug`, `buildMetadataSessionCacheEnvelope` (1607-1625) — forwarding wrappers → `metadataSessionBinding.ts`
+- `resolveMetadataSessionBinding`, `resolveMetadataSessionSlug`, `resolveScopedMetadataSessionSlug`, `buildMetadataSessionCacheEnvelope` (1607-1625) — forwarding wrappers → `utilities/session/metadataSessionBinding.ts`
 - `hasMaskedQuestionPayloadInCache`, `buildQuestionDecryptContext`, `refreshEncryptedQuestionPayloadsForGroup`, `refreshQuestionMetadataForGroup` (6287-6297) — forwarding wrappers → `sessionQuestionCacheController.ts`
 
 ### Scan scope, registry hydration, and deep scan planning

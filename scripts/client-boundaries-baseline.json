@@ -212,12 +212,6 @@
       "source": "client/src/utilities/survey/sessionSurveyCacheController.ts",
       "import": "../../components/MainSite/metadataCacheEntryBuilders.js",
       "resolved": "client/src/components/MainSite/metadataCacheEntryBuilders"
-    },
-    {
-      "rule": "utilities-no-components",
-      "source": "client/src/utilities/survey/sessionSurveyCacheController.ts",
-      "import": "../../components/MainSite/metadataSessionBinding.js",
-      "resolved": "client/src/components/MainSite/metadataSessionBinding"
     }
   ]
 }
