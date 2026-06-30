@@ -18,7 +18,7 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   writeCacheOptimistic: jest.fn(),
 }), { virtual: true });
 
-jest.mock('../../components/MainSite/cacheConstants', () => ({
+jest.mock('./sessionCacheConstants', () => ({
   __esModule: true,
   DG_MANAGED_CACHE_NAMES: new Set([
     'questionsCache',

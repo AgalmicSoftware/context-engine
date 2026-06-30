@@ -1,5 +1,5 @@
 /**
- * @module components/MainSite/cacheConstants
+ * @module utilities/cache/sessionCacheConstants
  */
 
 export const SESSION_FALLBACK_REDIRECT_STORAGE_KEY_PREFIX = 'dg:sessionFallbackRedirectSeen:';
