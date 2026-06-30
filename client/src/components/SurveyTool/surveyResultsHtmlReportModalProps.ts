@@ -9,7 +9,7 @@ import type {
 import type { SurveyResultsHtmlReportExportModalProps } from './SurveyResultsHtmlReportExportModal';
 import {
   buildSurveyResultsHtmlReportExportModalDescriptor,
-} from './surveyResultsExportDisplayHelpers';
+} from './surveyResultsHtmlReportModalDescriptor';
 
 export type SurveyResultsHtmlReportModalPropsInput = Pick<
   SurveyResultsHtmlReportExportModalProps,
