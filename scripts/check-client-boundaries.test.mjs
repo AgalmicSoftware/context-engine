@@ -359,7 +359,7 @@ test('json output includes duplicate baseline entries and exits nonzero', () => 
   });
 });
 
-test('resolved baseline entries report ratchet-down guidance without failing', () => {
+test('resolved baseline entries fail with ratchet-down guidance', () => {
   withTempRoot((rootDir) => {
     const staleSource = 'client/src/components/Admin/AdminPage.tsx';
     writeFile(
@@ -384,10 +384,10 @@ test('resolved baseline entries report ratchet-down guidance without failing', (
       rootDir,
       stdout: (line) => stdout.push(line),
       stderr: (line) => stderr.push(line),
-    }), 0);
+    }), 1);
     assert.match(stdout.join('\n'), /Current violations: 1; baseline: 2; new: 0; resolved: 1\./);
-    assert.match(stdout.join('\n'), /Resolved baseline entries detected/);
-    assert.equal(stderr.length, 0);
+    assert.match(stderr.join('\n'), /resolved baseline entry\/entries found; prune the baseline in the same commit/);
+    assert.match(stderr.join('\n'), /route-page-no-low-level/);
   });
 });
 

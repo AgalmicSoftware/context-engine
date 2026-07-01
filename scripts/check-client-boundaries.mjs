@@ -602,7 +602,11 @@ export function runClientBoundaryCheck({
 
   if (args.has('--json')) {
     stdout(JSON.stringify(result, null, 2));
-    return comparison.newViolations.length > 0 || duplicateBaselineViolations.length > 0 ? 1 : 0;
+    return (
+      comparison.newViolations.length > 0
+      || duplicateBaselineViolations.length > 0
+      || comparison.resolvedViolations.length > 0
+    ) ? 1 : 0;
   }
 
   stdout(`Client boundary check scanned ${SOURCE_ROOT}.`);
@@ -615,10 +619,6 @@ export function runClientBoundaryCheck({
     violations.forEach((violation) => stdout(formatViolation(violation)));
   }
 
-  if (comparison.resolvedViolations.length > 0) {
-    stdout('Resolved baseline entries detected. Run --write-baseline after reviewing the cleanup.');
-  }
-
   if (duplicateBaselineViolations.length > 0) {
     stderr('Client boundary check failed: duplicate baseline entry/entries found.');
     duplicateBaselineViolations.forEach((violation) => stderr(`- ${formatViolation(violation)}`));
@@ -628,6 +628,12 @@ export function runClientBoundaryCheck({
   if (comparison.newViolations.length > 0) {
     stderr('Client boundary check failed: new architecture boundary violation(s) found.');
     comparison.newViolations.forEach((violation) => stderr(`- ${formatViolation(violation)}`));
+    return 1;
+  }
+
+  if (comparison.resolvedViolations.length > 0) {
+    stderr('Client boundary check failed: resolved baseline entry/entries found; prune the baseline in the same commit.');
+    comparison.resolvedViolations.forEach((violation) => stderr(`- ${formatViolation(violation)}`));
     return 1;
   }
 
