@@ -35,6 +35,7 @@ test('countTypeDebtInText counts each tracked debt marker', () => {
   const counts = countTypeDebtInText(`
 // @ts-nocheck
 const value: any = input as any;
+const narrowed = input as unknown as string;
 type AsyncValue = Promise<any>;
 type ListValue = Array<any>;
 type MapValue = Record<string, any>;
@@ -43,6 +44,7 @@ type MapValue = Record<string, any>;
   assert.equal(counts.tsNocheck, 1);
   assert.equal(counts.colonAny, 1);
   assert.equal(counts.asAny, 1);
+  assert.equal(counts.asUnknownAs, 1);
   assert.equal(counts.promiseAny, 1);
   assert.equal(counts.arrayAny, 1);
   assert.equal(counts.recordAny, 1);
