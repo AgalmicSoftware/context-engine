@@ -58,6 +58,10 @@ export const CLIENT_BOUNDARY_RULES = Object.freeze({
     id: 'route-page-no-low-level',
     description: 'route/page code should not add direct imports of low-level web3/worker/storage modules',
   },
+  noPassthroughFacade: {
+    id: 'no-passthrough-facade',
+    description: 'client utility/component modules should not add thin pass-through facades over low-level modules',
+  },
   uiNoRouteRuntime: {
     id: 'ui-no-route-runtime',
     description: 'client/src/components/ui/** must not import route/runtime owners',
@@ -200,6 +204,17 @@ const isRouteRuntimeOwnerImport = (resolvedImport) => ROUTE_RUNTIME_OWNER_PREFIX
 const isLowLevelRouteImport = (resolvedImport) => LOW_LEVEL_ROUTE_IMPORT_PREFIXES
   .some((prefix) => startsWithPath(resolvedImport, prefix));
 
+const isPassthroughFacadeRuleScope = (filePath) => (
+  (isUtilitiesPath(filePath) || isComponentsPath(filePath))
+  && !hasPathPrefix(filePath, 'client/src/domains/')
+  && !hasPathPrefix(filePath, 'client/src/app/runtime/')
+);
+
+const isComponentRuntimeFacadeCandidate = (filePath) => (
+  isComponentsPath(filePath)
+  && /Runtime\.(?:js|jsx|ts|tsx)$/.test(path.posix.basename(filePath))
+);
+
 export function isRouteOrPageCode(filePath) {
   const normalizedPath = normalizePath(filePath).replace(/\.(?:js|jsx|ts|tsx)$/, '');
 
@@ -228,6 +243,166 @@ function buildViolation(rule, source, specifier, resolvedImport) {
     import: specifier,
     resolved: resolvedImport,
   };
+}
+
+function parseNamedExportCount(specifiers) {
+  if (!specifiers) {
+    return 1;
+  }
+
+  return specifiers
+    .split(',')
+    .map((specifier) => specifier.trim())
+    .filter(Boolean)
+    .length;
+}
+
+function parseImportedIdentifiers(importClause) {
+  const identifiers = [];
+  const clause = importClause.trim();
+  const namespaceMatch = clause.match(/\*\s+as\s+([A-Za-z_$][\w$]*)/);
+  if (namespaceMatch) {
+    identifiers.push(namespaceMatch[1]);
+  }
+
+  const namedMatch = clause.match(/\{([\s\S]*?)\}/);
+  if (namedMatch) {
+    for (const namedImport of namedMatch[1].split(',')) {
+      const cleaned = namedImport.trim();
+      if (!cleaned || cleaned.startsWith('type ')) {
+        continue;
+      }
+      const aliasMatch = cleaned.match(/\bas\s+([A-Za-z_$][\w$]*)$/);
+      const directMatch = cleaned.match(/^([A-Za-z_$][\w$]*)/);
+      if (aliasMatch) {
+        identifiers.push(aliasMatch[1]);
+      } else if (directMatch) {
+        identifiers.push(directMatch[1]);
+      }
+    }
+  }
+
+  const defaultImport = clause
+    .replace(/\{[\s\S]*?\}/g, '')
+    .replace(/\*\s+as\s+[A-Za-z_$][\w$]*/g, '')
+    .split(',')[0]
+    .trim();
+  if (/^[A-Za-z_$][\w$]*$/.test(defaultImport)) {
+    identifiers.push(defaultImport);
+  }
+
+  return identifiers;
+}
+
+function collectLowLevelImportedIdentifiers(sourceFile, sourceText) {
+  const identifiers = new Set();
+  const importPattern = /\bimport\s+(?:type\s+)?([^'";]+?)\s+from\s*['"]([^'"]+)['"]/g;
+
+  for (const match of sourceText.matchAll(importPattern)) {
+    const resolved = resolveClientImport(sourceFile, match[2]);
+    if (!resolved || !isLowLevelRouteImport(resolved)) {
+      continue;
+    }
+    parseImportedIdentifiers(match[1]).forEach((identifier) => identifiers.add(identifier));
+  }
+
+  let addedAlias = true;
+  while (addedAlias) {
+    addedAlias = false;
+    const aliasPattern = /\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*\(?\s*([A-Za-z_$][\w$]*)\b[^;]*;/g;
+    for (const match of sourceText.matchAll(aliasPattern)) {
+      if (identifiers.has(match[2]) && !identifiers.has(match[1])) {
+        identifiers.add(match[1]);
+        addedAlias = true;
+      }
+    }
+  }
+
+  return identifiers;
+}
+
+function isLowLevelDelegatingExpression(expression, lowLevelIdentifiers) {
+  const normalized = expression.trim();
+  if (!normalized) {
+    return false;
+  }
+
+  for (const identifier of lowLevelIdentifiers) {
+    const escapedIdentifier = identifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (new RegExp(`^${escapedIdentifier}\\s*(?:\\.|\\?\\.|\\()`).test(normalized)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function collectPassthroughFacadeExportStats(sourceFile, sourceText) {
+  let totalExports = 0;
+  let passthroughExports = 0;
+
+  const reExportPattern = /\bexport\s+(?:type\s+)?(?:\*\s*(?:as\s+[A-Za-z_$][\w$]*\s*)?|\{([\s\S]*?)\})\s+from\s*['"]([^'"]+)['"]/g;
+  for (const match of sourceText.matchAll(reExportPattern)) {
+    const exportCount = parseNamedExportCount(match[1]);
+    totalExports += exportCount;
+
+    const resolved = resolveClientImport(sourceFile, match[2]);
+    if (resolved && isLowLevelRouteImport(resolved)) {
+      passthroughExports += exportCount;
+    }
+  }
+
+  const lowLevelIdentifiers = collectLowLevelImportedIdentifiers(sourceFile, sourceText);
+
+  const exportedConstPattern = /\bexport\s+const\s+([A-Za-z_$][\w$]*)\s*=[\s\S]*?=>\s*\(([\s\S]*?)\)\s*;/g;
+  for (const match of sourceText.matchAll(exportedConstPattern)) {
+    totalExports += 1;
+    if (isLowLevelDelegatingExpression(match[2], lowLevelIdentifiers)) {
+      passthroughExports += 1;
+    }
+  }
+
+  const exportedFunctionPattern = /\bexport\s+(?:async\s+)?function\s+[A-Za-z_$][\w$]*\s*\([^)]*\)\s*(?::[^{]+)?\{\s*return\s+([\s\S]*?);\s*\}/g;
+  for (const match of sourceText.matchAll(exportedFunctionPattern)) {
+    totalExports += 1;
+    if (isLowLevelDelegatingExpression(match[1], lowLevelIdentifiers)) {
+      passthroughExports += 1;
+    }
+  }
+
+  return {
+    totalExports,
+    passthroughExports,
+  };
+}
+
+export function evaluatePassthroughFacade({ source, sourceText }) {
+  if (!isPassthroughFacadeRuleScope(source)) {
+    return [];
+  }
+
+  const { totalExports, passthroughExports } = collectPassthroughFacadeExportStats(source, sourceText);
+  if (passthroughExports === 0) {
+    return [];
+  }
+
+  const passthroughRatio = passthroughExports / totalExports;
+  const exceedsFacadeThreshold = totalExports >= 3 && passthroughRatio >= 0.8;
+  const isComponentMicroFacade = (
+    isComponentRuntimeFacadeCandidate(source)
+    && totalExports >= 1
+    && passthroughRatio === 1
+  );
+
+  if (!exceedsFacadeThreshold && !isComponentMicroFacade) {
+    return [];
+  }
+
+  return [buildViolation(
+    CLIENT_BOUNDARY_RULES.noPassthroughFacade,
+    source,
+    '<passthrough-facade>',
+    source,
+  )];
 }
 
 export function evaluateClientBoundaryImport({ source, specifier, resolved }) {
@@ -285,7 +460,10 @@ export function collectClientBoundaryViolations({
       continue;
     }
 
-    const importSpecifiers = extractImportSpecifiers(fs.readFileSync(absolutePath, 'utf8'));
+    const sourceText = fs.readFileSync(absolutePath, 'utf8');
+    const importSpecifiers = extractImportSpecifiers(sourceText);
+    violations.push(...evaluatePassthroughFacade({ source, sourceText }));
+
     for (const specifier of importSpecifiers) {
       const resolved = resolveClientImport(source, specifier);
       if (!resolved) {
