@@ -7,6 +7,15 @@ export type SbtReadOptions = {
 
 export type SbtMetadataRecord = Record<string, unknown>;
 
+export type SbtOnChainConfig = {
+  maxTokens: unknown;
+  collectionBurnAuth: unknown;
+  mintingEndTime: unknown;
+  hasPasswordMint: unknown;
+  admin: unknown;
+  owner: unknown;
+};
+
 export type SbtTransactionResult = Record<string, unknown> & {
   transactionHash: string;
 };
@@ -29,6 +38,11 @@ export type SbtMetadataReadsPort = {
     groupKeyOrCfg?: SbtGroupKeyOrConfig,
     options?: SbtReadOptions
   ) => Promise<string | null>;
+  getSbtOnChainConfig: (
+    providerName: string,
+    sbtAddress: string,
+    groupKeyOrCfg?: SbtGroupKeyOrConfig
+  ) => Promise<SbtOnChainConfig>;
 };
 
 export type SbtMintExecutionPort = {

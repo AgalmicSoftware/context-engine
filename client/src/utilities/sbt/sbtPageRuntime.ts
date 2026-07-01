@@ -9,7 +9,6 @@ type SbtPageContractRuntime = {
   burnToken: (...args: unknown[]) => Promise<SbtPageTransactionResult>;
   claimWithPassword: (...args: unknown[]) => Promise<SbtPageTransactionResult>;
   getOwnerByTokenId: (...args: unknown[]) => Promise<unknown>;
-  getReadProviderForGroup: (...args: unknown[]) => unknown;
   getSBTTokenIdByOwner: (...args: unknown[]) => Promise<unknown>;
   getSbtHistorySummary: (...args: unknown[]) => Promise<unknown>;
   isPasswordValid: (...args: unknown[]) => Promise<boolean>;
@@ -32,10 +31,6 @@ export const claimWithPassword = (...args: unknown[]): Promise<SbtPageTransactio
 
 export const getOwnerByTokenId = (...args: unknown[]): Promise<unknown> => (
   contractScriptsRuntime.getOwnerByTokenId(...args)
-);
-
-export const getReadProviderForGroup = (...args: unknown[]): unknown => (
-  contractScriptsRuntime.getReadProviderForGroup(...args)
 );
 
 export const getSBTTokenIdByOwner = (...args: unknown[]): Promise<unknown> => (
