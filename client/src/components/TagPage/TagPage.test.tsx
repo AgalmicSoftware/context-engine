@@ -24,11 +24,16 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   subscribeCacheUpdates: (...args: any[]) => (mockSubscribeCacheUpdates as any)(...args),
 }));
 
-jest.mock('../../utilities/tags/tagPageRuntime.js', () => ({
+jest.mock('../../utilities/web3/contractScripts.js', () => ({
   __esModule: true,
+  default: {},
   getAllSessionSlugs: (...args: any[]) => mockGetAllSessionSlugs(...args),
   getSessionConfigBySlug: (...args: any[]) => mockGetSessionConfigBySlug(...args),
   getDemoSessionConfigBySlug: (...args: any[]) => mockGetDemoSessionConfigBySlug(...args),
+}));
+
+jest.mock('../../utilities/web3/sessionRegistry.js', () => ({
+  __esModule: true,
   SESSION_REGISTRY_CACHE_UPDATED_EVENT: 'ce:session-registry-cache-updated',
 }));
 
