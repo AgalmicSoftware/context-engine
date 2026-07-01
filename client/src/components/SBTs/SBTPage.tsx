@@ -8,8 +8,6 @@ import {
   addHashedPasswords,
   burnToken,
   claimWithPassword,
-  computeGroupPasswordHash,
-  generateInvitePayloads,
   getDemoSessionConfigBySlug,
   getOwnerByTokenId,
   getReadProviderForGroup,
@@ -19,9 +17,9 @@ import {
   getSessionConfigBySlugOrDefault,
   isPasswordValid,
   normalizeSessionSlug,
-  signGroupMintAuthorization,
   startClaim,
 } from '../../utilities/sbt/sbtPageRuntime.js';
+import { sbtGroupMintAuthorizationPort } from '../../domains/sbts/contractScriptsSbtGroupMintAuthorizationPort.js';
 import { sbtMetadataReadsPort } from '../../domains/sbts/contractScriptsSbtMetadataReadsPort.js';
 import { sbtMintExecutionPort } from '../../domains/sbts/contractScriptsSbtMintExecutionPort.js';
 import { getChainBlockTimeMs } from '../../variables/chains.js';
@@ -1430,7 +1428,7 @@ class SBTPage extends Component<any, any> {
         });
         const localHash = walletScopeSbtAddress === null
           ? null
-          : computeGroupPasswordHash({
+          : sbtGroupMintAuthorizationPort.computeGroupPasswordHash({
               password,
               sbtAddress: walletScopeSbtAddress
             });
@@ -1494,7 +1492,7 @@ class SBTPage extends Component<any, any> {
         }
 
         const nonce = mintedBig.add(1).toString();
-        const invites = await generateInvitePayloads({
+        const invites = await sbtGroupMintAuthorizationPort.generateInvitePayloads({
           password,
           sbtAddress: sbt,
           nonces: [nonce],
@@ -3047,7 +3045,7 @@ class SBTPage extends Component<any, any> {
       });
       const local = walletScopeSbtAddress === null
         ? null
-        : computeGroupPasswordHash({
+        : sbtGroupMintAuthorizationPort.computeGroupPasswordHash({
             password,
             sbtAddress: walletScopeSbtAddress
       });
@@ -3071,10 +3069,10 @@ class SBTPage extends Component<any, any> {
       });
 
       sbtLog.log('[MANUAL-MINT] Signing authorization...');
-      const sig = await signGroupMintAuthorization({
+      const sig = await sbtGroupMintAuthorizationPort.signGroupMintAuthorization({
         password,
         sbtAddress: sbt,
-        userAddress: mintAccount,
+        userAddress: String(mintAccount || ''),
         walletScopeSbtAddress,
       });
       sbtLog.log('[MANUAL-MINT] Signature:', sig);
