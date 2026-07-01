@@ -7,8 +7,6 @@ import { ethers } from 'ethers';
 import {
   addHashedPasswords,
   burnToken,
-  claim,
-  claimWithInvite,
   claimWithPassword,
   computeGroupPasswordHash,
   generateInvitePayloads,
@@ -20,12 +18,12 @@ import {
   getSessionChainId,
   getSessionConfigBySlugOrDefault,
   isPasswordValid,
-  mintWithGroupSignature,
   normalizeSessionSlug,
   signGroupMintAuthorization,
   startClaim,
 } from '../../utilities/sbt/sbtPageRuntime.js';
 import { sbtMetadataReadsPort } from '../../domains/sbts/contractScriptsSbtMetadataReadsPort.js';
+import { sbtMintExecutionPort } from '../../domains/sbts/contractScriptsSbtMintExecutionPort.js';
 import { getChainBlockTimeMs } from '../../variables/chains.js';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import styles from './SBTPage.module.scss';
@@ -1347,12 +1345,12 @@ class SBTPage extends Component<any, any> {
         sbtAddress: sbt,
         sessionSlug: slug,
       });
-      const tx = await claimWithInvite(
+      const tx = await sbtMintExecutionPort.claimWithInvite(
         this.props.provider,
         sbt,
-        payload.nonce,
-        payload.signature
-      ) as SbtPageTransactionResult;
+        String(payload.nonce),
+        String(payload.signature)
+      );
 
       await this.completeMintSuccessForTarget({
         accountLower: mintAccountLower,
@@ -3085,7 +3083,7 @@ class SBTPage extends Component<any, any> {
         return false;
       }
       sbtLog.log('[MANUAL-MINT] Sending transaction...');
-      const tx = await mintWithGroupSignature(this.props.provider, sbt, sig);
+      const tx = await sbtMintExecutionPort.mintWithGroupSignature(this.props.provider, sbt, String(sig || ''));
       sbtLog.log('[MANUAL-MINT] Tx hash:', tx.transactionHash);
 
       await this.completeMintSuccessForTarget({
@@ -3247,7 +3245,7 @@ class SBTPage extends Component<any, any> {
           sbtAddress: sbtAddressOriginalCase,
           sessionSlug: slug,
         });
-        const tx = await claim(this.props.provider, sbtAddressOriginalCase);
+        const tx = await sbtMintExecutionPort.claim(this.props.provider, sbtAddressOriginalCase);
         this.cacheTransactionHash(tx.transactionHash, mintAccountLower);
         await this.completeMintSuccessForTarget({
           accountLower: mintAccountLower,
