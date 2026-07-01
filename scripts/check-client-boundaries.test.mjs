@@ -65,6 +65,22 @@ test('resolveClientImport resolves local client imports and ignores packages', (
     'client/src/utilities/web3/sessionRegistry'
   );
   assert.equal(
+    resolveClientImport('client/src/components/Admin/AdminPage.tsx', 'utilities/web3/contractScripts.js'),
+    'client/src/utilities/web3/contractScripts'
+  );
+  assert.equal(
+    resolveClientImport('client/src/components/Admin/AdminPage.tsx', 'components/Shared/CETooltip'),
+    'client/src/components/Shared/CETooltip'
+  );
+  assert.equal(
+    resolveClientImport('client/src/components/Admin/AdminPage.tsx', 'assets/logo.png'),
+    'client/src/assets/logo.png'
+  );
+  assert.equal(
+    resolveClientImport('client/src/components/Admin/AdminPage.tsx', 'variables/chains.js'),
+    'client/src/variables/chains'
+  );
+  assert.equal(
     resolveClientImport('client\\src\\components\\Admin\\AdminPage.tsx', '..\\..\\utilities\\web3\\index.ts'),
     'client/src/utilities/web3/'
   );
@@ -189,6 +205,26 @@ test('route/page low-level imports fail only when not present in the baseline', 
       stderr: (line) => failedStderr.push(line),
     }), 1);
     assert.match(failedStderr.join('\n'), /new architecture boundary violation/);
+  });
+});
+
+test('route/page low-level imports through Vite bare aliases are violations', () => {
+  withTempRoot((rootDir) => {
+    writeFile(
+      rootDir,
+      'client/src/components/UserPage/UserPage.tsx',
+      "import contractScripts from 'utilities/web3/contractScripts.js';\n"
+    );
+
+    const violations = collectClientBoundaryViolations({ rootDir });
+    assert.deepEqual(violations, [
+      {
+        rule: 'route-page-no-low-level',
+        source: 'client/src/components/UserPage/UserPage.tsx',
+        import: 'utilities/web3/contractScripts.js',
+        resolved: 'client/src/utilities/web3/contractScripts',
+      },
+    ]);
   });
 });
 

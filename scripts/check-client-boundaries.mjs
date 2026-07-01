@@ -33,6 +33,13 @@ const LOW_LEVEL_ROUTE_IMPORT_PREFIXES = Object.freeze([
   'client/src/utilities/worker/',
 ]);
 
+const VITE_BARE_CLIENT_ALIASES = Object.freeze([
+  'assets',
+  'components',
+  'utilities',
+  'variables',
+]);
+
 const ROUTE_RUNTIME_OWNER_PREFIXES = Object.freeze([
   'client/src/app/runtime/',
   'client/src/app/routes/',
@@ -165,6 +172,14 @@ export function resolveClientImport(sourceFile, specifier) {
     resolved = `client/${normalizedSpecifier}`;
   } else if (normalizedSpecifier.startsWith('@/')) {
     resolved = `${SOURCE_ROOT}/${normalizedSpecifier.slice(2)}`;
+  } else {
+    const alias = VITE_BARE_CLIENT_ALIASES.find((candidate) => (
+      normalizedSpecifier === candidate
+      || normalizedSpecifier.startsWith(`${candidate}/`)
+    ));
+    if (alias) {
+      resolved = `${SOURCE_ROOT}/${normalizedSpecifier}`;
+    }
   }
 
   if (!resolved || !resolved.startsWith(`${SOURCE_ROOT}/`)) {
