@@ -29,6 +29,11 @@ export const TYPE_DEBT_PATTERNS = Object.freeze([
     pattern: /\bas\s+any\b/g,
   },
   {
+    key: 'asUnknownAs',
+    label: 'as unknown as',
+    pattern: /\bas\s+unknown\s+as\b/g,
+  },
+  {
     key: 'promiseAny',
     label: 'Promise<any>',
     pattern: /\bPromise\s*<\s*any\s*>/g,
