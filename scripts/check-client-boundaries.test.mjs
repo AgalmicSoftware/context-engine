@@ -307,6 +307,54 @@ test('app runtime modules may delegate to low-level modules', () => {
   });
 });
 
+test('production files cannot import excluded harness or test utility modules', () => {
+  withTempRoot((rootDir) => {
+    writeFile(
+      rootDir,
+      'client/src/components/Widget/Widget.tsx',
+      `
+        import { renderWidget } from './WidgetHarness';
+        import { buildWidget } from './Widget.testUtils';
+        import fixtureData from './fixtures/data';
+      `
+    );
+
+    const violations = collectClientBoundaryViolations({ rootDir });
+    assert.deepEqual(violations, [
+      {
+        rule: 'production-no-test-exclusion-imports',
+        source: 'client/src/components/Widget/Widget.tsx',
+        import: './fixtures/data',
+        resolved: 'client/src/components/Widget/fixtures/data',
+      },
+      {
+        rule: 'production-no-test-exclusion-imports',
+        source: 'client/src/components/Widget/Widget.tsx',
+        import: './Widget.testUtils',
+        resolved: 'client/src/components/Widget/Widget.testUtils',
+      },
+      {
+        rule: 'production-no-test-exclusion-imports',
+        source: 'client/src/components/Widget/Widget.tsx',
+        import: './WidgetHarness',
+        resolved: 'client/src/components/Widget/WidgetHarness',
+      },
+    ]);
+  });
+});
+
+test('test files may import excluded harness modules', () => {
+  withTempRoot((rootDir) => {
+    writeFile(
+      rootDir,
+      'client/src/components/Widget/Widget.test.tsx',
+      "import { renderWidget } from './WidgetHarness';\n"
+    );
+
+    assert.deepEqual(collectClientBoundaryViolations({ rootDir }), []);
+  });
+});
+
 test('duplicate baseline entries fail even when the current violation is baselined', () => {
   withTempRoot((rootDir) => {
     writeFile(
