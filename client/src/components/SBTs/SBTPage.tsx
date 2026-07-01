@@ -13,13 +13,10 @@ import {
   computeGroupPasswordHash,
   generateInvitePayloads,
   getDemoSessionConfigBySlug,
-  getGroupPasswordHash,
-  getMintedTokens,
   getOwnerByTokenId,
   getReadProviderForGroup,
   getSBTTokenIdByOwner,
   getSbtHistorySummary,
-  getSbtMetadata,
   getSessionChainId,
   getSessionConfigBySlugOrDefault,
   isPasswordValid,
@@ -28,6 +25,7 @@ import {
   signGroupMintAuthorization,
   startClaim,
 } from '../../utilities/sbt/sbtPageRuntime.js';
+import { sbtMetadataReadsPort } from '../../domains/sbts/contractScriptsSbtMetadataReadsPort.js';
 import { getChainBlockTimeMs } from '../../variables/chains.js';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import styles from './SBTPage.module.scss';
@@ -874,6 +872,7 @@ class SBTPage extends Component<any, any> {
     const targetSlug = this.getEffectiveSessionSlug();
     const targetAccountLower = String(this.props.account || '').trim().toLowerCase();
     const targetChainId = this.getMintTargetChainId();
+    const currentSbtAddressString = String(currentSbtAddress || '');
     const isUrlAutoMintTargetCurrent = () => this.isMintTargetContextCurrent({
       accountLower: targetAccountLower,
       chainId: targetChainId,
@@ -918,7 +917,7 @@ class SBTPage extends Component<any, any> {
     let sbtInfo: SbtPageInfoState | null = this.state.sbtInfo;
     if (!sbtInfo || typeof sbtInfo !== 'object') {
       try {
-        sbtInfo = await getSbtMetadata('none', currentSbtAddress, slug) as SbtPageInfoState | null;
+        sbtInfo = await sbtMetadataReadsPort.getSbtMetadata('none', currentSbtAddressString, slug) as SbtPageInfoState | null;
       } catch (_) {
         sbtInfo = null;
       }
@@ -939,7 +938,7 @@ class SBTPage extends Component<any, any> {
       return minted;
     }
 
-    const onchainGph = await getGroupPasswordHash('none', currentSbtAddress, slug);
+    const onchainGph = await sbtMetadataReadsPort.getGroupPasswordHash('none', currentSbtAddressString, slug);
     if (!isUrlAutoMintTargetCurrent()) return false;
     if (onchainGph && onchainGph !== ethers.constants.HashZero) {
       const minted = await this.mintUnlimitedWithGroupPassword({
@@ -1224,6 +1223,7 @@ class SBTPage extends Component<any, any> {
 
   autoMintPublicIfAllowed = async (sbtAddress: unknown, options: SbtPageAutoMintOptions = {}): Promise<boolean> => {
     if (!sbtAddress) return false;
+    const sbtAddressString = String(sbtAddress || '');
 
     const slug = options?.sessionSlugOverride != null
       ? String(options.sessionSlugOverride || '')
@@ -1245,11 +1245,11 @@ class SBTPage extends Component<any, any> {
     const currentPropAddress = resolveSbtAddressString(this.props.SBTAddress);
     let sbtInfo: unknown = (
       currentPropAddress &&
-      String(currentPropAddress).toLowerCase() === String(sbtAddress).toLowerCase()
+      String(currentPropAddress).toLowerCase() === sbtAddressString.toLowerCase()
     ) ? this.state.sbtInfo : null;
     if (!sbtInfo || typeof sbtInfo !== 'object') {
       try {
-        sbtInfo = await getSbtMetadata('none', sbtAddress, slug);
+        sbtInfo = await sbtMetadataReadsPort.getSbtMetadata('none', sbtAddressString, slug);
       } catch (_) {
         sbtInfo = null;
       }
@@ -1266,7 +1266,7 @@ class SBTPage extends Component<any, any> {
     const sbtInfoRecord = isRecord(sbtInfo) ? sbtInfo : {};
     let onchainGph: unknown = null;
     try {
-      onchainGph = await getGroupPasswordHash('none', sbtAddress, slug);
+      onchainGph = await sbtMetadataReadsPort.getGroupPasswordHash('none', sbtAddressString, slug);
     } catch (_) {
       onchainGph = null;
     }
@@ -1418,7 +1418,7 @@ class SBTPage extends Component<any, any> {
 
       let onchainHash = options?.groupPasswordHashOverride || (sbtOverride ? null : this.state.groupPasswordHash) || null;
       if (!onchainHash) {
-        try { onchainHash = await getGroupPasswordHash('none', sbt, slug); } catch (e) { sbtLog.warn('SBTPage: fallback', e); }
+        try { onchainHash = await sbtMetadataReadsPort.getGroupPasswordHash('none', sbt, slug); } catch (e) { sbtLog.warn('SBTPage: fallback', e); }
       }
       if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
         return false;
@@ -1465,7 +1465,7 @@ class SBTPage extends Component<any, any> {
         }
         let mintedTokens: unknown = null;
         try {
-          mintedTokens = await getMintedTokens('none', sbt, slug);
+          mintedTokens = await sbtMetadataReadsPort.getMintedTokens('none', sbt, slug);
         } catch (_) {
           mintedTokens = null;
         }
@@ -1527,7 +1527,7 @@ class SBTPage extends Component<any, any> {
 
         let mintedAfter: unknown = null;
         try {
-          mintedAfter = await getMintedTokens('none', sbt, slug);
+          mintedAfter = await sbtMetadataReadsPort.getMintedTokens('none', sbt, slug);
         } catch (_) {
           mintedAfter = null;
         }
@@ -2341,7 +2341,7 @@ class SBTPage extends Component<any, any> {
       ) {
         if (!isCurrentLoad()) return;
         try {
-          const directMetadata = await getSbtMetadata(
+          const directMetadata = await sbtMetadataReadsPort.getSbtMetadata(
             'none',
             sbtAddressOriginalCase,
             buildDirectMetadataContext(resolvedSlug, netIdStr, sbtInfo)
@@ -2398,7 +2398,7 @@ class SBTPage extends Component<any, any> {
         ) {
           if (!isCurrentLoad()) return;
           try {
-            const directMetadata = await getSbtMetadata(
+            const directMetadata = await sbtMetadataReadsPort.getSbtMetadata(
               'none',
               sbtAddressOriginalCase,
               buildDirectMetadataContext(resolvedSlug, netIdStr, sbtInfo)
@@ -2573,7 +2573,7 @@ class SBTPage extends Component<any, any> {
       });
       const groupPasswordHash = shouldReuseCachedGroupPasswordHash
         ? cachedGroupPasswordHash
-        : await getGroupPasswordHash('none', sbtAddressOriginalCase, resolvedSlug);
+        : await sbtMetadataReadsPort.getGroupPasswordHash('none', sbtAddressOriginalCase, resolvedSlug);
       if (!isCurrentLoad()) return;
       const {
         hasGroupHash,
@@ -2650,7 +2650,7 @@ class SBTPage extends Component<any, any> {
         }
         if (mintedTokensOverride == null) {
           try {
-            const mintedTokensRaw = await getMintedTokens('none', sbtAddressOriginalCase, resolvedSlug);
+            const mintedTokensRaw = await sbtMetadataReadsPort.getMintedTokens('none', sbtAddressOriginalCase, resolvedSlug);
             if (!isCurrentLoad()) return;
             mintedTokensOverride = sanitizeSbtPageMintedTokensOverride(mintedTokensRaw);
             if (mintedTokensOverride != null) {
@@ -2664,7 +2664,7 @@ class SBTPage extends Component<any, any> {
         if (mintedTokensOverride == null && sbtInfo?.chainID != null) {
           try {
             const fallbackCfg = { networkChainId: Number(sbtInfo.chainID) };
-            const mintedTokensRaw = await getMintedTokens('none', sbtAddressOriginalCase, fallbackCfg);
+            const mintedTokensRaw = await sbtMetadataReadsPort.getMintedTokens('none', sbtAddressOriginalCase, fallbackCfg);
             if (!isCurrentLoad()) return;
             mintedTokensOverride = sanitizeSbtPageMintedTokensOverride(mintedTokensRaw);
             if (mintedTokensOverride != null) {
@@ -3032,7 +3032,7 @@ class SBTPage extends Component<any, any> {
       }
 
       sbtLog.log('[MANUAL-MINT] Reading on-chain groupPasswordHash...');
-      const onchain = await getGroupPasswordHash('none', sbt, slug);
+      const onchain = await sbtMetadataReadsPort.getGroupPasswordHash('none', sbt, slug);
       sbtLog.log('[MANUAL-MINT] On-chain groupPasswordHash:', onchain);
       if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
         return false;

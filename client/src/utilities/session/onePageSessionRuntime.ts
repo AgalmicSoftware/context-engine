@@ -9,12 +9,6 @@ type OnePageSessionTransactionResult = Record<string, unknown> & {
   transactionHash: string;
 };
 
-type OnePageSessionSbtMetadata = Record<string, unknown> & {
-  hasPasswordMint?: boolean;
-  image?: unknown;
-  maxTokens?: unknown;
-};
-
 type OnePageSessionBalance = {
   gte: (value: unknown) => boolean;
 };
@@ -25,10 +19,7 @@ type OnePageSessionContractRuntime = {
   computeGroupPasswordHash: (input: unknown) => string;
   generateInvitePayloads: (...args: unknown[]) => Promise<OnePageSessionInvitePayload[]>;
   getETHBalance?: (...args: unknown[]) => Promise<OnePageSessionBalance | null>;
-  getGroupPasswordHash: (...args: unknown[]) => Promise<string>;
-  getMintedTokens: (...args: unknown[]) => Promise<unknown>;
   getNativeBalance?: (...args: unknown[]) => Promise<OnePageSessionBalance | null>;
-  getSbtMetadata: (...args: unknown[]) => Promise<OnePageSessionSbtMetadata | null>;
   mintWithGroupSignature: (...args: unknown[]) => Promise<OnePageSessionTransactionResult>;
   signGroupMintAuthorization: (...args: unknown[]) => Promise<unknown>;
 };
@@ -42,14 +33,6 @@ const contractNamedExports = contractScriptsExports as unknown as OnePageSession
 
 export const getAllSessionSlugs = (...args: unknown[]): unknown[] => (
   contractNamedExports.getAllSessionSlugs(...args)
-);
-
-export const getSbtMetadata = (...args: unknown[]): Promise<OnePageSessionSbtMetadata | null> => (
-  contractRuntime.getSbtMetadata(...args)
-);
-
-export const getGroupPasswordHash = (...args: unknown[]): Promise<string> => (
-  contractRuntime.getGroupPasswordHash(...args)
 );
 
 export const hasNativeBalanceReader = (): boolean => (
@@ -74,10 +57,6 @@ export const claimSbt = (...args: unknown[]): Promise<OnePageSessionTransactionR
 
 export const computeGroupPasswordHash = (input: unknown): string => (
   contractRuntime.computeGroupPasswordHash(input)
-);
-
-export const getMintedTokens = (...args: unknown[]): Promise<unknown> => (
-  contractRuntime.getMintedTokens(...args)
 );
 
 export const generateInvitePayloads = (...args: unknown[]): Promise<OnePageSessionInvitePayload[]> => (

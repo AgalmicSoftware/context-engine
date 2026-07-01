@@ -32,16 +32,14 @@ import {
   computeGroupPasswordHash,
   generateInvitePayloads,
   getAllSessionSlugs,
-  getGroupPasswordHash,
   getLegacyEthBalance,
-  getMintedTokens,
   getNativeBalance,
-  getSbtMetadata,
   hasLegacyEthBalanceReader,
   hasNativeBalanceReader,
   mintWithGroupSignature,
   signGroupMintAuthorization,
 } from '../../utilities/session/onePageSessionRuntime.js';
+import { sbtMetadataReadsPort } from '../../domains/sbts/contractScriptsSbtMetadataReadsPort.js';
 
 import { resolveEffectiveSlug, normalizeSurveyToolFilterState } from '../SurveyTool/surveyToolUtils.js';
 import { resolvePolisDemoQuestionPool } from '../SurveyTool/surveyPolisDemoQuestionPool.js';
@@ -1177,7 +1175,7 @@ class OnePageSession extends Component<any, any> {
           let info: any = null;
           try {
             // Use internal read provider ('none' resolves to read-only)
-            info = await getSbtMetadata('none', addr, slug);
+            info = await sbtMetadataReadsPort.getSbtMetadata('none', addr, slug);
           } catch (e) { demoLog.warn('OnePageSession: fallback', e); }
           const name = getSbtDisplayName(info) || `Group ${addr.slice(0,6)}...`;
           fetchedNames[addr] = name;
@@ -1355,7 +1353,7 @@ class OnePageSession extends Component<any, any> {
     const slug = resolveEffectiveSlug(this.props);
     try {
       // Read-only provider internally
-      const onchainGph = await getGroupPasswordHash('none', sbtAddress, slug);
+      const onchainGph = await sbtMetadataReadsPort.getGroupPasswordHash('none', sbtAddress, slug);
       const pw = cryptoUtils.normalizeGroupPasswordInput(password);
       if (!pw) return false;
 
@@ -1589,7 +1587,7 @@ class OnePageSession extends Component<any, any> {
         // 2. NETWORK FALLBACK (Last Resort)
         if (!sbtInfo) {
            // 'none' provider = read-only RPC
-           sbtInfo = await getSbtMetadata('none', sbtAddr, currentSlug);
+           sbtInfo = await sbtMetadataReadsPort.getSbtMetadata('none', sbtAddr, currentSlug);
         }
 
         // 3. PREFLIGHT CHECKS
@@ -1666,7 +1664,7 @@ class OnePageSession extends Component<any, any> {
           }
           path = 'invite';
         } else {
-          const gph = await getGroupPasswordHash('none', sbtAddr, currentSlug);
+          const gph = await sbtMetadataReadsPort.getGroupPasswordHash('none', sbtAddr, currentSlug);
           const hasGroupPassword = !!gph && gph !== ethers.constants.HashZero;
 
           let isPublic = false;
@@ -1695,7 +1693,7 @@ class OnePageSession extends Component<any, any> {
               }
               if (maxTokensLimit === null && hasGroupPassword) {
                 try {
-                  const onchainInfo = await getSbtMetadata('none', sbtAddr, currentSlug);
+                  const onchainInfo = await sbtMetadataReadsPort.getSbtMetadata('none', sbtAddr, currentSlug);
                   const rawMax = onchainInfo?.maxTokens;
                   if (rawMax !== undefined && rawMax !== null && rawMax !== '' && rawMax !== '0') {
                     maxTokensLimit = ethers.BigNumber.from(rawMax);
@@ -1756,7 +1754,7 @@ class OnePageSession extends Component<any, any> {
             if (!password) throw new Error('Invalid group password');
             let walletScopeSbtAddress = sbtAddr;
             try {
-              const onchainHash = await getGroupPasswordHash('none', sbtAddr, currentSlug);
+              const onchainHash = await sbtMetadataReadsPort.getGroupPasswordHash('none', sbtAddr, currentSlug);
               if (onchainHash && onchainHash !== ethers.constants.HashZero) {
                 walletScopeSbtAddress = cryptoUtils.resolveGroupPasswordWalletScopeAddress({
                   password,
@@ -1794,7 +1792,7 @@ class OnePageSession extends Component<any, any> {
             for (let attempt = 0; attempt < maxAttempts; attempt++) {
               let mintedTokens: any = null;
               try {
-                mintedTokens = await getMintedTokens('none', sbtAddr, currentSlug);
+                mintedTokens = await sbtMetadataReadsPort.getMintedTokens('none', sbtAddr, currentSlug);
               } catch (_) {
                 mintedTokens = null;
               }
@@ -1838,7 +1836,7 @@ class OnePageSession extends Component<any, any> {
 
               let mintedAfter: any = null;
               try {
-                mintedAfter = await getMintedTokens('none', sbtAddr, currentSlug);
+                mintedAfter = await sbtMetadataReadsPort.getMintedTokens('none', sbtAddr, currentSlug);
               } catch (_) {
                 mintedAfter = null;
               }
@@ -1914,7 +1912,7 @@ class OnePageSession extends Component<any, any> {
       throw new Error('Group password is required.');
     }
 
-    const onchain = await getGroupPasswordHash('none', sbtAddress, resolveEffectiveSlug(this.props));
+    const onchain = await sbtMetadataReadsPort.getGroupPasswordHash('none', sbtAddress, resolveEffectiveSlug(this.props));
     if (!onchain || onchain === ethers.constants.HashZero) throw new Error('No group password set on-chain');
 
     const walletScopeSbtAddress = cryptoUtils.resolveGroupPasswordWalletScopeAddress({
