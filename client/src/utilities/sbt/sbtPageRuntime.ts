@@ -18,13 +18,10 @@ type SbtPageContractRuntime = {
   claimWithPassword: (...args: unknown[]) => Promise<SbtPageTransactionResult>;
   computeGroupPasswordHash: (input: unknown) => string;
   generateInvitePayloads: (...args: unknown[]) => Promise<SbtPageInvitePayload[]>;
-  getGroupPasswordHash: (...args: unknown[]) => Promise<string>;
-  getMintedTokens: (...args: unknown[]) => Promise<unknown>;
   getOwnerByTokenId: (...args: unknown[]) => Promise<unknown>;
   getReadProviderForGroup: (...args: unknown[]) => unknown;
   getSBTTokenIdByOwner: (...args: unknown[]) => Promise<unknown>;
   getSbtHistorySummary: (...args: unknown[]) => Promise<unknown>;
-  getSbtMetadata: (...args: unknown[]) => Promise<Record<string, unknown> | null | undefined>;
   isPasswordValid: (...args: unknown[]) => Promise<boolean>;
   mintWithGroupSignature: (...args: unknown[]) => Promise<SbtPageTransactionResult>;
   signGroupMintAuthorization: (...args: unknown[]) => Promise<unknown>;
@@ -61,14 +58,6 @@ export const generateInvitePayloads = (...args: unknown[]): Promise<SbtPageInvit
   contractScriptsRuntime.generateInvitePayloads(...args)
 );
 
-export const getGroupPasswordHash = (...args: unknown[]): Promise<string> => (
-  contractScriptsRuntime.getGroupPasswordHash(...args)
-);
-
-export const getMintedTokens = (...args: unknown[]): Promise<unknown> => (
-  contractScriptsRuntime.getMintedTokens(...args)
-);
-
 export const getOwnerByTokenId = (...args: unknown[]): Promise<unknown> => (
   contractScriptsRuntime.getOwnerByTokenId(...args)
 );
@@ -83,10 +72,6 @@ export const getSBTTokenIdByOwner = (...args: unknown[]): Promise<unknown> => (
 
 export const getSbtHistorySummary = (...args: unknown[]): Promise<unknown> => (
   contractScriptsRuntime.getSbtHistorySummary(...args)
-);
-
-export const getSbtMetadata = (...args: unknown[]): Promise<Record<string, unknown> | null | undefined> => (
-  contractScriptsRuntime.getSbtMetadata(...args)
 );
 
 export const isPasswordValid = (...args: unknown[]): Promise<boolean> => (
