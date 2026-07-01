@@ -21,7 +21,7 @@ Type-debt ratchet:
 npm run type-debt:check
 ```
 
-This counts production `client/src` TS/TSX `@ts-nocheck` and explicit-`any` markers against `scripts/type-debt-baseline.json`. Tests, test utilities, and `*Harness.ts(x)` files are excluded. Use `node scripts/check-type-debt-ratchet.mjs --write-baseline` only after intentional cleanup or a reviewed baseline change.
+This counts production `client/src` TS/TSX `@ts-nocheck`, explicit-`any`, and double-cast `as unknown as` markers against `scripts/type-debt-baseline.json`. Tests, test utilities, and `*Harness.ts(x)` files are excluded. Use `node scripts/check-type-debt-ratchet.mjs --write-baseline` only after intentional cleanup or a reviewed baseline change.
 
 Client boundary checker:
 
@@ -29,7 +29,7 @@ Client boundary checker:
 npm run client-boundaries:check
 ```
 
-This compares conservative client import-boundary rules against `scripts/client-boundaries-baseline.json` and fails for new violations or duplicate baseline entries. Use `node scripts/check-client-boundaries.mjs --write-baseline` after reviewed boundary cleanup removes or intentionally reclassifies entries.
+This compares conservative client import-boundary rules against `scripts/client-boundaries-baseline.json` and fails for new violations, duplicate baseline entries, or resolved baseline entries that were not pruned in the same change. The checker resolves Vite client aliases, guards production imports from excluded test/harness files, and flags likely low-level pass-through facades outside sanctioned domain/runtime layers. Use `node scripts/check-client-boundaries.mjs --write-baseline` after reviewed boundary cleanup removes or intentionally reclassifies entries.
 
 The stripped public checkout keeps `scripts/vite-navigation-smoke.js` as the maintained local route/style smoke runner. Private full-workflow E2E files may be absent in this checkout; see [`../docs/e2e-commands.md`](../docs/e2e-commands.md) for the public smoke command and private-runner notes.
 
