@@ -1,24 +1,12 @@
 import contractScripts, * as contractScriptsExports from '../web3/contractScripts.js';
 
-type OnePageSessionInvitePayload = Record<string, unknown> & {
-  nonce?: unknown;
-  signature?: unknown;
-};
-
-type OnePageSessionTransactionResult = Record<string, unknown> & {
-  transactionHash: string;
-};
-
 type OnePageSessionBalance = {
   gte: (value: unknown) => boolean;
 };
 
 type OnePageSessionContractRuntime = {
-  computeGroupPasswordHash: (input: unknown) => string;
-  generateInvitePayloads: (...args: unknown[]) => Promise<OnePageSessionInvitePayload[]>;
   getETHBalance?: (...args: unknown[]) => Promise<OnePageSessionBalance | null>;
   getNativeBalance?: (...args: unknown[]) => Promise<OnePageSessionBalance | null>;
-  signGroupMintAuthorization: (...args: unknown[]) => Promise<unknown>;
 };
 
 type OnePageSessionContractExports = {
@@ -46,16 +34,4 @@ export const getNativeBalance = (...args: unknown[]): Promise<OnePageSessionBala
 
 export const getLegacyEthBalance = (...args: unknown[]): Promise<OnePageSessionBalance | null> => (
   contractRuntime.getETHBalance?.(...args) ?? Promise.resolve(null)
-);
-
-export const computeGroupPasswordHash = (input: unknown): string => (
-  contractRuntime.computeGroupPasswordHash(input)
-);
-
-export const generateInvitePayloads = (...args: unknown[]): Promise<OnePageSessionInvitePayload[]> => (
-  contractRuntime.generateInvitePayloads(...args)
-);
-
-export const signGroupMintAuthorization = (...args: unknown[]): Promise<unknown> => (
-  contractRuntime.signGroupMintAuthorization(...args)
 );

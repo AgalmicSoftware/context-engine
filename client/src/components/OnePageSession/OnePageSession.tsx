@@ -27,15 +27,13 @@ import styles from './OnePageSession.module.scss';
 import LazyFallback from '../Shared/LazyFallback';
 
 import {
-  computeGroupPasswordHash,
-  generateInvitePayloads,
   getAllSessionSlugs,
   getLegacyEthBalance,
   getNativeBalance,
   hasLegacyEthBalanceReader,
   hasNativeBalanceReader,
-  signGroupMintAuthorization,
 } from '../../utilities/session/onePageSessionRuntime.js';
+import { sbtGroupMintAuthorizationPort } from '../../domains/sbts/contractScriptsSbtGroupMintAuthorizationPort.js';
 import { sbtMetadataReadsPort } from '../../domains/sbts/contractScriptsSbtMetadataReadsPort.js';
 import { sbtMintExecutionPort } from '../../domains/sbts/contractScriptsSbtMintExecutionPort.js';
 
@@ -1761,7 +1759,7 @@ class OnePageSession extends Component<any, any> {
                 });
                 const localHash = walletScopeSbtAddress === null
                   ? null
-                  : computeGroupPasswordHash({
+                  : sbtGroupMintAuthorizationPort.computeGroupPasswordHash({
                       password,
                       sbtAddress: walletScopeSbtAddress
                     });
@@ -1815,7 +1813,7 @@ class OnePageSession extends Component<any, any> {
               }
 
               const nonce = mintedBig.add(1).toString();
-              const invites = await generateInvitePayloads({
+              const invites = await sbtGroupMintAuthorizationPort.generateInvitePayloads({
                 password,
                 sbtAddress: sbtAddr,
                 nonces: [nonce],
@@ -1930,7 +1928,7 @@ class OnePageSession extends Component<any, any> {
     });
     const local = walletScopeSbtAddress === null
       ? null
-      : computeGroupPasswordHash({
+      : sbtGroupMintAuthorizationPort.computeGroupPasswordHash({
           password: pw,
           sbtAddress: walletScopeSbtAddress
         });
@@ -1940,10 +1938,10 @@ class OnePageSession extends Component<any, any> {
 
     this.setState({ mintingStatus: 'pending', lastTransactionType: 'mint' });
 
-    const sig = await signGroupMintAuthorization({
+    const sig = await sbtGroupMintAuthorizationPort.signGroupMintAuthorization({
       password: pw,
       sbtAddress,
-      userAddress: this.props.account,
+      userAddress: String(this.props.account || ''),
       walletScopeSbtAddress
     });
 
