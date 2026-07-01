@@ -12,7 +12,7 @@
   "counts": {
     "tsNocheck": 0,
     "colonAny": 3484,
-    "asAny": 340,
+    "asAny": 338,
     "asUnknownAs": 114,
     "promiseAny": 31,
     "arrayAny": 0,
