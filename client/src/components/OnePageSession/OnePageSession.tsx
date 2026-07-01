@@ -27,8 +27,6 @@ import styles from './OnePageSession.module.scss';
 import LazyFallback from '../Shared/LazyFallback';
 
 import {
-  claimSbt,
-  claimSbtWithInvite,
   computeGroupPasswordHash,
   generateInvitePayloads,
   getAllSessionSlugs,
@@ -36,10 +34,10 @@ import {
   getNativeBalance,
   hasLegacyEthBalanceReader,
   hasNativeBalanceReader,
-  mintWithGroupSignature,
   signGroupMintAuthorization,
 } from '../../utilities/session/onePageSessionRuntime.js';
 import { sbtMetadataReadsPort } from '../../domains/sbts/contractScriptsSbtMetadataReadsPort.js';
+import { sbtMintExecutionPort } from '../../domains/sbts/contractScriptsSbtMintExecutionPort.js';
 
 import { resolveEffectiveSlug, normalizeSurveyToolFilterState } from '../SurveyTool/surveyToolUtils.js';
 import { resolvePolisDemoQuestionPool } from '../SurveyTool/surveyPolisDemoQuestionPool.js';
@@ -1743,7 +1741,7 @@ class OnePageSession extends Component<any, any> {
         }
 
         if (path === 'public') {
-          await claimSbt(this.props.provider, sbtAddr);
+          await sbtMintExecutionPort.claim(this.props.provider, sbtAddr);
           this.consumeAutoMintAttempt(sbtAddr, userAddr);
           updateStatus(sbtKey, { status: 'success', name: `Joined: ${sbtName || 'Group'}` });
           this.onSbtMintSuccess(sbtAddr);
@@ -1827,7 +1825,12 @@ class OnePageSession extends Component<any, any> {
               if (!payload) throw new Error('Failed to generate invite');
 
               try {
-                await claimSbtWithInvite(this.props.provider, sbtAddr, payload.nonce, payload.signature);
+                await sbtMintExecutionPort.claimWithInvite(
+                  this.props.provider,
+                  sbtAddr,
+                  String(payload.nonce),
+                  String(payload.signature),
+                );
                 lastError = null;
                 break;
               } catch (err) {
@@ -1857,7 +1860,12 @@ class OnePageSession extends Component<any, any> {
               throw lastError;
             }
           } else {
-            await claimSbtWithInvite(this.props.provider, sbtAddr, payload.nonce, payload.signature);
+            await sbtMintExecutionPort.claimWithInvite(
+              this.props.provider,
+              sbtAddr,
+              String(payload.nonce),
+              String(payload.signature),
+            );
           }
           this.consumeAutoMintAttempt(sbtAddr, userAddr);
           updateStatus(sbtKey, { status: 'success', name: `Joined: ${sbtName || 'Group'}` });
@@ -1939,7 +1947,7 @@ class OnePageSession extends Component<any, any> {
       walletScopeSbtAddress
     });
 
-    const tx = await mintWithGroupSignature(this.props.provider, sbtAddress, sig);
+    const tx = await sbtMintExecutionPort.mintWithGroupSignature(this.props.provider, sbtAddress, String(sig || ''));
 
     this.setState({
       mintingStatus: 'success',
