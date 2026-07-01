@@ -77,24 +77,6 @@
     },
     {
       "rule": "route-page-no-low-level",
-      "source": "client/src/components/App.tsx",
-      "import": "../utilities/web3/rpcReadCache.js",
-      "resolved": "client/src/utilities/web3/rpcReadCache"
-    },
-    {
-      "rule": "route-page-no-low-level",
-      "source": "client/src/components/App.tsx",
-      "import": "../utilities/web3/rpcSelection.js",
-      "resolved": "client/src/utilities/web3/rpcSelection"
-    },
-    {
-      "rule": "route-page-no-low-level",
-      "source": "client/src/components/App.tsx",
-      "import": "../utilities/web3/wagmiDisconnectState.js",
-      "resolved": "client/src/utilities/web3/wagmiDisconnectState"
-    },
-    {
-      "rule": "route-page-no-low-level",
       "source": "client/src/components/MainSite/MainSite.tsx",
       "import": "../../utilities/arweave/arweaveRetryHelpers.js",
       "resolved": "client/src/utilities/arweave/arweaveRetryHelpers"
