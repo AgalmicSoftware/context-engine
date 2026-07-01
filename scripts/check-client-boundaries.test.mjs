@@ -228,6 +228,85 @@ test('route/page low-level imports through Vite bare aliases are violations', ()
   });
 });
 
+test('pure low-level re-export barrels are pass-through facade violations', () => {
+  withTempRoot((rootDir) => {
+    writeFile(
+      rootDir,
+      'client/src/utilities/user/userPageRuntime.ts',
+      `
+        export {
+          getDemoSessionConfigBySlug,
+          getSessionConfigBySlug,
+          normalizeSessionSlug,
+        } from '../web3/contractScripts.js';
+        export {
+          checkSponsoredAccess,
+        } from '../web3/sponsoredAccess.js';
+      `
+    );
+
+    const violations = collectClientBoundaryViolations({ rootDir });
+    assert.deepEqual(violations, [
+      {
+        rule: 'no-passthrough-facade',
+        source: 'client/src/utilities/user/userPageRuntime.ts',
+        import: '<passthrough-facade>',
+        resolved: 'client/src/utilities/user/userPageRuntime.ts',
+      },
+    ]);
+  });
+});
+
+test('component-local runtime micro-facades over low-level modules are violations', () => {
+  withTempRoot((rootDir) => {
+    writeFile(
+      rootDir,
+      'client/src/components/Admin/adminWorkerRuntime.ts',
+      `
+        import { corsProxyUtils } from '../../utilities/worker/corsProxy.js';
+
+        export const resolveAdminWorkerUrl = (...args) => (
+          corsProxyUtils.resolveCorsProxyUrl(...args)
+        );
+      `
+    );
+
+    const violations = collectClientBoundaryViolations({ rootDir });
+    assert.deepEqual(violations, [
+      {
+        rule: 'no-passthrough-facade',
+        source: 'client/src/components/Admin/adminWorkerRuntime.ts',
+        import: '<passthrough-facade>',
+        resolved: 'client/src/components/Admin/adminWorkerRuntime.ts',
+      },
+    ]);
+  });
+});
+
+test('app runtime modules may delegate to low-level modules', () => {
+  withTempRoot((rootDir) => {
+    writeFile(
+      rootDir,
+      'client/src/app/runtime/appWagmiRuntime.ts',
+      `
+        import contractScripts from '../../utilities/web3/contractScripts.js';
+
+        export const first = () => (
+          contractScripts.first()
+        );
+        export const second = () => (
+          contractScripts.second()
+        );
+        export const third = () => (
+          contractScripts.third()
+        );
+      `
+    );
+
+    assert.deepEqual(collectClientBoundaryViolations({ rootDir }), []);
+  });
+});
+
 test('duplicate baseline entries fail even when the current violation is baselined', () => {
   withTempRoot((rootDir) => {
     writeFile(
