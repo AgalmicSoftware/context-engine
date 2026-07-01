@@ -32,8 +32,6 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { toStr, normalizeSlug as canonicalizeSlug } from '../../utilities/shared/primitives.js';
 import { notify } from '../../utilities/ui/notify.js';
 
-const buildSignedBootstrapAdminAuthUntyped = buildSignedBootstrapAdminAuth as any;
-const uploadSponsoredBundleUntyped = uploadSponsoredBundle as any;
 const getErrorMessage = (error: any, fallback = 'Unknown error') => (
   error instanceof Error && error.message ? error.message : String(error?.message || error || fallback)
 );
@@ -672,7 +670,7 @@ const SponsorPage = ({
     const baseUrl = normalizeWorkerUrl(overrideWorkerUrl || workerUrl || selectedConfigWorkerUrl);
     if (!baseUrl) throw new Error('Worker URL is missing.');
     const chainId = Number(selectedConfig?.__registry?.chainId || selectedConfig?.networkChainId || network?.id || 1) || 1;
-    return buildSignedBootstrapAdminAuthUntyped({
+    return buildSignedBootstrapAdminAuth({
       slug,
       workerUrl: baseUrl,
       statement: 'Admin request: bootstrap arweave upload',
@@ -835,7 +833,7 @@ const SponsorPage = ({
 
       const adminAuth = await buildBootstrapUploadAuth({ workerUrl: resolvedWorkerUrl });
       if (!isCurrentCreateRequest()) return;
-      const result = await uploadSponsoredBundleUntyped({
+      const result = await uploadSponsoredBundle({
         secret,
         label,
         expiresAt: normalizedExpiry,
