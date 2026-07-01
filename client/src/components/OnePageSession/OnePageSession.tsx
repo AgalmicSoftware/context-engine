@@ -1432,12 +1432,12 @@ class OnePageSession extends Component<any, any> {
 
       const deadline = Date.now() + Number(timeoutMs || 0);
       let bal = await getBalance();
-      if (bal.gte(minBN)) return true;
+      if (bal?.gte(minBN)) return true;
 
       while (Date.now() < deadline) {
         await new Promise((r: any) => setTimeout(r, pollIntervalMs || 0));
         try { bal = await getBalance(); } catch (_) { continue; }
-        if (bal.gte(minBN)) return true;
+        if (bal?.gte(minBN)) return true;
       }
       return false;
     } catch {
