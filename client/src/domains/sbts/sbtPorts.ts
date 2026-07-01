@@ -7,6 +7,10 @@ export type SbtReadOptions = {
 
 export type SbtMetadataRecord = Record<string, unknown>;
 
+export type SbtTransactionResult = Record<string, unknown> & {
+  transactionHash: string;
+};
+
 export type SbtMetadataReadsPort = {
   getSbtMetadata: (
     providerName: string,
@@ -25,4 +29,22 @@ export type SbtMetadataReadsPort = {
     groupKeyOrCfg?: SbtGroupKeyOrConfig,
     options?: SbtReadOptions
   ) => Promise<string | null>;
+};
+
+export type SbtMintExecutionPort = {
+  claim: (
+    providerName: string,
+    sbtAddress: string
+  ) => Promise<SbtTransactionResult>;
+  claimWithInvite: (
+    providerName: string,
+    sbtAddress: string,
+    nonce: string | number,
+    signature: string
+  ) => Promise<SbtTransactionResult>;
+  mintWithGroupSignature: (
+    providerName: string,
+    sbtAddress: string,
+    signature: string
+  ) => Promise<SbtTransactionResult>;
 };
