@@ -13,8 +13,6 @@ type SbtPageInvitePayload = Record<string, unknown> & {
 type SbtPageContractRuntime = {
   addHashedPasswords: (...args: unknown[]) => Promise<SbtPageTransactionResult>;
   burnToken: (...args: unknown[]) => Promise<SbtPageTransactionResult>;
-  claim: (...args: unknown[]) => Promise<SbtPageTransactionResult>;
-  claimWithInvite: (...args: unknown[]) => Promise<SbtPageTransactionResult>;
   claimWithPassword: (...args: unknown[]) => Promise<SbtPageTransactionResult>;
   computeGroupPasswordHash: (input: unknown) => string;
   generateInvitePayloads: (...args: unknown[]) => Promise<SbtPageInvitePayload[]>;
@@ -23,7 +21,6 @@ type SbtPageContractRuntime = {
   getSBTTokenIdByOwner: (...args: unknown[]) => Promise<unknown>;
   getSbtHistorySummary: (...args: unknown[]) => Promise<unknown>;
   isPasswordValid: (...args: unknown[]) => Promise<boolean>;
-  mintWithGroupSignature: (...args: unknown[]) => Promise<SbtPageTransactionResult>;
   signGroupMintAuthorization: (...args: unknown[]) => Promise<unknown>;
   startClaim: (...args: unknown[]) => Promise<SbtPageTransactionResult>;
 };
@@ -36,14 +33,6 @@ export const addHashedPasswords = (...args: unknown[]): Promise<SbtPageTransacti
 
 export const burnToken = (...args: unknown[]): Promise<SbtPageTransactionResult> => (
   contractScriptsRuntime.burnToken(...args)
-);
-
-export const claim = (...args: unknown[]): Promise<SbtPageTransactionResult> => (
-  contractScriptsRuntime.claim(...args)
-);
-
-export const claimWithInvite = (...args: unknown[]): Promise<SbtPageTransactionResult> => (
-  contractScriptsRuntime.claimWithInvite(...args)
 );
 
 export const claimWithPassword = (...args: unknown[]): Promise<SbtPageTransactionResult> => (
@@ -76,10 +65,6 @@ export const getSbtHistorySummary = (...args: unknown[]): Promise<unknown> => (
 
 export const isPasswordValid = (...args: unknown[]): Promise<boolean> => (
   contractScriptsRuntime.isPasswordValid(...args)
-);
-
-export const mintWithGroupSignature = (...args: unknown[]): Promise<SbtPageTransactionResult> => (
-  contractScriptsRuntime.mintWithGroupSignature(...args)
 );
 
 export const signGroupMintAuthorization = (...args: unknown[]): Promise<unknown> => (
