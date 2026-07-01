@@ -48,3 +48,45 @@ export type SbtMintExecutionPort = {
     signature: string
   ) => Promise<SbtTransactionResult>;
 };
+
+export type SbtGroupPasswordHashInput = {
+  password: string;
+  sbtAddress: string | null;
+  adminAddress?: string;
+  chainId?: string | number;
+  name?: string;
+  symbol?: string;
+  tokenURI?: string;
+};
+
+export type SbtGroupMintAuthorizationInput = {
+  password: string;
+  sbtAddress: string;
+  userAddress: string;
+  walletScopeSbtAddress?: string | null;
+};
+
+export type SbtInvitePayload = {
+  nonce: string | number;
+  signature: string;
+  inviteCode: string;
+};
+
+export type SbtInvitePayloadsInput = {
+  password: string;
+  sbtAddress: string;
+  nonces: Array<string | number>;
+  walletScopeSbtAddress?: string | null;
+};
+
+export type SbtGroupMintAuthorizationPort = {
+  computeGroupPasswordHash: (
+    input: SbtGroupPasswordHashInput
+  ) => string;
+  signGroupMintAuthorization: (
+    input: SbtGroupMintAuthorizationInput
+  ) => Promise<string>;
+  generateInvitePayloads: (
+    input: SbtInvitePayloadsInput
+  ) => Promise<SbtInvitePayload[]>;
+};
