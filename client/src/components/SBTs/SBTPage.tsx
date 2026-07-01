@@ -10,7 +10,6 @@ import {
   claimWithPassword,
   getDemoSessionConfigBySlug,
   getOwnerByTokenId,
-  getReadProviderForGroup,
   getSBTTokenIdByOwner,
   getSbtHistorySummary,
   getSessionChainId,
@@ -2093,63 +2092,37 @@ class SBTPage extends Component<any, any> {
         needMax,
         shouldRead,
       } = resolveSbtPageChainMetadataReadNeeds({ info, zeroAddress });
-      const withSoftReadTimeout = (
-        task: unknown,
-        fallbackValue: unknown = null,
-        timeoutMs: number = 750
-      ): Promise<unknown> => new Promise((resolve) => {
-        let settled = false;
-        let timer: ReturnType<typeof setTimeout>;
-        const finish = (value: unknown) => {
-          if (settled) return;
-          settled = true;
-          clearTimeout(timer);
-          resolve(value);
-        };
-        timer = setTimeout(() => finish(fallbackValue), timeoutMs);
-        Promise.resolve(task)
-          .then((value: unknown) => finish(value))
-          .catch(() => finish(fallbackValue));
-      });
-      const SBT_ABI_FRAG = [
-        "function maxTokens() view returns (uint256)",
-        "function collectionBurnAuth() view returns (uint8)",
-        "function mintingEndTime() view returns (uint256)",
-        "function hasPasswordMint() view returns (bool)",
-        "function admin() view returns (address)",
-        "function owner() view returns (address)"
-      ];
       if (!shouldRead) {
         return info;
       }
       try {
-        const ro = getReadProviderForGroup(slugForRead, { contractKey: 'sbtFactory' });
-        const c = new ethers.Contract(String(addr || ''), SBT_ABI_FRAG, ro as ethers.providers.Provider);
-        const [max, burn, end, hasPw, adminAddr, ownerAddr] = await Promise.all([
-          needMax ? withSoftReadTimeout(c.maxTokens(), null) : null,
-          needBurn ? withSoftReadTimeout(c.collectionBurnAuth(), null) : null,
-          needEnd ? withSoftReadTimeout(c.mintingEndTime(), null) : null,
-          needHasPw ? withSoftReadTimeout(c.hasPasswordMint(), null) : null,
-          needAdmin ? withSoftReadTimeout(c.admin(), null) : null,
-          needAdmin ? withSoftReadTimeout(c.owner(), null) : null,
-        ]);
-        if (max != null) info.maxTokens = ethers.BigNumber.isBigNumber(max) ? max.toString() : String(max);
-        if (burn != null) {
-          info.burnAuth = Number(ethers.BigNumber.isBigNumber(burn) ? burn.toNumber() : burn);
+        const {
+          maxTokens,
+          collectionBurnAuth,
+          mintingEndTime,
+          hasPasswordMint,
+          admin,
+          owner,
+        } = await sbtMetadataReadsPort.getSbtOnChainConfig('none', String(addr || ''), slugForRead);
+        if (needMax && maxTokens != null) {
+          info.maxTokens = ethers.BigNumber.isBigNumber(maxTokens) ? maxTokens.toString() : String(maxTokens);
+        }
+        if (needBurn && collectionBurnAuth != null) {
+          info.burnAuth = Number(ethers.BigNumber.isBigNumber(collectionBurnAuth) ? collectionBurnAuth.toNumber() : collectionBurnAuth);
           info.burnAuthVerifiedOnChain = true;
           delete info.burnAuthNeedsOnChainRefresh;
         }
-        if (end != null) {
+        if (needEnd && mintingEndTime != null) {
           info.mintingEndTime = coerceSbtPageEpochSeconds(
-            ethers.BigNumber.isBigNumber(end) ? end.toNumber() : Number(end)
+            ethers.BigNumber.isBigNumber(mintingEndTime) ? mintingEndTime.toNumber() : Number(mintingEndTime)
           );
         }
-        if (hasPw != null) info.hasPasswordMint = !!hasPw;
+        if (needHasPw && hasPasswordMint != null) info.hasPasswordMint = !!hasPasswordMint;
         Object.assign(info, buildSbtPageAdminFallbackPatch({
-          adminAddress: adminAddr,
+          adminAddress: needAdmin ? admin : null,
           existingCreator: info.creator,
           existingDeployer: info.deployer,
-          ownerAddress: ownerAddr,
+          ownerAddress: needAdmin ? owner : null,
           zeroAddress,
         }));
       } catch (e) { sbtLog.warn('SBTPage: fallback', e); }
