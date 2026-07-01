@@ -1,4 +1,5 @@
 import type { SbtMintExecutionPort } from './sbtPorts.js';
+import { bindSbtMintExecutionPort } from './contractScriptsSbtMintExecutionPort.js';
 
 const executeSbtMintFlows = async (
   port: SbtMintExecutionPort,
@@ -55,6 +56,60 @@ describe('SbtMintExecutionPort', () => {
     expect(fakePort.mintWithGroupSignature).toHaveBeenCalledWith(
       'injected',
       sbtAddress,
+      '0xgroupSignature',
+    );
+  });
+
+  it('binds mint execution through a call-time contractScripts getter', async () => {
+    const firstContractScripts = {
+      claim: jest.fn(async () => ({ transactionHash: '0xfirstClaim' })),
+      claimWithInvite: jest.fn(async () => ({ transactionHash: '0xfirstInvite' })),
+      mintWithGroupSignature: jest.fn(async () => ({ transactionHash: '0xfirstGroup' })),
+    };
+    const secondContractScripts = {
+      claim: jest.fn(async () => ({ transactionHash: '0xsecondClaim' })),
+      claimWithInvite: jest.fn(async () => ({ transactionHash: '0xsecondInvite' })),
+      mintWithGroupSignature: jest.fn(async () => ({ transactionHash: '0xsecondGroup' })),
+    };
+    let currentContractScripts = firstContractScripts;
+    const port = bindSbtMintExecutionPort({
+      contractScripts: () => currentContractScripts,
+    });
+
+    await expect(port.claim('injected', '0x0000000000000000000000000000000000000001'))
+      .resolves.toEqual({ transactionHash: '0xfirstClaim' });
+
+    currentContractScripts = secondContractScripts;
+
+    await expect(
+      port.claimWithInvite(
+        'injected',
+        '0x0000000000000000000000000000000000000002',
+        '8',
+        '0xinviteSignature',
+      )
+    ).resolves.toEqual({ transactionHash: '0xsecondInvite' });
+    await expect(
+      port.mintWithGroupSignature(
+        'injected',
+        '0x0000000000000000000000000000000000000002',
+        '0xgroupSignature',
+      )
+    ).resolves.toEqual({ transactionHash: '0xsecondGroup' });
+
+    expect(firstContractScripts.claim).toHaveBeenCalledWith(
+      'injected',
+      '0x0000000000000000000000000000000000000001',
+    );
+    expect(secondContractScripts.claimWithInvite).toHaveBeenCalledWith(
+      'injected',
+      '0x0000000000000000000000000000000000000002',
+      '8',
+      '0xinviteSignature',
+    );
+    expect(secondContractScripts.mintWithGroupSignature).toHaveBeenCalledWith(
+      'injected',
+      '0x0000000000000000000000000000000000000002',
       '0xgroupSignature',
     );
   });
