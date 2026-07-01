@@ -62,6 +62,10 @@ export const CLIENT_BOUNDARY_RULES = Object.freeze({
     id: 'no-passthrough-facade',
     description: 'client utility/component modules should not add thin pass-through facades over low-level modules',
   },
+  productionNoTestExclusionImports: {
+    id: 'production-no-test-exclusion-imports',
+    description: 'production client/src files must not import harness/test utility/fixture modules excluded from test gates',
+  },
   uiNoRouteRuntime: {
     id: 'ui-no-route-runtime',
     description: 'client/src/components/ui/** must not import route/runtime owners',
@@ -214,6 +218,37 @@ const isComponentRuntimeFacadeCandidate = (filePath) => (
   isComponentsPath(filePath)
   && /Runtime\.(?:js|jsx|ts|tsx)$/.test(path.posix.basename(filePath))
 );
+
+const TEST_EXCLUSION_IMPORT_FILE_PATTERN =
+  /(?:^|[._-])(?:test-?utils?|testing|fixtures?)(?:[._-]|\.|$)|(?:testFixtures|testUtils|testingUtils)|harness(?:\.(?:js|jsx|ts|tsx))?$/i;
+
+function isTestExclusionImportTarget(filePath) {
+  const normalizedPath = normalizePath(filePath);
+  if (!normalizedPath.startsWith(`${SOURCE_ROOT}/`)) {
+    return false;
+  }
+
+  const basename = path.posix.basename(normalizedPath);
+  if (
+    TEST_FILE_PATTERN.test(basename)
+    || /^setupTests(?:\.(?:js|jsx|ts|tsx))?$/i.test(basename)
+    || TEST_EXCLUSION_IMPORT_FILE_PATTERN.test(basename)
+  ) {
+    return true;
+  }
+
+  const sourceRelativeSegments = normalizedPath.slice(`${SOURCE_ROOT}/`.length).split('/');
+  return sourceRelativeSegments.some((segment) => (
+    segment === '__fixtures__'
+    || segment === '__mocks__'
+    || segment === '__tests__'
+    || segment === 'fixtures'
+    || segment === 'test'
+    || segment === 'test-utils'
+    || segment === 'tests'
+    || segment === 'testing'
+  ));
+}
 
 export function isRouteOrPageCode(filePath) {
   const normalizedPath = normalizePath(filePath).replace(/\.(?:js|jsx|ts|tsx)$/, '');
@@ -438,6 +473,15 @@ export function evaluateClientBoundaryImport({ source, specifier, resolved }) {
   if (isRouteOrPageCode(source) && isLowLevelRouteImport(resolved)) {
     violations.push(buildViolation(
       CLIENT_BOUNDARY_RULES.routePageNoLowLevel,
+      source,
+      specifier,
+      resolved,
+    ));
+  }
+
+  if (isTestExclusionImportTarget(resolved)) {
+    violations.push(buildViolation(
+      CLIENT_BOUNDARY_RULES.productionNoTestExclusionImports,
       source,
       specifier,
       resolved,
