@@ -8,15 +8,19 @@
 
 import * as contractScriptsImpl from './contractScripts.impl.js';
 
-type AnyRecord = Record<string, any>;
+type CommonJsExportRecord = Record<string, unknown>;
 type ContractScriptsImplModule = typeof import('./contractScripts.impl.js');
 type ContractScriptsDefaultExport = ContractScriptsImplModule['default'];
+type ContractScriptsDefaultWithLegacyBalance = ContractScriptsDefaultExport & {
+  getETHBalance?: ContractScriptsDefaultExport['getNativeBalance'];
+};
 
 const _impl = contractScriptsImpl as ContractScriptsImplModule;
 const defaultExport = _impl.default as ContractScriptsDefaultExport;
+const defaultExportWithLegacyBalance = defaultExport as ContractScriptsDefaultWithLegacyBalance;
 const commonJsExports = typeof exports === 'undefined'
   ? null
-  : (exports as AnyRecord);
+  : (exports as CommonJsExportRecord);
 
 if (commonJsExports) {
   Object.defineProperty(commonJsExports, '__esModule', { value: true });
@@ -41,7 +45,7 @@ export const getReadProviderForGroup = _impl.getReadProviderForGroup;
 export const getReadProviderForSession = _impl.getReadProviderForSession;
 export const getProviderLocation = defaultExport?.getProviderLocation;
 export const getNativeBalance = defaultExport?.getNativeBalance;
-export const getETHBalance = (defaultExport as AnyRecord)?.getETHBalance || defaultExport?.getNativeBalance;
+export const getETHBalance = defaultExportWithLegacyBalance?.getETHBalance || defaultExport?.getNativeBalance;
 export const __test__contractScriptsArweaveCache = _impl.__test__contractScriptsArweaveCache;
 export const __test__contractScriptsArweaveUploads = _impl.__test__contractScriptsArweaveUploads;
 export const __test__contractScriptsSessionNameFields = _impl.__test__contractScriptsSessionNameFields;
