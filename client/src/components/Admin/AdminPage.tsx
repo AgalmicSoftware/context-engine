@@ -14,7 +14,10 @@ import { encryptedFieldsUtils } from '../../utilities/crypto/encryptedFields.js'
 import { normalizeOriginList } from '../../utilities/urlUtils.js';
 import { adminWorkerPorts } from '../../domains/worker/adminWorkerPorts.js';
 import { adminArweavePort } from '../../domains/storage/adminArweavePorts.js';
-import { adminSessionRegistryPorts } from '../../domains/sessions/registry/sessionRegistryAdminPorts.js';
+import {
+  adminSessionRegistryPorts,
+  type AdminSessionRegistryEntry,
+} from '../../domains/sessions/registry/sessionRegistryAdminPorts.js';
 import { normalizeSessionMediaUrl } from '../../domains/sessions/sessionMediaUrls.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
@@ -142,6 +145,13 @@ type AdminMetadataBlockLimitsDraft = {
   start: string;
   end: string;
 };
+type AdminSessionConfigLike = {
+  sessionName?: unknown;
+  sessionId?: unknown;
+  networkChainId?: unknown;
+  __registry?: Record<string, unknown>;
+  [key: string]: unknown;
+};
 
 export const __adminPageTestUtils = {
   applyAdminMetadataDraft,
@@ -159,6 +169,12 @@ const buildSecretPresenceTargetKey = ({ slug, workerUrl }: { slug?: unknown; wor
   return normalizedWorkerUrl ? `${normalizedSlug}\n${normalizedWorkerUrl}` : '';
 };
 
+const asAdminSessionConfig = (value: unknown): AdminSessionConfigLike => (
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? value as AdminSessionConfigLike
+    : {}
+);
+
 const AdminPage = ({
   account,
   provider,
@@ -169,7 +185,7 @@ const AdminPage = ({
   initialSessionId,
   initialRegistryChainId,
 }: any) => {
-  const [sessions, setSessions] = useState<any>([]);
+  const [sessions, setSessions] = useState<AdminSessionRegistryEntry[]>([]);
   const [selectedSlug, setSelectedSlug] = useState('');
   const [ignoreRequestedSession, setIgnoreRequestedSession] = useState(false);
   const [workerUrl, setWorkerUrl] = useState('');
@@ -411,8 +427,10 @@ const AdminPage = ({
 
   const sessionsForChain = useMemo(() => {
     if (!requestedChainId) return sessions || [];
-    return (sessions || []).filter(([, cfg]: any) => {
-      const chainId = Number(cfg?.__registry?.registryChainId || cfg?.__registry?.chainId || 0) || 0;
+    return (sessions || []).filter(([, rawCfg]) => {
+      const cfg = asAdminSessionConfig(rawCfg);
+      const registry = asAdminSessionConfig(cfg.__registry);
+      const chainId = Number(registry.registryChainId || registry.chainId || 0) || 0;
       return chainId === requestedChainId;
     });
   }, [sessions, requestedChainId]);
@@ -421,12 +439,14 @@ const AdminPage = ({
   const requestedSessionMatch = useMemo(() => {
     if (!requestedSessionRaw) return null;
     if (requestedSessionIdHex) {
-      return availableSessions.find(([, cfg]: any) => {
-        const cfgId = adminSessionRegistryPorts.reads.normalizeSessionIdHex(cfg?.__registry?.sessionIdHex || cfg?.sessionId);
+      return availableSessions.find(([, rawCfg]) => {
+        const cfg = asAdminSessionConfig(rawCfg);
+        const registry = asAdminSessionConfig(cfg.__registry);
+        const cfgId = adminSessionRegistryPorts.reads.normalizeSessionIdHex(registry.sessionIdHex || cfg.sessionId);
         return cfgId && cfgId === requestedSessionIdHex;
       }) || null;
     }
-    return availableSessions.find(([slug]: any) => slug === requestedSessionSlug) || null;
+    return availableSessions.find(([slug]) => slug === requestedSessionSlug) || null;
   }, [availableSessions, requestedSessionRaw, requestedSessionIdHex, requestedSessionSlug]);
 
   useEffect(() => {
@@ -469,7 +489,7 @@ const AdminPage = ({
       setSelectedSlug(availableSessions[0][0] || '');
       return;
     }
-    const hasSelected = availableSessions.some(([slug]: any) => slug === selectedSlug);
+    const hasSelected = availableSessions.some(([slug]) => slug === selectedSlug);
     if (!hasSelected) setSelectedSlug(availableSessions[0][0] || '');
   }, [
     availableSessions,
@@ -533,8 +553,8 @@ const AdminPage = ({
   ]);
 
   const selectedConfig: any = useMemo(() => {
-    const match = availableSessions.find(([slug]: any) => slug === selectedSlug);
-    return match ? match[1] : null;
+    const match = availableSessions.find(([slug]) => slug === selectedSlug);
+    return match ? asAdminSessionConfig(match[1]) : null;
   }, [availableSessions, selectedSlug]);
   const effectiveWorkerAllowOrigins = useMemo(() => {
     if (!selectedConfig) return [];
@@ -2288,11 +2308,14 @@ const AdminPage = ({
                           Requested: {requestedSessionRaw}
                         </option>
                       )}
-                      {availableSessions.map(([slug, cfg]: any) => (
-                        <option key={slug} value={slug}>
-                          {slug || 'general'}{cfg?.sessionName ? ` — ${cfg?.sessionName}` : ''}
-                        </option>
-                      ))}
+                      {availableSessions.map(([slug, rawCfg]) => {
+                        const cfg = asAdminSessionConfig(rawCfg);
+                        return (
+                          <option key={slug} value={slug}>
+                            {slug || 'general'}{cfg.sessionName ? ` — ${cfg.sessionName}` : ''}
+                          </option>
+                        );
+                      })}
                     </Input>
                   ) : (
                     <strong className={styles.heroStatValue}>{selectedSessionName}</strong>

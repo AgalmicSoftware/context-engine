@@ -5,7 +5,8 @@ import {
 } from '../publish/sessionPublishAdapters.js';
 
 export type SessionRegistryRecord = Record<string, unknown>;
-export type SessionRegistryEntry = unknown[];
+export type SessionRegistryRawEntry = unknown[];
+export type SessionRegistryEntry = [string, unknown];
 
 export type SessionRegistryCacheTarget = {
   addEventListener: (
@@ -19,7 +20,7 @@ export type SessionRegistryCacheTarget = {
 };
 
 export type SessionRegistryStore = {
-  getAllSessionEntries: () => SessionRegistryEntry[];
+  getAllSessionEntries: () => SessionRegistryRawEntry[];
 };
 
 export type SessionRegistryReadModule = SessionRegistryPublishModule & {
@@ -76,7 +77,7 @@ export const bindSessionRegistryReadsPort = ({
       readSessionRegistry().loadSessionRegistryCache(input)
     ),
     getAllSessionEntries: () => (
-      readSessionRegistry().sessionRegistryStore.getAllSessionEntries()
+      readSessionRegistry().sessionRegistryStore.getAllSessionEntries() as SessionRegistryEntry[]
     ),
     fetchSessionFromRegistry: (input) => (
       publishAdapter.fetchSessionFromRegistry(input || {}) as Promise<SessionRegistryRecord | null | undefined>
