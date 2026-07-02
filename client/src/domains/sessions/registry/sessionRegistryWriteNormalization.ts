@@ -1,14 +1,14 @@
 import { toStr } from '../../../utilities/shared/primitives.js';
 
-type RegistryWriteRecord = Record<string, unknown>;
+export type RegistryWriteRecord = Record<string, unknown>;
 
-const isObj = (value: unknown): value is RegistryWriteRecord => (
+export const isObj = (value: unknown): value is RegistryWriteRecord => (
   !!value && typeof value === 'object' && !Array.isArray(value)
 );
 
-const trimString = (value: unknown): string => toStr(value).trim();
+export const trimString = (value: unknown): string => toStr(value).trim();
 
-const cloneValue = <T = unknown>(value: T): T => {
+export const cloneValue = <T = unknown>(value: T): T => {
   if (Array.isArray(value)) return value.map((entry) => cloneValue(entry)) as T;
   if (isObj(value)) {
     return Object.keys(value).reduce<RegistryWriteRecord>((acc, key) => {
