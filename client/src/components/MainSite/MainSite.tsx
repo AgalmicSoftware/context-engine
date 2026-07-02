@@ -216,12 +216,11 @@ import {
   SessionLoadingSkeleton as SessionLoadingSkeletonRaw,
 } from './routeStatusViews';
 import {
-  KNOWN_ROUTE_PREFIXES,
-  isStaticNonCacheRoute,
   QUESTION_RESULTS_RE,
   SURVEY_RESULTS_RE,
   VALID_SURVEY_ID_RE,
 } from './routeConfig.js';
+import { resolveMainSiteRouteMatch } from './routeTable.js';
 import {
   buildPublicRoute,
   buildPublicUrl,
@@ -6445,21 +6444,8 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
       fullPath = sessionFallbackTarget.path;
     }
     const pathWithoutQuery = String(fullPath || '').split('?')[0] || '';
-    const isSbtsListRoute = this.isSbtListRoutePath(pathWithoutQuery);
-    const isSbtDetailRoute =
-      pathWithoutQuery.startsWith('/sbt/') ||
-      pathWithoutQuery.startsWith('/group/');
     const pathSegments = pathWithoutQuery.split('/').filter(Boolean);
     const firstPathSegment = String(pathSegments[0] || '').trim().toLowerCase();
-    const isExperimentalStubRoute =
-      pathWithoutQuery === '/debate' ||
-      pathWithoutQuery === '/debate/' ||
-      pathWithoutQuery.startsWith('/tag/');
-    const isKnownRoutePrefix =
-      pathWithoutQuery === '/' ||
-      pathWithoutQuery === '' ||
-      KNOWN_ROUTE_PREFIXES.has(firstPathSegment) ||
-      pathWithoutQuery.includes('0x');
 
     // Robust results routing (/survey/:id/results or /questions/results)
     const surveyMatch = fullPath.match(SURVEY_RESULTS_RE);
@@ -6471,13 +6457,17 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     const defaultSessionChainId = this.getDisplaySessionChainId(defaultSlug);
     const defaultSessionNetwork = this.getDisplaySessionNetwork(defaultSlug);
 
-    const isWizardRoute = fullPath === '/session/new' || fullPath === '/new';
-    const shouldBypassCacheHydrationWait =
-      isExperimentalStubRoute ||
-      isStaticNonCacheRoute(fullPath);
+    const routeMatch = resolveMainSiteRouteMatch({
+      fullPath,
+      isAddress: ethers.utils.isAddress,
+      surveyIDFromPath,
+    });
+    const isWizardRoute = routeMatch.key === 'wizard';
+    const shouldBypassCacheHydrationWait = routeMatch.shouldBypassCacheHydrationWait;
+    const isKnownRoutePrefix = routeMatch.isKnownRoutePrefix;
     if (isWizardRoute) {
-      if (fullPath === '/new' && typeof window !== 'undefined') {
-        window.history.replaceState({}, '', `${buildPublicRoute('/session/new')}${searchStr}${hashStr}`);
+      if (routeMatch.canonicalPath && typeof window !== 'undefined') {
+        window.history.replaceState({}, '', `${buildPublicRoute(routeMatch.canonicalPath)}${searchStr}${hashStr}`);
       }
       return (
         <Suspense fallback={<LazyFallback label="Loading Session Wizard..." />}>
@@ -6565,72 +6555,68 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
       isResultsRoute,
     };
 
-    if (surveyIDFromPath) {
+    if (routeMatch.key === 'surveyId') {
       return this._renderSurveyIdRoute(ctx);
     }
 
-    if (fullPath === "/" || fullPath === "") {
+    if (routeMatch.key === 'home') {
       return this._renderHomeRoute(ctx);
     }
-    if (fullPath === '/debate' || fullPath === '/debate/') {
+    if (routeMatch.key === 'debate') {
       return this._renderDebateRoute(fullPath);
     }
-    if (isOnOrWithinRoutePathFn(fullPath, '/atlas')) {
+    if (routeMatch.key === 'atlas') {
       return this._renderAtlasRoute(ctx);
     }
-    if (fullPath.startsWith('/tag/')) {
+    if (routeMatch.key === 'tag') {
       return this._renderTagRoute(ctx);
     }
-    if (fullPath === "/bookmarks" || fullPath === "/bookmarks/") {
+    if (routeMatch.key === 'bookmarks') {
       return this._renderBookmarksRoute();
     }
-    if (fullPath === "/compare" || fullPath === "/compare/" || fullPath.startsWith("/compare/")) {
+    if (routeMatch.key === 'compare') {
       return this._renderCompareRoute(ctx);
     }
-    if (
-      isOnOrWithinRoutePathFn(fullPath, '/surveys') ||
-      fullPath.startsWith("/survey/") ||
-      isOnOrWithinRoutePathFn(fullPath, '/questions')
-    ) {
+    if (routeMatch.key === 'surveysOrQuestionsList') {
       return this._renderSurveysOrQuestionsListRoute(ctx);
     }
-    if (fullPath.startsWith("/question/")) {
+    if (routeMatch.key === 'questionDetail') {
       return this._renderQuestionDetailRoute(ctx);
     }
-    if (isSbtsListRoute) {
+    if (routeMatch.key === 'sbtsList') {
       return this._renderSbtsListRoute(ctx);
     }
-    if (isSbtDetailRoute) {
+    if (routeMatch.key === 'sbtDetail') {
       return this._renderSbtDetailRoute(ctx);
     }
-    if (fullPath.startsWith("/su/")) {
+    if (routeMatch.key === 'simUser') {
       return this._renderSimUserRoute(fullPath, defaultSessionNetwork);
     }
-    if (fullPath.includes("0x")) {
+    if (routeMatch.key === 'userProfile') {
       return this._renderUserProfileRoute(ctx);
     }
-    if (fullPath === "/about") {
+    if (routeMatch.key === 'about') {
       return this._renderAboutRoute();
     }
-    if (fullPath === "/demos" || fullPath === "/demos/") {
+    if (routeMatch.key === 'demos') {
       return this._renderDemosRoute();
     }
-    if (fullPath === "/matrix") {
+    if (routeMatch.key === 'matrix') {
       return this._renderMatrixRoute();
     }
-    if (fullPath === "/contracts" || fullPath.startsWith("/contracts/")) {
+    if (routeMatch.key === 'contracts') {
       return this._renderContractsRoute(ctx);
     }
-    if (fullPath === "/admin") {
+    if (routeMatch.key === 'admin') {
       return this._renderAdminRoute(ctx);
     }
-    if (fullPath === "/sponsor" || fullPath === "/sponsor/") {
+    if (routeMatch.key === 'sponsor') {
       return this._renderSponsorRoute(ctx);
     }
-    if (fullPath === "/agent" || fullPath === "/agent/") {
+    if (routeMatch.key === 'agent') {
       return this._renderAgentRoute();
     }
-    if (firstPathSegment === "session") {
+    if (routeMatch.key === 'session') {
       return this._renderSessionRoute(ctx);
     }
     return <NotFoundRoute path={fullPath} />;
