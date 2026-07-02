@@ -53,6 +53,7 @@ const typedMainSiteComponentFiles = ['src/components/MainSite/**/*.{ts,tsx}'];
 const typedUserPageComponentFiles = ['src/components/UserPage/**/*.{ts,tsx}'];
 const typedSessionsComponentFiles = ['src/components/Sessions/**/*.{ts,tsx}'];
 const typedSbtComponentFiles = ['src/components/SBTs/**/*.{ts,tsx}'];
+const typedSurveyToolComponentFiles = ['src/components/SurveyTool/**/*.{ts,tsx}'];
 
 const sharedLanguageOptions = {
   parser: tsParser,
@@ -464,6 +465,17 @@ export default [
   },
   {
     files: typedSbtComponentFiles,
+    languageOptions: sharedLanguageOptions,
+    plugins: reactPlugins,
+    settings: reactSettings,
+    rules: {
+      ...sharedRules,
+      ...reactRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedSurveyToolComponentFiles,
     languageOptions: sharedLanguageOptions,
     plugins: reactPlugins,
     settings: reactSettings,
