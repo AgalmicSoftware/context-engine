@@ -13,7 +13,10 @@ import {
   getVisibleSessionWizardContractKeys,
   sanitizeSessionWizardContracts,
 } from './sessionWizardContracts.js';
-import { SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS } from './sessionWizardOnChainCompat.js';
+import {
+  SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS,
+  buildSessionWizardRegistrySessionFields,
+} from '../../domains/sessions/registry/sessionRegistryWriteNormalization.js';
 import { buildWorkerLitCredentialsConfig } from './sessionWizardWorkerSecretSupport';
 import {
   isWorkerSbtGateCloudflareStorageProfile,
@@ -48,7 +51,10 @@ const WORKER_METADATA_ALIAS_KEYS = Object.freeze([
   'deployHelperEnabled',
 ]);
 
-export { SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS };
+export {
+  SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS,
+  buildSessionWizardRegistrySessionFields,
+};
 
 const orderMetadataFields = (metadata: AnyRecord, fieldOrder: string[] = []): AnyRecord => {
   if (!isObj(metadata)) return metadata;
@@ -224,39 +230,6 @@ export const sanitizeSessionWizardMetadataPayload = (metadata: AnyRecord, {
   }
 
   return orderMetadataFields(next, fieldOrder);
-};
-
-export const buildSessionWizardRegistrySessionFields = ({
-  onChainFields = {},
-  sponsoredFields = {},
-  compatibilityFieldPaths = SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS,
-}: {
-  onChainFields?: AnyRecord;
-  sponsoredFields?: AnyRecord;
-  compatibilityFieldPaths?: Record<string, string[]>;
-} = {}): AnyRecord => {
-  const next: AnyRecord = {};
-  const compatPaths = isObj(compatibilityFieldPaths) ? compatibilityFieldPaths : {};
-  const rawOnChainFields = isObj(onChainFields) ? onChainFields : {};
-
-  Object.keys(compatPaths).forEach((fieldKey) => {
-    if (!Object.prototype.hasOwnProperty.call(rawOnChainFields, fieldKey)) return;
-    const rawValue = rawOnChainFields[fieldKey];
-    if (typeof rawValue === 'string') {
-      next[fieldKey] = trimString(rawValue);
-      return;
-    }
-    if (rawValue != null) {
-      next[fieldKey] = cloneValue(rawValue);
-    }
-  });
-
-  Object.entries(isObj(sponsoredFields) ? sponsoredFields : {}).forEach(([key, value]) => {
-    const trimmed = trimString(value);
-    if (trimmed) next[key] = trimmed;
-  });
-
-  return next;
 };
 
 export const buildSessionWizardWorkerConfigPayload = ({
