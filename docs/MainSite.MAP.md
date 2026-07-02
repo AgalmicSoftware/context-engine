@@ -61,7 +61,7 @@ Golden route coverage lives in `routeTable.test.ts` for:
 
 ## Runtime Characterization
 
-`MainSite.routes.test.jsx` now pins the runtime bodies that were previously easy to stub around:
+`MainSite.routes.test.jsx` pins the runtime bodies that were previously easy to stub around:
 
 - Listener lifecycle: registry cache listener, SBT listener, and survey listener registration/removal across mount, stable update, and unmount.
 - Registry bootstrap: MainSite wiring of `_registryBootstrapPromise` and `_registryBootstrapScopeKey`, failure cleanup, same-scope reuse, and scope-change restart.
@@ -69,7 +69,7 @@ Golden route coverage lives in `routeTable.test.ts` for:
 - Survey event reconciliation: real `SurveyAdded` body writes survey/question caches and preserves Arweave retry branches.
 - Network re-init: SBT detail route tears down active/detail listeners before rebuilding cache/listener state.
 
-The characterization tests intentionally pin behavior as-is. They do not move `contractScripts`, `sessionRegistry`, or `arweaveRetryHelpers` out of MainSite.
+The characterization tests intentionally pin behavior as-is. The follow-up domain-port lane then routed the former `contractScripts`, `sessionRegistry`, and `arweaveRetryHelpers` low-level imports through typed purpose ports and domain helpers while preserving those pinned call shapes.
 
 ## Extracted Controllers And Helpers
 
@@ -94,6 +94,25 @@ The characterization tests intentionally pin behavior as-is. They do not move `c
   Session name/info/header display resolution.
 - `client/src/domains/sessions/sessionMediaUrls.ts`
   Typed domain wrapper for session media URL normalization. MainSite uses this instead of importing `utilities/arweave/arweaveUrls` directly.
+
+### Domain ports
+
+- `client/src/domains/sessions/registry/sessionRegistryReadPorts.ts`
+  Typed session-registry read/cache port used by MainSite for cache load, store reads, session fetches, cache-update subscription, session config reads, and session ID formatting.
+- `client/src/domains/chain/contractScriptsChainScanReadsPort.ts`
+  Typed chain-scan read port for latest-block, relevant block-window, and session read-provider access.
+- `client/src/domains/profiles/contractScriptsProfileScanPort.ts`
+  Typed user profile scan port for `getSBTsForUser` and `getUserActivity`.
+- `client/src/domains/sbts/contractScriptsSbtEventStreamsPort.ts`
+  Typed SBT/survey listener removal port preserving call-time `contractScripts` lookup for spy compatibility.
+- `client/src/domains/sbts/contractScriptsSbtMetadataReadsPort.ts`
+  Typed SBT metadata read port extended with SBT creation-block lookup.
+- `client/src/domains/surveys/contractScriptsSurveyReadsPort.ts`
+  Typed survey/question read port for survey hashes, survey/question data, and response reads.
+- `client/src/domains/worker/contractScriptsFaucetFundingPort.ts`
+  Typed faucet funding port for the MainSite testnet-funding call.
+- `client/src/domains/surveys/questionArweaveCacheBranches.ts`
+  Domain home for question Arweave cache branch preservation and merge helpers. The legacy utility module re-exports these helpers for remaining low-level consumers.
 
 ### Scan policy and profile scan
 
@@ -167,20 +186,21 @@ URL + Redux session state + wallet/network
 
 ## Boundary Seams
 
-MainSite started this lane with four client-boundary baseline entries:
+MainSite started the modernization lane with four client-boundary baseline entries:
 
 - `utilities/arweave/arweaveUrls`
 - `utilities/arweave/arweaveRetryHelpers`
 - `utilities/web3/contractScripts`
 - `utilities/web3/sessionRegistry`
 
-`arweaveUrls` is now cleared through `domains/sessions/sessionMediaUrls.ts`.
+All four are now cleared:
 
-The other three entries stay intentionally baselined:
+- `arweaveUrls` routes through `domains/sessions/sessionMediaUrls.ts`.
+- `arweaveRetryHelpers` cache-branch helpers live in `domains/surveys/questionArweaveCacheBranches.ts`.
+- `contractScripts` usage is purpose-split through chain, profile, SBT, survey, and faucet ports.
+- `sessionRegistry` usage routes through `domains/sessions/registry/sessionRegistryReadPorts.ts`.
 
-- `arweaveRetryHelpers` remains in scan/hydration cache-merge bodies.
-- `contractScripts` remains in listener teardown/startup, profile scan fan-out, survey event reconciliation, and cache refresh bodies.
-- `sessionRegistry` remains in route/session lookup, registry bootstrap, and cache update wiring.
+The client-boundary baseline is now 0/0.
 
 ## Frontend Architecture Readiness Matrix
 
@@ -188,11 +208,11 @@ The other three entries stay intentionally baselined:
 |---|---|---|---|---|---|---|
 | Route classification | Yes | N/A | Yes | `MainSite.getMainView` renders | None | Route props can move only after route-table consumers stabilize |
 | Session media URL normalization | Yes | Yes | Yes | MainSite supplies helper to `sessionDisplayHelpers` | None | Share with Admin/storage URL domain when Admin lane lands |
-| Listener lifecycle | Partial | No | Yes | MainSite lifecycle starts/removes listeners | Characterization landed, movement owned by PRD 449/556 | Extract listener orchestration after contract listener ports exist |
-| Registry bootstrap and route session lookup | Partial | No | Yes | MainSite + `sessionProfileScanController` bridge state | Characterization landed, movement owned by PRD 449/556 | Session registry route/read ports |
-| User profile scan fan-out | Partial | No | Yes | MainSite owns scan body and cache writes | Characterization landed, movement owned by PRD 449/556 | Profile scan reducer/controller extraction |
-| Survey event reconciliation | Partial | No | Yes | MainSite owns real-time cache reconciliation | Characterization landed, movement owned by PRD 449/556 | Survey/question event reconciliation controller |
-| Arweave retry branch merge | No | N/A | Yes | MainSite owns cache merge call sites | Characterization landed, movement owned by PRD 449/556 | Question cache hydration/retry controller |
+| Listener lifecycle | Partial | Yes | Yes | MainSite lifecycle starts/removes listeners | Listener orchestration still crosses mount/update/unmount state | Extract listener orchestration after attach-side controller ports converge |
+| Registry bootstrap and route session lookup | Partial | Yes | Yes | MainSite + `sessionProfileScanController` bridge state | Bootstrap promise identity and route/session state stay parent-owned | Session bootstrap controller extraction |
+| User profile scan fan-out | Partial | Yes | Yes | MainSite owns scan body and cache writes | Scan body still writes multiple caches and UI flags | Profile scan reducer/controller extraction |
+| Survey event reconciliation | Partial | Yes | Yes | MainSite owns real-time cache reconciliation | Event reconciliation still owns cache writes and merge decisions | Survey/question event reconciliation controller |
+| Arweave retry branch merge | Yes | Yes | Yes | MainSite owns cache merge call sites | Cache merge call sites remain inside scan/hydration bodies | Question cache hydration/retry controller |
 
 ## Edit Heuristics
 

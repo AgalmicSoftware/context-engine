@@ -10,11 +10,11 @@
   - `client/src/utilities/web3/contractProfile.ts`
 - Current lengths:
   - `contractScripts.js`: **12 lines**
-  - `contractScripts.impl.ts`: **5,445 lines**
-  - `sessionRegistry.ts`: **2,392 lines**
-  - `contractHelpers.ts`: **950 lines**
-  - `contractEventListeners.ts`: **454 lines**
-  - `contractProfile.ts`: **1,102 lines**
+  - `contractScripts.impl.ts`: **5,470 lines**
+  - `sessionRegistry.ts`: **2,525 lines**
+  - `contractHelpers.ts`: **1,040 lines**
+  - `contractEventListeners.ts`: **554 lines**
+  - `contractProfile.ts`: **1,109 lines**
 - This map intentionally avoids exact line numbers. Phase 4 TypeScript extraction and helper splits move code frequently, so name-based navigation stays more accurate than stale ranges.
 - `sessionRegistry.ts` and `contractScripts.impl.ts` typecheck without `@ts-nocheck`. The typed web3-core milestone was verified on OP Sepolia with the gate and gated-decrypt E2E suites; Lit v3 remains chain-configured and is not tied to a single testnet.
 
@@ -29,6 +29,8 @@ contractScripts.js  [CJS compatibility barrel for jest.spyOn]
 
 `contractScripts` is still the main web3 integration layer between React and chain, Arweave, Lit, and registry state. The TypeScript split only moved reusable helper families out of the monolith; `contractScripts.impl.ts` still owns session resolution, provider selection, decrypt policy, survey/question reads and writes, SBT flows, and the final default export wiring.
 
+Route/page code now reaches selected `contractScripts` operations through purpose ports under `client/src/domains/**` when that boundary has been modernized. Those adapters deliberately use call-time property lookup against the shared barrel object so `jest.spyOn(contractScripts, ...)` remains a supported test seam.
+
 ## Navigation Rules
 - Start in `contractScripts.js` only if you need barrel-export behavior or `jest.spyOn` compatibility.
 - Start in `sessionRegistry.ts` for session registry lookups, registry cache behavior, session config normalization, or chain-aware session metadata.
@@ -36,6 +38,7 @@ contractScripts.js  [CJS compatibility barrel for jest.spyOn]
 - Start in `contractEventListeners.ts` for long-lived listener registration and cleanup.
 - Start in `contractProfile.ts` for user-profile scans, SBT universe discovery, and memoized holdings/activity views.
 - Start in `contractScripts.impl.ts` for everything else: session lookup, decrypt policy, Arweave IO, tx submission, SBT creation/claim flows, and dependency wiring.
+- Start in `client/src/domains/sbts/`, `client/src/domains/chain/`, `client/src/domains/profiles/`, `client/src/domains/surveys/`, or `client/src/domains/worker/` when a page already uses a purpose port for a narrow read/write/listener/faucet operation.
 
 ## File Index
 

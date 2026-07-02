@@ -59,7 +59,8 @@ route behavior remains the compatibility target.
 
 - Do not convert `MainSite` from a class component as part of route-table work.
 - Do not move `contractScripts`, `sessionRegistry`, or `arweaveRetryHelpers`
-  imports as part of route classification changes.
+  imports as part of route classification changes. Later domain-port lanes may
+  move those runtime seams independently when they are behavior-pinned.
 - Do not change route paths, query parameters, aliases, or `data-testid` values.
 - Add or update table tests before changing route order or route metadata.
 - Keep URL side effects in the caller unless a future route controller owns and
