@@ -47,6 +47,7 @@ const typedOnePageSessionComponentFiles = ['src/components/OnePageSession/**/*.{
 const typedTagPageComponentFiles = ['src/components/TagPage/**/*.{ts,tsx}'];
 const typedDocumentLibraryComponentFiles = ['src/components/DocumentLibrary/**/*.{ts,tsx}'];
 const typedDemoViewsComponentFiles = ['src/components/DemoViews/**/*.{ts,tsx}'];
+const typedAccountComponentFiles = ['src/components/Account/**/*.{ts,tsx}'];
 
 const sharedLanguageOptions = {
   parser: tsParser,
@@ -392,6 +393,17 @@ export default [
   },
   {
     files: typedDemoViewsComponentFiles,
+    languageOptions: sharedLanguageOptions,
+    plugins: reactPlugins,
+    settings: reactSettings,
+    rules: {
+      ...sharedRules,
+      ...reactRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedAccountComponentFiles,
     languageOptions: sharedLanguageOptions,
     plugins: reactPlugins,
     settings: reactSettings,
