@@ -262,6 +262,10 @@ import {
   surveyResultsAnalysisArtifactMergePort,
 } from '../../domains/surveys/surveyResultsAnalysisArtifactMergePort';
 import {
+  createSurveyResultsFetchResponsesRuntime,
+  type SurveyResultsFetchResponsesRuntime,
+} from '../../domains/surveys/surveyResultsFetchResponsesRuntime';
+import {
   createSurveyResultsLocalStoragePollingRuntime,
   type SurveyResultsLocalStoragePollingRuntime,
 } from '../../domains/surveys/surveyResultsLocalStoragePollingRuntime';
@@ -1042,9 +1046,6 @@ type SurveyResultsInstanceFields = {
   _questionFilterQuestionsMemo: SurveyResultsQuestionFilterQuestionsMemo;
   _questionTableEntriesMemo: SurveyResultsQuestionTableEntriesMemo;
   _lockedResponsesModelMemo: SurveyResultsLockedResponsesModelMemo;
-  _fetchResponsesInFlight: boolean;
-  _fetchResponsesQueued: boolean;
-  _fetchResponsesRequestScheduled: boolean;
   _lastLocalStoragePollCoarseSignature: string;
   _lastLocalStoragePollDetailedSignature: string;
   _lastPolledQuestionsRef: unknown;
@@ -1110,9 +1111,6 @@ const createSurveyResultsInstanceFields = (): SurveyResultsInstanceFields => ({
         hasGenericGateMessage: false,
       },
     },
-  _fetchResponsesInFlight: false,
-  _fetchResponsesQueued: false,
-  _fetchResponsesRequestScheduled: false,
   _lastLocalStoragePollCoarseSignature: '',
   _lastLocalStoragePollDetailedSignature: '',
   _lastPolledQuestionsRef: null,
@@ -1185,6 +1183,14 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
   }
   const inst = instRef.current;
   const pendingSetStateCallbacksRef = useRef<VoidFunction[]>([]);
+  const fetchResponsesRuntimeRef = useRef<SurveyResultsFetchResponsesRuntime | null>(null);
+  if (fetchResponsesRuntimeRef.current === null) {
+    fetchResponsesRuntimeRef.current = createSurveyResultsFetchResponsesRuntime({
+      fetchResponses: () => fetchResponses(),
+      isMounted: () => inst._isMounted,
+    });
+  }
+  const fetchResponsesRuntime = fetchResponsesRuntimeRef.current;
   const queuedResultsRefreshRuntimeRef = useRef<SurveyResultsQueuedRefreshRuntime | null>(null);
   if (queuedResultsRefreshRuntimeRef.current === null) {
     queuedResultsRefreshRuntimeRef.current = createSurveyResultsQueuedRefreshRuntime({
@@ -1521,34 +1527,7 @@ function commitResultsFilterState(statePatch: SurveyResultsRecord | null | undef
   }
 
 const requestFetchResponses = (): void => {
-    if (!inst._isMounted) return;
-    if (inst._fetchResponsesRequestScheduled) return;
-    inst._fetchResponsesRequestScheduled = true;
-    Promise.resolve().then(() => {
-      inst._fetchResponsesRequestScheduled = false;
-      if (!inst._isMounted) return;
-      if (inst._fetchResponsesInFlight) {
-        inst._fetchResponsesQueued = true;
-        return;
-      }
-      void flushFetchResponsesRequest();
-    });
-  };
-
-const flushFetchResponsesRequest = async (): Promise<void> => {
-    if (!inst._isMounted || inst._fetchResponsesInFlight) return;
-    inst._fetchResponsesInFlight = true;
-    try {
-      await fetchResponses();
-    } finally {
-      inst._fetchResponsesInFlight = false;
-      if (inst._fetchResponsesQueued) {
-        inst._fetchResponsesQueued = false;
-        if (inst._isMounted) {
-          void flushFetchResponsesRequest();
-        }
-      }
-    }
+    fetchResponsesRuntime.request();
   };
 
 const shouldUseAnimationFrameForRefreshCoalescing = (): boolean => {
@@ -1988,7 +1967,8 @@ function pollLocalStorageForUpdates(): boolean {
       localRespBlock !== stateRef.current.responseLocalBlock ||
       localSBlock !== stateRef.current.surveyLocalBlock;
 
-    if (inst._fetchResponsesInFlight && !blockOrRespChanged) {
+    const fetchRuntimeSnapshot = fetchResponsesRuntime.getSnapshot();
+    if (fetchRuntimeSnapshot.inFlight && !blockOrRespChanged) {
       return false;
     }
 
@@ -1997,17 +1977,17 @@ function pollLocalStorageForUpdates(): boolean {
       stableCycles > 0 &&
       (stableCycles % LOCAL_STORAGE_FORCE_RESCAN_EVERY) === 0;
     const shouldForceCountRescan =
-      !inst._fetchResponsesInFlight &&
+      !fetchRuntimeSnapshot.inFlight &&
       (!coarseSignatureUnchanged || forceRescanOnStableCycle);
 
-    const newQuestionsCount = inst._fetchResponsesInFlight
+    const newQuestionsCount = fetchRuntimeSnapshot.inFlight
       ? Number(stateRef.current.cachedQuestionsCount || 0)
       : getMemoizedQuestionsCountForPolling(questionsById, {
           forceScan: shouldForceCountRescan,
         });
     const localSurveyResponsesCount = currentSurveyId
       ? (
-          inst._fetchResponsesInFlight
+          fetchRuntimeSnapshot.inFlight
             ? Number(stateRef.current.cachedSurveyResponsesCount || 0)
             : getMemoizedSurveyResponsesCountForPolling(surveyResponsesById, currentSurveyId, {
                 forceScan: shouldForceCountRescan,
@@ -4806,9 +4786,7 @@ return renderSurveyResultsHtmlReportExportModal(getHtmlReportModalProps());
 
     return () => {
     inst._isMounted = false;
-    inst._fetchResponsesQueued = false;
-    inst._fetchResponsesInFlight = false;
-    inst._fetchResponsesRequestScheduled = false;
+    fetchResponsesRuntime.destroy();
     inst._nonceTickInFlight = false;
     inst._nonceTickQueued = false;
     inst._pollLatestBlockFetchInFlight = false;
