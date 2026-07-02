@@ -26,6 +26,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   const pkg = readJson(rootDir, 'package.json');
   const scripts = pkg.scripts || {};
   const workflow = readText(rootDir, '.github/workflows/ci.yml');
+  const syncPublicHistory = readText(rootDir, 'scripts/sync-public-history.sh');
   const publishWorkflowPath = '.github/workflows/publish-worker-bundles.yml';
   const publishWorkflow = fs.existsSync(path.join(rootDir, publishWorkflowPath))
     ? readText(rootDir, publishWorkflowPath)
@@ -65,6 +66,11 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
       failures.push(`CI workflow must include ${description}`);
     }
   };
+  const expectSyncPublicHistoryContains = (expected, description = expected) => {
+    if (!syncPublicHistory.includes(expected)) {
+      failures.push(`sync-public-history verification must include ${description}`);
+    }
+  };
 
   expectFile('tests/root/deployHelperOrigins.test.mjs');
   expectFile('scripts/worker-bundle.mjs');
@@ -84,6 +90,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFile('scripts/verify-worker-bundle-sync.test.js');
   expectFile('scripts/verify-public-release-surface.js');
   expectFile('scripts/verify-public-release-surface.test.js');
+  expectFile('scripts/sync-public-history.sh');
   expectFile('workers/sessionCorsWorker/package.json');
   expectFile(publishWorkflowPath);
   expectFile('workers/deploy-helper/wrangler.example.toml');
@@ -136,6 +143,9 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('verify:release', 'npm run verify:worker-bundle');
   expectScriptContains('verify:release', 'npm --prefix client run build');
   expectScriptOmits('verify:release', 'NODE_OPTIONS=--openssl-legacy-provider');
+
+  expectSyncPublicHistoryContains('npm run test:wiring', '"npm run test:wiring"');
+  expectSyncPublicHistoryContains('npm run type-debt:check', '"npm run type-debt:check"');
 
   expectWorkflowContains('wiring-and-release:', 'the wiring-and-release job');
   expectWorkflowContains('contracts:', 'the contracts job');
