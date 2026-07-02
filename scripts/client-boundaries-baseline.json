@@ -35,12 +35,6 @@
     },
     {
       "rule": "route-page-no-low-level",
-      "source": "client/src/components/Admin/AdminPage.tsx",
-      "import": "../../utilities/worker/workerAuth.js",
-      "resolved": "client/src/utilities/worker/workerAuth"
-    },
-    {
-      "rule": "route-page-no-low-level",
       "source": "client/src/components/MainSite/MainSite.tsx",
       "import": "../../utilities/arweave/arweaveRetryHelpers.js",
       "resolved": "client/src/utilities/arweave/arweaveRetryHelpers"

@@ -171,7 +171,7 @@ export const bindAdminWorkerPorts = ({
       if (!nonceResp.ok) {
         throw new Error(String(nonceData.error || `Nonce request failed (${nonceResp.status}).`));
       }
-      const nonce = String(nonceData.nonce || '').trim();
+      const nonce = String(nonceData.nonce);
       return {
         nonce,
         nonceData,
