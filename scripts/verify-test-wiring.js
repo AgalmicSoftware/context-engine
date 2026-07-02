@@ -26,6 +26,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   const pkg = readJson(rootDir, 'package.json');
   const scripts = pkg.scripts || {};
   const workflow = readText(rootDir, '.github/workflows/ci.yml');
+  const syncPublicHistory = readText(rootDir, 'scripts/sync-public-history.sh');
   const publishWorkflowPath = '.github/workflows/publish-worker-bundles.yml';
   const publishWorkflow = fs.existsSync(path.join(rootDir, publishWorkflowPath))
     ? readText(rootDir, publishWorkflowPath)
@@ -65,6 +66,11 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
       failures.push(`CI workflow must include ${description}`);
     }
   };
+  const expectSyncPublicHistoryContains = (expected, description = expected) => {
+    if (!syncPublicHistory.includes(expected)) {
+      failures.push(`sync-public-history verification must include ${description}`);
+    }
+  };
 
   expectFile('tests/root/deployHelperOrigins.test.mjs');
   expectFile('scripts/worker-bundle.mjs');
@@ -75,6 +81,8 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFile('scripts/check-client-boundaries.test.mjs');
   expectFile('scripts/client-boundaries-baseline.json');
   expectFile('scripts/check-type-debt-ratchet.mjs');
+  expectFile('scripts/check-baseline-monotonicity.mjs');
+  expectFile('scripts/check-baseline-monotonicity.test.mjs');
   expectFile('scripts/testInventoryConfig.js');
   expectFile('scripts/verify-test-inventory.js');
   expectFile('scripts/verify-test-inventory.test.js');
@@ -84,6 +92,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFile('scripts/verify-worker-bundle-sync.test.js');
   expectFile('scripts/verify-public-release-surface.js');
   expectFile('scripts/verify-public-release-surface.test.js');
+  expectFile('scripts/sync-public-history.sh');
   expectFile('workers/sessionCorsWorker/package.json');
   expectFile(publishWorkflowPath);
   expectFile('workers/deploy-helper/wrangler.example.toml');
@@ -137,6 +146,9 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('verify:release', 'npm --prefix client run build');
   expectScriptOmits('verify:release', 'NODE_OPTIONS=--openssl-legacy-provider');
 
+  expectSyncPublicHistoryContains('npm run test:wiring', '"npm run test:wiring"');
+  expectSyncPublicHistoryContains('npm run type-debt:check', '"npm run type-debt:check"');
+
   expectWorkflowContains('wiring-and-release:', 'the wiring-and-release job');
   expectWorkflowContains('contracts:', 'the contracts job');
   expectWorkflowContains('client:', 'the client job');
@@ -146,6 +158,8 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectWorkflowContains('test:', 'the final aggregate test job');
   expectWorkflowContains('run: npm run test:wiring', '"npm run test:wiring"');
   expectWorkflowContains('run: npm run type-debt:check', '"npm run type-debt:check"');
+  expectWorkflowContains('BASELINE_MONOTONICITY_BASE:', 'baseline monotonicity base env');
+  expectWorkflowContains('node scripts/check-baseline-monotonicity.mjs', '"node scripts/check-baseline-monotonicity.mjs"');
   expectWorkflowContains('run: npm run lint', '"npm run lint"');
   expectWorkflowContains('run: npm run typecheck:client', '"npm run typecheck:client"');
   expectWorkflowContains('run: npm run verify:public-release-surface', '"npm run verify:public-release-surface"');

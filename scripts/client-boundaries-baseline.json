@@ -35,51 +35,9 @@
     },
     {
       "rule": "route-page-no-low-level",
-      "source": "client/src/components/Admin/AdminPage.tsx",
-      "import": "../../utilities/arweave/arweaveScripts.js",
-      "resolved": "client/src/utilities/arweave/arweaveScripts"
-    },
-    {
-      "rule": "route-page-no-low-level",
-      "source": "client/src/components/Admin/AdminPage.tsx",
-      "import": "../../utilities/arweave/arweaveUrls.js",
-      "resolved": "client/src/utilities/arweave/arweaveUrls"
-    },
-    {
-      "rule": "route-page-no-low-level",
-      "source": "client/src/components/Admin/AdminPage.tsx",
-      "import": "../../utilities/web3/sessionRegistry.js",
-      "resolved": "client/src/utilities/web3/sessionRegistry"
-    },
-    {
-      "rule": "route-page-no-low-level",
-      "source": "client/src/components/Admin/AdminPage.tsx",
-      "import": "../../utilities/worker/corsProxy.js",
-      "resolved": "client/src/utilities/worker/corsProxy"
-    },
-    {
-      "rule": "route-page-no-low-level",
-      "source": "client/src/components/Admin/AdminPage.tsx",
-      "import": "../../utilities/worker/workerAuth.js",
-      "resolved": "client/src/utilities/worker/workerAuth"
-    },
-    {
-      "rule": "route-page-no-low-level",
-      "source": "client/src/components/Admin/AdminPage.tsx",
-      "import": "../../utilities/worker/workerCorsOrigins.js",
-      "resolved": "client/src/utilities/worker/workerCorsOrigins"
-    },
-    {
-      "rule": "route-page-no-low-level",
       "source": "client/src/components/MainSite/MainSite.tsx",
       "import": "../../utilities/arweave/arweaveRetryHelpers.js",
       "resolved": "client/src/utilities/arweave/arweaveRetryHelpers"
-    },
-    {
-      "rule": "route-page-no-low-level",
-      "source": "client/src/components/MainSite/MainSite.tsx",
-      "import": "../../utilities/arweave/arweaveUrls.js",
-      "resolved": "client/src/utilities/arweave/arweaveUrls"
     },
     {
       "rule": "route-page-no-low-level",

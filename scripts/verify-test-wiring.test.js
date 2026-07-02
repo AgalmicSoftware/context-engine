@@ -75,6 +75,9 @@ test('public-release style copies without .git still pass wiring checks', () => 
         '    steps:',
         '      - run: npm run test:wiring',
         '      - run: npm run type-debt:check',
+        '      - env:',
+        '          BASELINE_MONOTONICITY_BASE: ${{ github.event.pull_request.base.sha || \'origin/main\' }}',
+        '        run: node scripts/check-baseline-monotonicity.mjs',
         '      - run: npm run lint',
         '      - run: npm run typecheck:client',
         '      - run: npm run verify:public-release-surface',
@@ -131,6 +134,19 @@ test('public-release style copies without .git still pass wiring checks', () => 
         '        dist/deployHelper.bundle.js',
       ].join('\n'),
     );
+    writeFile(
+      rootDir,
+      'scripts/sync-public-history.sh',
+      [
+        '#!/usr/bin/env bash',
+        'verify_public_test_wiring() {',
+        '  npm run test:wiring',
+        '}',
+        'verify_public_type_debt() {',
+        '  npm run type-debt:check',
+        '}',
+      ].join('\n'),
+    );
 
     [
       'tests/root/deployHelperOrigins.test.mjs',
@@ -142,6 +158,8 @@ test('public-release style copies without .git still pass wiring checks', () => 
       'scripts/check-client-boundaries.test.mjs',
       'scripts/client-boundaries-baseline.json',
       'scripts/check-type-debt-ratchet.mjs',
+      'scripts/check-baseline-monotonicity.mjs',
+      'scripts/check-baseline-monotonicity.test.mjs',
       'scripts/testInventoryConfig.js',
       'scripts/verify-test-inventory.js',
       'scripts/verify-test-inventory.test.js',

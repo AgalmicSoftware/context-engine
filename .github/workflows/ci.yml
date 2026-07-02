@@ -47,6 +47,21 @@ jobs:
       - name: Check type debt ratchet
         run: npm run type-debt:check
 
+      - name: Check baseline monotonicity
+        env:
+          BASELINE_MONOTONICITY_BASE: ${{ github.event.pull_request.base.sha || 'origin/main' }}
+          BASELINE_MONOTONICITY_ALLOW_TEXT: >-
+            ${{ github.event.pull_request.title }}
+            ${{ github.event.pull_request.body }}
+            ${{ github.event.head_commit.message }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin main || true
+          if [ "$BASELINE_MONOTONICITY_BASE" != "origin/main" ]; then
+            git fetch --no-tags --depth=1 origin "$BASELINE_MONOTONICITY_BASE" || true
+          fi
+          node scripts/check-baseline-monotonicity.mjs --base "$BASELINE_MONOTONICITY_BASE" --allow-text "$BASELINE_MONOTONICITY_ALLOW_TEXT"
+
       - name: Lint client
         run: npm run lint
 
