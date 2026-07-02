@@ -10,12 +10,6 @@
       "resolved": "client/src/utilities/sponsor/sponsorPageRuntime.ts"
     },
     {
-      "rule": "no-passthrough-facade",
-      "source": "client/src/utilities/user/userPageRuntime.ts",
-      "import": "<passthrough-facade>",
-      "resolved": "client/src/utilities/user/userPageRuntime.ts"
-    },
-    {
       "rule": "route-page-no-low-level",
       "source": "client/src/components/MainSite/MainSite.tsx",
       "import": "../../utilities/arweave/arweaveRetryHelpers.js",
