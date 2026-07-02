@@ -18,8 +18,8 @@ import {
   getAllSessionSlugs,
   getDemoSessionConfigBySlug,
   getSessionConfigBySlug as getStrictSessionConfigBySlug,
-  SESSION_REGISTRY_CACHE_UPDATED_EVENT,
-} from '../../utilities/tags/tagPageRuntime.js';
+} from '../../domains/sessions/sessionConfig.js';
+import { sessionRegistryReadsPort } from '../../domains/sessions/registry/sessionRegistryReadPorts.js';
 import { normalizeGlobalSessionSelection } from '../../utilities/session/globalSessionState.js';
 import { parseQuestionSessionSlugFromSearch } from '../../utilities/survey/questionRouting.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
@@ -741,10 +741,7 @@ export const TagPageView = ({
       setSessionRegistryRevision((value) => value + 1);
     };
 
-    window.addEventListener(SESSION_REGISTRY_CACHE_UPDATED_EVENT, handleRegistryCacheUpdated);
-    return () => {
-      window.removeEventListener(SESSION_REGISTRY_CACHE_UPDATED_EVENT, handleRegistryCacheUpdated);
-    };
+    return sessionRegistryReadsPort.subscribeToCacheUpdates(window, handleRegistryCacheUpdated);
   }, []);
 
   useEffect(() => {

@@ -1,5 +1,6 @@
 import * as contractScripts from '../../utilities/web3/contractScripts.js';
 import {
+  getAllSessionSlugs,
   getDemoSessionConfigBySlug,
   getSessionChainId,
   getSessionConfigBySlug,
@@ -13,6 +14,7 @@ jest.mock('../../utilities/web3/contractScripts.js', () => ({
   getSessionConfigBySlug: jest.fn((slug) => ({ slug, source: 'strict' })),
   getDemoSessionConfigBySlug: jest.fn((slug) => ({ slug, source: 'demo' })),
   getSessionConfigBySlugOrDefault: jest.fn((slug) => ({ slug, source: 'default' })),
+  getAllSessionSlugs: jest.fn(() => ['edge']),
   getSessionChainId: jest.fn(() => 11155420),
 }));
 
@@ -31,6 +33,7 @@ describe('sessionConfig domain adapter', () => {
       source: 'demo',
     });
     expect(getSessionConfigBySlugOrDefault('')).toEqual({ slug: '', source: 'default' });
+    expect(getAllSessionSlugs({ includeEmpty: true })).toEqual(['edge']);
     expect(getSessionChainId('edge')).toBe(11155420);
 
     expect(mockedContractScripts.normalizeSessionSlug).toHaveBeenCalledWith('Edge');
@@ -40,6 +43,7 @@ describe('sessionConfig domain adapter', () => {
       { allowDemoFallback: true },
     );
     expect(mockedContractScripts.getSessionConfigBySlugOrDefault).toHaveBeenCalledWith('');
+    expect(mockedContractScripts.getAllSessionSlugs).toHaveBeenCalledWith({ includeEmpty: true });
     expect(mockedContractScripts.getSessionChainId).toHaveBeenCalledWith('edge');
   });
 
