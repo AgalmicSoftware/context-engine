@@ -81,6 +81,8 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFile('scripts/check-client-boundaries.test.mjs');
   expectFile('scripts/client-boundaries-baseline.json');
   expectFile('scripts/check-type-debt-ratchet.mjs');
+  expectFile('scripts/check-baseline-monotonicity.mjs');
+  expectFile('scripts/check-baseline-monotonicity.test.mjs');
   expectFile('scripts/testInventoryConfig.js');
   expectFile('scripts/verify-test-inventory.js');
   expectFile('scripts/verify-test-inventory.test.js');
@@ -156,6 +158,8 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectWorkflowContains('test:', 'the final aggregate test job');
   expectWorkflowContains('run: npm run test:wiring', '"npm run test:wiring"');
   expectWorkflowContains('run: npm run type-debt:check', '"npm run type-debt:check"');
+  expectWorkflowContains('BASELINE_MONOTONICITY_BASE:', 'baseline monotonicity base env');
+  expectWorkflowContains('node scripts/check-baseline-monotonicity.mjs', '"node scripts/check-baseline-monotonicity.mjs"');
   expectWorkflowContains('run: npm run lint', '"npm run lint"');
   expectWorkflowContains('run: npm run typecheck:client', '"npm run typecheck:client"');
   expectWorkflowContains('run: npm run verify:public-release-surface', '"npm run verify:public-release-surface"');
