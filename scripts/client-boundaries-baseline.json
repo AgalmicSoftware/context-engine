@@ -36,12 +36,6 @@
     {
       "rule": "route-page-no-low-level",
       "source": "client/src/components/Admin/AdminPage.tsx",
-      "import": "../../utilities/web3/sessionRegistry.js",
-      "resolved": "client/src/utilities/web3/sessionRegistry"
-    },
-    {
-      "rule": "route-page-no-low-level",
-      "source": "client/src/components/Admin/AdminPage.tsx",
       "import": "../../utilities/worker/workerAuth.js",
       "resolved": "client/src/utilities/worker/workerAuth"
     },
