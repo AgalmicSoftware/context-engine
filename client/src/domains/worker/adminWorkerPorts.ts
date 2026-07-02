@@ -4,6 +4,7 @@ import * as defaultWorkerAuth from '../../utilities/worker/workerAuth.js';
 import {
   bindWorkerAuthPublishAdapter,
   type WorkerAdminActionAuthInput,
+  type WorkerBootstrapAdminAuthInput,
   type WorkerAuthPublishModule,
 } from '../sessions/publish/sessionPublishAdapters.js';
 
@@ -92,9 +93,13 @@ export type AdminWorkerUrlPort = {
   buildWorkerAllowOrigins: (
     input?: AdminBuildWorkerAllowOriginsInput
   ) => string[];
+  normalizeWorkerUrl: (value: unknown) => string;
 };
 
 export type WorkerAdminAuthPort = {
+  buildSignedBootstrapAdminAuth: (
+    input: WorkerBootstrapAdminAuthInput
+  ) => Promise<AdminWorkerRecord>;
   buildSignedAdminActionAuth: (
     input: WorkerAdminActionAuthInput
   ) => Promise<AdminWorkerRecord>;
@@ -159,8 +164,12 @@ export const bindAdminWorkerPorts = ({
     workerUrl: {
       resolveCorsProxyUrl: (input) => readCorsProxy().resolveCorsProxyUrl(input),
       buildWorkerAllowOrigins: (input) => readCorsOrigins().buildWorkerAllowOrigins(input),
+      normalizeWorkerUrl: (value) => workerAuthPublishAdapter.normalizeWorkerUrl(value),
     },
     adminAuth: {
+      buildSignedBootstrapAdminAuth: (input) => (
+        workerAuthPublishAdapter.buildSignedBootstrapAdminAuth(input)
+      ),
       buildSignedAdminActionAuth: (input) => (
         workerAuthPublishAdapter.buildSignedAdminActionAuth(input)
       ),

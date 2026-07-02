@@ -25,7 +25,7 @@ describe('admin worker ports', () => {
       corsProxy: () => corsProxy,
       corsOrigins: () => corsOrigins,
       workerAuth: () => ({
-        normalizeWorkerUrl: jest.fn(),
+        normalizeWorkerUrl: jest.fn((value) => `normalized:${value}`),
         buildSignedBootstrapAdminAuth: jest.fn(),
         buildSignedAdminActionAuth: jest.fn(),
         buildSiweMessage: jest.fn(),
@@ -47,6 +47,8 @@ describe('admin worker ports', () => {
       currentOrigin: 'https://app.example',
       extraOrigins: ['https://extra.example'],
     })).toEqual(['https://second.example']);
+    expect(ports.workerUrl.normalizeWorkerUrl(' https://worker.example.test/ '))
+      .toBe('normalized: https://worker.example.test/ ');
 
     expect(firstCorsProxy.resolveCorsProxyUrl).toHaveBeenCalledWith({
       sessionSlug: 'edge',
@@ -62,14 +64,14 @@ describe('admin worker ports', () => {
   it('routes signed admin actions and worker fetches through late workerAuth lookup', async () => {
     const firstWorkerAuth: AdminWorkerAuthModule = {
       normalizeWorkerUrl: jest.fn(),
-      buildSignedBootstrapAdminAuth: jest.fn(),
+      buildSignedBootstrapAdminAuth: jest.fn(async () => ({ signature: '0xfirstBootstrap' })),
       buildSignedAdminActionAuth: jest.fn(async () => ({ signature: '0xfirst' })),
       buildSiweMessage: jest.fn(() => 'first-message'),
       fetchWorkerWithAuth: jest.fn(async () => ({ ok: true, status: 200 })),
     };
     const secondWorkerAuth: AdminWorkerAuthModule = {
       normalizeWorkerUrl: jest.fn(),
-      buildSignedBootstrapAdminAuth: jest.fn(),
+      buildSignedBootstrapAdminAuth: jest.fn(async () => ({ signature: '0xsecondBootstrap' })),
       buildSignedAdminActionAuth: jest.fn(async () => ({ signature: '0xsecond' })),
       buildSiweMessage: jest.fn(() => 'second-message'),
       fetchWorkerWithAuth: jest.fn(async () => ({ ok: true, status: 201 })),
@@ -91,6 +93,11 @@ describe('admin worker ports', () => {
 
     await expect(ports.adminAuth.buildSignedAdminActionAuth(authInput))
       .resolves.toEqual({ signature: '0xfirst' });
+    await expect(ports.adminAuth.buildSignedBootstrapAdminAuth({
+      slug: 'edge',
+      workerUrl: 'https://worker.example.test',
+      context: { account: '0xabc' },
+    })).resolves.toEqual({ signature: '0xfirstBootstrap' });
 
     workerAuth = secondWorkerAuth;
 
@@ -101,6 +108,11 @@ describe('admin worker ports', () => {
     )).resolves.toEqual({ ok: true, status: 201 });
 
     expect(firstWorkerAuth.buildSignedAdminActionAuth).toHaveBeenCalledWith(authInput);
+    expect(firstWorkerAuth.buildSignedBootstrapAdminAuth).toHaveBeenCalledWith({
+      slug: 'edge',
+      workerUrl: 'https://worker.example.test',
+      context: { account: '0xabc' },
+    });
     expect(secondWorkerAuth.fetchWorkerWithAuth).toHaveBeenCalledWith(
       'https://worker.example.test/ai',
       { method: 'POST' },
