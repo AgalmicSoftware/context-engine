@@ -12,12 +12,26 @@ import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
 import { buildSiweMessage } from '../worker/workerAuth.js';
 import { normalizeSessionSlug } from './sessionConfigResolvers.js';
 
-type AnyRecord = Record<string, any>;
+type SignerLike = {
+  getAddress: () => Promise<string> | string;
+  signMessage: (message: string) => Promise<string> | string;
+};
+type SessionConfigFields = {
+  networkChainId?: unknown;
+  slug?: unknown;
+};
+type ErrorMessageSource = {
+  message?: unknown;
+};
+type NonceResponseBody = {
+  error?: unknown;
+  nonce?: unknown;
+};
 type BuildArweaveUploadBootstrapAuthOptions = {
-  signer?: AnyRecord | null;
+  signer?: unknown;
   providerLike?: unknown;
   sessionSlug?: unknown;
-  sessionConfig?: AnyRecord | null;
+  sessionConfig?: unknown;
 };
 type BuildArweaveUploadBootstrapAuthResult = {
   address: string;
@@ -30,23 +44,42 @@ type RetryOptions = {
   baseDelayMs?: number;
 };
 
+const asSignerLike = (value: unknown): SignerLike | null => (
+  value &&
+  typeof value === 'object' &&
+  typeof (value as Partial<SignerLike>).signMessage === 'function' &&
+  typeof (value as Partial<SignerLike>).getAddress === 'function'
+    ? value as SignerLike
+    : null
+);
+
+const asSessionConfigFields = (value: unknown): SessionConfigFields => (
+  value && typeof value === 'object' ? value as SessionConfigFields : {}
+);
+
+const asErrorMessageSource = (value: unknown): ErrorMessageSource => (
+  value && typeof value === 'object' ? value as ErrorMessageSource : {}
+);
+
 export const buildArweaveUploadBootstrapAuth = async ({
   signer = null,
   providerLike = null,
   sessionSlug = '',
   sessionConfig = null,
 }: BuildArweaveUploadBootstrapAuthOptions = {}): Promise<BuildArweaveUploadBootstrapAuthResult | null> => {
-  if (!signer || typeof signer.signMessage !== 'function') return null;
-  const slug = normalizeSessionSlug(sessionSlug || sessionConfig?.slug || '');
+  const signerLike = asSignerLike(signer);
+  if (!signerLike) return null;
+  const sessionConfigFields = asSessionConfigFields(sessionConfig);
+  const slug = normalizeSessionSlug(sessionSlug || sessionConfigFields.slug || '');
   let signerAddress = '';
   try {
-    signerAddress = await signer.getAddress();
+    signerAddress = await signerLike.getAddress();
   } catch (_) {
     signerAddress = '';
   }
   if (!signerAddress) return null;
 
-  const chainId = Number(sessionConfig?.networkChainId || 0) || 1;
+  const chainId = Number(sessionConfigFields.networkChainId || 0) || 1;
   const workerUrl = await getCorsProxyUrlOrThrow({
     sessionSlug: slug,
     sessionConfig,
@@ -65,9 +98,9 @@ export const buildArweaveUploadBootstrapAuth = async ({
       sessionSlug: slug,
     }),
   });
-  const nonceData = await nonceResp.json().catch(() => ({}));
+  const nonceData = await nonceResp.json().catch(() => ({})) as NonceResponseBody;
   if (!nonceResp.ok) {
-    throw new Error(nonceData?.error || 'Failed to request Arweave bootstrap nonce.');
+    throw new Error(String(nonceData?.error || 'Failed to request Arweave bootstrap nonce.'));
   }
 
   const message = buildSiweMessage({
@@ -76,7 +109,7 @@ export const buildArweaveUploadBootstrapAuth = async ({
     chainId,
     statement: 'Admin request: bootstrap arweave upload',
   });
-  const signature = await signer.signMessage(message);
+  const signature = await signerLike.signMessage(message);
   const recovered = ethers.utils.verifyMessage(message, signature);
   if (!recovered || recovered.toLowerCase() !== signerAddress.toLowerCase()) {
     throw new Error('Arweave bootstrap signature does not match signer address.');
@@ -91,7 +124,7 @@ export const buildArweaveUploadBootstrapAuth = async ({
 };
 
 export const isRetryableArweaveUploadError = (error: unknown): boolean => {
-  const source = (error && typeof error === 'object') ? error as AnyRecord : {};
+  const source = asErrorMessageSource(error);
   const msg = String(source.message || error || '').toLowerCase();
   if (!msg) return false;
 
@@ -123,7 +156,7 @@ export const uploadDataToArweaveWithRetry = async (
   let lastErr: unknown = null;
   for (let i = 0; i < attempts; i += 1) {
     try {
-      return await arweaveScripts.uploadDataToArweave(data, format, opts as AnyRecord | undefined);
+      return await arweaveScripts.uploadDataToArweave(data, format, opts as Record<string, unknown> | undefined);
     } catch (err) {
       lastErr = err;
       if (i >= attempts - 1 || !isRetryableArweaveUploadError(err)) {
