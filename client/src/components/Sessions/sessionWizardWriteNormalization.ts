@@ -6,7 +6,6 @@ import {
 } from '../../utilities/session/sessionMetadata.js';
 import { normalizeBlockLimitsForConfig } from '../../utilities/session/blockLimits.js';
 import { SESSION_WORKER_METADATA_ALIAS_KEYS } from '../../utilities/session/sessionWorkerUrlCompatibility.js';
-import { toStr } from '../../utilities/shared/primitives.js';
 import { sessionRegistryUtils } from '../../utilities/web3/sessionRegistry.js';
 import {
   getSessionWizardContractDefaults,
@@ -16,6 +15,9 @@ import {
 import {
   SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS,
   buildSessionWizardRegistrySessionFields,
+  cloneValue,
+  isObj,
+  trimString,
 } from '../../domains/sessions/registry/sessionRegistryWriteNormalization.js';
 import { buildWorkerLitCredentialsConfig } from './sessionWizardWorkerSecretSupport';
 import {
@@ -29,19 +31,6 @@ import type {
   SessionContractsLike,
   WorkerSecretsLike,
 } from '../shellTypes';
-
-const isObj = (value: unknown): value is AnyRecord => !!value && typeof value === 'object' && !Array.isArray(value);
-const trimString = (value: unknown): string => toStr(value).trim();
-const cloneValue = <T = unknown>(value: T): T => {
-  if (Array.isArray(value)) return value.map((entry) => cloneValue(entry)) as T;
-  if (isObj(value)) {
-    return Object.keys(value).reduce<AnyRecord>((acc, key) => {
-      acc[key] = cloneValue(value[key]);
-      return acc;
-    }, {}) as T;
-  }
-  return (typeof value === 'string' ? value.trim() : value) as T;
-};
 
 const WORKER_METADATA_ALIAS_KEYS = Object.freeze([
   ...SESSION_WORKER_METADATA_ALIAS_KEYS,
