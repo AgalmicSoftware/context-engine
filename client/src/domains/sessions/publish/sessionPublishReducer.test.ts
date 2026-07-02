@@ -1,4 +1,5 @@
 import {
+  buildSessionPublishEffectQueue,
   createInitialSessionPublishState,
   getNextSessionPublishEffect,
   sessionPublishReducer,
@@ -18,6 +19,20 @@ const reduceActions = (actions: SessionPublishAction[]) => actions.reduce(
 );
 
 describe('sessionPublishReducer', () => {
+  it('keeps the publish reducer queue free of navigation effects', () => {
+    expect(buildSessionPublishEffectQueue(publishPlan({
+      autoDeployWorker: true,
+      deployPendingSbts: true,
+    }))).toEqual([
+      'checkRequirements',
+      'deployWorker',
+      'deployPendingSbts',
+      'uploadMetadata',
+      'registerSession',
+      'refreshRegistryCache',
+    ]);
+  });
+
   it('models the normal upload, register, refresh, and published flow', () => {
     const state = reduceActions([
       { type: 'beginPublish', plan: publishPlan() },
