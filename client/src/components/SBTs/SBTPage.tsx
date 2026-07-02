@@ -5,24 +5,16 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCopy, faCheck, faSpinner, faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
 import { ethers } from 'ethers';
 import {
-  addHashedPasswords,
-  burnToken,
-  claimWithPassword,
-  getOwnerByTokenId,
-  getSBTTokenIdByOwner,
-  getSbtHistorySummary,
-  isPasswordValid,
-  startClaim,
-} from '../../utilities/sbt/sbtPageRuntime.js';
-import {
   getDemoSessionConfigBySlug,
   getSessionChainId,
   getSessionConfigBySlugOrDefault,
   normalizeSessionSlug,
 } from '../../domains/sessions/sessionConfig.js';
+import { sbtAdminOpsPort } from '../../domains/sbts/contractScriptsSbtAdminOpsPort.js';
 import { sbtGroupMintAuthorizationPort } from '../../domains/sbts/contractScriptsSbtGroupMintAuthorizationPort.js';
 import { sbtMetadataReadsPort } from '../../domains/sbts/contractScriptsSbtMetadataReadsPort.js';
 import { sbtMintExecutionPort } from '../../domains/sbts/contractScriptsSbtMintExecutionPort.js';
+import { sbtOwnershipReadsPort } from '../../domains/sbts/contractScriptsSbtOwnershipReadsPort.js';
 import { getChainBlockTimeMs } from '../../variables/chains.js';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import styles from './SBTPage.module.scss';
@@ -1748,7 +1740,7 @@ class SBTPage extends Component<any, any> {
         const hashed = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(token));
         let ok = false;
         try {
-          ok = await isPasswordValid(provider, sbtAddressOriginalCase, hashed, targetSlug);
+          ok = await sbtAdminOpsPort.isPasswordValid(provider, sbtAddressOriginalCase, hashed, targetSlug);
         } catch {
           ok = false;
         }
@@ -2006,10 +1998,11 @@ class SBTPage extends Component<any, any> {
     }
     const zero = String(ethers.constants.AddressZero || '').toLowerCase();
     const holders = new Set<string>();
+    const sbtAddressForLookup = String(sbtAddress || '').trim();
     const probeOwnerByTokenId = async (tokenId: number): Promise<void> => {
       let owner: unknown = null;
       try {
-        owner = await getOwnerByTokenId('none', sbtAddress, tokenId, sessionSlug);
+        owner = await sbtOwnershipReadsPort.getOwnerByTokenId('none', sbtAddressForLookup, tokenId, sessionSlug);
       } catch (_) {
         owner = null;
       }
@@ -2591,7 +2584,7 @@ class SBTPage extends Component<any, any> {
         setSummaryFallbacks(historySummary, 'summary-cache');
         if (mintedTokensOverride == null) {
           try {
-            const summaryRaw = await getSbtHistorySummary('none', sbtAddressOriginalCase, resolvedSlug);
+            const summaryRaw = await sbtOwnershipReadsPort.getSbtHistorySummary('none', sbtAddressOriginalCase, resolvedSlug);
             if (!isCurrentLoad()) return;
             historySummary = normalizeSbtPageHistorySummary(summaryRaw) || historySummary;
             setSummaryFallbacks(historySummary, 'summary-group');
@@ -2607,7 +2600,7 @@ class SBTPage extends Component<any, any> {
         if (mintedTokensOverride == null && sbtInfo?.chainID != null) {
           try {
             const fallbackCfg = { networkChainId: Number(sbtInfo.chainID) };
-            const summaryRaw = await getSbtHistorySummary('none', sbtAddressOriginalCase, fallbackCfg);
+            const summaryRaw = await sbtOwnershipReadsPort.getSbtHistorySummary('none', sbtAddressOriginalCase, fallbackCfg);
             if (!isCurrentLoad()) return;
             historySummary = normalizeSbtPageHistorySummary(summaryRaw) || historySummary;
             setSummaryFallbacks(historySummary, 'summary-chainId');
@@ -3136,7 +3129,7 @@ class SBTPage extends Component<any, any> {
           // isPasswordValid() is a free view call and saves two wasted txs on bad passwords.
           const hashedPassword = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(effectivePassword));
           try {
-            const isValid = await isPasswordValid(
+            const isValid = await sbtAdminOpsPort.isPasswordValid(
               this.props.provider,
               sbtAddressOriginalCase,
               hashedPassword,
@@ -3170,7 +3163,7 @@ class SBTPage extends Component<any, any> {
             [effectivePassword, mintAccount]
           );
 
-          const tx = await startClaim(this.props.provider, sbtAddressOriginalCase, userCommit);
+          const tx = await sbtAdminOpsPort.startClaim(this.props.provider, sbtAddressOriginalCase, userCommit);
           if (
             this._isMounted &&
             this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })
@@ -3200,7 +3193,7 @@ class SBTPage extends Component<any, any> {
             sbtAddress: sbtAddressOriginalCase,
             sessionSlug: slug,
           });
-          const tx = await claimWithPassword(this.props.provider, sbtAddressOriginalCase, effectivePassword);
+          const tx = await sbtAdminOpsPort.claimWithPassword(this.props.provider, sbtAddressOriginalCase, effectivePassword);
           this.cacheTransactionHash(tx.transactionHash, mintAccountLower);
           await this.completeMintSuccessForTarget({
             accountLower: mintAccountLower,
@@ -3269,13 +3262,13 @@ class SBTPage extends Component<any, any> {
 
       if (!sbtAddressOriginalCase) return;
 
-      const tokenIdToBurn = await getSBTTokenIdByOwner('none', sbtAddressOriginalCase, this.props.account, this.getEffectiveSessionSlug());
+      const tokenIdToBurn = await sbtOwnershipReadsPort.getSBTTokenIdByOwner('none', sbtAddressOriginalCase, this.props.account, this.getEffectiveSessionSlug());
       if (!tokenIdToBurn) {
         if (this._isMounted) this.setState(buildSbtPageBurnFailurePatch({ error: "No valid token ID found" }));
         return;
       }
 
-      const tx = await burnToken(this.props.provider, sbtAddressOriginalCase, tokenIdToBurn);
+      const tx = await sbtAdminOpsPort.burnToken(this.props.provider, sbtAddressOriginalCase, tokenIdToBurn);
       await this.loadSBTInfo(true);
       if (this._isMounted) this.setState(buildSbtPageBurnSuccessPatch({ txHash: tx.transactionHash }));
       this.cacheTransactionHash(tx.transactionHash);
@@ -3323,7 +3316,7 @@ class SBTPage extends Component<any, any> {
     try {
       // Full address search
       if (input.startsWith('0x') && input.length === 42) {
-        const tokenId = await getSBTTokenIdByOwner(
+        const tokenId = await sbtOwnershipReadsPort.getSBTTokenIdByOwner(
           'none',
           sbtAddressOriginalCase,
           input,
@@ -3339,7 +3332,7 @@ class SBTPage extends Component<any, any> {
       }
       // Numeric tokenId search
       else if (/^\d+$/.test(input)) {
-        const address = await getOwnerByTokenId(
+        const address = await sbtOwnershipReadsPort.getOwnerByTokenId(
           'none',
           sbtAddressOriginalCase,
           input,
@@ -3393,7 +3386,7 @@ class SBTPage extends Component<any, any> {
       tokenIdToBurn = burnSearchResultRecord.tokenId;
       burnedAddrLower = burnSearchResultRecord.address ? String(burnSearchResultRecord.address).toLowerCase() : null;
     } else if (isOwnerBurn) {
-      tokenIdToBurn = await getSBTTokenIdByOwner('none', sbtAddressOriginalCase, this.props.account, this.getEffectiveSessionSlug());
+      tokenIdToBurn = await sbtOwnershipReadsPort.getSBTTokenIdByOwner('none', sbtAddressOriginalCase, this.props.account, this.getEffectiveSessionSlug());
       burnedAddrLower = userAddress;
       if (!tokenIdToBurn) {
         if (this._isMounted) this.setState(buildSbtPageBurnFailurePatch({ error: "No valid token ID found" }));
@@ -3409,7 +3402,7 @@ class SBTPage extends Component<any, any> {
 
     try {
       if (this._isMounted) this.setState(buildSbtPageBurnPendingPatch());
-      const tx = await burnToken(this.props.provider, sbtAddressOriginalCase, tokenIdToBurn);
+      const tx = await sbtAdminOpsPort.burnToken(this.props.provider, sbtAddressOriginalCase, tokenIdToBurn);
       await this.loadSBTInfo(true);
       if (this._isMounted) this.setState(buildSbtPageBurnSuccessPatch({
         resetBurnSearch: true,
@@ -3545,7 +3538,7 @@ class SBTPage extends Component<any, any> {
       const sbtAddressOriginalCase = resolveSbtAddressString(this.props.SBTAddress);
       if (!sbtAddressOriginalCase) return;
 
-      const tx = await addHashedPasswords(this.props.provider, sbtAddressOriginalCase, hashedPasswords);
+      const tx = await sbtAdminOpsPort.addHashedPasswords(this.props.provider, sbtAddressOriginalCase, hashedPasswords);
       sbtLog.log("addHashedPasswords transaction hash:", tx.transactionHash);
 
       this.cacheTransactionHash(tx.transactionHash);
@@ -3783,7 +3776,7 @@ class SBTPage extends Component<any, any> {
       return;
     }
 
-    const tx = await burnToken(this.props.provider, sbtAddressOriginalCaseForAdminBurn, burnSearchResultRecord?.tokenId);
+    const tx = await sbtAdminOpsPort.burnToken(this.props.provider, sbtAddressOriginalCaseForAdminBurn, burnSearchResultRecord?.tokenId);
     await this.loadSBTInfo(true);
     if (this._isMounted) this.setState(buildSbtPageBurnSuccessPatch({
       resetBurnSearch: true,
