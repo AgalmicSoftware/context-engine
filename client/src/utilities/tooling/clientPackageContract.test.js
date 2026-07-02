@@ -45,6 +45,7 @@ const expectedLintCommand = [
   '"src/components/DebateMap/**/*.{ts,tsx}"',
   '"src/components/Navbar/**/*.{ts,tsx}"',
   '"src/components/ContractPage/**/*.{ts,tsx}"',
+  '"src/components/OnePageSession/**/*.{ts,tsx}"',
 ].join(' ');
 
 describe('client package modernization contract', () => {
@@ -91,6 +92,7 @@ describe('client package modernization contract', () => {
     expect(eslintConfig).toContain("const typedDebateMapComponentFiles = ['src/components/DebateMap/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedNavbarComponentFiles = ['src/components/Navbar/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedContractPageComponentFiles = ['src/components/ContractPage/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedOnePageSessionComponentFiles = ['src/components/OnePageSession/**/*.{ts,tsx}']");
   });
 
   it('keeps web3-sensitive dependencies pinned during modernization', () => {
