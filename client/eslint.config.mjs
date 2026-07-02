@@ -11,6 +11,7 @@ const typedWorkerUtilityFiles = ['src/utilities/worker/**/*.{ts,tsx}'];
 const typedArweaveUtilityFiles = ['src/utilities/arweave/**/*.{ts,tsx}'];
 const typedCacheUtilityFiles = ['src/utilities/cache/**/*.{ts,tsx}'];
 const typedSurveyUtilityFiles = ['src/utilities/survey/**/*.{ts,tsx}'];
+const typedSbtUtilityFiles = ['src/utilities/sbt/**/*.{ts,tsx}'];
 const typedUiUtilityFiles = ['src/utilities/ui/**/*.{ts,tsx}'];
 const typedSharedComponentFiles = ['src/components/Shared/**/*.{ts,tsx}'];
 const typedInformationalComponentFiles = [
@@ -144,6 +145,14 @@ export default [
   },
   {
     files: typedSurveyUtilityFiles,
+    languageOptions: sharedLanguageOptions,
+    rules: {
+      ...sharedRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedSbtUtilityFiles,
     languageOptions: sharedLanguageOptions,
     rules: {
       ...sharedRules,
