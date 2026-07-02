@@ -30,7 +30,7 @@ import {
   faExclamationCircle
 } from '@fortawesome/free-solid-svg-icons';
 
-import contractScripts, {
+import {
   getAllSessionSlugs,
   getSessionConfigBySlug,
 } from '../../utilities/web3/contractScripts.js';
@@ -258,6 +258,9 @@ import {
 import {
   surveyResultsCachePort,
 } from '../../domains/surveys/surveyResultsCachePort';
+import {
+  chainScanReadsPort,
+} from '../../domains/chain/contractScriptsChainScanReadsPort';
 import { getPolisDemoQuestionPool } from './surveyPolisDemoQuestionPool.js';
 import {
   runSurveyResultsBrowserDownload,
@@ -1572,7 +1575,7 @@ const updateParentWithCurrentFiltersForUrl = (): void => {
 const runNonceTickRefresh = async (): Promise<void> => {
     try {
       const slug = getEffectiveSlug();
-      const latest = await contractScripts.getLatestBlockNumber(propsRef.current.provider as string | undefined, slug);
+      const latest = await chainScanReadsPort.getLatestBlockNumber(propsRef.current.provider as string | undefined, slug);
       const refreshStatusSequencePlan = buildSurveyResultsRefreshStatusSequencePlan({
         isMounted: inst._isMounted,
         latestBlock: latest,
@@ -1870,7 +1873,7 @@ const maybeRefreshNetworkLatestBlockFromPolling = (): void => {
     inst._pollLatestBlockLastAttemptAt = now;
     inst._pollLatestBlockFetchInFlight = true;
     const slug = getEffectiveSlug();
-    contractScripts
+    chainScanReadsPort
       .getLatestBlockNumber(propsRef.current.provider as string | undefined, slug)
       .then((blk: unknown) => {
         if (!inst._isMounted) return;
@@ -4405,7 +4408,7 @@ setState(asSurveyResultsStateUpdater((prevState) => buildSurveyResultsBooleanTog
 const handleManualRefresh = async (): Promise<void> => {
 try {
   const slug = getEffectiveSlug();
-	  const latestOnChain = await contractScripts.getLatestBlockNumber(propsRef.current.provider as string | undefined, slug);
+	  const latestOnChain = await chainScanReadsPort.getLatestBlockNumber(propsRef.current.provider as string | undefined, slug);
   const refreshStatusSequencePlan = buildSurveyResultsRefreshStatusSequencePlan({
     latestBlock: latestOnChain,
     followUpEffects: [

@@ -11,9 +11,11 @@ export type ChainReadProvider = {
   ) => Promise<{ blockNumber?: number | null } | null | undefined>;
 };
 
+export type ChainProviderRef = string | undefined;
+
 type ChainScanReadsContractScripts = {
   getLatestBlockNumber: (
-    providerName: string,
+    providerName: ChainProviderRef,
     groupKeyOrCfg?: unknown
   ) => Promise<number>;
   getRelevantBlockWindowForFilter: (
@@ -27,7 +29,7 @@ type ChainScanReadsContractScripts = {
 
 export type ChainScanReadsPort = {
   getLatestBlockNumber: (
-    providerName: string,
+    providerName: ChainProviderRef,
     groupKeyOrCfg?: unknown
   ) => Promise<number>;
   getRelevantBlockWindowForFilter: (
