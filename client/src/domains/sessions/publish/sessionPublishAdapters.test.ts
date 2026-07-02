@@ -245,4 +245,3 @@ describe('session publish adapters', () => {
     );
   });
 });
-

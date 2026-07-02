@@ -208,4 +208,3 @@ describe('sessionPublishReducer', () => {
     expect(getNextSessionPublishEffect(cancelled.plan, cancelled.completed)).toBe('deployWorker');
   });
 });
-
