@@ -153,7 +153,7 @@ export const sanitizeSessionWizardMetadataPayload = (metadata: AnyRecord, {
   delete next.orderHeaderImg;
 
   if (isObj(next.ai)) {
-    const ai = next.ai;
+    const ai = next.ai as AnyRecord;
     const fallbackProvider = normalizeAiProvider(ai.mode || ai.provider || 'openai');
     ai.models = normalizeAiModels(ai.models, fallbackProvider, ai.transcription);
     if (isObj(ai.models?.fast)) {
@@ -215,7 +215,7 @@ export const sanitizeSessionWizardMetadataPayload = (metadata: AnyRecord, {
   }
 
   if (isObj(next.contracts)) {
-    next.contracts = sanitizeContracts(next.contracts);
+    next.contracts = sanitizeContracts(next.contracts as SessionContractsLike);
   }
 
   return orderMetadataFields(next, fieldOrder);
