@@ -182,14 +182,14 @@ import { getEffectiveAiConfig } from 'utilities/ai/aiSettings.js';
 
 import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
 import { createLogger } from 'utilities/logging.js';
+import { checkSponsoredAccess } from '../../domains/sessions/sponsoredAccess.js';
 import {
-  checkSponsoredAccess,
   getDemoSessionConfigBySlug,
   getSessionConfigBySlug,
   getSessionConfigBySlugOrDefault,
   getSessionSlugByName,
   normalizeSessionSlug,
-} from '../../utilities/user/userPageRuntime.js';
+} from '../../domains/sessions/sessionConfig.js';
 import {
   getAllowedSessionSlugs,
   readSessionScanScope,
