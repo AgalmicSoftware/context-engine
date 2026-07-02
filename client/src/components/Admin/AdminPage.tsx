@@ -9,7 +9,6 @@ import {
   USE_ONCHAIN_SESSION_REGISTRY,
 } from '../../variables/appConfig.js';
 import { getDefaultHttpRpc } from '../../variables/chains.js';
-import { corsProxyUtils } from '../../utilities/worker/corsProxy.js';
 import {
   buildSiweMessage,
   buildSignedAdminActionAuth,
@@ -20,7 +19,7 @@ import { arweaveScripts } from '../../utilities/arweave/arweaveScripts.js';
 import { encryptedFieldsUtils } from '../../utilities/crypto/encryptedFields.js';
 import { normalizeOriginList } from '../../utilities/urlUtils.js';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
-import { buildWorkerAllowOrigins } from '../../utilities/worker/workerCorsOrigins.js';
+import { adminWorkerPorts } from '../../domains/worker/adminWorkerPorts.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
   loadSessionRegistryCache,
@@ -867,7 +866,7 @@ const AdminPage = ({
       setWorkerStatus('Resolving worker URL…');
       let resolved;
       try {
-        resolved = await corsProxyUtils.resolveCorsProxyUrl({
+        resolved = await adminWorkerPorts.workerUrl.resolveCorsProxyUrl({
           sessionSlug: selectedSlug,
           sessionConfig: selectedConfig,
           // Never auto-decrypt worker URLs here; keep wallet prompts behind user actions.
@@ -1324,7 +1323,7 @@ const AdminPage = ({
         currentOrigin = toStr(window.location.origin).trim();
       }
     } catch (_) {}
-    return buildWorkerAllowOrigins({
+    return adminWorkerPorts.workerUrl.buildWorkerAllowOrigins({
       currentOrigin,
       extraOrigins,
     });

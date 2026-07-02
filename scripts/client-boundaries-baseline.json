@@ -54,20 +54,8 @@
     {
       "rule": "route-page-no-low-level",
       "source": "client/src/components/Admin/AdminPage.tsx",
-      "import": "../../utilities/worker/corsProxy.js",
-      "resolved": "client/src/utilities/worker/corsProxy"
-    },
-    {
-      "rule": "route-page-no-low-level",
-      "source": "client/src/components/Admin/AdminPage.tsx",
       "import": "../../utilities/worker/workerAuth.js",
       "resolved": "client/src/utilities/worker/workerAuth"
-    },
-    {
-      "rule": "route-page-no-low-level",
-      "source": "client/src/components/Admin/AdminPage.tsx",
-      "import": "../../utilities/worker/workerCorsOrigins.js",
-      "resolved": "client/src/utilities/worker/workerCorsOrigins"
     },
     {
       "rule": "route-page-no-low-level",
