@@ -30,6 +30,17 @@ export type SbtTransactionResult = Record<string, unknown> & {
   transactionHash: string;
 };
 
+export type SbtTokenIdInput = unknown;
+
+export type SbtHistorySummary = {
+  totalMinted?: unknown;
+  totalBurned?: unknown;
+  activeSupply?: unknown;
+  currentHolderCount?: unknown;
+  historicalHolderCount?: unknown;
+  [key: string]: unknown;
+};
+
 export type SbtMetadataReadsPort = {
   getSbtMetadata: (
     providerName: SbtProviderRef,
@@ -72,6 +83,55 @@ export type SbtMintExecutionPort = {
     sbtAddress: string,
     signature: string
   ) => Promise<SbtTransactionResult>;
+};
+
+export type SbtAdminOpsPort = {
+  addHashedPasswords: (
+    providerName: SbtProviderRef,
+    sbtAddress: string,
+    hashedPasswords: string[]
+  ) => Promise<SbtTransactionResult>;
+  burnToken: (
+    providerName: SbtProviderRef,
+    sbtAddress: string,
+    tokenId: SbtTokenIdInput
+  ) => Promise<SbtTransactionResult>;
+  claimWithPassword: (
+    providerName: SbtProviderRef,
+    sbtAddress: string,
+    password: string
+  ) => Promise<SbtTransactionResult>;
+  isPasswordValid: (
+    providerLike: SbtProviderRef,
+    sbtAddress: string,
+    hashedPasswordBytes32: string,
+    groupKeyOrCfg?: SbtGroupKeyOrConfig
+  ) => Promise<boolean>;
+  startClaim: (
+    providerName: SbtProviderRef,
+    sbtAddress: string,
+    userCommit: string
+  ) => Promise<SbtTransactionResult>;
+};
+
+export type SbtOwnershipReadsPort = {
+  getOwnerByTokenId: (
+    providerName: SbtProviderRef,
+    sbtAddress: string,
+    tokenId: SbtTokenIdInput,
+    groupKeyOrCfg?: SbtGroupKeyOrConfig
+  ) => Promise<string | null>;
+  getSBTTokenIdByOwner: (
+    providerName: SbtProviderRef,
+    sbtAddress: string,
+    ownerAddress: string,
+    groupKeyOrCfg?: SbtGroupKeyOrConfig
+  ) => Promise<string | null>;
+  getSbtHistorySummary: (
+    providerName: SbtProviderRef,
+    sbtAddress: string,
+    groupKeyOrCfg?: SbtGroupKeyOrConfig
+  ) => Promise<SbtHistorySummary | null>;
 };
 
 export type SbtGroupPasswordHashInput = {
