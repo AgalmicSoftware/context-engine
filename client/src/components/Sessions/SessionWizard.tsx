@@ -102,8 +102,8 @@ import {
 import {
   createInitialSessionPublishState,
   sessionPublishReducer,
-  type SessionPublishPlan,
 } from '../../domains/sessions/publish/sessionPublishReducer.js';
+import { beginSessionPublishReducerAttempt, markSessionPublishEffectSucceeded, runSessionPublishEffect } from '../../domains/sessions/publish/sessionPublishDispatch.js';
 import SessionWizardInfoTooltip, {
   type SessionWizardTooltipRenderOptions,
 } from './SessionWizardInfoTooltip';
@@ -141,7 +141,6 @@ import {
   runSessionWizardPublishMetadataUploadController,
   runSessionWizardPublishCompletionController,
   runSessionWizardPublishController,
-  type SessionWizardPublishExecutionPlanLike,
   type SessionWizardPublishWorkerSignerArgs,
   type SessionWizardRegisterGroupArgs,
   type SessionWizardRegisterTxEntry,
@@ -620,43 +619,6 @@ const buildProvisionedSponsoredContextState = (
   };
 };
 
-const buildSessionPublishReducerPlan = (
-  publishExecutionPlan: SessionWizardPublishExecutionPlanLike
-): SessionPublishPlan => ({
-  autoDeployWorker: !!publishExecutionPlan.shouldAutoDeployWorker,
-  deployPendingSbts: !!publishExecutionPlan.shouldDeployPendingSbts,
-  uploadMetadata: !!publishExecutionPlan.shouldUploadMetadata,
-  refreshRegistryCache: true,
-});
-
-const readSessionWizardSbtMetadata = async (
-  sbtAddress: string,
-  lookupContext: UnknownRecord
-): Promise<unknown> => {
-  return sessionPublishSbtMetadataAdapter.getSbtMetadata({
-    providerName: 'none',
-    sbtAddress,
-    groupKeyOrCfg: lookupContext,
-  });
-};
-
-const buildSessionWizardSignedBootstrapAdminAuth = (input: {
-  slug?: string;
-  workerUrl?: string;
-  statement?: string;
-  context?: UnknownRecord;
-  nonce?: string;
-}): Promise<UnknownRecord> => workerAuthPublishAdapter.buildSignedBootstrapAdminAuth(input);
-
-const buildSessionWizardSignedAdminActionAuth = (input: {
-  action?: string;
-  slug?: string;
-  body?: UnknownRecord;
-  workerUrl?: string;
-  context?: UnknownRecord;
-  nonce?: string;
-}): Promise<UnknownRecord> => workerAuthPublishAdapter.buildSignedAdminActionAuth(input);
-
 const SessionWizard = ({
   account,
   provider,
@@ -784,13 +746,9 @@ const SessionWizard = ({
   const [adminUrlStatus, setAdminUrlStatus] = useState('');
   const [publishStep, setPublishStep] = useState(0); // 0=idle, 1=deploying sbts/uploading, 2=uploading, 3=registering, 4=done
   const [publishBusy, setPublishBusy] = useState(false);
-  const [sessionPublishState, dispatchSessionPublish] = useReducer(
-    sessionPublishReducer,
-    undefined,
-    () => createInitialSessionPublishState({ status: 'editing' })
-  );
-  const sessionPublishStateRef = useRef(sessionPublishState);
-  sessionPublishStateRef.current = sessionPublishState;
+  const [, dispatchSessionPublish] = useReducer(sessionPublishReducer, undefined, () => (
+    createInitialSessionPublishState({ status: 'editing' })
+  ));
   const publishRequestInFlightRef = useRef(false);
   const [publishStepElapsedMs, setPublishStepElapsedMs] = useState(0);
   const [wizardMode, setWizardMode] = useState('normal');
@@ -1611,10 +1569,11 @@ const SessionWizard = ({
     const run = async () => {
       let sbtName: string = defaultAddr;
       try {
-        const info = await readSessionWizardSbtMetadata(
-          defaultAddr,
-          defaultSponsoredSbtLookupContext
-        );
+        const info = await sessionPublishSbtMetadataAdapter.getSbtMetadata({
+          providerName: 'none',
+          sbtAddress: defaultAddr,
+          groupKeyOrCfg: defaultSponsoredSbtLookupContext,
+        });
         const displayName = toStr(getSbtDisplayName(info)).trim();
         if (displayName) sbtName = displayName;
       } catch (e) { log.warn('SessionWizard: fallback', e); }
@@ -3533,14 +3492,7 @@ const SessionWizard = ({
         canUploadMetadataNow,
       });
       const { publishExecutionPlan } = publishRequestDescriptor;
-      dispatchSessionPublish({
-        type: 'beginPublish',
-        plan: buildSessionPublishReducerPlan(publishExecutionPlan),
-      });
-      dispatchSessionPublish({
-        type: 'effectSucceeded',
-        effect: 'checkRequirements',
-      });
+      beginSessionPublishReducerAttempt(dispatchSessionPublish, publishExecutionPlan);
       let uploadResult = null;
       let workerUrlOverride = '';
       let deployedPendingDrafts = [];
@@ -3550,48 +3502,25 @@ const SessionWizard = ({
           signerAccountOverride,
         },
         ports: {
-          deployWorker: async () => {
-            try {
-              const deployResult = await handleDeployWorker({ forceSponsoredAutoDeploy: true });
-              dispatchSessionPublish({
-                type: 'effectSucceeded',
-                effect: 'deployWorker',
-                result: {
-                  workerUrl: deployResult?.workerUrl || '',
-                },
-              });
-              return deployResult;
-            } catch (err) {
-              dispatchSessionPublish({
-                type: 'effectFailed',
-                effect: 'deployWorker',
-                message: getSessionWizardErrorMessage(err),
-                recoverable: true,
-              });
-              throw err;
-            }
-          },
+          deployWorker: () => runSessionPublishEffect({
+            dispatch: dispatchSessionPublish,
+            effect: 'deployWorker',
+            getErrorMessage: getSessionWizardErrorMessage,
+            run: () => handleDeployWorker({ forceSponsoredAutoDeploy: true }),
+            result: (deployResult) => ({ workerUrl: deployResult?.workerUrl || '' }),
+          }),
           deployPendingSbts: ({ workerUrlOverride: pendingWorkerUrlOverride, signerAccountOverride }) => (
-            deployPendingSbtDrafts({
-              workerUrlOverride: pendingWorkerUrlOverride,
-              signerAccountOverride,
-            }).then((deployedDrafts) => {
-              dispatchSessionPublish({
-                type: 'effectSucceeded',
-                effect: 'deployPendingSbts',
-                result: {
-                  deployedPendingSbtCount: deployedDrafts.length,
-                },
-              });
-              return deployedDrafts;
-            }).catch((err) => {
-              dispatchSessionPublish({
-                type: 'effectFailed',
-                effect: 'deployPendingSbts',
-                message: getSessionWizardErrorMessage(err),
-                recoverable: true,
-              });
-              throw err;
+            runSessionPublishEffect({
+              dispatch: dispatchSessionPublish,
+              effect: 'deployPendingSbts',
+              getErrorMessage: getSessionWizardErrorMessage,
+              run: () => deployPendingSbtDrafts({
+                workerUrlOverride: pendingWorkerUrlOverride,
+                signerAccountOverride,
+              }),
+              result: (deployedDrafts) => ({
+                deployedPendingSbtCount: deployedDrafts.length,
+              }),
             })
           ),
         },
@@ -3609,27 +3538,13 @@ const SessionWizard = ({
       const metadataUploadControllerResult = await runSessionWizardPublishMetadataUploadController({
         request: metadataUploadRequest,
         ports: {
-          uploadMetadata: async (args) => {
-            try {
-              const result = await handleUploadMetadata(args);
-              dispatchSessionPublish({
-                type: 'effectSucceeded',
-                effect: 'uploadMetadata',
-                result: {
-                  metadataUri: result?.metadataUri || '',
-                },
-              });
-              return result;
-            } catch (err) {
-              dispatchSessionPublish({
-                type: 'effectFailed',
-                effect: 'uploadMetadata',
-                message: getSessionWizardErrorMessage(err),
-                recoverable: true,
-              });
-              throw err;
-            }
-          },
+          uploadMetadata: (args) => runSessionPublishEffect({
+            dispatch: dispatchSessionPublish,
+            effect: 'uploadMetadata',
+            getErrorMessage: getSessionWizardErrorMessage,
+            run: () => handleUploadMetadata(args),
+            result: (result) => ({ metadataUri: result?.metadataUri || '' }),
+          }),
         },
         callbacks: {
           setPublishStep,
@@ -3641,25 +3556,13 @@ const SessionWizard = ({
         uploadResult,
       });
       setPublishStep(registerStepRequest.publishStep);
-      try {
-        await handleRegisterGroup(registerStepRequest.registerGroupArgs);
-        dispatchSessionPublish({
-          type: 'effectSucceeded',
-          effect: 'registerSession',
-        });
-        dispatchSessionPublish({
-          type: 'effectSucceeded',
-          effect: 'refreshRegistryCache',
-        });
-      } catch (err) {
-        dispatchSessionPublish({
-          type: 'effectFailed',
-          effect: 'registerSession',
-          message: getSessionWizardErrorMessage(err),
-          recoverable: true,
-        });
-        throw err;
-      }
+      await runSessionPublishEffect({
+        dispatch: dispatchSessionPublish,
+        effect: 'registerSession',
+        getErrorMessage: getSessionWizardErrorMessage,
+        run: () => handleRegisterGroup(registerStepRequest.registerGroupArgs),
+      });
+      markSessionPublishEffectSucceeded(dispatchSessionPublish, 'refreshRegistryCache');
       const completionRequest = resolveSessionWizardPublishCompletionRequest({
         publishExecutionPlan,
         deployedPendingDrafts,
@@ -4024,7 +3927,7 @@ const SessionWizard = ({
     const baseUrl = normalizeWorkerUrl(toStr(workerUrl || resolveWorkerBaseUrl()).trim());
     if (!baseUrl) throw new Error('Worker URL is missing.');
     const authAccount = toStr(accountOverride || resolvedWalletAccountRef.current || account).trim();
-    return buildSessionWizardSignedBootstrapAdminAuth({
+    return workerAuthPublishAdapter.buildSignedBootstrapAdminAuth({
       slug: normalizeSlug(targetSlug),
       workerUrl: baseUrl,
       statement: toStr(statement).trim(),
@@ -4072,7 +3975,7 @@ const SessionWizard = ({
     const baseUrl = normalizeWorkerUrl(toStr(workerUrl || resolveWorkerBaseUrl()).trim());
     if (!baseUrl) throw new Error('Worker URL is missing.');
     const authAccount = toStr(accountOverride || resolvedWalletAccountRef.current || account).trim();
-    return buildSessionWizardSignedAdminActionAuth({
+    return workerAuthPublishAdapter.buildSignedAdminActionAuth({
       action: toStr(action).trim() || 'set-config',
       slug: normalizeSlug(targetSlug),
       body,
