@@ -23,12 +23,6 @@
     },
     {
       "rule": "no-passthrough-facade",
-      "source": "client/src/utilities/tags/tagPageRuntime.ts",
-      "import": "<passthrough-facade>",
-      "resolved": "client/src/utilities/tags/tagPageRuntime.ts"
-    },
-    {
-      "rule": "no-passthrough-facade",
       "source": "client/src/utilities/user/userPageRuntime.ts",
       "import": "<passthrough-facade>",
       "resolved": "client/src/utilities/user/userPageRuntime.ts"
