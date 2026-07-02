@@ -5,12 +5,6 @@
   "violations": [
     {
       "rule": "no-passthrough-facade",
-      "source": "client/src/utilities/contracts/contractPageRuntime.ts",
-      "import": "<passthrough-facade>",
-      "resolved": "client/src/utilities/contracts/contractPageRuntime.ts"
-    },
-    {
-      "rule": "no-passthrough-facade",
       "source": "client/src/utilities/sbt/sbtPageRuntime.ts",
       "import": "<passthrough-facade>",
       "resolved": "client/src/utilities/sbt/sbtPageRuntime.ts"
