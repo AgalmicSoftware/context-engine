@@ -65,6 +65,28 @@ export type SbtMetadataReadsPort = {
     groupKeyOrCfg?: SbtGroupKeyOrConfig,
     fields?: SbtOnChainConfigFields
   ) => Promise<SbtOnChainConfig>;
+  getSbtCreationBlockByAddress: (
+    providerName: SbtProviderRef,
+    sbtAddress: string,
+    groupKeyOrCfg?: SbtGroupKeyOrConfig,
+    options?: SbtReadOptions
+  ) => Promise<number | null>;
+};
+
+export type SbtEventStreamsPort = {
+  removeSBTEventListener: (
+    providerName: SbtProviderRef,
+    sessionSlug: string
+  ) => unknown;
+  removeSurveyEventsListener: (
+    providerName: SbtProviderRef,
+    sessionSlug: string
+  ) => unknown;
+  removeSBTInstanceEventsListener: (
+    providerName: SbtProviderRef,
+    addresses: unknown[],
+    sessionSlug: string
+  ) => unknown;
 };
 
 export type SbtMintExecutionPort = {
