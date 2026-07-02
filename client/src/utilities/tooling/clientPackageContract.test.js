@@ -50,6 +50,7 @@ const expectedLintCommand = [
   '"src/components/DocumentLibrary/**/*.{ts,tsx}"',
   '"src/components/DemoViews/**/*.{ts,tsx}"',
   '"src/components/Account/**/*.{ts,tsx}"',
+  '"src/components/Admin/**/*.{ts,tsx}"',
 ].join(' ');
 
 describe('client package modernization contract', () => {
@@ -101,6 +102,7 @@ describe('client package modernization contract', () => {
     expect(eslintConfig).toContain("const typedDocumentLibraryComponentFiles = ['src/components/DocumentLibrary/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedDemoViewsComponentFiles = ['src/components/DemoViews/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedAccountComponentFiles = ['src/components/Account/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedAdminComponentFiles = ['src/components/Admin/**/*.{ts,tsx}']");
   });
 
   it('keeps web3-sensitive dependencies pinned during modernization', () => {
