@@ -50,7 +50,7 @@ import {
   sessionRegistryStore,
   sessionRegistryUtils,
 } from '../../utilities/web3/sessionRegistry.js';
-import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
+import { normalizeSessionMediaUrl } from '../../domains/sessions/sessionMediaUrls.js';
 import {
   readSessionScanScope,
   readSessionScanSlugs,
@@ -1725,7 +1725,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
       overrides: this.state.sessionHeaderOverrides || {},
       normalizeSessionSlug,
       getDemoSessionConfigBySlug,
-      normalizeArweaveUrl,
+      normalizeArweaveUrl: normalizeSessionMediaUrl,
     });
   };
 
