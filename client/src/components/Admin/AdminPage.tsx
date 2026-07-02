@@ -2292,7 +2292,7 @@ const AdminPage = ({
                   )}
                 </div>
                 <div className={styles.heroSessionPrimaryBody}>
-                  {!!availableSessions.length ? (
+                  {availableSessions.length > 0 ? (
                     <Input
                       type="select"
                       value={selectedSlug}
@@ -2358,7 +2358,7 @@ const AdminPage = ({
                       </div>
                     )}
                   </div>
-                  {!!selectedConfig ? (
+                  {selectedConfig ? (
                     <div className={styles.heroSessionDetailBody}>
                       <div className={styles.heroWorkerRow}>
                         <div className={styles.heroCardInputShell}>
