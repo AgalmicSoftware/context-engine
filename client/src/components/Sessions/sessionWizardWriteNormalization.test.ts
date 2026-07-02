@@ -187,6 +187,7 @@ describe('sessionWizardWriteNormalization', () => {
       chainId: DEFAULT_CONFIG_CHAIN_ID,
       slug: 'edge',
       fields: onChainFields,
+      gasPriceGwei: '1',
     });
 
     expect(contractMock.estimateGas.setSessionFields).not.toHaveBeenCalled();
