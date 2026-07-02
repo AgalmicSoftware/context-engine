@@ -13,6 +13,7 @@ const typedCacheUtilityFiles = ['src/utilities/cache/**/*.{ts,tsx}'];
 const typedSurveyUtilityFiles = ['src/utilities/survey/**/*.{ts,tsx}'];
 const typedSbtUtilityFiles = ['src/utilities/sbt/**/*.{ts,tsx}'];
 const typedUserUtilityFiles = ['src/utilities/user/**/*.{ts,tsx}'];
+const typedSponsorUtilityFiles = ['src/utilities/sponsor/**/*.{ts,tsx}'];
 const typedUiUtilityFiles = ['src/utilities/ui/**/*.{ts,tsx}'];
 const typedSharedComponentFiles = ['src/components/Shared/**/*.{ts,tsx}'];
 const typedInformationalComponentFiles = [
@@ -162,6 +163,14 @@ export default [
   },
   {
     files: typedUserUtilityFiles,
+    languageOptions: sharedLanguageOptions,
+    rules: {
+      ...sharedRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedSponsorUtilityFiles,
     languageOptions: sharedLanguageOptions,
     rules: {
       ...sharedRules,
