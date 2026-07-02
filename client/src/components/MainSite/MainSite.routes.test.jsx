@@ -10,7 +10,11 @@ import {
   getSessionConfigBySlug,
   normalizeSessionSlug,
 } from '../../utilities/web3/contractScripts.js';
-import { sessionRegistryStore } from '../../utilities/web3/sessionRegistry.js';
+import {
+  SESSION_REGISTRY_CACHE_UPDATED_EVENT,
+  loadGroupRegistryCache,
+  sessionRegistryStore,
+} from '../../utilities/web3/sessionRegistry.js';
 import { FIRST_VISIT_STORAGE_KEY } from '../Onboarding/onboardingConfig.js';
 import { FIRST_VISIT_ROOT_REDIRECT_CONSUMED_STORAGE_KEY } from './sessionFallbackRedirect.js';
 import { getPolisDemoQuestionPool } from '../SurveyTool/surveyPolisDemoQuestionPool';
@@ -243,16 +247,27 @@ jest.mock('../../utilities/web3/contractScripts.js', () => {
   const contractScripts = {
     decryptQuestionPayloadInPlace: jest.fn(),
     getAllSbtAddressesCached: jest.fn(),
+    getLatestBlockNumber: jest.fn(),
     getQuestionData: jest.fn(),
+    getReadProviderForSession: jest.fn(),
+    getResponse: jest.fn(),
     getRelevantBlockWindowForFilter: jest.fn(),
     getSbtCreationBlockByAddress: jest.fn(),
     getSbtHistorySummary: jest.fn(),
     getSbtMintBurnCountsByAddress: jest.fn(),
     getSbtMetadata: jest.fn(),
+    getSBTsForUser: jest.fn(),
+    getSurveyDataById: jest.fn(),
+    getSurveyHash: jest.fn(),
+    getSurveyResponse: jest.fn(),
+    getUserActivity: jest.fn(),
+    listenForSBTEvents: jest.fn(),
+    listenForSBTInstanceEvents: jest.fn(),
     listenForSurveyEvents: jest.fn(),
     removeSBTEventListener: jest.fn(),
     removeSBTInstanceEventsListener: jest.fn(),
     removeSurveyEventsListener: jest.fn(),
+    sendTestnetFunds: jest.fn(),
   };
   return {
     __esModule: true,
@@ -306,6 +321,7 @@ jest.mock('../../utilities/web3/sessionRegistry.js', () => {
   };
   return {
     __esModule: true,
+    SESSION_REGISTRY_CACHE_UPDATED_EVENT: 'ce:session-registry-cache-updated',
     fetchSessionFromRegistry: jest.fn(),
     loadGroupRegistryCache: jest.fn(),
     sessionRegistryStore: {
@@ -537,6 +553,30 @@ const stubMainSiteMountSideEffects = (subject) => {
   subject.checkAllCachesReady = jest.fn();
   subject.handleDeepLinkScan = jest.fn();
   return subject;
+};
+
+const attachDgStore = (subject, initial = {}) => {
+  const store = new Map(Object.entries(initial));
+  const key = (name, slug) => `${name}:${slug || ''}`;
+  subject.DG = {
+    read: jest.fn((name, slug) => store.get(key(name, slug)) || null),
+    write: jest.fn((name, slug, value) => {
+      store.set(key(name, slug), value);
+      return value;
+    }),
+    remove: jest.fn((name, slug) => {
+      store.delete(key(name, slug));
+    }),
+    key: jest.fn(key),
+  };
+  return {
+    store,
+    read: (name, slug) => store.get(key(name, slug)) || null,
+    write: (name, slug, value) => {
+      store.set(key(name, slug), value);
+      return value;
+    },
+  };
 };
 
 describe('MainSite connected export wiring', () => {
@@ -1827,6 +1867,409 @@ describe('MainSite route render smoke', () => {
 
     expect(await screen.findByTestId(E2E_TESTIDS.PAGE_ATLAS_ROOT)).toBeInTheDocument();
     expect(await screen.findByTestId('mock-debate-map')).toHaveAttribute('data-demo-mode', 'true');
+  });
+
+  it('registers listener pairs once across mount, stable updates, and unmount', async () => {
+    const subject = stubMainSiteMountSideEffects(createSubject({
+      path: '/session/edge',
+      activeSessionSlug: 'edge',
+      sessionConfig: buildSessionConfig({
+        blockLimits: { start: 100, end: null },
+      }),
+    }));
+    const addEventListenerSpy = jest.spyOn(window, 'addEventListener');
+    const removeEventListenerSpy = jest.spyOn(window, 'removeEventListener');
+    subject.getCurrentPathname = jest.fn(() => '/session/edge');
+    subject.getInitializableSessionNetwork = jest.fn(() => DEFAULT_NETWORK);
+    subject.getDisplaySessionNetwork = jest.fn(() => DEFAULT_NETWORK);
+    subject.getDisplaySessionChainId = jest.fn(() => DEFAULT_NETWORK.id);
+    subject.isBuiltInDemoSessionRoutePath = jest.fn(() => false);
+    subject.initializeQuestionCache = jest.fn(async () => undefined);
+    subject.initializeSbtCache = jest.fn(async () => undefined);
+    subject.initializeSurveyCache = jest.fn(async () => undefined);
+    subject.fetchQuestionResponsesChunked = jest.fn(async () => undefined);
+    subject.shouldAutoRunFullSbtScan = jest.fn(() => false);
+    subject.checkAllCachesReady = jest.fn();
+    loadGroupRegistryCache.mockResolvedValue({});
+
+    await act(async () => {
+      await subject.componentDidMount();
+    });
+
+    expect(addEventListenerSpy).toHaveBeenCalledWith(
+      SESSION_REGISTRY_CACHE_UPDATED_EVENT,
+      subject.handleSessionRegistryCacheUpdated
+    );
+    expect(contractScripts.removeSBTEventListener).toHaveBeenCalledWith('none', 'edge');
+    expect(contractScripts.removeSurveyEventsListener).toHaveBeenCalledWith('none', 'edge');
+    expect(contractScripts.listenForSBTEvents).toHaveBeenCalledWith(
+      'none',
+      expect.any(Function),
+      'edge'
+    );
+    expect(contractScripts.listenForSurveyEvents).toHaveBeenCalledWith(
+      'none',
+      expect.any(Function),
+      'edge'
+    );
+    const sbtHandler = contractScripts.listenForSBTEvents.mock.calls[0][1];
+    const surveyHandler = contractScripts.listenForSurveyEvents.mock.calls[0][1];
+
+    subject.componentDidUpdate(subject.props, subject.state);
+
+    expect(contractScripts.listenForSBTEvents).toHaveBeenCalledTimes(1);
+    expect(contractScripts.listenForSurveyEvents).toHaveBeenCalledTimes(1);
+    expect(contractScripts.listenForSBTEvents.mock.calls[0][1]).toBe(sbtHandler);
+    expect(contractScripts.listenForSurveyEvents.mock.calls[0][1]).toBe(surveyHandler);
+
+    subject.componentWillUnmount();
+
+    expect(removeEventListenerSpy).toHaveBeenCalledWith(
+      SESSION_REGISTRY_CACHE_UPDATED_EVENT,
+      subject.handleSessionRegistryCacheUpdated
+    );
+    expect(contractScripts.removeSBTEventListener).toHaveBeenLastCalledWith('none', 'edge');
+    expect(contractScripts.removeSurveyEventsListener).toHaveBeenLastCalledWith('none', 'edge');
+    expect(contractScripts.removeSBTInstanceEventsListener).toHaveBeenLastCalledWith('none', [], 'edge');
+  });
+
+  it('wires registry bootstrap promise state through MainSite and clears failures', async () => {
+    const subject = stubMainSiteMountSideEffects(createSubject({
+      path: '/session/edge',
+      activeSessionSlug: 'edge',
+      sessionConfig: buildSessionConfig(),
+    }));
+    const mountBootstrap = createDeferred();
+    loadGroupRegistryCache.mockReturnValueOnce(mountBootstrap.promise);
+
+    await act(async () => {
+      await subject.componentDidMount();
+    });
+
+    expect(loadGroupRegistryCache).toHaveBeenCalledWith(expect.objectContaining({
+      chainIds: undefined,
+      force: true,
+      bootstrapRpc: true,
+    }));
+    expect(subject._registryBootstrapPromise).toBe(mountBootstrap.promise);
+    expect(subject._registryBootstrapScopeKey).toBe('all');
+
+    mountBootstrap.reject(new Error('bootstrap failed'));
+    await mountBootstrap.promise.catch(() => null);
+    await Promise.resolve();
+
+    expect(subject._registryBootstrapPromise).toBeNull();
+    expect(subject._registryBootstrapScopeKey).toBe('');
+  });
+
+  it('reuses registry hydration in flight for a scope and restarts on scope changes', async () => {
+    const subject = createSubject({
+      path: '/session/edge',
+      activeSessionSlug: 'edge',
+      sessionConfig: buildSessionConfig(),
+    });
+    const sameScope = createDeferred();
+    subject._registryBootstrapPromise = sameScope.promise;
+    subject._registryBootstrapScopeKey = subject.getRegistryBootstrapScopeKey();
+    sessionRegistryStore.getAllSessionEntries.mockReturnValue([['edge', buildSessionConfig()]]);
+
+    const first = subject.ensureRegistryHydratedForProfileScan();
+    const second = subject.ensureRegistryHydratedForProfileScan();
+    sameScope.resolve({ __loadMeta: { hadLoadErrors: false } });
+
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      expect.objectContaining({ hasEntries: true }),
+      expect.objectContaining({ hasEntries: true }),
+    ]);
+    expect(loadGroupRegistryCache).not.toHaveBeenCalled();
+
+    const mismatched = createDeferred();
+    subject._registryBootstrapPromise = sameScope.promise;
+    subject._registryBootstrapScopeKey = '11155420';
+    loadGroupRegistryCache.mockReturnValueOnce(mismatched.promise);
+
+    const restarted = subject.ensureRegistryHydratedForProfileScan();
+
+    expect(loadGroupRegistryCache).toHaveBeenCalledTimes(1);
+    expect(subject._registryBootstrapPromise).toBe(mismatched.promise);
+    expect(subject._registryBootstrapScopeKey).toBe('all');
+
+    mismatched.resolve({ __loadMeta: { hadLoadErrors: false } });
+    await expect(restarted).resolves.toEqual(expect.objectContaining({ hasEntries: true }));
+  });
+
+  it('exits invalid profile scans before touching contract or registry seams', async () => {
+    const subject = createSubject({ path: '/u/not-an-address' });
+
+    await expect(subject.scanSpecificUserProfile('not-an-address')).resolves.toBeNull();
+
+    expect(loadGroupRegistryCache).not.toHaveBeenCalled();
+    expect(contractScripts.getLatestBlockNumber).not.toHaveBeenCalled();
+    expect(contractScripts.getSBTsForUser).not.toHaveBeenCalled();
+    expect(contractScripts.getUserActivity).not.toHaveBeenCalled();
+  });
+
+  it('dedupes user-profile fan-out and writes discovered boundary-backed caches', async () => {
+    const target = '0x00000000000000000000000000000000000000ab';
+    const sbtAddress = '0x00000000000000000000000000000000000000c1';
+    const surveyId = `0x${'1'.repeat(64)}`;
+    const questionId = `0x${'2'.repeat(64)}`;
+    const sessionConfig = buildSessionConfig({
+      blockLimits: { start: 100, end: null },
+    });
+    const subject = createSubject({
+      path: `/u/${target}`,
+      activeSessionSlug: 'edge',
+      sessionConfig,
+    });
+    subject._mounted = true;
+    const dg = attachDgStore(subject);
+    subject.getUserProfileAllSessionsScanMode = jest.fn(() => ({
+      legacyAllSessions: false,
+      useAllSessionsSbtScan: false,
+      useAllSessionsSurveyActivityScan: false,
+      useAllSessionsQuestionActivityScan: false,
+      useAllSessionsActivityScan: false,
+      useAllSessionsScan: false,
+    }));
+    subject.getProfileScanScopeContext = jest.fn(() => ({
+      scope: 'active',
+      list: [],
+      activeSlug: 'edge',
+      activeSlugFromRoute: true,
+    }));
+    subject.ensureRegistryHydratedForProfileScan = jest.fn(async () => null);
+    subject.resolveProfileDeepScanPlan = jest.fn(() => ({
+      slugs: ['edge'],
+      usedAllSessions: false,
+      coverageComplete: true,
+      coverageReason: '',
+      registryEntryCount: 1,
+      rawAllSlugCount: 1,
+      activeChainSlugCount: 1,
+      scopedFallbackSlugCount: 0,
+      relevantSlugs: ['edge'],
+      prioritizedGeneralFirst: false,
+      scanOrdering: 'active',
+    }));
+    subject.readProfileScanStepTimeoutMs = jest.fn(() => 5000);
+    subject.readProfileScanSbtBurstSize = jest.fn(() => 1);
+    subject.readProfileScanActivityLookbackBlocks = jest.fn(() => 0);
+    subject.emitProfileScanColdDiag = jest.fn();
+    subject.emitProfileScanTelemetry = jest.fn();
+    subject.scheduleProfileScanRetryAfterRegistryHydration = jest.fn();
+    subject.queueLocalRevisionUpdate = jest.fn();
+    contractScripts.getLatestBlockNumber.mockResolvedValue(125);
+    contractScripts.getSBTsForUser.mockResolvedValue({
+      data: [{ sbtAddress, sbtInfo: { name: 'Badge' } }],
+      hadError: false,
+    });
+    contractScripts.getUserActivity.mockResolvedValue({
+      data: {
+        createdSurveys: [{ id: surveyId, data: { title: 'Survey' } }],
+        createdQuestions: [{ id: questionId, data: { prompt: 'Question' } }],
+        surveyResponses: [],
+        questionResponses: [],
+      },
+      hadError: false,
+    });
+
+    const first = subject.scanSpecificUserProfile(target);
+    const second = subject.scanSpecificUserProfile(target);
+    const [firstReport, secondReport] = await Promise.all([first, second]);
+
+    expect(firstReport).toBe(secondReport);
+    expect(contractScripts.getLatestBlockNumber).toHaveBeenCalledTimes(1);
+    expect(contractScripts.getSBTsForUser).toHaveBeenCalledWith(
+      target,
+      'edge',
+      100,
+      expect.objectContaining({
+        returnMeta: true,
+        ignoreScope: false,
+      })
+    );
+    expect(contractScripts.getUserActivity).toHaveBeenCalledWith(
+      target,
+      'edge',
+      100,
+      expect.objectContaining({
+        returnMeta: true,
+        includeSurveyActivity: true,
+        includeQuestionActivity: true,
+        forceArweaveFetch: true,
+      })
+    );
+    expect(dg.read('userCache', 'edge')?.[target.toLowerCase()]?.['84532']?.data?.sbts)
+      .toEqual([expect.objectContaining({ sbtAddress })]);
+    expect(dg.read('sbtCache', 'edge')?.['84532']?.sbtList?.[sbtAddress.toLowerCase()])
+      .toEqual(expect.objectContaining({
+        sbtAddress,
+        mintedAddresses: [target.toLowerCase()],
+      }));
+    expect(dg.read('surveysCache', 'edge')?.['84532']?.surveys?.[surveyId])
+      .toEqual(expect.objectContaining({ surveyID: surveyId }));
+    expect(dg.read('questionsCache', 'edge')?.['84532']?.questions?.[questionId])
+      .toEqual(expect.objectContaining({ id: questionId }));
+  });
+
+  it('reconciles survey events into survey and question caches without dropping arweave branches', async () => {
+    const surveyId = `0x${'3'.repeat(64)}`;
+    const questionId = `0x${'4'.repeat(64)}`;
+    const subject = createSubject({
+      path: '/session/edge',
+      activeSessionSlug: 'edge',
+      sessionConfig: buildSessionConfig(),
+    });
+    const dg = attachDgStore(subject, {
+      'questionsCache:edge': {
+        '84532': {
+          questionsLatestBlock: 12,
+          questions: {},
+          questionResponses: {},
+          questionResponsesMeta: {},
+          arweaveTxCache: { keep: 'cached-tx' },
+          arweaveTxFailureCache: { keep: 'cached-failure' },
+          questionHydrationMeta: { keep: 'hydration' },
+        },
+      },
+    });
+    subject.buildMetadataSessionCacheEnvelope = jest.fn((metadata, slug) => ({
+      targetSlug: slug,
+      metadata: {
+        ...metadata,
+        sessionSlug: slug,
+        slug,
+      },
+    }));
+    subject.buildQuestionDecryptContext = jest.fn(() => ({ sessionSlug: 'edge' }));
+    subject.setReadinessStateIfChanged = jest.fn((patch, cb) => {
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof cb === 'function') cb();
+    });
+    subject.queueLocalRevisionUpdate = jest.fn();
+    subject.checkAllCachesReady = jest.fn();
+    contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({
+      fromBlock: 10,
+      toBlock: 20,
+    });
+    contractScripts.getSurveyDataById.mockResolvedValue({
+      questionIDs: [questionId.toUpperCase()],
+      creator: '',
+      title: 'Survey',
+    });
+    contractScripts.getQuestionData.mockResolvedValue({
+      prompt: 'Question',
+    });
+
+    await subject.onNewSurveyEventDetectedForGroup('edge', {
+      type: 'SurveyAdded',
+      surveyId: surveyId.toUpperCase(),
+      blockNumber: 30,
+    });
+
+    expect(contractScripts.getSurveyDataById).toHaveBeenCalledWith('none', surveyId, 'edge');
+    expect(contractScripts.getQuestionData).toHaveBeenCalledWith(
+      'none',
+      questionId,
+      'edge',
+      expect.objectContaining({
+        decryptContext: { sessionSlug: 'edge' },
+        skipDecrypt: true,
+      })
+    );
+    expect(dg.read('surveysCache', 'edge')?.['84532']?.surveys?.[surveyId])
+      .toEqual(expect.objectContaining({
+        surveyID: surveyId,
+        creationBlock: 30,
+        sessionSlug: 'edge',
+      }));
+    const questionNet = dg.read('questionsCache', 'edge')?.['84532'];
+    expect(questionNet?.questions?.[questionId]).toEqual(expect.objectContaining({
+      id: questionId,
+      sessionSlug: 'edge',
+    }));
+    expect(questionNet?.questionsLatestBlock).toBe(30);
+    expect(questionNet?.arweaveTxCache).toEqual({ keep: 'cached-tx' });
+    expect(questionNet?.arweaveTxFailureCache).toEqual({ keep: 'cached-failure' });
+    expect(questionNet?.questionHydrationMeta).toEqual({ keep: 'hydration' });
+    expect(subject.setReadinessStateIfChanged).toHaveBeenNthCalledWith(
+      1,
+      { isSurveyCacheReady: false, isQuestionCacheReady: false }
+    );
+    expect(subject.queueLocalRevisionUpdate).toHaveBeenCalledWith({
+      needsQuestionResponsesNonce: true,
+      checkAllCachesReady: true,
+    });
+  });
+
+  it('tears down SBT detail listeners before rebuilding network caches', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000d1';
+    const subject = createSubject({
+      path: `/sbt/${sbtAddress}`,
+      activeSessionSlug: 'edge',
+      sessionConfig: buildSessionConfig(),
+    });
+    const order = [];
+    subject.startCacheReinitRun = jest.fn(() => 'run-1');
+    subject.isCacheReinitRunActive = jest.fn(() => true);
+    subject.getCurrentPathname = jest.fn(() => `/sbt/${sbtAddress}`);
+    subject.getInitializableSessionNetwork = jest.fn(() => DEFAULT_NETWORK);
+    subject.getSbtAddressFromPath = jest.fn(() => sbtAddress);
+    subject.resolvePinnedSbtDetailRouteSlug = jest.fn(async () => {
+      order.push('resolve-detail');
+      return 'detail';
+    });
+    subject.removeSbtRealtimeListenersForGroup = jest.fn((slug) => {
+      order.push(`remove:${slug}`);
+    });
+    subject.refreshSbtData = jest.fn(async () => {
+      order.push('refresh-sbt');
+    });
+    subject.shouldAttachSbtDetailInstanceListener = jest.fn(() => true);
+    subject.shouldAutoRunFullSbtScan = jest.fn(() => false);
+    subject.startSbtDetailInstanceListenerForGroup = jest.fn((slug, addresses) => {
+      order.push(`start-detail:${slug}:${addresses[0]}`);
+    });
+    subject.initializeSurveyCache = jest.fn(async () => {
+      order.push('init-surveys');
+    });
+    subject.initializeQuestionCache = jest.fn(async () => {
+      order.push('init-questions');
+    });
+    subject.startSurveyAndQuestionEventListener = jest.fn(() => {
+      order.push('start-survey-listener');
+      return true;
+    });
+    subject.fetchQuestionResponsesChunked = jest.fn(async () => {
+      order.push('fetch-responses');
+    });
+    subject.setReadinessStateIfChanged = jest.fn((patch) => {
+      if (patch?.isAllCachesReady === false) order.push('reset-readiness');
+      if (patch?.isSBTCacheReady === true) order.push('sbt-ready');
+      if (patch?.isSurveyCacheReady === true) order.push('survey-ready');
+    });
+    subject.checkAllCachesReady = jest.fn(() => {
+      order.push('check-ready');
+    });
+
+    await subject.handleNetworkChange();
+
+    expect(order).toEqual([
+      'reset-readiness',
+      'resolve-detail',
+      'remove:edge',
+      'remove:detail',
+      'refresh-sbt',
+      'sbt-ready',
+      `start-detail:detail:${sbtAddress}`,
+      'init-surveys',
+      'survey-ready',
+      'init-questions',
+      'start-survey-listener',
+      'fetch-responses',
+      'check-ready',
+    ]);
   });
 });
 
