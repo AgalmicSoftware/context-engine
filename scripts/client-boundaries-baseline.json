@@ -2,5 +2,36 @@
   "version": 1,
   "mode": "fail-on-new-violation",
   "note": "Existing legacy boundary violations are allowed only as a baseline; new violations fail the boundary check.",
-  "violations": []
+  "violations": [
+    {
+      "rule": "no-passthrough-facade",
+      "source": "client/src/utilities/sponsor/sponsorPageRuntime.ts",
+      "import": "<passthrough-facade>",
+      "resolved": "client/src/utilities/sponsor/sponsorPageRuntime.ts"
+    },
+    {
+      "rule": "no-passthrough-facade",
+      "source": "client/src/utilities/user/userPageRuntime.ts",
+      "import": "<passthrough-facade>",
+      "resolved": "client/src/utilities/user/userPageRuntime.ts"
+    },
+    {
+      "rule": "route-page-no-low-level",
+      "source": "client/src/components/MainSite/MainSite.tsx",
+      "import": "../../utilities/arweave/arweaveRetryHelpers.js",
+      "resolved": "client/src/utilities/arweave/arweaveRetryHelpers"
+    },
+    {
+      "rule": "route-page-no-low-level",
+      "source": "client/src/components/MainSite/MainSite.tsx",
+      "import": "../../utilities/web3/contractScripts.js",
+      "resolved": "client/src/utilities/web3/contractScripts"
+    },
+    {
+      "rule": "route-page-no-low-level",
+      "source": "client/src/components/MainSite/MainSite.tsx",
+      "import": "../../utilities/web3/sessionRegistry.js",
+      "resolved": "client/src/utilities/web3/sessionRegistry"
+    }
+  ]
 }

@@ -1,7 +1,11 @@
 import type { SbtAdminOpsPort, SbtProviderRef } from './sbtPorts.js';
-import { bindSbtAdminOpsPort } from './sbtAdminOpsPort.js';
+import { bindSbtAdminOpsPort } from './contractScriptsSbtAdminOpsPort.js';
 
-const executeSbtAdminOps = async (port: SbtAdminOpsPort, providerName: SbtProviderRef, sbtAddress: string) => {
+const executeSbtAdminOps = async (
+  port: SbtAdminOpsPort,
+  providerName: SbtProviderRef,
+  sbtAddress: string,
+) => {
   const [addTx, burnTx, passwordTx, isValid, startTx] = await Promise.all([
     port.addHashedPasswords(providerName, sbtAddress, ['0xhash1', '0xhash2']),
     port.burnToken(providerName, sbtAddress, '4'),
@@ -40,67 +44,62 @@ describe('SbtAdminOpsPort', () => {
     expect(fakePort.startClaim).toHaveBeenCalledWith(providerRef, sbtAddress, '0xcommit');
   });
 
-  it('binds admin ops through a call-time chainGateway getter', async () => {
-    const firstChainGateway = {
+  it('binds admin ops through a call-time contractScripts getter', async () => {
+    const firstContractScripts = {
       addHashedPasswords: jest.fn(async () => ({ transactionHash: '0xfirstAdd' })),
       burnToken: jest.fn(async () => ({ transactionHash: '0xfirstBurn' })),
       claimWithPassword: jest.fn(async () => ({ transactionHash: '0xfirstPassword' })),
       isPasswordValid: jest.fn(async () => false),
       startClaim: jest.fn(async () => ({ transactionHash: '0xfirstStart' })),
     };
-    const secondChainGateway = {
+    const secondContractScripts = {
       addHashedPasswords: jest.fn(async () => ({ transactionHash: '0xsecondAdd' })),
       burnToken: jest.fn(async () => ({ transactionHash: '0xsecondBurn' })),
       claimWithPassword: jest.fn(async () => ({ transactionHash: '0xsecondPassword' })),
       isPasswordValid: jest.fn(async () => true),
       startClaim: jest.fn(async () => ({ transactionHash: '0xsecondStart' })),
     };
-    let currentChainGateway = firstChainGateway;
+    let currentContractScripts = firstContractScripts;
     const port = bindSbtAdminOpsPort({
-      chainGateway: () => currentChainGateway,
+      contractScripts: () => currentContractScripts,
     });
 
-    await expect(
-      port.addHashedPasswords('injected', '0x0000000000000000000000000000000000000001', ['0xfirst']),
-    ).resolves.toEqual({ transactionHash: '0xfirstAdd' });
+    await expect(port.addHashedPasswords('injected', '0x0000000000000000000000000000000000000001', ['0xfirst']))
+      .resolves.toEqual({ transactionHash: '0xfirstAdd' });
 
-    currentChainGateway = secondChainGateway;
+    currentContractScripts = secondContractScripts;
 
-    await expect(port.burnToken('injected', '0x0000000000000000000000000000000000000002', '5')).resolves.toEqual({
-      transactionHash: '0xsecondBurn',
-    });
-    await expect(
-      port.claimWithPassword('injected', '0x0000000000000000000000000000000000000002', 'pw'),
-    ).resolves.toEqual({ transactionHash: '0xsecondPassword' });
-    await expect(
-      port.isPasswordValid('none', '0x0000000000000000000000000000000000000002', '0xhash', 'beta'),
-    ).resolves.toBe(true);
-    await expect(
-      port.startClaim('injected', '0x0000000000000000000000000000000000000002', '0xcommit'),
-    ).resolves.toEqual({ transactionHash: '0xsecondStart' });
+    await expect(port.burnToken('injected', '0x0000000000000000000000000000000000000002', '5'))
+      .resolves.toEqual({ transactionHash: '0xsecondBurn' });
+    await expect(port.claimWithPassword('injected', '0x0000000000000000000000000000000000000002', 'pw'))
+      .resolves.toEqual({ transactionHash: '0xsecondPassword' });
+    await expect(port.isPasswordValid('none', '0x0000000000000000000000000000000000000002', '0xhash', 'beta'))
+      .resolves.toBe(true);
+    await expect(port.startClaim('injected', '0x0000000000000000000000000000000000000002', '0xcommit'))
+      .resolves.toEqual({ transactionHash: '0xsecondStart' });
 
-    expect(firstChainGateway.addHashedPasswords).toHaveBeenCalledWith(
+    expect(firstContractScripts.addHashedPasswords).toHaveBeenCalledWith(
       'injected',
       '0x0000000000000000000000000000000000000001',
       ['0xfirst'],
     );
-    expect(secondChainGateway.burnToken).toHaveBeenCalledWith(
+    expect(secondContractScripts.burnToken).toHaveBeenCalledWith(
       'injected',
       '0x0000000000000000000000000000000000000002',
       '5',
     );
-    expect(secondChainGateway.claimWithPassword).toHaveBeenCalledWith(
+    expect(secondContractScripts.claimWithPassword).toHaveBeenCalledWith(
       'injected',
       '0x0000000000000000000000000000000000000002',
       'pw',
     );
-    expect(secondChainGateway.isPasswordValid).toHaveBeenCalledWith(
+    expect(secondContractScripts.isPasswordValid).toHaveBeenCalledWith(
       'none',
       '0x0000000000000000000000000000000000000002',
       '0xhash',
       'beta',
     );
-    expect(secondChainGateway.startClaim).toHaveBeenCalledWith(
+    expect(secondContractScripts.startClaim).toHaveBeenCalledWith(
       'injected',
       '0x0000000000000000000000000000000000000002',
       '0xcommit',

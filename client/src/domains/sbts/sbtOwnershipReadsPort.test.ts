@@ -1,7 +1,11 @@
 import type { SbtOwnershipReadsPort } from './sbtPorts.js';
-import { bindSbtOwnershipReadsPort } from './sbtOwnershipReadsPort.js';
+import { bindSbtOwnershipReadsPort } from './contractScriptsSbtOwnershipReadsPort.js';
 
-const readSbtOwnershipSnapshot = async (port: SbtOwnershipReadsPort, sbtAddress: string, sessionSlug: string) => {
+const readSbtOwnershipSnapshot = async (
+  port: SbtOwnershipReadsPort,
+  sbtAddress: string,
+  sessionSlug: string,
+) => {
   const [owner, tokenId, historySummary] = await Promise.all([
     port.getOwnerByTokenId('none', sbtAddress, '3', sessionSlug),
     port.getSBTTokenIdByOwner('none', sbtAddress, '0x0000000000000000000000000000000000000002', sessionSlug),
@@ -36,53 +40,49 @@ describe('SbtOwnershipReadsPort', () => {
     expect(fakePort.getSbtHistorySummary).toHaveBeenCalledWith('none', sbtAddress, 'alpha');
   });
 
-  it('binds ownership reads through a call-time chainGateway getter', async () => {
-    const firstChainGateway = {
+  it('binds ownership reads through a call-time contractScripts getter', async () => {
+    const firstContractScripts = {
       getOwnerByTokenId: jest.fn(async () => '0x0000000000000000000000000000000000000003'),
       getSBTTokenIdByOwner: jest.fn(async () => '7'),
       getSbtHistorySummary: jest.fn(async () => ({ totalMinted: '8' })),
     };
-    const secondChainGateway = {
+    const secondContractScripts = {
       getOwnerByTokenId: jest.fn(async () => '0x0000000000000000000000000000000000000004'),
       getSBTTokenIdByOwner: jest.fn(async () => '9'),
       getSbtHistorySummary: jest.fn(async () => ({ totalMinted: '10' })),
     };
-    let currentChainGateway = firstChainGateway;
+    let currentContractScripts = firstContractScripts;
     const port = bindSbtOwnershipReadsPort({
-      chainGateway: () => currentChainGateway,
+      contractScripts: () => currentContractScripts,
     });
 
-    await expect(
-      port.getOwnerByTokenId('none', '0x0000000000000000000000000000000000000001', '7', 'alpha'),
-    ).resolves.toBe('0x0000000000000000000000000000000000000003');
+    await expect(port.getOwnerByTokenId('none', '0x0000000000000000000000000000000000000001', '7', 'alpha'))
+      .resolves.toBe('0x0000000000000000000000000000000000000003');
 
-    currentChainGateway = secondChainGateway;
+    currentContractScripts = secondContractScripts;
 
-    await expect(
-      port.getSBTTokenIdByOwner(
-        'none',
-        '0x0000000000000000000000000000000000000002',
-        '0x0000000000000000000000000000000000000005',
-        'beta',
-      ),
-    ).resolves.toBe('9');
-    await expect(
-      port.getSbtHistorySummary('none', '0x0000000000000000000000000000000000000002', 'beta'),
-    ).resolves.toEqual({ totalMinted: '10' });
+    await expect(port.getSBTTokenIdByOwner(
+      'none',
+      '0x0000000000000000000000000000000000000002',
+      '0x0000000000000000000000000000000000000005',
+      'beta',
+    )).resolves.toBe('9');
+    await expect(port.getSbtHistorySummary('none', '0x0000000000000000000000000000000000000002', 'beta'))
+      .resolves.toEqual({ totalMinted: '10' });
 
-    expect(firstChainGateway.getOwnerByTokenId).toHaveBeenCalledWith(
+    expect(firstContractScripts.getOwnerByTokenId).toHaveBeenCalledWith(
       'none',
       '0x0000000000000000000000000000000000000001',
       '7',
       'alpha',
     );
-    expect(secondChainGateway.getSBTTokenIdByOwner).toHaveBeenCalledWith(
+    expect(secondContractScripts.getSBTTokenIdByOwner).toHaveBeenCalledWith(
       'none',
       '0x0000000000000000000000000000000000000002',
       '0x0000000000000000000000000000000000000005',
       'beta',
     );
-    expect(secondChainGateway.getSbtHistorySummary).toHaveBeenCalledWith(
+    expect(secondContractScripts.getSbtHistorySummary).toHaveBeenCalledWith(
       'none',
       '0x0000000000000000000000000000000000000002',
       'beta',
