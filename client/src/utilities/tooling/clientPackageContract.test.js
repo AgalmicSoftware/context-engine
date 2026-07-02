@@ -54,6 +54,7 @@ const expectedLintCommand = [
   '"src/components/MainSite/**/*.{ts,tsx}"',
   '"src/components/UserPage/**/*.{ts,tsx}"',
   '"src/components/Sessions/**/*.{ts,tsx}"',
+  '"src/components/SBTs/**/*.{ts,tsx}"',
 ].join(' ');
 
 describe('client package modernization contract', () => {
@@ -109,6 +110,7 @@ describe('client package modernization contract', () => {
     expect(eslintConfig).toContain("const typedMainSiteComponentFiles = ['src/components/MainSite/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedUserPageComponentFiles = ['src/components/UserPage/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedSessionsComponentFiles = ['src/components/Sessions/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedSbtComponentFiles = ['src/components/SBTs/**/*.{ts,tsx}']");
   });
 
   it('keeps web3-sensitive dependencies pinned during modernization', () => {
