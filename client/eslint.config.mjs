@@ -49,6 +49,7 @@ const typedDocumentLibraryComponentFiles = ['src/components/DocumentLibrary/**/*
 const typedDemoViewsComponentFiles = ['src/components/DemoViews/**/*.{ts,tsx}'];
 const typedAccountComponentFiles = ['src/components/Account/**/*.{ts,tsx}'];
 const typedAdminComponentFiles = ['src/components/Admin/**/*.{ts,tsx}'];
+const typedMainSiteComponentFiles = ['src/components/MainSite/**/*.{ts,tsx}'];
 
 const sharedLanguageOptions = {
   parser: tsParser,
@@ -416,6 +417,17 @@ export default [
   },
   {
     files: typedAdminComponentFiles,
+    languageOptions: sharedLanguageOptions,
+    plugins: reactPlugins,
+    settings: reactSettings,
+    rules: {
+      ...sharedRules,
+      ...reactRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedMainSiteComponentFiles,
     languageOptions: sharedLanguageOptions,
     plugins: reactPlugins,
     settings: reactSettings,
