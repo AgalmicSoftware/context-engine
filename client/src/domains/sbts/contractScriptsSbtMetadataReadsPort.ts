@@ -5,6 +5,7 @@ import type {
   SbtMetadataReadsPort,
   SbtMetadataRecord,
   SbtOnChainConfig,
+  SbtOnChainConfigFields,
   SbtReadOptions,
 } from './sbtPorts.js';
 
@@ -61,6 +62,8 @@ type BindSbtMetadataReadsPortArgs = {
   createOnChainConfigContract?: CreateSbtOnChainConfigContract;
 };
 
+type ResolvedSbtOnChainConfigFields = Required<SbtOnChainConfigFields>;
+
 const createEthersSbtOnChainConfigContract: CreateSbtOnChainConfigContract = (
   sbtAddress,
   abi,
@@ -94,6 +97,27 @@ const withSoftReadTimeout = <T>(
   task.then((value) => finish(value)).catch(() => finish(fallbackValue));
 });
 
+const resolveSbtOnChainConfigFields = (
+  fields?: SbtOnChainConfigFields
+): ResolvedSbtOnChainConfigFields => {
+  if (!fields) {
+    return {
+      maxTokens: true,
+      collectionBurnAuth: true,
+      mintingEndTime: true,
+      hasPasswordMint: true,
+      adminAndOwner: true,
+    };
+  }
+  return {
+    maxTokens: !!fields.maxTokens,
+    collectionBurnAuth: !!fields.collectionBurnAuth,
+    mintingEndTime: !!fields.mintingEndTime,
+    hasPasswordMint: !!fields.hasPasswordMint,
+    adminAndOwner: !!fields.adminAndOwner,
+  };
+};
+
 export const bindSbtMetadataReadsPort = ({
   contractScripts: readContractScripts,
   createOnChainConfigContract = createEthersSbtOnChainConfigContract,
@@ -107,7 +131,7 @@ export const bindSbtMetadataReadsPort = ({
   getGroupPasswordHash: (providerName, sbtAddress, groupKeyOrCfg, options) => (
     readContractScripts().getGroupPasswordHash(providerName, sbtAddress, groupKeyOrCfg, options)
   ),
-  getSbtOnChainConfig: async (_providerName, sbtAddress, groupKeyOrCfg) => {
+  getSbtOnChainConfig: async (_providerName, sbtAddress, groupKeyOrCfg, fields) => {
     const scripts = readContractScripts();
     const provider = scripts.getReadProviderForGroup?.(groupKeyOrCfg, {
       contractKey: 'sbtFactory',
@@ -120,6 +144,7 @@ export const bindSbtMetadataReadsPort = ({
       SBT_ON_CHAIN_CONFIG_ABI,
       provider
     );
+    const requested = resolveSbtOnChainConfigFields(fields);
     const [
       maxTokens,
       collectionBurnAuth,
@@ -128,12 +153,12 @@ export const bindSbtMetadataReadsPort = ({
       admin,
       owner,
     ] = await Promise.all([
-      withSoftReadTimeout(contract.maxTokens()),
-      withSoftReadTimeout(contract.collectionBurnAuth()),
-      withSoftReadTimeout(contract.mintingEndTime()),
-      withSoftReadTimeout(contract.hasPasswordMint()),
-      withSoftReadTimeout(contract.admin()),
-      withSoftReadTimeout(contract.owner()),
+      requested.maxTokens ? withSoftReadTimeout(contract.maxTokens()) : Promise.resolve(null),
+      requested.collectionBurnAuth ? withSoftReadTimeout(contract.collectionBurnAuth()) : Promise.resolve(null),
+      requested.mintingEndTime ? withSoftReadTimeout(contract.mintingEndTime()) : Promise.resolve(null),
+      requested.hasPasswordMint ? withSoftReadTimeout(contract.hasPasswordMint()) : Promise.resolve(null),
+      requested.adminAndOwner ? withSoftReadTimeout(contract.admin()) : Promise.resolve(null),
+      requested.adminAndOwner ? withSoftReadTimeout(contract.owner()) : Promise.resolve(null),
     ]);
     return {
       maxTokens,

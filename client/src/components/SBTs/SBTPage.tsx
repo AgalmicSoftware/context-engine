@@ -2103,7 +2103,13 @@ class SBTPage extends Component<any, any> {
           hasPasswordMint,
           admin,
           owner,
-        } = await sbtMetadataReadsPort.getSbtOnChainConfig('none', String(addr || ''), slugForRead);
+        } = await sbtMetadataReadsPort.getSbtOnChainConfig('none', String(addr || ''), slugForRead, {
+          maxTokens: needMax,
+          collectionBurnAuth: needBurn,
+          mintingEndTime: needEnd,
+          hasPasswordMint: needHasPw,
+          adminAndOwner: needAdmin,
+        });
         if (needMax && maxTokens != null) {
           info.maxTokens = ethers.BigNumber.isBigNumber(maxTokens) ? maxTokens.toString() : String(maxTokens);
         }
