@@ -1,0 +1,101 @@
+import {
+  MAIN_SITE_ROUTE_DEFINITIONS,
+  resolveMainSiteRouteMatch,
+} from './routeTable.js';
+
+const ADDRESS = '0x00000000000000000000000000000000000000f1';
+const SURVEY_ID = `0x${'a'.repeat(64)}`;
+const QUESTION_ID = `0x${'b'.repeat(64)}`;
+
+const isAddress = (value: string) => /^0x[0-9a-fA-F]{40}$/.test(value);
+
+describe('MainSite route table', () => {
+  it('publishes a stable ordered set of route keys', () => {
+    expect(MAIN_SITE_ROUTE_DEFINITIONS.map((entry) => entry.key)).toEqual([
+      'wizard',
+      'surveyId',
+      'home',
+      'debate',
+      'atlas',
+      'tag',
+      'bookmarks',
+      'compare',
+      'surveysOrQuestionsList',
+      'questionDetail',
+      'sbtsList',
+      'sbtDetail',
+      'simUser',
+      'userProfile',
+      'about',
+      'demos',
+      'matrix',
+      'contracts',
+      'admin',
+      'sponsor',
+      'agent',
+      'session',
+    ]);
+  });
+
+  it.each([
+    ['/session/edge', 'session', { sessionToken: 'edge' }],
+    ['/session/edge/questions', 'session', { sessionToken: 'edge' }],
+    ['/session/edge/docs', 'session', { sessionToken: 'edge' }],
+    [`/survey/${SURVEY_ID}/results`, 'surveyId', { surveyIDFromPath: SURVEY_ID }],
+    [`/question/${QUESTION_ID}?session=edge`, 'questionDetail', { questionId: QUESTION_ID }],
+    [`/sbt/${ADDRESS}`, 'sbtDetail', { sbtAddress: ADDRESS }],
+    [`/u/${ADDRESS}`, 'userProfile', {}],
+    ['/admin', 'admin', {}],
+    ['/sponsor', 'sponsor', {}],
+  ])('classifies %s as %s', (fullPath, key, expected) => {
+    expect(resolveMainSiteRouteMatch({ fullPath, isAddress })).toEqual(
+      expect.objectContaining({
+        key,
+        ...expected,
+      })
+    );
+  });
+
+  it('keeps alias and canonicalization decisions visible to the caller', () => {
+    expect(resolveMainSiteRouteMatch({ fullPath: '/new', isAddress })).toEqual(
+      expect.objectContaining({
+        key: 'wizard',
+        canonicalPath: '/session/new',
+      })
+    );
+    expect(resolveMainSiteRouteMatch({ fullPath: '/session/new', isAddress })).toEqual(
+      expect.objectContaining({
+        key: 'wizard',
+        canonicalPath: undefined,
+      })
+    );
+    expect(resolveMainSiteRouteMatch({ fullPath: '/groups/edge', isAddress })).toEqual(
+      expect.objectContaining({
+        key: 'sbtsList',
+        sbtAddress: null,
+      })
+    );
+    expect(resolveMainSiteRouteMatch({ fullPath: `/group/${ADDRESS}`, isAddress })).toEqual(
+      expect.objectContaining({
+        key: 'sbtDetail',
+        sbtAddress: ADDRESS,
+      })
+    );
+  });
+
+  it('exposes cache-wait metadata without rendering anything', () => {
+    expect(resolveMainSiteRouteMatch({ fullPath: '/admin', isAddress })).toEqual(
+      expect.objectContaining({
+        isKnownRoutePrefix: true,
+        shouldBypassCacheHydrationWait: true,
+      })
+    );
+    expect(resolveMainSiteRouteMatch({ fullPath: '/not-a-route', isAddress })).toEqual(
+      expect.objectContaining({
+        key: 'notFound',
+        isKnownRoutePrefix: false,
+        shouldBypassCacheHydrationWait: false,
+      })
+    );
+  });
+});
