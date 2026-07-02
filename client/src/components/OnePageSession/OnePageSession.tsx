@@ -27,13 +27,13 @@ import styles from './OnePageSession.module.scss';
 import LazyFallback from '../Shared/LazyFallback';
 
 import {
-  getAllSessionSlugs,
   getLegacyEthBalance,
   getNativeBalance,
   hasLegacyEthBalanceReader,
   hasNativeBalanceReader,
-  type OnePageSessionBalance,
-} from '../../utilities/session/onePageSessionRuntime.js';
+  type SessionBalance,
+} from '../../domains/sessions/sessionBalanceReaders.js';
+import { getAllSessionSlugs } from '../../domains/sessions/sessionConfig.js';
 import { sbtGroupMintAuthorizationPort } from '../../domains/sbts/contractScriptsSbtGroupMintAuthorizationPort.js';
 import { sbtMetadataReadsPort } from '../../domains/sbts/contractScriptsSbtMetadataReadsPort.js';
 import { sbtMintExecutionPort } from '../../domains/sbts/contractScriptsSbtMintExecutionPort.js';
@@ -1418,9 +1418,9 @@ class OnePageSession extends Component<any, any> {
         return false;
       }
 
-      // Group-aware read: rely on the session runtime facade (no ad-hoc provider instantiation)
+      // Group-aware read: rely on the session balance domain (no ad-hoc provider instantiation)
       const slug = resolveEffectiveSlug(this.props);
-      const getBalance = async (): Promise<OnePageSessionBalance> => {
+      const getBalance = async (): Promise<SessionBalance> => {
         try { return await readBalance(address, slug) || ethers.BigNumber.from(0); }
         catch { return ethers.BigNumber.from(0); }
       };
