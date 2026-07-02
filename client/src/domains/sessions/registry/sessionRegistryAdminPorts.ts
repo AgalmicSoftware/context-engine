@@ -1,12 +1,19 @@
 import * as defaultSessionRegistry from '../../../utilities/web3/sessionRegistry.js';
 import {
-  bindSessionRegistryPublishAdapter,
-  type SessionRegistryPublishModule,
-} from '../publish/sessionPublishAdapters.js';
+  bindSessionRegistryReadsPort,
+  type SessionRegistryCacheTarget,
+  type SessionRegistryEntry,
+  type SessionRegistryReadModule,
+  type SessionRegistryReadsPort,
+  type SessionRegistryRecord,
+  type SessionRegistryStore,
+} from './sessionRegistryReadPorts.js';
 import { buildSessionWizardRegistrySessionFields } from './sessionRegistryWriteNormalization.js';
 
-export type AdminSessionRegistryRecord = Record<string, unknown>;
-export type AdminSessionRegistryEntry = unknown[];
+export type { SessionRegistryReadsPort } from './sessionRegistryReadPorts.js';
+
+export type AdminSessionRegistryRecord = SessionRegistryRecord;
+export type AdminSessionRegistryEntry = SessionRegistryEntry;
 export type AdminSessionRegistryWriteResult = AdminSessionRegistryRecord & {
   metadataUri?: unknown;
   txHash?: unknown;
@@ -15,33 +22,10 @@ export type AdminSessionRegistryWriteResult = AdminSessionRegistryRecord & {
   }>;
 };
 
-export type AdminSessionRegistryCacheTarget = {
-  addEventListener: (
-    type: string,
-    listener: EventListenerOrEventListenerObject
-  ) => void;
-  removeEventListener: (
-    type: string,
-    listener: EventListenerOrEventListenerObject
-  ) => void;
-};
+export type AdminSessionRegistryCacheTarget = SessionRegistryCacheTarget;
+export type AdminSessionRegistryStore = SessionRegistryStore;
 
-export type AdminSessionRegistryStore = {
-  getAllSessionEntries: () => AdminSessionRegistryEntry[];
-};
-
-export type AdminSessionRegistryModule = SessionRegistryPublishModule & {
-  SESSION_REGISTRY_CACHE_UPDATED_EVENT: string;
-  loadSessionRegistryCache: (
-    input?: AdminSessionRegistryRecord
-  ) => Promise<unknown>;
-  sessionRegistryStore: AdminSessionRegistryStore;
-  fetchSessionFromRegistry: (
-    input?: AdminSessionRegistryRecord
-  ) => Promise<AdminSessionRegistryRecord | null | undefined>;
-  upsertSessionRegistryCache: (
-    input?: AdminSessionRegistryRecord
-  ) => unknown;
+export type AdminSessionRegistryModule = SessionRegistryReadModule & {
   setSessionFieldsOnChain: (
     input?: AdminSessionRegistryRecord
   ) => Promise<AdminSessionRegistryWriteResult>;
@@ -61,25 +45,6 @@ export type AdminRegistrySessionFieldsInput = {
   onChainFields?: AdminSessionRegistryRecord;
   sponsoredFields?: AdminSessionRegistryRecord;
   compatibilityFieldPaths?: Record<string, string[]>;
-};
-
-export type SessionRegistryReadsPort = {
-  loadSessionRegistryCache: (
-    input?: AdminSessionRegistryRecord
-  ) => Promise<unknown>;
-  getAllSessionEntries: () => AdminSessionRegistryEntry[];
-  fetchSessionFromRegistry: (
-    input?: AdminSessionRegistryRecord
-  ) => Promise<AdminSessionRegistryRecord | null | undefined>;
-  upsertSessionRegistryCache: (
-    input?: AdminSessionRegistryRecord
-  ) => unknown;
-  normalizeSessionIdHex: (value: unknown) => string;
-  toRegistrySlug: (value: unknown) => string;
-  subscribeToCacheUpdates: (
-    target: AdminSessionRegistryCacheTarget,
-    listener: EventListenerOrEventListenerObject
-  ) => () => void;
 };
 
 export type SessionRegistryAdminWritesPort = {
@@ -110,46 +75,15 @@ export type BindAdminSessionRegistryPortsArgs = {
   sessionRegistry: () => AdminSessionRegistryModule;
 };
 
-const resolveCacheUpdateEvent = (module: AdminSessionRegistryModule): string => (
-  module.SESSION_REGISTRY_CACHE_UPDATED_EVENT ||
-  String((module.sessionRegistryUtils as AdminSessionRegistryRecord).SESSION_REGISTRY_CACHE_UPDATED_EVENT || '')
-);
-
 export const bindAdminSessionRegistryPorts = ({
   sessionRegistry: readSessionRegistry,
 }: BindAdminSessionRegistryPortsArgs): AdminSessionRegistryPorts => {
-  const publishAdapter = bindSessionRegistryPublishAdapter({
+  const reads = bindSessionRegistryReadsPort({
     sessionRegistry: readSessionRegistry,
   });
 
   return {
-    reads: {
-      loadSessionRegistryCache: (input) => (
-        readSessionRegistry().loadSessionRegistryCache(input)
-      ),
-      getAllSessionEntries: () => (
-        readSessionRegistry().sessionRegistryStore.getAllSessionEntries()
-      ),
-      fetchSessionFromRegistry: (input) => (
-        publishAdapter.fetchSessionFromRegistry(input || {}) as Promise<AdminSessionRegistryRecord | null | undefined>
-      ),
-      upsertSessionRegistryCache: (input) => (
-        publishAdapter.upsertSessionRegistryCache(input || {})
-      ),
-      normalizeSessionIdHex: (value) => (
-        publishAdapter.normalizeSessionIdHex(value)
-      ),
-      toRegistrySlug: (value) => (
-        publishAdapter.toRegistrySlug(value)
-      ),
-      subscribeToCacheUpdates: (target, listener) => {
-        const eventName = resolveCacheUpdateEvent(readSessionRegistry());
-        target.addEventListener(eventName, listener);
-        return () => {
-          target.removeEventListener(eventName, listener);
-        };
-      },
-    },
+    reads,
     writes: {
       buildRegistrySessionFields: (input) => (
         buildSessionWizardRegistrySessionFields(input)
