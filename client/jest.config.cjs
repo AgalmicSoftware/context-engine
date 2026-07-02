@@ -59,5 +59,13 @@ module.exports = {
     '^ox\\/([A-Z].*)$': `${oxCjsBase}/core/$1.js`,
   },
   watchPathIgnorePatterns: ['<rootDir>/build', '<rootDir>/coverage'],
+  coverageThreshold: {
+    global: {
+      statements: 74.95,
+      branches: 60.33,
+      functions: 76.52,
+      lines: 78.36,
+    },
+  },
   resetMocks: false,
 };

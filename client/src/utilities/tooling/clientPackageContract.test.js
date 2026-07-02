@@ -11,6 +11,8 @@ const readClientFile = (relativePath) => {
   return fs.readFileSync(filePath, 'utf8');
 };
 
+const readClientJestConfig = () => require(path.resolve(__dirname, '../../../jest.config.cjs'));
+
 const expectedLintCommand = [
   'eslint src/',
   '"src/domains/**/*.{ts,tsx}"',
@@ -122,6 +124,19 @@ describe('client package modernization contract', () => {
     expect(pkg.devDependencies['react-scripts']).toBeUndefined();
     expect(pkg.devDependencies.webpack).toBeUndefined();
     expect(pkg.overrides.webpack).toBeUndefined();
+  });
+
+  it('keeps the client coverage floor pinned to the measured ratchet baseline', () => {
+    const jestConfig = readClientJestConfig();
+
+    expect(jestConfig.coverageThreshold).toEqual({
+      global: {
+        statements: 74.95,
+        branches: 60.33,
+        functions: 76.52,
+        lines: 78.36,
+      },
+    });
   });
 
   it('keeps stale dependency overrides out of the client package contract', () => {
