@@ -27,6 +27,7 @@ const mockLoadSessionRegistryCache = jest.fn();
 const mockGetAllSessionEntries = jest.fn();
 const mockBuildSignedAdminActionAuth = jest.fn();
 const mockFetchWorkerWithAuth = jest.fn();
+const mockBuildSiweMessage = jest.fn(() => 'siwe-message');
 const mockSetSessionFieldsOnChain = jest.fn();
 const mockUploadSessionMetadata = jest.fn();
 const mockUpdateSessionMetadataOnChain = jest.fn();
@@ -43,7 +44,7 @@ jest.mock('../../utilities/worker/corsProxy.js', () => ({
 }));
 
 jest.mock('../../utilities/worker/workerAuth.js', () => ({
-  buildSiweMessage: jest.fn(() => 'siwe-message'),
+  buildSiweMessage: (...args) => mockBuildSiweMessage(...args),
   buildSignedAdminActionAuth: (...args) => mockBuildSignedAdminActionAuth(...args),
   fetchWorkerWithAuth: (...args) => mockFetchWorkerWithAuth(...args),
 }));
@@ -170,6 +171,7 @@ describe('AdminPage rendered interactions', () => {
       status: 200,
       json: async () => ({ ok: true }),
     });
+    mockBuildSiweMessage.mockReturnValue('siwe-message');
     mockFetchSessionFromRegistry.mockResolvedValue(null);
     mockUploadDataToArweave.mockResolvedValue('arweave_test_tx_1234567890');
     mockBuildArweaveGatewayUrl.mockImplementation((txId) => `https://arweave.example.test/${txId}`);
@@ -401,6 +403,66 @@ describe('AdminPage rendered interactions', () => {
       })
     );
     expect(mockBuildArweaveGatewayUrl).toHaveBeenCalledWith('arweave_probe_tx_1234567890');
+  });
+
+  it('signs the prepared SIWE message and posts the denied-login body unchanged', async () => {
+    const signMessage = jest.fn().mockResolvedValue('0xrendered-siwe-signature');
+    web3ProviderSpy.mockImplementation(() => ({
+      getSigner: () => ({ signMessage }),
+    }));
+    mockBuildSiweMessage.mockReturnValue('rendered-byte-exact-siwe-message');
+    global.fetch = jest.fn((url) => {
+      if (String(url).endsWith('/auth/nonce')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ nonce: 'rendered-nonce' }),
+        });
+      }
+      if (String(url).endsWith('/auth/login')) {
+        return Promise.resolve({
+          ok: false,
+          status: 403,
+          json: async () => ({ error: 'expected-denied' }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true }),
+      });
+    });
+
+    await renderAdminPage();
+    await waitForResolvedWorkerUrl();
+    await clickAndSettle(screen.getByRole('button', { name: 'Test' }));
+    fireEvent.click(screen.getByTestId('ce-admin-denied-chip-login'));
+
+    await waitFor(() => {
+      expect(signMessage).toHaveBeenCalledWith('rendered-byte-exact-siwe-message');
+    });
+    const loginCall = global.fetch.mock.calls.find(([url]) => (
+      String(url).endsWith('/auth/login')
+    ));
+    expect(loginCall?.[1]).toMatchObject({
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    expect(JSON.parse(loginCall[1].body)).toEqual({
+      address: ADMIN_ADDRESS,
+      message: 'rendered-byte-exact-siwe-message',
+      signature: '0xrendered-siwe-signature',
+      sessionSlug: 'edge',
+    });
+    expect(mockBuildSiweMessage).toHaveBeenCalledWith({
+      address: ADMIN_ADDRESS,
+      nonce: 'rendered-nonce',
+      chainId: 84532,
+      statement: 'Sign in to Context Engine.',
+    });
+    await waitFor(() => {
+      expect(screen.getByText('OK (403 expected-denied)')).toBeInTheDocument();
+    });
   });
 
   it('does not reserve hero media space when the session header image fails to load', async () => {
