@@ -78,19 +78,29 @@ export const bindAdminArweavePorts = ({
   urls: readUrls,
 }: BindAdminArweavePortsArgs): AdminArweavePort => ({
   readArweaveWalletBalance: (jwk, opts) => (
-    readScripts().readArweaveWalletBalance(jwk, opts)
+    opts === undefined
+      ? readScripts().readArweaveWalletBalance(jwk)
+      : readScripts().readArweaveWalletBalance(jwk, opts)
   ),
   formatWinstonToAr: (winston, decimals) => (
-    readScripts().formatWinstonToAr(winston, decimals)
+    decimals === undefined
+      ? readScripts().formatWinstonToAr(winston)
+      : readScripts().formatWinstonToAr(winston, decimals)
   ),
   uploadDataToArweave: (data, format, opts) => (
-    readScripts().uploadDataToArweave(data, format, opts)
+    opts === undefined
+      ? readScripts().uploadDataToArweave(data, format)
+      : readScripts().uploadDataToArweave(data, format, opts)
   ),
   buildArweaveGatewayUrl: (txId, gateway) => (
-    readScripts().buildArweaveGatewayUrl(txId, gateway)
+    gateway === undefined
+      ? readScripts().buildArweaveGatewayUrl(txId)
+      : readScripts().buildArweaveGatewayUrl(txId, gateway)
   ),
   normalizeArweaveUrl: (value, options) => (
-    readUrls().normalizeArweaveUrl(value, options)
+    options === undefined
+      ? readUrls().normalizeArweaveUrl(value)
+      : readUrls().normalizeArweaveUrl(value, options)
   ),
 });
 
