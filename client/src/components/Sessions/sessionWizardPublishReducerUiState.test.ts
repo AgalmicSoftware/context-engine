@@ -2,7 +2,10 @@ import {
   createInitialSessionPublishState,
   type SessionPublishState,
 } from '../../domains/sessions/publish/sessionPublishReducer';
-import { resolveSessionWizardPublishReducerUiState } from './sessionWizardPublishReducerUiState';
+import {
+  resolveSessionWizardPublishReducerUiPlan,
+  resolveSessionWizardPublishReducerUiState,
+} from './sessionWizardPublishReducerUiState';
 
 const stepNumbers = {
   'deploy-worker': 1,
@@ -79,5 +82,47 @@ describe('resolveSessionWizardPublishReducerUiState', () => {
       publishBusy: true,
       publishStep: 0,
     });
+  });
+
+  it('builds the publish ui plan from reducer state without changing copy or step labels', () => {
+    const plan = resolveSessionWizardPublishReducerUiPlan({
+      state: state({
+        status: 'uploadingMetadata',
+        currentEffect: 'uploadMetadata',
+      }),
+      resolvedWorkerBaseUrl: 'https://worker.example.test',
+      workerMode: 'default',
+      usesDefaultWorkerUrl: true,
+      deployVerifiedInUi: false,
+      deployWorkerMatchesConfiguredUrl: false,
+      canUseSponsoredAutoDeployNow: false,
+      manualMetadataUrl: '',
+      metadataUrl: '',
+      buildMetadataGatewayUrl: (txId) => `https://gateway.example/${txId}`,
+      deployComplete: false,
+      hasPendingDrafts: true,
+      isNormalMode: true,
+      publishAdvancedOpen: false,
+      publishStepElapsedMs: 1300,
+      sbtsLabel: 'Groups',
+    });
+
+    expect(plan.publishActionDisplayState).toEqual(expect.objectContaining({
+      publishBusy: true,
+      publishButtonDisabled: true,
+      publishButtonLabel: 'Deploy Session',
+    }));
+    expect(plan.publishProgressDisplayState).toEqual(expect.objectContaining({
+      activePublishProgressStepLabel: 'Upload Arweave',
+      publishProgressEyebrow: 'Publishing Session',
+      publishStep: 2,
+      showPublishProgress: true,
+    }));
+    expect(plan.publishProgressDisplayState.publishProgressSteps).toEqual([
+      { key: 'deploy-sbts', label: 'Deploy Groups', state: 'complete' },
+      { key: 'upload-metadata', label: 'Upload Arweave', state: 'active' },
+      { key: 'register-session', label: 'Register On-chain', state: 'pending' },
+      { key: 'done', label: 'Done', state: 'pending' },
+    ]);
   });
 });
