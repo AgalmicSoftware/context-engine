@@ -289,28 +289,92 @@ verify_public_release_surface() {
   node "$verifier" "$TEMP_CLONE" >&2
 }
 
-verify_public_node_tests() {
+ensure_public_node_modules_link() {
   local node_path="$REPO_ROOT/node_modules"
   local temp_node_path="$TEMP_CLONE/node_modules"
-
-  if [ ! -f "$TEMP_CLONE/package.json" ]; then
-    fail "Cannot run public Node tests; package.json was not found in replay output." 1
-  fi
 
   if [ -d "$node_path" ] && [ ! -e "$temp_node_path" ]; then
     log_info "Linking source node_modules into public test checkout."
     ln -s "$node_path" "$temp_node_path"
   fi
+}
 
-  log_info "Running public release Node tests."
+run_public_npm_script() {
+  local script_name="$1"
+  local description="$2"
+  local node_path="$REPO_ROOT/node_modules"
+
+  if [ ! -f "$TEMP_CLONE/package.json" ]; then
+    fail "Cannot run public $description; package.json was not found in replay output." 1
+  fi
+
+  ensure_public_node_modules_link
+
+  log_info "Running public release $description."
   (
     cd "$TEMP_CLONE"
     if [ -d "$node_path" ]; then
-      NODE_PATH="$node_path${NODE_PATH:+:$NODE_PATH}" npm run test:node
+      NODE_PATH="$node_path${NODE_PATH:+:$NODE_PATH}" npm run "$script_name"
     else
-      npm run test:node
+      npm run "$script_name"
     fi
   )
+}
+
+verify_public_test_wiring() {
+  local verifier="$TEMP_CLONE/scripts/verify-test-wiring.js"
+  local node_path="$REPO_ROOT/node_modules"
+
+  if [ ! -f "$verifier" ]; then
+    log_info "Skipping public release test wiring checks; scripts/verify-test-wiring.js was not found in replay output."
+    return 0
+  fi
+
+  if [ ! -f "$TEMP_CLONE/package.json" ]; then
+    fail "Cannot run public test wiring checks; package.json was not found in replay output." 1
+  fi
+
+  ensure_public_node_modules_link
+
+  log_info "Running public release test wiring checks."
+  (
+    cd "$TEMP_CLONE"
+    if [ -d "$node_path" ]; then
+      NODE_PATH="$node_path${NODE_PATH:+:$NODE_PATH}" npm run test:wiring
+    else
+      npm run test:wiring
+    fi
+  )
+}
+
+verify_public_type_debt() {
+  local ratchet="$TEMP_CLONE/scripts/check-type-debt-ratchet.mjs"
+  local node_path="$REPO_ROOT/node_modules"
+
+  if [ ! -f "$ratchet" ]; then
+    log_info "Skipping public release type-debt ratchet; scripts/check-type-debt-ratchet.mjs was not found in replay output."
+    return 0
+  fi
+
+  if [ ! -f "$TEMP_CLONE/package.json" ]; then
+    fail "Cannot run public type-debt ratchet; package.json was not found in replay output." 1
+  fi
+
+  ensure_public_node_modules_link
+
+  log_info "Running public release type-debt ratchet."
+  (
+    cd "$TEMP_CLONE"
+    if [ -d "$node_path" ]; then
+      NODE_PATH="$node_path${NODE_PATH:+:$NODE_PATH}" npm run type-debt:check
+    else
+      npm run type-debt:check
+    fi
+  )
+}
+
+verify_public_node_tests() {
+  run_public_npm_script "test:node" "Node tests"
 }
 
 ensure_private_branch_guard() {
@@ -519,6 +583,14 @@ if [ -n "$offending_identities" ]; then
 fi
 
 if ! verify_public_release_surface; then
+  exit 2
+fi
+
+if ! verify_public_test_wiring; then
+  exit 2
+fi
+
+if ! verify_public_type_debt; then
   exit 2
 fi
 
