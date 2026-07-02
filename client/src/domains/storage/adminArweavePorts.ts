@@ -30,7 +30,7 @@ export type AdminArweaveScriptsModule = {
     data: unknown,
     format: string,
     opts?: AdminArweaveUploadOptions
-  ) => Promise<string>;
+  ) => Promise<string | undefined>;
   buildArweaveGatewayUrl: (
     txId: unknown,
     gateway?: unknown
@@ -57,7 +57,7 @@ export type AdminArweavePort = {
     data: unknown,
     format: string,
     opts?: AdminArweaveUploadOptions
-  ) => Promise<string>;
+  ) => Promise<string | undefined>;
   buildArweaveGatewayUrl: (
     txId: unknown,
     gateway?: unknown

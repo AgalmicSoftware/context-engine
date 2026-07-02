@@ -6,7 +6,14 @@ import {
 import { buildSessionWizardRegistrySessionFields } from './sessionRegistryWriteNormalization.js';
 
 export type AdminSessionRegistryRecord = Record<string, unknown>;
-export type AdminSessionRegistryEntry = [string, unknown];
+export type AdminSessionRegistryEntry = unknown[];
+export type AdminSessionRegistryWriteResult = AdminSessionRegistryRecord & {
+  metadataUri?: unknown;
+  txHash?: unknown;
+  txs?: Array<AdminSessionRegistryRecord & {
+    hash?: unknown;
+  }>;
+};
 
 export type AdminSessionRegistryCacheTarget = {
   addEventListener: (
@@ -37,17 +44,17 @@ export type AdminSessionRegistryModule = SessionRegistryPublishModule & {
   ) => unknown;
   setSessionFieldsOnChain: (
     input?: AdminSessionRegistryRecord
-  ) => Promise<AdminSessionRegistryRecord>;
+  ) => Promise<AdminSessionRegistryWriteResult>;
   setResourceGatesOnChain: (
     input?: AdminSessionRegistryRecord
-  ) => Promise<AdminSessionRegistryRecord>;
+  ) => Promise<AdminSessionRegistryWriteResult>;
   uploadSessionMetadata: (
     metadata: AdminSessionRegistryRecord,
     opts?: AdminSessionRegistryRecord
-  ) => Promise<AdminSessionRegistryRecord>;
+  ) => Promise<AdminSessionRegistryWriteResult>;
   updateSessionMetadataOnChain: (
     input?: AdminSessionRegistryRecord
-  ) => Promise<AdminSessionRegistryRecord>;
+  ) => Promise<AdminSessionRegistryWriteResult>;
 };
 
 export type AdminRegistrySessionFieldsInput = {
@@ -81,17 +88,17 @@ export type SessionRegistryAdminWritesPort = {
   ) => AdminSessionRegistryRecord;
   setSessionFieldsOnChain: (
     input?: AdminSessionRegistryRecord
-  ) => Promise<AdminSessionRegistryRecord>;
+  ) => Promise<AdminSessionRegistryWriteResult>;
   setResourceGatesOnChain: (
     input?: AdminSessionRegistryRecord
-  ) => Promise<AdminSessionRegistryRecord>;
+  ) => Promise<AdminSessionRegistryWriteResult>;
   uploadSessionMetadata: (
     metadata: AdminSessionRegistryRecord,
     opts?: AdminSessionRegistryRecord
-  ) => Promise<AdminSessionRegistryRecord>;
+  ) => Promise<AdminSessionRegistryWriteResult>;
   updateSessionMetadataOnChain: (
     input?: AdminSessionRegistryRecord
-  ) => Promise<AdminSessionRegistryRecord>;
+  ) => Promise<AdminSessionRegistryWriteResult>;
 };
 
 export type AdminSessionRegistryPorts = {
@@ -105,7 +112,7 @@ export type BindAdminSessionRegistryPortsArgs = {
 
 const resolveCacheUpdateEvent = (module: AdminSessionRegistryModule): string => (
   module.SESSION_REGISTRY_CACHE_UPDATED_EVENT ||
-  String(module.sessionRegistryUtils.SESSION_REGISTRY_CACHE_UPDATED_EVENT || '')
+  String((module.sessionRegistryUtils as AdminSessionRegistryRecord).SESSION_REGISTRY_CACHE_UPDATED_EVENT || '')
 );
 
 export const bindAdminSessionRegistryPorts = ({
@@ -164,5 +171,5 @@ export const bindAdminSessionRegistryPorts = ({
 };
 
 export const adminSessionRegistryPorts = bindAdminSessionRegistryPorts({
-  sessionRegistry: () => defaultSessionRegistry,
+  sessionRegistry: () => defaultSessionRegistry as AdminSessionRegistryModule,
 });

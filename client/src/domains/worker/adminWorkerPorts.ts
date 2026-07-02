@@ -46,7 +46,7 @@ export type AdminWorkerFetchContext = {
 export type AdminWorkerFetchResponse = {
   ok?: boolean;
   status?: number;
-  json?: () => Promise<unknown>;
+  json: () => Promise<AdminWorkerRecord>;
 };
 
 export type AdminWorkerAuthModule = {
@@ -119,7 +119,11 @@ export type AdminWorkerPorts = {
 type FetchLike = (
   input: string,
   init?: RequestInit
-) => Promise<AdminWorkerFetchResponse>;
+) => Promise<{
+  ok?: boolean;
+  status?: number;
+  json?: () => Promise<unknown>;
+}>;
 
 export type BindAdminWorkerPortsArgs = {
   corsProxy: () => AdminWorkerCorsProxyModule;
@@ -130,11 +134,13 @@ export type BindAdminWorkerPortsArgs = {
 
 const defaultFetchImpl = (): FetchLike => fetch;
 
-const readResponseJson = async (response: AdminWorkerFetchResponse): Promise<AdminWorkerRecord> => {
+const readResponseJson = async (response: {
+  json?: () => Promise<unknown>;
+}): Promise<AdminWorkerRecord> => {
   if (typeof response.json !== 'function') return {};
   const data = await response.json().catch(() => ({}));
   return data && typeof data === 'object' && !Array.isArray(data)
-    ? data
+    ? data as AdminWorkerRecord
     : {};
 };
 
