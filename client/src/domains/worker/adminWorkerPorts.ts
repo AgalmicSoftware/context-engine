@@ -1,7 +1,11 @@
 import { corsProxyUtils as defaultCorsProxyUtils } from '../../utilities/worker/corsProxy.js';
 import * as defaultWorkerCorsOrigins from '../../utilities/worker/workerCorsOrigins.js';
 import * as defaultWorkerAuth from '../../utilities/worker/workerAuth.js';
-import type { WorkerAdminActionAuthInput } from '../sessions/publish/sessionPublishAdapters.js';
+import {
+  bindWorkerAuthPublishAdapter,
+  type WorkerAdminActionAuthInput,
+  type WorkerAuthPublishModule,
+} from '../sessions/publish/sessionPublishAdapters.js';
 
 export type AdminWorkerRecord = Record<string, unknown>;
 
@@ -49,10 +53,7 @@ export type AdminWorkerFetchResponse = {
   json: () => Promise<AdminWorkerRecord>;
 };
 
-export type AdminWorkerAuthModule = {
-  buildSignedAdminActionAuth: (
-    input: WorkerAdminActionAuthInput
-  ) => Promise<AdminWorkerRecord>;
+export type AdminWorkerAuthModule = WorkerAuthPublishModule & {
   buildSiweMessage: (
     input: AdminBuildSiweMessageInput
   ) => string;
@@ -149,48 +150,56 @@ export const bindAdminWorkerPorts = ({
   corsOrigins: readCorsOrigins,
   workerAuth: readWorkerAuth,
   fetchImpl = defaultFetchImpl,
-}: BindAdminWorkerPortsArgs): AdminWorkerPorts => ({
-  workerUrl: {
-    resolveCorsProxyUrl: (input) => readCorsProxy().resolveCorsProxyUrl(input),
-    buildWorkerAllowOrigins: (input) => readCorsOrigins().buildWorkerAllowOrigins(input),
-  },
-  adminAuth: {
-    buildSignedAdminActionAuth: (input) => readWorkerAuth().buildSignedAdminActionAuth(input),
-    fetchWorkerWithAuth: (url, options, context) => (
-      readWorkerAuth().fetchWorkerWithAuth(url, options, context)
-    ),
-  },
-  siweLogin: {
-    prepareSiweLogin: async ({
-      workerUrl,
-      address,
-      sessionSlug,
-      chainId,
-      statement = 'Sign in to Context Engine.',
-    }) => {
-      const nonceResp = await fetchImpl()(`${workerUrl}/auth/nonce`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address, sessionSlug }),
-      });
-      const nonceData = await readResponseJson(nonceResp);
-      if (!nonceResp.ok) {
-        throw new Error(String(nonceData.error || `Nonce request failed (${nonceResp.status}).`));
-      }
-      const nonce = String(nonceData.nonce);
-      return {
-        nonce,
-        nonceData,
-        message: readWorkerAuth().buildSiweMessage({
-          address,
-          nonce,
-          chainId,
-          statement,
-        }),
-      };
+}: BindAdminWorkerPortsArgs): AdminWorkerPorts => {
+  const workerAuthPublishAdapter = bindWorkerAuthPublishAdapter({
+    workerAuth: readWorkerAuth,
+  });
+
+  return {
+    workerUrl: {
+      resolveCorsProxyUrl: (input) => readCorsProxy().resolveCorsProxyUrl(input),
+      buildWorkerAllowOrigins: (input) => readCorsOrigins().buildWorkerAllowOrigins(input),
     },
-  },
-});
+    adminAuth: {
+      buildSignedAdminActionAuth: (input) => (
+        workerAuthPublishAdapter.buildSignedAdminActionAuth(input)
+      ),
+      fetchWorkerWithAuth: (url, options, context) => (
+        readWorkerAuth().fetchWorkerWithAuth(url, options, context)
+      ),
+    },
+    siweLogin: {
+      prepareSiweLogin: async ({
+        workerUrl,
+        address,
+        sessionSlug,
+        chainId,
+        statement = 'Sign in to Context Engine.',
+      }) => {
+        const nonceResp = await fetchImpl()(`${workerUrl}/auth/nonce`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ address, sessionSlug }),
+        });
+        const nonceData = await readResponseJson(nonceResp);
+        if (!nonceResp.ok) {
+          throw new Error(String(nonceData.error || `Nonce request failed (${nonceResp.status}).`));
+        }
+        const nonce = String(nonceData.nonce);
+        return {
+          nonce,
+          nonceData,
+          message: readWorkerAuth().buildSiweMessage({
+            address,
+            nonce,
+            chainId,
+            statement,
+          }),
+        };
+      },
+    },
+  };
+};
 
 export const adminWorkerPorts = bindAdminWorkerPorts({
   corsProxy: () => defaultCorsProxyUtils,
