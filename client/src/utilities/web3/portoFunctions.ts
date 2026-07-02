@@ -1396,9 +1396,10 @@ export const createPortoProviderMock = (): any => {
     request: async ({ method, params }: { method: string; params?: any[] }) => {
       switch (method) {
         case 'eth_requestAccounts':
-        case 'eth_accounts':
+        case 'eth_accounts': {
           const addr = getPortoAddress();
           return addr ? [addr] : [];
+        }
 
         case 'eth_chainId':
           return portoChainIdHex;
@@ -1410,7 +1411,7 @@ export const createPortoProviderMock = (): any => {
           // Intercept transaction, send via Viem sidecar
           return await sendPortoTransaction(params![0]);
 
-        case 'eth_estimateGas':
+        case 'eth_estimateGas': {
           const tx = params?.[0] || {};
           try {
             if (!viemWalletClient) throw new Error('Porto client not initialized');
@@ -1428,6 +1429,7 @@ export const createPortoProviderMock = (): any => {
           }
           const fallbackGas = resolvePortoFallbackGas(tx);
           return `0x${fallbackGas.toString(16)}`;
+        }
 
         case 'eth_signTypedData_v4': {
           // Required for EIP-712 signing in cryptography.js (key derivation)
@@ -1471,7 +1473,7 @@ export const createPortoProviderMock = (): any => {
         case 'eth_blockNumber':
         case 'eth_call':
         case 'eth_getBalance':
-        case 'eth_gasPrice':
+        case 'eth_gasPrice': {
           // Delegate read-only calls to the Viem client if initialized
           if (viemWalletClient) {
              try {
@@ -1499,6 +1501,7 @@ export const createPortoProviderMock = (): any => {
 
           portoLog.warn(`PortoMock: Could not handle ${method} (no client/provider available)`);
           return null;
+        }
 
         default:
           portoLog.warn(`PortoMock: Method ${method} not implemented, attempting passthrough...`);

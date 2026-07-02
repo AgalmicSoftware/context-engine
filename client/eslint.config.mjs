@@ -9,6 +9,7 @@ const typedDomainFiles = ['src/domains/**/*.{ts,tsx}'];
 const typedSessionUtilityFiles = ['src/utilities/session/**/*.{ts,tsx}'];
 const typedWorkerUtilityFiles = ['src/utilities/worker/**/*.{ts,tsx}'];
 const typedArweaveUtilityFiles = ['src/utilities/arweave/**/*.{ts,tsx}'];
+const typedWeb3UtilityFiles = ['src/utilities/web3/**/*.{ts,tsx}'];
 const typedCacheUtilityFiles = ['src/utilities/cache/**/*.{ts,tsx}'];
 const typedSurveyUtilityFiles = ['src/utilities/survey/**/*.{ts,tsx}'];
 const typedSbtUtilityFiles = ['src/utilities/sbt/**/*.{ts,tsx}'];
@@ -134,6 +135,14 @@ export default [
   },
   {
     files: typedArweaveUtilityFiles,
+    languageOptions: sharedLanguageOptions,
+    rules: {
+      ...sharedRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedWeb3UtilityFiles,
     languageOptions: sharedLanguageOptions,
     rules: {
       ...sharedRules,

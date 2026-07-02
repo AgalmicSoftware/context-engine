@@ -17,6 +17,7 @@ const expectedLintCommand = [
   '"src/utilities/session/**/*.{ts,tsx}"',
   '"src/utilities/worker/**/*.{ts,tsx}"',
   '"src/utilities/arweave/**/*.{ts,tsx}"',
+  '"src/utilities/web3/**/*.{ts,tsx}"',
   '"src/utilities/cache/**/*.{ts,tsx}"',
   '"src/utilities/survey/**/*.{ts,tsx}"',
   '"src/utilities/sbt/**/*.{ts,tsx}"',
@@ -75,6 +76,7 @@ describe('client package modernization contract', () => {
     expect(eslintConfig).toContain("const typedSessionUtilityFiles = ['src/utilities/session/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedWorkerUtilityFiles = ['src/utilities/worker/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedArweaveUtilityFiles = ['src/utilities/arweave/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedWeb3UtilityFiles = ['src/utilities/web3/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedCacheUtilityFiles = ['src/utilities/cache/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedSurveyUtilityFiles = ['src/utilities/survey/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedSbtUtilityFiles = ['src/utilities/sbt/**/*.{ts,tsx}']");
