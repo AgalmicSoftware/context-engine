@@ -15,6 +15,7 @@ const typedSbtUtilityFiles = ['src/utilities/sbt/**/*.{ts,tsx}'];
 const typedUserUtilityFiles = ['src/utilities/user/**/*.{ts,tsx}'];
 const typedSponsorUtilityFiles = ['src/utilities/sponsor/**/*.{ts,tsx}'];
 const typedTagsUtilityFiles = ['src/utilities/tags/**/*.{ts,tsx}'];
+const typedContractsUtilityFiles = ['src/utilities/contracts/**/*.{ts,tsx}'];
 const typedUiUtilityFiles = ['src/utilities/ui/**/*.{ts,tsx}'];
 const typedSharedComponentFiles = ['src/components/Shared/**/*.{ts,tsx}'];
 const typedInformationalComponentFiles = [
@@ -180,6 +181,14 @@ export default [
   },
   {
     files: typedTagsUtilityFiles,
+    languageOptions: sharedLanguageOptions,
+    rules: {
+      ...sharedRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedContractsUtilityFiles,
     languageOptions: sharedLanguageOptions,
     rules: {
       ...sharedRules,
