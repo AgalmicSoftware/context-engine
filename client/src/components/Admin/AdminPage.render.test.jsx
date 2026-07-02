@@ -82,7 +82,11 @@ jest.mock('../../utilities/web3/sessionRegistry.js', () => ({
   uploadSessionMetadata: (...args) => mockUploadSessionMetadata(...args),
   updateSessionMetadataOnChain: (...args) => mockUpdateSessionMetadataOnChain(...args),
   sessionRegistryUtils: {
+    SESSION_REGISTRY_CACHE_UPDATED_EVENT,
+    fetchSessionFromRegistry: (...args) => mockFetchSessionFromRegistry(...args),
+    upsertSessionRegistryCache: (...args) => mockUpsertSessionRegistryCache(...args),
     normalizeSessionIdHex: jest.fn(() => ''),
+    toRegistrySlug: jest.fn((value) => String(value || '').trim().toLowerCase()),
   },
 }));
 
