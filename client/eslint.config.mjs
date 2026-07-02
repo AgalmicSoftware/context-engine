@@ -52,6 +52,7 @@ const typedAdminComponentFiles = ['src/components/Admin/**/*.{ts,tsx}'];
 const typedMainSiteComponentFiles = ['src/components/MainSite/**/*.{ts,tsx}'];
 const typedUserPageComponentFiles = ['src/components/UserPage/**/*.{ts,tsx}'];
 const typedSessionsComponentFiles = ['src/components/Sessions/**/*.{ts,tsx}'];
+const typedSbtComponentFiles = ['src/components/SBTs/**/*.{ts,tsx}'];
 
 const sharedLanguageOptions = {
   parser: tsParser,
@@ -452,6 +453,17 @@ export default [
   },
   {
     files: typedSessionsComponentFiles,
+    languageOptions: sharedLanguageOptions,
+    plugins: reactPlugins,
+    settings: reactSettings,
+    rules: {
+      ...sharedRules,
+      ...reactRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedSbtComponentFiles,
     languageOptions: sharedLanguageOptions,
     plugins: reactPlugins,
     settings: reactSettings,
