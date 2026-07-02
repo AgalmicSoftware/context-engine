@@ -262,6 +262,10 @@ import {
   surveyResultsAnalysisArtifactMergePort,
 } from '../../domains/surveys/surveyResultsAnalysisArtifactMergePort';
 import {
+  createSurveyResultsLocalStoragePollingRuntime,
+  type SurveyResultsLocalStoragePollingRuntime,
+} from '../../domains/surveys/surveyResultsLocalStoragePollingRuntime';
+import {
   chainScanReadsPort,
 } from '../../domains/chain/contractScriptsChainScanReadsPort';
 import { getPolisDemoQuestionPool } from './surveyPolisDemoQuestionPool.js';
@@ -1037,9 +1041,6 @@ type SurveyResultsInstanceFields = {
   _fetchResponsesInFlight: boolean;
   _fetchResponsesQueued: boolean;
   _fetchResponsesRequestScheduled: boolean;
-  _localStoragePollingIntervalId: ReturnType<typeof setTimeout> | null;
-  _localStoragePollingDelayMs: number;
-  _localStoragePollingStableCycles: number;
   _lastLocalStoragePollCoarseSignature: string;
   _lastLocalStoragePollDetailedSignature: string;
   _lastPolledQuestionsRef: unknown;
@@ -1111,9 +1112,6 @@ const createSurveyResultsInstanceFields = (): SurveyResultsInstanceFields => ({
   _fetchResponsesInFlight: false,
   _fetchResponsesQueued: false,
   _fetchResponsesRequestScheduled: false,
-  _localStoragePollingIntervalId: null,
-  _localStoragePollingDelayMs: LOCAL_STORAGE_POLL_MIN_MS,
-  _localStoragePollingStableCycles: 0,
   _lastLocalStoragePollCoarseSignature: '',
   _lastLocalStoragePollDetailedSignature: '',
   _lastPolledQuestionsRef: null,
@@ -1189,6 +1187,23 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
   }
   const inst = instRef.current;
   const pendingSetStateCallbacksRef = useRef<VoidFunction[]>([]);
+  const localStoragePollingRuntimeRef = useRef<SurveyResultsLocalStoragePollingRuntime | null>(null);
+  if (localStoragePollingRuntimeRef.current === null) {
+    localStoragePollingRuntimeRef.current = createSurveyResultsLocalStoragePollingRuntime({
+      minDelayMs: LOCAL_STORAGE_POLL_MIN_MS,
+      midDelayMs: LOCAL_STORAGE_POLL_MID_MS,
+      maxDelayMs: LOCAL_STORAGE_POLL_MAX_MS,
+      isOpen: () => !!propsRef.current.isOpen,
+      isDocumentHidden: () => isDocumentHidden(),
+      isMounted: () => inst._isMounted,
+      pollLocalStorageForUpdates: () => pollLocalStorageForUpdates(),
+      onResetWithReason: () => {
+        inst._lastLocalStoragePollCoarseSignature = '';
+        inst._lastLocalStoragePollDetailedSignature = '';
+      },
+    });
+  }
+  const localStoragePollingRuntime = localStoragePollingRuntimeRef.current;
   const setFilterLoadingHandlerRef = useRef<(loading: unknown) => void>(() => {});
   const stableSetFilterLoadingRef = useRef<(loading: unknown) => void>((loading) => {
     setFilterLoadingHandlerRef.current(loading);
@@ -1815,50 +1830,15 @@ const handleDocumentVisibilityChange = (): void => {
   };
 
 const resetLocalStoragePollingBackoff = (reason: unknown = ''): void => {
-    inst._localStoragePollingStableCycles = 0;
-    inst._localStoragePollingDelayMs = LOCAL_STORAGE_POLL_MIN_MS;
-    if (reason) {
-      inst._lastLocalStoragePollCoarseSignature = '';
-      inst._lastLocalStoragePollDetailedSignature = '';
-    }
-  };
-
-const updateLocalStoragePollingBackoff = (didObserveChange: unknown): void => {
-    if (didObserveChange) {
-      resetLocalStoragePollingBackoff();
-      return;
-    }
-    inst._localStoragePollingStableCycles += 1;
-    if (inst._localStoragePollingStableCycles <= 0) {
-      inst._localStoragePollingDelayMs = LOCAL_STORAGE_POLL_MIN_MS;
-      return;
-    }
-    if (inst._localStoragePollingStableCycles === 1) {
-      inst._localStoragePollingDelayMs = LOCAL_STORAGE_POLL_MID_MS;
-      return;
-    }
-    inst._localStoragePollingDelayMs = LOCAL_STORAGE_POLL_MAX_MS;
+    localStoragePollingRuntime.resetBackoff(reason);
   };
 
 function startLocalStoragePolling(): void {
-    if (!propsRef.current.isOpen) return;
-    if (isDocumentHidden()) return;
-    if (inst._localStoragePollingIntervalId) return;
-    const waitMs = Number(inst._localStoragePollingDelayMs || LOCAL_STORAGE_POLL_MIN_MS);
-    inst._localStoragePollingIntervalId = setTimeout(() => {
-      inst._localStoragePollingIntervalId = null;
-      if (!inst._isMounted) return;
-      if (isDocumentHidden()) return;
-      const didObserveChange = pollLocalStorageForUpdates();
-      updateLocalStoragePollingBackoff(!!didObserveChange);
-      startLocalStoragePolling();
-    }, waitMs);
+    localStoragePollingRuntime.start();
   }
 
 function stopLocalStoragePolling(): void {
-    if (!inst._localStoragePollingIntervalId) return;
-    clearTimeout(inst._localStoragePollingIntervalId);
-    inst._localStoragePollingIntervalId = null;
+    localStoragePollingRuntime.stop();
   }
 
 const maybeRefreshNetworkLatestBlockFromPolling = (): void => {
@@ -2032,7 +2012,7 @@ function pollLocalStorageForUpdates(): boolean {
       return false;
     }
 
-    const stableCycles = Math.max(0, Number(inst._localStoragePollingStableCycles || 0));
+    const stableCycles = Math.max(0, Number(localStoragePollingRuntime.getStableCycles() || 0));
     const forceRescanOnStableCycle =
       stableCycles > 0 &&
       (stableCycles % LOCAL_STORAGE_FORCE_RESCAN_EVERY) === 0;
@@ -4879,7 +4859,7 @@ return renderSurveyResultsHtmlReportExportModal(getHtmlReportModalProps());
     }
     window.removeEventListener('popstate', handleUrlChange);
     document.removeEventListener('visibilitychange', handleDocumentVisibilityChange);
-    stopLocalStoragePolling();
+    localStoragePollingRuntime.destroy();
 
     // If unmounting while still open, remove "/results" from the URL
     if (propsRef.current.isOpen && !propsRef.current.preventUrlChange) {
