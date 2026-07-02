@@ -20,6 +20,7 @@ describe('ChainScanReadsPort', () => {
     });
 
     await expect(port.getLatestBlockNumber('none', 'alpha')).resolves.toBe(10);
+    await expect(port.getLatestBlockNumber(undefined, 'fallback-session')).resolves.toBe(10);
 
     currentContractScripts = secondContractScripts;
 
@@ -28,6 +29,7 @@ describe('ChainScanReadsPort', () => {
     expect(port.getReadProviderForSession('beta')).toBe(secondProvider);
 
     expect(firstContractScripts.getLatestBlockNumber).toHaveBeenCalledWith('none', 'alpha');
+    expect(firstContractScripts.getLatestBlockNumber).toHaveBeenCalledWith(undefined, 'fallback-session');
     expect(secondContractScripts.getRelevantBlockWindowForFilter).toHaveBeenCalledWith('beta', { strict: true });
     expect(secondContractScripts.getReadProviderForSession).toHaveBeenCalledWith('beta');
   });
