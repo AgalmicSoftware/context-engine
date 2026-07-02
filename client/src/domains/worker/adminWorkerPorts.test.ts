@@ -25,6 +25,8 @@ describe('admin worker ports', () => {
       corsProxy: () => corsProxy,
       corsOrigins: () => corsOrigins,
       workerAuth: () => ({
+        normalizeWorkerUrl: jest.fn(),
+        buildSignedBootstrapAdminAuth: jest.fn(),
         buildSignedAdminActionAuth: jest.fn(),
         buildSiweMessage: jest.fn(),
         fetchWorkerWithAuth: jest.fn(),
@@ -59,11 +61,15 @@ describe('admin worker ports', () => {
 
   it('routes signed admin actions and worker fetches through late workerAuth lookup', async () => {
     const firstWorkerAuth: AdminWorkerAuthModule = {
+      normalizeWorkerUrl: jest.fn(),
+      buildSignedBootstrapAdminAuth: jest.fn(),
       buildSignedAdminActionAuth: jest.fn(async () => ({ signature: '0xfirst' })),
       buildSiweMessage: jest.fn(() => 'first-message'),
       fetchWorkerWithAuth: jest.fn(async () => ({ ok: true, status: 200 })),
     };
     const secondWorkerAuth: AdminWorkerAuthModule = {
+      normalizeWorkerUrl: jest.fn(),
+      buildSignedBootstrapAdminAuth: jest.fn(),
       buildSignedAdminActionAuth: jest.fn(async () => ({ signature: '0xsecond' })),
       buildSiweMessage: jest.fn(() => 'second-message'),
       fetchWorkerWithAuth: jest.fn(async () => ({ ok: true, status: 201 })),
@@ -113,6 +119,8 @@ describe('admin worker ports', () => {
       corsProxy: () => ({ resolveCorsProxyUrl: jest.fn() }),
       corsOrigins: () => ({ buildWorkerAllowOrigins: jest.fn() }),
       workerAuth: () => ({
+        normalizeWorkerUrl: jest.fn(),
+        buildSignedBootstrapAdminAuth: jest.fn(),
         buildSignedAdminActionAuth: jest.fn(),
         buildSiweMessage,
         fetchWorkerWithAuth: jest.fn(),
@@ -159,6 +167,8 @@ describe('admin worker ports', () => {
       corsProxy: () => ({ resolveCorsProxyUrl: jest.fn() }),
       corsOrigins: () => ({ buildWorkerAllowOrigins: jest.fn() }),
       workerAuth: () => ({
+        normalizeWorkerUrl: jest.fn(),
+        buildSignedBootstrapAdminAuth: jest.fn(),
         buildSignedAdminActionAuth: jest.fn(),
         buildSiweMessage,
         fetchWorkerWithAuth: jest.fn(),
