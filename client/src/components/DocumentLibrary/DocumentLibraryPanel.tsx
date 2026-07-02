@@ -796,9 +796,10 @@ export default function DocumentLibraryPanel({
       if (listRequestSeqRef.current !== requestSeq || activeListQueryKeyRef.current !== expectedQueryKey) return;
       setError(getErrorMessage(err, 'Failed to load docs.'));
     } finally {
-      if (listRequestSeqRef.current !== requestSeq || activeListQueryKeyRef.current !== expectedQueryKey) return;
-      loadingRef.current = false;
-      setLoading(false);
+      if (listRequestSeqRef.current === requestSeq && activeListQueryKeyRef.current === expectedQueryKey) {
+        loadingRef.current = false;
+        setLoading(false);
+      }
     }
   }, [account, canList, docProvider, graphqlUrl, graphqlUrls, listFilters, network?.id, pageSize, provider, sessionConfig, sessionSlug, listRunKey]);
 
