@@ -131,6 +131,19 @@ test('public-release style copies without .git still pass wiring checks', () => 
         '        dist/deployHelper.bundle.js',
       ].join('\n'),
     );
+    writeFile(
+      rootDir,
+      'scripts/sync-public-history.sh',
+      [
+        '#!/usr/bin/env bash',
+        'verify_public_test_wiring() {',
+        '  npm run test:wiring',
+        '}',
+        'verify_public_type_debt() {',
+        '  npm run type-debt:check',
+        '}',
+      ].join('\n'),
+    );
 
     [
       'tests/root/deployHelperOrigins.test.mjs',
