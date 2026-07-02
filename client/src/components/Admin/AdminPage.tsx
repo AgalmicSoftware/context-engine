@@ -1715,8 +1715,8 @@ const AdminPage = ({
           context: testContext,
           workerUrl: baseWorkerUrl,
         });
-        const payload = await resp.json().catch(() => ({}));
-        if (!resp.ok) throw new Error(payload?.error || `Health check failed (${resp.status})`);
+        const payload: Record<string, unknown> = await resp.json().catch(() => ({}));
+        if (!resp.ok) throw new Error(String(payload?.error || `Health check failed (${resp.status})`));
         return payload;
       });
       setTestResults((prev) => ({ ...prev, health: `OK (${data?.ts ? new Date(data.ts).toISOString() : 'healthy'})` }));
@@ -1810,8 +1810,8 @@ const AdminPage = ({
           context: testContext,
           workerUrl: baseWorkerUrl,
         });
-        const parsed = await resp.json().catch(() => ({}));
-        if (!resp.ok) throw new Error(parsed?.error || `AI test failed (${resp.status})`);
+        const parsed: Record<string, unknown> = await resp.json().catch(() => ({}));
+        if (!resp.ok) throw new Error(String(parsed?.error || `AI test failed (${resp.status})`));
         return parsed;
       });
       const preview = data?.completion || data?.content?.[0]?.text || 'ok';
@@ -1891,7 +1891,7 @@ const AdminPage = ({
           context: testContext,
           workerUrl: baseWorkerUrl,
         });
-        const parsed = await resp.json().catch(() => ({}));
+        const parsed: Record<string, unknown> = await resp.json().catch(() => ({}));
         if (!resp.ok) {
           const details = [
             parsed?.error,
