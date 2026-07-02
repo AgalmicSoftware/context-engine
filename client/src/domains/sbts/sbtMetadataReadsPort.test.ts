@@ -165,4 +165,158 @@ describe('SbtMetadataReadsPort', () => {
     expect(contract.admin).toHaveBeenCalled();
     expect(contract.owner).toHaveBeenCalled();
   });
+
+  it('only invokes requested on-chain config methods', async () => {
+    const provider = {} as ethers.providers.Provider;
+    const contract = {
+      maxTokens: jest.fn(async () => '10'),
+      collectionBurnAuth: jest.fn(async () => '2'),
+      mintingEndTime: jest.fn(async () => '0'),
+      hasPasswordMint: jest.fn(async () => true),
+      admin: jest.fn(async () => '0x0000000000000000000000000000000000000002'),
+      owner: jest.fn(async () => '0x0000000000000000000000000000000000000003'),
+    };
+    const contractScripts = {
+      getSbtMetadata: jest.fn(async () => ({ name: 'Alpha' })),
+      getMintedTokens: jest.fn(async () => '1'),
+      getGroupPasswordHash: jest.fn(async () => '0xhash'),
+      getReadProviderForGroup: jest.fn(() => provider),
+    };
+    const port = bindSbtMetadataReadsPort({
+      contractScripts: () => contractScripts,
+      createOnChainConfigContract: jest.fn(() => contract),
+    });
+
+    await expect(port.getSbtOnChainConfig(
+      'none',
+      '0x0000000000000000000000000000000000000001',
+      'alpha',
+      { collectionBurnAuth: true, adminAndOwner: true }
+    )).resolves.toEqual({
+      maxTokens: null,
+      collectionBurnAuth: '2',
+      mintingEndTime: null,
+      hasPasswordMint: null,
+      admin: '0x0000000000000000000000000000000000000002',
+      owner: '0x0000000000000000000000000000000000000003',
+    });
+
+    expect(contract.maxTokens).not.toHaveBeenCalled();
+    expect(contract.collectionBurnAuth).toHaveBeenCalledTimes(1);
+    expect(contract.mintingEndTime).not.toHaveBeenCalled();
+    expect(contract.hasPasswordMint).not.toHaveBeenCalled();
+    expect(contract.admin).toHaveBeenCalledTimes(1);
+    expect(contract.owner).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns null for a requested on-chain config method that times out', async () => {
+    jest.useFakeTimers();
+    try {
+      const provider = {} as ethers.providers.Provider;
+      const contract = {
+        maxTokens: jest.fn(() => new Promise<unknown>(() => undefined)),
+        collectionBurnAuth: jest.fn(async () => '2'),
+        mintingEndTime: jest.fn(async () => '0'),
+        hasPasswordMint: jest.fn(async () => true),
+        admin: jest.fn(async () => '0x0000000000000000000000000000000000000002'),
+        owner: jest.fn(async () => '0x0000000000000000000000000000000000000003'),
+      };
+      const contractScripts = {
+        getSbtMetadata: jest.fn(async () => ({ name: 'Alpha' })),
+        getMintedTokens: jest.fn(async () => '1'),
+        getGroupPasswordHash: jest.fn(async () => '0xhash'),
+        getReadProviderForGroup: jest.fn(() => provider),
+      };
+      const port = bindSbtMetadataReadsPort({
+        contractScripts: () => contractScripts,
+        createOnChainConfigContract: jest.fn(() => contract),
+      });
+
+      const result = port.getSbtOnChainConfig(
+        'none',
+        '0x0000000000000000000000000000000000000001',
+        'alpha',
+        { maxTokens: true }
+      );
+      await jest.advanceTimersByTimeAsync(750);
+
+      await expect(result).resolves.toEqual({
+        maxTokens: null,
+        collectionBurnAuth: null,
+        mintingEndTime: null,
+        hasPasswordMint: null,
+        admin: null,
+        owner: null,
+      });
+      expect(contract.maxTokens).toHaveBeenCalledTimes(1);
+      expect(contract.collectionBurnAuth).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('returns null for a requested on-chain config method that rejects', async () => {
+    const provider = {} as ethers.providers.Provider;
+    const contract = {
+      maxTokens: jest.fn(async () => '10'),
+      collectionBurnAuth: jest.fn(async () => { throw new Error('burn read failed'); }),
+      mintingEndTime: jest.fn(async () => '0'),
+      hasPasswordMint: jest.fn(async () => true),
+      admin: jest.fn(async () => '0x0000000000000000000000000000000000000002'),
+      owner: jest.fn(async () => '0x0000000000000000000000000000000000000003'),
+    };
+    const contractScripts = {
+      getSbtMetadata: jest.fn(async () => ({ name: 'Alpha' })),
+      getMintedTokens: jest.fn(async () => '1'),
+      getGroupPasswordHash: jest.fn(async () => '0xhash'),
+      getReadProviderForGroup: jest.fn(() => provider),
+    };
+    const port = bindSbtMetadataReadsPort({
+      contractScripts: () => contractScripts,
+      createOnChainConfigContract: jest.fn(() => contract),
+    });
+
+    await expect(port.getSbtOnChainConfig(
+      'none',
+      '0x0000000000000000000000000000000000000001',
+      'alpha',
+      { collectionBurnAuth: true }
+    )).resolves.toEqual({
+      maxTokens: null,
+      collectionBurnAuth: null,
+      mintingEndTime: null,
+      hasPasswordMint: null,
+      admin: null,
+      owner: null,
+    });
+
+    expect(contract.collectionBurnAuth).toHaveBeenCalledTimes(1);
+    expect(contract.maxTokens).not.toHaveBeenCalled();
+  });
+
+  it('throws when no SBT read provider resolver is available', async () => {
+    const contractScripts = {
+      getSbtMetadata: jest.fn(async () => ({ name: 'Alpha' })),
+      getMintedTokens: jest.fn(async () => '1'),
+      getGroupPasswordHash: jest.fn(async () => '0xhash'),
+    };
+    const port = bindSbtMetadataReadsPort({
+      contractScripts: () => contractScripts,
+      createOnChainConfigContract: jest.fn(() => ({
+        maxTokens: jest.fn(async () => '10'),
+        collectionBurnAuth: jest.fn(async () => '2'),
+        mintingEndTime: jest.fn(async () => '0'),
+        hasPasswordMint: jest.fn(async () => false),
+        admin: jest.fn(async () => '0x0000000000000000000000000000000000000002'),
+        owner: jest.fn(async () => '0x0000000000000000000000000000000000000003'),
+      })),
+    });
+
+    await expect(port.getSbtOnChainConfig(
+      'none',
+      '0x0000000000000000000000000000000000000001',
+      'alpha',
+      { maxTokens: true }
+    )).rejects.toThrow('Unable to resolve read provider for SBT on-chain config.');
+  });
 });
