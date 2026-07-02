@@ -1749,28 +1749,24 @@ class OnePageSession extends Component<any, any> {
             const password = cryptoUtils.normalizeGroupPasswordInput(invitePassword);
             if (!password) throw new Error('Invalid group password');
             let walletScopeSbtAddress = sbtAddr;
-            try {
-              const onchainHash = await sbtMetadataReadsPort.getGroupPasswordHash('none', sbtAddr, currentSlug);
-              if (onchainHash && onchainHash !== ethers.constants.HashZero) {
-                walletScopeSbtAddress = cryptoUtils.resolveGroupPasswordWalletScopeAddress({
-                  password,
-                  sbtAddress: sbtAddr,
-                  groupPasswordHash: onchainHash
-                });
-                const localHash = walletScopeSbtAddress === null
-                  ? null
-                  : sbtGroupMintAuthorizationPort.computeGroupPasswordHash({
-                      password,
-                      sbtAddress: walletScopeSbtAddress
-                    });
-                demoLog.log('[INVITE_DEBUG v4] auto-mint local groupPasswordHash:', localHash);
-                demoLog.log('[INVITE_DEBUG v4] auto-mint on-chain groupPasswordHash:', onchainHash);
-                if (!localHash || String(localHash).toLowerCase() !== String(onchainHash).toLowerCase()) {
-                  throw new Error('Group password mismatch');
-                }
+            const onchainHash = await sbtMetadataReadsPort.getGroupPasswordHash('none', sbtAddr, currentSlug);
+            if (onchainHash && onchainHash !== ethers.constants.HashZero) {
+              walletScopeSbtAddress = cryptoUtils.resolveGroupPasswordWalletScopeAddress({
+                password,
+                sbtAddress: sbtAddr,
+                groupPasswordHash: onchainHash
+              });
+              const localHash = walletScopeSbtAddress === null
+                ? null
+                : sbtGroupMintAuthorizationPort.computeGroupPasswordHash({
+                    password,
+                    sbtAddress: walletScopeSbtAddress
+                  });
+              demoLog.log('[INVITE_DEBUG v4] auto-mint local groupPasswordHash:', localHash);
+              demoLog.log('[INVITE_DEBUG v4] auto-mint on-chain groupPasswordHash:', onchainHash);
+              if (!localHash || String(localHash).toLowerCase() !== String(onchainHash).toLowerCase()) {
+                throw new Error('Group password mismatch');
               }
-            } catch (hashErr) {
-              throw hashErr;
             }
             let maxTokens: any = null;
             try {
