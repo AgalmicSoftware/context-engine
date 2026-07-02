@@ -15,11 +15,10 @@ import {
   fetchWorkerWithAuth,
 } from '../../utilities/worker/workerAuth.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
-import { arweaveScripts } from '../../utilities/arweave/arweaveScripts.js';
 import { encryptedFieldsUtils } from '../../utilities/crypto/encryptedFields.js';
 import { normalizeOriginList } from '../../utilities/urlUtils.js';
-import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import { adminWorkerPorts } from '../../domains/worker/adminWorkerPorts.js';
+import { adminArweavePort } from '../../domains/storage/adminArweavePorts.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
   loadSessionRegistryCache,
@@ -926,13 +925,13 @@ const AdminPage = ({
 
     let address = '';
     try {
-      const arweaveBalance = await arweaveScripts.readArweaveWalletBalance(parsedJwk);
+      const arweaveBalance = await adminArweavePort.readArweaveWalletBalance(parsedJwk);
       address = arweaveBalance.address;
       if (requestId !== arweaveResourceRequestRef.current) return;
       setArweaveResource(buildAdminArweaveBalanceResource({
         address,
         winston: arweaveBalance.winston,
-        formatWinstonToAr: arweaveScripts.formatWinstonToAr,
+        formatWinstonToAr: adminArweavePort.formatWinstonToAr,
         shortAddress,
       }));
     } catch (err) {
@@ -1870,7 +1869,7 @@ const AdminPage = ({
         ts: new Date().toISOString(),
         slug: selectedSlug || 'general',
       };
-      const txId = await withSessionConfigRetry(() => arweaveScripts.uploadDataToArweave(payload, 'json', {
+      const txId = await withSessionConfigRetry(() => adminArweavePort.uploadDataToArweave(payload, 'json', {
         sessionConfig: testSessionConfig,
         sessionSlug: selectedSlug,
         context: testContext,
@@ -1879,7 +1878,7 @@ const AdminPage = ({
       }));
       const tx = String(txId || '').trim();
       const txLabel = tx ? `OK (tx ${tx.slice(0, 12)}…)` : 'OK';
-      const txUrl = tx ? arweaveScripts.buildArweaveGatewayUrl(tx) : '';
+      const txUrl = tx ? adminArweavePort.buildArweaveGatewayUrl(tx) : '';
       setTestResults((prev) => ({ ...prev, arweave: { label: txLabel, href: txUrl } }));
       setTestStatus('Arweave upload succeeded.');
     } catch (err: any) {
@@ -2128,7 +2127,7 @@ const AdminPage = ({
     }
   };
 
-  const resolvedSessionHeader = normalizeArweaveUrl(
+  const resolvedSessionHeader = adminArweavePort.normalizeArweaveUrl(
     groupMetadata?.sessionHeaderImg || groupMetadata?.sessionHeader || '',
     { contextLabel: 'session_header_image' }
   );
@@ -2175,7 +2174,7 @@ const AdminPage = ({
   const metadataAdminUrl = buildUserPageUrl(metadataAdminAddress);
   const metadataUriValue = toStr(groupMetadata?.__registry?.metadataURI || '').trim();
   const metadataUriUrl = metadataUriValue
-    ? normalizeArweaveUrl(metadataUriValue, { contextLabel: 'admin_metadata_uri' }) || metadataUriValue
+    ? adminArweavePort.normalizeArweaveUrl(metadataUriValue, { contextLabel: 'admin_metadata_uri' }) || metadataUriValue
     : '';
   const metadataLoadState = toStr(groupMetadata?.__registry?.metadataLoadState).trim() || (metadataUriValue ? 'loaded' : 'none');
   const metadataDefaultedContractKeys = Array.isArray(groupMetadata?.__registry?.metadataDefaultedContractKeys)
