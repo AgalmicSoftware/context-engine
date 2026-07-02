@@ -48,6 +48,7 @@ const expectedLintCommand = [
   '"src/components/OnePageSession/**/*.{ts,tsx}"',
   '"src/components/TagPage/**/*.{ts,tsx}"',
   '"src/components/DocumentLibrary/**/*.{ts,tsx}"',
+  '"src/components/DemoViews/**/*.{ts,tsx}"',
 ].join(' ');
 
 describe('client package modernization contract', () => {
@@ -97,6 +98,7 @@ describe('client package modernization contract', () => {
     expect(eslintConfig).toContain("const typedOnePageSessionComponentFiles = ['src/components/OnePageSession/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedTagPageComponentFiles = ['src/components/TagPage/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedDocumentLibraryComponentFiles = ['src/components/DocumentLibrary/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedDemoViewsComponentFiles = ['src/components/DemoViews/**/*.{ts,tsx}']");
   });
 
   it('keeps web3-sensitive dependencies pinned during modernization', () => {
