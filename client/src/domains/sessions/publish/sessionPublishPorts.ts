@@ -95,11 +95,6 @@ export type SessionPublishSignAdminActionInput = {
   workerUrl: string;
 };
 
-export type SessionPublishRouteInput = {
-  sessionUrl: string;
-  adminUrl: string;
-};
-
 export type SessionWizardPublishPorts = {
   checkRequirements: (input: SessionPublishRequirementsInput) => Promise<SessionPublishRequirementsResult>;
   uploadSessionHeader: (
@@ -116,5 +111,4 @@ export type SessionWizardPublishPorts = {
   deployPendingSbt: (input: SessionPublishDeployPendingSbtInput) => Promise<SessionPublishDeployPendingSbtResult>;
   signAdminAction: (input: SessionPublishSignAdminActionInput) => Promise<unknown>;
   now: () => number;
-  route: (input: SessionPublishRouteInput) => void;
 };
