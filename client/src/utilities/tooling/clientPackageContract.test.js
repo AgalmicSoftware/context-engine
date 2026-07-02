@@ -23,6 +23,7 @@ const expectedLintCommand = [
   '"src/utilities/user/**/*.{ts,tsx}"',
   '"src/utilities/sponsor/**/*.{ts,tsx}"',
   '"src/utilities/tags/**/*.{ts,tsx}"',
+  '"src/utilities/contracts/**/*.{ts,tsx}"',
   '"src/utilities/ui/**/*.{ts,tsx}"',
   '"src/components/Shared/**/*.{ts,tsx}"',
   '"src/components/About/**/*.{ts,tsx}"',
@@ -79,6 +80,7 @@ describe('client package modernization contract', () => {
     expect(eslintConfig).toContain("const typedUserUtilityFiles = ['src/utilities/user/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedSponsorUtilityFiles = ['src/utilities/sponsor/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedTagsUtilityFiles = ['src/utilities/tags/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedContractsUtilityFiles = ['src/utilities/contracts/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedGateComponentFiles = ['src/components/Gates/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedCommunityTabComponentFiles = ['src/components/CommunityTab/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedPolisReportComponentFiles = ['src/components/PolisReport/**/*.{ts,tsx}']");
