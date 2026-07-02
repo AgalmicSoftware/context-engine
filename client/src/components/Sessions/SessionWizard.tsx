@@ -104,8 +104,11 @@ import {
   sessionPublishReducer,
   type SessionPublishEffect,
 } from '../../domains/sessions/publish/sessionPublishReducer.js';
-import { beginSessionPublishReducerAttempt, markSessionPublishEffectSucceeded, runSessionPublishEffect } from '../../domains/sessions/publish/sessionPublishDispatch.js';
-import { resolveSessionWizardPublishReducerUiState } from './sessionWizardPublishReducerUiState';
+import { beginSessionPublishReducerAttempt, markSessionPublishEffectFailed, markSessionPublishEffectSucceeded, runSessionPublishEffect } from '../../domains/sessions/publish/sessionPublishDispatch.js';
+import {
+  resolveSessionWizardPublishReducerUiPlan,
+  resolveSessionWizardPublishReducerUiState,
+} from './sessionWizardPublishReducerUiState';
 import SessionWizardInfoTooltip, {
   type SessionWizardTooltipRenderOptions,
 } from './SessionWizardInfoTooltip';
@@ -534,6 +537,8 @@ type SessionRegistryReadContract = {
 };
 
 type WorkerSecretsUpdateFn = (current: WorkerSecretsLike) => WorkerSecretsLike | UnknownRecord | null | undefined;
+
+const ignoreSessionPublishStep = (_publishStep: number): void => {};
 
 type SponsoredBundleDeploymentStatePatch = {
   deployForm?: DeployFormState;
@@ -3465,6 +3470,9 @@ const SessionWizard = ({
     }
     const signerAccountOverride = publishAdminPreflightDescriptor.signerAccountOverride;
     let activeSessionPublishEffect: SessionPublishEffect = 'checkRequirements';
+    const runTrackedPublishEffect = <Result,>(effect: SessionPublishEffect, run: () => Promise<Result>): Promise<Result> => {
+      activeSessionPublishEffect = effect; return run();
+    };
     try {
       const pendingDraftSnapshot = normalizePendingSbtDrafts(pendingSbtDrafts);
       const currentWorkerSecrets = getCurrentWorkerSecrets();
@@ -3501,10 +3509,9 @@ const SessionWizard = ({
             dispatch: dispatchSessionPublish,
             effect: 'deployWorker',
             getErrorMessage: getSessionWizardErrorMessage,
-            run: () => {
-              activeSessionPublishEffect = 'deployWorker';
-              return handleDeployWorker({ forceSponsoredAutoDeploy: true });
-            },
+            run: () => runTrackedPublishEffect('deployWorker', () => (
+              handleDeployWorker({ forceSponsoredAutoDeploy: true })
+            )),
             result: (deployResult) => ({ workerUrl: deployResult?.workerUrl || '' }),
           }),
           deployPendingSbts: ({ workerUrlOverride: pendingWorkerUrlOverride, signerAccountOverride }) => (
@@ -3512,22 +3519,19 @@ const SessionWizard = ({
               dispatch: dispatchSessionPublish,
               effect: 'deployPendingSbts',
               getErrorMessage: getSessionWizardErrorMessage,
-              run: () => {
-                activeSessionPublishEffect = 'deployPendingSbts';
-                return deployPendingSbtDrafts({
+              run: () => runTrackedPublishEffect('deployPendingSbts', () => (
+                deployPendingSbtDrafts({
                   workerUrlOverride: pendingWorkerUrlOverride,
                   signerAccountOverride,
-                });
-              },
+                })
+              )),
               result: (deployedDrafts) => ({
                 deployedPendingSbtCount: deployedDrafts.length,
               }),
             })
           ),
         },
-        callbacks: {
-          setPublishStep: () => {},
-        },
+        callbacks: { setPublishStep: ignoreSessionPublishStep },
       });
       workerUrlOverride = publishControllerResult.workerUrlOverride;
       deployedPendingDrafts = publishControllerResult.deployedPendingDrafts;
@@ -3543,16 +3547,11 @@ const SessionWizard = ({
             dispatch: dispatchSessionPublish,
             effect: 'uploadMetadata',
             getErrorMessage: getSessionWizardErrorMessage,
-            run: () => {
-              activeSessionPublishEffect = 'uploadMetadata';
-              return handleUploadMetadata(args);
-            },
+            run: () => runTrackedPublishEffect('uploadMetadata', () => handleUploadMetadata(args)),
             result: (result) => ({ metadataUri: result?.metadataUri || '' }),
           }),
         },
-        callbacks: {
-          setPublishStep: () => {},
-        },
+        callbacks: { setPublishStep: ignoreSessionPublishStep },
       });
       uploadResult = metadataUploadControllerResult.uploadResult;
       const registerStepRequest = resolveSessionWizardRegisterStepRequest({
@@ -3583,17 +3582,12 @@ const SessionWizard = ({
           promoteDeployedPendingSbtSelections,
           setPublishedPendingSbtLinks,
           clearPendingSbtDrafts: () => setPendingSbtDrafts([]),
-          setPublishStep: () => {},
+          setPublishStep: ignoreSessionPublishStep,
         },
       });
     } catch (err) {
       const publishFailureSettlement = resolveSessionWizardPublishFailureSettlementDescriptor({ error: err });
-      dispatchSessionPublish({
-        type: 'effectFailed',
-        effect: activeSessionPublishEffect,
-        message: publishFailureSettlement.errorMessage,
-        recoverable: true,
-      });
+      markSessionPublishEffectFailed(dispatchSessionPublish, activeSessionPublishEffect, publishFailureSettlement.errorMessage);
       setStatus(publishFailureSettlement.errorMessage);
     }
     } finally {
@@ -4267,35 +4261,8 @@ const SessionWizard = ({
     persistedNewSessionBannerDismissed,
     sponsoredBundleStatus,
   });
-  const publishUiPlanStepSeed = resolveSessionWizardPublishUiPlan({
-    resolvedWorkerBaseUrl,
-    workerMode,
-    usesDefaultWorkerUrl,
-    deployVerifiedInUi,
-    deployWorkerMatchesConfiguredUrl,
-    canUseSponsoredAutoDeployNow,
-    manualMetadataUrl,
-    metadataUrl,
-    buildMetadataGatewayUrl: (txId) => arweavePublishAdapter.buildArweaveGatewayUrl({ txId }),
-    deployComplete,
-    hasPendingDrafts: hasUndeployedPendingSbtDrafts,
-    isNormalMode,
-    publishAdvancedOpen,
-    publishBusy,
-    publishStep: 0,
-    publishStepElapsedMs: 0,
-    sbtsLabel: t('sbts'),
-  });
-  const { publishStep } = resolveSessionWizardPublishReducerUiState({
+  const publishUiPlan = resolveSessionWizardPublishReducerUiPlan({
     state: sessionPublishState,
-    stepNumbers: publishUiPlanStepSeed.publishExecutionPlan.stepNumbers,
-  });
-  useSessionWizardPublishElapsed({
-    publishBusy,
-    publishStep,
-    setPublishStepElapsedMs,
-  });
-  const publishUiPlan = resolveSessionWizardPublishUiPlan({
     resolvedWorkerBaseUrl,
     workerMode,
     usesDefaultWorkerUrl,
@@ -4309,11 +4276,11 @@ const SessionWizard = ({
     hasPendingDrafts: hasUndeployedPendingSbtDrafts,
     isNormalMode,
     publishAdvancedOpen,
-    publishBusy,
-    publishStep,
     publishStepElapsedMs,
     sbtsLabel: t('sbts'),
   });
+  const { publishProgressDisplayState: { publishStep } } = publishUiPlan;
+  useSessionWizardPublishElapsed({ publishBusy, publishStep, setPublishStepElapsedMs });
   const {
     canUploadMetadataNow,
   } = publishUiPlan.publishReadiness;

@@ -1,4 +1,9 @@
 import type { SessionPublishState } from '../../domains/sessions/publish/sessionPublishReducer';
+import {
+  resolveSessionWizardPublishUiPlan,
+  type SessionWizardPublishUiPlan,
+  type SessionWizardPublishUiPlanInput,
+} from './sessionWizardPublishReadiness';
 
 export type SessionWizardPublishStepNumbers = Partial<Record<
   'deploy-worker' | 'deploy-sbts' | 'upload-metadata' | 'register-session' | 'done',
@@ -8,6 +13,13 @@ export type SessionWizardPublishStepNumbers = Partial<Record<
 export type SessionWizardPublishReducerUiState = {
   publishBusy: boolean;
   publishStep: number;
+};
+
+export type SessionWizardPublishReducerUiPlanInput = Omit<
+  SessionWizardPublishUiPlanInput,
+  'publishBusy' | 'publishStep'
+> & {
+  state: SessionPublishState;
 };
 
 const BUSY_STATUSES = new Set<SessionPublishState['status']>([
@@ -76,4 +88,26 @@ export const resolveSessionWizardPublishReducerUiState = ({
     publishBusy: true,
     publishStep: 0,
   };
+};
+
+export const resolveSessionWizardPublishReducerUiPlan = ({
+  state,
+  ...input
+}: SessionWizardPublishReducerUiPlanInput): SessionWizardPublishUiPlan => {
+  const publishBusy = resolveSessionWizardPublishReducerUiState({ state }).publishBusy;
+  const stepSeed = resolveSessionWizardPublishUiPlan({
+    ...input,
+    publishBusy,
+    publishStep: 0,
+    publishStepElapsedMs: 0,
+  });
+  const { publishStep } = resolveSessionWizardPublishReducerUiState({
+    state,
+    stepNumbers: stepSeed.publishExecutionPlan.stepNumbers,
+  });
+  return resolveSessionWizardPublishUiPlan({
+    ...input,
+    publishBusy,
+    publishStep,
+  });
 };

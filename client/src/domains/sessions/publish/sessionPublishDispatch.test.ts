@@ -1,6 +1,7 @@
 import {
   beginSessionPublishReducerAttempt,
   buildSessionPublishReducerPlan,
+  markSessionPublishEffectFailed,
   markSessionPublishEffectSucceeded,
   runSessionPublishEffect,
   type SessionPublishDispatch,
@@ -104,6 +105,21 @@ describe('sessionPublishDispatch', () => {
       {
         type: 'effectSucceeded',
         effect: 'refreshRegistryCache',
+      },
+    ]);
+  });
+
+  it('can mark an effect failure without running an effect wrapper', () => {
+    const { actions, dispatch } = collectActions();
+
+    markSessionPublishEffectFailed(dispatch, 'registerSession', 'Registration failed.');
+
+    expect(actions).toEqual([
+      {
+        type: 'effectFailed',
+        effect: 'registerSession',
+        message: 'Registration failed.',
+        recoverable: true,
       },
     ]);
   });
