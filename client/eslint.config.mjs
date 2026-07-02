@@ -5,6 +5,7 @@ import reactPlugin from 'eslint-plugin-react';
 import reactHooksPlugin from 'eslint-plugin-react-hooks';
 
 const javascriptFiles = ['src/**/*.{js,jsx,mjs,cjs}'];
+const typedDomainFiles = ['src/domains/**/*.{ts,tsx}'];
 const typedUiUtilityFiles = ['src/utilities/ui/**/*.{ts,tsx}'];
 const typedSharedComponentFiles = ['src/components/Shared/**/*.{ts,tsx}'];
 const typedInformationalComponentFiles = [
@@ -94,6 +95,14 @@ export default [
     rules: {
       ...sharedRules,
       ...reactRules,
+    },
+  },
+  {
+    files: typedDomainFiles,
+    languageOptions: sharedLanguageOptions,
+    rules: {
+      ...sharedRules,
+      'no-undef': 'off',
     },
   },
   {
