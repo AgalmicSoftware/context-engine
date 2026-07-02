@@ -52,6 +52,12 @@ type SbtMetadataReadsContractScripts = {
     groupKeyOrCfg?: SbtGroupKeyOrConfig,
     options?: SbtReadOptions
   ) => Promise<string | null>;
+  getSbtCreationBlockByAddress: (
+    providerName: SbtProviderRef,
+    sbtAddress: string,
+    groupKeyOrCfg?: SbtGroupKeyOrConfig,
+    options?: SbtReadOptions
+  ) => Promise<number | null>;
   getReadProviderForGroup?: (
     groupKeyOrCfg?: SbtGroupKeyOrConfig,
     options?: { contractKey?: string }
@@ -131,6 +137,11 @@ export const bindSbtMetadataReadsPort = ({
   ),
   getGroupPasswordHash: (providerName, sbtAddress, groupKeyOrCfg, options) => (
     readContractScripts().getGroupPasswordHash(providerName, sbtAddress, groupKeyOrCfg, options)
+  ),
+  getSbtCreationBlockByAddress: (providerName, sbtAddress, groupKeyOrCfg, options) => (
+    options === undefined
+      ? readContractScripts().getSbtCreationBlockByAddress(providerName, sbtAddress, groupKeyOrCfg)
+      : readContractScripts().getSbtCreationBlockByAddress(providerName, sbtAddress, groupKeyOrCfg, options)
   ),
   getSbtOnChainConfig: async (_providerName, sbtAddress, groupKeyOrCfg, fields) => {
     const scripts = readContractScripts();
