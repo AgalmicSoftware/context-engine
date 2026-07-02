@@ -32,6 +32,7 @@ import {
   getNativeBalance,
   hasLegacyEthBalanceReader,
   hasNativeBalanceReader,
+  type OnePageSessionBalance,
 } from '../../utilities/session/onePageSessionRuntime.js';
 import { sbtGroupMintAuthorizationPort } from '../../domains/sbts/contractScriptsSbtGroupMintAuthorizationPort.js';
 import { sbtMetadataReadsPort } from '../../domains/sbts/contractScriptsSbtMetadataReadsPort.js';
@@ -1419,19 +1420,19 @@ class OnePageSession extends Component<any, any> {
 
       // Group-aware read: rely on the session runtime facade (no ad-hoc provider instantiation)
       const slug = resolveEffectiveSlug(this.props);
-      const getBalance = async () => {
-        try { return await readBalance(address, slug); }
+      const getBalance = async (): Promise<OnePageSessionBalance> => {
+        try { return await readBalance(address, slug) || ethers.BigNumber.from(0); }
         catch { return ethers.BigNumber.from(0); }
       };
 
       const deadline = Date.now() + Number(timeoutMs || 0);
       let bal = await getBalance();
-      if (bal?.gte(minBN)) return true;
+      if (bal.gte(minBN)) return true;
 
       while (Date.now() < deadline) {
         await new Promise((r: any) => setTimeout(r, pollIntervalMs || 0));
         try { bal = await getBalance(); } catch (_) { continue; }
-        if (bal?.gte(minBN)) return true;
+        if (bal.gte(minBN)) return true;
       }
       return false;
     } catch {
