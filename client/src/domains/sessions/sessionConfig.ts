@@ -28,3 +28,7 @@ export const getDemoSessionConfigBySlug = (
 export const getSessionConfigBySlugOrDefault = (slug: unknown): SessionConfig | null => (
   contractScripts.getSessionConfigBySlugOrDefault(slug) as SessionConfig | null
 );
+
+export const getSessionChainId = (slug: unknown): number | null => (
+  contractScripts.getSessionChainId(slug)
+);

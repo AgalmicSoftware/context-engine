@@ -8,16 +8,18 @@ import {
   addHashedPasswords,
   burnToken,
   claimWithPassword,
-  getDemoSessionConfigBySlug,
   getOwnerByTokenId,
   getSBTTokenIdByOwner,
   getSbtHistorySummary,
-  getSessionChainId,
-  getSessionConfigBySlugOrDefault,
   isPasswordValid,
-  normalizeSessionSlug,
   startClaim,
 } from '../../utilities/sbt/sbtPageRuntime.js';
+import {
+  getDemoSessionConfigBySlug,
+  getSessionChainId,
+  getSessionConfigBySlugOrDefault,
+  normalizeSessionSlug,
+} from '../../domains/sessions/sessionConfig.js';
 import { sbtGroupMintAuthorizationPort } from '../../domains/sbts/contractScriptsSbtGroupMintAuthorizationPort.js';
 import { sbtMetadataReadsPort } from '../../domains/sbts/contractScriptsSbtMetadataReadsPort.js';
 import { sbtMintExecutionPort } from '../../domains/sbts/contractScriptsSbtMintExecutionPort.js';

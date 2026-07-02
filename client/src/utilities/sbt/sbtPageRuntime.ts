@@ -48,11 +48,3 @@ export const isPasswordValid = (...args: unknown[]): Promise<boolean> => (
 export const startClaim = (...args: unknown[]): Promise<SbtPageTransactionResult> => (
   contractScriptsRuntime.startClaim(...args)
 );
-
-export {
-  getDemoSessionConfigBySlug,
-  getSessionChainId,
-  getSessionConfigBySlug,
-  getSessionConfigBySlugOrDefault,
-  normalizeSessionSlug,
-} from '../web3/contractScripts.js';
