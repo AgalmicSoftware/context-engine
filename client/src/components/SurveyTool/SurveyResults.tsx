@@ -266,6 +266,10 @@ import {
   type SurveyResultsLocalStoragePollingRuntime,
 } from '../../domains/surveys/surveyResultsLocalStoragePollingRuntime';
 import {
+  createSurveyResultsQueuedRefreshRuntime,
+  type SurveyResultsQueuedRefreshRuntime,
+} from '../../domains/surveys/surveyResultsQueuedRefreshRuntime';
+import {
   chainScanReadsPort,
 } from '../../domains/chain/contractScriptsChainScanReadsPort';
 import { getPolisDemoQuestionPool } from './surveyPolisDemoQuestionPool.js';
@@ -1060,9 +1064,6 @@ type SurveyResultsInstanceFields = {
   _surveyModeSourcePayloadRefSignature: string;
   _surveyModeSourceCacheNonce: number;
   _individualResponsesAggregatorMemo: SurveyResultsIndividualResponsesAggregatorMemo;
-  _resultsRefreshMicrotaskScheduled: boolean;
-  _resultsRefreshFrameRequestId: number | null;
-  _queuedResultsRefreshReasons: Set<string>;
   _aggregatorEntriesMemo: SurveyResultsAggregatorEntriesMemo;
   _polisQuestionResponsesMemo: SurveyResultsPolisQuestionResponsesMemo;
   _effectiveSlugScanMemo: SurveyResultsEffectiveSlugScanMemo;
@@ -1147,9 +1148,6 @@ const createSurveyResultsInstanceFields = (): SurveyResultsInstanceFields => ({
       responsesRef: null,
       result: {},
     },
-  _resultsRefreshMicrotaskScheduled: false,
-  _resultsRefreshFrameRequestId: null,
-  _queuedResultsRefreshReasons: new Set(),
   _aggregatorEntriesMemo: {
       aggregatorRef: null,
       entries: [],
@@ -1187,6 +1185,24 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
   }
   const inst = instRef.current;
   const pendingSetStateCallbacksRef = useRef<VoidFunction[]>([]);
+  const queuedResultsRefreshRuntimeRef = useRef<SurveyResultsQueuedRefreshRuntime | null>(null);
+  if (queuedResultsRefreshRuntimeRef.current === null) {
+    queuedResultsRefreshRuntimeRef.current = createSurveyResultsQueuedRefreshRuntime({
+      isMounted: () => inst._isMounted,
+      isOpen: () => !!propsRef.current.isOpen,
+      requestFetchResponses: () => requestFetchResponses(),
+      scheduleMicrotask,
+      shouldUseAnimationFrame: () => shouldUseAnimationFrameForRefreshCoalescing(),
+      animationFrame: {
+        requestAnimationFrame: (callback) => window.requestAnimationFrame(callback),
+        cancelAnimationFrame: (handle) => window.cancelAnimationFrame(handle),
+      },
+      measureFlush: (label, callback) => {
+        measureSync(label, callback);
+      },
+    });
+  }
+  const queuedResultsRefreshRuntime = queuedResultsRefreshRuntimeRef.current;
   const localStoragePollingRuntimeRef = useRef<SurveyResultsLocalStoragePollingRuntime | null>(null);
   if (localStoragePollingRuntimeRef.current === null) {
     localStoragePollingRuntimeRef.current = createSurveyResultsLocalStoragePollingRuntime({
@@ -1545,43 +1561,7 @@ const shouldUseAnimationFrameForRefreshCoalescing = (): boolean => {
   };
 
 const queueResultsRefresh = (reason: unknown = 'unknown'): void => {
-    if (!inst._isMounted) return;
-    if (reason) {
-      inst._queuedResultsRefreshReasons.add(String(reason));
-    }
-    if (inst._resultsRefreshMicrotaskScheduled) return;
-    inst._resultsRefreshMicrotaskScheduled = true;
-
-    scheduleMicrotask(() => {
-      inst._resultsRefreshMicrotaskScheduled = false;
-      if (!inst._isMounted) return;
-      if (inst._resultsRefreshFrameRequestId != null) return;
-
-      const flush = () => {
-        inst._resultsRefreshFrameRequestId = null;
-        flushQueuedResultsRefresh();
-      };
-
-      if (shouldUseAnimationFrameForRefreshCoalescing()) {
-        inst._resultsRefreshFrameRequestId = window.requestAnimationFrame(flush);
-        return;
-      }
-
-      flush();
-    });
-  };
-
-const flushQueuedResultsRefresh = (): void => {
-    if (!inst._isMounted) return;
-    if (inst._queuedResultsRefreshReasons.size === 0) return;
-    if (!propsRef.current.isOpen) {
-      inst._queuedResultsRefreshReasons.clear();
-      return;
-    }
-    inst._queuedResultsRefreshReasons.clear();
-    measureSync('ce.surveyResults.flushQueuedResultsRefresh', () => {
-      requestFetchResponses();
-    });
+    queuedResultsRefreshRuntime.queue(reason);
   };
 
 const updateParentWithCurrentFiltersForUrl = (): void => {
@@ -4832,15 +4812,10 @@ return renderSurveyResultsHtmlReportExportModal(getHtmlReportModalProps());
     inst._nonceTickInFlight = false;
     inst._nonceTickQueued = false;
     inst._pollLatestBlockFetchInFlight = false;
-    inst._resultsRefreshMicrotaskScheduled = false;
-    inst._queuedResultsRefreshReasons.clear();
+    queuedResultsRefreshRuntime.destroy();
     if (inst._responseParseMemo && typeof inst._responseParseMemo.clear === 'function') {
       inst._responseParseMemo.clear();
     }
-    if (inst._resultsRefreshFrameRequestId != null && typeof window !== 'undefined' && typeof window.cancelAnimationFrame === 'function') {
-      window.cancelAnimationFrame(inst._resultsRefreshFrameRequestId);
-    }
-    inst._resultsRefreshFrameRequestId = null;
     if (typeof inst._unsubscribeCacheUpdates === 'function') {
       inst._unsubscribeCacheUpdates();
     }
