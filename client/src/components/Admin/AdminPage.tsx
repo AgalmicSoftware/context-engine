@@ -9,11 +9,6 @@ import {
   USE_ONCHAIN_SESSION_REGISTRY,
 } from '../../variables/appConfig.js';
 import { getDefaultHttpRpc } from '../../variables/chains.js';
-import {
-  buildSiweMessage,
-  buildSignedAdminActionAuth,
-  fetchWorkerWithAuth,
-} from '../../utilities/worker/workerAuth.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { encryptedFieldsUtils } from '../../utilities/crypto/encryptedFields.js';
 import { normalizeOriginList } from '../../utilities/urlUtils.js';
@@ -1022,7 +1017,7 @@ const AdminPage = ({
       1
     ) || 1;
 
-    return buildSignedAdminActionAuth({
+    return adminWorkerPorts.adminAuth.buildSignedAdminActionAuth({
       action,
       slug,
       body,
@@ -1482,20 +1477,11 @@ const AdminPage = ({
     const baseUrl = normalizeWorkerUrl(workerUrl);
     if (!baseUrl) throw new Error('Worker URL is missing.');
 
-    const nonceResp = await fetch(`${baseUrl}/auth/nonce`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ address: account, sessionSlug: slug }),
-    });
-    const nonceData = await nonceResp.json().catch(() => ({}));
-    if (!nonceResp.ok) {
-      throw new Error(nonceData?.error || `Nonce request failed (${nonceResp.status}).`);
-    }
-
     const chainId = Number(selectedConfig?.__registry?.chainId || selectedConfig?.networkChainId || network?.id || 1) || 1;
-    const message = buildSiweMessage({
+    const { message } = await adminWorkerPorts.siweLogin.prepareSiweLogin({
+      workerUrl: baseUrl,
       address: account,
-      nonce: nonceData?.nonce,
+      sessionSlug: slug,
       chainId,
       statement: 'Sign in to Context Engine.',
     });
@@ -1722,7 +1708,7 @@ const AdminPage = ({
         }
       }
       const data = await withSessionConfigRetry(async () => {
-        const resp = await fetchWorkerWithAuth(`${healthBase}/health`, {
+        const resp = await adminWorkerPorts.adminAuth.fetchWorkerWithAuth(`${healthBase}/health`, {
           method: 'GET',
         }, {
           sessionSlug: selectedSlug,
@@ -1815,7 +1801,7 @@ const AdminPage = ({
       };
 
       const data = await withSessionConfigRetry(async () => {
-        const resp = await fetchWorkerWithAuth(`${baseWorkerUrl}/ai`, {
+        const resp = await adminWorkerPorts.adminAuth.fetchWorkerWithAuth(`${baseWorkerUrl}/ai`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -1892,7 +1878,7 @@ const AdminPage = ({
     setTestStatus(`Testing faucet transfer (${shortAddress(burnAddress)})…`);
     try {
       const data = await withSessionConfigRetry(async () => {
-        const resp = await fetchWorkerWithAuth(`${baseWorkerUrl}/`, {
+        const resp = await adminWorkerPorts.adminAuth.fetchWorkerWithAuth(`${baseWorkerUrl}/`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

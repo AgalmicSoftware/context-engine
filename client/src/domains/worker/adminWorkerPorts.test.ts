@@ -107,7 +107,7 @@ describe('admin worker ports', () => {
     const fetchImpl = jest.fn(async () => ({
       ok: true,
       status: 200,
-      json: async () => ({ nonce: 'nonce-123' }),
+      json: async () => ({ nonce: ' nonce-123 ' }),
     }));
     const ports = bindAdminWorkerPorts({
       corsProxy: () => ({ resolveCorsProxyUrl: jest.fn() }),
@@ -127,8 +127,8 @@ describe('admin worker ports', () => {
       chainId: 84532,
       statement: 'Sign in to Context Engine.',
     })).resolves.toEqual({
-      nonce: 'nonce-123',
-      nonceData: { nonce: 'nonce-123' },
+      nonce: ' nonce-123 ',
+      nonceData: { nonce: ' nonce-123 ' },
       message: 'byte-exact-siwe-message',
     });
 
@@ -142,7 +142,7 @@ describe('admin worker ports', () => {
     });
     expect(buildSiweMessage).toHaveBeenCalledWith({
       address: '0x00000000000000000000000000000000000000aa',
-      nonce: 'nonce-123',
+      nonce: ' nonce-123 ',
       chainId: 84532,
       statement: 'Sign in to Context Engine.',
     });
