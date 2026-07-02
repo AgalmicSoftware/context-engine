@@ -116,22 +116,39 @@ export const bindSessionRegistryPublishAdapter = ({
 
 export type WorkerAuthPublishModule = {
   normalizeWorkerUrl: (value: unknown) => string;
-  buildSignedBootstrapAdminAuth: (input: PublishRecord) => Promise<PublishRecord | null | undefined>;
-  buildSignedAdminActionAuth: (input: PublishRecord) => Promise<PublishRecord | null | undefined>;
+  buildSignedBootstrapAdminAuth: (input: WorkerBootstrapAdminAuthInput) => Promise<PublishRecord>;
+  buildSignedAdminActionAuth: (input: WorkerAdminActionAuthInput) => Promise<PublishRecord>;
 };
 
 export type BindWorkerAuthPublishAdapterArgs = {
   workerAuth: () => WorkerAuthPublishModule;
 };
 
+export type WorkerBootstrapAdminAuthInput = {
+  slug?: string;
+  workerUrl?: string;
+  statement?: string;
+  context?: PublishRecord;
+  nonce?: string;
+};
+
+export type WorkerAdminActionAuthInput = {
+  action?: string;
+  slug?: string;
+  body?: PublishRecord;
+  workerUrl?: string;
+  context?: PublishRecord;
+  nonce?: string;
+};
+
 export const bindWorkerAuthPublishAdapter = ({
   workerAuth: readWorkerAuth,
 }: BindWorkerAuthPublishAdapterArgs) => ({
   normalizeWorkerUrl: (value: unknown) => readWorkerAuth().normalizeWorkerUrl(value),
-  buildSignedBootstrapAdminAuth: (input: PublishRecord) => (
+  buildSignedBootstrapAdminAuth: (input: WorkerBootstrapAdminAuthInput) => (
     readWorkerAuth().buildSignedBootstrapAdminAuth(input)
   ),
-  buildSignedAdminActionAuth: (input: PublishRecord) => (
+  buildSignedAdminActionAuth: (input: WorkerAdminActionAuthInput) => (
     readWorkerAuth().buildSignedAdminActionAuth(input)
   ),
 });
