@@ -16,15 +16,13 @@ export type SessionPublishEffect =
   | 'deployPendingSbts'
   | 'uploadMetadata'
   | 'registerSession'
-  | 'refreshRegistryCache'
-  | 'route';
+  | 'refreshRegistryCache';
 
 export type SessionPublishPlan = {
   autoDeployWorker?: boolean;
   deployPendingSbts?: boolean;
   uploadMetadata?: boolean;
   refreshRegistryCache?: boolean;
-  routeAfterPublish?: boolean;
 };
 
 export type SessionPublishCompletedEffects = Partial<Record<SessionPublishEffect, boolean>>;
@@ -99,7 +97,6 @@ const EFFECT_STATUSES: Record<SessionPublishEffect, SessionPublishStatus> = {
   uploadMetadata: 'uploadingMetadata',
   registerSession: 'registeringOnChain',
   refreshRegistryCache: 'registeringOnChain',
-  route: 'published',
 };
 
 export const createInitialSessionPublishState = (
@@ -127,7 +124,6 @@ export const buildSessionPublishEffectQueue = (
   if (plan.uploadMetadata) queue.push('uploadMetadata');
   queue.push('registerSession');
   if (plan.refreshRegistryCache) queue.push('refreshRegistryCache');
-  if (plan.routeAfterPublish) queue.push('route');
   return queue;
 };
 
