@@ -26,48 +26,34 @@
 /* global BigInt */
 
 import { createWalletClient, fallback, http } from 'viem';
-import type { Hash } from 'viem';
-import type { Chain as WagmiChain } from 'wagmi';
 import { toAccount, privateKeyToAccount } from 'viem/accounts';
 import contractScripts from './contractScripts.js'; // Import purely for read-provider fallback if needed
+import {
+  base64URLToBuffer,
+  bufferToBase64URL,
+  countHexDataBytes,
+  getErrorMessage,
+  parseGweiToWei,
+  parseTxSelector,
+  toBigIntInput,
+  toUnknownRecord,
+  uniqueRpcUrls,
+  type HexString,
+  type PortoChainLike,
+  type PortoProviderMock,
+  type PortoReadProvider,
+  type PortoSignerAccount,
+  type PortoWalletClient,
+  type RecoverableSendErrorFlags,
+  type UnknownObj,
+} from './portoFunctionsSupport.js';
 import { PORTO_SESSION_KEY_ENABLED } from '../../variables/appConfig.js';
 import { chainHexId, getDefaultGasPriceGwei, getPortoRelayUrl as resolvePortoRelayUrl, resolvePortoChain } from '../../variables/chains.js';
 import { createLogger } from '../logging.js';
 
 const portoLog = createLogger('porto');
 
-type UnknownObj = Record<string, unknown>;
-type HexString = `0x${string}`;
-type PortoChainLike = WagmiChain;
 type PortoChainInput = Parameters<typeof resolvePortoChain>[0];
-
-interface PortoSignerAccount {
-  address?: string;
-  signMessage(args: { message: unknown }): Promise<Hash>;
-  signTypedData(typedData: unknown): Promise<Hash>;
-  signTransaction(transaction: unknown): Promise<Hash>;
-}
-
-interface PortoWalletClient {
-  account: { address: string };
-  request(args: { method: string; params?: unknown[] }): Promise<unknown>;
-  estimateGas(args: {
-    account: { address: string };
-    to?: unknown;
-    value?: bigint;
-    data?: unknown;
-  }): Promise<bigint>;
-  sendTransaction(tx: UnknownObj): Promise<unknown>;
-  signTypedData(typedData: unknown): Promise<unknown>;
-  signMessage(args: { message: unknown }): Promise<unknown>;
-}
-
-interface RecoverableSendErrorFlags {
-  replacementUnderpriced: boolean;
-  nonceTooLow: boolean;
-  alreadyKnown: boolean;
-  recoverable: boolean;
-}
 
 interface PortoSession {
   credentialId: string;
@@ -168,18 +154,6 @@ const PORTO_FALLBACK_GAS_BY_SELECTOR: Record<string, bigint> = {
   '0x0ea045bc': 1400000n,
 };
 
-const parseTxSelector = (data: unknown): string => {
-  const raw = String(data || '').trim().toLowerCase();
-  if (!raw.startsWith('0x') || raw.length < 10) return '';
-  return raw.slice(0, 10);
-};
-
-const countHexDataBytes = (data: unknown): number => {
-  const raw = String(data || '').trim().toLowerCase();
-  if (!raw.startsWith('0x') || raw.length <= 2) return 0;
-  return Math.floor((raw.length - 2) / 2);
-};
-
 const resolvePortoFallbackGas = (tx: UnknownObj = {}): bigint => {
   const data = tx?.data;
   const selector = parseTxSelector(data);
@@ -192,15 +166,6 @@ const resolvePortoFallbackGas = (tx: UnknownObj = {}): bigint => {
   if (dataBytes >= 1024) return PORTO_FALLBACK_LARGE_CALLDATA_GAS;
   if (dataBytes >= 256) return PORTO_FALLBACK_MEDIUM_CALLDATA_GAS;
   return PORTO_FALLBACK_CALLDATA_GAS;
-};
-
-const parseGweiToWei = (value: unknown): bigint | null => {
-  const raw = String(value || '').trim();
-  if (!/^\d+(?:\.\d+)?$/.test(raw)) return null;
-  const [wholeRaw, fracRaw = ''] = raw.split('.');
-  const whole = BigInt(wholeRaw || '0');
-  const frac = BigInt((`${fracRaw}000000000`).slice(0, 9));
-  return (whole * 1000000000n) + frac;
 };
 
 const resolvePortoDefaultGasPriceWei = (chainOrId: unknown = portoChain): bigint | null => {
@@ -216,18 +181,6 @@ const resolvePortoDefaultGasPriceWei = (chainOrId: unknown = portoChain): bigint
   }
 };
 
-const uniqueRpcUrls = (urls: unknown[] = []): string[] => {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  urls.forEach((entry) => {
-    const value = String(entry || '').trim().replace(/\/+$/, '');
-    if (!value || seen.has(value)) return;
-    seen.add(value);
-    out.push(value);
-  });
-  return out;
-};
-
 const resolvePortoRelayUrls = (chain: PortoChainLike | null | undefined, primaryUrl: string): string[] => uniqueRpcUrls([
   primaryUrl,
   ...(chain?.rpcUrls?.public?.http || []),
@@ -237,22 +190,6 @@ const resolvePortoRelayUrls = (chain: PortoChainLike | null | undefined, primary
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 const normalizePortoAddress = (value: unknown): string => String(value || '').trim().toLowerCase();
-const getErrorMessage = (error: unknown): string => (
-  error && typeof error === 'object' && 'message' in error
-    ? String((error as { message?: unknown }).message || error)
-    : String(error || '')
-);
-const toUnknownRecord = (value: unknown): Record<string, unknown> => (
-  value && typeof value === 'object' ? value as Record<string, unknown> : {}
-);
-const toBigIntInput = (value: unknown): string | number | bigint | boolean => (
-  typeof value === 'string' ||
-  typeof value === 'number' ||
-  typeof value === 'bigint' ||
-  typeof value === 'boolean'
-    ? value
-    : String(value)
-);
 const hasCurrentPortoSessionMetadata = (): boolean => (
   !!currentSession &&
   typeof currentSession === 'object' &&
@@ -330,34 +267,6 @@ const adoptHydratedPortoSession = (session: Partial<PortoSession> | null | undef
   }
   return currentSession.address;
 };
-
-/**
- * 1. WebAuthn Helpers (Native Browser API)
- * ------------------------------------------------------------------
- */
-
-function bufferToBase64URL(buffer: ArrayBuffer | ArrayBufferView): string {
-  const bytes = buffer instanceof ArrayBuffer
-    ? new Uint8Array(buffer)
-    : new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
-  let string = '';
-  for (let i = 0; i < bytes.byteLength; i++) {
-    string += String.fromCharCode(bytes[i]);
-  }
-  return btoa(string).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-function base64URLToBuffer(base64url: string): ArrayBuffer {
-  const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
-  const padLen = (4 - (base64.length % 4)) % 4;
-  const padded = base64 + '='.repeat(padLen);
-  const binary = atob(padded);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes.buffer;
-}
 
 /**
  * 1.5 Secure Session Storage (IndexedDB + AES-GCM)
@@ -1460,19 +1369,6 @@ export async function sendPortoTransaction(txRequest: UnknownObj): Promise<unkno
  * 4. The Bridge: Mock Provider for Ethers v5
  * ------------------------------------------------------------------
  */
-interface PortoProviderMock extends UnknownObj {
-  isPorto: true;
-  isMetaMask: false;
-  request(args: { method: string; params?: unknown[] }): Promise<unknown>;
-  on(event: unknown, handler: unknown): void;
-  removeListener(event: unknown, handler: unknown): void;
-  enable(): Promise<string[]>;
-}
-
-interface PortoReadProvider {
-  send(method: string, params: unknown[]): Promise<unknown>;
-}
-
 export const createPortoProviderMock = (): PortoProviderMock => {
   return {
     isPorto: true,
