@@ -44,12 +44,7 @@ import {
   DEFAULT_SESSION_SLUG_ALIAS,
 } from '../../variables/appConfig.js';
 import { getChainById, getSessionRegistryChainIds } from '../../variables/chains.js';
-import {
-  loadGroupRegistryCache,
-  SESSION_REGISTRY_CACHE_UPDATED_EVENT,
-  sessionRegistryStore,
-  sessionRegistryUtils,
-} from '../../utilities/web3/sessionRegistry.js';
+import { sessionRegistryReadsPort } from '../../domains/sessions/registry/sessionRegistryReadPorts.js';
 import { normalizeSessionMediaUrl } from '../../domains/sessions/sessionMediaUrls.js';
 import {
   readSessionScanScope,
@@ -1024,6 +1019,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
   });
   _lastGroupChainId: number | null = null;
   _cacheUpdateUnsubscribe: (() => void) | null = null;
+  _sessionRegistryCacheUpdateUnsubscribe: (() => void) | null = null;
   _userPriorityPromise: Promise<MainSiteProfileScanReport | null> | null = null;
   _userPriorityTarget: string | null = null;
   _aboutDemoSessionPreloadSlug = '';
@@ -1089,7 +1085,9 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
   getSessionFallbackScopeSlugs = () => getSessionFallbackScopeSlugsFn({
     readSessionScanScope,
     readSessionScanSlugs,
-    sessionRegistryStore,
+    sessionRegistryStore: {
+      getAllSessionEntries: sessionRegistryReadsPort.getAllSessionEntries,
+    },
     normalizeSessionSlug,
   });
 
@@ -1304,12 +1302,12 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     const sessionToken = String(rawToken || '').trim();
     const result = resolveMainSiteSessionSlugFromPathToken({
       rawToken: sessionToken,
-      formatSessionId: sessionRegistryUtils.formatSessionId,
-      resolveSessionConfigById: sessionRegistryStore.getSessionConfigById,
-      resolveSessionConfigBySlug: (slug: string) => sessionRegistryStore.getSessionConfig(slug) || getSessionConfigBySlug(slug),
+      formatSessionId: sessionRegistryReadsPort.formatSessionId,
+      resolveSessionConfigById: sessionRegistryReadsPort.getSessionConfigById,
+      resolveSessionConfigBySlug: (slug: string) => sessionRegistryReadsPort.getSessionConfig(slug) || getSessionConfigBySlug(slug),
     });
     if (!result && allowAsyncResolve) {
-      const sessionId = sessionRegistryUtils.formatSessionId(sessionToken);
+      const sessionId = sessionRegistryReadsPort.formatSessionId(sessionToken);
       if (sessionId) this.resolveSessionPathId(sessionId);
     }
     return result;
@@ -1531,7 +1529,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
 
     const sessionSlug = this.resolveSessionSlugFromPathToken(sessionTokenRaw, { allowAsyncResolve: false }) || '';
     const strictConfig = (
-      sessionRegistryStore.getSessionConfig(sessionSlug) ||
+      sessionRegistryReadsPort.getSessionConfig(sessionSlug) ||
       getSessionConfigBySlug(sessionSlug)
     );
     const displayConfig = strictConfig || getDemoSessionConfigBySlug(sessionSlug, { allowDemoFallback: true });
@@ -1565,7 +1563,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
       resolveDisplaySessionConfigBySlug: (slug: string) => (
         getDemoSessionConfigBySlug(slug, { allowDemoFallback: true })
       ),
-      resolveSessionConfigById: (sessionId: string | number) => sessionRegistryStore.getSessionConfigById(sessionId),
+      resolveSessionConfigById: (sessionId: string | number) => sessionRegistryReadsPort.getSessionConfigById(sessionId),
       resolveSessionSlugFromPathToken: (sessionToken: string) => (
         this.resolveSessionSlugFromPathToken(sessionToken, { allowAsyncResolve: true })
       ),
@@ -1577,8 +1575,8 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
       search: searchIn,
       allowSessionIdLookup: true,
       resolveSessionConfigById: (sessionId: string | number) => (
-        sessionRegistryStore.getSessionConfigById(
-        sessionRegistryUtils.formatSessionId(String(sessionId)) || sessionId
+        sessionRegistryReadsPort.getSessionConfigById(
+        sessionRegistryReadsPort.formatSessionId(String(sessionId)) || sessionId
         )
       ),
     });
@@ -1588,7 +1586,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     if (isKnownOrGeneralSessionSlug(normalizedHint, getSessionConfigBySlug)) {
       return normalizedHint;
     }
-    if (sessionRegistryStore.getSessionConfig(normalizedHint)) {
+    if (sessionRegistryReadsPort.getSessionConfig(normalizedHint)) {
       return normalizedHint;
     }
     if (getDemoSessionConfigBySlug(normalizedHint, { allowDemoFallback: true })) {
@@ -1666,7 +1664,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     const slug = this.getActiveSessionSlug();
     const cfg = resolveMainSiteLitSessionConfigSource({
       slug,
-      resolveRegistryConfigBySlug: (sessionSlug: string) => sessionRegistryStore.getSessionConfig(sessionSlug),
+      resolveRegistryConfigBySlug: (sessionSlug: string) => sessionRegistryReadsPort.getSessionConfig(sessionSlug),
       resolveStaticConfigBySlug: (sessionSlug: string) => getSessionConfigBySlugOrDefault(sessionSlug),
     });
     const { chainId, litNetwork, litChain, accessControlConditions, userMaxPrice, chipotle } = resolveMainSiteLitSessionConfig({
@@ -1958,7 +1956,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
       return resolveMainSiteRouteSessionSlugHint({
         search,
         allowSessionIdLookup: true,
-        resolveSessionConfigById: (sessionId: string | number) => sessionRegistryStore.getSessionConfigById(sessionId),
+        resolveSessionConfigById: (sessionId: string | number) => sessionRegistryReadsPort.getSessionConfigById(sessionId),
       });
     } catch (_) {
       return null;
@@ -1982,8 +1980,8 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
       return resolveMainSiteRouteSessionIdHint({
         search: window.location.search || '',
         requireResolved,
-        formatSessionId: sessionRegistryUtils.formatSessionId,
-        resolveSessionConfigById: (sessionId: string | number) => sessionRegistryStore.getSessionConfigById(sessionId),
+        formatSessionId: sessionRegistryReadsPort.formatSessionId,
+        resolveSessionConfigById: (sessionId: string | number) => sessionRegistryReadsPort.getSessionConfigById(sessionId),
       });
     } catch (_) {
       return null;
@@ -3808,8 +3806,8 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     }
     this._mounted = true;
     if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
-      window.addEventListener(
-        SESSION_REGISTRY_CACHE_UPDATED_EVENT,
+      this._sessionRegistryCacheUpdateUnsubscribe = sessionRegistryReadsPort.subscribeToCacheUpdates(
+        window,
         this.handleSessionRegistryCacheUpdated
       );
     }
@@ -3881,7 +3879,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
         ),
         defaultChainId: DEFAULT_CHAIN_ID,
       });
-      const run = loadGroupRegistryCache({
+      const run = sessionRegistryReadsPort.loadGroupRegistryCache({
         chainIds: bootstrapChainIds,
         account: this.props.account,
         providerLike: this.props.provider,
@@ -4212,12 +4210,10 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     this._mounted = false;
     this._sessionPathResolver.destroy();
     try {
-      if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
-        window.removeEventListener(
-          SESSION_REGISTRY_CACHE_UPDATED_EVENT,
-          this.handleSessionRegistryCacheUpdated
-        );
+      if (typeof this._sessionRegistryCacheUpdateUnsubscribe === 'function') {
+        this._sessionRegistryCacheUpdateUnsubscribe();
       }
+      this._sessionRegistryCacheUpdateUnsubscribe = null;
     } catch (e) { mainSiteLog.warn('MainSite: cleanup', e); }
     if (this.props.socket !== undefined) {
     }
@@ -5843,8 +5839,8 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
         search: searchStr,
         isCacheManagerReady: this.state.isCacheManagerReady,
         getSessionConfigBySlug: (slug: string) => this.getDisplaySessionCfg(slug) as SessionConfigLike | null,
-        formatSessionId: sessionRegistryUtils.formatSessionId,
-        resolveSessionConfigById: (sessionId: string | number) => sessionRegistryStore.getSessionConfigById(sessionId),
+        formatSessionId: sessionRegistryReadsPort.formatSessionId,
+        resolveSessionConfigById: (sessionId: string | number) => sessionRegistryReadsPort.getSessionConfigById(sessionId),
       })
       : null;
     const inheritedNetworkWaitSlug = (
@@ -6054,8 +6050,8 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
       search: searchStr,
       isCacheManagerReady: this.state.isCacheManagerReady,
       getSessionConfigBySlug: (slug: string) => this.getDisplaySessionCfg(slug) as SessionConfigLike | null,
-      formatSessionId: sessionRegistryUtils.formatSessionId,
-      resolveSessionConfigById: (sessionId: string | number) => sessionRegistryStore.getSessionConfigById(sessionId),
+      formatSessionId: sessionRegistryReadsPort.formatSessionId,
+      resolveSessionConfigById: (sessionId: string | number) => sessionRegistryReadsPort.getSessionConfigById(sessionId),
     });
     const queryQuestionSlug = questionRouteSession.sessionSlug;
     const queryQuestionSessionId = questionRouteSession.sessionId;
@@ -6157,10 +6153,10 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     );
     const sessionRoute = resolveMainSiteSessionRouteContext({
       sessionTokenRaw,
-      formatSessionId: sessionRegistryUtils.formatSessionId,
-      resolveSessionConfigById: (sessionId: string | number) => sessionRegistryStore.getSessionConfigById(sessionId),
+      formatSessionId: sessionRegistryReadsPort.formatSessionId,
+      resolveSessionConfigById: (sessionId: string | number) => sessionRegistryReadsPort.getSessionConfigById(sessionId),
       resolveSessionConfigBySlug: (slug: string) => (
-        sessionRegistryStore.getSessionConfig(slug) || getSessionConfigBySlug(slug)
+        sessionRegistryReadsPort.getSessionConfig(slug) || getSessionConfigBySlug(slug)
       ),
       resolveDisplaySessionConfigBySlug: (slug: string) => (
         getDemoSessionConfigBySlug(slug, { allowDemoFallback: true }) || (
