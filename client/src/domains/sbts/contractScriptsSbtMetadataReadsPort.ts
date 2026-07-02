@@ -6,6 +6,7 @@ import type {
   SbtMetadataRecord,
   SbtOnChainConfig,
   SbtOnChainConfigFields,
+  SbtProviderRef,
   SbtReadOptions,
 } from './sbtPorts.js';
 
@@ -35,18 +36,18 @@ type CreateSbtOnChainConfigContract = (
 
 type SbtMetadataReadsContractScripts = {
   getSbtMetadata: (
-    providerName: string,
+    providerName: SbtProviderRef,
     sbtAddress: string,
     groupKeyOrCfg?: SbtGroupKeyOrConfig
   ) => Promise<SbtMetadataRecord | null | undefined>;
   getMintedTokens: (
-    providerName: string,
+    providerName: SbtProviderRef,
     sbtAddress: string,
     groupKeyOrCfg?: SbtGroupKeyOrConfig,
     options?: SbtReadOptions
   ) => Promise<unknown>;
   getGroupPasswordHash: (
-    providerName: string,
+    providerName: SbtProviderRef,
     sbtAddress: string,
     groupKeyOrCfg?: SbtGroupKeyOrConfig,
     options?: SbtReadOptions

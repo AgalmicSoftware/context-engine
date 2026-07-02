@@ -439,6 +439,43 @@ test('resolved baseline entries fail with ratchet-down guidance', () => {
   });
 });
 
+test('json output includes resolved baseline entries and exits nonzero', () => {
+  withTempRoot((rootDir) => {
+    const staleSource = 'client/src/components/Admin/AdminPage.tsx';
+    writeFile(
+      rootDir,
+      staleSource,
+      "import { getSession } from '../../utilities/web3/sessionRegistry';\n"
+    );
+    writeFile(
+      rootDir,
+      'client/src/components/Sponsor/SponsorPage.tsx',
+      "import { getWorkerUrl } from '../../utilities/worker/workerUrl';\n"
+    );
+    const baselineViolations = collectClientBoundaryViolations({ rootDir });
+    assert.equal(baselineViolations.length, 2);
+    writeBoundaryBaseline(baselineViolations, rootDir);
+
+    fs.rmSync(path.join(rootDir, staleSource), { force: true });
+
+    const stdout = [];
+    const stderr = [];
+    assert.equal(runClientBoundaryCheck({
+      rootDir,
+      argv: ['--json'],
+      stdout: (line) => stdout.push(line),
+      stderr: (line) => stderr.push(line),
+    }), 1);
+
+    const result = JSON.parse(stdout.join('\n'));
+    assert.equal(result.totalViolations, 1);
+    assert.equal(result.baselineViolations, 2);
+    assert.deepEqual(result.newViolations, []);
+    assert.deepEqual(result.resolvedViolations, [baselineViolations[0]]);
+    assert.equal(stderr.length, 0);
+  });
+});
+
 test('new violation output includes rule, source, import, and resolved path', () => {
   withTempRoot((rootDir) => {
     writeFile(

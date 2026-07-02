@@ -1,22 +1,23 @@
 import contractScripts from '../../utilities/web3/contractScripts.js';
 import type {
   SbtMintExecutionPort,
+  SbtProviderRef,
   SbtTransactionResult,
 } from './sbtPorts.js';
 
 type SbtMintExecutionContractScripts = {
   claim: (
-    providerName: string,
+    providerName: SbtProviderRef,
     sbtAddress: string
   ) => Promise<SbtTransactionResult>;
   claimWithInvite: (
-    providerName: string,
+    providerName: SbtProviderRef,
     sbtAddress: string,
     nonce: string | number,
     signature: string
   ) => Promise<SbtTransactionResult>;
   mintWithGroupSignature: (
-    providerName: string,
+    providerName: SbtProviderRef,
     sbtAddress: string,
     signature: string
   ) => Promise<SbtTransactionResult>;

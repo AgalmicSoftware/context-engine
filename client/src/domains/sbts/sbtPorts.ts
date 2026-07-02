@@ -1,5 +1,7 @@
 export type SbtGroupKeyOrConfig = unknown;
 
+export type SbtProviderRef = string | { [key: string]: unknown };
+
 export type SbtReadOptions = {
   allowInjectedReadFallback?: boolean;
   [key: string]: unknown;
@@ -30,24 +32,24 @@ export type SbtTransactionResult = Record<string, unknown> & {
 
 export type SbtMetadataReadsPort = {
   getSbtMetadata: (
-    providerName: string,
+    providerName: SbtProviderRef,
     sbtAddress: string,
     groupKeyOrCfg?: SbtGroupKeyOrConfig
   ) => Promise<SbtMetadataRecord | null | undefined>;
   getMintedTokens: (
-    providerName: string,
+    providerName: SbtProviderRef,
     sbtAddress: string,
     groupKeyOrCfg?: SbtGroupKeyOrConfig,
     options?: SbtReadOptions
   ) => Promise<unknown>;
   getGroupPasswordHash: (
-    providerName: string,
+    providerName: SbtProviderRef,
     sbtAddress: string,
     groupKeyOrCfg?: SbtGroupKeyOrConfig,
     options?: SbtReadOptions
   ) => Promise<string | null>;
   getSbtOnChainConfig: (
-    providerName: string,
+    providerName: SbtProviderRef,
     sbtAddress: string,
     groupKeyOrCfg?: SbtGroupKeyOrConfig,
     fields?: SbtOnChainConfigFields
@@ -56,17 +58,17 @@ export type SbtMetadataReadsPort = {
 
 export type SbtMintExecutionPort = {
   claim: (
-    providerName: string,
+    providerName: SbtProviderRef,
     sbtAddress: string
   ) => Promise<SbtTransactionResult>;
   claimWithInvite: (
-    providerName: string,
+    providerName: SbtProviderRef,
     sbtAddress: string,
     nonce: string | number,
     signature: string
   ) => Promise<SbtTransactionResult>;
   mintWithGroupSignature: (
-    providerName: string,
+    providerName: SbtProviderRef,
     sbtAddress: string,
     signature: string
   ) => Promise<SbtTransactionResult>;
@@ -90,7 +92,7 @@ export type SbtGroupMintAuthorizationInput = {
 };
 
 export type SbtInvitePayload = {
-  nonce: string | number;
+  nonce: string;
   signature: string;
   inviteCode: string;
 };

@@ -41,7 +41,7 @@ describe('SbtGroupMintAuthorizationPort', () => {
       signGroupMintAuthorization: jest.fn(async () => '0xsignature'),
       generateInvitePayloads: jest.fn(async () => [
         { nonce: '1', signature: '0xinvite1', inviteCode: 'inv1' },
-        { nonce: 2, signature: '0xinvite2', inviteCode: 'inv2' },
+        { nonce: '2', signature: '0xinvite2', inviteCode: 'inv2' },
       ]),
     };
     const sbtAddress = '0x0000000000000000000000000000000000000001';
@@ -60,7 +60,7 @@ describe('SbtGroupMintAuthorizationPort', () => {
       signature: '0xsignature',
       invites: [
         { nonce: '1', signature: '0xinvite1', inviteCode: 'inv1' },
-        { nonce: 2, signature: '0xinvite2', inviteCode: 'inv2' },
+        { nonce: '2', signature: '0xinvite2', inviteCode: 'inv2' },
       ],
     });
 

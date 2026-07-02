@@ -1,10 +1,10 @@
 import type { ethers } from 'ethers';
-import type { SbtMetadataReadsPort } from './sbtPorts.js';
+import type { SbtMetadataReadsPort, SbtProviderRef } from './sbtPorts.js';
 import { bindSbtMetadataReadsPort } from './contractScriptsSbtMetadataReadsPort.js';
 
 const readSbtMetadataSnapshot = async (
   port: SbtMetadataReadsPort,
-  providerName: string,
+  providerName: SbtProviderRef,
   sbtAddress: string,
   groupKeyOrCfg: unknown,
 ) => {
@@ -41,9 +41,10 @@ describe('SbtMetadataReadsPort', () => {
       })),
     };
     const groupKeyOrCfg = { slug: 'alpha' };
+    const providerRef = { selectedAddress: '0x0000000000000000000000000000000000000004' };
 
     await expect(
-      readSbtMetadataSnapshot(fakePort, 'none', '0x0000000000000000000000000000000000000001', groupKeyOrCfg)
+      readSbtMetadataSnapshot(fakePort, providerRef, '0x0000000000000000000000000000000000000001', groupKeyOrCfg)
     ).resolves.toEqual({
       metadata: { name: 'Alpha SBT' },
       mintedTokens: '3',
@@ -51,18 +52,18 @@ describe('SbtMetadataReadsPort', () => {
     });
 
     expect(fakePort.getSbtMetadata).toHaveBeenCalledWith(
-      'none',
+      providerRef,
       '0x0000000000000000000000000000000000000001',
       groupKeyOrCfg,
     );
     expect(fakePort.getMintedTokens).toHaveBeenCalledWith(
-      'none',
+      providerRef,
       '0x0000000000000000000000000000000000000001',
       groupKeyOrCfg,
       { allowInjectedReadFallback: true },
     );
     expect(fakePort.getGroupPasswordHash).toHaveBeenCalledWith(
-      'none',
+      providerRef,
       '0x0000000000000000000000000000000000000001',
       groupKeyOrCfg,
       { allowInjectedReadFallback: true },

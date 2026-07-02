@@ -1,9 +1,9 @@
-import type { SbtMintExecutionPort } from './sbtPorts.js';
+import type { SbtMintExecutionPort, SbtProviderRef } from './sbtPorts.js';
 import { bindSbtMintExecutionPort } from './contractScriptsSbtMintExecutionPort.js';
 
 const executeSbtMintFlows = async (
   port: SbtMintExecutionPort,
-  providerName: string,
+  providerName: SbtProviderRef,
   sbtAddress: string,
   nonce: string,
   inviteSignature: string,
@@ -30,11 +30,12 @@ describe('SbtMintExecutionPort', () => {
       mintWithGroupSignature: jest.fn(async () => ({ transactionHash: '0xgroup' })),
     };
     const sbtAddress = '0x0000000000000000000000000000000000000001';
+    const providerRef = { selectedAddress: '0x0000000000000000000000000000000000000002' };
 
     await expect(
       executeSbtMintFlows(
         fakePort,
-        'injected',
+        providerRef,
         sbtAddress,
         '7',
         '0xinviteSignature',
@@ -46,15 +47,15 @@ describe('SbtMintExecutionPort', () => {
       groupTx: { transactionHash: '0xgroup' },
     });
 
-    expect(fakePort.claim).toHaveBeenCalledWith('injected', sbtAddress);
+    expect(fakePort.claim).toHaveBeenCalledWith(providerRef, sbtAddress);
     expect(fakePort.claimWithInvite).toHaveBeenCalledWith(
-      'injected',
+      providerRef,
       sbtAddress,
       '7',
       '0xinviteSignature',
     );
     expect(fakePort.mintWithGroupSignature).toHaveBeenCalledWith(
-      'injected',
+      providerRef,
       sbtAddress,
       '0xgroupSignature',
     );
