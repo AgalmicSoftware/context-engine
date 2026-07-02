@@ -45,6 +45,20 @@ export const markSessionPublishEffectSucceeded = (
   });
 };
 
+export const markSessionPublishEffectFailed = (
+  dispatch: SessionPublishDispatch,
+  effect: SessionPublishEffect,
+  message: string,
+  recoverable = true
+): void => {
+  dispatch({
+    type: 'effectFailed',
+    effect,
+    message,
+    recoverable,
+  });
+};
+
 export const beginSessionPublishReducerAttempt = (
   dispatch: SessionPublishDispatch,
   publishExecutionPlan: SessionPublishExecutionPlanInput
