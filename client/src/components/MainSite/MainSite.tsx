@@ -20,14 +20,20 @@ import "assets/css/contextEngine.scss";
 import stylesRaw from "./MainSite.module.scss";
 
 // Smart contract events / interactions
-import contractScriptsRaw, {
+import {
   getAllSessionSlugs,
   getDemoSessionConfigBySlug,
   getSessionConfigBySlug,
   getSessionConfigBySlugOrDefault,
   getSessionSlugByName,
   normalizeSessionSlug,
-} from '../../utilities/web3/contractScripts.js';
+} from '../../domains/sessions/sessionConfig.js';
+import { chainScanReadsPort } from '../../domains/chain/contractScriptsChainScanReadsPort.js';
+import { profileScanPort } from '../../domains/profiles/contractScriptsProfileScanPort.js';
+import { sbtEventStreamsPort } from '../../domains/sbts/contractScriptsSbtEventStreamsPort.js';
+import { sbtMetadataReadsPort } from '../../domains/sbts/contractScriptsSbtMetadataReadsPort.js';
+import { surveyReadsPort } from '../../domains/surveys/contractScriptsSurveyReadsPort.js';
+import { faucetFundingPort } from '../../domains/worker/contractScriptsFaucetFundingPort.js';
 import { deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import {
@@ -315,47 +321,12 @@ const mainSiteLog = createLogger('mainSite');
 
 const PROFILE_SCAN_REPORT_EVENT = 'ce:profile-scan-report';
 type MainSiteRouteComponent = React.ComponentType<Record<string, unknown>>;
-type MainSiteBlockWindow = Record<string, unknown> & {
-  fromBlock: number;
-  toBlock: number;
-};
 type MainSiteProfileMetaResult<T> = {
   data: T;
   hadError: boolean;
   error?: string;
 };
-type MainSiteReadProvider = Record<string, unknown> & {
-  getTransactionReceipt: (
-    transactionHash: string
-  ) => Promise<{ blockNumber: number }>;
-};
-type MainSiteContractScripts = {
-  getLatestBlockNumber: (...args: unknown[]) => Promise<number>;
-  getQuestionData: (...args: unknown[]) => Promise<MainSiteMutableMetadata | null>;
-  getReadProviderForSession?: (...args: unknown[]) => MainSiteReadProvider | null | undefined;
-  getRelevantBlockWindowForFilter: (...args: unknown[]) => Promise<MainSiteBlockWindow>;
-  getResponse: (...args: unknown[]) => Promise<Record<string, unknown> | null>;
-  getSBTsForUser: (
-    ...args: unknown[]
-  ) => Promise<MainSiteProfileScanSbt[] | MainSiteProfileMetaResult<MainSiteProfileScanSbt[]>>;
-  getSbtCreationBlockByAddress: (...args: unknown[]) => Promise<number | null>;
-  getSbtMetadata: (...args: unknown[]) => Promise<MainSiteMutableMetadata | null>;
-  getSurveyDataById: (...args: unknown[]) => Promise<MainSiteMutableMetadata | null>;
-  getSurveyHash: (...args: unknown[]) => Promise<string | null | undefined>;
-  getSurveyResponse: (...args: unknown[]) => Promise<Record<string, unknown> | null>;
-  getUserActivity: (
-    ...args: unknown[]
-  ) => Promise<MainSiteProfileActivityPayload | MainSiteProfileMetaResult<MainSiteProfileActivityPayload>>;
-  listenForSBTInstanceEvents: (...args: unknown[]) => unknown;
-  listenForSurveyEvents: (...args: unknown[]) => unknown;
-  removeSBTEventListener: (...args: unknown[]) => unknown;
-  removeSBTInstanceEventsListener: (...args: unknown[]) => unknown;
-  removeSurveyEventsListener: (...args: unknown[]) => unknown;
-  sendTestnetFunds: (...args: unknown[]) => Promise<unknown>;
-};
-
 const styles = stylesRaw as Record<string, string>;
-const contractScripts = contractScriptsRaw as unknown as MainSiteContractScripts;
 const WagmiHooksHOC = WagmiHooksHOCRaw;
 const Navbar = NavbarRaw as unknown as MainSiteRouteComponent;
 const MainAreaTabs = MainAreaTabsRaw as unknown as MainSiteRouteComponent;
@@ -2022,10 +1993,10 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
       getAllSessionSlugs,
       dgRead: (collection: string, slug: string) => this.readDgRecord(collection, slug, { clone: false }),
       getSbtMetadata: (provider: string, address: string, slug: string) => (
-        contractScripts.getSbtMetadata(provider, address, slug)
+        sbtMetadataReadsPort.getSbtMetadata(provider, address, slug)
       ),
       getSbtCreationBlockByAddress: (provider: string, address: string, slug: string) => (
-        contractScripts.getSbtCreationBlockByAddress(provider, address, slug)
+        sbtMetadataReadsPort.getSbtCreationBlockByAddress(provider, address, slug)
       ),
       normalizeSessionSlug,
       getSessionSlugByName,
@@ -2284,7 +2255,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
         try {
           // A. Scan: Check existence cheaply using hash
           const hash = await runWithTimeout(
-            () => contractScripts.getSurveyHash('none', sid, slug),
+            () => surveyReadsPort.getSurveyHash('none', sid, slug),
             'getSurveyHash',
             slug
           );
@@ -2294,7 +2265,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
 
             // B. Fetch: Get full JSON data immediately
             const surveyData = await runWithTimeout<MainSiteMutableMetadata | null>(
-              () => contractScripts.getSurveyDataById('none', sid, slug, {
+              () => surveyReadsPort.getSurveyDataById('none', sid, slug, {
                 throwOnFailure: true,
                 forceArweaveFetch: true,
               }),
@@ -2636,7 +2607,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
             });
             return;
           }
-          const currentBlock = await contractScripts.getLatestBlockNumber('none', slug);
+          const currentBlock = await chainScanReadsPort.getLatestBlockNumber('none', slug);
           let startBlockRaw = Number(sessionCfg?.blockLimits?.start);
           if (!Number.isFinite(startBlockRaw) || startBlockRaw <= 0) {
             const windowRef = (() => {
@@ -2646,7 +2617,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
               return baseCfg;
             })();
             try {
-              const fallbackWindow = await contractScripts.getRelevantBlockWindowForFilter(windowRef);
+              const fallbackWindow = await chainScanReadsPort.getRelevantBlockWindowForFilter(windowRef);
               startBlockRaw = Number(fallbackWindow?.fromBlock);
             } catch (fallbackError) {
               mainSiteLog.warn('[DeepSearch] Failed to recover missing blockLimits.start from SessionRegistry fallback.', {
@@ -2965,7 +2936,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
 
           if (sbtFromBlock <= currentBlock && shouldRunSbtForSlug) {
             const sbtResult = await runWithTimeout(
-              contractScripts.getSBTsForUser(target, slug, sbtFromBlock, {
+              profileScanPort.getSBTsForUser(target, slug, sbtFromBlock, {
                 returnMeta: true,
                 ignoreScope: report.useAllSessionsSbtScan === true,
               }),
@@ -3002,7 +2973,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
 
           if (activityFromBlock <= currentBlock && shouldRunActivityForSlug) {
             const activityResult = await runWithTimeout(
-              contractScripts.getUserActivity(target, slug, activityFromBlock, {
+              profileScanPort.getUserActivity(target, slug, activityFromBlock, {
                 returnMeta: true,
                 ignoreScope: report.useAllSessionsActivityScan === true,
                 includeSurveyActivity: shouldIncludeSurveyActivity,
@@ -3415,7 +3386,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
               const rows = await Promise.all(
                 Array.from(missingSurveyIds).map(async (surveyIdLower) => {
                   try {
-                    const surveyData = await contractScripts.getSurveyDataById(
+                    const surveyData = await surveyReadsPort.getSurveyDataById(
                       'none',
                       surveyIdLower,
                       metadataGroupRef,
@@ -3548,7 +3519,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
               const rows = await Promise.all(
                 Array.from(missingQuestionIds).map(async (questionIdLower) => {
                   try {
-                    const questionData = await contractScripts.getQuestionData(
+                    const questionData = await surveyReadsPort.getQuestionData(
                       'none',
                       questionIdLower,
                       metadataGroupRef,
@@ -4259,10 +4230,10 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
       this._queuedSurveyGroupScanHintedSlug = '';
     } catch (e) { mainSiteLog.warn('MainSite: cleanup', e); }
 
-    contractScripts.removeSBTEventListener('none', this.getSessionSlugFromState());
-    contractScripts.removeSurveyEventsListener('none', this.getSessionSlugFromState());
+    sbtEventStreamsPort.removeSBTEventListener('none', this.getSessionSlugFromState());
+    sbtEventStreamsPort.removeSurveyEventsListener('none', this.getSessionSlugFromState());
     // Also remove any per-instance SBT listeners to avoid leaks across navigation:
-    contractScripts.removeSBTInstanceEventsListener('none', [], this.getSessionSlugFromState());
+    sbtEventStreamsPort.removeSBTInstanceEventsListener('none', [], this.getSessionSlugFromState());
   }
 
   componentDidUpdate(prevProps: MainSiteProps, prevState: MainSiteState) {
@@ -4425,7 +4396,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
           if (!isCacheReinitRunActive()) return;
           // Stop listeners for the previous slug (safe even if none)
           this.removeSbtRealtimeListenersForGroup(prevActiveSlug || '', { removeInstance: false });
-          contractScripts.removeSurveyEventsListener('none', prevActiveSlug || '');
+          sbtEventStreamsPort.removeSurveyEventsListener('none', prevActiveSlug || '');
           if (!isCacheReinitRunActive()) return;
 
           const isSbtRoute =
@@ -4921,33 +4892,31 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
       mainSiteLog.error('Network ID undefined in onNewSurveyEventDetectedForGroup');
       return;
     }
-    const { fromBlock: baseFrom } = await contractScripts.getRelevantBlockWindowForFilter(slug);
+    const { fromBlock: baseFrom } = await chainScanReadsPort.getRelevantBlockWindowForFilter(slug);
     const initialLastBlockDefault = Math.max(0, baseFrom - 1);
 
     let eventBlockNumber = event.blockNumber;
     if (!eventBlockNumber && event.transactionHash) {
         let readProvider = null;
         try {
-          if (typeof contractScripts.getReadProviderForSession === 'function') {
-            readProvider = contractScripts.getReadProviderForSession(slug);
-          }
+          readProvider = chainScanReadsPort.getReadProviderForSession(slug);
         } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
 
         if (readProvider && typeof readProvider.getTransactionReceipt === 'function') {
           try {
               const receipt = await readProvider.getTransactionReceipt(event.transactionHash);
-              eventBlockNumber = receipt?.blockNumber;
+              eventBlockNumber = receipt?.blockNumber as number;
           } catch (e) {
               mainSiteLog.error("Failed to get block number from transaction hash for survey event", e);
-              const { toBlock: baseToFallback } = await contractScripts.getRelevantBlockWindowForFilter(slug);
+              const { toBlock: baseToFallback } = await chainScanReadsPort.getRelevantBlockWindowForFilter(slug);
               eventBlockNumber = baseToFallback;
           }
         } else {
-          const { toBlock: baseToFallback } = await contractScripts.getRelevantBlockWindowForFilter(slug);
+          const { toBlock: baseToFallback } = await chainScanReadsPort.getRelevantBlockWindowForFilter(slug);
           eventBlockNumber = baseToFallback;
         }
     } else if (!eventBlockNumber) {
-        const { toBlock: baseToFallback } = await contractScripts.getRelevantBlockWindowForFilter(slug);
+        const { toBlock: baseToFallback } = await chainScanReadsPort.getRelevantBlockWindowForFilter(slug);
         eventBlockNumber = baseToFallback;
     }
 
@@ -5012,7 +4981,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
         mainSiteLog.log(`Processing SurveyAdded event for surveyID: ${surveyID}`);
 
         try {
-          const surveyData = await contractScripts.getSurveyDataById('none', surveyID, slug) as MainSiteMutableMetadata | null;
+          const surveyData = await surveyReadsPort.getSurveyDataById('none', surveyID, slug) as MainSiteMutableMetadata | null;
 
           if (surveyData) {
             surveyData.surveyID = surveyID; // Ensure surveyID is present and lowercase
@@ -5050,7 +5019,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
                 const results = await Promise.all(
                   missingIds.map(async (qid: string): Promise<MainSiteQuestionFetchResult> => {
                     try {
-                      const questionData = await contractScripts.getQuestionData('none', qid, slug, {
+                      const questionData = await surveyReadsPort.getQuestionData('none', qid, slug, {
                         decryptContext: this.buildQuestionDecryptContext(slug),
                         skipDecrypt: true,
                       }) as MainSiteMutableMetadata | null;
@@ -5141,7 +5110,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
             const results = await Promise.all(
               missing.map(async (qid: string): Promise<MainSiteQuestionFetchResult> => {
                 try {
-                  const questionData = await contractScripts.getQuestionData('none', qid, slug, {
+                  const questionData = await surveyReadsPort.getQuestionData('none', qid, slug, {
                     decryptContext: this.buildQuestionDecryptContext(slug),
                     skipDecrypt: true,
                   }) as MainSiteMutableMetadata | null;
@@ -5214,7 +5183,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
       if (surveyIdFromEvent && surveyIdFromEvent !== ethers.constants.HashZero.toLowerCase()) {
         if (eventBlockNumber > (currentSurveyNetworkCache.surveyResponsesLatestBlock[surveyIdFromEvent] || 0)) {
             mainSiteLog.log(`Fetching survey response for survey ${surveyIdFromEvent}, responder ${responderAddressLower} due to ResponsesSubmitted event.`);
-            const surveyResponseData = await contractScripts.getSurveyResponse('none', responderAddressLower, surveyIdFromEvent, slug);
+            const surveyResponseData = await surveyReadsPort.getSurveyResponse('none', responderAddressLower, surveyIdFromEvent, slug);
             if (surveyResponseData) {
                 if (!currentSurveyNetworkCache.surveyResponses[surveyIdFromEvent]) {
                   currentSurveyNetworkCache.surveyResponses[surveyIdFromEvent] = {};
@@ -5280,7 +5249,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
         let shouldForceResponseBackfill = false;
         const results = await Promise.all(
           qIdsToFetch.map(async (qId: string): Promise<MainSiteResponseFetchResult> => {
-            const data = await contractScripts.getResponse('none', responderAddressLower, qId, slug, {
+            const data = await surveyReadsPort.getResponse('none', responderAddressLower, qId, slug, {
               forceArweaveFetch: true,
             }) as Record<string, unknown> | null;
             if (!data) shouldForceResponseBackfill = true;
@@ -6621,7 +6590,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
 
   // Used by Navbar faucet button
   getUserTestETH = async () => {
-    try { await contractScripts.sendTestnetFunds(this.props.account); }
+    try { await faucetFundingPort.sendTestnetFunds(this.props.account as string); }
     catch (e) { mainSiteLog.error('Faucet error:', e); }
   };
 

@@ -8,12 +8,15 @@ const readSbtMetadataSnapshot = async (
   sbtAddress: string,
   groupKeyOrCfg: unknown,
 ) => {
-  const [metadata, mintedTokens, groupPasswordHash] = await Promise.all([
+  const [metadata, mintedTokens, groupPasswordHash, creationBlock] = await Promise.all([
     port.getSbtMetadata(providerName, sbtAddress, groupKeyOrCfg),
     port.getMintedTokens(providerName, sbtAddress, groupKeyOrCfg, {
       allowInjectedReadFallback: true,
     }),
     port.getGroupPasswordHash(providerName, sbtAddress, groupKeyOrCfg, {
+      allowInjectedReadFallback: true,
+    }),
+    port.getSbtCreationBlockByAddress(providerName, sbtAddress, groupKeyOrCfg, {
       allowInjectedReadFallback: true,
     }),
   ]);
@@ -22,6 +25,7 @@ const readSbtMetadataSnapshot = async (
     metadata,
     mintedTokens,
     groupPasswordHash,
+    creationBlock,
   };
 };
 
@@ -31,6 +35,7 @@ describe('SbtMetadataReadsPort', () => {
       getSbtMetadata: jest.fn(async () => ({ name: 'Alpha SBT' })),
       getMintedTokens: jest.fn(async () => '3'),
       getGroupPasswordHash: jest.fn(async () => '0xhash'),
+      getSbtCreationBlockByAddress: jest.fn(async () => 12),
       getSbtOnChainConfig: jest.fn(async () => ({
         maxTokens: '10',
         collectionBurnAuth: '1',
@@ -49,6 +54,7 @@ describe('SbtMetadataReadsPort', () => {
       metadata: { name: 'Alpha SBT' },
       mintedTokens: '3',
       groupPasswordHash: '0xhash',
+      creationBlock: 12,
     });
 
     expect(fakePort.getSbtMetadata).toHaveBeenCalledWith(
@@ -68,6 +74,12 @@ describe('SbtMetadataReadsPort', () => {
       groupKeyOrCfg,
       { allowInjectedReadFallback: true },
     );
+    expect(fakePort.getSbtCreationBlockByAddress).toHaveBeenCalledWith(
+      providerRef,
+      '0x0000000000000000000000000000000000000001',
+      groupKeyOrCfg,
+      { allowInjectedReadFallback: true },
+    );
   });
 
   it('binds metadata reads through a call-time contractScripts getter', async () => {
@@ -75,11 +87,13 @@ describe('SbtMetadataReadsPort', () => {
       getSbtMetadata: jest.fn(async () => ({ name: 'First' })),
       getMintedTokens: jest.fn(async () => '1'),
       getGroupPasswordHash: jest.fn(async () => '0xfirst'),
+      getSbtCreationBlockByAddress: jest.fn(async () => 11),
     };
     const secondContractScripts = {
       getSbtMetadata: jest.fn(async () => ({ name: 'Second' })),
       getMintedTokens: jest.fn(async () => '2'),
       getGroupPasswordHash: jest.fn(async () => '0xsecond'),
+      getSbtCreationBlockByAddress: jest.fn(async () => 22),
     };
     let currentContractScripts = firstContractScripts;
     const port = bindSbtMetadataReadsPort({
@@ -95,6 +109,8 @@ describe('SbtMetadataReadsPort', () => {
       .resolves.toBe('2');
     await expect(port.getGroupPasswordHash('none', '0x0000000000000000000000000000000000000002', 'beta'))
       .resolves.toBe('0xsecond');
+    await expect(port.getSbtCreationBlockByAddress('none', '0x0000000000000000000000000000000000000002', 'beta'))
+      .resolves.toBe(22);
 
     expect(firstContractScripts.getSbtMetadata).toHaveBeenCalledWith(
       'none',
@@ -113,6 +129,11 @@ describe('SbtMetadataReadsPort', () => {
       'beta',
       undefined,
     );
+    expect(secondContractScripts.getSbtCreationBlockByAddress).toHaveBeenCalledWith(
+      'none',
+      '0x0000000000000000000000000000000000000002',
+      'beta',
+    );
   });
 
   it('reads on-chain config through the SBT read provider', async () => {
@@ -129,6 +150,7 @@ describe('SbtMetadataReadsPort', () => {
       getSbtMetadata: jest.fn(async () => ({ name: 'Alpha' })),
       getMintedTokens: jest.fn(async () => '1'),
       getGroupPasswordHash: jest.fn(async () => '0xhash'),
+      getSbtCreationBlockByAddress: jest.fn(async () => 12),
       getReadProviderForGroup: jest.fn(() => provider),
     };
     const createOnChainConfigContract = jest.fn(() => contract);
@@ -181,6 +203,7 @@ describe('SbtMetadataReadsPort', () => {
       getSbtMetadata: jest.fn(async () => ({ name: 'Alpha' })),
       getMintedTokens: jest.fn(async () => '1'),
       getGroupPasswordHash: jest.fn(async () => '0xhash'),
+      getSbtCreationBlockByAddress: jest.fn(async () => 12),
       getReadProviderForGroup: jest.fn(() => provider),
     };
     const port = bindSbtMetadataReadsPort({
@@ -225,7 +248,8 @@ describe('SbtMetadataReadsPort', () => {
       const contractScripts = {
         getSbtMetadata: jest.fn(async () => ({ name: 'Alpha' })),
         getMintedTokens: jest.fn(async () => '1'),
-        getGroupPasswordHash: jest.fn(async () => '0xhash'),
+      getGroupPasswordHash: jest.fn(async () => '0xhash'),
+      getSbtCreationBlockByAddress: jest.fn(async () => 12),
         getReadProviderForGroup: jest.fn(() => provider),
       };
       const port = bindSbtMetadataReadsPort({
@@ -270,6 +294,7 @@ describe('SbtMetadataReadsPort', () => {
       getSbtMetadata: jest.fn(async () => ({ name: 'Alpha' })),
       getMintedTokens: jest.fn(async () => '1'),
       getGroupPasswordHash: jest.fn(async () => '0xhash'),
+      getSbtCreationBlockByAddress: jest.fn(async () => 12),
       getReadProviderForGroup: jest.fn(() => provider),
     };
     const port = bindSbtMetadataReadsPort({
@@ -300,6 +325,7 @@ describe('SbtMetadataReadsPort', () => {
       getSbtMetadata: jest.fn(async () => ({ name: 'Alpha' })),
       getMintedTokens: jest.fn(async () => '1'),
       getGroupPasswordHash: jest.fn(async () => '0xhash'),
+      getSbtCreationBlockByAddress: jest.fn(async () => 12),
     };
     const port = bindSbtMetadataReadsPort({
       contractScripts: () => contractScripts,
