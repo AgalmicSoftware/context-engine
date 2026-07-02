@@ -92,48 +92,6 @@
       "source": "client/src/components/MainSite/MainSite.tsx",
       "import": "../../utilities/web3/sessionRegistry.js",
       "resolved": "client/src/utilities/web3/sessionRegistry"
-    },
-    {
-      "rule": "route-page-no-low-level",
-      "source": "client/src/components/Sessions/SessionWizard.tsx",
-      "import": "../../utilities/arweave/arweaveScripts.js",
-      "resolved": "client/src/utilities/arweave/arweaveScripts"
-    },
-    {
-      "rule": "route-page-no-low-level",
-      "source": "client/src/components/Sessions/SessionWizard.tsx",
-      "import": "../../utilities/arweave/publishUploadAuth.js",
-      "resolved": "client/src/utilities/arweave/publishUploadAuth"
-    },
-    {
-      "rule": "route-page-no-low-level",
-      "source": "client/src/components/Sessions/SessionWizard.tsx",
-      "import": "../../utilities/arweave/sponsoredBundles.js",
-      "resolved": "client/src/utilities/arweave/sponsoredBundles"
-    },
-    {
-      "rule": "route-page-no-low-level",
-      "source": "client/src/components/Sessions/SessionWizard.tsx",
-      "import": "../../utilities/web3/contractScripts.js",
-      "resolved": "client/src/utilities/web3/contractScripts"
-    },
-    {
-      "rule": "route-page-no-low-level",
-      "source": "client/src/components/Sessions/SessionWizard.tsx",
-      "import": "../../utilities/web3/sbtFactoryReceipt.js",
-      "resolved": "client/src/utilities/web3/sbtFactoryReceipt"
-    },
-    {
-      "rule": "route-page-no-low-level",
-      "source": "client/src/components/Sessions/SessionWizard.tsx",
-      "import": "../../utilities/web3/sessionRegistry.js",
-      "resolved": "client/src/utilities/web3/sessionRegistry"
-    },
-    {
-      "rule": "route-page-no-low-level",
-      "source": "client/src/components/Sessions/SessionWizard.tsx",
-      "import": "../../utilities/worker/workerAuth.js",
-      "resolved": "client/src/utilities/worker/workerAuth"
     }
   ]
 }
