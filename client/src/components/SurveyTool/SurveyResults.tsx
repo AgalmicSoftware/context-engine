@@ -41,12 +41,6 @@ import {
   parseQuestionSessionIdFromSearch,
   parseQuestionSessionSlugFromSearch,
 } from '../../utilities/survey/questionRouting.js';
-import {
-  listNamespaceEntriesSync,
-  peekCacheSync,
-  readCache,
-  subscribeCacheUpdates,
-} from '../../utilities/cache/cacheScripts.js';
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 import { buildResponseGatePolicy } from '../../utilities/crypto/litGatePolicy.js';
 import { resolveSbtDisplayLabel } from '../../utilities/sbt/sbtDisplayNames.js';
@@ -1230,7 +1224,7 @@ function getEffectiveSlug(): string {
 
       const slug = scanSurveyResultsSessionSlugFromCache({
         surveyId: sid,
-        surveyCacheEntries: listNamespaceEntriesSync('surveysCache', { cloneValues: false }),
+        surveyCacheEntries: surveyResultsCachePort.listNamespaceEntriesSync('surveysCache', { cloneValues: false }),
       });
       inst._effectiveSlugScanMemo = {
         surveyId: sid,
@@ -1346,7 +1340,7 @@ function getScopedQuestionNetworkDataSync(
       ports: {
         readQuestionBucket: (slug, networkId) => applyBuiltInDemoQuestionMetadataFallbackToBucket(
           resolveNetBucketReadOnly(
-            peekCacheSync('questionsCache', slug, { clone: false }) || {},
+            surveyResultsCachePort.peekCacheSync('questionsCache', slug, { clone: false }) || {},
             networkId,
             {
               questionsLatestBlock: 0,
@@ -1380,7 +1374,7 @@ async function getScopedQuestionNetworkData(
       ports: {
         peekQuestionBucket: (slug, networkId) => {
           const bucket = resolveNetBucketReadOnly(
-            peekCacheSync('questionsCache', slug, { clone: false }) || {},
+            surveyResultsCachePort.peekCacheSync('questionsCache', slug, { clone: false }) || {},
             networkId,
             {}
           ) as SurveyResultsQuestionBucketRecord;
@@ -1390,7 +1384,7 @@ async function getScopedQuestionNetworkData(
         },
         readQuestionBucket: async (slug, networkId) => applyBuiltInDemoQuestionMetadataFallbackToBucket(
           resolveNetBucketReadOnly(
-            (await readCache('questionsCache', slug)) || {},
+            (await surveyResultsCachePort.readCache('questionsCache', slug)) || {},
             networkId,
             {
               questionsLatestBlock: 0,
@@ -1969,7 +1963,7 @@ function pollLocalStorageForUpdates(): boolean {
       stateRef.current.viewMode === 'questions'
         ? getScopedQuestionNetworkDataSync('questions')
         : resolveNetBucketReadOnly(
-            peekCacheSync('questionsCache', slug, { clone: false }) || {},
+            surveyResultsCachePort.peekCacheSync('questionsCache', slug, { clone: false }) || {},
             netIdStr,
             {
               questionsLatestBlock: 0,
@@ -1984,7 +1978,7 @@ function pollLocalStorageForUpdates(): boolean {
     let surveyNetCache: SurveyResultsSurveyBucketRecord | null = null;
     let surveyResponsesById: unknown = {};
     if (currentSurveyId) {
-      const surveysCache = peekCacheSync('surveysCache', slug, { clone: false }) || {};
+      const surveysCache = surveyResultsCachePort.peekCacheSync('surveysCache', slug, { clone: false }) || {};
       surveyNetCache = resolveNetBucketReadOnly(surveysCache, netIdStr, {
         surveys: {},
         surveyResponses: {},
@@ -2204,9 +2198,9 @@ async function fetchSurveyModeResponses(): Promise<void> {
     const netIdStr = String(propsRef.current.network?.id ?? propsRef.current.networkChainId ?? '');
 
     // Read the specific group's cache
-    let surveysCache = peekCacheSync('surveysCache', slug, { clone: false }) || {};
+    let surveysCache = (surveyResultsCachePort.peekCacheSync('surveysCache', slug, { clone: false }) || {}) as SurveyResultsRecord;
     if (!surveysCache || Object.keys(surveysCache).length === 0) {
-      surveysCache = (await readCache('surveysCache', slug)) || {};
+      surveysCache = ((await surveyResultsCachePort.readCache('surveysCache', slug)) || {}) as SurveyResultsRecord;
     }
     const hasSurveyNetCache = !!(
       surveysCache &&
@@ -4788,7 +4782,7 @@ return renderSurveyResultsHtmlReportExportModal(getHtmlReportModalProps());
   // Class parity: componentDidMount / componentWillUnmount.
   useLayoutEffect(() => {
     inst._isMounted = true;
-    inst._unsubscribeCacheUpdates = subscribeCacheUpdates(handleManagedCacheUpdate);
+    inst._unsubscribeCacheUpdates = surveyResultsCachePort.subscribeCacheUpdates(handleManagedCacheUpdate);
     window.addEventListener('popstate', handleUrlChange);
     document.addEventListener('visibilitychange', handleDocumentVisibilityChange);
 
