@@ -14,6 +14,7 @@ const readClientFile = (relativePath) => {
 const expectedLintCommand = [
   'eslint src/',
   '"src/domains/**/*.{ts,tsx}"',
+  '"src/utilities/session/**/*.{ts,tsx}"',
   '"src/utilities/ui/**/*.{ts,tsx}"',
   '"src/components/Shared/**/*.{ts,tsx}"',
   '"src/components/About/**/*.{ts,tsx}"',
@@ -61,6 +62,7 @@ describe('client package modernization contract', () => {
     expect(pkg.scripts.start).not.toContain('vite');
     expect(eslintConfig).not.toContain('react-app');
     expect(eslintConfig).toContain("const typedDomainFiles = ['src/domains/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedSessionUtilityFiles = ['src/utilities/session/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedGateComponentFiles = ['src/components/Gates/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedCommunityTabComponentFiles = ['src/components/CommunityTab/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedPolisReportComponentFiles = ['src/components/PolisReport/**/*.{ts,tsx}']");
