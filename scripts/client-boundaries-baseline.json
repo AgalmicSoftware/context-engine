@@ -2,12 +2,5 @@
   "version": 1,
   "mode": "fail-on-new-violation",
   "note": "Existing legacy boundary violations are allowed only as a baseline; new violations fail the boundary check.",
-  "violations": [
-    {
-      "rule": "route-page-no-low-level",
-      "source": "client/src/components/MainSite/MainSite.tsx",
-      "import": "../../utilities/arweave/arweaveRetryHelpers.js",
-      "resolved": "client/src/utilities/arweave/arweaveRetryHelpers"
-    }
-  ]
+  "violations": []
 }

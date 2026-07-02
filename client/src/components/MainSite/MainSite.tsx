@@ -117,7 +117,7 @@ import {
 import {
   ensureQuestionArweaveCacheBranches,
   mergeQuestionArweaveCacheBranches,
-} from '../../utilities/arweave/arweaveRetryHelpers.js';
+} from '../../domains/surveys/questionArweaveCacheBranches.js';
 import {
   shouldAutoStartCeRuntimeStats,
   startCeRuntimeStats,
