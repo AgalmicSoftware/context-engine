@@ -7,23 +7,10 @@ import CEDateTimeInput from '../Shared/CEDateTimeInput';
 import {
   USE_ONCHAIN_SESSION_REGISTRY,
 } from '../../variables/appConfig.js';
-import {
-  buildSignedAdminActionAuth,
-  buildSignedBootstrapAdminAuth,
-  buildSponsoredBundlePlaintext,
-  fetchSessionFromRegistry,
-  generateSponsoredBundleSecret,
-  getAllSessionRegistryEntries,
-  hasSponsoredBundleFields,
-  loadSessionRegistryCache,
-  normalizeArweaveUrl,
-  normalizeSessionIdHex,
-  normalizeWorkerUrl,
-  resolveCorsProxyUrl,
-  SESSION_REGISTRY_CACHE_UPDATED_EVENT,
-  uploadSponsoredBundle,
-  upsertSessionRegistryCache,
-} from '../../utilities/sponsor/sponsorPageRuntime.js';
+import { sessionRegistryReadsPort } from '../../domains/sessions/registry/sessionRegistryReadPorts.js';
+import { sponsoredBundlePort } from '../../domains/storage/sponsoredBundlePorts.js';
+import { adminArweavePort } from '../../domains/storage/adminArweavePorts.js';
+import { adminWorkerPorts } from '../../domains/worker/adminWorkerPorts.js';
 import {
   getUsableSessionWorkerUrl,
   hasUsableSessionWorkerConfig,
@@ -298,7 +285,7 @@ const SponsorPage = ({
   const [shareTxId, setShareTxId] = useState<any>('');
   const shareTxUrl = shareTxId
     ? (() => {
-        const normalized = normalizeArweaveUrl(shareTxId);
+        const normalized = adminArweavePort.normalizeArweaveUrl(shareTxId);
         return normalized === shareTxId ? `https://ar-io.dev/${shareTxId}` : normalized;
       })()
     : '';
@@ -309,7 +296,7 @@ const SponsorPage = ({
   const workerUrlOverrideDirtyRef = useRef<any>(false);
   const createRequestSeqRef = useRef(0);
   const requestedSessionRaw = toStr(initialSessionId).trim();
-  const requestedSessionIdHex = normalizeSessionIdHex(requestedSessionRaw);
+  const requestedSessionIdHex = sessionRegistryReadsPort.normalizeSessionIdHex(requestedSessionRaw);
   const requestedSessionSlug = requestedSessionIdHex ? '' : normalizeSlug(requestedSessionRaw);
   const requestedChainId = parseChainIdInput(initialRegistryChainId) || null;
 
@@ -326,7 +313,7 @@ const SponsorPage = ({
   }, [persistBundleDraft, bundleForm, expiresAt]);
 
   const syncSessionsFromRegistryCache = useCallback(({ isCancelled }: any = {}) => {
-    const cached = getAllSessionRegistryEntries();
+    const cached = sessionRegistryReadsPort.getAllSessionEntries();
     const nextSessions = Array.isArray(cached) ? cached : [];
     if (typeof isCancelled === 'function' && isCancelled()) return nextSessions;
     setSessions(nextSessions);
@@ -340,7 +327,7 @@ const SponsorPage = ({
     const shouldForceRegistryRead = !USE_ONCHAIN_SESSION_REGISTRY || !!forceOnChain;
     const runRegistryLoad = async (bootstrapRpc: any) => {
       try {
-        return await loadSessionRegistryCache({
+        return await sessionRegistryReadsPort.loadSessionRegistryCache({
           ...(chainIds ? { chainIds } : {}),
           force: shouldForceRegistryRead,
           providerLike: null,
@@ -376,7 +363,7 @@ const SponsorPage = ({
       requestedFetchKeyRef.current = '';
       await loadSessions({ forceOnChain: true });
       if (!ignoreRequestedSession && requestedSessionRaw && requestedChainId) {
-        const config = await fetchSessionFromRegistry({
+        const config = await sessionRegistryReadsPort.fetchSessionFromRegistry({
           chainId: requestedChainId,
           sessionId: requestedSessionIdHex || '',
           slug: requestedSessionSlug || '',
@@ -386,8 +373,8 @@ const SponsorPage = ({
           bootstrapRpc: true,
         });
         if (config) {
-          upsertSessionRegistryCache({ config });
-          const refreshed = getAllSessionRegistryEntries();
+          sessionRegistryReadsPort.upsertSessionRegistryCache({ config });
+          const refreshed = sessionRegistryReadsPort.getAllSessionEntries();
           setSessions(refreshed || []);
           setSelectedSlug(normalizeSlug((config as any).slug));
         }
@@ -420,10 +407,7 @@ const SponsorPage = ({
     const handleRegistryCacheUpdated = () => {
       syncSessionsFromRegistryCache();
     };
-    window.addEventListener(SESSION_REGISTRY_CACHE_UPDATED_EVENT, handleRegistryCacheUpdated);
-    return () => {
-      window.removeEventListener(SESSION_REGISTRY_CACHE_UPDATED_EVENT, handleRegistryCacheUpdated);
-    };
+    return sessionRegistryReadsPort.subscribeToCacheUpdates(window, handleRegistryCacheUpdated);
   }, [syncSessionsFromRegistryCache]);
 
   const sessionsForChain = useMemo(() => {
@@ -438,7 +422,7 @@ const SponsorPage = ({
     if (!requestedSessionRaw) return null;
     if (requestedSessionIdHex) {
       return sessionsForChain.find(([, cfg]: any) => {
-        const cfgId = normalizeSessionIdHex(cfg?.__registry?.sessionIdHex || cfg?.sessionId);
+        const cfgId = sessionRegistryReadsPort.normalizeSessionIdHex(cfg?.__registry?.sessionIdHex || cfg?.sessionId);
         return cfgId && cfgId === requestedSessionIdHex;
       }) || null;
     }
@@ -506,7 +490,7 @@ const SponsorPage = ({
     const run = async () => {
       setSessionLookupStatus(`Fetching session from chain ${requestedChainId}…`);
       try {
-        const config = await fetchSessionFromRegistry({
+        const config = await sessionRegistryReadsPort.fetchSessionFromRegistry({
           chainId: requestedChainId,
           sessionId: requestedSessionIdHex || '',
           slug: requestedSessionSlug || '',
@@ -518,8 +502,8 @@ const SponsorPage = ({
         if (!config) {
           throw new Error(`Session not found on chain ${requestedChainId}: ${requestedSessionRaw}`);
         }
-        upsertSessionRegistryCache({ config });
-        const refreshed = getAllSessionRegistryEntries();
+        sessionRegistryReadsPort.upsertSessionRegistryCache({ config });
+        const refreshed = sessionRegistryReadsPort.getAllSessionEntries();
         if (cancelled) return;
         setSessions(refreshed || []);
         setSelectedSlug(normalizeSlug((config as any).slug));
@@ -553,7 +537,7 @@ const SponsorPage = ({
     Number(selectedConfig?.networkChainId || selectedConfig?.__registry?.chainId || network?.id || 0) || 0
   ), [network?.id, selectedConfig]);
   const selectedConfigWorkerUrl = useMemo(() => (
-    normalizeWorkerUrl(getUsableSessionWorkerUrl({
+    adminWorkerPorts.workerUrl.normalizeWorkerUrl(getUsableSessionWorkerUrl({
       slug: selectedSlug,
       sessionConfig: selectedConfig,
       allowSharedFallback: true,
@@ -566,7 +550,7 @@ const SponsorPage = ({
       allowSharedFallback: true,
     })
   ), [selectedConfig, selectedSlug]);
-  const normalizedEnteredWorkerUrl = useMemo(() => normalizeWorkerUrl(workerUrl), [workerUrl]);
+  const normalizedEnteredWorkerUrl = useMemo(() => adminWorkerPorts.workerUrl.normalizeWorkerUrl(workerUrl), [workerUrl]);
   const hasManualWorkerUrlOverride = workerUrlOverrideDirty && !!normalizedEnteredWorkerUrl;
   const deploySponsoringWorkerUrl = normalizedEnteredWorkerUrl || selectedConfigWorkerUrl || '';
   const accountLower = toStr(account || '').toLowerCase();
@@ -627,7 +611,7 @@ const SponsorPage = ({
       }
       let resolved;
       try {
-        resolved = await resolveCorsProxyUrl({
+        resolved = await adminWorkerPorts.workerUrl.resolveCorsProxyUrl({
           sessionSlug: selectedSlug,
           sessionConfig: selectedConfig,
           context: { account: '', providerLike: null },
@@ -639,7 +623,7 @@ const SponsorPage = ({
         return;
       }
       if (cancelled || workerUrlOverrideDirtyRef.current) return;
-      const resolvedUrl = normalizeWorkerUrl(resolved?.url || '');
+      const resolvedUrl = adminWorkerPorts.workerUrl.normalizeWorkerUrl(resolved?.url || '');
       setWorkerUrl(resolvedUrl);
     };
     run();
@@ -667,10 +651,10 @@ const SponsorPage = ({
       throw new Error('Connect a wallet to sign admin requests.');
     }
     const slug = normalizeSlug(selectedSlug);
-    const baseUrl = normalizeWorkerUrl(overrideWorkerUrl || workerUrl || selectedConfigWorkerUrl);
+    const baseUrl = adminWorkerPorts.workerUrl.normalizeWorkerUrl(overrideWorkerUrl || workerUrl || selectedConfigWorkerUrl);
     if (!baseUrl) throw new Error('Worker URL is missing.');
     const chainId = Number(selectedConfig?.__registry?.chainId || selectedConfig?.networkChainId || network?.id || 1) || 1;
-    return buildSignedBootstrapAdminAuth({
+    return adminWorkerPorts.adminAuth.buildSignedBootstrapAdminAuth({
       slug,
       workerUrl: baseUrl,
       statement: 'Admin request: bootstrap arweave upload',
@@ -688,10 +672,10 @@ const SponsorPage = ({
       throw new Error('Connect a wallet to sign admin requests.');
     }
     const slug = normalizeSlug(selectedSlug);
-    const baseUrl = normalizeWorkerUrl(overrideWorkerUrl || workerUrl || selectedConfigWorkerUrl);
+    const baseUrl = adminWorkerPorts.workerUrl.normalizeWorkerUrl(overrideWorkerUrl || workerUrl || selectedConfigWorkerUrl);
     if (!baseUrl) throw new Error('Worker URL is missing.');
     const chainId = Number(selectedConfig?.__registry?.chainId || selectedConfig?.networkChainId || network?.id || 1) || 1;
-    return buildSignedAdminActionAuth({
+    return adminWorkerPorts.adminAuth.buildSignedAdminActionAuth({
       action: 'issue-sponsored-grants',
       slug,
       body,
@@ -728,7 +712,7 @@ const SponsorPage = ({
       if (!canAdmin) throw new Error('Connect the admin wallet for the selected session.');
       const label = toStr(bundleForm.label).trim();
       if (!label) throw new Error('Label is required.');
-      const resolvedWorkerUrl = normalizeWorkerUrl(workerUrl || selectedConfigWorkerUrl);
+      const resolvedWorkerUrl = adminWorkerPorts.workerUrl.normalizeWorkerUrl(workerUrl || selectedConfigWorkerUrl);
       if (!resolvedWorkerUrl) throw new Error('Worker URL is missing.');
       const normalizedExpiry = normalizeExpiryToIso(expiresAt);
       const cloudflareApiToken = toStr(bundleForm.cloudflareApiToken).trim();
@@ -794,7 +778,7 @@ const SponsorPage = ({
         }
         deployGrantToken = toStr(grantData?.deployGrantToken).trim();
         faucetGrantToken = toStr(grantData?.faucetGrantToken).trim();
-        resolvedGrantWorkerUrl = normalizeWorkerUrl(grantData?.bootstrapWorkerUrl || resolvedWorkerUrl);
+        resolvedGrantWorkerUrl = adminWorkerPorts.workerUrl.normalizeWorkerUrl(grantData?.bootstrapWorkerUrl || resolvedWorkerUrl);
         if (grantRequest.deploy && !deployGrantToken) {
           throw new Error('Sponsored deploy grant issuance did not return a deploy token.');
         }
@@ -803,7 +787,7 @@ const SponsorPage = ({
         }
       }
 
-      const sponsoredBundlePayload = buildSponsoredBundlePlaintext({
+      const sponsoredBundlePayload = sponsoredBundlePort.buildSponsoredBundlePlaintext({
         openaiKey: bundleForm.openaiKey,
         anthropicKey: bundleForm.anthropicKey,
         openrouterKey: bundleForm.openrouterKey,
@@ -824,16 +808,16 @@ const SponsorPage = ({
           sourceWorkerUrl: resolvedWorkerUrl,
         },
       });
-      if (!hasSponsoredBundleFields(sponsoredBundlePayload)) {
+      if (!sponsoredBundlePort.hasSponsoredBundleFields(sponsoredBundlePayload)) {
         throw new Error('Add at least one sponsored credential before creating a URL.');
       }
 
-      const secret = generateSponsoredBundleSecret();
+      const secret = sponsoredBundlePort.generateSponsoredBundleSecret();
       setCreateStatusIfCurrent('Uploading sponsored bundle…');
 
       const adminAuth = await buildBootstrapUploadAuth({ workerUrl: resolvedWorkerUrl });
       if (!isCurrentCreateRequest()) return;
-      const result = await uploadSponsoredBundle({
+      const result = await sponsoredBundlePort.uploadSponsoredBundle({
         secret,
         label,
         expiresAt: normalizedExpiry,

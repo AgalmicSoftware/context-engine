@@ -37,6 +37,22 @@ const mockEncryptWithPassword = jest.fn();
 const mockUploadDataToArweave = jest.fn();
 const mockBuildSignedBootstrapAdminAuth = jest.fn();
 const mockBuildSignedAdminActionAuth = jest.fn();
+const mockNormalizeWorkerUrl = jest.fn((url = '') => {
+  const raw = String(url || '').trim();
+  if (!raw || raw.startsWith('/')) return '';
+  const ensured = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+  try {
+    const parsed = new URL(ensured);
+    const path = parsed.pathname.replace(/\/+$/, '');
+    const suffixes = ['/auth/nonce', '/auth/login', '/arweave/upload'];
+    const stripped = suffixes.reduce((current, suffix) => (
+      current.toLowerCase().endsWith(suffix) ? current.slice(0, -suffix.length) : current
+    ), path);
+    return stripped && stripped !== '/' ? `${parsed.origin}${stripped}` : parsed.origin;
+  } catch {
+    return '';
+  }
+});
 const mockNormalizeSessionIdHex = jest.fn((value = '') => (
   String(value || '').trim() === 'edge-session-id' ? '0xedge-session-id' : ''
 ));
@@ -48,6 +64,7 @@ jest.mock('../../utilities/worker/corsProxy.js', () => ({
 }));
 
 jest.mock('../../utilities/worker/workerAuth.js', () => ({
+  normalizeWorkerUrl: (...args: any[]) => mockNormalizeWorkerUrl(...args),
   buildSignedBootstrapAdminAuth: (...args: any[]) => mockBuildSignedBootstrapAdminAuth(...args),
   buildSignedAdminActionAuth: (...args: any[]) => mockBuildSignedAdminActionAuth(...args),
 }));
@@ -73,7 +90,9 @@ jest.mock('../../utilities/web3/sessionRegistry.js', () => ({
     getAllSessionEntries: (...args: any[]) => mockGetAllSessionEntries(...args),
   },
   sessionRegistryUtils: {
+    fetchSessionFromRegistry: (...args: any[]) => mockFetchSessionFromRegistry(...args),
     normalizeSessionIdHex: (...args: any[]) => mockNormalizeSessionIdHex(...args),
+    upsertSessionRegistryCache: (...args: any[]) => mockUpsertSessionRegistryCache(...args),
   },
   upsertSessionRegistryCache: (...args: any[]) => mockUpsertSessionRegistryCache(...args),
 }));
