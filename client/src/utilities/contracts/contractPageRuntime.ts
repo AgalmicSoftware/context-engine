@@ -1,21 +1,15 @@
-import contractScripts from '../web3/contractScripts.js';
-
-const contractScriptsUntyped = contractScripts as unknown as {
-  hexToBase64url: (value: string) => string;
-  base64urlToHex: (value: string) => string;
-  base64urlToBase64: (value: string) => string;
-};
+import { arweaveScripts } from '../arweave/arweaveScripts.js';
 
 export const hexToBase64url = (value: string): string => (
-  contractScriptsUntyped.hexToBase64url(value)
+  arweaveScripts.hexToBase64url(value)
 );
 
 export const base64urlToHex = (value: string): string => (
-  contractScriptsUntyped.base64urlToHex(value)
+  arweaveScripts.base64urlToHex(value)
 );
 
 export const base64urlToBase64 = (value: string): string => (
-  contractScriptsUntyped.base64urlToBase64(value)
+  arweaveScripts.base64urlToBase64(value)
 );
 
 export {
