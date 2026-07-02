@@ -46,4 +46,20 @@ describe('resolveSbtAddressFromFactoryReceipt', () => {
       logs: [{ topics: ['0xdeadbeef'], data: '0x' }],
     })).toBe('');
   });
+
+  it('returns an empty string for nullish receipts', () => {
+    expect(resolveSbtAddressFromFactoryReceipt(null)).toBe('');
+    expect(resolveSbtAddressFromFactoryReceipt(undefined)).toBe('');
+  });
+
+  it('ignores malformed factory logs and keeps scanning later logs', () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000c3';
+
+    expect(resolveSbtAddressFromFactoryReceipt({
+      logs: [
+        { topics: [FACTORY_IFACE.getEventTopic('SBTCreated')], data: '0x1234' },
+        makeReceiptLog('SBTCreated', [sbtAddress]),
+      ],
+    })).toBe(ethers.utils.getAddress(sbtAddress));
+  });
 });
