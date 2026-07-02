@@ -14,8 +14,9 @@ test-spy compatibility at the same time.
 The client boundary checker now treats route/page imports from those low-level
 homes as `route-page-no-low-level` violations and treats pass-through facade
 files as `no-passthrough-facade` violations. Existing debt is tracked in
-`scripts/client-boundaries-baseline.json`; new entries fail, resolved entries
-also fail until the baseline is pruned in the same commit.
+`scripts/client-boundaries-baseline.json`; new entries fail, and any future
+resolved entries also fail until the baseline is pruned in the same commit. The
+current boundary baseline is zero.
 
 ## Decision
 
@@ -53,12 +54,19 @@ late-binding behavior.
 
 ## Current Domain Homes
 
-- `client/src/domains/sbts/`: SBT metadata reads, mint execution, and group mint
-  authorization ports backed by `contractScripts`.
+- `client/src/domains/chain/`: chain scan read ports backed by `contractScripts`.
+- `client/src/domains/profiles/`: profile scan ports backed by `contractScripts`.
+- `client/src/domains/sbts/`: SBT metadata reads, mint execution, group mint
+  authorization, admin ops, ownership reads, and event-stream ports backed by
+  `contractScripts`.
 - `client/src/domains/sessions/`: session config, session media URL helpers,
-  publish reducer/ports/adapters, and session registry read/write ports.
+  balance readers, sponsored access, publish reducer/ports/adapters, and session
+  registry read/write ports.
 - `client/src/domains/storage/`: admin Arweave reads/uploads/URL helpers.
-- `client/src/domains/worker/`: admin worker URL/CORS/auth/SIWE helpers.
+- `client/src/domains/surveys/`: survey read ports and question Arweave cache
+  branch merge helpers.
+- `client/src/domains/worker/`: admin worker URL/CORS/auth/SIWE helpers and
+  faucet funding ports.
 - `client/src/app/runtime/`: application runtime construction that legitimately
   owns low-level setup imports.
 
@@ -68,5 +76,5 @@ The boundary checker is intentionally heuristic. It is not a substitute for
 review, but it makes dishonest moves noisy: renaming route/page code or hiding
 low-level calls behind local facade files no longer clears architecture debt.
 
-The remaining boundary baseline represents explicit modernization backlog, not
+A non-zero boundary baseline represents explicit modernization backlog, not
 permission to add adjacent coupling.
