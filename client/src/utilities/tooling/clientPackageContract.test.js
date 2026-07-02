@@ -14,7 +14,7 @@ const readClientFile = (relativePath) => {
 const readClientJestConfig = () => require(path.resolve(__dirname, '../../../jest.config.cjs'));
 
 const expectedLintCommand = [
-  'eslint src/',
+  'eslint --no-error-on-unmatched-pattern src/',
   '"src/domains/**/*.{ts,tsx}"',
   '"src/utilities/session/**/*.{ts,tsx}"',
   '"src/utilities/worker/**/*.{ts,tsx}"',
