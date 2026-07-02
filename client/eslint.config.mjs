@@ -8,6 +8,7 @@ const javascriptFiles = ['src/**/*.{js,jsx,mjs,cjs}'];
 const typedDomainFiles = ['src/domains/**/*.{ts,tsx}'];
 const typedSessionUtilityFiles = ['src/utilities/session/**/*.{ts,tsx}'];
 const typedWorkerUtilityFiles = ['src/utilities/worker/**/*.{ts,tsx}'];
+const typedArweaveUtilityFiles = ['src/utilities/arweave/**/*.{ts,tsx}'];
 const typedUiUtilityFiles = ['src/utilities/ui/**/*.{ts,tsx}'];
 const typedSharedComponentFiles = ['src/components/Shared/**/*.{ts,tsx}'];
 const typedInformationalComponentFiles = [
@@ -117,6 +118,14 @@ export default [
   },
   {
     files: typedWorkerUtilityFiles,
+    languageOptions: sharedLanguageOptions,
+    rules: {
+      ...sharedRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedArweaveUtilityFiles,
     languageOptions: sharedLanguageOptions,
     rules: {
       ...sharedRules,
