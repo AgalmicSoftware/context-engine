@@ -404,7 +404,7 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
                 borderLeft: `3px solid ${(sp && sp.color) || T.accent}`,
                 lineHeight: 1.6}}>
                 <div style={{ marginBottom: 8 }}>
-                  "{pointComment}"
+                  &quot;{pointComment}&quot;
                 </div>
                 <div style={{
                   fontSize: 11,
@@ -451,7 +451,7 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
                         lineHeight: 1.5,
                         borderLeft: `3px solid ${soften((sp && sp.color) || T.accent, 0.4)}`}}>
                         <div style={{ fontStyle: "italic", marginBottom: q.url || q.source ? 4 : 0 }}>
-                          "{q.text}{q.text.length >= 158 ? "…" : ""}"
+                          &quot;{q.text}{q.text.length >= 158 ? "…" : ""}&quot;
                         </div>
                         {q.url && (
                           <a href={q.url} target="_blank" rel="noopener noreferrer" style={{
