@@ -44,6 +44,7 @@ const typedDebateMapComponentFiles = ['src/components/DebateMap/**/*.{ts,tsx}'];
 const typedNavbarComponentFiles = ['src/components/Navbar/**/*.{ts,tsx}'];
 const typedContractPageComponentFiles = ['src/components/ContractPage/**/*.{ts,tsx}'];
 const typedOnePageSessionComponentFiles = ['src/components/OnePageSession/**/*.{ts,tsx}'];
+const typedTagPageComponentFiles = ['src/components/TagPage/**/*.{ts,tsx}'];
 
 const sharedLanguageOptions = {
   parser: tsParser,
@@ -356,6 +357,17 @@ export default [
   },
   {
     files: typedOnePageSessionComponentFiles,
+    languageOptions: sharedLanguageOptions,
+    plugins: reactPlugins,
+    settings: reactSettings,
+    rules: {
+      ...sharedRules,
+      ...reactRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedTagPageComponentFiles,
     languageOptions: sharedLanguageOptions,
     plugins: reactPlugins,
     settings: reactSettings,
