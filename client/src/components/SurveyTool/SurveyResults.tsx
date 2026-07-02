@@ -259,6 +259,9 @@ import {
   surveyResultsCachePort,
 } from '../../domains/surveys/surveyResultsCachePort';
 import {
+  surveyResultsAnalysisArtifactMergePort,
+} from '../../domains/surveys/surveyResultsAnalysisArtifactMergePort';
+import {
   chainScanReadsPort,
 } from '../../domains/chain/contractScriptsChainScanReadsPort';
 import { getPolisDemoQuestionPool } from './surveyPolisDemoQuestionPool.js';
@@ -274,8 +277,6 @@ import {
   downloadSessionResultsHtmlReport,
   downloadSessionResultsPdfReport,
   evaluateSessionResultsAnalysisEligibility,
-  mergeGeneratedSessionResultsAnalysisArtifacts,
-  normalizeGeneratedSessionResultsAnalysisArtifact,
   renderSessionResultsHtmlReport,
   SESSION_RESULTS_ANALYSIS_SECTION_KEYS,
   SESSION_RESULTS_EXPORT_FORMAT_PDF,
@@ -3338,14 +3339,14 @@ try {
       taskType: 'analysis',
       thinking: true,
     });
-    const sectionArtifact = normalizeGeneratedSessionResultsAnalysisArtifact({
+    const sectionArtifact = surveyResultsAnalysisArtifactMergePort.normalizeGeneratedArtifact({
       generatedAt: new Date().toISOString(),
       inputSignature,
       participants,
       rawOutput,
     });
-    artifact = mergeGeneratedSessionResultsAnalysisArtifacts({
-      base: artifact || normalizeGeneratedSessionResultsAnalysisArtifact({
+    artifact = surveyResultsAnalysisArtifactMergePort.mergeGeneratedArtifacts({
+      base: artifact || surveyResultsAnalysisArtifactMergePort.normalizeGeneratedArtifact({
         generatedAt: new Date().toISOString(),
         inputSignature,
         participants,
