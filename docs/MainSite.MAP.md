@@ -17,6 +17,7 @@ This map intentionally avoids exact line numbers. MainSite is still changing dur
 ## Route Dispatch
 
 Route matching is now classified by the pure `resolveMainSiteRouteMatch` table in `routeTable.ts`. `MainSite.getMainView` remains the rendering caller and still owns URL side effects such as `/new` canonicalization and question/survey responder query normalization.
+Degenerate double-slash SBT address URLs such as `//sbt/0x...` and `//group/0x...` intentionally resolve as SBT detail routes; this PRD 647 decision is pinned in `routeTable.test.ts`.
 
 Covered route keys:
 

@@ -83,6 +83,22 @@ describe('MainSite route table', () => {
     );
   });
 
+  it('keeps accepted double-slash SBT address paths on the SBT detail route', () => {
+    // PRD 647 section 0.5 accepts this degenerate path family as SBT detail.
+    expect(resolveMainSiteRouteMatch({ fullPath: `//sbt/${ADDRESS}`, isAddress })).toEqual(
+      expect.objectContaining({
+        key: 'sbtDetail',
+        sbtAddress: ADDRESS,
+      })
+    );
+    expect(resolveMainSiteRouteMatch({ fullPath: `//group/${ADDRESS}`, isAddress })).toEqual(
+      expect.objectContaining({
+        key: 'sbtDetail',
+        sbtAddress: ADDRESS,
+      })
+    );
+  });
+
   it('exposes cache-wait metadata without rendering anything', () => {
     expect(resolveMainSiteRouteMatch({ fullPath: '/admin', isAddress })).toEqual(
       expect.objectContaining({
