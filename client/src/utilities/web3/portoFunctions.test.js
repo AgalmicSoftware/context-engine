@@ -38,6 +38,7 @@ const setCredentialsMock = ({ createImpl, getImpl } = {}) => {
 };
 
 const loadPortoHarness = ({
+  createWalletClientImpl,
   sendTransactionImpl,
   estimateGasImpl,
   privateKeyToAccountImpl,
@@ -60,7 +61,7 @@ const loadPortoHarness = ({
     signTypedData: jest.fn(async () => '0xsigned'),
     signMessage: jest.fn(async () => '0xsigned'),
   };
-  const createWalletClientMock = jest.fn(() => walletClient);
+  const createWalletClientMock = jest.fn(createWalletClientImpl || (() => walletClient));
   const privateKeyToAccountMock = jest.fn(privateKeyToAccountImpl || (() => makeSignerAccount(BASE_ADDRESS)));
 
   jest.doMock('viem', () => ({
@@ -304,6 +305,122 @@ describe('sendPortoTransaction nonce retry behavior', () => {
     expect(
       requestMock.mock.calls.filter(([req]) => req?.method === 'eth_getTransactionCount')
     ).toHaveLength(0);
+  });
+
+  it('rebuilds a missing wallet client before sending with a restored signer', async () => {
+    let createAttempts = 0;
+    const { porto, createWalletClientMock, sendTransactionMock } = loadPortoHarness({
+      createWalletClientImpl: () => {
+        createAttempts += 1;
+        if (createAttempts === 1) {
+          throw new Error('relay init failed');
+        }
+        return {
+          account: { address: BASE_ADDRESS },
+          request: jest.fn(async ({ method }) => {
+            if (method === 'eth_gasPrice') return '0x64';
+            if (method === 'eth_getTransactionCount') return '0x2';
+            return null;
+          }),
+          estimateGas: jest.fn(async () => 21000n),
+          sendTransaction: sendTransactionMock,
+          signTypedData: jest.fn(async () => '0xsigned'),
+          signMessage: jest.fn(async () => '0xsigned'),
+        };
+      },
+    });
+    seedLegacyPortoSession();
+
+    await expect(porto.restoreSession()).resolves.toBeNull();
+    expect(porto.hasPortoSessionSigner()).toBe(true);
+    expect(createWalletClientMock).toHaveBeenCalledTimes(1);
+
+    await expect(porto.sendPortoTransaction({
+      to: TARGET_ADDRESS,
+      value: '0x0',
+      data: '0x',
+    })).resolves.toBe('0xhash');
+    expect(createWalletClientMock).toHaveBeenCalledTimes(2);
+    expect(sendTransactionMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('prompts before a provider send after legacy metadata-only restore', async () => {
+    const credentials = setCredentialsMock({
+      getImpl: async () => ({ id: 'assertion', rawId: RAW_ID }),
+    });
+    const { porto, createWalletClientMock, sendTransactionMock } = loadPortoHarness();
+    seedLegacyPortoSession();
+
+    await expect(porto.restoreSession({ requireSigner: false })).resolves.toBe(BASE_ADDRESS);
+
+    const provider = porto.createPortoProviderMock();
+    await expect(provider.request({
+      method: 'eth_sendTransaction',
+      params: [{
+        to: TARGET_ADDRESS,
+        value: '0x0',
+        data: '0x',
+      }],
+    })).resolves.toBe('0xhash');
+
+    expect(credentials.get).toHaveBeenCalledTimes(1);
+    expect(createWalletClientMock).toHaveBeenCalledTimes(1);
+    expect(sendTransactionMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses account signing fallbacks when wallet client sign helpers are absent', async () => {
+    const signMessageMock = jest.fn(async () => '0xaccountmsg');
+    const signTypedDataMock = jest.fn(async () => '0xaccounttyped');
+    const signerAccount = {
+      ...makeSignerAccount(BASE_ADDRESS),
+      signMessage: signMessageMock,
+      signTypedData: signTypedDataMock,
+    };
+    const { porto, sendTransactionMock } = loadPortoHarness({
+      privateKeyToAccountImpl: () => signerAccount,
+      createWalletClientImpl: ({ account }) => ({
+        account,
+        request: jest.fn(async ({ method }) => {
+          if (method === 'eth_gasPrice') return '0x64';
+          if (method === 'eth_getTransactionCount') return '0x2';
+          return null;
+        }),
+        sendTransaction: sendTransactionMock,
+      }),
+    });
+    seedLegacyPortoSession();
+
+    await expect(porto.restoreSession()).resolves.toBe(BASE_ADDRESS);
+    const provider = porto.createPortoProviderMock();
+
+    await expect(provider.request({
+      method: 'personal_sign',
+      params: ['0x6869', BASE_ADDRESS],
+    })).resolves.toBe('0xaccountmsg');
+    await expect(provider.request({
+      method: 'eth_signTypedData_v4',
+      params: [BASE_ADDRESS, { domain: {}, types: {}, primaryType: 'Msg', message: {} }],
+    })).resolves.toBe('0xaccounttyped');
+    await expect(provider.request({
+      method: 'eth_estimateGas',
+      params: [{
+        to: TARGET_ADDRESS,
+        value: '0x0',
+        data: '0x',
+      }],
+    })).resolves.toBe('0x5208');
+    await expect(provider.request({
+      method: 'eth_sendTransaction',
+      params: [{
+        to: TARGET_ADDRESS,
+        value: '0x0',
+        data: '0x',
+      }],
+    })).resolves.toBe('0xhash');
+
+    expect(signMessageMock).toHaveBeenCalledTimes(1);
+    expect(signTypedDataMock).toHaveBeenCalledTimes(1);
+    expect(sendTransactionMock).toHaveBeenCalledTimes(1);
   });
 
   it('pins nonce only after replacement-underpriced and retries with that nonce', async () => {
