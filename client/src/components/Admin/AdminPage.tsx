@@ -15,6 +15,7 @@ import { normalizeOriginList } from '../../utilities/urlUtils.js';
 import { adminWorkerPorts } from '../../domains/worker/adminWorkerPorts.js';
 import { adminArweavePort } from '../../domains/storage/adminArweavePorts.js';
 import { adminSessionRegistryPorts } from '../../domains/sessions/registry/sessionRegistryAdminPorts.js';
+import { normalizeSessionMediaUrl } from '../../domains/sessions/sessionMediaUrls.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
   buildSbtAccessControlConditions,
@@ -2101,7 +2102,7 @@ const AdminPage = ({
     }
   };
 
-  const resolvedSessionHeader = adminArweavePort.normalizeArweaveUrl(
+  const resolvedSessionHeader = normalizeSessionMediaUrl(
     groupMetadata?.sessionHeaderImg || groupMetadata?.sessionHeader || '',
     { contextLabel: 'session_header_image' }
   );

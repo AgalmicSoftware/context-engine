@@ -34,6 +34,7 @@ const mockUpsertSessionRegistryCache = jest.fn();
 const mockFetchSessionFromRegistry = jest.fn();
 const mockUploadDataToArweave = jest.fn();
 const mockBuildArweaveGatewayUrl = jest.fn();
+const mockNormalizeSessionMediaUrl = jest.fn((value) => String(value || '').trim());
 
 jest.mock('../../utilities/worker/corsProxy.js', () => ({
   corsProxyUtils: {
@@ -61,6 +62,10 @@ jest.mock('../../utilities/arweave/arweaveScripts.js', () => ({
     readArweaveWalletBalance: jest.fn(),
     formatWinstonToAr: jest.fn(),
   },
+}));
+
+jest.mock('../../domains/sessions/sessionMediaUrls.js', () => ({
+  normalizeSessionMediaUrl: (...args) => mockNormalizeSessionMediaUrl(...args),
 }));
 
 jest.mock('../../utilities/crypto/encryptedFields.js', () => ({
@@ -168,6 +173,7 @@ describe('AdminPage rendered interactions', () => {
     mockFetchSessionFromRegistry.mockResolvedValue(null);
     mockUploadDataToArweave.mockResolvedValue('arweave_test_tx_1234567890');
     mockBuildArweaveGatewayUrl.mockImplementation((txId) => `https://arweave.example.test/${txId}`);
+    mockNormalizeSessionMediaUrl.mockImplementation((value) => String(value || '').trim());
     mockUploadSessionMetadata.mockResolvedValue({
       txId: 'metadata_tx_id',
       metadataUri: 'ar://metadata_tx_id',
@@ -423,6 +429,43 @@ describe('AdminPage rendered interactions', () => {
         expect(hero).toHaveClass(styles.heroNoMedia);
       });
       expect(screen.queryByAltText('edge header')).not.toBeInTheDocument();
+    } finally {
+      global.Image = OriginalImage;
+    }
+  });
+
+  it('normalizes the session header image through the session media domain helper', async () => {
+    const OriginalImage = global.Image;
+    class LoadedImageMock {
+      set src(_value) {
+        setTimeout(() => {
+          if (typeof this.onload === 'function') this.onload();
+        }, 0);
+      }
+    }
+    global.Image = LoadedImageMock;
+    mockNormalizeSessionMediaUrl.mockReturnValue('https://media.example.test/session-header.png');
+    sessionEntries = [[
+      'edge',
+      buildSessionConfig({
+        sessionHeaderImg: ' ar://session_header_tx ',
+      }),
+    ]];
+
+    try {
+      await renderAdminPage();
+      await waitForResolvedWorkerUrl();
+
+      await waitFor(() => {
+        expect(screen.getByAltText('edge header')).toHaveAttribute(
+          'src',
+          'https://media.example.test/session-header.png'
+        );
+      });
+      expect(mockNormalizeSessionMediaUrl).toHaveBeenCalledWith(
+        ' ar://session_header_tx ',
+        { contextLabel: 'session_header_image' }
+      );
     } finally {
       global.Image = OriginalImage;
     }
