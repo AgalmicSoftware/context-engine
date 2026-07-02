@@ -1,23 +1,39 @@
 import contractScripts, * as contractScriptsExports from '../web3/contractScripts.js';
 
-type OnePageSessionBalance = {
-  gte: (value: unknown) => boolean;
+export type OnePageSessionBalance = {
+  gte(value: string | number | { toString: () => string }): boolean;
 };
 
+type OnePageSessionGroupConfig = {
+  slug?: unknown;
+  [key: string]: unknown;
+};
+
+type OnePageSessionGroupKeyOrConfig = string | OnePageSessionGroupConfig | null | undefined;
+
+type OnePageSessionBalanceReader = (
+  address: string,
+  groupKeyOrCfg?: OnePageSessionGroupKeyOrConfig
+) => Promise<OnePageSessionBalance | null>;
+
 type OnePageSessionContractRuntime = {
-  getETHBalance?: (...args: unknown[]) => Promise<OnePageSessionBalance | null>;
-  getNativeBalance?: (...args: unknown[]) => Promise<OnePageSessionBalance | null>;
+  getETHBalance?: OnePageSessionBalanceReader;
+  getNativeBalance?: OnePageSessionBalanceReader;
+};
+
+type OnePageSessionAllSlugsOptions = {
+  includeEmpty?: boolean;
 };
 
 type OnePageSessionContractExports = {
-  getAllSessionSlugs: (...args: unknown[]) => unknown[];
+  getAllSessionSlugs: (options?: OnePageSessionAllSlugsOptions) => unknown[];
 };
 
-const contractRuntime = contractScripts as unknown as OnePageSessionContractRuntime;
-const contractNamedExports = contractScriptsExports as unknown as OnePageSessionContractExports;
+const contractRuntime = contractScripts as OnePageSessionContractRuntime;
+const contractNamedExports = contractScriptsExports as OnePageSessionContractExports;
 
-export const getAllSessionSlugs = (...args: unknown[]): unknown[] => (
-  contractNamedExports.getAllSessionSlugs(...args)
+export const getAllSessionSlugs = (options?: OnePageSessionAllSlugsOptions): unknown[] => (
+  contractNamedExports.getAllSessionSlugs(options)
 );
 
 export const hasNativeBalanceReader = (): boolean => (
@@ -28,10 +44,16 @@ export const hasLegacyEthBalanceReader = (): boolean => (
   typeof contractRuntime.getETHBalance === 'function'
 );
 
-export const getNativeBalance = (...args: unknown[]): Promise<OnePageSessionBalance | null> => (
-  contractRuntime.getNativeBalance?.(...args) ?? Promise.resolve(null)
+export const getNativeBalance = (
+  address: string,
+  groupKeyOrCfg?: OnePageSessionGroupKeyOrConfig
+): Promise<OnePageSessionBalance | null> => (
+  contractRuntime.getNativeBalance?.(address, groupKeyOrCfg) ?? Promise.resolve(null)
 );
 
-export const getLegacyEthBalance = (...args: unknown[]): Promise<OnePageSessionBalance | null> => (
-  contractRuntime.getETHBalance?.(...args) ?? Promise.resolve(null)
+export const getLegacyEthBalance = (
+  address: string,
+  groupKeyOrCfg?: OnePageSessionGroupKeyOrConfig
+): Promise<OnePageSessionBalance | null> => (
+  contractRuntime.getETHBalance?.(address, groupKeyOrCfg) ?? Promise.resolve(null)
 );
