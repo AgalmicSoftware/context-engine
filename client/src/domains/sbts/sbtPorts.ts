@@ -16,6 +16,14 @@ export type SbtOnChainConfig = {
   owner: unknown;
 };
 
+export type SbtOnChainConfigFields = {
+  maxTokens?: boolean;
+  collectionBurnAuth?: boolean;
+  mintingEndTime?: boolean;
+  hasPasswordMint?: boolean;
+  adminAndOwner?: boolean;
+};
+
 export type SbtTransactionResult = Record<string, unknown> & {
   transactionHash: string;
 };
@@ -41,7 +49,8 @@ export type SbtMetadataReadsPort = {
   getSbtOnChainConfig: (
     providerName: string,
     sbtAddress: string,
-    groupKeyOrCfg?: SbtGroupKeyOrConfig
+    groupKeyOrCfg?: SbtGroupKeyOrConfig,
+    fields?: SbtOnChainConfigFields
   ) => Promise<SbtOnChainConfig>;
 };
 
