@@ -19,19 +19,8 @@ import { encryptedFieldsUtils } from '../../utilities/crypto/encryptedFields.js'
 import { normalizeOriginList } from '../../utilities/urlUtils.js';
 import { adminWorkerPorts } from '../../domains/worker/adminWorkerPorts.js';
 import { adminArweavePort } from '../../domains/storage/adminArweavePorts.js';
+import { adminSessionRegistryPorts } from '../../domains/sessions/registry/sessionRegistryAdminPorts.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import {
-  loadSessionRegistryCache,
-  SESSION_REGISTRY_CACHE_UPDATED_EVENT,
-  sessionRegistryStore,
-  setSessionFieldsOnChain,
-  setResourceGatesOnChain,
-  fetchSessionFromRegistry,
-  upsertSessionRegistryCache,
-  uploadSessionMetadata,
-  updateSessionMetadataOnChain,
-  sessionRegistryUtils,
-} from '../../utilities/web3/sessionRegistry.js';
 import {
   buildSbtAccessControlConditions,
   getGlobalLitHooks,
@@ -315,7 +304,7 @@ const AdminPage = ({
   }, []);
 
   const requestedSessionRaw = toStr(initialSessionId).trim();
-  const requestedSessionIdHex = sessionRegistryUtils.normalizeSessionIdHex(requestedSessionRaw);
+  const requestedSessionIdHex = adminSessionRegistryPorts.reads.normalizeSessionIdHex(requestedSessionRaw);
   const requestedSessionSlug = requestedSessionIdHex ? '' : normalizeSlug(requestedSessionRaw);
   const requestedChainId = parseChainIdInput(initialRegistryChainId) || null;
   const requestedFetchKeyRef = useRef('');
@@ -329,7 +318,7 @@ const AdminPage = ({
   }, [requestedSessionRaw, requestedChainId]);
 
   const syncSessionsFromRegistryCache = useCallback(() => {
-    const cached = sessionRegistryStore.getAllSessionEntries();
+    const cached = adminSessionRegistryPorts.reads.getAllSessionEntries();
     const nextSessions = Array.isArray(cached) ? cached : [];
     setSessions(nextSessions);
     return nextSessions;
@@ -342,7 +331,7 @@ const AdminPage = ({
     const shouldForceRegistryRead = !USE_ONCHAIN_SESSION_REGISTRY || !!forceOnChain;
     const runRegistryLoad = async (bootstrapRpc: any) => {
       try {
-        return await loadSessionRegistryCache({
+        return await adminSessionRegistryPorts.reads.loadSessionRegistryCache({
           ...(chainIds ? { chainIds } : {}),
           force: shouldForceRegistryRead,
           // In /admin, never auto-decrypt registry metadata; keep wallet prompts behind user actions.
@@ -380,7 +369,7 @@ const AdminPage = ({
       requestedFetchKeyRef.current = '';
       await loadSessions({ forceOnChain: true });
       if (!ignoreRequestedSession && requestedSessionRaw && requestedChainId) {
-        const config: any = await fetchSessionFromRegistry({
+        const config: any = await adminSessionRegistryPorts.reads.fetchSessionFromRegistry({
           chainId: requestedChainId,
           sessionId: requestedSessionIdHex || '',
           slug: requestedSessionSlug || '',
@@ -391,8 +380,8 @@ const AdminPage = ({
           bootstrapRpc: true,
         });
         if (config) {
-          upsertSessionRegistryCache({ config });
-          const refreshed = sessionRegistryStore.getAllSessionEntries();
+          adminSessionRegistryPorts.reads.upsertSessionRegistryCache({ config });
+          const refreshed = adminSessionRegistryPorts.reads.getAllSessionEntries();
           setSessions(refreshed || []);
           setSelectedSlug(normalizeSlug(config.slug));
         }
@@ -421,10 +410,7 @@ const AdminPage = ({
     const handleRegistryCacheUpdated = () => {
       syncSessionsFromRegistryCache();
     };
-    window.addEventListener(SESSION_REGISTRY_CACHE_UPDATED_EVENT, handleRegistryCacheUpdated);
-    return () => {
-      window.removeEventListener(SESSION_REGISTRY_CACHE_UPDATED_EVENT, handleRegistryCacheUpdated);
-    };
+    return adminSessionRegistryPorts.reads.subscribeToCacheUpdates(window, handleRegistryCacheUpdated);
   }, [syncSessionsFromRegistryCache]);
 
   const sessionsForChain = useMemo(() => {
@@ -440,7 +426,7 @@ const AdminPage = ({
     if (!requestedSessionRaw) return null;
     if (requestedSessionIdHex) {
       return availableSessions.find(([, cfg]: any) => {
-        const cfgId = sessionRegistryUtils.normalizeSessionIdHex(cfg?.__registry?.sessionIdHex || cfg?.sessionId);
+        const cfgId = adminSessionRegistryPorts.reads.normalizeSessionIdHex(cfg?.__registry?.sessionIdHex || cfg?.sessionId);
         return cfgId && cfgId === requestedSessionIdHex;
       }) || null;
     }
@@ -510,7 +496,7 @@ const AdminPage = ({
     const run = async () => {
       setSessionLookupStatus(`Fetching session from chain ${requestedChainId}…`);
       try {
-        const config: any = await fetchSessionFromRegistry({
+        const config: any = await adminSessionRegistryPorts.reads.fetchSessionFromRegistry({
           chainId: requestedChainId,
           sessionId: requestedSessionIdHex || '',
           slug: requestedSessionSlug || '',
@@ -523,8 +509,8 @@ const AdminPage = ({
         if (!config) {
           throw new Error(`Session not found on chain ${requestedChainId}: ${requestedSessionRaw}`);
         }
-        upsertSessionRegistryCache({ config });
-        const refreshed = sessionRegistryStore.getAllSessionEntries();
+        adminSessionRegistryPorts.reads.upsertSessionRegistryCache({ config });
+        const refreshed = adminSessionRegistryPorts.reads.getAllSessionEntries();
         if (cancelled) return;
         setSessions(refreshed || []);
         setSelectedSlug(normalizeSlug(config.slug));
@@ -1452,13 +1438,15 @@ const AdminPage = ({
         !Object.prototype.hasOwnProperty.call(secretsPayload, 'litAccountApiKey') &&
         !Object.prototype.hasOwnProperty.call(secretsPayload, 'litUsageApiKey')
       );
-      const sponsoredFields = buildSponsoredSessionFlagFields({
-        secrets: secretsPayload,
-        fallbackFields: shouldPreserveSponsoredLit ? { sponsored_lit: '1' } : {},
-        includeCustomRpcInAi: true,
+      const sponsoredFields = adminSessionRegistryPorts.writes.buildRegistrySessionFields({
+        sponsoredFields: buildSponsoredSessionFlagFields({
+          secrets: secretsPayload,
+          fallbackFields: shouldPreserveSponsoredLit ? { sponsored_lit: '1' } : {},
+          includeCustomRpcInAi: true,
+        }),
       });
       setChainStatus('Updating sponsored flags on-chain…');
-      await setSessionFieldsOnChain({
+      await adminSessionRegistryPorts.writes.setSessionFieldsOnChain({
         providerLike: provider,
         chainId: registryChainId,
         slug,
@@ -1566,7 +1554,7 @@ const AdminPage = ({
         0
       ) || 0;
       if (!registryChainId) throw new Error('Registry chain id is missing.');
-      const registrySlug = sessionRegistryUtils.toRegistrySlug(selectedSlug);
+      const registrySlug = adminSessionRegistryPorts.reads.toRegistrySlug(selectedSlug);
       const sbtAddresses = dedupeSbtSelections(defaultGateDraft.sbts || []).map((entry: any) => entry.address);
       if (!sbtAddresses.length) throw new Error('Provide at least one SBT address.');
       const gateChainId = parseChainIdInput(defaultGateDraft.chainId) ||
@@ -1576,7 +1564,7 @@ const AdminPage = ({
           0
         ) || 0;
       const mode = normalizeGateMode(defaultGateDraft.mode) === 'all' ? 1 : 0;
-      const result = await setResourceGatesOnChain({
+      const result = await adminSessionRegistryPorts.writes.setResourceGatesOnChain({
         providerLike: provider,
         chainId: registryChainId,
         slug: registrySlug,
@@ -2065,7 +2053,7 @@ const AdminPage = ({
         hasAutoFeatureOverride: metadataAutoFeatureTouched,
         advancedDraft: metadataConfigDraft,
       });
-      const uploadResult = await uploadSessionMetadata(metadata, {
+      const uploadResult = await adminSessionRegistryPorts.writes.uploadSessionMetadata(metadata, {
         sessionConfig: selectedConfig,
         sessionSlug: selectedSlug,
         context: testContext,
@@ -2073,7 +2061,7 @@ const AdminPage = ({
         ...(toStr(secrets.arweaveJwk).trim() ? { arweaveJwk: toStr(secrets.arweaveJwk).trim() } : {}),
       });
       setMetadataUpdateStatus('Updating SessionRegistry metadata URI…');
-      const registryResult = await updateSessionMetadataOnChain({
+      const registryResult = await adminSessionRegistryPorts.writes.updateSessionMetadataOnChain({
         providerLike: provider,
         chainId: relevantRegistryChainId,
         slug: selectedSlug,
@@ -2089,8 +2077,8 @@ const AdminPage = ({
           encryptedMetadataURI: toStr(selectedConfig?.__registry?.encryptedMetadataURI).trim(),
         },
       };
-      upsertSessionRegistryCache({ config: nextConfig });
-      setSessions(sessionRegistryStore.getAllSessionEntries() || []);
+      adminSessionRegistryPorts.reads.upsertSessionRegistryCache({ config: nextConfig });
+      setSessions(adminSessionRegistryPorts.reads.getAllSessionEntries() || []);
       setMetadataDraftTouched(false);
 	      const txUrl = buildTxExplorerUrl(registryResult?.txHash, relevantRegistryChainId);
 	      const baseSuccessStatus = txUrl ? `Session metadata updated. ${txUrl}` : 'Session metadata updated.';
