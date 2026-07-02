@@ -92,6 +92,31 @@ export const bindSurveyResultsCachePort = ({
   },
 });
 
+const readDefaultCacheScripts = (): SurveyResultsCacheScriptsModule => ({
+  listNamespaceEntriesSync: (namespace, options) => (
+    options === undefined
+      ? cacheScriptsModule.listNamespaceEntriesSync(namespace)
+      : cacheScriptsModule.listNamespaceEntriesSync(namespace, options)
+  ),
+  peekCacheSync: (namespace, slug, options) => {
+    if (slug === undefined) return cacheScriptsModule.peekCacheSync(namespace);
+    if (options === undefined) return cacheScriptsModule.peekCacheSync(namespace, slug);
+    return cacheScriptsModule.peekCacheSync(namespace, slug, options);
+  },
+  readCache: (namespace, slug) => (
+    slug === undefined
+      ? cacheScriptsModule.readCache(namespace)
+      : cacheScriptsModule.readCache(namespace, slug)
+  ),
+  subscribeCacheUpdates: (handler) => cacheScriptsModule.subscribeCacheUpdates(handler),
+  writeCache: (namespace, slug, value) => {
+    const writeCache = cacheScriptsModule.writeCache as SurveyResultsCacheScriptsModule['writeCache'];
+    if (slug === undefined) return writeCache(namespace);
+    if (value === undefined) return writeCache(namespace, slug);
+    return writeCache(namespace, slug, value);
+  },
+});
+
 export const surveyResultsCachePort = bindSurveyResultsCachePort({
-  cacheScripts: () => cacheScriptsModule,
+  cacheScripts: readDefaultCacheScripts,
 });
