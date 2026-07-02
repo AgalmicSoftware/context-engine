@@ -98,6 +98,42 @@ export const toBigIntInput = (value: unknown): string | number | bigint | boolea
     : String(value)
 );
 
+export function buildPortoWalletClientAdapter(createdWalletClient: UnknownObj): PortoWalletClient {
+  const clientAccount = toUnknownRecord(createdWalletClient.account);
+  const requestMethod = createdWalletClient.request;
+  const estimateGasMethod = createdWalletClient.estimateGas;
+  const sendTransactionMethod = createdWalletClient.sendTransaction;
+  const signTypedDataMethod = createdWalletClient.signTypedData;
+  const signMessageMethod = createdWalletClient.signMessage;
+  const accountSignTypedData = clientAccount.signTypedData;
+  const accountSignMessage = clientAccount.signMessage;
+  if (typeof requestMethod !== 'function') throw new Error('Porto wallet client missing request.');
+  if (typeof sendTransactionMethod !== 'function') throw new Error('Porto wallet client missing sendTransaction.');
+  return {
+    account: clientAccount as { address: string },
+    request: (args) => requestMethod.call(createdWalletClient, args) as Promise<unknown>,
+    estimateGas: (args) => {
+      if (typeof estimateGasMethod !== 'function') throw new Error('Porto wallet client missing estimateGas.');
+      return estimateGasMethod.call(createdWalletClient, args) as Promise<bigint>;
+    },
+    sendTransaction: (tx) => sendTransactionMethod.call(createdWalletClient, tx) as Promise<unknown>,
+    signTypedData: (typedData) => (
+      typeof signTypedDataMethod === 'function'
+        ? signTypedDataMethod.call(createdWalletClient, typedData) as Promise<unknown>
+        : typeof accountSignTypedData === 'function'
+          ? accountSignTypedData.call(clientAccount, typedData) as Promise<unknown>
+          : Promise.reject(new Error('Porto wallet client missing signTypedData.'))
+    ),
+    signMessage: (args) => (
+      typeof signMessageMethod === 'function'
+        ? signMessageMethod.call(createdWalletClient, args) as Promise<unknown>
+        : typeof accountSignMessage === 'function'
+          ? accountSignMessage.call(clientAccount, args) as Promise<unknown>
+          : Promise.reject(new Error('Porto wallet client missing signMessage.'))
+    ),
+  };
+}
+
 export function bufferToBase64URL(buffer: ArrayBuffer | ArrayBufferView): string {
   const bytes = buffer instanceof ArrayBuffer
     ? new Uint8Array(buffer)

@@ -31,6 +31,7 @@ import contractScripts from './contractScripts.js'; // Import purely for read-pr
 import {
   base64URLToBuffer,
   bufferToBase64URL,
+  buildPortoWalletClientAdapter,
   countHexDataBytes,
   getErrorMessage,
   parseGweiToWei,
@@ -547,49 +548,7 @@ function _initViemClient(): void {
     chain: portoChain,
     transport,
   }) as UnknownObj;
-  const clientAccount = toUnknownRecord(createdWalletClient.account);
-  const requestMethod = createdWalletClient.request;
-  const estimateGasMethod = createdWalletClient.estimateGas;
-  const sendTransactionMethod = createdWalletClient.sendTransaction;
-  const signTypedDataMethod = createdWalletClient.signTypedData;
-  const signMessageMethod = createdWalletClient.signMessage;
-  const accountSignTypedData = clientAccount.signTypedData;
-  const accountSignMessage = clientAccount.signMessage;
-  if (typeof requestMethod !== 'function') {
-    throw new Error('Porto wallet client missing request.');
-  }
-  if (typeof sendTransactionMethod !== 'function') {
-    throw new Error('Porto wallet client missing sendTransaction.');
-  }
-  viemWalletClient = {
-    account: clientAccount as { address: string },
-    request: (args) => requestMethod.call(createdWalletClient, args) as Promise<unknown>,
-    estimateGas: (args) => {
-      if (typeof estimateGasMethod !== 'function') {
-        throw new Error('Porto wallet client missing estimateGas.');
-      }
-      return estimateGasMethod.call(createdWalletClient, args) as Promise<bigint>;
-    },
-    sendTransaction: (tx) => sendTransactionMethod.call(createdWalletClient, tx) as Promise<unknown>,
-    signTypedData: (typedData) => {
-      if (typeof signTypedDataMethod === 'function') {
-        return signTypedDataMethod.call(createdWalletClient, typedData) as Promise<unknown>;
-      }
-      if (typeof accountSignTypedData !== 'function') {
-        throw new Error('Porto wallet client missing signTypedData.');
-      }
-      return accountSignTypedData.call(clientAccount, typedData) as Promise<unknown>;
-    },
-    signMessage: (args) => {
-      if (typeof signMessageMethod === 'function') {
-        return signMessageMethod.call(createdWalletClient, args) as Promise<unknown>;
-      }
-      if (typeof accountSignMessage !== 'function') {
-        throw new Error('Porto wallet client missing signMessage.');
-      }
-      return accountSignMessage.call(clientAccount, args) as Promise<unknown>;
-    },
-  };
+  viemWalletClient = buildPortoWalletClientAdapter(createdWalletClient);
   portoLog.log('[PORTO_RPC] Relay URLs:', relayCandidates);
 
   // Store a reference on window for cross-module access (cryptography.js)
