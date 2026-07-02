@@ -888,7 +888,7 @@ class QuestionFilter extends React.Component<any, any> {
           newStateFromUrl.sortByImportance = false;
           newStateFromUrl.pendingSortByImportance = false;
           // Keep existing topQuestionsCount or component default if not specified by URL
-          if (urlFilterState.hasOwnProperty('topQuestions')) {
+          if (Object.prototype.hasOwnProperty.call(urlFilterState, 'topQuestions')) {
             // only reset count if topQuestions key exists and is null
             newStateFromUrl.topQuestionsCount = DEFAULT_TOP_QUESTIONS_COUNT; // default count
             newStateFromUrl.pendingTopQuestionsCount = DEFAULT_TOP_QUESTIONS_COUNT; // default count
@@ -3541,12 +3541,12 @@ class QuestionFilter extends React.Component<any, any> {
                     </div>
                     {this.state.aiFilterApplied && aiSearchQuery && !aiApplyError && (
                       <p className={styles.aiStatusText}>
-                        Active: "{aiSearchQuery}" • Top {normalizePositiveInt(this.state.aiAppliedTopN, DEFAULT_AI_TOP_N)} • {aiCombineWithOtherFilters ? 'Combined' : 'Override'}
+                        Active: &quot;{aiSearchQuery}&quot; • Top {normalizePositiveInt(this.state.aiAppliedTopN, DEFAULT_AI_TOP_N)} • {aiCombineWithOtherFilters ? 'Combined' : 'Override'}
                       </p>
                     )}
                     {this.state.aiFilterApplied && aiSearchQuery && !aiCombineWithOtherFilters && !aiApplyError && (
                       <p className={styles.aiHintText}>
-                        AI Top-N override mode is active. Enable "Combine with other filters" to intersect with type/tag/SBT filters.
+                        AI Top-N override mode is active. Enable &quot;Combine with other filters&quot; to intersect with type/tag/SBT filters.
                       </p>
                     )}
                     {!!aiApplyError && (
