@@ -3,13 +3,12 @@ import {
   getNativeBalance,
   hasLegacyEthBalanceReader,
   hasNativeBalanceReader,
-} from './onePageSessionRuntime.js';
-import contractScripts from '../web3/contractScripts.js';
+} from './sessionBalanceReaders';
+import contractScripts from '../../utilities/web3/contractScripts.js';
 
-jest.mock('../web3/contractScripts.js', () => ({
+jest.mock('../../utilities/web3/contractScripts.js', () => ({
   __esModule: true,
   default: {},
-  getAllSessionSlugs: jest.fn(() => []),
 }));
 
 const mockContractScriptsDefault = contractScripts as {
@@ -17,7 +16,7 @@ const mockContractScriptsDefault = contractScripts as {
   getNativeBalance?: jest.Mock;
 };
 
-describe('onePageSessionRuntime balance readers', () => {
+describe('session balance readers', () => {
   beforeEach(() => {
     delete mockContractScriptsDefault.getETHBalance;
     delete mockContractScriptsDefault.getNativeBalance;
