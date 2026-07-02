@@ -65,6 +65,22 @@ test('resolveClientImport resolves local client imports and ignores packages', (
     'client/src/utilities/web3/sessionRegistry'
   );
   assert.equal(
+    resolveClientImport('client/src/components/Admin/AdminPage.tsx', 'utilities/web3/contractScripts.js'),
+    'client/src/utilities/web3/contractScripts'
+  );
+  assert.equal(
+    resolveClientImport('client/src/components/Admin/AdminPage.tsx', 'components/Shared/CETooltip'),
+    'client/src/components/Shared/CETooltip'
+  );
+  assert.equal(
+    resolveClientImport('client/src/components/Admin/AdminPage.tsx', 'assets/logo.png'),
+    'client/src/assets/logo.png'
+  );
+  assert.equal(
+    resolveClientImport('client/src/components/Admin/AdminPage.tsx', 'variables/chains.js'),
+    'client/src/variables/chains'
+  );
+  assert.equal(
     resolveClientImport('client\\src\\components\\Admin\\AdminPage.tsx', '..\\..\\utilities\\web3\\index.ts'),
     'client/src/utilities/web3/'
   );
@@ -192,6 +208,153 @@ test('route/page low-level imports fail only when not present in the baseline', 
   });
 });
 
+test('route/page low-level imports through Vite bare aliases are violations', () => {
+  withTempRoot((rootDir) => {
+    writeFile(
+      rootDir,
+      'client/src/components/UserPage/UserPage.tsx',
+      "import contractScripts from 'utilities/web3/contractScripts.js';\n"
+    );
+
+    const violations = collectClientBoundaryViolations({ rootDir });
+    assert.deepEqual(violations, [
+      {
+        rule: 'route-page-no-low-level',
+        source: 'client/src/components/UserPage/UserPage.tsx',
+        import: 'utilities/web3/contractScripts.js',
+        resolved: 'client/src/utilities/web3/contractScripts',
+      },
+    ]);
+  });
+});
+
+test('pure low-level re-export barrels are pass-through facade violations', () => {
+  withTempRoot((rootDir) => {
+    writeFile(
+      rootDir,
+      'client/src/utilities/user/userPageRuntime.ts',
+      `
+        export {
+          getDemoSessionConfigBySlug,
+          getSessionConfigBySlug,
+          normalizeSessionSlug,
+        } from '../web3/contractScripts.js';
+        export {
+          checkSponsoredAccess,
+        } from '../web3/sponsoredAccess.js';
+      `
+    );
+
+    const violations = collectClientBoundaryViolations({ rootDir });
+    assert.deepEqual(violations, [
+      {
+        rule: 'no-passthrough-facade',
+        source: 'client/src/utilities/user/userPageRuntime.ts',
+        import: '<passthrough-facade>',
+        resolved: 'client/src/utilities/user/userPageRuntime.ts',
+      },
+    ]);
+  });
+});
+
+test('component-local runtime micro-facades over low-level modules are violations', () => {
+  withTempRoot((rootDir) => {
+    writeFile(
+      rootDir,
+      'client/src/components/Admin/adminWorkerRuntime.ts',
+      `
+        import { corsProxyUtils } from '../../utilities/worker/corsProxy.js';
+
+        export const resolveAdminWorkerUrl = (...args) => (
+          corsProxyUtils.resolveCorsProxyUrl(...args)
+        );
+      `
+    );
+
+    const violations = collectClientBoundaryViolations({ rootDir });
+    assert.deepEqual(violations, [
+      {
+        rule: 'no-passthrough-facade',
+        source: 'client/src/components/Admin/adminWorkerRuntime.ts',
+        import: '<passthrough-facade>',
+        resolved: 'client/src/components/Admin/adminWorkerRuntime.ts',
+      },
+    ]);
+  });
+});
+
+test('app runtime modules may delegate to low-level modules', () => {
+  withTempRoot((rootDir) => {
+    writeFile(
+      rootDir,
+      'client/src/app/runtime/appWagmiRuntime.ts',
+      `
+        import contractScripts from '../../utilities/web3/contractScripts.js';
+
+        export const first = () => (
+          contractScripts.first()
+        );
+        export const second = () => (
+          contractScripts.second()
+        );
+        export const third = () => (
+          contractScripts.third()
+        );
+      `
+    );
+
+    assert.deepEqual(collectClientBoundaryViolations({ rootDir }), []);
+  });
+});
+
+test('production files cannot import excluded harness or test utility modules', () => {
+  withTempRoot((rootDir) => {
+    writeFile(
+      rootDir,
+      'client/src/components/Widget/Widget.tsx',
+      `
+        import { renderWidget } from './WidgetHarness';
+        import { buildWidget } from './Widget.testUtils';
+        import fixtureData from './fixtures/data';
+      `
+    );
+
+    const violations = collectClientBoundaryViolations({ rootDir });
+    assert.deepEqual(violations, [
+      {
+        rule: 'production-no-test-exclusion-imports',
+        source: 'client/src/components/Widget/Widget.tsx',
+        import: './fixtures/data',
+        resolved: 'client/src/components/Widget/fixtures/data',
+      },
+      {
+        rule: 'production-no-test-exclusion-imports',
+        source: 'client/src/components/Widget/Widget.tsx',
+        import: './Widget.testUtils',
+        resolved: 'client/src/components/Widget/Widget.testUtils',
+      },
+      {
+        rule: 'production-no-test-exclusion-imports',
+        source: 'client/src/components/Widget/Widget.tsx',
+        import: './WidgetHarness',
+        resolved: 'client/src/components/Widget/WidgetHarness',
+      },
+    ]);
+  });
+});
+
+test('test files may import excluded harness modules', () => {
+  withTempRoot((rootDir) => {
+    writeFile(
+      rootDir,
+      'client/src/components/Widget/Widget.test.tsx',
+      "import { renderWidget } from './WidgetHarness';\n"
+    );
+
+    assert.deepEqual(collectClientBoundaryViolations({ rootDir }), []);
+  });
+});
+
 test('duplicate baseline entries fail even when the current violation is baselined', () => {
   withTempRoot((rootDir) => {
     writeFile(
@@ -244,7 +407,7 @@ test('json output includes duplicate baseline entries and exits nonzero', () => 
   });
 });
 
-test('resolved baseline entries report ratchet-down guidance without failing', () => {
+test('resolved baseline entries fail with ratchet-down guidance', () => {
   withTempRoot((rootDir) => {
     const staleSource = 'client/src/components/Admin/AdminPage.tsx';
     writeFile(
@@ -269,9 +432,46 @@ test('resolved baseline entries report ratchet-down guidance without failing', (
       rootDir,
       stdout: (line) => stdout.push(line),
       stderr: (line) => stderr.push(line),
-    }), 0);
+    }), 1);
     assert.match(stdout.join('\n'), /Current violations: 1; baseline: 2; new: 0; resolved: 1\./);
-    assert.match(stdout.join('\n'), /Resolved baseline entries detected/);
+    assert.match(stderr.join('\n'), /resolved baseline entry\/entries found; prune the baseline in the same commit/);
+    assert.match(stderr.join('\n'), /route-page-no-low-level/);
+  });
+});
+
+test('json output includes resolved baseline entries and exits nonzero', () => {
+  withTempRoot((rootDir) => {
+    const staleSource = 'client/src/components/Admin/AdminPage.tsx';
+    writeFile(
+      rootDir,
+      staleSource,
+      "import { getSession } from '../../utilities/web3/sessionRegistry';\n"
+    );
+    writeFile(
+      rootDir,
+      'client/src/components/Sponsor/SponsorPage.tsx',
+      "import { getWorkerUrl } from '../../utilities/worker/workerUrl';\n"
+    );
+    const baselineViolations = collectClientBoundaryViolations({ rootDir });
+    assert.equal(baselineViolations.length, 2);
+    writeBoundaryBaseline(baselineViolations, rootDir);
+
+    fs.rmSync(path.join(rootDir, staleSource), { force: true });
+
+    const stdout = [];
+    const stderr = [];
+    assert.equal(runClientBoundaryCheck({
+      rootDir,
+      argv: ['--json'],
+      stdout: (line) => stdout.push(line),
+      stderr: (line) => stderr.push(line),
+    }), 1);
+
+    const result = JSON.parse(stdout.join('\n'));
+    assert.equal(result.totalViolations, 1);
+    assert.equal(result.baselineViolations, 2);
+    assert.deepEqual(result.newViolations, []);
+    assert.deepEqual(result.resolvedViolations, [baselineViolations[0]]);
     assert.equal(stderr.length, 0);
   });
 });

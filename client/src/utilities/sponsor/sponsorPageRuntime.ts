@@ -5,7 +5,9 @@ export {
   buildSponsoredBundlePlaintext,
   generateSponsoredBundleSecret,
   hasSponsoredBundleFields,
-  uploadSponsoredBundle,
+} from '../arweave/sponsoredBundles.js';
+import {
+  uploadSponsoredBundle as uploadSponsoredBundleImpl,
 } from '../arweave/sponsoredBundles.js';
 export {
   fetchSessionFromRegistry,
@@ -22,7 +24,9 @@ import {
 } from '../worker/corsProxy.js';
 export {
   buildSignedAdminActionAuth,
-  buildSignedBootstrapAdminAuth,
+} from '../worker/workerAuth.js';
+import {
+  buildSignedBootstrapAdminAuth as buildSignedBootstrapAdminAuthImpl,
 } from '../worker/workerAuth.js';
 export {
   normalizeWorkerUrl,
@@ -40,4 +44,41 @@ export const resolveCorsProxyUrl = (...args: Parameters<typeof corsProxyUtils.re
   url?: unknown;
 } | null | undefined> => (
   corsProxyUtils.resolveCorsProxyUrl(...args)
+);
+
+type SponsorBootstrapAdminAuthContext = {
+  account?: unknown;
+  chainId?: unknown;
+  provider?: unknown;
+  providerLike?: unknown;
+};
+
+type SponsorBootstrapAdminAuthInput = {
+  slug?: unknown;
+  workerUrl?: unknown;
+  context?: SponsorBootstrapAdminAuthContext;
+  statement?: string;
+  nonce?: unknown;
+};
+
+type SponsorBootstrapAdminAuthResult = {
+  address: string;
+  message: string;
+  signature: string;
+  sessionSlug: string;
+};
+
+export const buildSignedBootstrapAdminAuth = (
+  input: SponsorBootstrapAdminAuthInput = {},
+): Promise<SponsorBootstrapAdminAuthResult> => (
+  buildSignedBootstrapAdminAuthImpl(input)
+);
+
+export type SponsorUploadSponsoredBundleInput = Parameters<typeof uploadSponsoredBundleImpl>[0];
+export type SponsorUploadSponsoredBundleResult = Awaited<ReturnType<typeof uploadSponsoredBundleImpl>>;
+
+export const uploadSponsoredBundle = (
+  input: SponsorUploadSponsoredBundleInput = {},
+): Promise<SponsorUploadSponsoredBundleResult> => (
+  uploadSponsoredBundleImpl(input)
 );

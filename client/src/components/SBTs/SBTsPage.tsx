@@ -13,7 +13,7 @@ import {
   getSessionConfigBySlug,
   getSessionConfigBySlugOrDefault,
   normalizeSessionSlug,
-} from '../../utilities/sbt/sbtPageRuntime.js';
+} from '../../domains/sessions/sessionConfig.js';
 import { connect } from 'react-redux';
 import { createLogger } from '../../utilities/logging.js';
 import { peekCacheSync } from '../../utilities/cache/cacheScripts.js';
