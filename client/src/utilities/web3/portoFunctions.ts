@@ -547,13 +547,48 @@ function _initViemClient(): void {
     chain: portoChain,
     transport,
   }) as UnknownObj;
+  const clientAccount = toUnknownRecord(createdWalletClient.account);
+  const requestMethod = createdWalletClient.request;
+  const estimateGasMethod = createdWalletClient.estimateGas;
+  const sendTransactionMethod = createdWalletClient.sendTransaction;
+  const signTypedDataMethod = createdWalletClient.signTypedData;
+  const signMessageMethod = createdWalletClient.signMessage;
+  const accountSignTypedData = clientAccount.signTypedData;
+  const accountSignMessage = clientAccount.signMessage;
+  if (typeof requestMethod !== 'function') {
+    throw new Error('Porto wallet client missing request.');
+  }
+  if (typeof sendTransactionMethod !== 'function') {
+    throw new Error('Porto wallet client missing sendTransaction.');
+  }
   viemWalletClient = {
-    account: createdWalletClient.account as { address: string },
-    request: (createdWalletClient.request as PortoWalletClient['request']).bind(createdWalletClient),
-    estimateGas: (createdWalletClient.estimateGas as PortoWalletClient['estimateGas']).bind(createdWalletClient),
-    sendTransaction: (createdWalletClient.sendTransaction as PortoWalletClient['sendTransaction']).bind(createdWalletClient),
-    signTypedData: (createdWalletClient.signTypedData as PortoWalletClient['signTypedData']).bind(createdWalletClient),
-    signMessage: (createdWalletClient.signMessage as PortoWalletClient['signMessage']).bind(createdWalletClient),
+    account: clientAccount as { address: string },
+    request: (args) => requestMethod.call(createdWalletClient, args) as Promise<unknown>,
+    estimateGas: (args) => {
+      if (typeof estimateGasMethod !== 'function') {
+        throw new Error('Porto wallet client missing estimateGas.');
+      }
+      return estimateGasMethod.call(createdWalletClient, args) as Promise<bigint>;
+    },
+    sendTransaction: (tx) => sendTransactionMethod.call(createdWalletClient, tx) as Promise<unknown>,
+    signTypedData: (typedData) => {
+      if (typeof signTypedDataMethod === 'function') {
+        return signTypedDataMethod.call(createdWalletClient, typedData) as Promise<unknown>;
+      }
+      if (typeof accountSignTypedData !== 'function') {
+        throw new Error('Porto wallet client missing signTypedData.');
+      }
+      return accountSignTypedData.call(clientAccount, typedData) as Promise<unknown>;
+    },
+    signMessage: (args) => {
+      if (typeof signMessageMethod === 'function') {
+        return signMessageMethod.call(createdWalletClient, args) as Promise<unknown>;
+      }
+      if (typeof accountSignMessage !== 'function') {
+        throw new Error('Porto wallet client missing signMessage.');
+      }
+      return accountSignMessage.call(clientAccount, args) as Promise<unknown>;
+    },
   };
   portoLog.log('[PORTO_RPC] Relay URLs:', relayCandidates);
 
@@ -911,8 +946,14 @@ export async function restoreSession(options: RestoreSessionOptions = {}): Promi
   const revisionAtStart = portoSessionRevision;
   const requireSigner = options?.requireSigner !== false;
   try {
-    if (hasCurrentPortoSessionMetadata() && (!requireSigner || hasCurrentPortoSessionSigner())) {
-      return currentSession!.address;
+    if (hasCurrentPortoSessionMetadata()) {
+      if (!requireSigner) return currentSession!.address;
+      if (hasCurrentPortoSessionSigner()) {
+        if (!viemWalletClient) {
+          _initViemClient();
+        }
+        if (viemWalletClient) return currentSession!.address;
+      }
     }
 
     let record: PortoSessionRecord | null = null;
