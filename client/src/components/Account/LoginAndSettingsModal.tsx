@@ -136,8 +136,6 @@ const AccountUserPage = React.lazy(
   () => import("components/UserPage/UserPage")
 ) as React.LazyExoticComponent<React.ComponentType<AccountUserPageProps>>;
 
-type LoginAndSettingsRecord = Record<string, any>;
-
 interface LoginAndSettingsModalProps extends Partial<Omit<WagmiInjectedProps, 'network'>> {
   provider: string;
   network: WagmiInjectedProps['network'] | null;
@@ -459,8 +457,9 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       !Array.isArray(nextState)
     ) {
       const keys = Object.keys(nextState);
-      const currentState = this.state as unknown as Record<string, unknown>;
-      const changed = keys.some((key: any) => currentState[key] !== nextState[key]);
+      const changed = keys.some((key) => (
+        this.state[key as keyof LoginAndSettingsModalState] !== nextState[key]
+      ));
       if (!changed) {
         if (typeof cb === 'function') cb();
         return;
