@@ -46,7 +46,6 @@ import {
   peekCacheSync,
   readCache,
   subscribeCacheUpdates,
-  writeCache,
 } from '../../utilities/cache/cacheScripts.js';
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 import { buildResponseGatePolicy } from '../../utilities/crypto/litGatePolicy.js';
@@ -208,7 +207,6 @@ import {
 } from './surveyResultsAnalysisArtifactReadController';
 import {
   runSurveyResultsAnalysisArtifactWriteController,
-  type SurveyResultsAnalysisArtifactWritePort,
 } from './surveyResultsAnalysisArtifactWriteController';
 import {
   buildSurveyResultsAnalysisGeneratedArtifactCompletionPlan,
@@ -226,7 +224,6 @@ import {
 } from './surveyResultsFilterBookmarkWriteController';
 import {
   runSurveyResultsSurveyQuestionBookmarkWriteController,
-  type SurveyResultsBookmarksCacheWritePort,
 } from './surveyResultsSurveyQuestionBookmarkWriteController';
 import {
   runSurveyResultsManualRefreshDispatchController,
@@ -264,6 +261,9 @@ import {
   type SurveyResultsScopedQuestionNetworkData,
   type SurveyResultsScopedQuestionNetworkMemo,
 } from './surveyResultsQuestionNetworkReadController';
+import {
+  surveyResultsCachePort,
+} from '../../domains/surveys/surveyResultsCachePort';
 import { getPolisDemoQuestionPool } from './surveyPolisDemoQuestionPool.js';
 import {
   runSurveyResultsBrowserDownload,
@@ -321,7 +321,6 @@ const LOCAL_STORAGE_POLL_MIN_MS = 2000;
 const LOCAL_STORAGE_POLL_MID_MS = 4000;
 const LOCAL_STORAGE_POLL_MAX_MS = 12000;
 const LOCAL_STORAGE_FORCE_RESCAN_EVERY = 6;
-type SurveyResultsWriteCache = (namespace: string, slug: string, value: unknown) => Promise<unknown>;
 type SurveyResultsRecord = Record<string, unknown>;
 type SurveyResultsQuestionReadScopeContext = ReturnType<typeof resolveSurveyResultsQuestionReadScope>;
 type SurveyResultsSessionContext = ReturnType<typeof resolveSurveyResultsSessionContext>;
@@ -2891,7 +2890,9 @@ const readPlan = buildSurveyResultsAnalysisArtifactCacheReadRequestPlan({
   inputSignature,
   slug: getSessionResultsAnalysisCacheSlug(),
 });
-const readAnalysisCache = peekCacheSync as SurveyResultsAnalysisArtifactCacheReadPort;
+const readAnalysisCache: SurveyResultsAnalysisArtifactCacheReadPort = (namespace, cacheSlug, options) => (
+  surveyResultsCachePort.peekCacheSync(namespace, cacheSlug, options)
+);
 const readResult = runSurveyResultsAnalysisArtifactReadController({
   ports: {
     readAnalysisArtifactCache: readAnalysisCache,
@@ -2914,7 +2915,7 @@ const writeReadinessPlan = buildSurveyResultsAnalysisArtifactWriteReadinessPlan(
   slug,
 });
 if (!writeReadinessPlan.shouldReadCache) return;
-const current = toSurveyResultsRecord(await readCache('analysisCache', slug));
+const current = toSurveyResultsRecord(await surveyResultsCachePort.readCache('analysisCache', slug));
 const writePlan = buildSurveyResultsAnalysisArtifactWritePlan({
   artifact,
   cacheKey,
@@ -2926,7 +2927,9 @@ if (!writePlan.shouldWrite || !writePlan.payload) return;
 const writeResult = await runSurveyResultsAnalysisArtifactWriteController({
   plan: writePlan,
   ports: {
-    writeAnalysisArtifact: writeCache as unknown as SurveyResultsAnalysisArtifactWritePort,
+    writeAnalysisArtifact: (namespace, cacheSlug, payload) => (
+      surveyResultsCachePort.writeCache(namespace, cacheSlug, payload)
+    ),
   },
 });
 if (!writeResult.ok && writeResult.error) throw writeResult.error;
@@ -3617,7 +3620,7 @@ const bookmarksReadRequest = buildSurveyResultsBookmarksCacheReadRequest({ slug 
 let bookmarksCache: unknown = {};
 
 try {
-  bookmarksCache = peekCacheSync(
+  bookmarksCache = surveyResultsCachePort.peekCacheSync(
     bookmarksReadRequest.namespace,
     bookmarksReadRequest.slug,
     bookmarksReadRequest.options
@@ -3639,7 +3642,9 @@ if (!writePlan.shouldWrite || !writePlan.payload || !writePlan.statePatch) retur
 void runSurveyResultsSurveyQuestionBookmarkWriteController({
   plan: writePlan,
   ports: {
-    writeBookmarksCache: writeCache as unknown as SurveyResultsBookmarksCacheWritePort,
+    writeBookmarksCache: (namespace, cacheSlug, payload) => (
+      surveyResultsCachePort.writeCache(namespace, cacheSlug, payload)
+    ),
   },
 }).then((writeResult) => {
   if (!writeResult.ok && writeResult.error) {
@@ -3655,7 +3660,7 @@ const bookmarksReadRequest = buildSurveyResultsBookmarksCacheReadRequest({ slug 
 let bookmarksCache: unknown = {};
 
 try {
-  bookmarksCache = peekCacheSync(
+  bookmarksCache = surveyResultsCachePort.peekCacheSync(
     bookmarksReadRequest.namespace,
     bookmarksReadRequest.slug,
     bookmarksReadRequest.options
@@ -3677,7 +3682,9 @@ if (!writePlan.shouldWrite || !writePlan.payload || !writePlan.statePatch) retur
 void runSurveyResultsSurveyQuestionBookmarkWriteController({
   plan: writePlan,
   ports: {
-    writeBookmarksCache: writeCache as unknown as SurveyResultsBookmarksCacheWritePort,
+    writeBookmarksCache: (namespace, cacheSlug, payload) => (
+      surveyResultsCachePort.writeCache(namespace, cacheSlug, payload)
+    ),
   },
 }).then((writeResult) => {
   if (!writeResult.ok && writeResult.error) {
@@ -4448,9 +4455,9 @@ const mountedWritePlan = buildSurveyResultsFilterBookmarkWritePlan({
 if (!mountedWritePlan.shouldReadCache) return;
 const slug = getEffectiveSlug();
 
-let filtersCache: unknown = peekCacheSync('filters', slug, { clone: false });
+let filtersCache: unknown = surveyResultsCachePort.peekCacheSync('filters', slug, { clone: false });
 if (!filtersCache || typeof filtersCache !== 'object') {
-  filtersCache = (await readCache('filters', slug)) || {};
+  filtersCache = (await surveyResultsCachePort.readCache('filters', slug)) || {};
 } else {
   filtersCache = { ...(filtersCache as SurveyResultsFiltersCache) };
 }
@@ -4483,7 +4490,9 @@ if (!writePlan.shouldWrite || !writePlan.payload) return;
 const writeResult = await runSurveyResultsFilterBookmarkWriteController({
   plan: writePlan,
   ports: {
-    writeFilterBookmark: writeCache as SurveyResultsWriteCache,
+    writeFilterBookmark: (namespace, cacheSlug, payload) => (
+      surveyResultsCachePort.writeCache(namespace, cacheSlug, payload)
+    ),
   },
 });
 if (!writeResult.ok) {
