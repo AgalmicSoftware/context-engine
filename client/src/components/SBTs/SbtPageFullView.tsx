@@ -415,7 +415,7 @@ export const renderSbtPageFullView = ({
       </button>
       {passwordAlertState.showDetectedPasswordAlert && (
         <Alert color="info" className={styles.passwordAlert} fade={false}>
-          Password detected – click "start claim" to mint
+          Password detected – click &quot;start claim&quot; to mint
         </Alert>
       )}
       {sbtInfo ? (
