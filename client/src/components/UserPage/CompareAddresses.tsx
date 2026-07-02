@@ -1627,7 +1627,7 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
                 </div>
                 {comment && (
                   <div className={styles.drillParticipantComment} title={commentFull}>
-                    "{comment}"
+                    &quot;{comment}&quot;
                   </div>
                 )}
               </div>
