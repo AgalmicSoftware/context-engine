@@ -76,7 +76,7 @@ export const buildSbtListPassiveLatestLookupPlan = ({
     const snapshot = getSessionProgressSnapshot(slug);
     if (!snapshot) return;
     if (Number(snapshot.liveLatestBlock || 0) > 0) return;
-    if (!!realtimeCoverage[slug]) return;
+    if (realtimeCoverage[slug]) return;
 
     loadingTargets[slug] = Math.max(
       0,

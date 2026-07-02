@@ -13,7 +13,7 @@ import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
 import {
   getDemoSessionConfigBySlug,
   getSessionConfigBySlug as getStrictSessionConfigBySlug,
-} from '../../utilities/web3/contractScripts.js';
+} from '../../domains/sessions/sessionConfig.js';
 
 type SessionScopeState = {
   filterMode: 'all' | 'set';

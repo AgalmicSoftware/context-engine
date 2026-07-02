@@ -5,12 +5,6 @@
   "violations": [
     {
       "rule": "no-passthrough-facade",
-      "source": "client/src/utilities/contracts/contractPageRuntime.ts",
-      "import": "<passthrough-facade>",
-      "resolved": "client/src/utilities/contracts/contractPageRuntime.ts"
-    },
-    {
-      "rule": "no-passthrough-facade",
       "source": "client/src/utilities/sbt/sbtPageRuntime.ts",
       "import": "<passthrough-facade>",
       "resolved": "client/src/utilities/sbt/sbtPageRuntime.ts"
@@ -20,12 +14,6 @@
       "source": "client/src/utilities/sponsor/sponsorPageRuntime.ts",
       "import": "<passthrough-facade>",
       "resolved": "client/src/utilities/sponsor/sponsorPageRuntime.ts"
-    },
-    {
-      "rule": "no-passthrough-facade",
-      "source": "client/src/utilities/tags/tagPageRuntime.ts",
-      "import": "<passthrough-facade>",
-      "resolved": "client/src/utilities/tags/tagPageRuntime.ts"
     },
     {
       "rule": "no-passthrough-facade",

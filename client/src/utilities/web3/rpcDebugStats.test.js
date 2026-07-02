@@ -1,4 +1,11 @@
-import { rpcDebugRecord, rpcDebugReset, rpcDebugScanSummary } from './rpcDebugStats.js';
+import {
+  rpcDebugPopProviderContext,
+  rpcDebugPushProviderContextWithToken,
+  rpcDebugReadProviderContext,
+  rpcDebugRecord,
+  rpcDebugReset,
+  rpcDebugScanSummary,
+} from './rpcDebugStats.js';
 
 describe('rpcDebugStats filtering', () => {
   beforeEach(() => {
@@ -105,5 +112,68 @@ describe('rpcDebugStats filtering', () => {
       methods: ['eth_getlogs'],
       chainIds: ['84532'],
     });
+  });
+
+  it('retains recent rows while ignoring unknown outcome counters', () => {
+    rpcDebugRecord({
+      chainId: 84532,
+      method: 'eth_getLogs',
+      params: [{ fromBlock: '0x1', toBlock: '0x1', topics: [] }],
+      outcome: 'custom-outcome',
+      fnTag: 'debug-flow',
+      scopeTag: 'question-discovery',
+    });
+
+    const summary = rpcDebugScanSummary({
+      filter: { method: 'eth_getLogs', outcome: 'custom-outcome' },
+    });
+
+    expect(summary.retainedRecentCalls).toBe(1);
+    expect(summary.totals).toEqual({
+      total: 0,
+      network: 0,
+      cache_hit: 0,
+      inflight_hit: 0,
+      error: 0,
+    });
+    expect(summary.methods.eth_getLogs.total).toBe(0);
+  });
+
+  it('pushes and pops provider contexts by token', () => {
+    const provider = {};
+
+    expect(rpcDebugPushProviderContextWithToken(null, { fnTag: 'ignored' })).toBeNull();
+    expect(rpcDebugPushProviderContextWithToken(provider, {})).toBeNull();
+
+    const firstToken = rpcDebugPushProviderContextWithToken(provider, {
+      fnTag: 'first-flow',
+      scopeTag: 'first-scope',
+    });
+    const secondToken = rpcDebugPushProviderContextWithToken(provider, {
+      fnTag: 'second-flow',
+      scopeTag: 'second-scope',
+      fromBlock: '0x10',
+      toBlock: '0x20',
+    });
+
+    expect(typeof firstToken).toBe('number');
+    expect(typeof secondToken).toBe('number');
+    expect(rpcDebugReadProviderContext(provider)).toEqual({
+      fnTag: 'second-flow',
+      scopeTag: 'second-scope',
+      fromBlock: 16,
+      toBlock: 32,
+    });
+
+    rpcDebugPopProviderContext(provider, firstToken);
+    expect(rpcDebugReadProviderContext(provider)).toEqual({
+      fnTag: 'second-flow',
+      scopeTag: 'second-scope',
+      fromBlock: 16,
+      toBlock: 32,
+    });
+
+    rpcDebugPopProviderContext(provider, secondToken);
+    expect(rpcDebugReadProviderContext(provider)).toBeNull();
   });
 });

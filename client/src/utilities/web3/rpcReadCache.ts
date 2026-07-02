@@ -23,11 +23,11 @@ import { createLogger } from '../logging.js';
 type LooseObject = { [key: string]: unknown };
 type RpcParams = unknown[];
 type RpcCacheMethod = 'eth_call' | 'eth_getLogs' | 'eth_blockNumber' | 'eth_chainId';
-type ProviderSend = (methodIn: string, paramsIn: unknown[]) => Promise<any>;
+type ProviderSend = (methodIn: string, paramsIn: unknown[]) => Promise<unknown>;
 
 interface RpcCacheEntry {
   expiresAt: number;
-  value: any;
+  value: unknown;
 }
 
 interface RpcCacheByMethod {
@@ -47,7 +47,7 @@ interface RpcRateLimitState {
 
 interface RpcReadCacheState {
   v: number;
-  inflight: Map<string, Promise<any>>;
+  inflight: Map<string, Promise<unknown>>;
   cacheByMethod: RpcCacheByMethod;
   rateLimits: Map<string, RpcRateLimitState>;
 }
@@ -96,7 +96,7 @@ type RpcCacheGlobals = typeof globalThis & {
   ENABLE_RPC_DEBUG_TRACE?: boolean;
 };
 
-const log: any = createLogger('rpcReadCache');
+const log = createLogger('rpcReadCache');
 let evictionIntervalStarted: boolean = false;
 let evictionIntervalId: ReturnType<typeof setInterval> | null = null;
 
@@ -109,7 +109,7 @@ const createCacheByMethod = (): RpcCacheByMethod => ({
 
 const createGlobalCacheState = (): RpcReadCacheState => ({
   v: 1,
-  inflight: new Map<string, Promise<any>>(),
+  inflight: new Map<string, Promise<unknown>>(),
   cacheByMethod: createCacheByMethod(),
   rateLimits: new Map<string, RpcRateLimitState>(),
 });
@@ -475,7 +475,7 @@ const readHeaderValue = (headers: unknown, name: string): string => {
   if (!headers) return '';
   const lowerName = name.toLowerCase();
   try {
-    const getter = (headers as any)?.get;
+    const getter = isObj(headers) ? headers.get : null;
     if (typeof getter === 'function') {
       return toStr(getter.call(headers, name) || getter.call(headers, lowerName)).trim();
     }
@@ -665,11 +665,12 @@ export const wrapEthersJsonRpcSend = <T extends WrappedProvider | null | undefin
 
   const readProviderRpcDebugContext = (method: string, params: RpcParams): RpcDebugTags => {
     try {
-      const mapped: any = rpcDebugReadProviderContext(provider);
+      const mapped = rpcDebugReadProviderContext(provider);
       if (mapped && typeof mapped === 'object' && matchesProviderDebugContext(mapped, method, params)) {
+        const mappedRecord = mapped as ProviderDebugContext;
         return {
-          fnTag: normalizeDebugTag(mapped.fnTag || mapped.fn || ''),
-          scopeTag: normalizeDebugTag(mapped.scopeTag || mapped.scope || ''),
+          fnTag: normalizeDebugTag(mappedRecord.fnTag || mappedRecord.fn || ''),
+          scopeTag: normalizeDebugTag(mappedRecord.scopeTag || mappedRecord.scope || ''),
         };
       }
       const raw = provider && typeof provider === 'object' ? provider.__CE_RPC_DEBUG_CONTEXT__ : null;
@@ -693,7 +694,7 @@ export const wrapEthersJsonRpcSend = <T extends WrappedProvider | null | undefin
     provider.__CE_RPC_SEND_WRAPPED__ = true;
   }
 
-  provider.send = async (methodIn: unknown, paramsIn: unknown): Promise<any> => {
+  provider.send = async (methodIn: unknown, paramsIn: unknown): Promise<unknown> => {
     const method = toStr(methodIn).trim() || 'unknown';
     const params: RpcParams = Array.isArray(paramsIn) ? paramsIn : [];
 
@@ -802,7 +803,7 @@ export const wrapEthersJsonRpcSend = <T extends WrappedProvider | null | undefin
       }
     }
 
-    const run: Promise<any> = (async (): Promise<any> => {
+    const run: Promise<unknown> = (async (): Promise<unknown> => {
       return await originalSend(method, params);
     })();
 
@@ -875,7 +876,7 @@ export const __test__resetRpcReadCache = (): void => {
   const g = getGlobalObject();
   if (g.__CE_RPC_READ_CACHE__ && typeof g.__CE_RPC_READ_CACHE__ === 'object') {
     try {
-      g.__CE_RPC_READ_CACHE__.inflight = new Map<string, Promise<any>>();
+      g.__CE_RPC_READ_CACHE__.inflight = new Map<string, Promise<unknown>>();
       g.__CE_RPC_READ_CACHE__.cacheByMethod = createCacheByMethod();
       g.__CE_RPC_READ_CACHE__.rateLimits = new Map<string, RpcRateLimitState>();
     } catch (e) { log.warn('rpcReadCache: fallback', e); }

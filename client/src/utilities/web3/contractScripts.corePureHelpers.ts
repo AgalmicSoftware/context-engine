@@ -25,7 +25,7 @@ export const runWithSoftTimeout = <T>(
   }
   return new Promise((resolve, reject) => {
     let settled = false;
-    const finish = (handler: (value: any) => void, value: any): void => {
+    const finish = <Value>(handler: (value: Value) => void, value: Value): void => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);

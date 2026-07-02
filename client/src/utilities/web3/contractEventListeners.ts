@@ -9,45 +9,102 @@
 import { ethers } from 'ethers';
 import { extractChainId } from './chainIdResolution.js';
 
-type ContractEventListenerDeps = {
-  resolveSession: (groupKeyOrCfg: unknown) => any;
-  getSessionAddresses: (cfg: any) => any;
-  contractsLog: {
-    log: (...args: unknown[]) => void;
-    warn: (...args: unknown[]) => void;
-    error: (...args: unknown[]) => void;
+type LogFn = (message?: unknown, detail?: unknown, extra?: unknown) => void;
+type AddressMapEntry = { address?: string | null; chainId?: string | number | null };
+type SessionContractMap = {
+  sbtFactory?: AddressMapEntry;
+  surveys?: AddressMapEntry;
+};
+type SessionConfigLike = {
+  slug?: string | null;
+  networkChainId?: string | number | null;
+  contracts?: SessionContractMap;
+};
+type SessionAddresses = SessionContractMap;
+type ProviderRpcMeta = {
+  providerMode?: string | null;
+  providerLabel?: string | null;
+  preferredUrls?: unknown[];
+  skipGlobalPreferred?: boolean;
+};
+type EventReadProvider = ethers.providers.Provider & {
+  __CE_RPC_META?: ProviderRpcMeta | null;
+};
+type EventMetadata = {
+  transactionHash?: string;
+  blockNumber?: number;
+  transactionIndex?: number | string;
+  logIndex?: number | string;
+};
+type EventIdValue = { toString: () => string };
+type ContractEventPayload = {
+  type: string;
+  address?: string;
+  sbtAddress?: unknown;
+  creator?: unknown;
+  responder?: unknown;
+  surveyId?: string;
+  questionIds?: string[];
+  surveyIds?: string[];
+  args?: {
+    account?: string;
+    tokenId?: string;
+    burned?: boolean;
   };
-  sbtListenerMap: Map<string, any>;
-  surveyListenerMap: Map<string, any>;
-  getReadProviderForChain: ((chainId: number | string | undefined) => any) | null | undefined;
-  getReadProviderForGroup: ((groupKeyOrCfg: unknown, opts?: { contractKey?: string }) => any) | null | undefined;
-  SBT_FACTORY_ABI: any;
-  CUSTOM_SBT_ABI: any;
-  SURVEYS: any;
+  transactionHash?: string;
+  blockNumber?: number;
+  transactionIndex: number;
+  logIndex: number;
+  eventSignature?: string;
+};
+type ContractEventHandler = (event: ContractEventPayload) => void;
+type SbtActivityListener = (
+  account: unknown,
+  tokenId: unknown,
+  burned: unknown,
+  event: EventMetadata
+) => void;
+type AbiLike = ethers.ContractInterface;
+
+type ContractEventListenerDeps = {
+  resolveSession: (groupKeyOrCfg: unknown) => SessionConfigLike;
+  getSessionAddresses: (cfg: SessionConfigLike) => SessionAddresses;
+  contractsLog: {
+    log: LogFn;
+    warn: LogFn;
+    error: LogFn;
+  };
+  sbtListenerMap: Map<string, ethers.Contract>;
+  surveyListenerMap: Map<string, ethers.Contract>;
+  getReadProviderForChain: ((chainId: number | string | undefined) => EventReadProvider | null | undefined) | null | undefined;
+  getReadProviderForGroup: ((groupKeyOrCfg: unknown, opts?: { contractKey?: string }) => EventReadProvider | null | undefined) | null | undefined;
+  SBT_FACTORY_ABI: AbiLike;
+  CUSTOM_SBT_ABI: AbiLike;
+  SURVEYS: AbiLike;
   shouldLog: (category: string, level?: string) => boolean;
 };
 
 type SBTInstanceRegistryEntry = {
-  contract?: any;
-  onActivity?: any;
+  contract?: ethers.Contract;
+  onActivity?: SbtActivityListener;
 };
 
 type ListenForSBTInstanceEventsMethod = ((
-  providerName: any,
-  sbtAddresses?: any,
-  handler?: any,
-  groupKeyOrCfg?: any
+  providerName: unknown,
+  sbtAddresses?: unknown,
+  handler?: ContractEventHandler | null,
+  groupKeyOrCfg?: unknown
 ) => Promise<void>) & {
   _registry?: Map<string, SBTInstanceRegistryEntry>;
 };
 
 type ContractEventListenerMethods = {
-  listenForSBTEvents: (providerName: any, handleNewEvent: any, groupKeyOrCfg?: any) => Promise<void>;
-  removeSBTEventListener: (providerName: any, groupKeyOrCfg?: any) => void;
+  listenForSBTEvents: (providerName: unknown, handleNewEvent: ContractEventHandler, groupKeyOrCfg?: unknown) => Promise<void>;
+  removeSBTEventListener: (providerName: unknown, groupKeyOrCfg?: unknown) => void;
   listenForSBTInstanceEvents: ListenForSBTInstanceEventsMethod;
-  removeSBTInstanceEventsListener: (providerName: any, sbtAddresses?: any, groupKeyOrCfg?: any) => Promise<void>;
-  listenForSurveyEvents: (providerName: any, handleNewEvent: any, groupKeyOrCfg?: any) => Promise<void>;
-  removeSurveyEventsListener: (providerName: any, groupKeyOrCfg?: any) => void;
+  removeSBTInstanceEventsListener: (providerName: unknown, sbtAddresses?: unknown, groupKeyOrCfg?: unknown) => Promise<void>;
+  listenForSurveyEvents: (providerName: unknown, handleNewEvent: ContractEventHandler, groupKeyOrCfg?: unknown) => Promise<void>;
+  removeSurveyEventsListener: (providerName: unknown, groupKeyOrCfg?: unknown) => void;
 };
 
 export function createContractEventListenerMethods(deps: ContractEventListenerDeps): ContractEventListenerMethods {
@@ -65,14 +122,20 @@ export function createContractEventListenerMethods(deps: ContractEventListenerDe
     shouldLog,
   } = deps;
 
-  const resolveChainIdForContract = (cfg: any, contractKey: string = ''): number | null | undefined => (
-    extractChainId(cfg, { contractKey, strict: true } as any) as number | null | undefined
+  const resolveChainIdForContract = (
+    cfg: SessionConfigLike,
+    contractKey: string = ''
+  ): number | null | undefined => (
+    extractChainId(cfg, { contractKey, strict: true }) as number | null | undefined
   );
 
-  const buildProviderScopeKey = (provider: any, fallbackScope: string = 'default'): string => {
+  const buildProviderScopeKey = (
+    provider: EventReadProvider | null | undefined,
+    fallbackScope: string = 'default'
+  ): string => {
     const providerMeta = provider && typeof provider === 'object' ? provider.__CE_RPC_META : null;
     const preferredUrls = Array.isArray(providerMeta?.preferredUrls)
-      ? providerMeta.preferredUrls.map((url: any) => String(url || '').trim()).filter(Boolean).join(',')
+      ? providerMeta.preferredUrls.map((url) => String(url || '').trim()).filter(Boolean).join(',')
       : '';
     return [
       String(providerMeta?.providerMode || 'mode-default').trim() || 'mode-default',
@@ -90,7 +153,7 @@ export function createContractEventListenerMethods(deps: ContractEventListenerDe
   }: {
     address?: string | null;
     chainId?: string | number | null;
-    provider?: any;
+    provider?: EventReadProvider | null;
     fallbackScope?: string;
   }): string => (
     [
@@ -108,13 +171,19 @@ export function createContractEventListenerMethods(deps: ContractEventListenerDe
     };
   };
 
+  const toEventId = (value: EventIdValue): string => value.toString();
+  const toEventIds = (values: EventIdValue[]): string[] => (
+    values.map((id) => toEventId(id))
+  );
+
   const listenForSBTInstanceEvents: ListenForSBTInstanceEventsMethod = async function (
     this: ContractEventListenerMethods,
-    providerName: any,
-    sbtAddresses: any = [],
-    handler: any,
-    groupKeyOrCfg: any = null
+    providerName: unknown,
+    sbtAddresses: unknown = [],
+    handler: ContractEventHandler | null = null,
+    groupKeyOrCfg: unknown = null
   ): Promise<void> {
+    void providerName;
     const provider =
       (typeof getReadProviderForGroup === 'function' && getReadProviderForGroup(groupKeyOrCfg, { contractKey: 'sbtFactory' }));
 
@@ -123,12 +192,12 @@ export function createContractEventListenerMethods(deps: ContractEventListenerDe
       return;
     }
 
-    const input: any[] = Array.isArray(sbtAddresses) ? sbtAddresses : [sbtAddresses];
+    const input: unknown[] = Array.isArray(sbtAddresses) ? sbtAddresses : [sbtAddresses];
     const uniqueAddresses: string[] = Array.from(
       new Set(
         input
           .filter(Boolean)
-          .map((address: any) => {
+          .map((address) => {
             try {
               return ethers.utils.getAddress(String(address));
             } catch {
@@ -169,7 +238,7 @@ export function createContractEventListenerMethods(deps: ContractEventListenerDe
       try {
         const contract = new ethers.Contract(addr, CUSTOM_SBT_ABI, provider);
 
-        const onActivity = (account: any, tokenId: any, burned: any, event: any): void => {
+        const onActivity: SbtActivityListener = (account, tokenId, burned, event): void => {
           try {
             handler && handler({
               type: 'SBTActivity',
@@ -207,7 +276,12 @@ export function createContractEventListenerMethods(deps: ContractEventListenerDe
   };
 
   const methods: ContractEventListenerMethods = {
-    async listenForSBTEvents(providerName: any, handleNewEvent: any, groupKeyOrCfg: any = null): Promise<void> {
+    async listenForSBTEvents(
+      providerName: unknown,
+      handleNewEvent: ContractEventHandler,
+      groupKeyOrCfg: unknown = null
+    ): Promise<void> {
+      void providerName;
       const cfg = resolveSession(groupKeyOrCfg || '');
       const gAddrs = getSessionAddresses(cfg);
       const addr = gAddrs.sbtFactory?.address;
@@ -216,9 +290,13 @@ export function createContractEventListenerMethods(deps: ContractEventListenerDe
         contractsLog.log('listenForSBTEvents: missing address/chain; skipping listener setup.');
         return;
       }
-      const provider =
-        (typeof getReadProviderForGroup === 'function' && getReadProviderForGroup(groupKeyOrCfg, { contractKey: 'sbtFactory' })) ||
-        (typeof getReadProviderForChain === 'function' && getReadProviderForChain(chId));
+      const provider = (
+        (typeof getReadProviderForGroup === 'function'
+          ? getReadProviderForGroup(groupKeyOrCfg, { contractKey: 'sbtFactory' })
+          : null) ||
+        (typeof getReadProviderForChain === 'function' ? getReadProviderForChain(chId) : null) ||
+        undefined
+      );
       const listenerKey = buildListenerKey({
         address: addr,
         chainId: chId,
@@ -232,7 +310,7 @@ export function createContractEventListenerMethods(deps: ContractEventListenerDe
       }
       const contract = new ethers.Contract(addr, SBT_FACTORY_ABI, provider);
 
-      contract.on('SBTCreated', (sbtAddress, event) => {
+      contract.on('SBTCreated', (sbtAddress: unknown, event: EventMetadata) => {
         contractsLog.log('New SBT created:', sbtAddress);
         handleNewEvent({
           type: 'SBTCreated',
@@ -248,7 +326,8 @@ export function createContractEventListenerMethods(deps: ContractEventListenerDe
       contractsLog.log(`Listening for SBT Factory events on ${addr} (chain ${chId})...`);
     },
 
-    removeSBTEventListener(providerName: any, groupKeyOrCfg: any = null): void {
+    removeSBTEventListener(providerName: unknown, groupKeyOrCfg: unknown = null): void {
+      void providerName;
       const cfg = resolveSession(groupKeyOrCfg || '');
       const gAddrs = getSessionAddresses(cfg);
       const addr = gAddrs.sbtFactory?.address;
@@ -277,10 +356,11 @@ export function createContractEventListenerMethods(deps: ContractEventListenerDe
 
     async removeSBTInstanceEventsListener(
       this: ContractEventListenerMethods,
-      providerName: any,
-      sbtAddresses: any = [],
-      groupKeyOrCfg: any = null
+      providerName: unknown,
+      sbtAddresses: unknown = [],
+      groupKeyOrCfg: unknown = null
     ): Promise<void> {
+      void providerName;
       const registry = (this.listenForSBTInstanceEvents && this.listenForSBTInstanceEvents._registry) || null;
       if (!registry || registry.size === 0) {
         if (shouldLog('rpc', 'log')) {
@@ -289,12 +369,12 @@ export function createContractEventListenerMethods(deps: ContractEventListenerDe
         return;
       }
 
-      const list: any[] = Array.isArray(sbtAddresses) ? sbtAddresses : [sbtAddresses];
+      const list: unknown[] = Array.isArray(sbtAddresses) ? sbtAddresses : [sbtAddresses];
       const targets: string[] = Array.from(
         new Set(
           list
             .filter((value) => value && value !== '*')
-            .map((address: any) => {
+            .map((address) => {
               try {
                 return ethers.utils.getAddress(String(address));
               } catch {
@@ -302,7 +382,7 @@ export function createContractEventListenerMethods(deps: ContractEventListenerDe
               }
             })
             .filter(Boolean)
-            .map((address: any) => address.toLowerCase())
+            .map((address) => String(address).toLowerCase())
         )
       ) as string[];
 
@@ -344,7 +424,12 @@ export function createContractEventListenerMethods(deps: ContractEventListenerDe
       }
     },
 
-    async listenForSurveyEvents(providerName: any, handleNewEvent: any, groupKeyOrCfg: any = null): Promise<void> {
+    async listenForSurveyEvents(
+      providerName: unknown,
+      handleNewEvent: ContractEventHandler,
+      groupKeyOrCfg: unknown = null
+    ): Promise<void> {
+      void providerName;
       const cfg = resolveSession(groupKeyOrCfg || '');
       const gAddrs = getSessionAddresses(cfg);
       const addr = gAddrs.surveys?.address;
@@ -353,9 +438,13 @@ export function createContractEventListenerMethods(deps: ContractEventListenerDe
         contractsLog.log('listenForSurveyEvents: missing address/chain; skipping listener setup.');
         return;
       }
-      const provider =
-        (typeof getReadProviderForGroup === 'function' && getReadProviderForGroup(groupKeyOrCfg, { contractKey: 'surveys' })) ||
-        (typeof getReadProviderForChain === 'function' && getReadProviderForChain(chId));
+      const provider = (
+        (typeof getReadProviderForGroup === 'function'
+          ? getReadProviderForGroup(groupKeyOrCfg, { contractKey: 'surveys' })
+          : null) ||
+        (typeof getReadProviderForChain === 'function' ? getReadProviderForChain(chId) : null) ||
+        undefined
+      );
       const listenerKey = buildListenerKey({
         address: addr,
         chainId: chId,
@@ -369,12 +458,12 @@ export function createContractEventListenerMethods(deps: ContractEventListenerDe
       }
       const contract = new ethers.Contract(addr, SURVEYS, provider);
 
-      contract.on('SurveyAdded', (creator, surveyId, event) => {
-        contractsLog.log('New survey added:', { creator, surveyId: surveyId.toString() });
+      contract.on('SurveyAdded', (creator: unknown, surveyId: EventIdValue, event: EventMetadata) => {
+        contractsLog.log('New survey added:', { creator, surveyId: toEventId(surveyId) });
         handleNewEvent({
           type: 'SurveyAdded',
           creator,
-          surveyId: surveyId.toString(),
+          surveyId: toEventId(surveyId),
           transactionHash: event.transactionHash,
           blockNumber: event.blockNumber,
           transactionIndex: Number(event?.transactionIndex || 0),
@@ -382,17 +471,22 @@ export function createContractEventListenerMethods(deps: ContractEventListenerDe
         });
       });
 
-      contract.on('QuestionsAdded', (creator, questionIds, surveyIds, event) => {
+      contract.on('QuestionsAdded', (
+        creator: unknown,
+        questionIds: EventIdValue[],
+        surveyIds: EventIdValue[],
+        event: EventMetadata
+      ) => {
         contractsLog.log('New questions added:', {
           creator,
-          questionIds: questionIds.map((id: any) => id.toString()),
-          surveyIds: surveyIds.map((id: any) => id.toString()),
+          questionIds: toEventIds(questionIds),
+          surveyIds: toEventIds(surveyIds),
         });
         handleNewEvent({
           type: 'QuestionsAdded',
           creator,
-          questionIds: questionIds.map((id: any) => id.toString()),
-          surveyIds: surveyIds.map((id: any) => id.toString()),
+          questionIds: toEventIds(questionIds),
+          surveyIds: toEventIds(surveyIds),
           transactionHash: event.transactionHash,
           blockNumber: event.blockNumber,
           transactionIndex: Number(event?.transactionIndex || 0),
@@ -400,17 +494,22 @@ export function createContractEventListenerMethods(deps: ContractEventListenerDe
         });
       });
 
-      contract.on('ResponsesSubmitted', (responder, questionIds, surveyId, event) => {
+      contract.on('ResponsesSubmitted', (
+        responder: unknown,
+        questionIds: EventIdValue[],
+        surveyId: EventIdValue,
+        event: EventMetadata
+      ) => {
         contractsLog.log('New responses submitted:', {
           responder,
-          questionIds: questionIds.map((id: any) => id.toString()),
-          surveyId: surveyId.toString(),
+          questionIds: toEventIds(questionIds),
+          surveyId: toEventId(surveyId),
         });
         handleNewEvent({
           type: 'ResponsesSubmitted',
           responder,
-          questionIds: questionIds.map((id: any) => id.toString()),
-          surveyId: surveyId.toString(),
+          questionIds: toEventIds(questionIds),
+          surveyId: toEventId(surveyId),
           transactionHash: event.transactionHash,
           blockNumber: event.blockNumber,
           transactionIndex: Number(event?.transactionIndex || 0),
@@ -422,7 +521,8 @@ export function createContractEventListenerMethods(deps: ContractEventListenerDe
       contractsLog.log(`Listening for Survey events on ${addr} (chain ${chId})...`);
     },
 
-    removeSurveyEventsListener(providerName: any, groupKeyOrCfg: any = null): void {
+    removeSurveyEventsListener(providerName: unknown, groupKeyOrCfg: unknown = null): void {
+      void providerName;
       const cfg = resolveSession(groupKeyOrCfg || '');
       const gAddrs = getSessionAddresses(cfg);
       const addr = gAddrs.surveys?.address;
