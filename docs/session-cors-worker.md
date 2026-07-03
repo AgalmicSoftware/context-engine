@@ -637,6 +637,7 @@ modules under `workers/sessionCorsWorker/`. Key boundary files:
   wiring into the extracted authenticated dispatcher.
 - `nonce:{slug}:{address}` → nonce string (TTL 5m)
 - `usedNonce:{slug}:{nonce}` → "1" (TTL 10m)
+- `authToken:{slug}:{sub}:{jti}` → "1" for minted login tokens (TTL 4h)
 - `rate:{slug}:{address}` → JSON counter (stubbed)
 
 ## Registry fields (on-chain)
@@ -732,22 +733,31 @@ modules under `workers/sessionCorsWorker/`. Key boundary files:
    - Signed login request dispatch remains the thinner shared helper shell:
      it preserves login JSON parse failures, token signing, and the final
      `{ token, exp }` response contract after the extracted authority helper
-     resolves the signed request.
+     resolves the signed request. New tokens include a crypto-random `jti`
+     and are returned only after the matching KV token marker is persisted.
    - Token signing / verification now also route through a shared helper:
      it preserves `JSON.stringify(payload)` signing, `base64url(payloadJson) + "." + base64url(hmac(payloadJson))`,
-     cached HMAC key reuse, the exact token verification error strings, and `exp` comparison in epoch seconds.
+     cached HMAC key reuse, the exact token verification error strings, `jti`
+     type validation, and `exp` comparison in epoch seconds.
    - SIWE message parsing/validation now also routes through a shared helper:
      it preserves trimmed `URI` / `Chain ID` / `Nonce` / `Issued At` / `Expiration Time` extraction,
      required field checks, URI host vs domain matching, and invalid/expired expiration rejection
      across login, signed admin requests, and bootstrap admin verification.
 
-On success, the worker returns `{ token, exp }` where `exp` is now + 24h.
+On success, the worker returns `{ token, exp }` where `exp` is now + 4h.
 
 Token format:
 ```
 base64url(payloadJson) + "." + base64url(hmac(payloadJson))
 ```
-Payload: `{ sub, slug, scopes, exp }`.
+New payloads: `{ sub, slug, scopes, exp, jti }`.
+
+The worker stores `authToken:{slug}:{sub}:{jti}` in `GROUP_KV` with a TTL aligned
+to the token lifetime. Authenticated routes reject `jti` tokens when that marker
+is missing or expired, using the existing `401 { error: "Invalid token." }`
+contract. Legacy signed tokens without `jti` continue to verify by signature,
+shape, slug binding, and `exp` only until their natural 24h expiration window
+has passed; the worker no longer mints no-`jti` tokens.
 
 ## Required headers
 
@@ -756,6 +766,8 @@ Authenticated requests must include:
 - `X-Session-Slug: <slug>` when `DEFAULT_SESSION_SLUG`/`DEFAULT_GROUP_SLUG` are empty and the token has no slug claim (`X-Group-Slug` remains accepted as a legacy alias).
 - Authenticated auth-header + token/request slug binding now routes through a shared helper:
   it preserves the existing `401 Missing Authorization header.`, `verifyToken(...)` error passthrough, `X-Session-Slug` before legacy `X-Group-Slug`, `400 Missing sessionSlug.`, and `403 Token does not match requested session slug.` behavior.
+  For new `jti` tokens, the same helper also requires the live
+  `authToken:{slug}:{sub}:{jti}` KV marker before route context resolution.
 - Authenticated post-auth route context now also routes through a shared helper:
   it preserves the existing `404 Session config not found.`, fail-closed authenticated CORS rejection, and common authenticated context derivation (`slug`, `headers`, token `scopes`, lowercased `sub` address, and `limits.perWalletPerDay`) before route-specific scope/rate-limit handling runs.
 - Authenticated route scope/rate-limit preflight now also routes through a shared helper:
