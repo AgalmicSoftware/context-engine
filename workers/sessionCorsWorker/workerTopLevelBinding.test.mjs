@@ -59,7 +59,7 @@ test('createWorkerTopLevelRuntimeWithWorkerDeps preserves worker globals and sta
               'function isPasswordValid(bytes32 hashedPassword) view returns (bool)',
               'function groupPasswordHash() view returns (bytes32)',
             ],
-            TOKEN_TTL_SECONDS: 86400,
+            TOKEN_TTL_SECONDS: 14400,
             NONCE_TTL_SECONDS: 300,
             NONCE_RATE_LIMIT_MAX: 5,
             NONCE_RATE_LIMIT_WINDOW_MS: 60000,

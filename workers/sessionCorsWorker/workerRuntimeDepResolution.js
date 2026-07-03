@@ -86,6 +86,11 @@ import {
   verifyToken as verifyTokenBoundary,
 } from './tokenSigning.js';
 import {
+  buildAuthTokenJti as buildAuthTokenJtiBoundary,
+  persistAuthTokenRecord as persistAuthTokenRecordBoundary,
+  validateAuthTokenRecord as validateAuthTokenRecordBoundary,
+} from './authTokenClaims.js';
+import {
   normalizeSignedWorkerRequest as normalizeSignedWorkerRequestBoundary,
   validateRecoveredAddressMatchesRequest as validateRecoveredAddressMatchesRequestBoundary,
   validateSiweAddressMatchesRequest as validateSiweAddressMatchesRequestBoundary,
@@ -138,6 +143,7 @@ export const resolveWorkerRuntimeDeps = ({
       json: resolveDep('json', jsonBoundary),
       getSessionConfig: resolveDep('getSessionConfig', getSessionConfigBoundary),
       verifyToken: resolveDep('verifyToken', verifyTokenBoundary),
+      validateAuthTokenRecord: resolveDep('validateAuthTokenRecord', validateAuthTokenRecordBoundary),
       resolveWorkerRequestSlugContext: resolveDep('resolveWorkerRequestSlugContext', resolveWorkerRequestSlugContextBoundary),
       readTranscribeRequestPayload: resolveDep('readTranscribeRequestPayload', readTranscribeRequestPayloadBoundary),
       normalizeFaucetRequest: resolveDep('normalizeFaucetRequest', normalizeFaucetRequestBoundary),
@@ -161,6 +167,8 @@ export const resolveWorkerRuntimeDeps = ({
       consumeNonce: resolveDep('consumeNonce', consumeNonceBoundary),
       base64UrlEncode: resolveDep('base64UrlEncode', base64UrlEncodeBoundary),
       signToken: resolveDep('signToken', signTokenBoundary),
+      buildAuthTokenJti: resolveDep('buildAuthTokenJti', buildAuthTokenJtiBoundary),
+      persistAuthTokenRecord: resolveDep('persistAuthTokenRecord', persistAuthTokenRecordBoundary),
       readArweaveBootstrapUploadPayload: resolveDep('readArweaveBootstrapUploadPayload', readArweaveBootstrapUploadPayloadBoundary),
       getSessionSecrets: resolveDep('getSessionSecrets', getSessionSecretsBoundary),
       mergeWorkerConfigRecords: resolveDep('mergeWorkerConfigRecords', mergeWorkerConfigRecordsBoundary),

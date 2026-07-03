@@ -20,7 +20,7 @@ const FAUCET_SBT_GATE_ABI = [
   'function groupPasswordHash() view returns (bytes32)',
 ];
 
-const TOKEN_TTL_SECONDS = 60 * 60 * 24;
+const TOKEN_TTL_SECONDS = 60 * 60 * 4;
 const NONCE_TTL_SECONDS = 60 * 5;
 const NONCE_RATE_LIMIT_MAX = 5;
 const NONCE_RATE_LIMIT_WINDOW_MS = 60 * 1000;

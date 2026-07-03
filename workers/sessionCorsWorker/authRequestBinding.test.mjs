@@ -116,6 +116,8 @@ test('dispatchAuthLoginRequestWithWorkerDeps preserves login-request wiring and 
         assert.equal(value.deps.computeScopesForLogin, 'computeScopesForLogin');
         assert.equal(value.deps.signToken, 'signToken');
         assert.equal(value.deps.getAddress, 'getAddress');
+        assert.equal(value.deps.buildAuthTokenJti, 'buildAuthTokenJti');
+        assert.equal(value.deps.persistAuthTokenRecord, 'persistAuthTokenRecord');
         assert.equal(value.deps.now(), 1234567890);
         assert.equal(value.deps.LOGIN_SIWE_MAX_AGE_MS, 300000);
         assert.equal(value.deps.LOGIN_SIWE_FUTURE_SKEW_MS, 60000);
@@ -152,6 +154,8 @@ test('dispatchAuthLoginRequestWithWorkerDeps preserves login-request wiring and 
       computeScopesForLogin: 'computeScopesForLogin',
       signToken: 'signToken',
       getAddress: 'getAddress',
+      buildAuthTokenJti: 'buildAuthTokenJti',
+      persistAuthTokenRecord: 'persistAuthTokenRecord',
       now: () => 1234567890,
     },
     constants: {

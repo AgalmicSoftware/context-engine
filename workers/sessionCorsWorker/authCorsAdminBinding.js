@@ -45,6 +45,7 @@ export const createAuthCorsAdminAdaptersWithWorkerDeps = ({
       ...value,
       deps: {
         verifyToken: deps?.verifyToken,
+        validateAuthTokenRecord: deps?.validateAuthTokenRecord,
         resolveWorkerRequestSlugContext: deps?.resolveWorkerRequestSlugContext,
         json: deps?.json,
         MISSING_SLUG_ERROR: constants?.missingSlugError,
