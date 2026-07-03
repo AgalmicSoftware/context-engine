@@ -57,6 +57,7 @@ type CreateSurveyValidationInput = {
 };
 type CreateSurveySubmitGatePlanQuestion = {
   lockGateIds?: unknown;
+  lockGateIdsTouched?: unknown;
   [key: string]: unknown;
 };
 type CreateSurveySubmitGatePlanArgs = {
@@ -115,6 +116,7 @@ type CreateSurveyQuestionPatchEntry = {
   currentTagInputValue?: string;
   isGeneratingTags?: boolean;
   lockGateIds?: string[] | null;
+  lockGateIdsTouched?: boolean;
   [key: string]: unknown;
 };
 type CreateSurveyUploadedQuestionPatchEntry = {
@@ -866,10 +868,10 @@ export const buildCreateSurveySubmitGatePlan = ({
     const normalized = normalizeKnownGateIds(value);
     return normalized.length ? normalized : defaultSubmitGateIds;
   };
-  const applyStandaloneQuestionGateIds = (value: unknown): string[] => {
+  const applyStandaloneQuestionGateIds = (value: unknown, touched: unknown): string[] => {
     const normalized = normalizeKnownGateIds(value);
     if (normalized.length) return normalized;
-    if (Array.isArray(value) && normalizeGateIds(value).length === 0) return [];
+    if (touched && Array.isArray(value) && normalizeGateIds(value).length === 0) return [];
     return defaultSubmitGateIds;
   };
 
@@ -881,7 +883,10 @@ export const buildCreateSurveySubmitGatePlan = ({
     question?: CreateSurveySubmitGatePlanQuestion | null
   ): string[] => {
     if (!question) return [];
-    if (isStandaloneQuestion) return applyStandaloneQuestionGateIds(question.lockGateIds);
+    if (isStandaloneQuestion) return applyStandaloneQuestionGateIds(
+      question.lockGateIds,
+      question.lockGateIdsTouched
+    );
     const hasOwnLock = Object.prototype.hasOwnProperty.call(question || {}, 'lockGateIds');
     if (!hasOwnLock || question.lockGateIds === null) return resolvedSurveyLockGateIds;
     return applyDefaultSubmitGateIds(question.lockGateIds);
