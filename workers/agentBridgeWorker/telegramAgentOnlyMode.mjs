@@ -3812,19 +3812,24 @@ export async function exportAgentOnlyData({
   view = 'answers',
   format = 'jsonl',
   now = null,
+  compact = false,
+  includeImageBase64 = false,
 } = {}) {
   const slug = sanitizeSessionSlug(sessionSlug);
   const selectedWindow = safeString(windowId);
   const rows = [];
   const snapshotCache = new Map();
+  const compactExport = compact === true;
   if (['answers', 'wide', 'calibration', 'gold'].includes(view)) {
-    await syncActiveSnapshotForExport({
-      env,
-      sessionSlug: slug,
-      windowId: selectedWindow,
-      now,
-      cache: snapshotCache,
-    });
+    if (view === 'calibration' || ((view === 'wide' || view === 'gold') && !compactExport)) {
+      await syncActiveSnapshotForExport({
+        env,
+        sessionSlug: slug,
+        windowId: selectedWindow,
+        now,
+        cache: snapshotCache,
+      });
+    }
     if (view === 'calibration') {
       const calibrationBuckets = new Map();
       const stateEntries = await listKvEntriesByPrefix(env, `${AGENT_ONLY_ANSWER_STATE_KV_PREFIX}${slug}:`);
@@ -3924,7 +3929,7 @@ export async function exportAgentOnlyData({
           model: safeString(record.agentMetadata?.model),
           scaffold_version: safeString(record.agentMetadata?.scaffoldVersion),
           instructions_version: safeString(record.instructionsVersion),
-          eval_type: await evalTypeForStatement({
+          eval_type: compactExport ? '' : await evalTypeForStatement({
             env,
             sessionSlug: slug,
             windowId: record.windowId,
@@ -3945,7 +3950,7 @@ export async function exportAgentOnlyData({
           ? state.byStatement
           : {};
         for (const [statementId, value] of Object.entries(byStatement)) {
-          const reviewStatus = await reviewStatusForCurrentAgentAnswer({
+          const reviewStatus = compactExport ? '' : await reviewStatusForCurrentAgentAnswer({
             entry: value,
             env,
             sessionSlug: slug,
@@ -3953,7 +3958,7 @@ export async function exportAgentOnlyData({
             questionId: statementId,
             cache: snapshotCache,
           });
-          const normal = await latestSubmittedAnswerFor({
+          const normal = compactExport ? null : await latestSubmittedAnswerFor({
             env,
             sessionSlug: slug,
             telegramUserId: state.telegramUserId,
@@ -3968,7 +3973,7 @@ export async function exportAgentOnlyData({
             agent_confidence: value?.agent?.confidence ?? null,
             human_current_answer: normal?.answer || null,
             review_status: reviewStatus ? `human_${reviewStatus}` : '',
-            eval_type: await evalTypeForStatement({
+            eval_type: compactExport ? '' : await evalTypeForStatement({
               env,
               sessionSlug: slug,
               windowId: state.windowId,
@@ -4172,9 +4177,9 @@ export async function exportAgentOnlyData({
         frame_keys: Array.isArray(record.frameKeys) ? record.frameKeys.join(',') : '',
         image_content_type: safeString(record.imageContentType),
         image_byte_length_approx: Number(record.imageByteLengthApprox || 0) || 0,
-        image_base64: safeString(record.imageBase64),
         prompt_hash: safeString(record.promptHash),
         created_at: safeString(record.createdAt),
+        ...(includeImageBase64 ? { image_base64: safeString(record.imageBase64) } : {}),
       });
     }
   } else {

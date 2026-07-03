@@ -2711,6 +2711,21 @@ test('wide and gold exports join normal submitted answers and snapshot eval type
   assert.deepEqual(wideRows[0].agent_prediction, { value: 'agree' });
   assert.deepEqual(wideRows[0].human_current_answer, { value: 'unsure' });
 
+  const compactWide = await exportAgentOnlyData({
+    env: testEnv,
+    sessionSlug: 'alpha',
+    view: 'wide',
+    format: 'jsonl',
+    compact: true,
+  });
+  assert.equal(compactWide.ok, true);
+  const compactWideRows = compactWide.body.split('\n').filter(Boolean).map((line) => JSON.parse(line));
+  assert.equal(compactWideRows.length, 1);
+  assert.deepEqual(compactWideRows[0].agent_prediction, { value: 'agree' });
+  assert.equal(compactWideRows[0].human_current_answer, null);
+  assert.equal(compactWideRows[0].review_status, '');
+  assert.equal(compactWideRows[0].eval_type, '');
+
   const gold = await exportAgentOnlyData({
     env: testEnv,
     sessionSlug: 'alpha',
@@ -2724,6 +2739,20 @@ test('wide and gold exports join normal submitted answers and snapshot eval type
   assert.deepEqual(goldRows[0].prior_human_answer, { value: 'disagree' });
   assert.deepEqual(goldRows[0].agent_prediction, { value: 'agree' });
   assert.equal(gold.body.includes('1001'), false);
+
+  const compactGold = await exportAgentOnlyData({
+    env: testEnv,
+    sessionSlug: 'alpha',
+    view: 'gold',
+    format: 'jsonl',
+    compact: true,
+  });
+  assert.equal(compactGold.ok, true);
+  const compactGoldRows = compactGold.body.split('\n').filter(Boolean).map((line) => JSON.parse(line));
+  assert.equal(compactGoldRows.length, 1);
+  assert.deepEqual(compactGoldRows[0].prior_human_answer, { value: 'disagree' });
+  assert.deepEqual(compactGoldRows[0].agent_prediction, { value: 'agree' });
+  assert.equal(compactGoldRows[0].eval_type, '');
 
   await saveAgentOnlyModeConfig({
     env: testEnv,

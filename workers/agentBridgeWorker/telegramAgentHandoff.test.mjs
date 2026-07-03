@@ -2174,10 +2174,21 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   assert.equal(wrappedImageRow.image_view_id, wrapped.image_view_id);
   assert.equal(wrappedImageRow.run_id, 'route-run-1');
   assert.equal(wrappedImageRow.mode, 'wrapped');
-  assert.equal(wrappedImageRow.image_base64, Buffer.from('fake-png').toString('base64'));
+  assert.equal(Object.hasOwn(wrappedImageRow, 'image_base64'), false);
   assert.equal(wrappedImageRow.prompt_hash, wrapped.image_prompt_hash);
   assert.equal(wrappedImageRow.principal_id.startsWith('cep_'), true);
   assert.equal(JSON.stringify(imageRows).includes('telegramUserId'), false);
+
+  const imageExportWithBase64Response = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/agent-only/export?sessionSlug=alpha&view=images&format=jsonl&include_base64=true', {
+      token: 'agent-test-token',
+    }),
+    env,
+  });
+  const imageRowsWithBase64 = (await imageExportWithBase64Response.text()).trim().split('\n').filter(Boolean).map((line) => JSON.parse(line));
+  assert.equal(imageExportWithBase64Response.status, 200);
+  const wrappedImageRowWithBase64 = imageRowsWithBase64.find((row) => row.image_id === wrapped.image_id);
+  assert.equal(wrappedImageRowWithBase64.image_base64, Buffer.from('fake-png').toString('base64'));
 
   const attemptExportResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/admin/agent-only/export?sessionSlug=alpha&view=attempts&format=jsonl', {

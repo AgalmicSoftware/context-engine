@@ -723,6 +723,8 @@ function inputFromRequest(request, body = {}) {
     windowId: safeString(body.windowId || body.window_id || url.searchParams.get('windowId') || url.searchParams.get('window')),
     compact: Object.hasOwn(body, 'compact') ? body.compact : url.searchParams.get('compact'),
     format: safeString(body.format || url.searchParams.get('format')),
+    include_base64: Object.hasOwn(body, 'include_base64') ? body.include_base64 : url.searchParams.get('include_base64'),
+    includeBase64: Object.hasOwn(body, 'includeBase64') ? body.includeBase64 : url.searchParams.get('includeBase64'),
     queueKey: safeString(body.queueKey || url.searchParams.get('queueKey')),
     advance: Object.hasOwn(body, 'advance') ? body.advance : url.searchParams.get('advance'),
     resetQueue: Object.hasOwn(body, 'resetQueue') ? body.resetQueue : (body.reset || url.searchParams.get('resetQueue') || url.searchParams.get('reset')),
@@ -3450,12 +3452,19 @@ async function handleAdminAgentOnlyExportRequest({
 } = {}) {
   const sessionSlug = sanitizeSessionSlug(input.sessionSlug);
   if (!sessionSlug) return json({ ok: false, reason: 'session_slug_required' }, { status: 400 });
+  const includeBase64Input = lower(input.include_base64 || input.includeBase64);
+  const includeImageBase64 =
+    normalizeBoolean(input.include_base64, false) ||
+    normalizeBoolean(input.includeBase64, false) ||
+    includeBase64Input === 'true';
   const exported = await exportAgentOnlyData({
     env,
     sessionSlug,
     windowId: input.windowId,
     view: input.view || 'answers',
     format: input.format || 'jsonl',
+    compact: normalizeBoolean(input.compact, false),
+    includeImageBase64,
   });
   if (!exported.ok) {
     const payload = { ok: false, reason: exported.reason };
