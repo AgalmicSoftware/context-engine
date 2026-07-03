@@ -167,7 +167,7 @@ export const resolveSignerProvider = (options: ResolveSignerProviderOptions = {}
     return { ok: true, provider, source: 'web3auth' };
   }
 
-  if (providerName === 'wagmi') {
+  if (providerName === 'wagmi' || providerName === 'injected' || providerName === 'injected-wallet') {
     return resolveInjectedProvider(options.injectedProvider);
   }
 
@@ -180,7 +180,7 @@ export const resolveSignerProvider = (options: ResolveSignerProviderOptions = {}
     };
   }
 
-  if (options.allowInjectedSignerFallback) {
+  if (options.allowInjectedSignerFallback && !providerName) {
     return resolveInjectedProvider(options.injectedProvider);
   }
 

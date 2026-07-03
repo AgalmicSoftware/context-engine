@@ -93,6 +93,12 @@ output. The passkey prompt is enough to recreate the same EOA private key for
 the configured RP ID and derivation namespace. No encrypted EVM private key
 ciphertext is required for login.
 
+This is still an embedded EOA controlled by JavaScript running in this origin.
+The passkey protects derivation of the EOA key, but malicious same-origin script
+can request WebAuthn prompts or ask an unlocked soft session to sign. Treat CSP,
+third-party scripts, and dependency integrity as part of the wallet security
+model.
+
 The derivation namespace is part of the deterministic wallet namespace:
 
 ```bash
@@ -267,6 +273,7 @@ type SoftSessionPolicy = {
     | 'personal_sign'
     | 'eth_signTypedData_v4'
     | 'eth_sendTransaction'
+    | 'eth_signTransaction'
   >;
   allowedChainIds?: number[];
   allowedTargets?: `0x${string}`[];
@@ -274,8 +281,9 @@ type SoftSessionPolicy = {
 };
 ```
 
-By default, value-bearing transactions are rejected by local policy. Any
-transaction with value should have explicit user confirmation in the calling UI.
+By default, value-bearing transactions are rejected by local policy, and raw
+transaction signing is not included in the default method grant. Any transaction
+with value should have explicit user confirmation in the calling UI.
 
 Important: a malicious script running in the same origin may still ask the
 worker to sign. The worker reduces accidental exposure and isolates signing

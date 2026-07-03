@@ -7,7 +7,8 @@ import {
 import { createMemoryWalletStorage } from './keystore/storage.js';
 import { assertSoftSessionAllowed, createSoftSessionPolicy } from './session/sessionPolicy.js';
 import type { PasskeyCredentialClient, PasskeyWalletConfig } from './types.js';
-import type { SoftSessionClient } from './session/sessionWorkerClient.js';
+import { createInMemorySoftSessionClient, type SoftSessionClient } from './session/sessionWorkerClient.js';
+import { bufferToBase64URL } from './passkey/encoding.js';
 
 const PRIVATE_KEY = '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5' as const;
 const ADDRESS = new ethers.Wallet(PRIVATE_KEY).address as `0x${string}`;
@@ -186,6 +187,46 @@ describe('PasskeyEoaWalletClient', () => {
     expect(sessionClient.calls[0].privateKey).not.toBe(PRIVATE_KEY);
   });
 
+  it('does not persist or log PRF output or derived private keys', async () => {
+    const storage = createMemoryWalletStorage();
+    const sessionClient = makeSessionClient();
+    const consoleSpies = (['log', 'info', 'debug', 'warn', 'error'] as const).map((method) => (
+      jest.spyOn(console, method).mockImplementation(() => {})
+    ));
+    try {
+      const client = new PasskeyEoaWalletClient({
+        config: derivedConfig,
+        storage,
+        credentials: makeCredentials(),
+        sessionClient,
+        privateKeyFactory: () => { throw new Error('derived mode must not generate a random key'); },
+      });
+
+      await client.createWallet();
+      const storedJson = JSON.stringify(await storage.read());
+      const derivedPrivateKey = sessionClient.calls[0].privateKey;
+      const prfBase64Url = bufferToBase64URL(PRF_OUTPUT);
+      const prfHex = Buffer.from(new Uint8Array(PRF_OUTPUT)).toString('hex');
+      const logPayload = consoleSpies
+        .flatMap((spy) => spy.mock.calls)
+        .flatMap((args) => args.map((arg) => {
+          try {
+            return JSON.stringify(arg);
+          } catch (_) {
+            return String(arg);
+          }
+        }))
+        .join('\n');
+
+      for (const sensitive of [derivedPrivateKey, derivedPrivateKey.slice(2), prfBase64Url, prfHex]) {
+        expect(storedJson).not.toContain(sensitive);
+        expect(logPayload).not.toContain(sensitive);
+      }
+    } finally {
+      consoleSpies.forEach((spy) => spy.mockRestore());
+    }
+  });
+
   it('fails closed before WebAuthn when no encrypted wallet record is stored', async () => {
     const credentials = makeCredentials();
     const client = new PasskeyEoaWalletClient({
@@ -258,6 +299,87 @@ describe('soft session policy', () => {
       policy,
       method: 'eth_sendTransaction',
       tx: { to: ADDRESS, value: '0x1' },
+      now: 1500,
+    })).toThrow(/value-bearing/i);
+  });
+
+  it('requires explicit policy permission for raw transaction signing', async () => {
+    const sessionClient = createInMemorySoftSessionClient();
+    const policy = createSoftSessionPolicy({
+      address: ADDRESS,
+      ttlSeconds: 60,
+      allowedChainIds: [11155420],
+    });
+    await sessionClient.init({
+      privateKey: PRIVATE_KEY,
+      rpcUrl: 'http://127.0.0.1:1',
+      chainId: 11155420,
+      policy,
+    });
+
+    await expect(sessionClient.request({
+      method: 'eth_signTransaction',
+      params: [{
+        from: ADDRESS,
+        to: ADDRESS,
+        chainId: 11155420,
+        value: '0x0',
+        nonce: 0,
+        gasLimit: 21000,
+      }],
+    })).rejects.toThrow(/does not allow eth_signTransaction/i);
+  });
+
+  it('applies sender, chain, target, and value policy to raw transaction signing', () => {
+    const policy = createSoftSessionPolicy({
+      address: ADDRESS,
+      ttlSeconds: 60,
+      now: 1000,
+      allowedMethods: ['personal_sign', 'eth_signTypedData_v4', 'eth_sendTransaction', 'eth_signTransaction'],
+      allowedChainIds: [11155420],
+      allowedTargets: [ADDRESS],
+      maxTransactionValueWei: '0',
+    });
+    const allowedTx = {
+      from: ADDRESS,
+      to: ADDRESS,
+      chainId: 11155420,
+      value: '0x0',
+    };
+
+    expect(() => assertSoftSessionAllowed({
+      policy,
+      method: 'eth_signTransaction',
+      tx: allowedTx,
+      chainId: 11155420,
+      now: 1500,
+    })).not.toThrow();
+    expect(() => assertSoftSessionAllowed({
+      policy,
+      method: 'eth_signTransaction',
+      tx: { ...allowedTx, from: '0x0000000000000000000000000000000000000001' },
+      chainId: 11155420,
+      now: 1500,
+    })).toThrow(/sender/i);
+    expect(() => assertSoftSessionAllowed({
+      policy,
+      method: 'eth_signTransaction',
+      tx: { ...allowedTx, chainId: 84532 },
+      chainId: 11155420,
+      now: 1500,
+    })).toThrow(/active chain/i);
+    expect(() => assertSoftSessionAllowed({
+      policy,
+      method: 'eth_signTransaction',
+      tx: { ...allowedTx, to: '0x0000000000000000000000000000000000000002' },
+      chainId: 11155420,
+      now: 1500,
+    })).toThrow(/target/i);
+    expect(() => assertSoftSessionAllowed({
+      policy,
+      method: 'eth_signTransaction',
+      tx: { ...allowedTx, value: '0x1' },
+      chainId: 11155420,
       now: 1500,
     })).toThrow(/value-bearing/i);
   });

@@ -37,11 +37,6 @@ export const DEFAULT_DEMO_SURFACE_MODE = readPublicBoolEnv(
   'REACT_APP_CE_DEMO_SURFACE_MODE_DEFAULT',
   true
 );
-// Passkey EOA soft-session mode (true = routine message/tx signing can reuse the worker-held session).
-export const PASSKEY_WALLET_SOFT_SESSION_ENABLED = readPublicBoolEnv(
-  'REACT_APP_PASSKEY_WALLET_SOFT_SESSION_ENABLED',
-  true
-);
 // RainbowKit's MetaMask wallet falls back to WalletConnect when MetaMask is not injected.
 // Keep that external bridge opt-in so local startup does not open WalletConnect sockets.
 export const CE_ENABLE_WALLETCONNECT_FALLBACK = readPublicBoolEnv(
