@@ -81,6 +81,8 @@ export const dispatchAuthLoginRequestWithWorkerDeps = async ({
       computeScopesForLogin: deps?.computeScopesForLogin,
       signToken: deps?.signToken,
       getAddress: deps?.getAddress,
+      buildAuthTokenJti: deps?.buildAuthTokenJti,
+      persistAuthTokenRecord: deps?.persistAuthTokenRecord,
       now: deps?.now,
       LOGIN_SIWE_MAX_AGE_MS: constants?.loginSiweMaxAgeMs,
       LOGIN_SIWE_FUTURE_SKEW_MS: constants?.loginSiweFutureSkewMs,
