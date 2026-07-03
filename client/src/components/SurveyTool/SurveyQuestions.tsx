@@ -481,6 +481,8 @@ import {
   runSurveyQuestionsSubmitStartController,
   runSurveyQuestionsSubmitSuccessController,
   type SurveyQuestionsSubmitPendingStats,
+  type SurveyQuestionsSubmitStaleStatePatch,
+  type SurveyQuestionsSubmitStartControllerResult,
 } from './surveyQuestionsSubmitController.js';
 import {
   applySurveyQuestionsRuntimeInitialState,
@@ -580,6 +582,9 @@ import {
   type SurveyQuestionsSubmitFooterDisplayState,
   type SurveyQuestionsSubmitReadinessDescriptor,
   type SurveyQuestionsMaskedQuestionVisibilityState,
+  type SurveySubmitFailureStatePatch,
+  type SurveySubmitStartStatePatch,
+  type SurveySubmitSuccessStatePatch,
 } from './surveyQuestionsTypes.js';
 
 declare global {
@@ -7561,14 +7566,14 @@ const isSubmitContextCurrent = (snapshot: any = null) => (
     buildSubmitContextKey(snapshot) === buildSubmitContextKey()
   );
 
-const startSubmitAttempt = () => {
-    const attemptId: any = (Number(inst._submitAttemptSeq) || 0) + 1;
+const startSubmitAttempt = (): number => {
+    const attemptId = (Number(inst._submitAttemptSeq) || 0) + 1;
     inst._submitAttemptSeq = attemptId;
     inst._activeSubmitAttemptSeq = attemptId;
     return attemptId;
   };
 
-const finishSubmitAttempt = (attemptId: any = null) => {
+const finishSubmitAttempt = (attemptId: unknown = null): void => {
     if (Number(attemptId || 0) > 0 && inst._activeSubmitAttemptSeq === attemptId) {
       inst._activeSubmitAttemptSeq = 0;
     }
@@ -7586,8 +7591,8 @@ const handleStaleSubmitContext = (snapshot: any = null) => {
           inst._activeSubmitAttemptSeq ===
           (currentSnapshot as { submitAttemptId?: unknown } | null | undefined)?.submitAttemptId
         ),
-        finishSubmitAttempt: (submitAttemptId: any) => finishSubmitAttempt(submitAttemptId),
-        setSubmitStaleState: (statePatch: any) => setState(statePatch),
+        finishSubmitAttempt: (submitAttemptId: number) => finishSubmitAttempt(submitAttemptId),
+        setSubmitStaleState: (statePatch: SurveyQuestionsSubmitStaleStatePatch) => setState(statePatch),
       },
     });
   };
@@ -7621,10 +7626,10 @@ const encryptAndUpload = async () => {
       }
 
       submitContext = buildSubmitContextSnapshot();
-      const startResult: any = runSurveyQuestionsSubmitStartController({
+      const startResult: SurveyQuestionsSubmitStartControllerResult = runSurveyQuestionsSubmitStartController({
         ports: {
           startSubmitAttempt: () => startSubmitAttempt(),
-          setSubmitStartState: (statePatch: any) => setState(statePatch),
+          setSubmitStartState: (statePatch: SurveySubmitStartStatePatch) => setState(statePatch),
         },
       });
       submitContext.submitAttemptId = startResult.submitAttemptId;
@@ -7639,14 +7644,14 @@ const encryptAndUpload = async () => {
       let activeSlice: any = stateRef.current.surveysResponseState?.[surveyIndex] || { answers: {}, additionalComments: {}, importance: {}, conviction: {} };
 
       // Only encrypt when there are changed encrypted fields
-      const pendingStats: any = resolveSurveyQuestionsSubmitPendingStats({
+      const pendingStats: SurveyQuestionsSubmitPendingStats = resolveSurveyQuestionsSubmitPendingStats({
         getPendingEditStats: typeof getPendingEditStats === 'function'
           ? () => getPendingEditStats()
           : undefined,
         fallbackTotal: stateRef.current.modifiedCount || 0,
         fallbackEncrypted: stateRef.current.hasEncryptedChanges ? 1 : 0,
       });
-      const shouldEncrypt: any = Number(pendingStats.encrypted || 0) > 0 && changedQids.size > 0;
+      const shouldEncrypt = Number(pendingStats.encrypted || 0) > 0 && changedQids.size > 0;
 
       if (shouldEncrypt) {
         const {
@@ -7745,7 +7750,7 @@ const encryptAndUpload = async () => {
           ? receipt.__ceSubmissionGroupKey
           : submitContext.effectiveDraftSlug
       );
-      const responseUrl: any = resolveSurveyQuestionsSubmittedResponseUrl({
+      const responseUrl = resolveSurveyQuestionsSubmittedResponseUrl({
         account: submitContext.account,
         currentPathname: window.location.pathname,
         isStandalone: submitContext.isStandalone,
@@ -7773,7 +7778,7 @@ const encryptAndUpload = async () => {
       const optimisticUserAnswers: any = prepareJsonAndHash(surveyIndex, undefined, finalSlice);
 
       // Check encryption status from the new baseline
-      const hasEncrypted: any = Object.values(nextBaseline.answers || {}).some((a: any) => !!a.encrypted) ||
+      const hasEncrypted = Object.values(nextBaseline.answers || {}).some((a: any) => !!a.encrypted) ||
                            Object.values(nextBaseline.additionalComments || {}).some((a: any) => !!a.encrypted);
       invalidateDiffCaches();
       inst._userAnswersSliceCache = { source: null, value: null };
@@ -7790,8 +7795,11 @@ const encryptAndUpload = async () => {
           clearSubmitGuard: () => {
             inst._submitGuard = false;
           },
-          finishSubmitAttempt: (submitAttemptId: any) => finishSubmitAttempt(submitAttemptId),
-          setSubmitSuccessState: (statePatch: any, afterStateApplied: any) => setState(statePatch, afterStateApplied),
+          finishSubmitAttempt: (submitAttemptId: number) => finishSubmitAttempt(submitAttemptId),
+          setSubmitSuccessState: (
+            statePatch: SurveySubmitSuccessStatePatch,
+            afterStateApplied?: () => void
+          ) => setState(statePatch, afterStateApplied),
         },
         afterStateApplied: async () => {
           try {
@@ -7847,8 +7855,8 @@ const encryptAndUpload = async () => {
           clearSubmitGuard: () => {
             inst._submitGuard = false;
           },
-          finishSubmitAttempt: (submitAttemptId: any) => finishSubmitAttempt(submitAttemptId),
-          setSubmitFailureState: (statePatch: any) => setState(statePatch),
+          finishSubmitAttempt: (submitAttemptId: number) => finishSubmitAttempt(submitAttemptId),
+          setSubmitFailureState: (statePatch: SurveySubmitFailureStatePatch) => setState(statePatch),
         },
       });
     }
