@@ -18,7 +18,7 @@ const TRACKED_ANCHOR_FILES = Object.freeze([
   'docs/arweave-payloads.md',
   'docs/e2e-testid-api.md',
   'docs/lit-v3-design.md',
-  'docs/porto-information.md',
+  'docs/passkey-wallet.md',
   'docs/repo-structure.md',
   'scripts/audit-full.sh',
   'spec.md',

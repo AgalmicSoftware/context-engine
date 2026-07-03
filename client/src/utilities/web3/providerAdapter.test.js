@@ -65,16 +65,16 @@ describe('providerAdapter', () => {
     }));
   });
 
-  it('resolves Porto signer providers through the adapter factory', () => {
-    const portoProvider = { isPorto: true };
+  it('resolves passkey EOA signer providers through the adapter factory', () => {
+    const passkeyProvider = { isPasskeyEoa: true };
 
     expect(resolveSignerProvider({
-      providerName: 'porto_passkey',
-      portoProviderFactory: () => portoProvider,
+      providerName: 'passkey_eoa',
+      passkeyProviderFactory: () => passkeyProvider,
     })).toEqual({
       ok: true,
-      provider: portoProvider,
-      source: 'porto',
+      provider: passkeyProvider,
+      source: 'passkey-eoa',
     });
   });
 

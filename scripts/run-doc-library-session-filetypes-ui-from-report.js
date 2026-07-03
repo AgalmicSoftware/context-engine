@@ -18,19 +18,23 @@ Note: This script is safe to run repeatedly; it only exercises the UI.
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
-const { ethers } = require('ethers');
+const { buildPasskeyDerivedWallet } = require('./lib/passkey-derived-wallet');
 
 const ROOT = path.resolve(__dirname, '..');
 
-const base64UrlToBuffer = (value) => {
-  const normalized = String(value || '').replace(/-/g, '+').replace(/_/g, '/');
-  const padLen = (4 - (normalized.length % 4)) % 4;
-  return Buffer.from(normalized + '='.repeat(padLen), 'base64');
-};
-
-const derivePrivateKeyFromPasskeyRawId = (rawIdB64Url) => {
-  const rawIdBytes = base64UrlToBuffer(rawIdB64Url);
-  return ethers.utils.keccak256(rawIdBytes);
+const buildPasskeySeed = (rawIdB64Url, expectedAddress, label) => {
+  const walletInfo = buildPasskeyDerivedWallet(rawIdB64Url);
+  if (expectedAddress && String(walletInfo.address).toLowerCase() !== String(expectedAddress).toLowerCase()) {
+    throw new Error(
+      `Report wallet ${label} was generated with a stale derivation (${expectedAddress}); ` +
+      `expected passkey-derived address ${walletInfo.address}. Re-run the seed script.`
+    );
+  }
+  return {
+    credentialId: rawIdB64Url,
+    address: walletInfo.address,
+    privateKey: walletInfo.privateKey,
+  };
 };
 
 async function main() {
@@ -53,16 +57,8 @@ async function main() {
     throw new Error('Report JSON missing wallets A/B fields.');
   }
 
-  const portoA = {
-    credentialId: passkeyA,
-    address: addressA,
-    privateKey: derivePrivateKeyFromPasskeyRawId(passkeyA),
-  };
-  const portoB = {
-    credentialId: passkeyB,
-    address: addressB,
-    privateKey: derivePrivateKeyFromPasskeyRawId(passkeyB),
-  };
+  const passkeyWalletA = buildPasskeySeed(passkeyA, addressA, 'A');
+  const passkeyWalletB = buildPasskeySeed(passkeyB, addressB, 'B');
 
   const baseUrl = String(process.env.BASE_URL || report?.baseUrl || 'http://127.0.0.1:3000').replace(/\/+$/, '');
   const sessionSlug = String(process.env.SESSION_SLUG || report?.sessionSlug || '').trim();
@@ -80,8 +76,8 @@ async function main() {
     OUT_PNG: outPng,
     BASE_URL: baseUrl,
     SESSION_SLUG: sessionSlug,
-    PORTO_A: JSON.stringify(portoA),
-    PORTO_B: JSON.stringify(portoB),
+    PASSKEY_EOA_A: JSON.stringify(passkeyWalletA),
+    PASSKEY_EOA_B: JSON.stringify(passkeyWalletB),
   };
 
   const child = spawn('node', [uiScript], { cwd: ROOT, env, stdio: 'inherit' });
@@ -92,4 +88,3 @@ main().catch((err) => {
   console.error(err && err.stack ? err.stack : err);
   process.exit(1);
 });
-

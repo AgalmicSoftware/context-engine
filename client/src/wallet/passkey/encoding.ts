@@ -1,0 +1,41 @@
+export function isArrayBufferLike(value: unknown): value is ArrayBuffer {
+  return value instanceof ArrayBuffer || Object.prototype.toString.call(value) === '[object ArrayBuffer]';
+}
+
+export function bufferToBase64URL(buffer: ArrayBuffer | ArrayBufferView): string {
+  let bytes: Uint8Array;
+  if (isArrayBufferLike(buffer)) {
+    bytes = new Uint8Array(buffer);
+  } else if (ArrayBuffer.isView(buffer)) {
+    bytes = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+  } else {
+    throw new Error('Expected an ArrayBuffer or ArrayBufferView.');
+  }
+  let value = '';
+  for (let i = 0; i < bytes.byteLength; i += 1) {
+    value += String.fromCharCode(bytes[i]);
+  }
+  return btoa(value).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+export function base64URLToBuffer(base64url: string): ArrayBuffer {
+  const base64 = String(base64url || '').replace(/-/g, '+').replace(/_/g, '/');
+  const padLen = (4 - (base64.length % 4)) % 4;
+  const binary = atob(base64 + '='.repeat(padLen));
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes.buffer;
+}
+
+export function randomBytes(length: number): Uint8Array {
+  if (typeof crypto === 'undefined' || !crypto.getRandomValues) {
+    throw new Error('WebCrypto random source is not available.');
+  }
+  return crypto.getRandomValues(new Uint8Array(length));
+}
+
+export function randomBase64Url(length: number): string {
+  return bufferToBase64URL(randomBytes(length));
+}

@@ -55,12 +55,12 @@ const resolveDefaultProviderLike = () => {
     if (fromStore) return fromStore;
   } catch (_) {}
   if (typeof window !== 'undefined') {
-    if (window.__portoMockProvider && window.__portoMockProvider.isPorto) return 'porto_passkey';
+    if (window.__passkeyEoaProvider && window.__passkeyEoaProvider.isPasskeyEoa) return 'passkey_eoa';
     if (window.ethereum) return 'wagmi';
     if (window.web3authProvider) return 'web3auth';
   }
-  // Default to Porto since passkey auth is now the primary wallet path.
-  return 'porto_passkey';
+  // Default to the embedded passkey EOA because passkey auth is the primary wallet path.
+  return 'passkey_eoa';
 };
 const getWalletContext = (override = {}) => {
   const overrideProviderLike = toStr(override.providerLike || override.provider || '').trim();

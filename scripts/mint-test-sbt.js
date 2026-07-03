@@ -4,6 +4,7 @@ const { ethers } = require('ethers');
 const { nowHumanTag } = require('./lib/common');
 const { normalizeRequiredMetadataUri } = require('./lib/arweave-metadata');
 const { resolveChainDefaults } = require('./lib/network-defaults');
+const { buildPasskeyDerivedWallet } = require('./lib/passkey-derived-wallet');
 
 const DEFAULT_PASSKEY_RAW_ID_B64URL = 'AQIDBAUGBwgJCgsMDQ4PEA';
 const DEFAULT_GROUP_PASSWORD = 'browserUse';
@@ -40,14 +41,6 @@ const toBigNumber = (value, fallback) => {
   }
 };
 
-const base64UrlToBuffer = (value) => {
-  const normalized = String(value || '')
-    .replace(/-/g, '+')
-    .replace(/_/g, '/');
-  const padLen = (4 - (normalized.length % 4)) % 4;
-  return Buffer.from(normalized + '='.repeat(padLen), 'base64');
-};
-
 const normalizeGroupPasswordInput = (raw) => {
   const trimmed = String(raw || '').trim();
   const compact = trimmed.replace(/\s+/g, '');
@@ -60,11 +53,6 @@ const normalizeGroupPasswordInput = (raw) => {
     }
   }
   return compact;
-};
-
-const derivePrivateKeyFromPasskeyRawId = (rawIdB64Url) => {
-  const rawIdBytes = base64UrlToBuffer(rawIdB64Url);
-  return ethers.utils.keccak256(rawIdBytes);
 };
 
 const computeGroupPasswordHash = (password) => {
@@ -94,7 +82,7 @@ async function main() {
   const rpcUrl = chain.rpcUrl;
   const expectedChainId = chain.chainId;
   const rawIdB64Url = process.env.PASSKEY_RAW_ID_B64URL || DEFAULT_PASSKEY_RAW_ID_B64URL;
-  const privateKey = process.env.AI_TEST_PRIVATE_KEY || derivePrivateKeyFromPasskeyRawId(rawIdB64Url);
+  const privateKey = process.env.AI_TEST_PRIVATE_KEY || buildPasskeyDerivedWallet(rawIdB64Url).privateKey;
 
   const factoryAddress = chain.sbtFactory;
   const groupPassword = normalizeGroupPasswordInput(process.env.GROUP_PASSWORD || DEFAULT_GROUP_PASSWORD);

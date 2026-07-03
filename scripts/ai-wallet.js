@@ -3,6 +3,10 @@
 const { ethers } = require('ethers');
 const { loadClientDefaults } = require('./lib/network-defaults.js');
 const { getPublicRpcUrls } = require('../client/src/variables/rpcDefaults.js');
+const {
+  buildPasskeyDerivedWallet,
+  toPasskeyEoaSeedRecord,
+} = require('./lib/passkey-derived-wallet');
 
 const DEFAULT_CHAIN_ID = Number(loadClientDefaults()?.defaultChainId || 0);
 const DEFAULT_RPC_URL = getPublicRpcUrls(DEFAULT_CHAIN_ID)[0] || '';
@@ -11,14 +15,6 @@ const DEFAULT_PASSKEY_RAW_ID_B64URL = 'AQIDBAUGBwgJCgsMDQ4PEA';
 const toBool = (value) => {
   const raw = String(value || '').trim().toLowerCase();
   return raw === '1' || raw === 'true' || raw === 'yes' || raw === 'y';
-};
-
-const base64UrlToBuffer = (value) => {
-  const normalized = String(value || '')
-    .replace(/-/g, '+')
-    .replace(/_/g, '/');
-  const padLen = (4 - (normalized.length % 4)) % 4;
-  return Buffer.from(normalized + '='.repeat(padLen), 'base64');
 };
 
 const normalizeGroupPasswordInput = (raw) => {
@@ -44,20 +40,13 @@ const computeGroupPasswordHash = (password) => {
   return ethers.utils.solidityKeccak256(['address'], [tmpWallet.address]);
 };
 
-const deriveWalletFromPasskeyRawId = (rawIdB64Url) => {
-  const rawIdBytes = base64UrlToBuffer(rawIdB64Url);
-  const privateKey = ethers.utils.keccak256(rawIdBytes);
-  const wallet = new ethers.Wallet(privateKey);
-  return { rawIdBytes, privateKey, wallet };
-};
-
 async function main() {
   const rawIdB64Url = process.env.PASSKEY_RAW_ID_B64URL || DEFAULT_PASSKEY_RAW_ID_B64URL;
   const rpcUrl = process.env.RPC_URL || DEFAULT_RPC_URL;
   const groupPassword = normalizeGroupPasswordInput(process.env.GROUP_PASSWORD || '');
   const showPrivateKey = toBool(process.env.SHOW_PRIVATE_KEY || 'false');
 
-  const { rawIdBytes, privateKey, wallet } = deriveWalletFromPasskeyRawId(rawIdB64Url);
+  const { rawIdBytes, privateKey, wallet } = buildPasskeyDerivedWallet(rawIdB64Url);
 
   let balanceWei = null;
   let chainId = null;
@@ -76,6 +65,7 @@ async function main() {
   const result = {
     passkeyRawIdB64Url: rawIdB64Url,
     rawIdBytesHex: ethers.utils.hexlify(rawIdBytes),
+    walletKeyMode: 'passkey-derived',
     address: wallet.address,
     rpcUrl,
     chainId,
@@ -84,9 +74,11 @@ async function main() {
 
   if (showPrivateKey) {
     result.privateKey = privateKey;
-    result.portoLegacySessionRecord = {
-      credentialId: rawIdB64Url,
-      address: wallet.address,
+    result.passkeyEoaDevSeed = {
+      ...toPasskeyEoaSeedRecord({
+        credentialId: rawIdB64Url,
+        address: wallet.address,
+      }),
       privateKey,
     };
   }

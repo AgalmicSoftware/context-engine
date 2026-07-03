@@ -112,7 +112,7 @@ import contractScripts, {
   getSessionSlugByName
 } from '../../utilities/web3/contractScripts.js';
 import { sessionRegistryStore } from '../../utilities/web3/sessionRegistry.js';
-import * as portoFunctions from '../../utilities/web3/portoFunctions.js';
+import * as passkeyWallet from '../../wallet/passkeyWallet.js';
 import { ethers, utils } from 'ethers';
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
@@ -759,11 +759,11 @@ const getRuntimeStrategy = () => (
       : null
   );
 
-const isPortoAutoSignReady = () => {
+const isPasskeyWalletAutoSignReady = () => {
     try {
       return !!(
-        typeof portoFunctions.isPortoAutoSignReady === 'function' &&
-        portoFunctions.isPortoAutoSignReady()
+        typeof passkeyWallet.isPasskeyWalletAutoSignReady === 'function' &&
+        passkeyWallet.isPasskeyWalletAutoSignReady()
       );
     } catch (_: any) {
       return false;
@@ -773,7 +773,7 @@ const isPortoAutoSignReady = () => {
 const isAutoDecryptBlocked = () => {
     try {
       const kind: any = (cryptoUtils as any).getProviderKind(propsRef.current.provider);
-      return decideAutoDecryptBlocked(kind, () => isPortoAutoSignReady());
+      return decideAutoDecryptBlocked(kind, () => isPasskeyWalletAutoSignReady());
     } catch (_: any) {
       return false;
     }
@@ -783,7 +783,7 @@ const shouldAttemptAutomaticPromptDecrypt = () => {
     if (!propsRef.current.loginComplete || !propsRef.current.account || !propsRef.current.provider) return false;
     try {
       const kind: any = (cryptoUtils as any).getProviderKind(propsRef.current.provider);
-      return decideAutomaticPromptDecryptByKind(kind, () => isPortoAutoSignReady());
+      return decideAutomaticPromptDecryptByKind(kind, () => isPasskeyWalletAutoSignReady());
     } catch (_: any) {
       return false;
     }
@@ -1884,7 +1884,7 @@ const invalidateDiffCaches = () => {
   };
 
 const runDefaultComponentDidMount = () => {
-    // Force-disable auto-decrypt on wagmi/porto at mount; also clear any in-flight state
+    // Force-disable auto-decrypt on wagmi/passkey while no signer session is ready.
     if (isAutoDecryptBlocked()) {
       resetBlockedAutoDecryptSweepInternals();
       setState(buildAutoDecryptDisabledState());
@@ -2042,7 +2042,7 @@ const runDefaultComponentDidUpdate = async (prevProps: any, prevState: any) => {
       }
     } catch (e: any) { surveyLog.warn('SurveyTool: fallback', e); }
 
-    // Force-disable auto-decrypt whenever provider/account changes to wagmi/porto
+    // Force-disable auto-decrypt whenever provider/account changes to wagmi/passkey without a signer session.
     if (
       (prevProps.provider !== propsRef.current.provider || prevProps.account !== propsRef.current.account) &&
       isAutoDecryptBlocked()
@@ -4447,7 +4447,7 @@ const rehydrateLocalCacheAnswersForRenderedIds = async (callback: any = null, op
   };
 
 const toggleAutoDecrypt = () => {
-    // Guard: auto-decrypt is disabled for wagmi/porto providers
+    // Guard: auto-decrypt is disabled for wagmi/passkey providers unless auto-sign is ready.
     if (isAutoDecryptBlocked()) {
       resetBlockedAutoDecryptSweepInternals();
       setState(buildAutoDecryptDisabledState());
@@ -8430,7 +8430,7 @@ function runComponentWillUnmount(): any {
 
   Object.assign(engine, {
     getRuntimeStrategy,
-    isPortoAutoSignReady,
+    isPasskeyWalletAutoSignReady,
     isAutoDecryptBlocked,
     shouldAttemptAutomaticPromptDecrypt,
     _applyDraftTrackingState,
