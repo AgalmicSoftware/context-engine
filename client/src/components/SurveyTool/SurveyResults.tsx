@@ -30,7 +30,7 @@ import {
   faExclamationCircle
 } from '@fortawesome/free-solid-svg-icons';
 
-import contractScripts, {
+import {
   getAllSessionSlugs,
   getSessionConfigBySlug,
 } from '../../utilities/web3/contractScripts.js';
@@ -41,13 +41,6 @@ import {
   parseQuestionSessionIdFromSearch,
   parseQuestionSessionSlugFromSearch,
 } from '../../utilities/survey/questionRouting.js';
-import {
-  listNamespaceEntriesSync,
-  peekCacheSync,
-  readCache,
-  subscribeCacheUpdates,
-  writeCache,
-} from '../../utilities/cache/cacheScripts.js';
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 import { buildResponseGatePolicy } from '../../utilities/crypto/litGatePolicy.js';
 import { resolveSbtDisplayLabel } from '../../utilities/sbt/sbtDisplayNames.js';
@@ -208,7 +201,6 @@ import {
 } from './surveyResultsAnalysisArtifactReadController';
 import {
   runSurveyResultsAnalysisArtifactWriteController,
-  type SurveyResultsAnalysisArtifactWritePort,
 } from './surveyResultsAnalysisArtifactWriteController';
 import {
   buildSurveyResultsAnalysisGeneratedArtifactCompletionPlan,
@@ -226,7 +218,6 @@ import {
 } from './surveyResultsFilterBookmarkWriteController';
 import {
   runSurveyResultsSurveyQuestionBookmarkWriteController,
-  type SurveyResultsBookmarksCacheWritePort,
 } from './surveyResultsSurveyQuestionBookmarkWriteController';
 import {
   runSurveyResultsManualRefreshDispatchController,
@@ -264,6 +255,27 @@ import {
   type SurveyResultsScopedQuestionNetworkData,
   type SurveyResultsScopedQuestionNetworkMemo,
 } from './surveyResultsQuestionNetworkReadController';
+import {
+  surveyResultsCachePort,
+} from '../../domains/surveys/surveyResultsCachePort';
+import {
+  surveyResultsAnalysisArtifactMergePort,
+} from '../../domains/surveys/surveyResultsAnalysisArtifactMergePort';
+import {
+  createSurveyResultsFetchResponsesRuntime,
+  type SurveyResultsFetchResponsesRuntime,
+} from '../../domains/surveys/surveyResultsFetchResponsesRuntime';
+import {
+  createSurveyResultsLocalStoragePollingRuntime,
+  type SurveyResultsLocalStoragePollingRuntime,
+} from '../../domains/surveys/surveyResultsLocalStoragePollingRuntime';
+import {
+  createSurveyResultsQueuedRefreshRuntime,
+  type SurveyResultsQueuedRefreshRuntime,
+} from '../../domains/surveys/surveyResultsQueuedRefreshRuntime';
+import {
+  chainScanReadsPort,
+} from '../../domains/chain/contractScriptsChainScanReadsPort';
 import { getPolisDemoQuestionPool } from './surveyPolisDemoQuestionPool.js';
 import {
   runSurveyResultsBrowserDownload,
@@ -277,8 +289,6 @@ import {
   downloadSessionResultsHtmlReport,
   downloadSessionResultsPdfReport,
   evaluateSessionResultsAnalysisEligibility,
-  mergeGeneratedSessionResultsAnalysisArtifacts,
-  normalizeGeneratedSessionResultsAnalysisArtifact,
   renderSessionResultsHtmlReport,
   SESSION_RESULTS_ANALYSIS_SECTION_KEYS,
   SESSION_RESULTS_EXPORT_FORMAT_PDF,
@@ -321,7 +331,6 @@ const LOCAL_STORAGE_POLL_MIN_MS = 2000;
 const LOCAL_STORAGE_POLL_MID_MS = 4000;
 const LOCAL_STORAGE_POLL_MAX_MS = 12000;
 const LOCAL_STORAGE_FORCE_RESCAN_EVERY = 6;
-type SurveyResultsWriteCache = (namespace: string, slug: string, value: unknown) => Promise<unknown>;
 type SurveyResultsRecord = Record<string, unknown>;
 type SurveyResultsQuestionReadScopeContext = ReturnType<typeof resolveSurveyResultsQuestionReadScope>;
 type SurveyResultsSessionContext = ReturnType<typeof resolveSurveyResultsSessionContext>;
@@ -1037,12 +1046,6 @@ type SurveyResultsInstanceFields = {
   _questionFilterQuestionsMemo: SurveyResultsQuestionFilterQuestionsMemo;
   _questionTableEntriesMemo: SurveyResultsQuestionTableEntriesMemo;
   _lockedResponsesModelMemo: SurveyResultsLockedResponsesModelMemo;
-  _fetchResponsesInFlight: boolean;
-  _fetchResponsesQueued: boolean;
-  _fetchResponsesRequestScheduled: boolean;
-  _localStoragePollingIntervalId: ReturnType<typeof setTimeout> | null;
-  _localStoragePollingDelayMs: number;
-  _localStoragePollingStableCycles: number;
   _lastLocalStoragePollCoarseSignature: string;
   _lastLocalStoragePollDetailedSignature: string;
   _lastPolledQuestionsRef: unknown;
@@ -1062,9 +1065,6 @@ type SurveyResultsInstanceFields = {
   _surveyModeSourcePayloadRefSignature: string;
   _surveyModeSourceCacheNonce: number;
   _individualResponsesAggregatorMemo: SurveyResultsIndividualResponsesAggregatorMemo;
-  _resultsRefreshMicrotaskScheduled: boolean;
-  _resultsRefreshFrameRequestId: number | null;
-  _queuedResultsRefreshReasons: Set<string>;
   _aggregatorEntriesMemo: SurveyResultsAggregatorEntriesMemo;
   _polisQuestionResponsesMemo: SurveyResultsPolisQuestionResponsesMemo;
   _effectiveSlugScanMemo: SurveyResultsEffectiveSlugScanMemo;
@@ -1111,12 +1111,6 @@ const createSurveyResultsInstanceFields = (): SurveyResultsInstanceFields => ({
         hasGenericGateMessage: false,
       },
     },
-  _fetchResponsesInFlight: false,
-  _fetchResponsesQueued: false,
-  _fetchResponsesRequestScheduled: false,
-  _localStoragePollingIntervalId: null,
-  _localStoragePollingDelayMs: LOCAL_STORAGE_POLL_MIN_MS,
-  _localStoragePollingStableCycles: 0,
   _lastLocalStoragePollCoarseSignature: '',
   _lastLocalStoragePollDetailedSignature: '',
   _lastPolledQuestionsRef: null,
@@ -1152,9 +1146,6 @@ const createSurveyResultsInstanceFields = (): SurveyResultsInstanceFields => ({
       responsesRef: null,
       result: {},
     },
-  _resultsRefreshMicrotaskScheduled: false,
-  _resultsRefreshFrameRequestId: null,
-  _queuedResultsRefreshReasons: new Set(),
   _aggregatorEntriesMemo: {
       aggregatorRef: null,
       entries: [],
@@ -1192,6 +1183,49 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
   }
   const inst = instRef.current;
   const pendingSetStateCallbacksRef = useRef<VoidFunction[]>([]);
+  const fetchResponsesRuntimeRef = useRef<SurveyResultsFetchResponsesRuntime | null>(null);
+  if (fetchResponsesRuntimeRef.current === null) {
+    fetchResponsesRuntimeRef.current = createSurveyResultsFetchResponsesRuntime({
+      fetchResponses: () => fetchResponses(),
+      isMounted: () => inst._isMounted,
+    });
+  }
+  const fetchResponsesRuntime = fetchResponsesRuntimeRef.current;
+  const queuedResultsRefreshRuntimeRef = useRef<SurveyResultsQueuedRefreshRuntime | null>(null);
+  if (queuedResultsRefreshRuntimeRef.current === null) {
+    queuedResultsRefreshRuntimeRef.current = createSurveyResultsQueuedRefreshRuntime({
+      isMounted: () => inst._isMounted,
+      isOpen: () => !!propsRef.current.isOpen,
+      requestFetchResponses: () => requestFetchResponses(),
+      scheduleMicrotask,
+      shouldUseAnimationFrame: () => shouldUseAnimationFrameForRefreshCoalescing(),
+      animationFrame: {
+        requestAnimationFrame: (callback) => window.requestAnimationFrame(callback),
+        cancelAnimationFrame: (handle) => window.cancelAnimationFrame(handle),
+      },
+      measureFlush: (label, callback) => {
+        measureSync(label, callback);
+      },
+    });
+  }
+  const queuedResultsRefreshRuntime = queuedResultsRefreshRuntimeRef.current;
+  const localStoragePollingRuntimeRef = useRef<SurveyResultsLocalStoragePollingRuntime | null>(null);
+  if (localStoragePollingRuntimeRef.current === null) {
+    localStoragePollingRuntimeRef.current = createSurveyResultsLocalStoragePollingRuntime({
+      minDelayMs: LOCAL_STORAGE_POLL_MIN_MS,
+      midDelayMs: LOCAL_STORAGE_POLL_MID_MS,
+      maxDelayMs: LOCAL_STORAGE_POLL_MAX_MS,
+      isOpen: () => !!propsRef.current.isOpen,
+      isDocumentHidden: () => isDocumentHidden(),
+      isMounted: () => inst._isMounted,
+      pollLocalStorageForUpdates: () => pollLocalStorageForUpdates(),
+      onResetWithReason: () => {
+        inst._lastLocalStoragePollCoarseSignature = '';
+        inst._lastLocalStoragePollDetailedSignature = '';
+      },
+    });
+  }
+  const localStoragePollingRuntime = localStoragePollingRuntimeRef.current;
   const setFilterLoadingHandlerRef = useRef<(loading: unknown) => void>(() => {});
   const stableSetFilterLoadingRef = useRef<(loading: unknown) => void>((loading) => {
     setFilterLoadingHandlerRef.current(loading);
@@ -1231,7 +1265,7 @@ function getEffectiveSlug(): string {
 
       const slug = scanSurveyResultsSessionSlugFromCache({
         surveyId: sid,
-        surveyCacheEntries: listNamespaceEntriesSync('surveysCache', { cloneValues: false }),
+        surveyCacheEntries: surveyResultsCachePort.listNamespaceEntriesSync('surveysCache', { cloneValues: false }),
       });
       inst._effectiveSlugScanMemo = {
         surveyId: sid,
@@ -1347,7 +1381,7 @@ function getScopedQuestionNetworkDataSync(
       ports: {
         readQuestionBucket: (slug, networkId) => applyBuiltInDemoQuestionMetadataFallbackToBucket(
           resolveNetBucketReadOnly(
-            peekCacheSync('questionsCache', slug, { clone: false }) || {},
+            surveyResultsCachePort.peekCacheSync('questionsCache', slug, { clone: false }) || {},
             networkId,
             {
               questionsLatestBlock: 0,
@@ -1381,7 +1415,7 @@ async function getScopedQuestionNetworkData(
       ports: {
         peekQuestionBucket: (slug, networkId) => {
           const bucket = resolveNetBucketReadOnly(
-            peekCacheSync('questionsCache', slug, { clone: false }) || {},
+            surveyResultsCachePort.peekCacheSync('questionsCache', slug, { clone: false }) || {},
             networkId,
             {}
           ) as SurveyResultsQuestionBucketRecord;
@@ -1391,7 +1425,7 @@ async function getScopedQuestionNetworkData(
         },
         readQuestionBucket: async (slug, networkId) => applyBuiltInDemoQuestionMetadataFallbackToBucket(
           resolveNetBucketReadOnly(
-            (await readCache('questionsCache', slug)) || {},
+            (await surveyResultsCachePort.readCache('questionsCache', slug)) || {},
             networkId,
             {
               questionsLatestBlock: 0,
@@ -1493,34 +1527,7 @@ function commitResultsFilterState(statePatch: SurveyResultsRecord | null | undef
   }
 
 const requestFetchResponses = (): void => {
-    if (!inst._isMounted) return;
-    if (inst._fetchResponsesRequestScheduled) return;
-    inst._fetchResponsesRequestScheduled = true;
-    Promise.resolve().then(() => {
-      inst._fetchResponsesRequestScheduled = false;
-      if (!inst._isMounted) return;
-      if (inst._fetchResponsesInFlight) {
-        inst._fetchResponsesQueued = true;
-        return;
-      }
-      void flushFetchResponsesRequest();
-    });
-  };
-
-const flushFetchResponsesRequest = async (): Promise<void> => {
-    if (!inst._isMounted || inst._fetchResponsesInFlight) return;
-    inst._fetchResponsesInFlight = true;
-    try {
-      await fetchResponses();
-    } finally {
-      inst._fetchResponsesInFlight = false;
-      if (inst._fetchResponsesQueued) {
-        inst._fetchResponsesQueued = false;
-        if (inst._isMounted) {
-          void flushFetchResponsesRequest();
-        }
-      }
-    }
+    fetchResponsesRuntime.request();
   };
 
 const shouldUseAnimationFrameForRefreshCoalescing = (): boolean => {
@@ -1533,43 +1540,7 @@ const shouldUseAnimationFrameForRefreshCoalescing = (): boolean => {
   };
 
 const queueResultsRefresh = (reason: unknown = 'unknown'): void => {
-    if (!inst._isMounted) return;
-    if (reason) {
-      inst._queuedResultsRefreshReasons.add(String(reason));
-    }
-    if (inst._resultsRefreshMicrotaskScheduled) return;
-    inst._resultsRefreshMicrotaskScheduled = true;
-
-    scheduleMicrotask(() => {
-      inst._resultsRefreshMicrotaskScheduled = false;
-      if (!inst._isMounted) return;
-      if (inst._resultsRefreshFrameRequestId != null) return;
-
-      const flush = () => {
-        inst._resultsRefreshFrameRequestId = null;
-        flushQueuedResultsRefresh();
-      };
-
-      if (shouldUseAnimationFrameForRefreshCoalescing()) {
-        inst._resultsRefreshFrameRequestId = window.requestAnimationFrame(flush);
-        return;
-      }
-
-      flush();
-    });
-  };
-
-const flushQueuedResultsRefresh = (): void => {
-    if (!inst._isMounted) return;
-    if (inst._queuedResultsRefreshReasons.size === 0) return;
-    if (!propsRef.current.isOpen) {
-      inst._queuedResultsRefreshReasons.clear();
-      return;
-    }
-    inst._queuedResultsRefreshReasons.clear();
-    measureSync('ce.surveyResults.flushQueuedResultsRefresh', () => {
-      requestFetchResponses();
-    });
+    queuedResultsRefreshRuntime.queue(reason);
   };
 
 const updateParentWithCurrentFiltersForUrl = (): void => {
@@ -1579,7 +1550,7 @@ const updateParentWithCurrentFiltersForUrl = (): void => {
 const runNonceTickRefresh = async (): Promise<void> => {
     try {
       const slug = getEffectiveSlug();
-      const latest = await contractScripts.getLatestBlockNumber(propsRef.current.provider as string | undefined, slug);
+      const latest = await chainScanReadsPort.getLatestBlockNumber(propsRef.current.provider as string | undefined, slug);
       const refreshStatusSequencePlan = buildSurveyResultsRefreshStatusSequencePlan({
         isMounted: inst._isMounted,
         latestBlock: latest,
@@ -1818,50 +1789,15 @@ const handleDocumentVisibilityChange = (): void => {
   };
 
 const resetLocalStoragePollingBackoff = (reason: unknown = ''): void => {
-    inst._localStoragePollingStableCycles = 0;
-    inst._localStoragePollingDelayMs = LOCAL_STORAGE_POLL_MIN_MS;
-    if (reason) {
-      inst._lastLocalStoragePollCoarseSignature = '';
-      inst._lastLocalStoragePollDetailedSignature = '';
-    }
-  };
-
-const updateLocalStoragePollingBackoff = (didObserveChange: unknown): void => {
-    if (didObserveChange) {
-      resetLocalStoragePollingBackoff();
-      return;
-    }
-    inst._localStoragePollingStableCycles += 1;
-    if (inst._localStoragePollingStableCycles <= 0) {
-      inst._localStoragePollingDelayMs = LOCAL_STORAGE_POLL_MIN_MS;
-      return;
-    }
-    if (inst._localStoragePollingStableCycles === 1) {
-      inst._localStoragePollingDelayMs = LOCAL_STORAGE_POLL_MID_MS;
-      return;
-    }
-    inst._localStoragePollingDelayMs = LOCAL_STORAGE_POLL_MAX_MS;
+    localStoragePollingRuntime.resetBackoff(reason);
   };
 
 function startLocalStoragePolling(): void {
-    if (!propsRef.current.isOpen) return;
-    if (isDocumentHidden()) return;
-    if (inst._localStoragePollingIntervalId) return;
-    const waitMs = Number(inst._localStoragePollingDelayMs || LOCAL_STORAGE_POLL_MIN_MS);
-    inst._localStoragePollingIntervalId = setTimeout(() => {
-      inst._localStoragePollingIntervalId = null;
-      if (!inst._isMounted) return;
-      if (isDocumentHidden()) return;
-      const didObserveChange = pollLocalStorageForUpdates();
-      updateLocalStoragePollingBackoff(!!didObserveChange);
-      startLocalStoragePolling();
-    }, waitMs);
+    localStoragePollingRuntime.start();
   }
 
 function stopLocalStoragePolling(): void {
-    if (!inst._localStoragePollingIntervalId) return;
-    clearTimeout(inst._localStoragePollingIntervalId);
-    inst._localStoragePollingIntervalId = null;
+    localStoragePollingRuntime.stop();
   }
 
 const maybeRefreshNetworkLatestBlockFromPolling = (): void => {
@@ -1877,7 +1813,7 @@ const maybeRefreshNetworkLatestBlockFromPolling = (): void => {
     inst._pollLatestBlockLastAttemptAt = now;
     inst._pollLatestBlockFetchInFlight = true;
     const slug = getEffectiveSlug();
-    contractScripts
+    chainScanReadsPort
       .getLatestBlockNumber(propsRef.current.provider as string | undefined, slug)
       .then((blk: unknown) => {
         if (!inst._isMounted) return;
@@ -1970,7 +1906,7 @@ function pollLocalStorageForUpdates(): boolean {
       stateRef.current.viewMode === 'questions'
         ? getScopedQuestionNetworkDataSync('questions')
         : resolveNetBucketReadOnly(
-            peekCacheSync('questionsCache', slug, { clone: false }) || {},
+            surveyResultsCachePort.peekCacheSync('questionsCache', slug, { clone: false }) || {},
             netIdStr,
             {
               questionsLatestBlock: 0,
@@ -1985,7 +1921,7 @@ function pollLocalStorageForUpdates(): boolean {
     let surveyNetCache: SurveyResultsSurveyBucketRecord | null = null;
     let surveyResponsesById: unknown = {};
     if (currentSurveyId) {
-      const surveysCache = peekCacheSync('surveysCache', slug, { clone: false }) || {};
+      const surveysCache = surveyResultsCachePort.peekCacheSync('surveysCache', slug, { clone: false }) || {};
       surveyNetCache = resolveNetBucketReadOnly(surveysCache, netIdStr, {
         surveys: {},
         surveyResponses: {},
@@ -2031,26 +1967,27 @@ function pollLocalStorageForUpdates(): boolean {
       localRespBlock !== stateRef.current.responseLocalBlock ||
       localSBlock !== stateRef.current.surveyLocalBlock;
 
-    if (inst._fetchResponsesInFlight && !blockOrRespChanged) {
+    const fetchRuntimeSnapshot = fetchResponsesRuntime.getSnapshot();
+    if (fetchRuntimeSnapshot.inFlight && !blockOrRespChanged) {
       return false;
     }
 
-    const stableCycles = Math.max(0, Number(inst._localStoragePollingStableCycles || 0));
+    const stableCycles = Math.max(0, Number(localStoragePollingRuntime.getStableCycles() || 0));
     const forceRescanOnStableCycle =
       stableCycles > 0 &&
       (stableCycles % LOCAL_STORAGE_FORCE_RESCAN_EVERY) === 0;
     const shouldForceCountRescan =
-      !inst._fetchResponsesInFlight &&
+      !fetchRuntimeSnapshot.inFlight &&
       (!coarseSignatureUnchanged || forceRescanOnStableCycle);
 
-    const newQuestionsCount = inst._fetchResponsesInFlight
+    const newQuestionsCount = fetchRuntimeSnapshot.inFlight
       ? Number(stateRef.current.cachedQuestionsCount || 0)
       : getMemoizedQuestionsCountForPolling(questionsById, {
           forceScan: shouldForceCountRescan,
         });
     const localSurveyResponsesCount = currentSurveyId
       ? (
-          inst._fetchResponsesInFlight
+          fetchRuntimeSnapshot.inFlight
             ? Number(stateRef.current.cachedSurveyResponsesCount || 0)
             : getMemoizedSurveyResponsesCountForPolling(surveyResponsesById, currentSurveyId, {
                 forceScan: shouldForceCountRescan,
@@ -2205,9 +2142,9 @@ async function fetchSurveyModeResponses(): Promise<void> {
     const netIdStr = String(propsRef.current.network?.id ?? propsRef.current.networkChainId ?? '');
 
     // Read the specific group's cache
-    let surveysCache = peekCacheSync('surveysCache', slug, { clone: false }) || {};
+    let surveysCache = (surveyResultsCachePort.peekCacheSync('surveysCache', slug, { clone: false }) || {}) as SurveyResultsRecord;
     if (!surveysCache || Object.keys(surveysCache).length === 0) {
-      surveysCache = (await readCache('surveysCache', slug)) || {};
+      surveysCache = ((await surveyResultsCachePort.readCache('surveysCache', slug)) || {}) as SurveyResultsRecord;
     }
     const hasSurveyNetCache = !!(
       surveysCache &&
@@ -2891,7 +2828,9 @@ const readPlan = buildSurveyResultsAnalysisArtifactCacheReadRequestPlan({
   inputSignature,
   slug: getSessionResultsAnalysisCacheSlug(),
 });
-const readAnalysisCache = peekCacheSync as SurveyResultsAnalysisArtifactCacheReadPort;
+const readAnalysisCache: SurveyResultsAnalysisArtifactCacheReadPort = (namespace, cacheSlug, options) => (
+  surveyResultsCachePort.peekCacheSync(namespace, cacheSlug, options)
+);
 const readResult = runSurveyResultsAnalysisArtifactReadController({
   ports: {
     readAnalysisArtifactCache: readAnalysisCache,
@@ -2914,7 +2853,7 @@ const writeReadinessPlan = buildSurveyResultsAnalysisArtifactWriteReadinessPlan(
   slug,
 });
 if (!writeReadinessPlan.shouldReadCache) return;
-const current = toSurveyResultsRecord(await readCache('analysisCache', slug));
+const current = toSurveyResultsRecord(await surveyResultsCachePort.readCache('analysisCache', slug));
 const writePlan = buildSurveyResultsAnalysisArtifactWritePlan({
   artifact,
   cacheKey,
@@ -2926,7 +2865,9 @@ if (!writePlan.shouldWrite || !writePlan.payload) return;
 const writeResult = await runSurveyResultsAnalysisArtifactWriteController({
   plan: writePlan,
   ports: {
-    writeAnalysisArtifact: writeCache as unknown as SurveyResultsAnalysisArtifactWritePort,
+    writeAnalysisArtifact: (namespace, cacheSlug, payload) => (
+      surveyResultsCachePort.writeCache(namespace, cacheSlug, payload)
+    ),
   },
 });
 if (!writeResult.ok && writeResult.error) throw writeResult.error;
@@ -3338,14 +3279,14 @@ try {
       taskType: 'analysis',
       thinking: true,
     });
-    const sectionArtifact = normalizeGeneratedSessionResultsAnalysisArtifact({
+    const sectionArtifact = surveyResultsAnalysisArtifactMergePort.normalizeGeneratedArtifact({
       generatedAt: new Date().toISOString(),
       inputSignature,
       participants,
       rawOutput,
     });
-    artifact = mergeGeneratedSessionResultsAnalysisArtifacts({
-      base: artifact || normalizeGeneratedSessionResultsAnalysisArtifact({
+    artifact = surveyResultsAnalysisArtifactMergePort.mergeGeneratedArtifacts({
+      base: artifact || surveyResultsAnalysisArtifactMergePort.normalizeGeneratedArtifact({
         generatedAt: new Date().toISOString(),
         inputSignature,
         participants,
@@ -3617,7 +3558,7 @@ const bookmarksReadRequest = buildSurveyResultsBookmarksCacheReadRequest({ slug 
 let bookmarksCache: unknown = {};
 
 try {
-  bookmarksCache = peekCacheSync(
+  bookmarksCache = surveyResultsCachePort.peekCacheSync(
     bookmarksReadRequest.namespace,
     bookmarksReadRequest.slug,
     bookmarksReadRequest.options
@@ -3639,7 +3580,9 @@ if (!writePlan.shouldWrite || !writePlan.payload || !writePlan.statePatch) retur
 void runSurveyResultsSurveyQuestionBookmarkWriteController({
   plan: writePlan,
   ports: {
-    writeBookmarksCache: writeCache as unknown as SurveyResultsBookmarksCacheWritePort,
+    writeBookmarksCache: (namespace, cacheSlug, payload) => (
+      surveyResultsCachePort.writeCache(namespace, cacheSlug, payload)
+    ),
   },
 }).then((writeResult) => {
   if (!writeResult.ok && writeResult.error) {
@@ -3655,7 +3598,7 @@ const bookmarksReadRequest = buildSurveyResultsBookmarksCacheReadRequest({ slug 
 let bookmarksCache: unknown = {};
 
 try {
-  bookmarksCache = peekCacheSync(
+  bookmarksCache = surveyResultsCachePort.peekCacheSync(
     bookmarksReadRequest.namespace,
     bookmarksReadRequest.slug,
     bookmarksReadRequest.options
@@ -3677,7 +3620,9 @@ if (!writePlan.shouldWrite || !writePlan.payload || !writePlan.statePatch) retur
 void runSurveyResultsSurveyQuestionBookmarkWriteController({
   plan: writePlan,
   ports: {
-    writeBookmarksCache: writeCache as unknown as SurveyResultsBookmarksCacheWritePort,
+    writeBookmarksCache: (namespace, cacheSlug, payload) => (
+      surveyResultsCachePort.writeCache(namespace, cacheSlug, payload)
+    ),
   },
 }).then((writeResult) => {
   if (!writeResult.ok && writeResult.error) {
@@ -4404,7 +4349,7 @@ setState(asSurveyResultsStateUpdater((prevState) => buildSurveyResultsBooleanTog
 const handleManualRefresh = async (): Promise<void> => {
 try {
   const slug = getEffectiveSlug();
-	  const latestOnChain = await contractScripts.getLatestBlockNumber(propsRef.current.provider as string | undefined, slug);
+	  const latestOnChain = await chainScanReadsPort.getLatestBlockNumber(propsRef.current.provider as string | undefined, slug);
   const refreshStatusSequencePlan = buildSurveyResultsRefreshStatusSequencePlan({
     latestBlock: latestOnChain,
     followUpEffects: [
@@ -4448,9 +4393,9 @@ const mountedWritePlan = buildSurveyResultsFilterBookmarkWritePlan({
 if (!mountedWritePlan.shouldReadCache) return;
 const slug = getEffectiveSlug();
 
-let filtersCache: unknown = peekCacheSync('filters', slug, { clone: false });
+let filtersCache: unknown = surveyResultsCachePort.peekCacheSync('filters', slug, { clone: false });
 if (!filtersCache || typeof filtersCache !== 'object') {
-  filtersCache = (await readCache('filters', slug)) || {};
+  filtersCache = (await surveyResultsCachePort.readCache('filters', slug)) || {};
 } else {
   filtersCache = { ...(filtersCache as SurveyResultsFiltersCache) };
 }
@@ -4483,7 +4428,9 @@ if (!writePlan.shouldWrite || !writePlan.payload) return;
 const writeResult = await runSurveyResultsFilterBookmarkWriteController({
   plan: writePlan,
   ports: {
-    writeFilterBookmark: writeCache as SurveyResultsWriteCache,
+    writeFilterBookmark: (namespace, cacheSlug, payload) => (
+      surveyResultsCachePort.writeCache(namespace, cacheSlug, payload)
+    ),
   },
 });
 if (!writeResult.ok) {
@@ -4779,7 +4726,7 @@ return renderSurveyResultsHtmlReportExportModal(getHtmlReportModalProps());
   // Class parity: componentDidMount / componentWillUnmount.
   useLayoutEffect(() => {
     inst._isMounted = true;
-    inst._unsubscribeCacheUpdates = subscribeCacheUpdates(handleManagedCacheUpdate);
+    inst._unsubscribeCacheUpdates = surveyResultsCachePort.subscribeCacheUpdates(handleManagedCacheUpdate);
     window.addEventListener('popstate', handleUrlChange);
     document.addEventListener('visibilitychange', handleDocumentVisibilityChange);
 
@@ -4839,21 +4786,14 @@ return renderSurveyResultsHtmlReportExportModal(getHtmlReportModalProps());
 
     return () => {
     inst._isMounted = false;
-    inst._fetchResponsesQueued = false;
-    inst._fetchResponsesInFlight = false;
-    inst._fetchResponsesRequestScheduled = false;
+    fetchResponsesRuntime.destroy();
     inst._nonceTickInFlight = false;
     inst._nonceTickQueued = false;
     inst._pollLatestBlockFetchInFlight = false;
-    inst._resultsRefreshMicrotaskScheduled = false;
-    inst._queuedResultsRefreshReasons.clear();
+    queuedResultsRefreshRuntime.destroy();
     if (inst._responseParseMemo && typeof inst._responseParseMemo.clear === 'function') {
       inst._responseParseMemo.clear();
     }
-    if (inst._resultsRefreshFrameRequestId != null && typeof window !== 'undefined' && typeof window.cancelAnimationFrame === 'function') {
-      window.cancelAnimationFrame(inst._resultsRefreshFrameRequestId);
-    }
-    inst._resultsRefreshFrameRequestId = null;
     if (typeof inst._unsubscribeCacheUpdates === 'function') {
       inst._unsubscribeCacheUpdates();
     }
@@ -4872,7 +4812,7 @@ return renderSurveyResultsHtmlReportExportModal(getHtmlReportModalProps());
     }
     window.removeEventListener('popstate', handleUrlChange);
     document.removeEventListener('visibilitychange', handleDocumentVisibilityChange);
-    stopLocalStoragePolling();
+    localStoragePollingRuntime.destroy();
 
     // If unmounting while still open, remove "/results" from the URL
     if (propsRef.current.isOpen && !propsRef.current.preventUrlChange) {

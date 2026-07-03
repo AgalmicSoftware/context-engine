@@ -214,6 +214,47 @@ test('checkNonceRateLimit enforces a per-address fixed window limit', async () =
   ]);
 });
 
+test('checkNonceRateLimit preserves burst behavior inside one fixed window', async () => {
+  const store = new Map();
+  const env = {
+    GROUP_KV: {
+      get: async (key) => store.get(key) || null,
+      put: async (key, value) => {
+        store.set(key, value);
+      },
+    },
+  };
+  const opts = {
+    env,
+    slug: 'session-a',
+    identity: 'anon:cid:client_abc12345',
+    address: '0xAbC',
+    limit: 5,
+    now: () => 123_456,
+    windowMs: 60_000,
+    ttlSeconds: 61,
+  };
+
+  const results = [];
+  for (let index = 0; index < 6; index += 1) {
+    results.push(await checkNonceRateLimit(opts));
+  }
+
+  assert.deepEqual(results, [
+    { ok: true },
+    { ok: true },
+    { ok: true },
+    { ok: true },
+    { ok: true },
+    {
+      ok: false,
+      error: 'Too many nonce requests. Try again shortly.',
+      retryAfterSeconds: 61,
+    },
+  ]);
+  assert.equal(store.get('rate:authNonce:session-a:anon:cid:client_abc12345:120000'), '6');
+});
+
 test('checkNonceRateLimit prefers caller identity over the claimed wallet address', async () => {
   const store = new Map();
   const calls = [];

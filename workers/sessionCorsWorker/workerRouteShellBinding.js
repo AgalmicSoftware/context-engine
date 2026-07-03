@@ -143,6 +143,8 @@ export const createWorkerRouteShellWithWorkerDeps = ({
           computeScopesForLogin: deps?.computeScopesForLogin,
           signToken: deps?.signToken,
           getAddress: deps?.getAddress,
+          buildAuthTokenJti: deps?.buildAuthTokenJti,
+          persistAuthTokenRecord: deps?.persistAuthTokenRecord,
           now: deps?.now,
         },
         constants: {
