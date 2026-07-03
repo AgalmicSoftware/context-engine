@@ -1111,6 +1111,7 @@ describe('Porto session restore validation', () => {
   beforeEach(() => {
     ensureWebCrypto();
     localStorage.clear();
+    delete globalThis.CE_PORTO_RESTORE_INDEXEDDB_TIMEOUT_MS;
     consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     originalIndexedDbDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'indexedDB');
@@ -1131,6 +1132,7 @@ describe('Porto session restore validation', () => {
     } else {
       delete navigator.credentials;
     }
+    delete globalThis.CE_PORTO_RESTORE_INDEXEDDB_TIMEOUT_MS;
   });
 
   it('restores encrypted indexedDB sessions only after a fresh passkey assertion', async () => {
@@ -1351,6 +1353,36 @@ describe('Porto session restore validation', () => {
     expect(createWalletClientMock).not.toHaveBeenCalled();
     expect(localStorage.getItem(PORTO_STORAGE_KEY)).toBeTruthy();
     expect(await porto.createPortoProviderMock().request({ method: 'eth_accounts', params: [] })).toEqual([BASE_ADDRESS]);
+  });
+
+  it('falls back to legacy localStorage when indexedDB restore stalls', async () => {
+    globalThis.CE_PORTO_RESTORE_INDEXEDDB_TIMEOUT_MS = 5;
+    const credentials = setCredentialsMock({
+      getImpl: async () => ({ id: 'assertion', rawId: RAW_ID }),
+    });
+    Object.defineProperty(globalThis, 'indexedDB', {
+      value: createIndexedDbMock(null, {
+        waitForGet: () => new Promise(() => {}),
+      }),
+      configurable: true,
+    });
+    localStorage.setItem(
+      PORTO_STORAGE_KEY,
+      JSON.stringify({
+        credentialId: CREDENTIAL_ID,
+        address: BASE_ADDRESS,
+        privateKey: PRIVATE_KEY,
+      })
+    );
+
+    const { porto, createWalletClientMock } = loadPortoHarness();
+
+    const restored = await porto.restoreSession({ requireSigner: false });
+
+    expect(restored).toBe(BASE_ADDRESS);
+    expect(credentials.get).not.toHaveBeenCalled();
+    expect(createWalletClientMock).not.toHaveBeenCalled();
+    expect(localStorage.getItem(PORTO_STORAGE_KEY)).toBeTruthy();
   });
 
   it('rejects legacy localStorage sessions when the persisted address does not match the private key', async () => {

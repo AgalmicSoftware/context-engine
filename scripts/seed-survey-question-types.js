@@ -23,6 +23,10 @@ const {
   normalizeRpcUrl,
   resolveRpcRewriteConfig,
 } = require('./lib/rpc-rewrite-config');
+const {
+  base64UrlToBuffer,
+  derivePrivateKeyFromPasskeyRawId,
+} = require('./lib/porto-wallet-derivation.js');
 const { resolveSeedPasskeyRawId } = require('./lib/e2e/passkey-env');
 const {
   launchBrowserWithRetry,
@@ -109,19 +113,6 @@ const nowTag = () => {
   const min = String(d.getMinutes()).padStart(2, '0');
   const ss = String(d.getSeconds()).padStart(2, '0');
   return `${yyyy}${mm}${dd}-${hh}${min}${ss}`;
-};
-
-const base64UrlToBuffer = (value) => {
-  const normalized = String(value || '')
-    .replace(/-/g, '+')
-    .replace(/_/g, '/');
-  const padLen = (4 - (normalized.length % 4)) % 4;
-  return Buffer.from(normalized + '='.repeat(padLen), 'base64');
-};
-
-const derivePrivateKeyFromPasskeyRawId = (rawIdB64Url) => {
-  const rawIdBytes = base64UrlToBuffer(rawIdB64Url);
-  return ethers.utils.keccak256(rawIdBytes);
 };
 
 const writeJson = (filePath, value) => {

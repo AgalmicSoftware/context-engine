@@ -96,6 +96,7 @@ const PORTO_DB_VERSION = 1;
 const PORTO_DB_STORE = 'porto_sessions';
 const PORTO_SESSION_RECORD_VERSION = 1;
 const PORTO_SESSION_KEY_CONTEXT = 'porto_session_key_v1';
+const PORTO_RESTORE_INDEXEDDB_TIMEOUT_MS = 1500;
 
 const getPortoChainId = (chain: PortoChainLike | null | undefined): number => (
   Number(chain?.id || 0) || 0
@@ -191,6 +192,34 @@ const resolvePortoRelayUrls = (chain: PortoChainLike | null | undefined, primary
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 const normalizePortoAddress = (value: unknown): string => String(value || '').trim().toLowerCase();
+const resolvePortoRestoreIndexedDbTimeoutMs = (): number => {
+  const portoGlobal = globalThis as typeof globalThis & {
+    CE_PORTO_RESTORE_INDEXEDDB_TIMEOUT_MS?: unknown;
+  };
+  const override = Number(portoGlobal.CE_PORTO_RESTORE_INDEXEDDB_TIMEOUT_MS);
+  if (Number.isFinite(override) && override >= 0) return Math.floor(override);
+  return PORTO_RESTORE_INDEXEDDB_TIMEOUT_MS;
+};
+const withPortoRestoreIndexedDbTimeout = async <T>(
+  promise: Promise<T>,
+  label: string
+): Promise<T> => {
+  const timeoutMs = resolvePortoRestoreIndexedDbTimeoutMs();
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return promise;
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+};
 const hasCurrentPortoSessionMetadata = (): boolean => (
   !!currentSession &&
   typeof currentSession === 'object' &&
@@ -917,7 +946,10 @@ export async function restoreSession(options: RestoreSessionOptions = {}): Promi
 
     let record: PortoSessionRecord | null = null;
     try {
-      record = await readPortoSessionRecord();
+      record = await withPortoRestoreIndexedDbTimeout(
+        readPortoSessionRecord(),
+        'IndexedDB Porto session restore'
+      );
     } catch (e) {
       portoLog.warn("IndexedDB restore failed, checking legacy storage:", e);
     }

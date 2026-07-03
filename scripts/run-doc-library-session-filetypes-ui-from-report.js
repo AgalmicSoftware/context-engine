@@ -18,20 +18,9 @@ Note: This script is safe to run repeatedly; it only exercises the UI.
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
-const { ethers } = require('ethers');
+const { derivePrivateKeyFromPasskeyRawId } = require('./lib/porto-wallet-derivation.js');
 
 const ROOT = path.resolve(__dirname, '..');
-
-const base64UrlToBuffer = (value) => {
-  const normalized = String(value || '').replace(/-/g, '+').replace(/_/g, '/');
-  const padLen = (4 - (normalized.length % 4)) % 4;
-  return Buffer.from(normalized + '='.repeat(padLen), 'base64');
-};
-
-const derivePrivateKeyFromPasskeyRawId = (rawIdB64Url) => {
-  const rawIdBytes = base64UrlToBuffer(rawIdB64Url);
-  return ethers.utils.keccak256(rawIdBytes);
-};
 
 async function main() {
   const arg = String(process.argv[2] || '').trim();
@@ -92,4 +81,3 @@ main().catch((err) => {
   console.error(err && err.stack ? err.stack : err);
   process.exit(1);
 });
-

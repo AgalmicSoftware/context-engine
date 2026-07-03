@@ -4,6 +4,7 @@ const { ethers } = require('ethers');
 const { nowHumanTag } = require('./lib/common');
 const { normalizeRequiredMetadataUri } = require('./lib/arweave-metadata');
 const { resolveChainDefaults } = require('./lib/network-defaults');
+const { derivePrivateKeyFromPasskeyRawId } = require('./lib/porto-wallet-derivation.js');
 
 const DEFAULT_PASSKEY_RAW_ID_B64URL = 'AQIDBAUGBwgJCgsMDQ4PEA';
 const DEFAULT_GROUP_PASSWORD = 'browserUse';
@@ -40,14 +41,6 @@ const toBigNumber = (value, fallback) => {
   }
 };
 
-const base64UrlToBuffer = (value) => {
-  const normalized = String(value || '')
-    .replace(/-/g, '+')
-    .replace(/_/g, '/');
-  const padLen = (4 - (normalized.length % 4)) % 4;
-  return Buffer.from(normalized + '='.repeat(padLen), 'base64');
-};
-
 const normalizeGroupPasswordInput = (raw) => {
   const trimmed = String(raw || '').trim();
   const compact = trimmed.replace(/\s+/g, '');
@@ -60,11 +53,6 @@ const normalizeGroupPasswordInput = (raw) => {
     }
   }
   return compact;
-};
-
-const derivePrivateKeyFromPasskeyRawId = (rawIdB64Url) => {
-  const rawIdBytes = base64UrlToBuffer(rawIdB64Url);
-  return ethers.utils.keccak256(rawIdBytes);
 };
 
 const computeGroupPasswordHash = (password) => {
