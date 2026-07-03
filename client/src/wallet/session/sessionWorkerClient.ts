@@ -33,22 +33,6 @@ const normalizeTypedData = (payload: unknown): Required<Pick<SignTypedDataPayloa
   };
 };
 
-type BigNumberInput = Parameters<typeof ethers.BigNumber.from>[0];
-
-const normalizeBigNumberInput = (value: unknown, field: string): BigNumberInput | undefined => {
-  if (value === undefined || value === null || value === '') return undefined;
-  if (ethers.BigNumber.isBigNumber(value)) return value;
-  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'bigint') return value;
-  if (value instanceof Uint8Array) return value;
-  if (Array.isArray(value) && value.every((item) => typeof item === 'number')) return value;
-  throw new Error(`Invalid transaction ${field}.`);
-};
-
-const normalizeOptionalBigNumber = (value: unknown, field: string): ethers.BigNumber | undefined => {
-  const input = normalizeBigNumberInput(value, field);
-  return input === undefined ? undefined : ethers.BigNumber.from(input);
-};
-
 export const createInMemorySoftSessionClient = (): SoftSessionClient => {
   let wallet: ethers.Wallet | null = null;
   let provider: ethers.providers.JsonRpcProvider | null = null;
@@ -88,22 +72,24 @@ export const createInMemorySoftSessionClient = (): SoftSessionClient => {
           const response = await wallet.sendTransaction({
             to: tx.to as string | undefined,
             data: tx.data as string | undefined,
-            value: normalizeOptionalBigNumber(tx.value, 'value'),
-            gasLimit: normalizeOptionalBigNumber(tx.gas ?? tx.gasLimit, 'gasLimit'),
-            gasPrice: normalizeOptionalBigNumber(tx.gasPrice, 'gasPrice'),
-            maxFeePerGas: normalizeOptionalBigNumber(tx.maxFeePerGas, 'maxFeePerGas'),
-            maxPriorityFeePerGas: normalizeOptionalBigNumber(tx.maxPriorityFeePerGas, 'maxPriorityFeePerGas'),
+            value: tx.value ? ethers.BigNumber.from(tx.value as any) : undefined,
+            gasLimit: (tx.gas || tx.gasLimit) ? ethers.BigNumber.from((tx.gas || tx.gasLimit) as any) : undefined,
+            gasPrice: tx.gasPrice ? ethers.BigNumber.from(tx.gasPrice as any) : undefined,
+            maxFeePerGas: tx.maxFeePerGas ? ethers.BigNumber.from(tx.maxFeePerGas as any) : undefined,
+            maxPriorityFeePerGas: tx.maxPriorityFeePerGas
+              ? ethers.BigNumber.from(tx.maxPriorityFeePerGas as any)
+              : undefined,
             nonce: tx.nonce as number | undefined,
           });
           return response.hash;
         }
         case 'eth_signTransaction': {
           const tx = (params[0] || {}) as Record<string, unknown>;
-          assertSoftSessionAllowed({ policy, method: 'eth_signTransaction', tx, chainId });
+          assertSoftSessionAllowed({ policy, method: 'eth_sendTransaction', tx, chainId });
           return wallet.signTransaction(tx as ethers.providers.TransactionRequest);
         }
         default:
-          throw new Error(`Unsupported passkey session method: ${method}`);
+          return provider.send(method, params);
       }
     },
 
@@ -141,7 +127,7 @@ export const createWorkerSoftSessionClient = (): SoftSessionClient => {
   };
 
   const callWorker = (payload: Record<string, unknown>): Promise<unknown> => {
-    const id = `wallet-worker:${(seq += 1)}`;
+    const id = `wallet-worker:${seq += 1}`;
     return new Promise((resolve, reject) => {
       pending.set(id, { resolve, reject });
       ensureWorker()
@@ -155,7 +141,7 @@ export const createWorkerSoftSessionClient = (): SoftSessionClient => {
 
   return {
     async init(options) {
-      const result = (await callWorker({ type: 'init', ...options })) as { address?: string };
+      const result = await callWorker({ type: 'init', ...options }) as { address?: string };
       return String(result?.address || '');
     },
     request(args) {

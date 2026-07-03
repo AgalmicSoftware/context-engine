@@ -104,7 +104,14 @@ still useful for understanding the older Naga-era implementation.
   - bootstrap authority: `litApiBase` + `litAccountApiKey`
   - scoped runtime: `litApiBase` + `litGroupId` + `litPkpId` + `litActionCid` + `litUsageApiKey`
 - `/admin` Lit quick tests now run against the currently active hook runtime rather than assuming a hidden legacy default.
-- When Porto passkey session-key mode is enabled, typed-data signatures are still auto-signed, so worker auth and any remaining direct Lit SDK auth flows can run without extra passkey prompts.
+- When passkey EOA soft-session mode is enabled and the current page has an
+  unlocked in-memory signer, typed-data signatures are auto-signed, so worker
+  auth and any remaining direct Lit SDK auth flows can run without extra
+  passkey prompts. Passive wallet restores only hydrate account metadata; they
+  do not make automatic decrypt paths interactive.
+- For non-creator gated metadata decrypts, CE prefers Lit SBT recipients before
+  trying the self EIP-712 unwrap path, avoiding a needless self-sign attempt
+  when the viewer should use the SBT gate.
 
 ---
 

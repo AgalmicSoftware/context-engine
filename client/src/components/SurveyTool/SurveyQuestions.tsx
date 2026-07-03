@@ -113,6 +113,8 @@ import contractScripts, {
   getSessionConfigBySlug as getStrictSessionConfigBySlug,
   getSessionSlugByName
 } from '../../utilities/web3/contractScripts.js';
+import { sessionRegistryStore } from '../../utilities/web3/sessionRegistry.js';
+import * as passkeyWallet from '../../wallet/passkeyWallet.js';
 import { ethers, utils } from 'ethers';
 import CESlider from '../Shared/CESlider';
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
@@ -697,7 +699,43 @@ export interface SurveyQuestions {
   _gateSbtHydrationSig = '';
   _gateSbtHydrationRetryTimer = null;
 
-  _applyDraftTrackingState = (tracking = {}) => {
+const getRuntimeStrategy = () => (
+    propsRef.current.runtimeStrategy && typeof propsRef.current.runtimeStrategy === 'object'
+      ? propsRef.current.runtimeStrategy
+      : null
+  );
+
+const isPasskeyWalletAutoSignReady = () => {
+    try {
+      return !!(
+        typeof passkeyWallet.isPasskeyWalletAutoSignReady === 'function' &&
+        passkeyWallet.isPasskeyWalletAutoSignReady()
+      );
+    } catch (_: any) {
+      return false;
+    }
+  };
+
+const isAutoDecryptBlocked = () => {
+    try {
+      const kind: any = (cryptoUtils as any).getProviderKind(propsRef.current.provider);
+      return decideAutoDecryptBlocked(kind, () => isPasskeyWalletAutoSignReady());
+    } catch (_: any) {
+      return false;
+    }
+  };
+
+const shouldAttemptAutomaticPromptDecrypt = () => {
+    if (!propsRef.current.loginComplete || !propsRef.current.account || !propsRef.current.provider) return false;
+    try {
+      const kind: any = (cryptoUtils as any).getProviderKind(propsRef.current.provider);
+      return decideAutomaticPromptDecryptByKind(kind, () => isPasskeyWalletAutoSignReady());
+    } catch (_: any) {
+      return false;
+    }
+  };
+
+const _applyDraftTrackingState = (tracking: any = {}) => {
     if (!tracking || typeof tracking !== 'object') return;
     if (Object.prototype.hasOwnProperty.call(tracking, 'draftParseCache')) {
       this._draftParseCache = tracking.draftParseCache ?? null;
@@ -1852,14 +1890,11 @@ export interface SurveyQuestions {
     this._pendingEditStatsCache = null;
   };
 
-  componentDidMount() {
-    // Force-disable auto-decrypt on wagmi/porto at mount; also clear any in-flight state
-    if (this.isAutoDecryptBlocked()) {
-      this._autoDecQueue = [];
-      this._autoDecProcessing = false;
-      this._autoDecryptMaskedAttemptSignature = {};
-      this.clearAutoDecryptSweepScheduling();
-      this.setState({ autoDecryptEnabled: false, decryptingByKey: {} });
+const runDefaultComponentDidMount = () => {
+    // Force-disable auto-decrypt on wagmi/passkey while no signer session is ready.
+    if (isAutoDecryptBlocked()) {
+      resetBlockedAutoDecryptSweepInternals();
+      setState(buildAutoDecryptDisabledState());
     }
 
     // Lazy load ZK-compatible Poseidon hasher (poseidon-lite)
@@ -2019,7 +2054,7 @@ export interface SurveyQuestions {
       }
     } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
 
-    // Force-disable auto-decrypt whenever provider/account changes to wagmi/porto
+    // Force-disable auto-decrypt whenever provider/account changes to wagmi/passkey without a signer session.
     if (
       (prevProps.provider !== this.props.provider || prevProps.account !== this.props.account) &&
       this.isAutoDecryptBlocked()
@@ -5229,15 +5264,11 @@ export interface SurveyQuestions {
     });
   };
 
-
-  toggleAutoDecrypt = () => {
-    // Guard: auto-decrypt is disabled for wagmi/porto providers
-    if (this.isAutoDecryptBlocked()) {
-      this._autoDecQueue = [];
-      this._autoDecProcessing = false;
-      this._autoDecryptMaskedAttemptSignature = {};
-      this.clearAutoDecryptSweepScheduling();
-      this.setState({ autoDecryptEnabled: false, decryptingByKey: {} });
+const toggleAutoDecrypt = () => {
+    // Guard: auto-decrypt is disabled for wagmi/passkey providers unless auto-sign is ready.
+    if (isAutoDecryptBlocked()) {
+      resetBlockedAutoDecryptSweepInternals();
+      setState(buildAutoDecryptDisabledState());
       return;
     }
     this.setState(
@@ -13080,28 +13111,298 @@ export class PileViewMode extends SurveyQuestions {
     </div>
   );
 
-  renderPileAdditionalInput = ({
-    questionId,
-    additional,
-    glowAdditional,
-  }) => (
-    <SurveyAudioFieldInput
-      {...this.getAudioInputWorkerProps()}
-      placeholder="Additional comments..."
-      value={additional.value || ''}
-      updateFunction={(val) => this.handleAdditionalPile(questionId, val)}
-      toggleEncryption={(newState) =>
-        this.toggleAdditionalCommentsEncryption(0, questionId, newState)
-      }
-      dataTestId={E2E_TESTIDS.SURVEY_ADDITIONAL_INPUT}
-      dataCeQuestionId={String(questionId || '').trim().toLowerCase()}
-      disabled={this.state.isSubmitting}
-      forceGlow={glowAdditional}
-      encrypted={additional.encrypted || false}
-      disableEncryption={true}
-      enableDownloads={false}
-    />
-  );
+  Object.assign(engine, {
+    getRuntimeStrategy,
+    isPasskeyWalletAutoSignReady,
+    isAutoDecryptBlocked,
+    shouldAttemptAutomaticPromptDecrypt,
+    _applyDraftTrackingState,
+    invalidateResponseHydrationRuns,
+    setResponseHydrationState,
+    _applyDraftHydrationEntryToSlice,
+    _applyResponseHydrationEntryToSlice,
+    _applyResponseHydrationListToSlice,
+    _applyCachedResponseEntryToSlice,
+    _applyLocalCacheHydrationEntryToSlice,
+    setManagedTimeout,
+    clearManagedTimeouts,
+    clearSingleQuestionBootstrapRetry,
+    getPendingSingleQuestionBootstrapRetryAttempt,
+    updateSingleQuestionDebug,
+    scheduleSingleQuestionBootstrapRetry,
+    shouldUseAnimationFrameForAutoDecryptSweep,
+    clearAutoDecryptSweepScheduling,
+    flushQueuedAutoDecryptVisibleSweep,
+    queueAutoDecryptVisibleSweep,
+    buildAutoDecryptMaskedFieldSignature,
+    buildDecryptContextSnapshot,
+    buildDecryptContextKey,
+    isDecryptContextCurrent,
+    canUpdateStateForAsyncSnapshot,
+    startSurveyDecryptAttempt,
+    canUpdateSurveyDecryptAttempt,
+    finishSurveyDecryptAttempt,
+    registerQuestionDecryptBusyTokens,
+    clearQuestionDecryptBusyTokens,
+    ownsQuestionDecryptBusyTokens,
+    buildQuestionDecryptOwnedClearState,
+    buildQuestionDecryptStaleState,
+    buildQuestionDecryptFailureStateForAttempt,
+    buildDecryptTaskKey,
+    getQuestionFieldTaskKey,
+    isQuestionFieldBusy,
+    getQuestionFieldDecryptSelection,
+    decryptQuestionRatingEnvelopes,
+    decryptQuestionRatingEnvelopeMap,
+    buildQuestionDecryptExecutionContext,
+    buildSurveyDecryptExecutionContext,
+    buildViewedResponseDecryptSuccessState,
+    buildSelfQuestionDecryptSuccessState,
+    buildSurveyDecryptSuccessState,
+    syncDecryptedQuestionIntoBaseline,
+    mergeLatestEncryptedQuestionFields,
+    mergeQuestionResponseOverrideIntoDecryptSlice,
+    buildSurveyDecryptSourceState,
+    hydrateLatestQuestionDecryptState,
+    prepareViewedQuestionDecryptState,
+    prepareSelfQuestionDecryptState,
+    resolveLatestSurveyDecryptResponse,
+    prepareSurveyDecryptAttempt,
+    resolveQuestionDecryptHandlingMode,
+    prepareQuestionDecryptAttempt,
+    finalizeQuestionDecryptAttempt,
+    finalizeSurveyDecryptAttempt,
+    normalizeBulkDecryptedSliceForSurveyState,
+    mergeQuestionRatingEnvelopeState,
+    buildQuestionDecryptStartState,
+    buildQuestionDecryptFailureState,
+    buildViewedResponseDecryptBaseline,
+    buildSelfQuestionDecryptBaseline,
+    normalizeSingleQuestionViewedResponse,
+    runDedupedDecryptTask,
+    clearGateSbtHydrationRetry,
+    scheduleGateSbtHydrationRetry,
+    isResponseJsonPreviewVisible,
+    scheduleJsonPreviewUpdate,
+    resolveEffectiveResponseGateConfig,
+    resolveSessionChainId,
+    buildResponseGateConfigSignature,
+    invalidateCanDecryptOtherResponsesTracking,
+    resetBlockedAutoDecryptSweepInternals,
+    resetVisibleAutoDecryptSweepState,
+    startCanDecryptOtherResponsesRun,
+    isCurrentCanDecryptOtherResponsesRun,
+    clearCanDecryptOtherResponsesInFlightIfTracked,
+    refreshCanDecryptOtherResponses,
+    buildCanDecryptOtherResponsesSignature,
+    maybeRefreshCanDecryptOtherResponses,
+    emitPendingStats,
+    getPendingStatsSnapshot,
+    getActiveSurveyIndex,
+    didEditDiffInputsChange,
+    invalidateDiffCaches,
+    runDefaultComponentDidMount,
+    runDefaultComponentDidUpdate,
+    runDefaultComponentWillUnmount,
+    _getDraftScope,
+    _getEffectiveDraftSlug,
+    getAudioInputWorkerProps,
+    buildQuestionDecryptContext,
+    buildAutomaticQuestionMetadataFetchOptions,
+    hasMaskedCurrentQuestionPayload,
+    isMaskedPromptText,
+    getQuestionFetchCandidateSlugs,
+    cacheQuestionPayloadForSlug,
+    applyQuestionPayloadToRenderedPools,
+    fetchQuestionPayloadWithDeterministicContext,
+    handleReloadMaskedPrompt,
+    reloadMaskedQuestionBatch,
+    renderPromptWithManualDecrypt,
+    renderQuestionTagControl,
+    renderQuestionTagDropdown,
+    handleQuestionTagSelect,
+    closeQuestionTagModal,
+    renderQuestionTagDropdownRow,
+    getSliderMode,
+    setSliderMode,
+    getConvictionValueForSlice,
+    getImportanceValueForSlice,
+    flushDraftPersistAfterSliderChange,
+    handleConvictionImportanceChange,
+    renderFullQuestionSliderSection,
+    renderFullQuestionResponseInput,
+    renderFullQuestionAdditionalInput,
+    parseEncryptedEnvelope,
+    getFieldDecryptState,
+    getQuestionFieldDisplayState,
+    getQuestionResponseDisplayState,
+    getQuestionRenderDisplayState,
+    isQuestionPromptMasked,
+    getQuestionPayloadDisplayState,
+    getAnswerLockDisplayState,
+    getGatedPromptNoticeState,
+    renderGatedPromptNotice,
+    renderFullQuestionGatedPromptCard,
+    renderQuestionMaskedPromptCard,
+    renderQuestionAnswerLockControl,
+    renderQuestionAdditionalLockControl,
+    renderFullQuestionFooterIcons,
+    renderFullQuestionCardIcons,
+    renderQuestionFieldDecryptControl,
+    renderFullQuestionCardShell,
+    areResponsesConsistent,
+    getEditTrackingQuestionIds,
+    getIndexedQuestionEntryKeys,
+    getChangedQidsAndFields,
+    maybeAutoDecryptVisibleFields,
+    processAutoDecryptQueue,
+    getDraftKey,
+    loadDraft,
+    migratePersistedDraftForActiveAccount,
+    persistDraftSafely,
+    persistDraft,
+    clearDraft,
+    clearDraftFor,
+    getCurrentRenderedQuestionIds,
+    getHydrationQuestionIds,
+    buildLocalCacheHydrationSignature,
+    getRenderedQuestionIdsForResponseHydration,
+    resolveQuestionSlugMapForIds,
+    resolveSubmissionGroupContext,
+    getMissingRenderedResponseIdsForAccount,
+    ensurePriorResponsesForRenderedIds,
+    rehydrateDraftForRenderedIds,
+    resetFormStateForAccountChange,
+    deepClone,
+    valuesEqual,
+    computeModifiedQuestionsCount,
+    handleRevertPendingChanges,
+    buildSliceFromUserAnswers,
+    resolveDiffBaselineSlice,
+    prefillSurveyResponses,
+    buildSliceFromLocalCache,
+    rehydrateLocalCacheAnswersForRenderedIds,
+    toggleAutoDecrypt,
+    getLatestQuestionResponse,
+    getLatestSurveyResponse,
+    loadBookmarks,
+    handleBookmarkToggle,
+    getAnsweredQuestionsCount,
+    recalculateEditStats,
+    initializeSurveyResponseState,
+    checkAndHandleStartFresh,
+    getSurveyQuestionPoolLoadState,
+    showTransientSubmitFeedback,
+    maybeBlockSubmitUntilQuestionPoolComplete,
+    fetchQuestionPool,
+    loadQuestionFromCache,
+    mergeSurveyResponseState,
+    fetchSurveyResponse,
+    prefillSingleQuestionResponse,
+    parseAnswerValue,
+    handleStartFresh,
+    fetchSingleQuestionData,
+    resolveDecryptSurveyId,
+    handleDecryptEdit,
+    handleDecryptViewedResponseField,
+    getViewedResponseOverrideForQuestion,
+    handleDecryptViewedResponseFieldInternal,
+    handleDecryptQuestionAnswer,
+    handleDecryptQuestionAnswerInternal,
+    handleAnswer,
+    handleAdditional,
+    handleConviction,
+    handleImportance,
+    toggleAnswerEncryption,
+    toggleAdditionalCommentsEncryption,
+    toggleDisplayAnswerMode,
+    handleShowJsonAtBottom,
+    handleScrollToTop,
+    getSurveyResponse,
+    getSurveyMetadataForJson,
+    prepareJsonAndHash,
+    updateJsonPreview,
+    jsonTreeDisplay,
+    handlePrimarySubmitClick,
+    getQuestionsJson,
+    getResponseJson,
+    getSurveyJson,
+    copyJsonToClipboard,
+    toggleShowQuestionsJson,
+    toggleShowResponseJson,
+    toggleShowSurveyJson,
+    getCommentsOpen,
+    toggleComments,
+    getLockAudienceDisplayState,
+    applyLockAudienceSelection,
+    toggleQuestionFieldEncryptionEnabled,
+    handleLockAudienceButtonClick,
+    renderAnswerLockControl,
+    renderQuestion,
+    buildResponseGatePolicyCacheKey,
+    getResponseGatePolicy,
+    getQuestionLookupMap,
+    getQuestionById,
+    buildGateAudienceSbtItems,
+    getQuestionEncryptionGates,
+    normalizeFieldAudienceMode,
+    getQuestionGateOptions,
+    getResponseGateOptions,
+    getResponseGateOptionById,
+    resolveFieldEncryptionGateId,
+    buildInheritedAdditionalFieldState,
+    getEffectiveRecipientsForField,
+    resolveGatedPromptGateNames,
+    buildRecipientsFromGates,
+    isQuestionLockedForResponse,
+    getEffectiveRecipientsForQid,
+    hasDefaultResponseGateRecipients,
+    getDefaultResponseEncryptionAudience,
+    getDefaultResponseEncryptionAudienceForQid,
+    normalizeResponseEncryptionAudience,
+    buildEmptyResponseFieldState,
+    resolveFieldEncryptionAudience,
+    normalizeGateLabelText,
+    resolveSbtGateLabel,
+    collectGateSbtAddressesForHydration,
+    hydrateGateSbtLabels,
+    buildLockedQuestionGateDetails,
+    getLockedQuestionGateSourcePool,
+    getMemoizedLockedQuestionGateDetails,
+    buildSessionQuestionGateDetails,
+    getLockedGateRequirementSentence,
+    renderLockedQuestionsPanel,
+    resolveGateDisplayLabel,
+    resolveConfiguredGateLabel,
+    resolveLockAudienceSessionName,
+    resolveQuestionGateOption,
+    getLockAudienceMenuStateKey,
+    isLockAudienceMenuOpen,
+    toggleLockAudienceGateDetails,
+    toggleLockAudienceMenu,
+    applyAnswerEncryptionAudience,
+    applyAdditionalEncryptionAudience,
+    buildLitEncryptionOptionsForRecipients,
+    buildFieldEncryptionWorkGroups,
+    encryptFieldWorkGroups,
+    buildSubmitContextSnapshot,
+    buildSubmitContextKey,
+    isSubmitContextCurrent,
+    startSubmitAttempt,
+    finishSubmitAttempt,
+    handleStaleSubmitContext,
+    encryptAndUpload,
+    computePendingEditStatsAtIndex,
+    getPendingEditStats,
+    handleExitEditing,
+    verifyEncryption,
+    submitSurveyResponse,
+    writeSubmittedResponsesToLocalCaches,
+    renderQuestionAnswer,
+    renderSurveyAnswers,
+    getMemoizedMaskedQuestionVisibility,
+    renderDefaultSurveyQuestionsRoute,
+  });
 
   renderPileAdditionalEditorRow = ({
     questionId,

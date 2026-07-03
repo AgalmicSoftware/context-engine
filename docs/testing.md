@@ -101,6 +101,8 @@ nvm use 20
 npm run test:e2e
 ```
 
-Wallet behavior and local contract setup are documented in
-[docs/passkey-wallet.md](passkey-wallet.md) and
-[docs/local-chain.md](local-chain.md).
+For required env setup, wallet flows, and the full command catalog, use:
+
+- [docs/e2e-setup.md](e2e-setup.md)
+- [docs/e2e-commands.md](e2e-commands.md)
+- [docs/passkey-wallet.md](passkey-wallet.md)

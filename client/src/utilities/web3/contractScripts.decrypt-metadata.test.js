@@ -103,14 +103,18 @@ describe('contractScripts metadata decrypt helpers', () => {
       promptEncrypted: '{"recipients":[{"type":"lit-sbt-v1","lit":{"ciphertext":"cipher"}}]}',
     };
 
-    await contractScripts.decryptQuestionPayloadInPlace(questionData, GROUP_CFG, {
-      decryptContext: {
-        account: ACCOUNT,
-        providerLike: 'passkey_eoa',
-        chainId: 84532,
-        litHooks: { getKey: jest.fn() },
-      },
-    });
+    await contractScripts.decryptQuestionPayloadInPlace(
+      questionData,
+      GROUP_CFG,
+      {
+        decryptContext: {
+          account: ACCOUNT,
+          providerLike: 'passkey_eoa',
+          chainId: 84532,
+          litHooks: { getKey: jest.fn() },
+        },
+      }
+    );
 
     expect(questionData.prompt).toBe('SBT prompt');
     expect(questionData.promptDecrypted).toBe(true);

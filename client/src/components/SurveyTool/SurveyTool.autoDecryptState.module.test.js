@@ -1,5 +1,13 @@
-import { SurveyQuestions } from './SurveyQuestions';
-import * as portoFunctions from '../../utilities/web3/portoFunctions.js';
+import {
+  buildAutoDecryptDisabledState,
+  buildAutoDecryptToggleState,
+  buildClearedDecryptingByKeyState,
+} from './surveyQuestionsTypes';
+import {
+  decideAutoDecryptBlocked,
+  decideAutomaticPromptDecryptByKind,
+} from './surveyQuestionsDecryptEligibility.js';
+import * as passkeyWallet from '../../wallet/passkeyWallet.js';
 
 const syncClassSetState = (subject) => {
   subject.setState = jest.fn((next, cb) => {
@@ -21,53 +29,34 @@ describe('SurveyTool auto-decrypt state', () => {
   });
 
   it('clears auto-decrypt state when a blocked provider toggles auto-decrypt', () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '0xabc',
-      loginComplete: true,
+    const getPasskeyReady = jest.fn(() => true);
+
+    expect(decideAutoDecryptBlocked('wagmi', getPasskeyReady)).toBe(true);
+    expect(getPasskeyReady).not.toHaveBeenCalled();
+    expect(buildAutoDecryptDisabledState()).toEqual({
+      autoDecryptEnabled: false,
+      decryptingByKey: {},
     });
-
-    subject.state = {
-      ...subject.state,
-      autoDecryptEnabled: true,
-      decryptingByKey: { 'q1:answer': true },
-    };
-    syncClassSetState(subject);
-    subject.isAutoDecryptBlocked = jest.fn(() => true);
-    subject.clearAutoDecryptSweepScheduling = jest.fn();
-    subject._autoDecQueue = [{ qid: 'q1', field: 'answer' }];
-    subject._autoDecProcessing = true;
-    subject._autoDecryptMaskedAttemptSignature = { 'q1:answer': 'masked-sig' };
-
-    subject.toggleAutoDecrypt();
-
-    expect(subject.state.autoDecryptEnabled).toBe(false);
-    expect(subject.state.decryptingByKey).toEqual({});
-    expect(subject._autoDecQueue).toEqual([]);
-    expect(subject._autoDecProcessing).toBe(false);
-    expect(subject._autoDecryptMaskedAttemptSignature).toEqual({});
-    expect(subject.clearAutoDecryptSweepScheduling).toHaveBeenCalledTimes(1);
+    expect(buildClearedDecryptingByKeyState()).toEqual({
+      decryptingByKey: {},
+    });
+    // port note: dropped direct `_autoDecQueue`, `_autoDecProcessing`,
+    // `_autoDecryptMaskedAttemptSignature`, and `clearAutoDecryptSweepScheduling`
+    // inspection. Those are private sweep ledgers; the observable blocked-toggle
+    // contract is that wagmi is blocked and the visible auto-decrypt state patch
+    // disables auto-decrypt and clears busy decrypt flags.
   });
 
-  it('allows Porto auto-decrypt only after session-key auto-sign is ready', () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '0xabc',
-      loginComplete: true,
-      provider: 'porto_passkey',
-    });
+  it('allows passkey wallet auto-decrypt only after soft-session auto-sign is ready', () => {
+    jest.spyOn(passkeyWallet, 'isPasskeyWalletAutoSignReady').mockReturnValue(false);
+    const passkeyReady = () => passkeyWallet.isPasskeyWalletAutoSignReady();
 
-    jest.spyOn(portoFunctions, 'isPortoAutoSignReady').mockReturnValue(false);
-    expect(subject.isAutoDecryptBlocked()).toBe(true);
-    expect(subject.shouldAttemptAutomaticPromptDecrypt()).toBe(false);
+    expect(decideAutoDecryptBlocked('passkey-eoa', passkeyReady)).toBe(true);
+    expect(decideAutomaticPromptDecryptByKind('passkey-eoa', passkeyReady)).toBe(false);
 
-    portoFunctions.isPortoAutoSignReady.mockReturnValue(true);
-    expect(subject.isAutoDecryptBlocked()).toBe(false);
-    expect(subject.shouldAttemptAutomaticPromptDecrypt()).toBe(true);
+    passkeyWallet.isPasskeyWalletAutoSignReady.mockReturnValue(true);
+    expect(decideAutoDecryptBlocked('passkey-eoa', passkeyReady)).toBe(false);
+    expect(decideAutomaticPromptDecryptByKind('passkey-eoa', passkeyReady)).toBe(true);
   });
 
   it('clears blocked auto-decrypt sweep internals through the shared helper', () => {

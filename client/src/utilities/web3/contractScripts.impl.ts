@@ -314,7 +314,127 @@ const RPC_STATS_MAX = 200;
 /* ------------------------------------------------------------------ */
 
 const MAX_CACHE_SIZE = 500;
-const isObj = (val: unknown): val is Record<string, unknown> => !!val && typeof val === 'object' && !Array.isArray(val);
+/** @type {Map<string, any>} */
+const _encryptedValueCache = new Map();
+/** @type {Set<string>} */
+const _decryptFailureLogCache = new Set();
+
+const toLower = (val: any) => toStr(val).trim().toLowerCase();
+const isObj = (val: any) => !!val && typeof val === 'object' && !Array.isArray(val);
+
+const getLitGetKey = (ctx: any = {}) => {
+  if (ctx?.litOpts && typeof ctx.litOpts.getKey === 'function') return ctx.litOpts.getKey;
+  if (ctx?.litHooks && typeof ctx.litHooks.getKey === 'function') return ctx.litHooks.getKey;
+  if (ctx?.lit && typeof ctx.lit.getKey === 'function') return ctx.lit.getKey;
+  return null;
+};
+
+const buildDecryptContextTag = (ctx: any = {}) => {
+  const account = normalizeAddress(ctx?.account || '');
+  const providerLike = toLower(ctx?.providerLike || '');
+  const chainId = Number(ctx?.chainId || 0) || 0;
+  const hasLitGetKey = !!getLitGetKey(ctx);
+  const preferLitRecipients = ctx?.preferLitRecipients ? '1' : '0';
+  return `${account}|${providerLike}|${chainId}|lit:${hasLitGetKey ? '1' : '0'}|litFirst:${preferLitRecipients}`;
+};
+
+const resolveDefaultProviderLike = () => {
+  try {
+    const state = store?.getState ? store.getState() : null;
+    const fromStore = toStr(state?.profile?.provider || '').trim();
+    if (fromStore) return fromStore;
+  } catch (err: any) {
+    contractsLog.debug('resolveDefaultProviderLike error:', err);
+  }
+  if (typeof window !== 'undefined') {
+    if (window.__passkeyEoaProvider && window.__passkeyEoaProvider.isPasskeyEoa) return 'passkey_eoa';
+    if (window.ethereum) return 'wagmi';
+    if (window.web3authProvider) return 'web3auth';
+  }
+  // Default to the embedded passkey EOA because passkey auth is the primary wallet path.
+  return 'passkey_eoa';
+};
+
+const classifyDecryptFailure = (err: any, ctx: any = {}) => {
+  const msg = toLower(err?.message || err?.reason || '');
+  if (!ctx?.chainId) return 'missing-chain';
+  if (!ctx?.providerLike) return 'missing-provider';
+  if (!ctx?.account) return 'missing-account';
+  if (!getLitGetKey(ctx)) return 'missing-lit-hooks';
+  if (
+    msg.includes('access control') ||
+    msg.includes('unable to unwrap cek') ||
+    msg.includes('not authorized') ||
+    msg.includes('unauthorized') ||
+    msg.includes('auth sig')
+  ) {
+    return 'acc-failed';
+  }
+  if (
+    msg.includes('wrong chain') ||
+    msg.includes('wrong network') ||
+    msg.includes('chain mismatch')
+  ) {
+    return 'wrong-chain';
+  }
+  return 'decrypt-failed';
+};
+
+const getDecryptFailureMessage = (reason: any) => {
+  switch (reason) {
+    case 'missing-chain':
+      return 'Missing chainId for decrypt context.';
+    case 'missing-provider':
+      return 'Missing provider for decrypt context.';
+    case 'missing-account':
+      return 'Missing account for decrypt context.';
+    case 'missing-lit-hooks':
+      return 'Missing Lit hooks for decrypt context.';
+    case 'acc-failed':
+      return 'Lit access control check failed.';
+    case 'wrong-chain':
+      return 'Decrypt attempted on the wrong network.';
+    case 'decrypt-failed':
+      return 'Encrypted payload failed integrity checks.';
+    default:
+      return 'Unknown decrypt failure.';
+  }
+};
+
+const buildDecryptFailureResult = (reason: any, err: any = null) => {
+  let type = 'unknown';
+  let retryable = false;
+  switch (reason) {
+    case 'missing-chain':
+    case 'missing-provider':
+    case 'missing-account':
+    case 'missing-lit-hooks':
+      type = 'key_unavailable';
+      retryable = true;
+      break;
+    case 'acc-failed':
+      type = 'lit_failure';
+      break;
+    case 'wrong-chain':
+      type = 'network';
+      retryable = true;
+      break;
+    case 'decrypt-failed':
+      type = 'aes_integrity';
+      break;
+    default:
+      type = 'unknown';
+      break;
+  }
+  return {
+    value: null,
+    error: {
+      type,
+      message: err?.message || err?.reason || getDecryptFailureMessage(reason),
+      retryable,
+    },
+  };
+};
 
 const isRetryableSurveyResponseReadError = (error: any) => {
   if (!error) return false;
@@ -1019,6 +1139,8 @@ async function resolveGroupPasswordWalletScopeSbtAddress({
 /* ------------------------------------------------------------------ */
 
 const contractScripts: any = {
+  _blockCache: {}, // For the memoized getBlockWithCaching
+
   // Expose embedded passkey wallet auth for UI.
   createPasskeyWallet: passkeyWallet.createPasskeyWallet,
 
@@ -4803,9 +4925,8 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
       injectedProvider: win.ethereum,
       web3AuthProvider: win.web3authProvider,
       passkeyProviderFactory: () => passkeyWallet.createPasskeyEip1193Provider(),
-      // Legacy empty provider state can still use an injected wallet. Named
-      // providers must resolve explicitly so passkey flows cannot silently
-      // degrade to a different signer.
+      // Compatibility wrapper: preserve the old unknown-provider injected fallback
+      // until call sites explicitly opt into stricter signer-provider resolution.
       allowInjectedSignerFallback: true,
     });
     if (resolved.ok) return resolved.provider;

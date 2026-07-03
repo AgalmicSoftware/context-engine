@@ -132,7 +132,7 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => ({
 
 import { LoginAndSettingsModal, buildBookmarksRoutePath } from './LoginAndSettingsModal';
 import contractScripts from '../../utilities/web3/contractScripts.js';
-import * as portoFunctions from '../../utilities/web3/portoFunctions.js';
+import * as passkeyWallet from '../../wallet/passkeyWallet.js';
 import { saveLocalAiSettings } from '../../utilities/ai/aiSettings.js';
 import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
 import { clearAllWorkerSessionTokens } from '../../utilities/worker/workerAuth.js';
@@ -360,9 +360,9 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     passkeyWallet.getPasskeyWalletChain.mockReset();
     passkeyWallet.getPasskeyWalletChain.mockReturnValue(null);
     passkeyWallet.isMissingPasskeyWalletRecordError.mockReset();
-    passkeyWallet.isMissingPasskeyWalletRecordError.mockImplementation(
-      (error) => error?.code === 'CE_PASSKEY_WALLET_RECORD_MISSING',
-    );
+    passkeyWallet.isMissingPasskeyWalletRecordError.mockImplementation((error) => (
+      error?.code === 'CE_PASSKEY_WALLET_RECORD_MISSING'
+    ));
     passkeyWallet.unlockPasskeyWallet.mockReset();
     passkeyWallet.logoutPasskeyWallet.mockReset();
     passkeyWallet.restorePasskeyWalletSession.mockReset();
@@ -491,6 +491,26 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     await waitFor(() => {
       expect(screen.getByTestId('ce-passkey-wallet-status')).toHaveTextContent(
         /No passkey wallet is saved in this browser/i,
+      );
+    });
+  });
+
+  it('shows an inline recovery hint when login has no stored passkey wallet record', async () => {
+    const missingWalletError = Object.assign(
+      new Error('No encrypted passkey wallet is saved in this browser.'),
+      { code: 'CE_PASSKEY_WALLET_RECORD_MISSING' }
+    );
+    passkeyWallet.unlockPasskeyWallet.mockRejectedValueOnce(missingWalletError);
+
+    render(<LoginAndSettingsModal {...buildProps()} />);
+
+    const loginButton = getPasskeyLoginButton();
+    expect(loginButton).toBeTruthy();
+    fireEvent.click(loginButton);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ce-passkey-wallet-status')).toHaveTextContent(
+        /No passkey wallet is saved in this browser/i
       );
     });
   });
@@ -1099,12 +1119,10 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     });
 
     await waitFor(() => {
-      expect(props.changeAccount).toHaveBeenCalledWith(
-        expect.objectContaining({
-          account: PASSKEY_ADDRESS,
-          provider: 'passkey_eoa',
-        }),
-      );
+      expect(props.changeAccount).toHaveBeenCalledWith(expect.objectContaining({
+        account: PASSKEY_ADDRESS,
+        provider: 'passkey_eoa',
+      }));
     });
 
     const payload = props.changeAccount.mock.calls[0][0];
@@ -1116,25 +1134,6 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
       loginComplete: true,
       provider: 'passkey_eoa',
     });
-  });
-
-  it('labels passkey registration as creation while it is in progress', () => {
-    const subject = new LoginAndSettingsModal(
-      buildProps({
-        loginComplete: false,
-        loginInProgress: true,
-        provider: 'passkey_eoa',
-      }),
-    );
-    subject.state = {
-      ...subject.state,
-      passkeyMode: 'create',
-    };
-
-    render(subject.getModalDisplay());
-
-    expect(screen.getByText('creating passkey...')).toBeInTheDocument();
-    expect(screen.queryByText('logging in...')).not.toBeInTheDocument();
   });
 
   it('resets back to a logged-out state when passkey wallet sign-in fails', async () => {

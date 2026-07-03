@@ -1,2 +1,3 @@
-export const createSessionWorker = (): Worker =>
-  new Worker(new URL('./sessionWorker.ts', import.meta.url), { type: 'module' });
+export const createSessionWorker = (): Worker => (
+  new Worker(new URL('./sessionWorker.ts', import.meta.url), { type: 'module' })
+);

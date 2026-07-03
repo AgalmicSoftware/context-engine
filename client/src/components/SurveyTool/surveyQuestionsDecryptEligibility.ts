@@ -3,7 +3,10 @@
 // embedded-wallet kind -- this preserves the original lazy evaluation exactly.
 export type DecryptProviderKind = string | null | undefined;
 
-export function decideAutoDecryptBlocked(providerKind: DecryptProviderKind, getPasskeyReady: () => boolean): boolean {
+export function decideAutoDecryptBlocked(
+  providerKind: DecryptProviderKind,
+  getPasskeyReady: () => boolean,
+): boolean {
   if (providerKind === 'wagmi') return true;
   if (providerKind === 'passkey-eoa') return !getPasskeyReady();
   return false;

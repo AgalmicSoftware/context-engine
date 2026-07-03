@@ -203,6 +203,21 @@ Registration cost notes:
 - `SessionRegistry.createSession(...)` currently requires a `0.0001 ETH` creation fee on top of gas
 - `setSessionFields(...)` and `setResourceGates(...)` are separate follow-up transactions in the current flow
 
+### 4. A connected browser wallet
+
+Use any wallet that can connect to OP Sepolia and sign both transactions and SIWE-style messages:
+
+- MetaMask
+- Context Engine passkey EOA wallet
+- Coinbase Wallet
+- Other WalletConnect-compatible wallets
+
+The same wallet is used for:
+
+- Cloudflare worker admin signatures during setup
+- Session registration transactions
+- Optional SBT deployment transactions
+
 ## Session Creation Walkthrough
 
 Open `/new`. The app canonicalizes that route to `/session/new`, but `/new` is the intended entry point.

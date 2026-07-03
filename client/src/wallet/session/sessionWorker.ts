@@ -82,22 +82,6 @@ const normalizeMessage = (message: unknown): string | Uint8Array => {
   return String(message ?? '');
 };
 
-type BigNumberInput = Parameters<typeof ethers.BigNumber.from>[0];
-
-const normalizeBigNumberInput = (value: unknown, field: string): BigNumberInput | undefined => {
-  if (value === undefined || value === null || value === '') return undefined;
-  if (ethers.BigNumber.isBigNumber(value)) return value;
-  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'bigint') return value;
-  if (value instanceof Uint8Array) return value;
-  if (Array.isArray(value) && value.every((item) => typeof item === 'number')) return value;
-  throw new Error(`Invalid transaction ${field}.`);
-};
-
-const normalizeOptionalBigNumber = (value: unknown, field: string): ethers.BigNumber | undefined => {
-  const input = normalizeBigNumberInput(value, field);
-  return input === undefined ? undefined : ethers.BigNumber.from(input);
-};
-
 const handleRequest = async (message: RequestMessage): Promise<unknown> => {
   if (!wallet || !provider || !policy) throw new Error('Passkey wallet is locked.');
   switch (message.method) {
@@ -118,27 +102,29 @@ const handleRequest = async (message: RequestMessage): Promise<unknown> => {
       return wallet._signTypedData(typedData.domain, typedData.types, typedData.message);
     }
     case 'eth_sendTransaction': {
-      const tx = (message.params?.[0] || {}) as Record<string, unknown>;
+      const tx = ((message.params?.[0] || {}) as Record<string, unknown>);
       assertSoftSessionAllowed({ policy, method: 'eth_sendTransaction', tx, chainId: activeChainId });
       const response = await wallet.sendTransaction({
         to: tx.to as string | undefined,
         data: tx.data as string | undefined,
-        value: normalizeOptionalBigNumber(tx.value, 'value'),
-        gasLimit: normalizeOptionalBigNumber(tx.gas ?? tx.gasLimit, 'gasLimit'),
-        gasPrice: normalizeOptionalBigNumber(tx.gasPrice, 'gasPrice'),
-        maxFeePerGas: normalizeOptionalBigNumber(tx.maxFeePerGas, 'maxFeePerGas'),
-        maxPriorityFeePerGas: normalizeOptionalBigNumber(tx.maxPriorityFeePerGas, 'maxPriorityFeePerGas'),
+        value: tx.value ? ethers.BigNumber.from(tx.value as any) : undefined,
+        gasLimit: (tx.gas || tx.gasLimit) ? ethers.BigNumber.from((tx.gas || tx.gasLimit) as any) : undefined,
+        gasPrice: tx.gasPrice ? ethers.BigNumber.from(tx.gasPrice as any) : undefined,
+        maxFeePerGas: tx.maxFeePerGas ? ethers.BigNumber.from(tx.maxFeePerGas as any) : undefined,
+        maxPriorityFeePerGas: tx.maxPriorityFeePerGas
+          ? ethers.BigNumber.from(tx.maxPriorityFeePerGas as any)
+          : undefined,
         nonce: tx.nonce as number | undefined,
       });
       return response.hash;
     }
     case 'eth_signTransaction': {
-      const tx = (message.params?.[0] || {}) as Record<string, unknown>;
-      assertSoftSessionAllowed({ policy, method: 'eth_signTransaction', tx, chainId: activeChainId });
+      const tx = ((message.params?.[0] || {}) as Record<string, unknown>);
+      assertSoftSessionAllowed({ policy, method: 'eth_sendTransaction', tx, chainId: activeChainId });
       return wallet.signTransaction(tx as ethers.providers.TransactionRequest);
     }
     default:
-      throw new Error(`Unsupported passkey session method: ${message.method}`);
+      return provider.send(message.method, message.params || []);
   }
 };
 

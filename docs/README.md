@@ -65,7 +65,10 @@ Release:
 - `docs/releasing.md`: Public-history replay, stripped artifact export, and release hygiene checks.
 
 Wallets:
-- `docs/porto-information.md`: Porto passkey wallet wiring and deterministic test wallet workflow.
+- `docs/passkey-wallet.md`: passkey-unlocked EOA wallet wiring and deterministic test wallet workflow.
+- `docs/forking-wallet.md`: RP ID and wallet setup checklist for forks.
+- `docs/security-model.md`: embedded wallet and soft-session security model.
+- `docs/passkey-wallet-migration-audit.md`: Porto migration audit and remaining risks.
 
 E2E workflows:
 - `docs/e2e-setup.md`: End-to-end workflow scripts, chain runtime modes, and the current manual-fork workflow for repeated verification against live deployments.

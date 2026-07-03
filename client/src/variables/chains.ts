@@ -55,18 +55,18 @@ const defineCompatChain = (config: UnknownRecord): CeChain =>
 
 const SEPOLIA_SOURCE_ID = 11_155_111;
 const OP_MAINNET_SOURCE_ID = 1;
-const BASE_SEPOLIA_PUBLIC_RPC_URLS: readonly string[] = Object.freeze(getPublicRpcUrls(84532));
-const BASE_PUBLIC_RPC_URLS: readonly string[] = Object.freeze(getPublicRpcUrls(8453));
-const OPTIMISM_PUBLIC_RPC_URLS: readonly string[] = Object.freeze(getPublicRpcUrls(10));
-const OPTIMISM_SEPOLIA_PUBLIC_RPC_URLS: readonly string[] = Object.freeze(getPublicRpcUrls(11155420));
-const ARBITRUM_PUBLIC_RPC_URLS: readonly string[] = Object.freeze(getPublicRpcUrls(42161));
-const ARBITRUM_SEPOLIA_PUBLIC_RPC_URLS: readonly string[] = Object.freeze(getPublicRpcUrls(421614));
-const ETHEREUM_PUBLIC_RPC_URLS: readonly string[] = Object.freeze(getPublicRpcUrls(1));
-const POLYGON_PUBLIC_RPC_URLS: readonly string[] = Object.freeze(getPublicRpcUrls(137));
-const BSC_PUBLIC_RPC_URLS: readonly string[] = Object.freeze(getPublicRpcUrls(56));
-const CELO_PUBLIC_RPC_URLS: readonly string[] = Object.freeze(getPublicRpcUrls(42220));
-const KATANA_PUBLIC_RPC_URLS: readonly string[] = Object.freeze(getPublicRpcUrls(747474));
-const CONFIGURED_PAID_RPC_URL_HTTP_BY_CHAIN: RpcUrlMap = Object.freeze({
+const BASE_SEPOLIA_PUBLIC_RPC_URLS = Object.freeze(getPublicRpcUrls(84532));
+const BASE_PUBLIC_RPC_URLS = Object.freeze(getPublicRpcUrls(8453));
+const OPTIMISM_PUBLIC_RPC_URLS = Object.freeze(getPublicRpcUrls(10));
+const OPTIMISM_SEPOLIA_PUBLIC_RPC_URLS = Object.freeze(getPublicRpcUrls(11155420));
+const ARBITRUM_PUBLIC_RPC_URLS = Object.freeze(getPublicRpcUrls(42161));
+const ARBITRUM_SEPOLIA_PUBLIC_RPC_URLS = Object.freeze(getPublicRpcUrls(421614));
+const ETHEREUM_PUBLIC_RPC_URLS = Object.freeze(getPublicRpcUrls(1));
+const POLYGON_PUBLIC_RPC_URLS = Object.freeze(getPublicRpcUrls(137));
+const BSC_PUBLIC_RPC_URLS = Object.freeze(getPublicRpcUrls(56));
+const CELO_PUBLIC_RPC_URLS = Object.freeze(getPublicRpcUrls(42220));
+const KATANA_PUBLIC_RPC_URLS = Object.freeze(getPublicRpcUrls(747474));
+const CONFIGURED_PAID_RPC_URL_HTTP_BY_CHAIN = Object.freeze({
   84532: readPublicEnv('REACT_APP_CE_BASE_SEPOLIA_PAID_RPC_URL_HTTP', ''),
   11155420: readPublicEnv('REACT_APP_CE_OP_SEPOLIA_PAID_RPC_URL_HTTP', ''),
 });
@@ -718,7 +718,7 @@ export const anvil = defineCompatChain({
   testnet: true,
 });
 
-export const chainRegistry: ChainRegistry = {
+export const chainRegistry = {
   1: mainnet,
   10: optimism,
   11155420: optimismSepolia,
@@ -928,20 +928,10 @@ export const chainHttpRpcNoPath = (ch: unknown): string => {
   const filtered = pathUrl ? candidates.filter((url) => url !== pathUrl) : candidates;
   return filtered[0] || '';
 };
-export const chainCurrency = (ch: unknown) => {
-  const nativeCurrency = readRecord(ch, 'nativeCurrency');
-  return nativeCurrency && typeof nativeCurrency === 'object'
-    ? nativeCurrency
-    : { name: 'ETH', symbol: 'ETH', decimals: 18 };
-};
-export const isTestnetChain = (ch: unknown): boolean => {
-  const chain = asRecord(ch);
-  if (typeof chain.testnet === 'boolean') return chain.testnet;
-  const rpcUrls = asRecord(chain.rpcUrls);
-  const defaultRpcUrls = asRecord(readRecord(rpcUrls, 'default'));
-  const publicRpcUrls = asRecord(readRecord(rpcUrls, 'public'));
-  const blockExplorers = asRecord(chain.blockExplorers);
-  const defaultBlockExplorer = asRecord(readRecord(blockExplorers, 'default'));
+export const chainCurrency = (ch) =>
+  ch?.nativeCurrency ?? { name: 'ETH', symbol: 'ETH', decimals: 18 }
+export const isTestnetChain = (ch) => {
+  if (typeof ch?.testnet === 'boolean') return ch.testnet
   const bag = [
     chain.name,
     chain.network,

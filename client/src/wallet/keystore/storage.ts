@@ -21,7 +21,7 @@ const waitForSeededRecord = async (): Promise<void> => {
   }
 };
 
-const openWalletDb = (): Promise<IDBDatabase> =>
+const openWalletDb = (): Promise<IDBDatabase> => (
   new Promise((resolve, reject) => {
     if (typeof indexedDB === 'undefined') {
       reject(new Error('IndexedDB is required for encrypted wallet storage.'));
@@ -36,7 +36,8 @@ const openWalletDb = (): Promise<IDBDatabase> =>
       }
     };
     request.onsuccess = () => resolve(request.result);
-  });
+  })
+);
 
 export const indexedDbWalletStorage: PasskeyWalletStorage = {
   async read(): Promise<PasskeyWalletRecord | null> {

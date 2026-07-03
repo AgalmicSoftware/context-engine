@@ -159,7 +159,6 @@ interface LoginAndSettingsModalState {
   testFundsStatusTone: string;
   passkeyWalletStatusMessage: string;
   passkeyWalletStatusTone: string;
-  passkeyMode: PasskeyWalletActionMode;
   autoRequestTestnetFundsEnabled: boolean;
   autoSendTriggered: boolean;
   aiSettings: any;
@@ -271,7 +270,6 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       testFundsStatusTone: '',
       passkeyWalletStatusMessage: '',
       passkeyWalletStatusTone: '',
-      passkeyMode: '',
       autoRequestTestnetFundsEnabled: DEFAULT_AUTO_REQUEST_TESTNET_FUNDS,
       autoSendTriggered: false,
       aiSettings: null,
@@ -315,67 +313,6 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   _testFundsRequestId: number = 0;
   _passkeyWalletRestoreReqId: number = 0;
   _passkeyWalletActionId: number = 0;
-  _sponsoredSessionSourcesMemo: { key: string; value: SponsoredSessionSources } | null = null;
-  _settingsOverviewMemo: { key: string; value: LoginSettingsOverviewContext } | null = null;
-  _sessionCapabilityProjectionResolver: typeof resolveSessionCapabilityProjection = resolveSessionCapabilityProjection;
-  _passkeyActions = createLoginPasskeyActions({
-    accountLogError: (message, error) => accountLog.error(message, error),
-    changeAccount: (payload) => this.props.changeAccount(payload),
-    clearAllWorkerSessionTokens,
-    getAccount: () => this.props.account,
-    getErrorMessage,
-    getProvider: () => this.props.provider,
-    getTargetNetwork: () => this.getTargetNetwork(),
-    isCurrentAction: (actionId) => this.isCurrentPasskeyWalletAction(actionId),
-    normalizeAccountForComparison,
-    notifyInfo: (message) => notify.info(message),
-    passkeyWallet,
-    setActionMode: (passkeyMode) => this.setStateIfMounted({ passkeyMode }),
-    setStatus: (patch) => this.setStateIfMounted(patch),
-    startAction: () => this.startPasskeyWalletAction(),
-    updateLoginInfo: (payload) => this.props.updateLoginInfo(payload),
-  });
-  syncPasskeyWalletChain = this._passkeyActions.syncPasskeyWalletChain;
-  getPasskeyWalletNetwork = this._passkeyActions.getPasskeyWalletNetwork;
-  handlePasskeyWalletCreate = this._passkeyActions.handlePasskeyWalletCreate;
-  handlePasskeyWalletSignIn = this._passkeyActions.handlePasskeyWalletSignIn;
-  _finalizePasskeyWalletLogin = this._passkeyActions._finalizePasskeyWalletLogin;
-  _agentTokenActions = createLoginAgentActions({
-    changeAccount: (payload) => this.props.changeAccount(payload),
-    exchangeAgentClientLogin,
-    extractAgentClientToken,
-    getActiveSessionSlug: () => this.getActiveSessionSlug(),
-    getAgentTokenInput: () => this.state.agentTokenInput,
-    getDemoSessionConfigBySlug,
-    getPropSessionConfig: () => this.props.sessionConfig,
-    getSessionConfigBySlugOrDefault,
-    getTargetNetwork: () => this.getTargetNetwork(),
-    isTelegramFirstSessionConfig,
-    normalizeSettingsSessionSlug,
-    setState: (patch) => {
-      if (typeof patch === 'function') {
-        this.setState(
-          (prev) =>
-            patch(prev) as Pick<
-              LoginAndSettingsModalState,
-              'agentTokenError' | 'agentTokenInput' | 'agentTokenStatus' | 'agentTokenLoginOpen'
-            >,
-        );
-        return;
-      }
-      this.setState(
-        patch as Pick<LoginAndSettingsModalState, 'agentTokenError' | 'agentTokenInput' | 'agentTokenStatus'>,
-      );
-    },
-    setStateIfMounted: (patch) => this.setStateIfMounted(patch),
-    updateLoginInfo: (payload) => this.props.updateLoginInfo(payload),
-    windowTarget: typeof window !== 'undefined' ? window : null,
-  });
-  getDisplaySessionConfig = this._agentTokenActions.getDisplaySessionConfig;
-  getAgentTokenLoginSessionContext = this._agentTokenActions.getAgentTokenLoginSessionContext;
-  shouldShowAgentTokenLogin = this._agentTokenActions.shouldShowAgentTokenLogin;
-  toggleAgentTokenLogin = this._agentTokenActions.toggleAgentTokenLogin;
-  handleAgentTokenLoginSubmit = this._agentTokenActions.handleAgentTokenLoginSubmit;
 
   getListModePrimarySessionSlug = (state: Partial<LoginAndSettingsModalState> = this.state) => {
     const scope = this.getSessionScanScopeValue(state);
@@ -459,17 +396,23 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     return this.buildTargetNetworkDescriptor(DEFAULT_CHAIN_ID);
   };
 
-  getTargetNetwork = (): LoginTargetNetwork => {
-    const slug = this.getActiveSessionSlug();
-    const capabilities = this.getActiveSessionCapabilities();
-    const projectedChainId =
-      capabilities.showNetworkControls && Number(capabilities.chainId) > 0 ? Number(capabilities.chainId) : null;
-    if (!projectedChainId) return this.getGlobalTargetNetwork();
+  syncPasskeyWalletChain = (targetNetwork: any = null) => {
+    const tn = targetNetwork || this.getTargetNetwork();
+    passkeyWallet.setPasskeyWalletChain(tn);
+    if (typeof passkeyWallet.getPasskeyWalletChain === 'function') {
+      return passkeyWallet.getPasskeyWalletChain();
+    }
+    return tn;
+  };
 
-    const configuredNetwork = getSessionNetwork(slug);
-    if (Number(readChainIdLike(configuredNetwork)) === projectedChainId) return configuredNetwork as LoginTargetNetwork;
-
-    return getChainById(projectedChainId) || this.buildTargetNetworkDescriptor(projectedChainId);
+  getPasskeyWalletNetwork = (targetNetwork: any = null) => {
+    const tn = this.syncPasskeyWalletChain(targetNetwork);
+    if (!tn) return tn;
+    const chainId = Number(tn?.id ?? tn?.chainId ?? 0);
+    if (!chainId) return tn;
+    const nameBase = tn?.name || `Chain ${chainId}`;
+    const name = /\(Passkey\)$/.test(nameBase) ? nameBase : `${nameBase} (Passkey)`;
+    return { ...tn, id: chainId, chainId, name };
   };
 
   async componentDidMount() {
@@ -484,12 +427,13 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     const restoredAddress = await passkeyWallet.restorePasskeyWalletSession({ requireSigner: false });
     if (!this._isMounted) return;
 
-    const restoreStillCurrent =
+    const restoreStillCurrent = (
       passkeyRestoreReqId === this._passkeyWalletRestoreReqId &&
-      passkeyActionIdAtRestoreStart === this._passkeyWalletActionId;
+      passkeyActionIdAtRestoreStart === this._passkeyWalletActionId
+    );
     if (restoredAddress && restoreStillCurrent) {
-      accountLog.log('Restored passkey wallet session:', restoredAddress);
-      const web3info = {
+       accountLog.log("Restored passkey wallet session:", restoredAddress);
+       const web3info = {
         account: restoredAddress,
         provider: 'passkey_eoa',
         network: passkeyNetwork,
@@ -499,7 +443,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       this.props.updateLoginInfo({
         loginInProgress: false,
         loginComplete: true,
-        provider: 'passkey_eoa',
+        provider: "passkey_eoa",
       });
     }
 
@@ -612,7 +556,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     }
 
     if (props.provider === 'passkey_eoa' || props.provider === 'web3auth') {
-      const providerResolver =
+      const providerResolver = (
         typeof getProviderLocation === 'function'
           ? getProviderLocation
           : contractScripts && typeof contractScripts.getProviderLocation === 'function'
@@ -741,46 +685,90 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
 
   // Passkey wallet handlers
 
-  handlePortoSignUp = async () => {
+  startPasskeyWalletAction = (): number => {
+    this._passkeyWalletActionId += 1;
+    return this._passkeyWalletActionId;
+  };
+
+  isCurrentPasskeyWalletAction = (actionId: number): boolean => (
+    this._isMounted && actionId === this._passkeyWalletActionId
+  );
+
+  handlePasskeyWalletCreate = async () => {
+    const passkeyActionId = this.startPasskeyWalletAction();
+    this.setStateIfMounted({
+      passkeyWalletStatusMessage: '',
+      passkeyWalletStatusTone: '',
+    });
     this.props.updateLoginInfo({
       loginInProgress: true,
       loginComplete: false,
-      provider: "porto_passkey",
+      provider: "passkey_eoa",
     });
 
     try {
-      const portoNetwork = this.getPortoNetwork();
-      const address = await portoFunctions.authenticatePorto();
-      this._finalizePortoLogin(address, portoNetwork);
+      const passkeyNetwork = this.getPasskeyWalletNetwork();
+      const address = await passkeyWallet.createPasskeyWallet();
+      if (!this.isCurrentPasskeyWalletAction(passkeyActionId)) return;
+      this._finalizePasskeyWalletLogin(address, passkeyNetwork);
     } catch (error) {
-      accountLog.error("Porto Sign Up Error:", error);
+      accountLog.error("Passkey wallet create error:", error);
+      if (!this.isCurrentPasskeyWalletAction(passkeyActionId)) return;
+      const message = toStr((error as any)?.message).trim() || 'Could not create passkey wallet.';
+      this.setStateIfMounted({
+        passkeyWalletStatusMessage: `Create failed: ${message}`,
+        passkeyWalletStatusTone: 'error',
+      });
       this.props.updateLoginInfo({ loginInProgress: false, loginComplete: false, provider: null });
     }
   };
 
-  handlePortoSignIn = async () => {
+  handlePasskeyWalletSignIn = async () => {
+    const passkeyActionId = this.startPasskeyWalletAction();
+    this.setStateIfMounted({
+      passkeyWalletStatusMessage: '',
+      passkeyWalletStatusTone: '',
+    });
     this.props.updateLoginInfo({
       loginInProgress: true,
       loginComplete: false,
-      provider: "porto_passkey",
+      provider: "passkey_eoa",
     });
 
     try {
-      const portoNetwork = this.getPortoNetwork();
-      const address = await portoFunctions.loginWithPorto();
-      this._finalizePortoLogin(address, portoNetwork);
+      const passkeyNetwork = this.getPasskeyWalletNetwork();
+      const address = await passkeyWallet.unlockPasskeyWallet();
+      if (!this.isCurrentPasskeyWalletAction(passkeyActionId)) return;
+      this._finalizePasskeyWalletLogin(address, passkeyNetwork);
     } catch (error) {
-      accountLog.error("Porto Sign In Error:", error);
+      accountLog.error("Passkey wallet sign-in error:", error);
+      if (!this.isCurrentPasskeyWalletAction(passkeyActionId)) return;
+      const isMissingWallet = passkeyWallet.isMissingPasskeyWalletRecordError?.(error);
+      const message = isMissingWallet
+        ? 'No passkey wallet is saved in this browser for this app. Use Create to make one under this RP ID.'
+        : `Login failed: ${toStr((error as any)?.message).trim() || 'Could not unlock passkey wallet.'}`;
+      this.setStateIfMounted({
+        passkeyWalletStatusMessage: message,
+        passkeyWalletStatusTone: 'error',
+      });
       this.props.updateLoginInfo({ loginInProgress: false, loginComplete: false, provider: null });
     }
   };
 
-  _finalizePortoLogin = (address: any, targetNetwork: any = null) => {
-      const portoNetwork = this.getPortoNetwork(targetNetwork);
+  _finalizePasskeyWalletLogin = (address: any, targetNetwork: any = null) => {
+      const passkeyNetwork = this.getPasskeyWalletNetwork(targetNetwork);
+      const previousPasskeyAccount = this.props.provider === 'passkey_eoa'
+        ? normalizeAccountForComparison(this.props.account)
+        : '';
+      const nextPasskeyAccount = normalizeAccountForComparison(address);
+      if (previousPasskeyAccount && nextPasskeyAccount && previousPasskeyAccount !== nextPasskeyAccount) {
+        clearAllWorkerSessionTokens();
+        notify.info('Passkey account switched.');
+      }
       const web3info = {
         account: address,
-        provider: 'porto_passkey',
-        network: portoNetwork,
+        provider: 'passkey_eoa',
+        network: passkeyNetwork,
         userImageURL: undefined,
       };
 
@@ -788,13 +776,14 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       this.props.updateLoginInfo({
         loginInProgress: false,
         loginComplete: true,
-        provider: "porto_passkey",
+        provider: "passkey_eoa",
       });
   };
 
   handleLogout = async () => {
-    if (this.props.provider === 'porto_passkey') {
-       portoFunctions.logoutPorto();
+    this._passkeyWalletActionId += 1;
+    if (this.props.provider === 'passkey_eoa') {
+       await passkeyWallet.logoutPasskeyWallet();
     }
 
     if (this.props.provider === 'wagmi' && this.props.wagmiDisconnect) {
@@ -877,10 +866,8 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     if (activeSessionChanged) {
       this.loadAiSettings();
       this.loadResourceKeys();
-      const capabilities = this.getActiveSessionCapabilities();
-      if (capabilities.showNetworkControls && capabilities.chainId) {
-        this.syncPasskeyWalletChain(this.getTargetNetwork());
-      }
+      this.loadSponsoredAccess();
+      this.syncPasskeyWalletChain();
     }
     if (needsSponsoredAccessRefresh) this.loadSponsoredAccess();
 
@@ -2500,10 +2487,10 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
               </ul>
             </div>
 
-            {/* Porto / passkey buttons */}
+            {/* Passkey wallet buttons */}
              <div className={styles.passkeyButtonContainer}>
                <Button
-                  onClick={this.handlePortoSignUp}
+                  onClick={this.handlePasskeyWalletCreate}
                   color="primary"
                   className={`${styles.passkeyButton} ${styles.passkeyButtonPrimary}`}
                 >
@@ -2511,7 +2498,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
                   <span>Create  </span>
                </Button>
                <Button
-                  onClick={this.handlePortoSignIn}
+                  onClick={this.handlePasskeyWalletSignIn}
                   color="secondary"
                   outline
                   className={`${styles.passkeyButton} ${styles.passkeyButtonOutline}`}
@@ -2520,6 +2507,17 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
                   <span> Login</span>
                </Button>
             </div>
+            {this.state.passkeyWalletStatusMessage && (
+              <div
+                className={`${styles.passkeyWalletStatus} ${
+                  this.state.passkeyWalletStatusTone === 'error' ? styles.passkeyWalletStatusError : ''
+                }`}
+                role="status"
+                data-testid="ce-passkey-wallet-status"
+              >
+                {this.state.passkeyWalletStatusMessage}
+              </div>
+            )}
 
             <button
               type="button"
@@ -2545,7 +2543,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       );
     }
 
-    // Logged-in view for all providers (Porto, Wagmi)
+    // Logged-in view for all providers (passkey wallet, Wagmi)
     if (this.props.loginComplete) {
       const activeSessionSlug = this.getActiveSessionSlug();
       const activeSessionConfig = this.getDisplaySessionConfig(activeSessionSlug);

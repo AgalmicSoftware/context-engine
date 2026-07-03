@@ -69,7 +69,7 @@ const createPasskeyProvider = (factory?: () => unknown): unknown => {
   if (win?.__passkeyEoaProvider) return win.__passkeyEoaProvider;
 
   // Keep the dependency lazy so read-only adapter imports do not eagerly load wallet code.
-
+  // eslint-disable-next-line global-require
   const wallet = require('../../wallet/passkeyWallet.js');
   if (wallet && typeof wallet.createPasskeyEip1193Provider === 'function') {
     return wallet.createPasskeyEip1193Provider();

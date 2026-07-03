@@ -277,9 +277,11 @@ const resolvePublicAssetPath = (requestUrl) => {
 };
 
 const readClientEnv = (mode) => {
-  const loadedEnv = loadEnv(mode, __dirname, ['REACT_APP_', 'PUBLIC_URL']);
+  const loadedEnv = loadEnv(mode, __dirname, ['REACT_APP_', 'NEXT_PUBLIC_', 'PUBLIC_URL']);
   const reactAppEnv = Object.fromEntries(
-    Object.entries(process.env).filter(([key]) => key.startsWith('REACT_APP_'))
+    Object.entries(process.env).filter(([key]) => (
+      key.startsWith('REACT_APP_') || key.startsWith('NEXT_PUBLIC_')
+    ))
   );
   const publicUrl = process.env.PUBLIC_URL ?? loadedEnv.PUBLIC_URL ?? '/';
   return {
@@ -412,7 +414,7 @@ export default defineConfig(({ mode }) => {
     appType: 'spa',
     base: normalizeBase(clientEnv.PUBLIC_URL),
     publicDir: false,
-    envPrefix: ['VITE_', 'REACT_APP_'],
+    envPrefix: ['VITE_', 'REACT_APP_', 'NEXT_PUBLIC_'],
     define: {
       'process.env': JSON.stringify(clientEnv),
     },

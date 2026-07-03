@@ -44,7 +44,7 @@ type ProviderLike = string | (UnknownRecord & {
   provider?: unknown;
   request?: Eip1193Provider['request'];
 }) | null | undefined;
-type ProviderKind = 'wagmi' | 'porto' | 'web3auth';
+type ProviderKind = 'wagmi' | 'passkey-eoa' | 'web3auth';
 type ByteInput = Uint8Array | ArrayBuffer | ArrayBufferView | ArrayLike<number>;
 type MaybePromise<T> = T | Promise<T>;
 type PoseidonHashValue = string | number | bigint;
@@ -191,8 +191,8 @@ type DecryptCacheEntry = {
 
 declare global {
   interface Window {
-    __portoMockProvider?: Eip1193Provider & { isPorto?: boolean };
-    __ceCreatePortoProviderMock?: () => Eip1193Provider | null;
+    __passkeyEoaProvider?: Eip1193Provider & { isPasskeyEoa?: boolean };
+    __ceCreatePasskeyEip1193Provider?: () => Eip1193Provider | null;
     web3authProvider?: Eip1193Provider;
     ethereum?: Eip1193Provider;
     poseidon?: PoseidonHasher;
@@ -644,9 +644,9 @@ const getProviderKind = (providerLike: ProviderLike): ProviderKind => {
       (typeof window !== 'undefined' ? window.ethereum : null)
     ) as (UnknownRecord & { provider?: UnknownRecord }) | null;
 
-    // Check for Porto provider first (must come before other checks)
-    if (p && p.isPorto === true) {
-      return 'porto';
+    // Check for the embedded passkey provider first (must come before other checks).
+    if (p && p.isPasskeyEoa === true) {
+      return 'passkey-eoa';
     }
 
     // Keep Web3Auth detection; it is cheap and enables quick re-enable.
@@ -672,10 +672,10 @@ const getProviderKind = (providerLike: ProviderLike): ProviderKind => {
 const _getProvider = (providerLike: ProviderLike): Eip1193Provider => {
   const providerRecord = isRecord(providerLike) ? providerLike : null;
   const candidate = ((providerRecord && providerRecord.provider) || providerLike) as
-    (UnknownRecord & { provider?: unknown; request?: Eip1193Provider['request']; isPorto?: boolean }) | null;
+    (UnknownRecord & { provider?: unknown; request?: Eip1193Provider['request']; isPasskeyEoa?: boolean }) | null;
 
-  // Check for Porto provider first - return directly if it has isPorto flag and request method
-  if (candidate && candidate.isPorto === true && typeof candidate.request === 'function') {
+  // Check for embedded passkey provider first.
+  if (candidate && candidate.isPasskeyEoa === true && typeof candidate.request === 'function') {
     return candidate as Eip1193Provider;
   }
 
@@ -687,48 +687,37 @@ const _getProvider = (providerLike: ProviderLike): Eip1193Provider => {
   if (typeof providerLike === 'string') {
     const s = providerLike.trim().toLowerCase();
 
-    // Handle Porto provider string. Prefer the seeded window global when a signing
-    // client is already warm, but synthesize the lazy mock provider on demand so
-    // post-login auth flows can still trigger a passkey assertion only when signing.
-    if (s === 'porto_passkey' || s === 'porto') {
-      if (typeof window !== 'undefined' && window.__portoMockProvider && window.__portoMockProvider.isPorto) {
-        return window.__portoMockProvider;
+    // Handle embedded passkey provider strings. Prefer the seeded window global
+    // when a signing client is already warm, but synthesize the lazy provider on
+    // demand so post-login auth flows can still trigger a passkey assertion only
+    // when signing.
+    if (s === 'passkey_eoa' || s === 'passkey-eoa') {
+      if (typeof window !== 'undefined' && window.__passkeyEoaProvider && window.__passkeyEoaProvider.isPasskeyEoa) {
+        return window.__passkeyEoaProvider;
       }
       try {
-        const globalBuildPortoProvider =
-          typeof window !== 'undefined' && typeof window.__ceCreatePortoProviderMock === 'function'
-            ? window.__ceCreatePortoProviderMock
+        const globalBuildPasskeyProvider =
+          typeof window !== 'undefined' && typeof window.__ceCreatePasskeyEip1193Provider === 'function'
+            ? window.__ceCreatePasskeyEip1193Provider
             : null;
-        if (globalBuildPortoProvider) {
-          const portoProvider = globalBuildPortoProvider();
-          if (portoProvider && portoProvider.isPorto === true && typeof portoProvider.request === 'function') {
+        if (globalBuildPasskeyProvider) {
+          const passkeyProvider = globalBuildPasskeyProvider();
+          if (passkeyProvider && passkeyProvider.isPasskeyEoa === true && typeof passkeyProvider.request === 'function') {
             if (typeof window !== 'undefined') {
-              window.__portoMockProvider = portoProvider;
+              window.__passkeyEoaProvider = passkeyProvider;
             }
-            return portoProvider;
-          }
-        }
-        // Avoid a hard module cycle at load time: portoFunctions imports contractScripts,
-        // which already depends on cryptography.
-        // eslint-disable-next-line global-require
-        const portoModule = require('../web3/portoFunctions.js');
-        const buildPortoProvider =
-          portoModule?.createPortoProviderMock ||
-          portoModule?.default?.createPortoProviderMock;
-        const portoProvider = typeof buildPortoProvider === 'function'
-          ? buildPortoProvider()
-          : null;
-        if (portoProvider && portoProvider.isPorto === true && typeof portoProvider.request === 'function') {
-          if (typeof window !== 'undefined') {
-            window.__portoMockProvider = portoProvider;
+            return passkeyProvider;
           }
         }
         // Avoid a hard module cycle at load time.
-
+        // eslint-disable-next-line global-require
         const walletModule = require('../../wallet/passkeyWallet.js');
         const buildPasskeyProvider =
-          walletModule?.createPasskeyEip1193Provider || walletModule?.default?.createPasskeyEip1193Provider;
-        const passkeyProvider = typeof buildPasskeyProvider === 'function' ? buildPasskeyProvider() : null;
+          walletModule?.createPasskeyEip1193Provider ||
+          walletModule?.default?.createPasskeyEip1193Provider;
+        const passkeyProvider = typeof buildPasskeyProvider === 'function'
+          ? buildPasskeyProvider()
+          : null;
         if (passkeyProvider && passkeyProvider.isPasskeyEoa === true && typeof passkeyProvider.request === 'function') {
           if (typeof window !== 'undefined') {
             window.__passkeyEoaProvider = passkeyProvider;

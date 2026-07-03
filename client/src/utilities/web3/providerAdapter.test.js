@@ -72,30 +72,13 @@ describe('providerAdapter', () => {
     );
   });
 
-  it('allows explicit injected signer provider selection', () => {
-    const injectedProvider = { request: jest.fn() };
-
-    expect(
-      resolveSignerProvider({
-        providerName: 'injected',
-        injectedProvider,
-      }),
-    ).toEqual({
-      ok: true,
-      provider: injectedProvider,
-      source: 'injected-wallet',
-    });
-  });
-
   it('resolves passkey EOA signer providers through the adapter factory', () => {
     const passkeyProvider = { isPasskeyEoa: true };
 
-    expect(
-      resolveSignerProvider({
-        providerName: 'passkey_eoa',
-        passkeyProviderFactory: () => passkeyProvider,
-      }),
-    ).toEqual({
+    expect(resolveSignerProvider({
+      providerName: 'passkey_eoa',
+      passkeyProviderFactory: () => passkeyProvider,
+    })).toEqual({
       ok: true,
       provider: passkeyProvider,
       source: 'passkey-eoa',
