@@ -1,6 +1,11 @@
 const CACHE_NAME = 'ce-cc-v8';
 const SHELL_ASSETS = ['/', '/index.html', '/manifest.webmanifest'];
-const STATIC_ASSET_PATHS = new Set([...SHELL_ASSETS, '/styles.css', '/ethers.umd.min.js']);
+const STATIC_ASSET_PATHS = new Set([
+  ...SHELL_ASSETS,
+  '/styles.css',
+  '/ethers.umd.min.js',
+  '/passkey-wallet-derivation.mjs',
+]);
 const STATIC_ASSET_PREFIXES = ['/js/'];
 const NAVIGATION_FALLBACK_URL = '/index.html';
 

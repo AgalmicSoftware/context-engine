@@ -15,15 +15,19 @@ const {
   writeJson,
 } = require('./lib/common');
 const { resolveChainDefaults } = require('./lib/network-defaults');
+const {
+  DEFAULT_PASSKEY_RAW_ID_B64URL,
+  buildPasskeyDerivedWallet,
+  toPasskeyEoaSeedRecord,
+} = require('./lib/passkey-derived-wallet');
 
-let buildWalletFromPasskey;
-let DEFAULT_PASSKEY_A;
-let DEFAULT_PASSKEY_B;
-let DEFAULT_PASSKEY_C;
-let DEFAULT_PASSKEY_D;
-let DEFAULT_PASSKEY_E;
+const DEFAULT_PASSKEY_A = DEFAULT_PASSKEY_RAW_ID_B64URL;
+const DEFAULT_PASSKEY_B = 'EBESExQVFhcYGRobHB0eHw';
+const DEFAULT_PASSKEY_C = 'ICEiIyQlJicoKSorLC0uLw';
+const DEFAULT_PASSKEY_D = 'MDEyMzQ1Njc4OTo7PD0-Pw';
+const DEFAULT_PASSKEY_E = 'QEFCQ0RFRkdISUpLTE1OTw';
+
 let ensureWalletFunded;
-let toPortoSeedRecord;
 let createNonceSender;
 let sleep;
 let launchBrowserWithRetry;
@@ -35,14 +39,7 @@ const loadE2eRuntime = () => {
   if (locators) return;
 
   ({
-    buildWalletFromPasskey,
-    DEFAULT_PASSKEY_A,
-    DEFAULT_PASSKEY_B,
-    DEFAULT_PASSKEY_C,
-    DEFAULT_PASSKEY_D,
-    DEFAULT_PASSKEY_E,
     ensureWalletFunded,
-    toPortoSeedRecord,
   } = require('./lib/e2e/wallets'));
   ({ createNonceSender, sleep } = require('./lib/e2e/tx'));
   ({
@@ -337,13 +334,67 @@ const createContextForWallet = async ({ browser, wallet }) => {
     serviceWorkers: 'block',
   });
 
-  await context.addInitScript(({ portoSession }) => {
+  await context.addInitScript(({ passkeyWalletSeed }) => {
+    let seededPrfOutput = null;
+    const fromBase64Url = (value) => {
+      const base64 = String(value || '').replace(/-/g, '+').replace(/_/g, '/');
+      const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+      const raw = atob(padded);
+      const out = new Uint8Array(raw.length);
+      for (let i = 0; i < raw.length; i += 1) out[i] = raw.charCodeAt(i);
+      return out;
+    };
+    const openWalletDb = () => new Promise((resolve, reject) => {
+      const request = indexedDB.open('ce_passkey_wallet_db', 1);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains('wallet_records')) db.createObjectStore('wallet_records');
+      };
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+    });
+    const writeWalletRecord = async (record) => {
+      const db = await openWalletDb();
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction('wallet_records', 'readwrite');
+        tx.objectStore('wallet_records').put(record, 'active');
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error);
+      });
+      db.close();
+    };
+    const toArrayBuffer = (bytes) => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+    window.__CE_PASSKEY_WALLET_E2E_SEED_READY__ = (async () => {
+      if (!passkeyWalletSeed?.credentialId || !passkeyWalletSeed?.prfOutput || !passkeyWalletSeed?.address) return;
+      seededPrfOutput = toArrayBuffer(fromBase64Url(passkeyWalletSeed.prfOutput));
+      const now = new Date().toISOString();
+      const rpId = String(passkeyWalletSeed.rpId || 'localhost');
+      const address = String(passkeyWalletSeed.address);
+      await writeWalletRecord({
+        id: `derived-wallet:${rpId}:${address.toLowerCase()}`,
+        rpId,
+        credentialId: passkeyWalletSeed.credentialId,
+        evmAddress: address,
+        keyMode: 'passkey-derived',
+        derivationVersion: 'passkey-prf-hkdf-secp256k1-v1',
+        prfSalt: passkeyWalletSeed.prfSalt,
+        createdAt: now,
+        updatedAt: now,
+      });
+    })();
+
     try {
-      localStorage.setItem('porto_session_v1', JSON.stringify(portoSession));
+      window.__CE_PASSKEY_WALLET_E2E_SEED_ADDRESS__ = passkeyWalletSeed?.address || '';
     } catch (_) {}
 
-    const fakeRaw = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
-    const fakeCredential = { rawId: fakeRaw.buffer };
+    const rawId = fromBase64Url(passkeyWalletSeed?.credentialId || '');
+    const fakeCredential = {
+      rawId: rawId.buffer,
+      getClientExtensionResults: () => ({
+        prf: { enabled: true, results: { first: seededPrfOutput } },
+      }),
+    };
     try {
       if (!window.PublicKeyCredential) {
         window.PublicKeyCredential = function PublicKeyCredential() {};
@@ -367,10 +418,9 @@ const createContextForWallet = async ({ browser, wallet }) => {
       } catch (_) {}
     }
   }, {
-    portoSession: toPortoSeedRecord({
+    passkeyWalletSeed: toPasskeyEoaSeedRecord({
       credentialId: wallet.rawIdB64Url,
       address: wallet.address,
-      privateKey: wallet.privateKey,
     }),
   });
 
@@ -453,11 +503,11 @@ async function main() {
   const passkeyD = toStr(args['passkey-d'] || process.env.PASSKEY_D || DEFAULT_PASSKEY_D).trim() || DEFAULT_PASSKEY_D;
   const passkeyE = toStr(args['passkey-e'] || process.env.PASSKEY_E || DEFAULT_PASSKEY_E).trim() || DEFAULT_PASSKEY_E;
 
-  const walletA = buildWalletFromPasskey(passkeyA, provider);
-  const walletB = buildWalletFromPasskey(passkeyB, provider);
-  const walletC = buildWalletFromPasskey(passkeyC, provider);
-  const walletD = buildWalletFromPasskey(passkeyD, provider);
-  const walletE = buildWalletFromPasskey(passkeyE, provider);
+  const walletA = buildPasskeyDerivedWallet(passkeyA, provider);
+  const walletB = buildPasskeyDerivedWallet(passkeyB, provider);
+  const walletC = buildPasskeyDerivedWallet(passkeyC, provider);
+  const walletD = buildPasskeyDerivedWallet(passkeyD, provider);
+  const walletE = buildPasskeyDerivedWallet(passkeyE, provider);
   const walletSet = [
     { key: 'A', info: walletA },
     { key: 'B', info: walletB },

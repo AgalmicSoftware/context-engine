@@ -3590,6 +3590,25 @@ body.w3a-silent iframe[class^='walletIframe-'] {
   }
 }
 
+.passkeyWalletStatus {
+  max-width: min(520px, 100%);
+  margin: 14px auto 0;
+  padding: 10px 12px;
+  border-radius: var(--ce-radius-8);
+  border: 1px solid rgba(140, 170, 220, 0.28);
+  background: rgba(18, 22, 48, 0.72);
+  color: #f2f4ff;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.passkeyWalletStatusError {
+  border-color: rgba(255, 142, 142, 0.42);
+  background: rgba(76, 24, 38, 0.55);
+  color: #ffe8ec;
+}
+
 .cryptoLoginLink {
   background: rgba(18, 22, 50, 0.45);
   border: 1px solid rgba(255, 255, 255, 0.15);

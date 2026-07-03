@@ -1,4 +1,9 @@
-import { derivePortoWalletFromCredential } from '/porto-derivation.mjs';
+import {
+  buildPrfExtension,
+  derivePasskeyWalletFromCredential,
+  getCredentialPrfEnabled,
+  getPasskeyDerivedPrfSalt,
+} from '/passkey-wallet-derivation.mjs';
 import { apiLocal } from '/js/api.mjs';
 import { normalizeConfiguredSessions } from '/js/sessionSlugs.mjs';
 import {
@@ -15,6 +20,26 @@ export function pluginDir() {
   return '~/.claude/plugins/contextEngine-cc';
 }
 
+async function requestPasskeyAssertion({ rpId, credentialId, salt }) {
+  const publicKey = {
+    challenge: crypto.getRandomValues(new Uint8Array(32)),
+    rpId,
+    userVerification: 'required',
+    timeout: 60000,
+    extensions: buildPrfExtension(salt),
+  };
+  if (credentialId) {
+    publicKey.allowCredentials = [{
+      id: credentialId,
+      type: 'public-key',
+      transports: ['internal', 'hybrid'],
+    }];
+  }
+  const assertion = await navigator.credentials.get({ publicKey });
+  if (!assertion) throw new Error('No passkey assertion was returned.');
+  return assertion;
+}
+
 export async function createPasskey() {
   if (!navigator.credentials) {
     throw new Error('WebAuthn not available. Use Chrome or Safari on localhost.');
@@ -22,6 +47,8 @@ export async function createPasskey() {
   setStatus('auth-status', 'Creating passkey...', '');
 
   const challenge = crypto.getRandomValues(new Uint8Array(32));
+  const rpId = window.location.hostname;
+  const prfSalt = await getPasskeyDerivedPrfSalt({ rpId });
   const date = new Date();
   const month = date.toLocaleDateString('en-US', { month: 'long' });
   const day = date.getDate();
@@ -33,7 +60,7 @@ export async function createPasskey() {
   const credential = await navigator.credentials.create({
     publicKey: {
       challenge,
-      rp: { name: 'Context Engine', id: window.location.hostname },
+      rp: { name: 'Context Engine', id: rpId },
       user: {
         id: Uint8Array.from(uniqueName, (char) => char.charCodeAt(0)),
         name: uniqueName,
@@ -44,13 +71,25 @@ export async function createPasskey() {
         authenticatorAttachment: 'platform',
         residentKey: 'required',
         requireResidentKey: true,
+        userVerification: 'required',
       },
       attestation: 'none',
       timeout: 60000,
+      extensions: buildPrfExtension(prfSalt),
     },
   });
 
-  return derivePortoWalletFromCredential(credential);
+  if (!credential) throw new Error('No passkey credential was created.');
+  if (!getCredentialPrfEnabled(credential)) {
+    throw new Error('This passkey does not advertise WebAuthn PRF support.');
+  }
+  setStatus('auth-status', 'Unlocking passkey...', '');
+  const assertion = await requestPasskeyAssertion({
+    rpId,
+    credentialId: credential.rawId,
+    salt: prfSalt,
+  });
+  return derivePasskeyWalletFromCredential(assertion, { rpId });
 }
 
 export async function loginPasskey() {
@@ -59,18 +98,14 @@ export async function loginPasskey() {
   }
   setStatus('auth-status', 'Signing in...', '');
 
-  const challenge = crypto.getRandomValues(new Uint8Array(32));
-  const assertion = await navigator.credentials.get({
-    publicKey: {
-      challenge,
-      rpId: window.location.hostname,
-      userVerification: 'preferred',
-      allowCredentials: [],
-      timeout: 60000,
-    },
+  const rpId = window.location.hostname;
+  const prfSalt = await getPasskeyDerivedPrfSalt({ rpId });
+  const assertion = await requestPasskeyAssertion({
+    rpId,
+    salt: prfSalt,
   });
 
-  return derivePortoWalletFromCredential(assertion);
+  return derivePasskeyWalletFromCredential(assertion, { rpId });
 }
 
 export function buildSessionAuthMessage({ address, nonce, chainId, domain, uri }) {

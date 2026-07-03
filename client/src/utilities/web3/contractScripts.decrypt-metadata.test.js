@@ -109,7 +109,7 @@ describe('contractScripts metadata decrypt helpers', () => {
       {
         decryptContext: {
           account: ACCOUNT,
-          providerLike: 'porto_passkey',
+          providerLike: 'passkey_eoa',
           chainId: 84532,
           litHooks: { getKey: jest.fn() },
         },

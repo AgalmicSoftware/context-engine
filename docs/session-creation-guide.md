@@ -145,7 +145,7 @@ Registration cost notes:
 Use any wallet that can connect to OP Sepolia and sign both transactions and SIWE-style messages:
 
 - MetaMask
-- Porto passkey wallet
+- Context Engine passkey EOA wallet
 - Coinbase Wallet
 - Other WalletConnect-compatible wallets
 

@@ -183,8 +183,8 @@ declare global {
   }
 }
 
-// === NEW: Porto / Passkey Sidecar ===
-import * as portoFunctions from './portoFunctions.js';
+// Embedded passkey EOA sidecar.
+import * as passkeyWallet from '../../wallet/passkeyWallet.js';
 
 export {
   normalizeSessionSlug,
@@ -314,12 +314,12 @@ const resolveDefaultProviderLike = () => {
     contractsLog.debug('resolveDefaultProviderLike error:', err);
   }
   if (typeof window !== 'undefined') {
-    if (window.__portoMockProvider && window.__portoMockProvider.isPorto) return 'porto_passkey';
+    if (window.__passkeyEoaProvider && window.__passkeyEoaProvider.isPasskeyEoa) return 'passkey_eoa';
     if (window.ethereum) return 'wagmi';
     if (window.web3authProvider) return 'web3auth';
   }
-  // Default to Porto since passkey auth is now the primary wallet path.
-  return 'porto_passkey';
+  // Default to the embedded passkey EOA because passkey auth is the primary wallet path.
+  return 'passkey_eoa';
 };
 
 const classifyDecryptFailure = (err: any, ctx: any = {}) => {
@@ -1569,8 +1569,8 @@ async function resolveGroupPasswordWalletScopeSbtAddress({
 const contractScripts: any = {
   _blockCache: {}, // For the memoized getBlockWithCaching
 
-  // --- NEW: Expose Porto Auth for UI ---
-  authenticatePorto: portoFunctions.authenticatePorto,
+  // Expose embedded passkey wallet auth for UI.
+  createPasskeyWallet: passkeyWallet.createPasskeyWallet,
 
   invalidateReadCachesForGroup: (groupKeyOrCfg: any = null) => {
     clearReadCachesForGroup(groupKeyOrCfg);
@@ -5412,7 +5412,7 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
       providerName,
       injectedProvider: win.ethereum,
       web3AuthProvider: win.web3authProvider,
-      portoProviderFactory: () => portoFunctions.createPortoProviderMock(),
+      passkeyProviderFactory: () => passkeyWallet.createPasskeyEip1193Provider(),
       // Compatibility wrapper: preserve the old unknown-provider injected fallback
       // until call sites explicitly opt into stricter signer-provider resolution.
       allowInjectedSignerFallback: true,

@@ -199,7 +199,7 @@ Security defaults:
 
 If your token expires, the hook will open the browser automatically and show a macOS notification.
 
-Passkey wallet derivation now matches the main client’s HKDF-SHA256 Porto path. Reusing the same wallet across the client and `contextEngine-cc` still requires both apps to run on the same hostname because WebAuthn passkeys are scoped by RP ID.
+Passkey wallet derivation matches the main client’s passkey PRF -> HKDF-SHA256 EOA path. Reusing the same wallet across the client and `contextEngine-cc` still requires both apps to run on the same hostname because WebAuthn passkeys are scoped by RP ID.
 
 ### Local JWT endpoint safeguards
 

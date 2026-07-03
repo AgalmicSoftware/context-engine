@@ -17,13 +17,16 @@ Outputs:
 
 const fs = require('fs');
 const path = require('path');
-const { ethers } = require('ethers');
 const {
   dedupeRpcUrls,
   normalizeRpcUrl,
   resolveRpcRewriteConfig,
 } = require('./lib/rpc-rewrite-config');
 const { resolveSeedPasskeyRawId } = require('./lib/e2e/passkey-env');
+const {
+  buildPasskeyDerivedWallet,
+  toPasskeyEoaSeedRecord,
+} = require('./lib/passkey-derived-wallet');
 const {
   launchBrowserWithRetry,
   requirePlaywright,
@@ -111,19 +114,6 @@ const nowTag = () => {
   return `${yyyy}${mm}${dd}-${hh}${min}${ss}`;
 };
 
-const base64UrlToBuffer = (value) => {
-  const normalized = String(value || '')
-    .replace(/-/g, '+')
-    .replace(/_/g, '/');
-  const padLen = (4 - (normalized.length % 4)) % 4;
-  return Buffer.from(normalized + '='.repeat(padLen), 'base64');
-};
-
-const derivePrivateKeyFromPasskeyRawId = (rawIdB64Url) => {
-  const rawIdBytes = base64UrlToBuffer(rawIdB64Url);
-  return ethers.utils.keccak256(rawIdBytes);
-};
-
 const writeJson = (filePath, value) => {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
@@ -194,13 +184,11 @@ async function main() {
     defaultRawId: DEFAULTS.passkeyRawIdB64Url,
   });
   const rawIdB64Url = String(passkeySelection.rawId || '').trim() || DEFAULTS.passkeyRawIdB64Url;
-  const privateKey = derivePrivateKeyFromPasskeyRawId(rawIdB64Url);
-  const wallet = new ethers.Wallet(privateKey);
-  const portoSession = {
-    credentialId: rawIdB64Url,
+  const wallet = buildPasskeyDerivedWallet(rawIdB64Url);
+  const passkeyWalletSeed = toPasskeyEoaSeedRecord({
+    credentialId: wallet.credentialId,
     address: wallet.address,
-    privateKey,
-  };
+  });
 
   const playwright = requirePlaywright();
   const { browserName, browserType } = resolvePlaywrightBrowserType(playwright);
@@ -289,8 +277,8 @@ async function main() {
     log,
   });
 
-  // Seed a deterministic Porto session + stub WebAuthn for headless runs.
-  await context.addInitScript(({ portoSessionRecord, resourceKeysSeed, rpcRewrite, sessionRegistrySeed, preferPathRpc: preferPathRpcSeed }) => {
+  // Seed a deterministic passkey wallet session + stub WebAuthn for headless runs.
+  await context.addInitScript(({ passkeyWalletSeedRecord, resourceKeysSeed, rpcRewrite, sessionRegistrySeed, preferPathRpc: preferPathRpcSeed }) => {
     const normalizeUrl = (value) => String(value || '').trim().replace(/\/+$/, '');
     const applyRpcRewrite = (() => {
       const cfg = rpcRewrite && typeof rpcRewrite === 'object' ? rpcRewrite : null;
@@ -314,9 +302,54 @@ async function main() {
     // Can be re-enabled by setting E2E_PREFER_PATH_RPC=1.
     try { globalThis.CE_PREFER_PATH_RPC = !!preferPathRpcSeed; } catch (_) {}
 
-    try {
-      localStorage.setItem('porto_session_v1', JSON.stringify(portoSessionRecord));
-    } catch (_) {}
+    let seededPrfOutput = null;
+    const fromBase64Url = (value) => {
+      const base64 = String(value || '').replace(/-/g, '+').replace(/_/g, '/');
+      const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+      const raw = atob(padded);
+      const out = new Uint8Array(raw.length);
+      for (let i = 0; i < raw.length; i += 1) out[i] = raw.charCodeAt(i);
+      return out;
+    };
+    const openWalletDb = () => new Promise((resolve, reject) => {
+      const request = indexedDB.open('ce_passkey_wallet_db', 1);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains('wallet_records')) db.createObjectStore('wallet_records');
+      };
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+    });
+    const writeWalletRecord = async (record) => {
+      const db = await openWalletDb();
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction('wallet_records', 'readwrite');
+        tx.objectStore('wallet_records').put(record, 'active');
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error);
+      });
+      db.close();
+    };
+    const toArrayBuffer = (bytes) => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+    window.__CE_PASSKEY_WALLET_E2E_SEED_READY__ = (async () => {
+      if (!passkeyWalletSeedRecord?.credentialId || !passkeyWalletSeedRecord?.prfOutput || !passkeyWalletSeedRecord?.address) return;
+      seededPrfOutput = toArrayBuffer(fromBase64Url(passkeyWalletSeedRecord.prfOutput));
+      const now = new Date().toISOString();
+      const rpId = String(passkeyWalletSeedRecord.rpId || 'localhost');
+      const address = String(passkeyWalletSeedRecord.address);
+      await writeWalletRecord({
+        id: `derived-wallet:${rpId}:${address.toLowerCase()}`,
+        rpId,
+        credentialId: passkeyWalletSeedRecord.credentialId,
+        evmAddress: address,
+        keyMode: 'passkey-derived',
+        derivationVersion: 'passkey-prf-hkdf-secp256k1-v1',
+        prfSalt: passkeyWalletSeedRecord.prfSalt,
+        createdAt: now,
+        updatedAt: now,
+      });
+    })();
 
     // Match the shared E2E browser seed so cold-loading /session/<slug> does not
     // open the onboarding overlay over the create controls.
@@ -434,8 +467,16 @@ async function main() {
       } catch (_) {}
     }
 
-    const fakeRaw = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
-    const fakeCredential = { rawId: fakeRaw.buffer };
+    const fakeRaw = fromBase64Url(passkeyWalletSeedRecord?.credentialId || '');
+    const fakeCredential = {
+      rawId: fakeRaw.buffer,
+      getClientExtensionResults: () => ({
+        prf: {
+          enabled: true,
+          results: { first: seededPrfOutput || new ArrayBuffer(32) },
+        },
+      }),
+    };
     try {
       if (!window.PublicKeyCredential) {
         window.PublicKeyCredential = function PublicKeyCredential() {};
@@ -459,7 +500,7 @@ async function main() {
       } catch (_) {}
     }
 	  }, {
-	    portoSessionRecord: portoSession,
+	    passkeyWalletSeedRecord: passkeyWalletSeed,
 	    resourceKeysSeed: {
 	      sessionSlug,
 	      generalSlug: '',

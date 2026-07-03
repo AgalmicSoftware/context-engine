@@ -11,7 +11,7 @@ import {
 
 type AnyRecord = Record<string, any>;
 
-type ProviderSource = 'configured-read' | 'session-sponsored' | 'injected-wallet' | 'porto' | 'web3auth';
+type ProviderSource = 'configured-read' | 'session-sponsored' | 'injected-wallet' | 'passkey-eoa' | 'web3auth';
 
 type AdapterResult<T = unknown> = {
   ok: boolean;
@@ -38,7 +38,7 @@ type ResolveSignerProviderOptions = {
   allowInjectedSignerFallback?: boolean;
   injectedProvider?: unknown;
   web3AuthProvider?: unknown;
-  portoProviderFactory?: () => unknown;
+  passkeyProviderFactory?: () => unknown;
 };
 
 type WalletChainRequestOptions = {
@@ -72,16 +72,16 @@ const getWeb3AuthProvider = (web3AuthProvider?: unknown): unknown => {
   return win?.web3authProvider || null;
 };
 
-const createPortoProvider = (factory?: () => unknown): unknown => {
+const createPasskeyProvider = (factory?: () => unknown): unknown => {
   if (typeof factory === 'function') return factory();
   const win = getWindowLike();
-  if (win?.__portoMockProvider) return win.__portoMockProvider;
+  if (win?.__passkeyEoaProvider) return win.__passkeyEoaProvider;
 
   // Keep the dependency lazy so read-only adapter imports do not eagerly load wallet code.
   // eslint-disable-next-line global-require
-  const porto = require('./portoFunctions.js');
-  if (porto && typeof porto.createPortoProviderMock === 'function') {
-    return porto.createPortoProviderMock();
+  const wallet = require('../../wallet/passkeyWallet.js');
+  if (wallet && typeof wallet.createPasskeyEip1193Provider === 'function') {
+    return wallet.createPasskeyEip1193Provider();
   }
   return null;
 };
@@ -141,17 +141,17 @@ export const resolveReadProvider = (options: ResolveReadProviderOptions = {}): A
 export const resolveSignerProvider = (options: ResolveSignerProviderOptions = {}): AdapterResult => {
   const providerName = normalizeProviderName(options.providerName);
 
-  if (providerName === 'porto_passkey') {
-    const provider = createPortoProvider(options.portoProviderFactory);
+  if (providerName === 'passkey_eoa' || providerName === 'passkey-eoa') {
+    const provider = createPasskeyProvider(options.passkeyProviderFactory);
     if (!provider) {
       return {
         ok: false,
-        error: 'Porto passkey provider is not available. Reconnect your passkey wallet first.',
+        error: 'Passkey wallet provider is not available. Unlock your wallet first.',
         recoverable: true,
         status: 'missing-provider',
       };
     }
-    return { ok: true, provider, source: 'porto' };
+    return { ok: true, provider, source: 'passkey-eoa' };
   }
 
   if (providerName === 'web3auth') {

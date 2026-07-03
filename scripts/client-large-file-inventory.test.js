@@ -60,7 +60,6 @@ const LARGE_CLIENT_FILE_BASELINE = Object.freeze({
   'client/src/components/SurveyTool/surveyToolDraftState.ts': 1326,
   'client/src/utilities/worker/workerAuth.js': 1234,
   'client/src/utilities/session/sessionProfileScanController.ts': 1227,
-  'client/src/utilities/web3/portoFunctions.ts': 1532,
   'client/src/components/Shared/AudioInput/AudioInput.tsx': 1194,
   'client/src/components/Sponsor/SponsorPage.tsx': 1191,
   'client/src/components/SBTs/createSbtGroupHelpers.ts': 1109,

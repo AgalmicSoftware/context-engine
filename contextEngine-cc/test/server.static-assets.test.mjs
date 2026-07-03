@@ -64,6 +64,7 @@ describe('server static auth assets', () => {
         swResponse,
         mainResponse,
         authResponse,
+        derivationResponse,
         sessionsResponse,
         apiResponse,
         formResponse,
@@ -77,6 +78,7 @@ describe('server static auth assets', () => {
         fetch(`http://127.0.0.1:${address.port}/sw.js`),
         fetch(`http://127.0.0.1:${address.port}/js/main.mjs`),
         fetch(`http://127.0.0.1:${address.port}/js/auth.mjs`),
+        fetch(`http://127.0.0.1:${address.port}/passkey-wallet-derivation.mjs`),
         fetch(`http://127.0.0.1:${address.port}/js/sessions.mjs`),
         fetch(`http://127.0.0.1:${address.port}/js/api.mjs`),
         fetch(`http://127.0.0.1:${address.port}/js/form.mjs`),
@@ -86,12 +88,13 @@ describe('server static auth assets', () => {
         fetch(`http://127.0.0.1:${address.port}/js/state.mjs`),
       ]);
 
-      const [html, css, swJs, mainJs, authJs, sessionsJs, apiJs, formJs, uiJs, settingsJs, submitJs, stateJs] = await Promise.all([
+      const [html, css, swJs, mainJs, authJs, derivationJs, sessionsJs, apiJs, formJs, uiJs, settingsJs, submitJs, stateJs] = await Promise.all([
         indexResponse.text(),
         cssResponse.text(),
         swResponse.text(),
         mainResponse.text(),
         authResponse.text(),
+        derivationResponse.text(),
         sessionsResponse.text(),
         apiResponse.text(),
         formResponse.text(),
@@ -128,6 +131,7 @@ describe('server static auth assets', () => {
       for (const response of [
         mainResponse,
         authResponse,
+        derivationResponse,
         sessionsResponse,
         apiResponse,
         formResponse,
@@ -147,7 +151,10 @@ describe('server static auth assets', () => {
       assert.match(mainJs, /getToken\(\)/);
       assert.doesNotMatch(mainJs, /state\.token/);
       assert.doesNotMatch(mainJs, /state\.privateKey/);
-      assert.match(authJs, /derivePortoWalletFromCredential/);
+      assert.match(authJs, /derivePasskeyWalletFromCredential/);
+      assert.match(authJs, /passkey-wallet-derivation\.mjs/);
+      assert.match(derivationJs, /passkey-prf-hkdf-secp256k1-v1/);
+      assert.doesNotMatch(derivationJs, /porto/i);
       assert.match(authJs, /buildLocalJwtRequestBody/);
       assert.match(authJs, /signMessageWithAuthWallet/);
       assert.match(authJs, /clearPrivateKey\(\)/);
