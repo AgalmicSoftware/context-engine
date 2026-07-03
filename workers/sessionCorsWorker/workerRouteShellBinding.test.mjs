@@ -26,6 +26,8 @@ const createBaseDeps = () => ({
   computeScopesForLogin: 'computeScopesForLogin',
   signToken: 'signToken',
   getAddress: 'getAddress',
+  buildAuthTokenJti: 'buildAuthTokenJti',
+  persistAuthTokenRecord: 'persistAuthTokenRecord',
   now: 'now',
   readArweaveBootstrapUploadPayload: 'readArweaveBootstrapUploadPayload',
   getSessionConfig: 'getSessionConfig',
@@ -230,6 +232,8 @@ test('createWorkerRouteShellWithWorkerDeps preserves auth-login branch wiring', 
           computeScopesForLogin: 'computeScopesForLogin',
           signToken: 'signToken',
           getAddress: 'getAddress',
+          buildAuthTokenJti: 'buildAuthTokenJti',
+          persistAuthTokenRecord: 'persistAuthTokenRecord',
           now: 'now',
         });
         assert.deepEqual(value.constants, {
