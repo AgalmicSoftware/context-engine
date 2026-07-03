@@ -1,7 +1,9 @@
 import React from 'react';
-import { screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 
 import { renderSurveyQuestions } from './surveyQuestionsTestHarness';
+import contractScripts from '../../utilities/web3/contractScripts.js';
+import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import {
   executeSurveyDraftHydration,
   executeSurveySingleQuestionPrefill,
@@ -155,6 +157,214 @@ describe('SurveyQuestions runtime helpers', () => {
     expect(strategy.componentWillUnmount).toHaveBeenCalledTimes(1);
     // port note: direct bridge method facade calls are class-only; the post-conversion
     // guard is that lifecycle/render strategy callbacks route through the mounted harness.
+  });
+
+  it('parent gate precheck invalidates stale response-decrypt access checks before wallet login', async () => {
+    let runtimeEngine = null;
+    renderSurveyQuestions({
+      account: '',
+      isStandalone: true,
+      loginComplete: false,
+      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Question one' }],
+      runtimeStrategy: {
+        render: (engine) => {
+          runtimeEngine = engine;
+          return null;
+        },
+      },
+      sessionSlug: 'edge',
+      viewAddress: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+    });
+
+    await waitFor(() => expect(runtimeEngine).not.toBeNull());
+    runtimeEngine._canDecryptOtherResponsesInFlight = Promise.resolve(true);
+    runtimeEngine._canDecryptOtherResponsesKey = 'stale-gate-key';
+    runtimeEngine._canDecryptOtherResponsesRunId = 7;
+
+    await act(async () => {
+      await expect(runtimeEngine.refreshCanDecryptOtherResponses()).resolves.toBe(false);
+    });
+
+    await waitFor(() => {
+      expect(runtimeEngine.state.canDecryptOtherResponses).toBe(false);
+      expect(runtimeEngine.state.canDecryptOtherResponsesStatus).toBe('needs-wallet');
+    });
+    expect(runtimeEngine._canDecryptOtherResponsesInFlight).toBeNull();
+    expect(runtimeEngine._canDecryptOtherResponsesKey).toBe('');
+    expect(runtimeEngine._canDecryptOtherResponsesRunId).toBe(8);
+  });
+
+  it('persists and reloads standalone question drafts through the parent runtime storage key', async () => {
+    jest.useFakeTimers();
+    let runtimeEngine = null;
+    const view = renderSurveyQuestions({
+      account: '0xabc',
+      activeSessionSlug: 'edge',
+      isStandalone: true,
+      loginComplete: true,
+      network: { id: 84532 },
+      networkChainId: 84532,
+      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Question one' }],
+      runtimeStrategy: {
+        render: (engine) => {
+          runtimeEngine = engine;
+          return null;
+        },
+      },
+      sessionSlug: 'edge',
+    });
+
+    await waitFor(() => expect(runtimeEngine).not.toBeNull());
+    const draftKey = runtimeEngine.getDraftKey();
+    expect(sessionStorage.getItem(draftKey)).toBeNull();
+
+    await act(async () => {
+      runtimeEngine.handleAnswer(0, 'q1', 'draft answer');
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(runtimeEngine._persistTimer).toBeTruthy());
+
+    await act(async () => {
+      jest.runOnlyPendingTimers();
+      await Promise.resolve();
+    });
+
+    const persisted = JSON.parse(sessionStorage.getItem(draftKey));
+    expect(persisted.answers.q1.value).toBe('draft answer');
+    expect(runtimeEngine.loadDraft().answers.q1.value).toBe('draft answer');
+
+    view.unmount();
+  });
+
+  it('deduplicates and clears single-question bootstrap retry timers in the parent runtime', async () => {
+    jest.useFakeTimers();
+    let runtimeEngine = null;
+    const view = renderSurveyQuestions({
+      account: '0xabc',
+      isStandalone: true,
+      loginComplete: true,
+      questionID: 'q1',
+      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Question one' }],
+      runtimeStrategy: {
+        render: (engine) => {
+          runtimeEngine = engine;
+          return null;
+        },
+      },
+      sessionSlug: 'edge',
+      singleQuestionMode: true,
+    });
+
+    await waitFor(() => expect(runtimeEngine?._isMounted).toBe(true));
+    expect(runtimeEngine.scheduleSingleQuestionBootstrapRetry({
+      questionId: 'q1',
+      attempt: 0,
+      reason: 'metadata-empty',
+    })).toBe(true);
+    const firstTimer = runtimeEngine._singleQuestionBootstrapRetryTimer;
+    expect(firstTimer).toBeTruthy();
+    expect(runtimeEngine._singleQuestionBootstrapRetrySig).toBe('q1:1');
+    expect(runtimeEngine.getPendingSingleQuestionBootstrapRetryAttempt('q1')).toBe(1);
+
+    expect(runtimeEngine.scheduleSingleQuestionBootstrapRetry({
+      questionId: 'q1',
+      attempt: 0,
+      reason: 'duplicate',
+    })).toBe(true);
+    expect(runtimeEngine._singleQuestionBootstrapRetryTimer).toBe(firstTimer);
+    expect(runtimeEngine._singleQuestionBootstrapRetrySig).toBe('q1:1');
+
+    expect(runtimeEngine.scheduleSingleQuestionBootstrapRetry({
+      questionId: 'q1',
+      attempt: 1,
+      reason: 'newer-attempt',
+    })).toBe(true);
+    expect(runtimeEngine._singleQuestionBootstrapRetryTimer).not.toBe(firstTimer);
+    expect(runtimeEngine._singleQuestionBootstrapRetrySig).toBe('q1:2');
+
+    view.unmount();
+    expect(runtimeEngine._singleQuestionBootstrapRetryTimer).toBeNull();
+    expect(runtimeEngine._singleQuestionBootstrapRetrySig).toBe('');
+    jest.runOnlyPendingTimers();
+    expect(runtimeEngine._isMounted).toBe(false);
+  });
+
+  it('runs primary submit through start state, contract write, receipt, and submitted state', async () => {
+    const txDeferred = createDeferred();
+    const events = [];
+    const submitResponsesSpy = jest
+      .spyOn(contractScripts, 'submitResponses')
+      .mockImplementation(async (...args) => {
+        events.push({ type: 'contract', args });
+        return txDeferred.promise;
+      });
+    jest.spyOn(cryptoUtils, 'getProviderKind').mockReturnValue('browser');
+    jest.spyOn(cryptoUtils, 'hashIdentifier').mockImplementation((value) => `hashed:${String(value)}`);
+
+    let runtimeEngine = null;
+    renderSurveyQuestions({
+      account: '0xabc',
+      isStandalone: true,
+      loginComplete: true,
+      network: { id: 84532 },
+      networkChainId: 84532,
+      provider: { request: jest.fn() },
+      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Question one' }],
+      runtimeStrategy: {
+        render: (engine) => {
+          runtimeEngine = engine;
+          return null;
+        },
+      },
+      sessionSlug: 'edge',
+    });
+
+    await waitFor(() => expect(runtimeEngine).not.toBeNull());
+    await act(async () => {
+      runtimeEngine.handleAnswer(0, 'q1', 'submitted answer');
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(runtimeEngine.getPendingEditStats().total).toBe(1));
+
+    await act(async () => {
+      runtimeEngine.handlePrimarySubmitClick();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => expect(submitResponsesSpy).toHaveBeenCalledTimes(1));
+    expect(runtimeEngine._submitGuard).toBe(true);
+    expect(runtimeEngine.state.isSubmitting).toBe(true);
+    expect(runtimeEngine.state.currentStep).toBe(2);
+    expect(events[0].type).toBe('contract');
+    expect(events[0].args[0]).toBe(runtimeEngine.props.provider);
+    expect(events[0].args[1]).toEqual(['hashed:q1']);
+    expect(events[0].args[5]).toBe('edge');
+
+    await act(async () => {
+      txDeferred.resolve({
+        wait: async () => {
+          events.push({ type: 'receipt' });
+          return {
+            status: 1,
+            blockNumber: 42,
+            transactionHash: `0x${'7'.repeat(64)}`,
+            transactionIndex: 0,
+          };
+        },
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => expect(runtimeEngine.state.submissionComplete).toBe(true));
+    expect(events.map((event) => event.type)).toEqual(['contract', 'receipt']);
+    expect(runtimeEngine._submitGuard).toBe(false);
+    expect(runtimeEngine.state.responseUrl).toBe('/');
+    expect(runtimeEngine.state.userAnswers.responses[0]).toEqual(expect.objectContaining({
+      questionID: 'q1',
+      responder: '0xabc',
+      answer: expect.objectContaining({ value: 'submitted answer' }),
+    }));
   });
 
   it('runs mount-time survey draft hydration under the response hydration guard', () => {
