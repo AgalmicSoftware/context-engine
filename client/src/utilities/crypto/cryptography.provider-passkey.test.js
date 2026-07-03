@@ -1,9 +1,9 @@
 import { cryptoUtils } from './cryptography.js';
 
-const mockCreatePortoProvider = jest.fn();
+const mockCreatePasskeyProvider = jest.fn();
 
-jest.mock('../web3/portoFunctions.js', () => ({
-  createPortoProviderMock: (...args) => mockCreatePortoProvider(...args),
+jest.mock('../../wallet/passkeyWallet.js', () => ({
+  createPasskeyEip1193Provider: (...args) => mockCreatePasskeyProvider(...args),
 }));
 
 const setWindowProvider = (key, value) => {
@@ -14,63 +14,63 @@ const setWindowProvider = (key, value) => {
   });
 };
 
-describe('cryptoUtils Porto provider bootstrap', () => {
+describe('cryptoUtils passkey EOA provider bootstrap', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockCreatePortoProvider.mockReset();
+    mockCreatePasskeyProvider.mockReset();
     try {
-      delete window.__portoMockProvider;
-      delete window.__ceCreatePortoProviderMock;
+      delete window.__passkeyEoaProvider;
+      delete window.__ceCreatePasskeyEip1193Provider;
       delete window.ethereum;
       delete window.web3authProvider;
     } catch (_) {
-      window.__portoMockProvider = undefined;
-      window.__ceCreatePortoProviderMock = undefined;
+      window.__passkeyEoaProvider = undefined;
+      window.__ceCreatePasskeyEip1193Provider = undefined;
       window.ethereum = undefined;
       window.web3authProvider = undefined;
     }
   });
 
-  it('uses the Vite-safe Porto provider factory when one is registered on window', () => {
+  it('uses the Vite-safe passkey provider factory when one is registered on window', () => {
     const provider = {
-      isPorto: true,
+      isPasskeyEoa: true,
       request: jest.fn(),
     };
-    window.__ceCreatePortoProviderMock = jest.fn(() => provider);
+    window.__ceCreatePasskeyEip1193Provider = jest.fn(() => provider);
 
-    const resolved = cryptoUtils._getProvider('porto_passkey');
+    const resolved = cryptoUtils._getProvider('passkey_eoa');
 
     expect(resolved).toBe(provider);
-    expect(window.__ceCreatePortoProviderMock).toHaveBeenCalledTimes(1);
-    expect(mockCreatePortoProvider).not.toHaveBeenCalled();
-    expect(window.__portoMockProvider).toBe(provider);
+    expect(window.__ceCreatePasskeyEip1193Provider).toHaveBeenCalledTimes(1);
+    expect(mockCreatePasskeyProvider).not.toHaveBeenCalled();
+    expect(window.__passkeyEoaProvider).toBe(provider);
   });
 
-  it('synthesizes the Porto provider on demand for porto_passkey strings', () => {
+  it('synthesizes the passkey provider on demand for passkey_eoa strings', () => {
     const provider = {
-      isPorto: true,
+      isPasskeyEoa: true,
       request: jest.fn(),
     };
-    mockCreatePortoProvider.mockReturnValue(provider);
+    mockCreatePasskeyProvider.mockReturnValue(provider);
 
-    const resolved = cryptoUtils._getProvider('porto_passkey');
+    const resolved = cryptoUtils._getProvider('passkey_eoa');
 
     expect(resolved).toBe(provider);
-    expect(mockCreatePortoProvider).toHaveBeenCalledTimes(1);
-    expect(window.__portoMockProvider).toBe(provider);
+    expect(mockCreatePasskeyProvider).toHaveBeenCalledTimes(1);
+    expect(window.__passkeyEoaProvider).toBe(provider);
   });
 
-  it('reuses the seeded Porto provider when one is already present on window', () => {
+  it('reuses the seeded passkey provider when one is already present on window', () => {
     const seededProvider = {
-      isPorto: true,
+      isPasskeyEoa: true,
       request: jest.fn(),
     };
-    window.__portoMockProvider = seededProvider;
+    window.__passkeyEoaProvider = seededProvider;
 
-    const resolved = cryptoUtils._getProvider('porto_passkey');
+    const resolved = cryptoUtils._getProvider('passkey_eoa');
 
     expect(resolved).toBe(seededProvider);
-    expect(mockCreatePortoProvider).not.toHaveBeenCalled();
+    expect(mockCreatePasskeyProvider).not.toHaveBeenCalled();
   });
 
   it('prefers the Web3Auth provider for web3auth strings when present', () => {

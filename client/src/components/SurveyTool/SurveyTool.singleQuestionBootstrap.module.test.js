@@ -112,9 +112,9 @@ const shouldRehydrateStandaloneLocalResponses = ({
 const buildAutomaticQuestionMetadataFetchOptions = ({
   account = ACCOUNT,
   loginComplete = true,
-  provider = 'porto_passkey',
-  providerKind = 'porto',
-  portoReady = false,
+  provider = 'passkey_eoa',
+  providerKind = 'passkey-eoa',
+  passkeyReady = false,
 } = {}) => {
   const decryptContext = {
     account,
@@ -124,7 +124,7 @@ const buildAutomaticQuestionMetadataFetchOptions = ({
     loginComplete &&
     account &&
     provider &&
-    decideAutomaticPromptDecryptByKind(providerKind, () => portoReady)
+    decideAutomaticPromptDecryptByKind(providerKind, () => passkeyReady)
   );
   return canDecrypt ? { decryptContext } : { decryptContext, skipDecrypt: true };
 };
@@ -174,14 +174,14 @@ describe('SurveyTool single-question bootstrap cache', () => {
       masked: true,
       prev: {
         account: ACCOUNT,
-        provider: 'porto_passkey',
+        provider: 'passkey_eoa',
         loginComplete: true,
         litHooks: null,
         sbtCacheRevision: 0,
       },
       next: {
         account: ACCOUNT,
-        provider: 'porto_passkey',
+        provider: 'passkey_eoa',
         loginComplete: true,
         litHooks: { getKey: jest.fn() },
         sbtCacheRevision: 0,
@@ -218,7 +218,7 @@ describe('SurveyTool single-question bootstrap cache', () => {
     const events = [];
     const plan = shouldRehydrateStandaloneLocalResponses({
       prevProps: { account: '', loginComplete: false, provider: '' },
-      nextProps: { account: ACCOUNT, loginComplete: true, provider: 'porto_passkey' },
+      nextProps: { account: ACCOUNT, loginComplete: true, provider: 'passkey_eoa' },
     });
 
     if (plan.shouldResetForAuth) {
@@ -240,7 +240,7 @@ describe('SurveyTool single-question bootstrap cache', () => {
       prevProps: {
         account: ACCOUNT,
         loginComplete: true,
-        provider: 'porto_passkey',
+        provider: 'passkey_eoa',
         isQuestionCacheReady: true,
         isResponsesCacheReady: true,
         questionsCacheNonce: 3,
@@ -249,7 +249,7 @@ describe('SurveyTool single-question bootstrap cache', () => {
       nextProps: {
         account: ACCOUNT,
         loginComplete: true,
-        provider: 'porto_passkey',
+        provider: 'passkey_eoa',
         isQuestionCacheReady: true,
         isResponsesCacheReady: true,
         questionsCacheNonce: 3,
@@ -275,23 +275,23 @@ describe('SurveyTool single-question bootstrap cache', () => {
     expect(getQuestionData.mock.calls.every((call) => call[0] === 'edge')).toBe(true);
   });
 
-  it('skips automatic single-question prompt decrypt for passive Porto sessions', () => {
+  it('skips automatic single-question prompt decrypt for passive passkey wallet sessions', () => {
     expect(buildAutomaticQuestionMetadataFetchOptions({
-      portoReady: false,
+      passkeyReady: false,
     })).toEqual(expect.objectContaining({ skipDecrypt: true }));
     // port note: the class wrapper also builds a decrypt context; the behavior
     // guarded here is the boundary option passed to `getQuestionData`.
   });
 
-  it('auto-decrypts single-question prompts when Porto auto-sign is ready', () => {
+  it('auto-decrypts single-question prompts when passkey wallet auto-sign is ready', () => {
     const options = buildAutomaticQuestionMetadataFetchOptions({
-      portoReady: true,
+      passkeyReady: true,
     });
 
     expect(options).not.toEqual(expect.objectContaining({ skipDecrypt: true }));
     expect(options.decryptContext).toEqual(expect.objectContaining({
       account: ACCOUNT,
-      providerLike: 'porto_passkey',
+      providerLike: 'passkey_eoa',
     }));
   });
 

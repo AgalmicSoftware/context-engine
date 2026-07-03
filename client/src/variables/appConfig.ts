@@ -37,9 +37,9 @@ export const DEFAULT_DEMO_SURFACE_MODE = readPublicBoolEnv(
   'REACT_APP_CE_DEMO_SURFACE_MODE_DEFAULT',
   true
 );
-// Porto passkey session-key mode (true = silent tx/message signing)
-export const PORTO_SESSION_KEY_ENABLED = readPublicBoolEnv(
-  'REACT_APP_PORTO_SESSION_KEY_ENABLED',
+// Passkey EOA soft-session mode (true = routine message/tx signing can reuse the worker-held session).
+export const PASSKEY_WALLET_SOFT_SESSION_ENABLED = readPublicBoolEnv(
+  'REACT_APP_PASSKEY_WALLET_SOFT_SESSION_ENABLED',
   true
 );
 // RainbowKit's MetaMask wallet falls back to WalletConnect when MetaMask is not injected.

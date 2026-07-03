@@ -181,7 +181,8 @@ Decrypt:  Client ──▸ Lit SDK decrypt(payload) ──▸ Lit nodes verify S
 | SBT management | `components/SBTs/SBTsList.tsx`, `SBTPage.tsx`, `CreateSBTGroup.tsx` |
 | Gate components | `components/Gates/` |
 | **Utilities** | |
-| Web3 / contracts | `utilities/web3/contractScripts.js` (compat barrel), `contractScripts.impl.ts`, `contractHelpers.ts`, `contractEventListeners.ts`, `contractProfile.ts`, `sessionRegistry.ts`, `portoFunctions.ts` |
+| Web3 / contracts | `utilities/web3/contractScripts.js` (compat barrel), `contractScripts.impl.ts`, `contractHelpers.ts`, `contractEventListeners.ts`, `contractProfile.ts`, `sessionRegistry.ts` |
+| Wallet | `client/src/wallet/` passkey EOA wallet config, encrypted keystore, EIP-1193 provider, and soft-session worker |
 | Crypto / Lit | `utilities/crypto/litProtocol.js`, `cryptography.js`, `encryptedFields.js` |
 | Arweave | `utilities/arweave/arweaveScripts.js`, `arweaveUrls.js` |
 | Session helpers | `utilities/session/sessionNaming.js`, `sessionMetadata.js`, `resourceKeys.js` |
@@ -327,6 +328,8 @@ SBTFactory                      ────────────────
 - [`docs/cache/README.md`](docs/cache/README.md) — managed cache backend + namespace guide
 - [`docs/lit-protocol-information.md`](docs/lit-protocol-information.md) — Lit Protocol integration
 - [`docs/resource-keys.md`](docs/resource-keys.md) — Resource key resolution
-- [`docs/porto-information.md`](docs/porto-information.md) — Porto passkey wallet
+- [`docs/passkey-wallet.md`](docs/passkey-wallet.md) — passkey EOA wallet
+- [`docs/forking-wallet.md`](docs/forking-wallet.md) — fork-owned RP ID setup
+- [`docs/security-model.md`](docs/security-model.md) — embedded wallet security model
 - [`docs/local-chain.md`](docs/local-chain.md) — Local Anvil development
 - [`CLAUDE.md`](CLAUDE.md) — AI agent workflow and conventions

@@ -26,7 +26,7 @@ const DEFAULT_LOGGING_CONFIG = {
     account: false,
     ui: false,
     whisper: false,
-    porto: false,
+    wallet: false,
     inviteDebug: false,
     cache: false,
     crypto: false

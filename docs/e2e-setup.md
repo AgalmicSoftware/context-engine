@@ -41,7 +41,7 @@ Arweave is public and permanent. Use non-identifying payloads only.
      - `E2E_OPENAI_KEY` when running real deploy verification with `E2E_AI_MOCK=0`
    - For fresh full private runs, set `CLOUDFLARE_API_TOKEN` and let session setup create the worker-backed session target.
    - For reuse-only runs, set both `SESSION_SLUG` and `SESSION_WORKER_URL` from an already established E2E session target.
-   - Ensure the deterministic wallet you use (derived from `PASSKEY_RAW_ID_B64URL`) is funded on the target chain.
+   - Ensure the deterministic wallet you use (derived from the fixture credential ID through the passkey mock PRF/HKDF path) is funded on the target chain.
    - For multi-wallet Polis seeding, keep walletA funded; walletB/C/D/E are auto-topped-up by the runner when below threshold.
 3. Run `npm run -s test:e2e` for the public navigation smoke, or any private
    `ai:*` workflow command; the scripts auto-load `.env.e2e.local`, then

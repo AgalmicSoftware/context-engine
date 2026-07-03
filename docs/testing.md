@@ -116,4 +116,4 @@ For required env setup, wallet flows, and the full command catalog, use:
 
 - [docs/e2e-setup.md](e2e-setup.md)
 - [docs/e2e-commands.md](e2e-commands.md)
-- [docs/porto-information.md](porto-information.md)
+- [docs/passkey-wallet.md](passkey-wallet.md)

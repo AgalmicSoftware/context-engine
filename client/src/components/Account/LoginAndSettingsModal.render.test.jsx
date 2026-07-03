@@ -36,13 +36,14 @@ jest.mock('../../utilities/web3/contractScripts.js', () => ({
   getAllSessionSlugs: jest.fn(() => []),
 }));
 
-jest.mock('../../utilities/web3/portoFunctions.js', () => ({
-  authenticatePorto: jest.fn(),
-  getPortoChain: jest.fn(() => null),
-  loginWithPorto: jest.fn(),
-  logoutPorto: jest.fn(),
-  restoreSession: jest.fn(async () => null),
-  setPortoChain: jest.fn(),
+jest.mock('../../wallet/passkeyWallet.js', () => ({
+  createPasskeyWallet: jest.fn(),
+  getPasskeyWalletChain: jest.fn(() => null),
+  isMissingPasskeyWalletRecordError: jest.fn((error) => error?.code === 'CE_PASSKEY_WALLET_RECORD_MISSING'),
+  unlockPasskeyWallet: jest.fn(),
+  logoutPasskeyWallet: jest.fn(),
+  restorePasskeyWalletSession: jest.fn(async () => null),
+  setPasskeyWalletChain: jest.fn(),
 }));
 
 jest.mock('../../utilities/ai/aiSettings.js', () => {
@@ -108,7 +109,7 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => ({
 
 import { LoginAndSettingsModal, buildBookmarksRoutePath } from './LoginAndSettingsModal';
 import contractScripts from '../../utilities/web3/contractScripts.js';
-import * as portoFunctions from '../../utilities/web3/portoFunctions.js';
+import * as passkeyWallet from '../../wallet/passkeyWallet.js';
 import { saveLocalAiSettings } from '../../utilities/ai/aiSettings.js';
 import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
 import { clearAllWorkerSessionTokens } from '../../utilities/worker/workerAuth.js';
@@ -269,14 +270,18 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     localStorage.clear();
-    portoFunctions.authenticatePorto.mockReset();
-    portoFunctions.getPortoChain.mockReset();
-    portoFunctions.getPortoChain.mockReturnValue(null);
-    portoFunctions.loginWithPorto.mockReset();
-    portoFunctions.logoutPorto.mockReset();
-    portoFunctions.restoreSession.mockReset();
-    portoFunctions.restoreSession.mockResolvedValue(null);
-    portoFunctions.setPortoChain.mockReset();
+    passkeyWallet.createPasskeyWallet.mockReset();
+    passkeyWallet.getPasskeyWalletChain.mockReset();
+    passkeyWallet.getPasskeyWalletChain.mockReturnValue(null);
+    passkeyWallet.isMissingPasskeyWalletRecordError.mockReset();
+    passkeyWallet.isMissingPasskeyWalletRecordError.mockImplementation((error) => (
+      error?.code === 'CE_PASSKEY_WALLET_RECORD_MISSING'
+    ));
+    passkeyWallet.unlockPasskeyWallet.mockReset();
+    passkeyWallet.logoutPasskeyWallet.mockReset();
+    passkeyWallet.restorePasskeyWalletSession.mockReset();
+    passkeyWallet.restorePasskeyWalletSession.mockResolvedValue(null);
+    passkeyWallet.setPasskeyWalletChain.mockReset();
     getAllSessionSlugs.mockReturnValue([]);
     getSessionConfigBySlugOrDefault.mockImplementation(() => ({}));
     checkSponsoredAccess.mockImplementation(async () => ({ status: 'unknown' }));
@@ -295,6 +300,26 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open Crypto Login (RainbowKit)' }));
 
     expect(props.openConnectModal).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows an inline recovery hint when login has no stored passkey wallet record', async () => {
+    const missingWalletError = Object.assign(
+      new Error('No encrypted passkey wallet is saved in this browser.'),
+      { code: 'CE_PASSKEY_WALLET_RECORD_MISSING' }
+    );
+    passkeyWallet.unlockPasskeyWallet.mockRejectedValueOnce(missingWalletError);
+
+    render(<LoginAndSettingsModal {...buildProps()} />);
+
+    const loginButton = getPasskeyLoginButton();
+    expect(loginButton).toBeTruthy();
+    fireEvent.click(loginButton);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ce-passkey-wallet-status')).toHaveTextContent(
+        /No passkey wallet is saved in this browser/i
+      );
+    });
   });
 
   it('renders the full auth modal with a centered dialog wrapper', async () => {
@@ -866,8 +891,8 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     expect(screen.queryByText(/Selected 2 sessions?/i)).not.toBeInTheDocument();
   });
 
-  it('completes Porto sign-in from the rendered login view', async () => {
-    portoFunctions.loginWithPorto.mockResolvedValue(PASSKEY_ADDRESS);
+  it('completes passkey wallet sign-in from the rendered login view', async () => {
+    passkeyWallet.unlockPasskeyWallet.mockResolvedValue(PASSKEY_ADDRESS);
     const props = buildProps();
     const subject = new LoginAndSettingsModal(props);
     subject._isMounted = true;
@@ -878,13 +903,13 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     expect(props.updateLoginInfo).toHaveBeenNthCalledWith(1, {
       loginInProgress: true,
       loginComplete: false,
-      provider: 'porto_passkey',
+      provider: 'passkey_eoa',
     });
 
     await waitFor(() => {
       expect(props.changeAccount).toHaveBeenCalledWith(expect.objectContaining({
         account: PASSKEY_ADDRESS,
-        provider: 'porto_passkey',
+        provider: 'passkey_eoa',
       }));
     });
 
@@ -895,12 +920,12 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     expect(props.updateLoginInfo).toHaveBeenLastCalledWith({
       loginInProgress: false,
       loginComplete: true,
-      provider: 'porto_passkey',
+      provider: 'passkey_eoa',
     });
   });
 
-  it('resets back to a logged-out state when Porto sign-in fails', async () => {
-    portoFunctions.loginWithPorto.mockRejectedValue(new Error('passkey rejected'));
+  it('resets back to a logged-out state when passkey wallet sign-in fails', async () => {
+    passkeyWallet.unlockPasskeyWallet.mockRejectedValue(new Error('passkey rejected'));
     const props = buildProps();
     const subject = new LoginAndSettingsModal(props);
     subject._isMounted = true;

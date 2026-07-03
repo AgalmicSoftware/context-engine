@@ -47,7 +47,9 @@ Primary storage and authority split:
 - Session: A named "space" (identified by `slug` and/or `sessionId`) that ties together contracts, metadata, worker config, and access gates.
 - Group: Typically an SBT contract (non-transferable ERC-721) representing membership/entitlement.
 - Gate: An access rule stored on-chain in `SessionRegistry` that says which SBT(s) are required (and whether Any/All) to access a resource.
-- Porto wallet: A passkey-backed wallet option using IndexedDB-encrypted session keys for gasless UX.
+- Passkey EOA wallet: A passkey-unlocked embedded EOA wallet using WebAuthn PRF
+  to derive the EOA key by default, with optional AES-GCM encrypted private-key
+  compatibility mode and soft worker-held sessions.
 - Doc Library: A per-session and per-SBT-group document store on Arweave, with optional Lit encryption.
 - Sponsored resource: A service that uses secrets (AI keys, Arweave wallet, faucet key) and therefore routes through the Worker.
 - Sponsored grant: A pre-authorized access token for worker resources (deploy, faucet) redeemable without full auth.
@@ -226,14 +228,18 @@ Deep-dive docs:
 
 What users can do:
 - Connect with a standard injected wallet (RainbowKit/wagmi, e.g. MetaMask).
-- Use a passkey-backed Porto-style wallet with silent "session key" mode (optional) for smoother UX.
+- Use the embedded passkey EOA wallet with soft worker-held session mode
+  (optional) for smoother UX.
 
 What the system does:
-- Maintains wallet sessions in browser storage (Porto uses IndexedDB with encrypted storage, with a localStorage fallback).
+- Maintains an encrypted passkey EOA wallet record in IndexedDB. Plaintext
+  private keys, PRF output, and derived encryption keys are not persisted.
 - Uses the connected wallet identity for contract actions, worker login, and Lit auth.
 
 Deep-dive docs:
-- `docs/porto-information.md`
+- `docs/passkey-wallet.md`
+- `docs/forking-wallet.md`
+- `docs/security-model.md`
 
 ### 8) Bookmarks, Profiles, and Discovery
 
@@ -339,7 +345,8 @@ Worker API (selected endpoints):
 - Arweave: durable JSON payloads for session metadata, survey metadata, question payloads, and SBT tokenURI metadata.
 - Worker KV: operational per-session config and secrets.
 - Browser localStorage: caches for surveys/questions/responses/SBTs/bookmarks/user scans.
-- Browser IndexedDB: Porto passkey wallet sessions (encrypted payloads, with localStorage fallback when needed).
+- Browser IndexedDB: passkey EOA encrypted wallet records. Plaintext wallet
+  keys must not be stored in localStorage or IndexedDB.
 
 ## Configuration Surfaces
 
