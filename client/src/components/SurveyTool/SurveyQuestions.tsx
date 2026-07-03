@@ -480,6 +480,7 @@ import {
   runSurveyQuestionsStaleSubmitController,
   runSurveyQuestionsSubmitStartController,
   runSurveyQuestionsSubmitSuccessController,
+  type SurveyQuestionsSubmitPendingStats,
 } from './surveyQuestionsSubmitController.js';
 import {
   applySurveyQuestionsRuntimeInitialState,
@@ -567,8 +568,18 @@ import {
   buildUserSurveyResponseFoundState,
   buildUserSurveyResponseMissingState,
   isSurveyQuestionsMaskedPromptText,
+  type SurveyQuestionsAuthoringPanelDisplayState,
+  type SurveyQuestionsAuthoringRouteReadinessDescriptor,
+  type SurveyQuestionsFullLoadingProgressState,
+  type SurveyQuestionsJsonPanelDisplayState,
   type SurveyQuestionsProps,
+  type SurveyQuestionsPrimarySubmitPlan,
+  type SurveyQuestionsRenderReadinessDescriptor,
+  type SurveyQuestionsRouteViewDisplayState,
   type SurveyQuestionsState,
+  type SurveyQuestionsSubmitFooterDisplayState,
+  type SurveyQuestionsSubmitReadinessDescriptor,
+  type SurveyQuestionsMaskedQuestionVisibilityState,
 } from './surveyQuestionsTypes.js';
 
 declare global {
@@ -6183,20 +6194,20 @@ const jsonTreeDisplay = (jsonInput: any) => (
   );
 
 const handlePrimarySubmitClick = () => {
-    const inFlightPlan: any = buildSurveyQuestionsPrimarySubmitPlan({
+    const inFlightPlan: SurveyQuestionsPrimarySubmitPlan = buildSurveyQuestionsPrimarySubmitPlan({
       isSubmitting: stateRef.current.isSubmitting,
       submitGuardActive: inst._submitGuard,
     });
     if (inFlightPlan.action === 'inert') return;
 
-    const pendingStats: any = resolveSurveyQuestionsSubmitPendingStats({
+    const pendingStats: SurveyQuestionsSubmitPendingStats = resolveSurveyQuestionsSubmitPendingStats({
       getPendingEditStats: typeof getPendingEditStats === 'function'
         ? () => getPendingEditStats()
         : undefined,
       fallbackTotal: stateRef.current.modifiedCount || 0,
     });
-    const pendingEditCount: any = pendingStats.total;
-    const planBase: any = {
+    const pendingEditCount = pendingStats.total;
+    const planBase: Parameters<typeof buildSurveyQuestionsPrimarySubmitPlan>[0] = {
       account: propsRef.current.account,
       draftSlug: '',
       isStandalone: propsRef.current.isStandalone,
@@ -6209,7 +6220,7 @@ const handlePrimarySubmitClick = () => {
       submittedSinceLastEdit: stateRef.current.submittedSinceLastEdit,
       surveyId: propsRef.current.surveyId,
     };
-    let plan: any = buildSurveyQuestionsPrimarySubmitPlan(planBase);
+    let plan: SurveyQuestionsPrimarySubmitPlan = buildSurveyQuestionsPrimarySubmitPlan(planBase);
     if (plan.action === 'navigate') {
       plan = buildSurveyQuestionsPrimarySubmitPlan({
         ...planBase,
@@ -6221,7 +6232,7 @@ const handlePrimarySubmitClick = () => {
       runSurveyQuestionsSubmitController({
         plan,
         ports: {
-          navigateToResponse: (path: any) => window.history.pushState({}, '', path),
+          navigateToResponse: (path: string) => window.history.pushState({}, '', path),
         },
       });
       return;
@@ -8112,10 +8123,13 @@ const renderSurveyAnswers = (responses: any, isOwnResponse: any) => {
     );
   };
 
-const getMemoizedMaskedQuestionVisibility = (questionPoolInput: any, singleQuestionMode: any) => {
-    const fullQuestionPool: any = Array.isArray(questionPoolInput) ? questionPoolInput : EMPTY_QUESTION_POOL;
-    const isSingleQuestionMode: any = !!singleQuestionMode;
-    const modeKey: any = isSingleQuestionMode ? 'single' : 'multi';
+const getMemoizedMaskedQuestionVisibility = (
+    questionPoolInput: unknown,
+    singleQuestionMode: unknown
+  ): SurveyQuestionsMaskedQuestionVisibilityState => {
+    const fullQuestionPool = Array.isArray(questionPoolInput) ? questionPoolInput : EMPTY_QUESTION_POOL;
+    const isSingleQuestionMode = !!singleQuestionMode;
+    const modeKey = isSingleQuestionMode ? 'single' : 'multi';
     let memoByMode: any = null;
     try {
       memoByMode = inst._maskedQuestionVisibilityMemoByPool.get(fullQuestionPool) || null;
@@ -8129,12 +8143,12 @@ const getMemoizedMaskedQuestionVisibility = (questionPoolInput: any, singleQuest
     bumpSurveyPerfCounter('maskedVisibilityMemoMissCount');
     bumpSurveyPerfCounter('maskedVisibilityPoolSizeOnMiss', fullQuestionPool.length);
 
-    const value: any = buildSurveyQuestionsMaskedQuestionVisibility({
+    const value: SurveyQuestionsMaskedQuestionVisibilityState = buildSurveyQuestionsMaskedQuestionVisibility({
       isMaskedPromptText: isMaskedPromptText,
       questionPool: fullQuestionPool,
       singleQuestionMode: isSingleQuestionMode,
     });
-    const { visibleQuestionPool, hiddenMaskedQuestionIds }: any = value;
+    const { visibleQuestionPool, hiddenMaskedQuestionIds } = value;
     bumpSurveyPerfCounter('maskedVisibilityVisibleCountOnMiss', visibleQuestionPool.length);
     bumpSurveyPerfCounter('maskedVisibilityHiddenCountOnMiss', hiddenMaskedQuestionIds.length);
 
@@ -8149,11 +8163,11 @@ const getMemoizedMaskedQuestionVisibility = (questionPoolInput: any, singleQuest
 
 const renderDefaultSurveyQuestionsRoute = () => {
     bumpSurveyPerfCounter('renderCount');
-    const maskedQuestionVisibility: any = getMemoizedMaskedQuestionVisibility(
+    const maskedQuestionVisibility = getMemoizedMaskedQuestionVisibility(
       stateRef.current.questionPool,
       propsRef.current.singleQuestionMode
     );
-    const renderReadiness: any = buildSurveyQuestionsRenderReadinessDescriptor({
+    const renderReadiness: SurveyQuestionsRenderReadinessDescriptor = buildSurveyQuestionsRenderReadinessDescriptor({
       displayAnswerMode: stateRef.current.displayAnswerMode,
       fullQuestionPool: maskedQuestionVisibility.fullQuestionPool,
       hiddenMaskedQuestionIds: maskedQuestionVisibility.hiddenMaskedQuestionIds,
@@ -8175,8 +8189,8 @@ const renderDefaultSurveyQuestionsRoute = () => {
       hiddenMaskedQuestionIds,
       gatedEmptyStateReady,
       hasHiddenMaskedQuestions,
-    }: any = renderReadiness;
-    const fullLoadingProgress: any = buildSurveyQuestionsFullLoadingProgressState({
+    } = renderReadiness;
+    const fullLoadingProgress: SurveyQuestionsFullLoadingProgressState = buildSurveyQuestionsFullLoadingProgressState({
       questionScanProgress: propsRef.current.questionScanProgress,
       progressSlug:
         (inst._getEffectiveDraftSlug ? inst._getEffectiveDraftSlug() : '') ||
@@ -8193,48 +8207,46 @@ const renderDefaultSurveyQuestionsRoute = () => {
       );
     }
 
-    const viewingAnswers: any = stateRef.current.displayAnswerMode;
-    const { jsonPreview }: any = buildSurveyQuestionsJsonPreviewDisplayState({
+    const viewingAnswers = stateRef.current.displayAnswerMode;
+    const { jsonPreview } = buildSurveyQuestionsJsonPreviewDisplayState({
       jsonPreview: stateRef.current.jsonPreview,
       questionPool: stateRef.current.questionPool,
       viewingAnswers,
     });
 
-    const routeViewDisplayState: any = buildSurveyQuestionsRouteViewDisplayState({
+    const routeViewDisplayState: SurveyQuestionsRouteViewDisplayState = buildSurveyQuestionsRouteViewDisplayState({
       account: propsRef.current.account,
       isEditing: stateRef.current.isEditing,
       isStandalone: propsRef.current.isStandalone,
       questionPool: stateRef.current.questionPool,
       responderAddress: propsRef.current.responderAddress,
-      shortenAddress: getShortenedAddress as any,
+      shortenAddress: (address: string) => String(getShortenedAddress(address, false) || ''),
       singleQuestionMode: propsRef.current.singleQuestionMode,
       userHasResponse: stateRef.current.userHasResponse,
       viewAddress: propsRef.current.viewAddress,
       viewingAnswers,
     });
-    const {
-      isOwnResponse,
-      isSingleQuestionView,
-    }: any = routeViewDisplayState;
+    const { isOwnResponse } = routeViewDisplayState;
+    const isSingleQuestionView = !!routeViewDisplayState.isSingleQuestionView;
 
     // Submit button label block (centralized)
-    const _pendingStats: any = getPendingStatsSnapshot();
-    const _suffix: any = _pendingStats.total === 1 ? 'Response' : 'Responses';
+    const _pendingStats: SurveyQuestionsSubmitPendingStats = getPendingStatsSnapshot();
+    const _suffix = _pendingStats.total === 1 ? 'Response' : 'Responses';
 
-    const submitButtonText: any = isSingleQuestionView
+    const submitButtonText = isSingleQuestionView
       ? 'SUBMIT'
       : (propsRef.current.computeSubmitLabel || computeSubmitLabel)(engine, {
           suffix: _suffix,
           pendingStats: _pendingStats,
         });
-    const submitReadiness: any = buildSurveyQuestionsSubmitReadinessDescriptor({
+    const submitReadiness: SurveyQuestionsSubmitReadinessDescriptor = buildSurveyQuestionsSubmitReadinessDescriptor({
       currentStep: stateRef.current.currentStep,
       isSubmitting: stateRef.current.isSubmitting,
       pendingStats: _pendingStats,
       resolveMaskedCurrentQuestionPayload: hasMaskedCurrentQuestionPayload,
       singleQuestionMode: propsRef.current.singleQuestionMode,
     });
-    const submitFooterDisplayState: any = buildSurveyQuestionsSubmitFooterDisplayState({
+    const submitFooterDisplayState: SurveyQuestionsSubmitFooterDisplayState = buildSurveyQuestionsSubmitFooterDisplayState({
       currentStep: stateRef.current.currentStep,
       hasEncryptedAnswers: submitReadiness.hasEncryptedAnswers,
       hasMaskedCurrentQuestionPayload: submitReadiness.hasMaskedCurrentQuestionPayload,
@@ -8253,7 +8265,7 @@ const renderDefaultSurveyQuestionsRoute = () => {
       userHasResponse: stateRef.current.userHasResponse,
     });
 
-    const { jsonForDisplay }: any = buildSurveyQuestionsJsonForDisplayState({
+    const { jsonForDisplay } = buildSurveyQuestionsJsonForDisplayState({
       isOwnResponse,
       jsonPreview,
       noResponse: stateRef.current.noResponse,
@@ -8265,8 +8277,8 @@ const renderDefaultSurveyQuestionsRoute = () => {
       viewingAnswers,
     });
 
-    const hideEmbeddedDebugUi: any = !!propsRef.current.hideEmbeddedDebugUi;
-    const jsonPanelDisplayState: any = buildSurveyQuestionsJsonPanelDisplayState({
+    const hideEmbeddedDebugUi = !!propsRef.current.hideEmbeddedDebugUi;
+    const jsonPanelDisplayState: SurveyQuestionsJsonPanelDisplayState = buildSurveyQuestionsJsonPanelDisplayState({
       isSingleQuestionView,
       isStandalone: propsRef.current.isStandalone,
       singleQuestionMode: propsRef.current.singleQuestionMode,
@@ -8275,20 +8287,20 @@ const renderDefaultSurveyQuestionsRoute = () => {
       showSurveyJson: stateRef.current.showSurveyJson,
       styleMap: styles,
     });
-    const surveyJson: any = jsonPanelDisplayState.showSurveyJsonPanel ? getSurveyJson() : null;
-    const questionsJson: any = jsonPanelDisplayState.showQuestionsJsonPanel ? getQuestionsJson() : null;
-    const responseJson: any = jsonPanelDisplayState.showResponseJsonPanel
+    const surveyJson = jsonPanelDisplayState.showSurveyJsonPanel ? getSurveyJson() : null;
+    const questionsJson = jsonPanelDisplayState.showQuestionsJsonPanel ? getQuestionsJson() : null;
+    const responseJson = jsonPanelDisplayState.showResponseJsonPanel
       ? (viewingAnswers ? jsonForDisplay : getResponseJson())
       : null;
-    const canEditQuestions: any = submitFooterDisplayState.canEditQuestions;
-    const authoringPanelDisplayState: any = buildSurveyQuestionsAuthoringPanelDisplayState({
+    const canEditQuestions = submitFooterDisplayState.canEditQuestions;
+    const authoringPanelDisplayState: SurveyQuestionsAuthoringPanelDisplayState = buildSurveyQuestionsAuthoringPanelDisplayState({
       canEditQuestions,
       hasCurrentSurveyResponseState: !!currentSurveyResponseState,
       hideEmbeddedDebugUi,
       questionPoolReady,
       singleQuestionMode: propsRef.current.singleQuestionMode,
     });
-    const layoutDisplayState: any = buildSurveyQuestionsLayoutDisplayState({
+    const layoutDisplayState = buildSurveyQuestionsLayoutDisplayState({
       activeTagModalTag: stateRef.current.activeTagModalTag,
       isSingleQuestionView,
       isStandalone: propsRef.current.isStandalone,
@@ -8296,20 +8308,20 @@ const renderDefaultSurveyQuestionsRoute = () => {
       styleMap: styles,
       viewingAnswers,
     });
-    const authoringRouteReadiness: any = buildSurveyQuestionsAuthoringRouteReadinessDescriptor({
+    const authoringRouteReadiness: SurveyQuestionsAuthoringRouteReadinessDescriptor = buildSurveyQuestionsAuthoringRouteReadinessDescriptor({
       canEditQuestions,
       gatedEmptyStateReady,
       hasCurrentSurveyResponseState: !!currentSurveyResponseState,
       questionPoolReady,
       visibleQuestionPool,
     });
-    const renderedEditableQuestions: any = authoringRouteReadiness.shouldRenderEditableQuestions
+    const renderedEditableQuestions: React.ReactNode = authoringRouteReadiness.shouldRenderEditableQuestions
       ? visibleQuestionPool.map((question: any, qIndex: any) =>
           renderQuestion(question, qIndex, currentSurveyResponseState)
         )
       : null;
-    const lockedGateDetails: any = getMemoizedLockedQuestionGateDetails(hiddenMaskedQuestionIds);
-    const lockedQuestionsBanner: any = renderLockedQuestionsPanel({
+    const lockedGateDetails = getMemoizedLockedQuestionGateDetails(hiddenMaskedQuestionIds);
+    const lockedQuestionsBanner = renderLockedQuestionsPanel({
       hiddenMaskedQuestionIds,
       lockedGateDetails,
     });
