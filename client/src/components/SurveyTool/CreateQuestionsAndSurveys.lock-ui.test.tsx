@@ -176,7 +176,9 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
 
     const callbacks: Array<() => void> = [];
     for (const item of queued.splice(0)) {
-      const patch = typeof item.update === 'function' ? item.update(instance.state, instance.props) : item.update;
+      const patch = typeof item.update === 'function'
+        ? item.update(instance.state, instance.props)
+        : item.update;
       if (patch && typeof patch === 'object') {
         instance.state = { ...instance.state, ...patch };
       }
@@ -184,7 +186,9 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
     }
 
     instance.setState = jest.fn((update: any, cb?: () => void) => {
-      const patch = typeof update === 'function' ? update(instance.state, instance.props) : update;
+      const patch = typeof update === 'function'
+        ? update(instance.state, instance.props)
+        : update;
       if (patch && typeof patch === 'object') {
         instance.state = { ...instance.state, ...patch };
       }
@@ -192,11 +196,8 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
     });
     callbacks.forEach((cb) => cb());
 
-    expect(instance.state.questions.map((question: { type?: string }) => question.type)).toEqual([
-      'binary',
-      'rating',
-      'freeform',
-    ]);
+    expect(instance.state.questions.map((question: { type?: string }) => question.type))
+      .toEqual(['binary', 'rating', 'freeform']);
   });
 
   it('does not schedule a save when the placeholder question type is added', () => {
@@ -303,7 +304,7 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
     expect(questionLock.querySelector(`.${gateLockStyles.dots}`)).toBeNull();
   });
 
-  it('shows the default lock for an explicit empty standalone question gate selection', () => {
+  it('keeps an explicit empty standalone question gate selection unlocked', () => {
     const instance = makeInstance();
     instance.resolveGateOptions = jest.fn(() => ({
       gateMap: {
@@ -337,8 +338,8 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
     expect(questionLock).not.toBeNull();
     if (!questionLock) throw new Error('Expected question header lock to render');
     const button = within(questionLock).getByTestId(E2E_TESTIDS.GATE_LOCK_BUTTON);
-    expect(button).toHaveAttribute('aria-label', 'Edit locked access rule');
-    expect(button.querySelector('svg')?.getAttribute('data-icon')).toBe('lock');
+    expect(button).toHaveAttribute('aria-label', 'Choose access rule');
+    expect(button.querySelector('svg')?.getAttribute('data-icon')).toBe('lock-open');
   });
 
   it('shows the default lock for an explicit empty survey gate selection', () => {

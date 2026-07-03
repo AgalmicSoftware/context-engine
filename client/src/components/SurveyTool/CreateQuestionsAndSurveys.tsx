@@ -1463,28 +1463,25 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     const requestedType = String(type || '');
     if (!requestedType || requestedType === 'Question Type') return;
 
-    this.setState(
-      (prevState: CreateQuestionsAndSurveysState) => {
-        const questions = Array.isArray(prevState.questions) ? prevState.questions : [];
-        const newQuestionDraft = buildCreateSurveyNewQuestionDraft({
-          addingQuestionType: requestedType,
-          generateQuestionId: this.generateQuestionId,
-          isStandaloneQuestion: prevState.isStandaloneQuestion,
-          questionCount: questions.length,
-        });
-        if (!newQuestionDraft) return null;
+    this.setState((prevState: CreateQuestionsAndSurveysState) => {
+      const questions = Array.isArray(prevState.questions) ? prevState.questions : [];
+      const newQuestionDraft = buildCreateSurveyNewQuestionDraft({
+        addingQuestionType: requestedType,
+        generateQuestionId: this.generateQuestionId,
+        isStandaloneQuestion: prevState.isStandaloneQuestion,
+        questionCount: questions.length,
+      });
+      if (!newQuestionDraft) return null;
 
-        return {
-          questions: [...questions, newQuestionDraft.question],
-          addingQuestionType: 'Question Type',
-          focusTargetUiKey: newQuestionDraft.uiKey, // Set focus target instead of scroll
-        };
-      },
-      () => {
-        this.updateSurveyHash();
-        this.saveToLocalStorage();
-      },
-    );
+      return {
+        questions: [...questions, newQuestionDraft.question],
+        addingQuestionType: 'Question Type',
+        focusTargetUiKey: newQuestionDraft.uiKey // Set focus target instead of scroll
+      };
+    }, () => {
+      this.updateSurveyHash();
+      this.saveToLocalStorage();
+    });
   };
 
   quickAdd = (type: string): void => {
@@ -3244,13 +3241,15 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       if (normalized.length) return normalized;
       return defaultGateId ? [defaultGateId] : [];
     };
-    const applyStandaloneSelectedGateIds = (value: unknown, touched: unknown) => {
+    const applyStandaloneSelectedGateIds = (value: unknown) => {
       const normalized = normalizeSelectedGateIds(value);
       if (normalized.length) return normalized;
-      if (touched && Array.isArray(value) && normalizeGateIds(value).length === 0) return [];
+      if (Array.isArray(value) && normalizeGateIds(value).length === 0) return [];
       return defaultGateId ? [defaultGateId] : [];
     };
-    const surveySelectedGateIds = !isStandaloneQuestion ? applyDefaultSelectedGateIds(surveyLockGateIds) : [];
+    const surveySelectedGateIds = !isStandaloneQuestion
+      ? applyDefaultSelectedGateIds(surveyLockGateIds)
+      : [];
 
     // JSON preview (only questions; no questionIDs)
     let jsonData: Record<string, unknown> = {};
@@ -3439,10 +3438,8 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
                       (!Object.prototype.hasOwnProperty.call(question || {}, 'lockGateIds') ||
                         question.lockGateIds === null);
                     const selectedGateIds = isStandaloneQuestion
-                      ? applyStandaloneSelectedGateIds(question.lockGateIds, question.lockGateIdsTouched)
-                      : inheritsSurvey
-                        ? surveySelectedGateIds
-                        : applyDefaultSelectedGateIds(question.lockGateIds);
+                      ? applyStandaloneSelectedGateIds(question.lockGateIds)
+                      : (inheritsSurvey ? surveySelectedGateIds : applyDefaultSelectedGateIds(question.lockGateIds));
 
                     return hasSelectableGateOptions ? (
                       <>
