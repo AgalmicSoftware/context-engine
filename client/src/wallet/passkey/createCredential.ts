@@ -12,6 +12,15 @@ const credentialClient = (): PasskeyCredentialClient => {
 
 const userIdBytes = (value: string): Uint8Array => new TextEncoder().encode(value).slice(0, 64);
 
+export const formatPasskeyCredentialUserName = (date = new Date()): string => {
+  const month = date.toLocaleDateString('en-US', { month: 'long' });
+  const day = date.getDate();
+  const year = date.getFullYear();
+  const time = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+    .replace(/[:\s]/g, '');
+  return `ContextEngine-${month}${day}-${year}-${time}`;
+};
+
 export const createPasskeyCredential = async ({
   config,
   salt,
@@ -24,8 +33,7 @@ export const createPasskeyCredential = async ({
   if (typeof PublicKeyCredential === 'undefined') {
     throw new Error('WebAuthn is not supported in this browser.');
   }
-  const createdAt = new Date();
-  const userName = `ContextEngine-${createdAt.toISOString()}`;
+  const userName = formatPasskeyCredentialUserName();
   const credential = await credentials.create({
     publicKey: {
       challenge: randomBytes(32),
