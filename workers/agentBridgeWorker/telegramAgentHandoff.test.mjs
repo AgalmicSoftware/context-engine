@@ -2405,6 +2405,18 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   assert.equal(exported.includes('cep_'), true);
   assert.equal(exported.includes('telegramUserId'), false);
   assert.equal(exported.includes('42'), false);
+
+  const pagedMetricsResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/agent-only/export?sessionSlug=alpha&view=answers&format=jsonl&limit=1', {
+      token: 'agent-test-token',
+    }),
+    env,
+  });
+  const pagedExported = await pagedMetricsResponse.text();
+  assert.equal(pagedMetricsResponse.status, 200);
+  assert.equal(pagedMetricsResponse.headers.get('x-agent-only-row-count'), '1');
+  assert.equal(Boolean(pagedMetricsResponse.headers.get('x-agent-only-next-cursor')), true);
+  assert.equal(pagedExported.trim().split('\n').filter(Boolean).length, 1);
 });
 
 test('Agent-only admin routes accept session admin delegation tokens and reject non-admin tokens', async () => {

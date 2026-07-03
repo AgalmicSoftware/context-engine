@@ -3622,6 +3622,28 @@ async function listKvEntriesByPrefix(env = {}, prefix = '', limit = 100000) {
   return entries;
 }
 
+async function listKvEntriesPageByPrefix(env = {}, prefix = '', {
+  limit = 250,
+  cursor = '',
+} = {}) {
+  const kv = env?.AGENT_ACTION_KV;
+  if (!prefix || !kv || typeof kv.list !== 'function') return { entries: [], nextCursor: '' };
+  const pageLimit = Math.max(1, Math.min(1000, Math.floor(Number(limit)) || 250));
+  const page = await kv.list({
+    prefix,
+    limit: pageLimit,
+    ...(safeString(cursor) ? { cursor: safeString(cursor) } : {}),
+  }).catch(() => null);
+  const keys = Array.isArray(page?.keys) ? page.keys : [];
+  return {
+    entries: keys.map((entry) => ({
+      key: safeString(entry?.name || entry),
+      metadata: entry && typeof entry === 'object' && !Array.isArray(entry) ? (entry.metadata || null) : null,
+    })),
+    nextCursor: page?.list_complete === false ? safeString(page.cursor) : '',
+  };
+}
+
 function sessionFromKey(key = '', prefix = '') {
   return sanitizeSessionSlug(safeString(key).slice(prefix.length).split(':')[0]);
 }
@@ -3814,12 +3836,23 @@ export async function exportAgentOnlyData({
   now = null,
   compact = false,
   includeImageBase64 = false,
+  cursor = '',
+  limit = 0,
 } = {}) {
   const slug = sanitizeSessionSlug(sessionSlug);
   const selectedWindow = safeString(windowId);
   const rows = [];
   const snapshotCache = new Map();
   const compactExport = compact === true;
+  const exportCursor = safeString(cursor);
+  const rawLimit = Math.floor(Number(limit)) || 0;
+  const exportLimit = Math.max(1, Math.min(1000, rawLimit || 250));
+  const pagedExport = Boolean(exportCursor || rawLimit > 0);
+  let nextCursor = '';
+  const listExportEntries = async (prefix) => {
+    if (!pagedExport) return { entries: await listKvEntriesByPrefix(env, prefix), nextCursor: '' };
+    return listKvEntriesPageByPrefix(env, prefix, { limit: exportLimit, cursor: exportCursor });
+  };
   if (['answers', 'wide', 'calibration', 'gold'].includes(view)) {
     if (view === 'calibration' || ((view === 'wide' || view === 'gold') && !compactExport)) {
       await syncActiveSnapshotForExport({
@@ -3832,7 +3865,9 @@ export async function exportAgentOnlyData({
     }
     if (view === 'calibration') {
       const calibrationBuckets = new Map();
-      const stateEntries = await listKvEntriesByPrefix(env, `${AGENT_ONLY_ANSWER_STATE_KV_PREFIX}${slug}:`);
+      const listed = await listExportEntries(`${AGENT_ONLY_ANSWER_STATE_KV_PREFIX}${slug}:`);
+      const stateEntries = listed.entries;
+      nextCursor = listed.nextCursor;
       for (const entry of stateEntries) {
         const state = await readKvJson(env, entry.key);
         if (!state || (selectedWindow && safeString(state.windowId) !== selectedWindow)) continue;
@@ -3874,74 +3909,81 @@ export async function exportAgentOnlyData({
       return {
         ok: true,
         rows,
+        nextCursor,
         body: outputFormat === 'csv' ? rowsToCsv(rows) : rowsToJsonl(rows),
         contentType: outputFormat === 'csv' ? 'text/csv; charset=utf-8' : 'application/x-ndjson; charset=utf-8',
       };
     }
-    const eventEntries = await listKvEntriesByPrefix(env, `${AGENT_ONLY_ANSWER_EVENT_KV_PREFIX}${slug}:`);
-    for (const entry of eventEntries) {
-      const record = await readKvJson(env, entry.key);
-      if (!record || (selectedWindow && safeString(record.windowId) !== selectedWindow)) continue;
-      const principalId = await agentOnlyPrincipalId(env, record.telegramUserId);
-      if (view === 'answers') {
-        rows.push({
-          principal_id: principalId,
-          statement_id: safeString(record.questionId),
-          window_id: safeString(record.windowId),
-          run_id: safeString(record.runId),
-          source: safeString(record.source),
-          event_kind: safeString(record.eventKind),
-          answer: record.answer || null,
-          confidence: record.confidence ?? null,
-          rationale: safeString(record.eventKind) === 'privacy_protective_skip' ? null : safeString(record.rationale),
-          agent_initialized_at: safeString(record.agentMetadata?.agentInitializedAt),
-          model: safeString(record.agentMetadata?.model),
-          scaffold_version: safeString(record.agentMetadata?.scaffoldVersion),
-          token_current_run_total: normalizeTokenCount(record.agentMetadata?.tokenUsage?.currentRunTotalTokens),
-          token_recent_sessions_total: normalizeTokenCount(record.agentMetadata?.tokenUsage?.recentSessionsTotalTokens),
-          token_input: normalizeTokenCount(record.agentMetadata?.tokenUsage?.inputTokens),
-          token_output: normalizeTokenCount(record.agentMetadata?.tokenUsage?.outputTokens),
-          token_daily_usage_30d: normalizeDailyTokenUsage(record.agentMetadata?.tokenUsage?.dailyUsage30d),
-          token_edge_in_person_dates: normalizeTokenUsageDates(record.agentMetadata?.tokenUsage?.edgeInPersonDates),
-          token_usage_source: safeString(record.agentMetadata?.tokenUsage?.source),
-          instructions_version: safeString(record.instructionsVersion),
-          request_id: safeString(record.requestId),
-          created_at: safeString(record.createdAt),
-        });
-      } else if (view === 'gold' && safeString(record.source) === 'agent_autofill' && record.eventKind === 'answer') {
-        const prior = await latestSubmittedAnswerFor({
-          env,
-          sessionSlug: slug,
-          telegramUserId: record.telegramUserId,
-          questionId: record.questionId,
-          beforeIso: record.createdAt,
-        });
-        if (!prior) continue;
-        rows.push({
-          principal_id: principalId,
-          statement_id: safeString(record.questionId),
-          window_id: safeString(record.windowId),
-          run_id: safeString(record.runId),
-          prior_human_answer: prior.answer || null,
-          prior_human_created_at: safeString(prior.createdAt),
-          agent_prediction: record.answer || null,
-          agent_confidence: record.confidence ?? null,
-          model: safeString(record.agentMetadata?.model),
-          scaffold_version: safeString(record.agentMetadata?.scaffoldVersion),
-          instructions_version: safeString(record.instructionsVersion),
-          eval_type: compactExport ? '' : await evalTypeForStatement({
+    if (view === 'answers' || view === 'gold') {
+      const listed = await listExportEntries(`${AGENT_ONLY_ANSWER_EVENT_KV_PREFIX}${slug}:`);
+      const eventEntries = listed.entries;
+      nextCursor = listed.nextCursor;
+      for (const entry of eventEntries) {
+        const record = await readKvJson(env, entry.key);
+        if (!record || (selectedWindow && safeString(record.windowId) !== selectedWindow)) continue;
+        const principalId = await agentOnlyPrincipalId(env, record.telegramUserId);
+        if (view === 'answers') {
+          rows.push({
+            principal_id: principalId,
+            statement_id: safeString(record.questionId),
+            window_id: safeString(record.windowId),
+            run_id: safeString(record.runId),
+            source: safeString(record.source),
+            event_kind: safeString(record.eventKind),
+            answer: record.answer || null,
+            confidence: record.confidence ?? null,
+            rationale: safeString(record.eventKind) === 'privacy_protective_skip' ? null : safeString(record.rationale),
+            agent_initialized_at: safeString(record.agentMetadata?.agentInitializedAt),
+            model: safeString(record.agentMetadata?.model),
+            scaffold_version: safeString(record.agentMetadata?.scaffoldVersion),
+            token_current_run_total: normalizeTokenCount(record.agentMetadata?.tokenUsage?.currentRunTotalTokens),
+            token_recent_sessions_total: normalizeTokenCount(record.agentMetadata?.tokenUsage?.recentSessionsTotalTokens),
+            token_input: normalizeTokenCount(record.agentMetadata?.tokenUsage?.inputTokens),
+            token_output: normalizeTokenCount(record.agentMetadata?.tokenUsage?.outputTokens),
+            token_daily_usage_30d: normalizeDailyTokenUsage(record.agentMetadata?.tokenUsage?.dailyUsage30d),
+            token_edge_in_person_dates: normalizeTokenUsageDates(record.agentMetadata?.tokenUsage?.edgeInPersonDates),
+            token_usage_source: safeString(record.agentMetadata?.tokenUsage?.source),
+            instructions_version: safeString(record.instructionsVersion),
+            request_id: safeString(record.requestId),
+            created_at: safeString(record.createdAt),
+          });
+        } else if (safeString(record.source) === 'agent_autofill' && record.eventKind === 'answer') {
+          const prior = await latestSubmittedAnswerFor({
             env,
             sessionSlug: slug,
-            windowId: record.windowId,
+            telegramUserId: record.telegramUserId,
             questionId: record.questionId,
-            cache: snapshotCache,
-          }),
-          created_at: safeString(record.createdAt),
-        });
+            beforeIso: record.createdAt,
+          });
+          if (!prior) continue;
+          rows.push({
+            principal_id: principalId,
+            statement_id: safeString(record.questionId),
+            window_id: safeString(record.windowId),
+            run_id: safeString(record.runId),
+            prior_human_answer: prior.answer || null,
+            prior_human_created_at: safeString(prior.createdAt),
+            agent_prediction: record.answer || null,
+            agent_confidence: record.confidence ?? null,
+            model: safeString(record.agentMetadata?.model),
+            scaffold_version: safeString(record.agentMetadata?.scaffoldVersion),
+            instructions_version: safeString(record.instructionsVersion),
+            eval_type: compactExport ? '' : await evalTypeForStatement({
+              env,
+              sessionSlug: slug,
+              windowId: record.windowId,
+              questionId: record.questionId,
+              cache: snapshotCache,
+            }),
+            created_at: safeString(record.createdAt),
+          });
+        }
       }
     }
     if (view === 'wide') {
-      const stateEntries = await listKvEntriesByPrefix(env, `${AGENT_ONLY_ANSWER_STATE_KV_PREFIX}${slug}:`);
+      const listedWide = await listExportEntries(`${AGENT_ONLY_ANSWER_STATE_KV_PREFIX}${slug}:`);
+      const stateEntries = listedWide.entries;
+      nextCursor = listedWide.nextCursor;
       for (const entry of stateEntries) {
         const state = await readKvJson(env, entry.key);
         if (!state || (selectedWindow && safeString(state.windowId) !== selectedWindow)) continue;
@@ -4014,7 +4056,9 @@ export async function exportAgentOnlyData({
       }
     }
   } else if (view === 'attempts') {
-    const entries = await listKvEntriesByPrefix(env, `${AGENT_ONLY_ATTEMPT_EVENT_KV_PREFIX}${slug}:`);
+    const listed = await listExportEntries(`${AGENT_ONLY_ATTEMPT_EVENT_KV_PREFIX}${slug}:`);
+    const entries = listed.entries;
+    nextCursor = listed.nextCursor;
     for (const entry of entries) {
       const record = await readKvJson(env, entry.key);
       if (!record || (selectedWindow && safeString(record.windowId) !== selectedWindow)) continue;
@@ -4156,7 +4200,9 @@ export async function exportAgentOnlyData({
       contentType: outputFormat === 'jsonl' ? 'application/x-ndjson; charset=utf-8' : 'application/json; charset=utf-8',
     };
   } else if (view === 'images') {
-    const entries = await listKvEntriesByPrefix(env, `${AGENT_ONLY_WRAPPED_IMAGE_KV_PREFIX}${slug}:`);
+    const listed = await listExportEntries(`${AGENT_ONLY_WRAPPED_IMAGE_KV_PREFIX}${slug}:`);
+    const entries = listed.entries;
+    nextCursor = listed.nextCursor;
     for (const entry of entries) {
       const record = await readKvJson(env, entry.key);
       if (!record || (selectedWindow && safeString(record.windowId) !== selectedWindow)) continue;
@@ -4189,6 +4235,7 @@ export async function exportAgentOnlyData({
   return {
     ok: true,
     rows,
+    nextCursor,
     body: outputFormat === 'csv' ? rowsToCsv(rows) : rowsToJsonl(rows),
     contentType: outputFormat === 'csv' ? 'text/csv; charset=utf-8' : 'application/x-ndjson; charset=utf-8',
   };

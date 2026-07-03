@@ -3465,18 +3465,23 @@ async function handleAdminAgentOnlyExportRequest({
     format: input.format || 'jsonl',
     compact: normalizeBoolean(input.compact, false),
     includeImageBase64,
+    cursor: input.cursor,
+    limit: input.limit,
   });
   if (!exported.ok) {
     const payload = { ok: false, reason: exported.reason };
     assertNoSecretShape(payload, 'Agent-only admin export error must not serialize secrets.');
     return json(payload, { status: exported.status || 400 });
   }
+  const headers = {
+    'content-type': exported.contentType,
+    'cache-control': 'no-store',
+    'x-agent-only-row-count': String(Array.isArray(exported.rows) ? exported.rows.length : 0),
+  };
+  if (exported.nextCursor) headers['x-agent-only-next-cursor'] = exported.nextCursor;
   return new Response(exported.body, {
     status: 200,
-    headers: {
-      'content-type': exported.contentType,
-      'cache-control': 'no-store',
-    },
+    headers,
   });
 }
 
