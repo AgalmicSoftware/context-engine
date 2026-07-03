@@ -44,4 +44,16 @@ describe('passkey wallet config', () => {
       accountOrigin: 'https://preview.pages.dev',
     }))).toThrow(/preview domain/i);
   });
+
+  it('rejects invalid wallet, key, and session modes instead of coercing them', () => {
+    expect(() => validatePasskeyWalletConfig(baseConfig({
+      walletMode: 'porto' as unknown as PasskeyWalletConfig['walletMode'],
+    }))).toThrow(/unsupported passkey wallet mode/i);
+    expect(() => validatePasskeyWalletConfig(baseConfig({
+      walletKeyMode: 'plaintext' as unknown as PasskeyWalletConfig['walletKeyMode'],
+    }))).toThrow(/unsupported passkey wallet key mode/i);
+    expect(() => validatePasskeyWalletConfig(baseConfig({
+      sessionMode: 'relay' as unknown as PasskeyWalletConfig['sessionMode'],
+    }))).toThrow(/unsupported passkey wallet session mode/i);
+  });
 });

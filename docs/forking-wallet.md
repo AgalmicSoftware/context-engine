@@ -59,6 +59,7 @@ REACT_APP_NEXT_PUBLIC_WALLET_DERIVATION_NAMESPACE=context-engine
 - normal Ethereum signer
 - normal gas payer
 - soft worker-held sessions for convenience
+- dependent on same-origin script integrity while unlocked
 
 ## What This Wallet Is Not
 

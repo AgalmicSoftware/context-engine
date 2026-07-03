@@ -71,6 +71,11 @@ test('index.html uses deployment-relative discovery asset links for the active P
   );
 });
 
+test('index.html does not load the remote Font Awesome kit', () => {
+  assert.doesNotMatch(indexHtml, /kit\.fontawesome\.com/);
+  assert.doesNotMatch(indexHtml, /<script[^>]+src=["']https:\/\/kit\.fontawesome\.com\//i);
+});
+
 test('discoverability assets point to the latest GitHub branch documents', () => {
   assert.match(discoverabilityHtml, toUrlMatcher(repoUrl));
   assert.match(discoverabilityHtml, toUrlMatcher(repoSourceUrl));

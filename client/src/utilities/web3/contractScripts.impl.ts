@@ -5413,8 +5413,9 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
       injectedProvider: win.ethereum,
       web3AuthProvider: win.web3authProvider,
       passkeyProviderFactory: () => passkeyWallet.createPasskeyEip1193Provider(),
-      // Compatibility wrapper: preserve the old unknown-provider injected fallback
-      // until call sites explicitly opt into stricter signer-provider resolution.
+      // Legacy empty provider state can still use an injected wallet. Named
+      // providers must resolve explicitly so passkey flows cannot silently
+      // degrade to a different signer.
       allowInjectedSignerFallback: true,
     });
     if (resolved.ok) return resolved.provider;

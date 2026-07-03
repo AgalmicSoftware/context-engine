@@ -85,7 +85,7 @@ export const createInMemorySoftSessionClient = (): SoftSessionClient => {
         }
         case 'eth_signTransaction': {
           const tx = (params[0] || {}) as Record<string, unknown>;
-          assertSoftSessionAllowed({ policy, method: 'eth_sendTransaction', tx, chainId });
+          assertSoftSessionAllowed({ policy, method: 'eth_signTransaction', tx, chainId });
           return wallet.signTransaction(tx as ethers.providers.TransactionRequest);
         }
         default:
