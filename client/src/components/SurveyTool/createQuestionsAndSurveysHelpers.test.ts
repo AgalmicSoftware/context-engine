@@ -258,11 +258,16 @@ describe('createQuestionsAndSurveysHelpers question options', () => {
       },
       isStandaloneQuestion: true,
       surveyLockGateIds: ['default-gate'],
-      questions: [{ id: 'q1', lockGateIds: [] }],
+      questions: [
+        { id: 'q1', lockGateIds: [] },
+        { id: 'q2', lockGateIds: ['question-gate'] },
+      ],
     });
 
     expect(standalonePlan.resolvedSurveyLockGateIds).toEqual([]);
     expect(standalonePlan.resolveQuestionSubmitGateIds({ id: 'q1', lockGateIds: [] }))
+      .toEqual([]);
+    expect(standalonePlan.resolveQuestionSubmitGateIds({ id: 'q-missing-lock' }))
       .toEqual(['default-gate']);
     expect(standalonePlan.resolveQuestionSubmitGateIds({ id: 'q2', lockGateIds: ['question-gate'] }))
       .toEqual(['question-gate']);

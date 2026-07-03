@@ -18,24 +18,9 @@ Note: This script is safe to run repeatedly; it only exercises the UI.
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
-const { buildPasskeyDerivedWallet } = require('./lib/passkey-derived-wallet');
+const { derivePrivateKeyFromPasskeyRawId } = require('./lib/porto-wallet-derivation.js');
 
 const ROOT = path.resolve(__dirname, '..');
-
-const buildPasskeySeed = (rawIdB64Url, expectedAddress, label) => {
-  const walletInfo = buildPasskeyDerivedWallet(rawIdB64Url);
-  if (expectedAddress && String(walletInfo.address).toLowerCase() !== String(expectedAddress).toLowerCase()) {
-    throw new Error(
-      `Report wallet ${label} was generated with a stale derivation (${expectedAddress}); ` +
-      `expected passkey-derived address ${walletInfo.address}. Re-run the seed script.`
-    );
-  }
-  return {
-    credentialId: rawIdB64Url,
-    address: walletInfo.address,
-    privateKey: walletInfo.privateKey,
-  };
-};
 
 async function main() {
   const arg = String(process.argv[2] || '').trim();
