@@ -53,6 +53,12 @@ Changing RP ID, derivation namespace, derivation version, or selected passkey
 changes the derived EOA address. Losing the passkey means losing access to the
 derived EOA unless another recovery or transfer path was set up separately.
 
+The passkey does not create an onchain passkey wallet or protect against every
+same-origin script. JavaScript running under the configured RP ID can request
+WebAuthn prompts and ask the unlocked soft-session worker to sign. Production
+deployments must therefore treat app-shell script integrity and CSP as wallet
+security controls, not just general web hardening.
+
 Wallet material is locked on:
 
 - explicit logout/disconnect
@@ -67,9 +73,10 @@ Soft sessions are not a hard security boundary. They are a convenience and
 isolation mechanism.
 
 The worker checks local policy before signing. That policy can restrict methods,
-chain IDs, target addresses, transaction value, and expiry. These limits are not
-enforced by Ethereum. A malicious script that executes in the same origin may be
-able to ask the worker to sign.
+chain IDs, sender address, target addresses, transaction value, and expiry. Raw
+transaction signing requires its own explicit `eth_signTransaction` method grant.
+These limits are not enforced by Ethereum. A malicious script that executes in
+the same origin may be able to ask the worker to sign.
 
 This design is simpler than smart-account systems and does not provide:
 
@@ -95,9 +102,10 @@ plaintext key storage or a UI-only passkey prompt.
 
 ## CSP And Third-Party Script Note
 
-The current static app shell still loads Font Awesome and Google Fonts from
-third-party origins and includes inline JSON-LD structured data. A stricter CSP
-for wallet unlock screens should be deployed before production wallet rollout:
+The current static app shell still loads Google Fonts from third-party origins
+and includes inline JSON-LD structured data. Font Awesome icons are loaded from
+bundled `@fortawesome` packages, not the remote kit script. A stricter CSP for
+wallet unlock screens should be deployed before production wallet rollout:
 
 - keep wallet unlock/sign routes free of third-party scripts where practical
 - remove or nonce inline scripts

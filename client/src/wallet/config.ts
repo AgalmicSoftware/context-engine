@@ -83,6 +83,17 @@ export const isRpIdAllowedForOrigin = (rpId: string, origin: string): boolean =>
 export const validatePasskeyWalletConfig = (config: PasskeyWalletConfig): PasskeyWalletConfig => {
   const rpId = normalizeHostname(config.rpId);
   const derivationNamespace = normalizeDerivationNamespace(config.derivationNamespace) || DEFAULT_DERIVATION_NAMESPACE;
+  if (config.walletMode !== 'passkey-eoa') {
+    throw new Error(`Unsupported passkey wallet mode "${String(config.walletMode || '')}". Expected "passkey-eoa".`);
+  }
+  if (config.walletKeyMode !== 'passkey-derived' && config.walletKeyMode !== 'encrypted-private-key') {
+    throw new Error(
+      `Unsupported passkey wallet key mode "${String(config.walletKeyMode || '')}". Expected "passkey-derived" or "encrypted-private-key".`
+    );
+  }
+  if (config.sessionMode !== 'soft') {
+    throw new Error(`Unsupported passkey wallet session mode "${String(config.sessionMode || '')}". Expected "soft".`);
+  }
   if (!rpId) {
     throw new Error('Passkey wallet RP ID is required. Set NEXT_PUBLIC_RP_ID or REACT_APP_NEXT_PUBLIC_RP_ID.');
   }
@@ -126,9 +137,9 @@ export const getPasskeyWalletConfig = (): PasskeyWalletConfig => {
     rpName: readDualEnv('NEXT_PUBLIC_RP_NAME', 'REACT_APP_NEXT_PUBLIC_RP_NAME', DEFAULT_RP_NAME),
     appOrigin,
     accountOrigin,
-    walletMode: walletMode === 'passkey-eoa' ? 'passkey-eoa' : 'passkey-eoa',
-    walletKeyMode: walletKeyMode === 'encrypted-private-key' ? 'encrypted-private-key' : 'passkey-derived',
-    sessionMode: sessionMode === 'soft' ? 'soft' : 'soft',
+    walletMode: walletMode as PasskeyWalletConfig['walletMode'],
+    walletKeyMode: walletKeyMode as PasskeyWalletConfig['walletKeyMode'],
+    sessionMode: sessionMode as PasskeyWalletConfig['sessionMode'],
     unlockTtlSeconds: Number.isFinite(ttlSeconds) && ttlSeconds > 0 ? ttlSeconds : DEFAULT_TTL_SECONDS,
     allowPreviewRpId: readDualBoolEnv(
       'NEXT_PUBLIC_ALLOW_PREVIEW_RP_ID',

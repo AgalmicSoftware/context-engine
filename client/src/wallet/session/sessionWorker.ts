@@ -120,7 +120,7 @@ const handleRequest = async (message: RequestMessage): Promise<unknown> => {
     }
     case 'eth_signTransaction': {
       const tx = ((message.params?.[0] || {}) as Record<string, unknown>);
-      assertSoftSessionAllowed({ policy, method: 'eth_sendTransaction', tx, chainId: activeChainId });
+      assertSoftSessionAllowed({ policy, method: 'eth_signTransaction', tx, chainId: activeChainId });
       return wallet.signTransaction(tx as ethers.providers.TransactionRequest);
     }
     default:
