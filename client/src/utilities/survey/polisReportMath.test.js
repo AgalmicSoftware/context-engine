@@ -94,6 +94,9 @@ describe('computePolisConversationMath', () => {
     expect(result.clusterAssignments[3]).toBe(result.clusterAssignments[4]);
     expect(result.clusterAssignments[0]).not.toBe(result.clusterAssignments[3]);
     expect(Number.isInteger(result.clusterAssignments[5])).toBe(true);
+    expect(result.groupVotes).toBeUndefined();
+    expect(result.groupAwareConsensus).toBeUndefined();
+    expect(result.consensus).toBeUndefined();
   });
 });
 

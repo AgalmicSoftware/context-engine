@@ -435,7 +435,7 @@ const AdminPage = ({
     });
   }, [sessions, requestedChainId]);
 
-  const availableSessions = useMemo(() => sessionsForChain, [sessionsForChain]);
+  const availableSessions = sessionsForChain;
   const requestedSessionMatch = useMemo(() => {
     if (!requestedSessionRaw) return null;
     if (requestedSessionIdHex) {
@@ -815,10 +815,6 @@ const AdminPage = ({
     currentSponsored?.lit === true ||
     toStr(currentSponsored?.lit).trim() === '1'
   );
-  const nextSponsored = useMemo(() => buildSponsoredSessionFlagFields({
-    secrets,
-    includeCustomRpcInAi: true,
-  }), [secrets]);
   const resourceSessionConfig = groupMetadata || selectedConfig;
   const selectedConfigWorkerUrl = useMemo(() => (
     normalizeWorkerUrl(getUsableSessionWorkerUrl({
@@ -1481,8 +1477,6 @@ const AdminPage = ({
       const msg = getErrorMessage(err, 'Failed to update secrets.');
       if (msg.toLowerCase().includes('flag')) {
         setChainStatus(msg);
-      } else if (saveStatus) {
-        setSaveStatus(msg);
       } else {
         setSaveStatus(msg);
       }

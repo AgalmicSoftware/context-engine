@@ -1944,15 +1944,9 @@ async function uploadDataToArweave(data, format, opts = {}) {
             bootstrapPayload?.error ||
             bootstrapPayload?.message ||
             (bootstrapResponse.ok ? '' : `Arweave upload failed (${bootstrapResponse.status})`);
-          if (bootstrapResponse.ok) {
-            response = bootstrapResponse;
-            payload = bootstrapPayload;
-            message = bootstrapMessage;
-          } else {
-            response = bootstrapResponse;
-            payload = bootstrapPayload;
-            message = bootstrapMessage;
-          }
+          response = bootstrapResponse;
+          payload = bootstrapPayload;
+          message = bootstrapMessage;
         } catch (err) {
           const bootstrapError = String(err?.message || err || 'network error');
           return {

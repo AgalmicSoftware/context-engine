@@ -6542,7 +6542,7 @@ const renderQuestion = (question: any, qIndex: any, currentSurveyResponseState: 
     });
     const sliderOpen: any = !!stateRef.current.sliderToggleExpandedByQuestion?.[question.id];
 
-    const cardKey: any = `${question.id}-${stateRef.current.decryptionNonce}`;
+    const cardKey: any = String(question.id || '');
     const showResponseLookupSpinner: any = shouldShowSingleQuestionResponseLookupSpinner({
       singleQuestionMode: propsRef.current.singleQuestionMode,
       isLoadingResponse: stateRef.current.isLoadingResponse,
