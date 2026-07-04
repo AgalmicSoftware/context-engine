@@ -655,6 +655,7 @@ type SurveyQuestionsPendingStatsSnapshot = {
   submittedSinceLastEdit: boolean;
   isSubmitting: boolean;
 };
+type SurveyQuestionsPendingStatsInput = Partial<Pick<SurveyQuestionsPendingStatsSnapshot, 'total' | 'encrypted'>> | null | undefined;
 type SurveyQuestionsAutoDecryptQueueItem = {
   qid: string;
   field: string;
@@ -2007,18 +2008,18 @@ const maybeRefreshCanDecryptOtherResponses = () => {
     } catch (e: any) { surveyLog.warn('SurveyTool: fallback', e); }
   };
 
-const emitPendingStats = (stats: any) => {
+const emitPendingStats = (stats: SurveyQuestionsPendingStatsInput) => {
     if (typeof propsRef.current.onPendingStatsChange !== 'function') return;
-    const total: any = Number(stats?.total || 0);
-    const encrypted: any = Number(stats?.encrypted || 0);
-    const submittedSinceLastEdit: any = !!stateRef.current.submittedSinceLastEdit;
-    const isSubmitting: any = !!stateRef.current.isSubmitting;
-    const last: any = inst._lastPendingStats || {};
+    const total = Number(stats?.total || 0);
+    const encrypted = Number(stats?.encrypted || 0);
+    const submittedSinceLastEdit = !!stateRef.current.submittedSinceLastEdit;
+    const isSubmitting = !!stateRef.current.isSubmitting;
+    const last = inst._lastPendingStats;
     if (
-      last.total === total &&
-      last.encrypted === encrypted &&
-      !!last.submittedSinceLastEdit === submittedSinceLastEdit &&
-      !!last.isSubmitting === isSubmitting
+      last?.total === total &&
+      last?.encrypted === encrypted &&
+      !!last?.submittedSinceLastEdit === submittedSinceLastEdit &&
+      !!last?.isSubmitting === isSubmitting
     ) return;
     inst._lastPendingStats = { total, encrypted, submittedSinceLastEdit, isSubmitting };
     propsRef.current.onPendingStatsChange({ total, encrypted, submittedSinceLastEdit, isSubmitting });
@@ -2026,24 +2027,24 @@ const emitPendingStats = (stats: any) => {
 
 const getPendingStatsSnapshot = () => getPendingStatsSnapshotFromState(stateRef.current);
 
-const getActiveSurveyIndex = (surveyIndexParam: any) => (
+const getActiveSurveyIndex = (surveyIndexParam?: number | null) => (
     propsRef.current.isStandalone || propsRef.current.singleQuestionMode
       ? 0
       : (surveyIndexParam ?? propsRef.current.surveyIndex ?? 0)
   );
 
-const didEditDiffInputsChange = (prevProps: any, prevState: any) => {
+const didEditDiffInputsChange = (prevProps?: SurveyQuestionsProps | null, prevState?: SurveyQuestionsState | null) => {
     if (!prevProps || !prevState) return true;
-    const prevSessionSlugHint: any = getSessionSlugHintFromProps(prevProps);
-    const nextSessionSlugHint: any = getSessionSlugHintFromProps(propsRef.current);
-    const prevSessionSlugPinned: any = getSessionSlugPinnedFromProps(prevProps);
-    const nextSessionSlugPinned: any = getSessionSlugPinnedFromProps(propsRef.current);
-    const prevStateQuestionPoolSig: any = buildQuestionIdScopeSignature(prevState.questionPool);
-    const nextStateQuestionPoolSig: any = buildQuestionIdScopeSignature(stateRef.current.questionPool);
-    const prevStatePileQuestionsSig: any = buildQuestionIdScopeSignature(prevState.pileQuestions);
-    const nextStatePileQuestionsSig: any = buildQuestionIdScopeSignature(stateRef.current.pileQuestions);
-    const prevPropsQuestionPoolSig: any = buildQuestionIdScopeSignature(prevProps.questionPool);
-    const nextPropsQuestionPoolSig: any = buildQuestionIdScopeSignature(propsRef.current.questionPool);
+    const prevSessionSlugHint = getSessionSlugHintFromProps(prevProps);
+    const nextSessionSlugHint = getSessionSlugHintFromProps(propsRef.current);
+    const prevSessionSlugPinned = getSessionSlugPinnedFromProps(prevProps);
+    const nextSessionSlugPinned = getSessionSlugPinnedFromProps(propsRef.current);
+    const prevStateQuestionPoolSig = buildQuestionIdScopeSignature(prevState.questionPool);
+    const nextStateQuestionPoolSig = buildQuestionIdScopeSignature(stateRef.current.questionPool);
+    const prevStatePileQuestionsSig = buildQuestionIdScopeSignature(prevState.pileQuestions);
+    const nextStatePileQuestionsSig = buildQuestionIdScopeSignature(stateRef.current.pileQuestions);
+    const prevPropsQuestionPoolSig = buildQuestionIdScopeSignature(prevProps.questionPool);
+    const nextPropsQuestionPoolSig = buildQuestionIdScopeSignature(propsRef.current.questionPool);
     if (prevState.surveysResponseState !== stateRef.current.surveysResponseState) return true;
     if (prevState.editBaseline !== stateRef.current.editBaseline) return true;
     if (prevState.userAnswers !== stateRef.current.userAnswers) return true;
