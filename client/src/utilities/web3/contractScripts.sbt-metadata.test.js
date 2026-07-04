@@ -24,6 +24,17 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
     admin: jest.fn().mockResolvedValue(adminAddress),
     owner: jest.fn().mockResolvedValue(adminAddress),
     tokenURI: jest.fn().mockResolvedValue(tokenUriValue),
+    getSBTMetadata: jest.fn().mockResolvedValue([
+      'Metadata Test SBT',
+      'MTSBT',
+      ethers.BigNumber.from(0),
+      ethers.BigNumber.from(0),
+      adminAddress,
+      ethers.BigNumber.from(0),
+      false,
+      0,
+      tokenUriValue,
+    ]),
     maxTokens: jest.fn().mockResolvedValue(ethers.BigNumber.from(0)),
     collectionBurnAuth: jest.fn().mockResolvedValue(0),
     burnAuth: jest.fn().mockResolvedValue(0),
@@ -119,6 +130,47 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
     expect(fetchSpy).toHaveBeenCalledWith(metadataUrl, expect.objectContaining({
       headers: expect.objectContaining({ accept: 'application/json' }),
     }));
+  });
+
+  it('uses getSBTMetadata for collection tokenURI before probing token-specific URIs', async () => {
+    const metadataUrl = 'https://example.com/metadata/aggregate-getter.json';
+    const imageUrl = 'https://example.com/assets/aggregate-getter.webp';
+    const stub = baseContractStub(null);
+    stub.tokenURI.mockRejectedValue(new Error('nonexistent token'));
+    stub.getSBTMetadata.mockResolvedValue([
+      'Metadata Test SBT',
+      'MTSBT',
+      ethers.BigNumber.from(0),
+      ethers.BigNumber.from(0),
+      adminAddress,
+      ethers.BigNumber.from(0),
+      false,
+      0,
+      metadataUrl,
+    ]);
+    contractSpy = jest.spyOn(ethers, 'Contract').mockImplementation(() => stub);
+    fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      headers: { get: () => 'application/json; charset=utf-8' },
+      json: async () => ({
+        name: 'Aggregate Getter SBT',
+        image: imageUrl,
+      }),
+      text: async () => '',
+    });
+
+    const meta = await contractScripts.getSbtMetadata('none', sbtAddress, {
+      slug: 'edge',
+      networkChainId: 84532,
+      contracts: {},
+    });
+
+    expect(meta).toEqual(expect.objectContaining({
+      tokenURI: metadataUrl,
+      image: imageUrl,
+    }));
+    expect(stub.getSBTMetadata).toHaveBeenCalledTimes(1);
+    expect(stub.tokenURI).not.toHaveBeenCalled();
   });
 
   it('normalizes legacy SBT document URL aliases from tokenURI JSON', async () => {

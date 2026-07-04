@@ -211,8 +211,9 @@ contract CustomSBTTest is TestUtils {
 
         assertEq(deployed, predicted, "configured deterministic address mismatch");
         assertEq(factory.sbtCount(), 1, "configured create should increment count");
+        (,,,,,,,, string memory collectionTokenURI) = MySBT(deployed).getSBTMetadata();
         assertEq(
-            keccak256(bytes(MySBT(deployed).tokenURI(1))),
+            keccak256(bytes(collectionTokenURI)),
             keccak256(bytes("ar://configured-metadata")),
             "token URI should be finalized"
         );
@@ -396,6 +397,49 @@ contract CustomSBTTest is TestUtils {
             "collection burnAuth mismatch"
         );
         assertHistorySummary(sbt, 1, 0, 1, 1, 1);
+    }
+
+    function testTokenURIRevertsForNonexistentAndBurnedTokens() public {
+        bytes32[] memory empty = new bytes32[](0);
+        MySBT sbt = new MySBT(
+            "ContextEngine",
+            "CE",
+            0,
+            admin,
+            0,
+            MySBT.MintMode.PublicClaim,
+            MySBT.BurnAuth.OwnerOnly,
+            empty,
+            "ar://collection-metadata",
+            bytes32(0),
+            false,
+            false
+        );
+
+        vm.expectRevert(InvalidTokenId.selector);
+        sbt.tokenURI(1);
+
+        vm.prank(user);
+        sbt.claim();
+        uint256 tokenId = sbt.getTokenIdByOwner(user);
+        assertEq(
+            keccak256(bytes(sbt.tokenURI(tokenId))),
+            keccak256(bytes("ar://collection-metadata")),
+            "live token URI mismatch"
+        );
+
+        (,,,,,,,, string memory collectionTokenURI) = sbt.getSBTMetadata();
+        assertEq(
+            keccak256(bytes(collectionTokenURI)),
+            keccak256(bytes("ar://collection-metadata")),
+            "collection metadata URI mismatch"
+        );
+
+        vm.prank(user);
+        sbt.burn(tokenId);
+
+        vm.expectRevert(InvalidTokenId.selector);
+        sbt.tokenURI(tokenId);
     }
 
     function testBurnEmitsActivityEventAndKeepsCollectionBurnAuthReadable() public {
