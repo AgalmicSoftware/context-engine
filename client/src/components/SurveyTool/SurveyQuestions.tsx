@@ -595,7 +595,7 @@ import {
 
 declare global {
   interface Window {
-    __CE_SINGLE_Q_DEBUG__?: Array<Record<string, unknown>>;
+    __CE_SINGLE_Q_DEBUG__?: Record<string, unknown>;
   }
 }
 
@@ -717,6 +717,12 @@ type SurveyQuestionsResponseHydrationEntryApplier = (args?: SurveyQuestionsRespo
 type SurveyQuestionsResponseHydrationListApplier = (args?: SurveyQuestionsResponseHydrationListArgs) => boolean;
 type SurveyQuestionsCachedResponseEntryApplier = (args?: SurveyQuestionsCachedResponseEntryArgs) => boolean;
 type SurveyQuestionsLocalCacheHydrationEntryApplier = (args?: SurveyQuestionsLocalCacheHydrationEntryArgs) => boolean;
+type SurveyQuestionsTimeoutCallback = () => void;
+type SurveyQuestionsBootstrapRetryArgs = {
+  questionId?: unknown;
+  attempt?: unknown;
+  reason?: unknown;
+};
 
 export interface SurveyQuestions {
   setState: SurveyQuestionsSetState;
@@ -1228,11 +1234,11 @@ const _applyLocalCacheHydrationEntryToSlice = ({
     return changed;
   };
 
-const setManagedTimeout = (fn: any, delayMs: any = 0) => {
-    const timeoutId: any = setTimeout(() => {
+const setManagedTimeout = (fn: SurveyQuestionsTimeoutCallback, delayMs: unknown = 0) => {
+    const timeoutId = setTimeout(() => {
       inst._transientTimeouts.delete(timeoutId);
       if (!inst._isMounted) return;
-      try { fn(); } catch (e: any) { surveyLog.warn('SurveyTool: callback', e); }
+      try { fn(); } catch (e: unknown) { surveyLog.warn('SurveyTool: callback', e); }
     }, Math.max(0, Number(delayMs) || 0));
     inst._transientTimeouts.add(timeoutId);
     return timeoutId;
@@ -1240,7 +1246,7 @@ const setManagedTimeout = (fn: any, delayMs: any = 0) => {
 
 const clearManagedTimeouts = () => {
     if (!inst._transientTimeouts || inst._transientTimeouts.size === 0) return;
-    inst._transientTimeouts.forEach((timeoutId: any) => {
+    inst._transientTimeouts.forEach((timeoutId) => {
       clearTimeout(timeoutId);
     });
     inst._transientTimeouts.clear();
@@ -1254,21 +1260,21 @@ const clearSingleQuestionBootstrapRetry = () => {
     inst._singleQuestionBootstrapRetrySig = '';
   };
 
-const getPendingSingleQuestionBootstrapRetryAttempt = (questionId: any = '') => {
-    const qid: any = String(questionId || propsRef.current.questionID || '').trim().toLowerCase();
+const getPendingSingleQuestionBootstrapRetryAttempt = (questionId: unknown = '') => {
+    const qid = String(questionId || propsRef.current.questionID || '').trim().toLowerCase();
     if (!qid) return 0;
-    const currentRetrySig: any = String(inst._singleQuestionBootstrapRetrySig || '').trim().toLowerCase();
+    const currentRetrySig = String(inst._singleQuestionBootstrapRetrySig || '').trim().toLowerCase();
     if (!currentRetrySig) return 0;
-    const [currentQid = '', currentAttemptToken = '0']: any = currentRetrySig.split(':');
+    const [currentQid = '', currentAttemptToken = '0'] = currentRetrySig.split(':');
     if (currentQid !== qid) return 0;
-    const currentAttempt: any = Number(currentAttemptToken || 0);
+    const currentAttempt = Number(currentAttemptToken || 0);
     return Number.isFinite(currentAttempt) && currentAttempt > 0 ? currentAttempt : 0;
   };
 
-const updateSingleQuestionDebug = (patch: any = {}) => {
+const updateSingleQuestionDebug = (patch: Record<string, unknown> = {}) => {
     if (typeof window === 'undefined') return;
     try {
-      const prev: any =
+      const prev =
         (window.__CE_SINGLE_Q_DEBUG__ && typeof window.__CE_SINGLE_Q_DEBUG__ === 'object')
           ? window.__CE_SINGLE_Q_DEBUG__
           : {};
@@ -1277,32 +1283,32 @@ const updateSingleQuestionDebug = (patch: any = {}) => {
         ...patch,
         updatedAt: Date.now(),
       };
-    } catch (e: any) { surveyLog.warn('SurveyTool: fallback', e); }
+    } catch (e: unknown) { surveyLog.warn('SurveyTool: fallback', e); }
   };
 
-const scheduleSingleQuestionBootstrapRetry = ({ questionId = '', attempt = 0, reason = '' }: any = {}) => {
-    const qid: any = String(questionId || propsRef.current.questionID || '').trim().toLowerCase();
+const scheduleSingleQuestionBootstrapRetry = ({ questionId = '', attempt = 0, reason = '' }: SurveyQuestionsBootstrapRetryArgs = {}) => {
+    const qid = String(questionId || propsRef.current.questionID || '').trim().toLowerCase();
     if (!qid || !inst._isMounted) return false;
 
-    const maxAttempts: any = 6;
-    const nextAttempt: any = Math.max(1, Number(attempt || 0) + 1);
+    const maxAttempts = 6;
+    const nextAttempt = Math.max(1, Number(attempt || 0) + 1);
     if (nextAttempt > maxAttempts) return false;
 
-    const currentRetrySig: any = String(inst._singleQuestionBootstrapRetrySig || '').trim().toLowerCase();
+    const currentRetrySig = String(inst._singleQuestionBootstrapRetrySig || '').trim().toLowerCase();
     if (currentRetrySig) {
-      const [currentQid = '', currentAttemptToken = '0']: any = currentRetrySig.split(':');
-      const currentAttempt: any = Number(currentAttemptToken || 0);
+      const [currentQid = '', currentAttemptToken = '0'] = currentRetrySig.split(':');
+      const currentAttempt = Number(currentAttemptToken || 0);
       if (currentQid === qid && Number.isFinite(currentAttempt) && currentAttempt >= nextAttempt) {
         return true;
       }
     }
 
-    const retrySig: any = `${qid}:${nextAttempt}`;
+    const retrySig = `${qid}:${nextAttempt}`;
     if (inst._singleQuestionBootstrapRetrySig === retrySig) return true;
 
     clearSingleQuestionBootstrapRetry();
     inst._singleQuestionBootstrapRetrySig = retrySig;
-    const delayMs: any = Math.min(25000, 4000 * nextAttempt);
+    const delayMs = Math.min(25000, 4000 * nextAttempt);
 
     inst._singleQuestionBootstrapRetryTimer = setTimeout(() => {
       inst._singleQuestionBootstrapRetryTimer = null;
@@ -1311,12 +1317,15 @@ const scheduleSingleQuestionBootstrapRetry = ({ questionId = '', attempt = 0, re
       fetchSingleQuestionData({
         forceQuestionMetadataRefetch: true,
         bootstrapRetryAttempt: nextAttempt,
-      }).catch((error: any) => {
+      }).catch((error: unknown) => {
+        const errorRecord = error && typeof error === 'object'
+          ? error as { message?: unknown }
+          : null;
         surveyLog.error('SurveyQuestions: bootstrap retry failed', {
           questionId: qid,
           attempt: nextAttempt,
           reason,
-          error: error?.message || String(error),
+          error: errorRecord?.message || String(error),
         });
       });
     }, delayMs);
@@ -1328,7 +1337,7 @@ const shouldUseAnimationFrameForAutoDecryptSweep = () => {
     if (typeof window === 'undefined') return false;
     if (typeof window.requestAnimationFrame !== 'function') return false;
     if (typeof document !== 'undefined' && document.hidden) return false;
-    const ua: any = String((typeof navigator !== 'undefined' && navigator.userAgent) || '');
+    const ua = String((typeof navigator !== 'undefined' && navigator.userAgent) || '');
     if (/jsdom/i.test(ua)) return false;
     return true;
   };
@@ -1337,7 +1346,7 @@ const clearAutoDecryptSweepScheduling = () => {
     inst._autoDecryptSweepMicrotaskScheduled = false;
     inst._queuedAutoDecryptSweepReasons.clear();
     if (inst._autoDecryptSweepFrameRequestId != null && typeof window !== 'undefined') {
-      try { window.cancelAnimationFrame(inst._autoDecryptSweepFrameRequestId); } catch (e: any) { surveyLog.warn('SurveyTool: cleanup', e); }
+      try { window.cancelAnimationFrame(inst._autoDecryptSweepFrameRequestId); } catch (e: unknown) { surveyLog.warn('SurveyTool: cleanup', e); }
     }
     inst._autoDecryptSweepFrameRequestId = null;
   };
