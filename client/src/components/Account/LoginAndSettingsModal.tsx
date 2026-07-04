@@ -316,8 +316,10 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   _sponsoredReqId: number = 0;
   _cacheClearInFlight: boolean = false;
   _testFundsRequestId: number = 0;
-  _passkeyWalletRestoreReqId: number = 0;
-  _passkeyWalletActionId: number = 0;
+  _portoSessionRestoreReqId: number = 0;
+  _portoSessionActionId: number = 0;
+  _sponsoredSessionSourcesMemo: { key: string; value: any } | null = null;
+  _settingsOverviewMemo: { key: string; value: any } | null = null;
 
   getListModePrimarySessionSlug = (state: Partial<LoginAndSettingsModalState> = this.state) => {
     const scope = this.getSessionScanScopeValue(state);
@@ -1609,11 +1611,43 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     sessionScanSlugsInput = this.state.sessionScanSlugsInput,
   }: any = {}) => {
     const active = normalizeSettingsSessionSlug(activeSlug);
+    const scope = normalizeSessionScanScope(sessionScanScope || '');
+    const listSlugs = this.getConfiguredSessionScanSlugs({
+      sessionScanSlugs,
+      sessionScanSlugsInput,
+    });
+    const allSessionSlugs = getAllSessionSlugs({ includeEmpty: true }) || [];
+    const sourceSlugs = uniqueList([
+      ...allSessionSlugs.map((slug: any) => normalizeSettingsSessionSlug(slug)),
+      active,
+      '',
+    ]);
+    const configBySlug: any = new Map();
+    const sponsoredSourceSignature = sourceSlugs.map((slug: any) => {
+      const cfg = this.getDisplaySessionConfig(slug);
+      configBySlug.set(slug, cfg);
+      return {
+        slug,
+        sessionName: cfg?.sessionName || cfg?.name || cfg?.title || '',
+        networkChainId: cfg?.networkChainId || cfg?.chainId || '',
+        sponsoredKeys: cfg?.sponsoredKeys && typeof cfg.sponsoredKeys === 'object' ? cfg.sponsoredKeys : {},
+      };
+    });
+    const memoKey = JSON.stringify({
+      active,
+      scope,
+      listSlugs,
+      allSessionSlugs,
+      sponsoredSourceSignature,
+    });
+    if (this._sponsoredSessionSourcesMemo?.key === memoKey) {
+      return this._sponsoredSessionSourcesMemo.value;
+    }
     const entries: any = new Map();
     const pushSession = (slugIn: any) => {
       const slug = normalizeSettingsSessionSlug(slugIn);
       if (entries.has(slug)) return;
-      const cfg = this.getDisplaySessionConfig(slug);
+      const cfg = configBySlug.has(slug) ? configBySlug.get(slug) : this.getDisplaySessionConfig(slug);
       const descriptor = this.getSessionDescriptor(slug, cfg, active);
       entries.set(slug, {
         ...descriptor,
@@ -1621,7 +1655,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       });
     };
 
-    (getAllSessionSlugs({ includeEmpty: true }) || []).forEach(pushSession);
+    allSessionSlugs.forEach(pushSession);
     pushSession(active);
     pushSession('');
 
@@ -1629,8 +1663,8 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     const knownSlugs = allSessions.map((entry: any) => entry.slug);
     const rpcScopeSlugs = this.getScanScopeSessionSlugs({
       activeSlug: active,
-      sessionScanScope,
-      sessionScanSlugs,
+      sessionScanScope: scope,
+      sessionScanSlugs: listSlugs,
       sessionScanSlugsInput,
       knownSlugs,
     });
@@ -1651,10 +1685,12 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       return acc;
     }, {});
 
-    return {
+    const value = {
       byResource,
       rpcScope: byResource.rpc.filter((entry: any) => rpcScopeSlugs.includes(entry.slug)),
     };
+    this._sponsoredSessionSourcesMemo = { key: memoKey, value };
+    return value;
   };
 
   toggleAiSettingsPanel = () => {
@@ -1933,13 +1969,32 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     const activeSession = this.getSessionDescriptor(sessionSlug, sessionConfig);
     const sponsoredAccess = this.state.sponsoredAccess || {};
     const sponsorSessions = this.getSponsoredSessionSources({ activeSlug: sessionSlug });
+    const memoKey = JSON.stringify({
+      activeSession,
+      loginComplete: this.props.loginComplete,
+      provider: this.props.provider,
+      selectedSessionScope: this.props.selectedSessionScope,
+      selectedSessionSlugs: this.props.selectedSessionSlugs || [],
+      sessionScanScope: this.getSessionScanScopeValue(),
+      sessionScanSlugs: this.state.sessionScanSlugs,
+      sessionScanSlugsInput: this.state.sessionScanSlugsInput,
+      sponsoredAccess,
+      sponsorSessions,
+      targetNetworkId: tn?.id,
+      targetNetworkName,
+      walletNetworkId: walletNet?.id,
+      walletNetworkName,
+    });
+    if (this._settingsOverviewMemo?.key === memoKey) {
+      return this._settingsOverviewMemo.value;
+    }
     const sponsorshipCards = buildLoginSettingsSponsorshipCards({
       activeSession,
       sponsoredAccess,
       sponsorSessions,
     });
 
-    return {
+    const value = {
       activeSession,
       cryptoTerminology: isCryptoMode(),
       needsNetworkSwitch,
@@ -1950,6 +2005,8 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       targetNetwork: tn,
       walletNetworkName,
     };
+    this._settingsOverviewMemo = { key: memoKey, value };
+    return value;
   };
 
   renderInlineNetworkSummary = ({
