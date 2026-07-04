@@ -534,7 +534,7 @@ describe('userPageDeepScanHelpers', () => {
       network: { id: 84532 },
       peekCache,
       viewAddress,
-    })).toBe(`${viewLower}|84532|120|:84532:10:1;edge:84532:12:2`);
+    })).toBe(`${viewLower}|84532|120|:84532:10;edge:84532:12`);
     expect(peekCache).toHaveBeenCalledWith('userCache', '', { clone: false });
     expect(buildUserPageDeepScanTooltipInputSignature({
       viewAddress: '',

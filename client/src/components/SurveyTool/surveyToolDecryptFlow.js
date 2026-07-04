@@ -1515,27 +1515,34 @@ export const applyDecryptedQuestionResponseValues = (
   if (!responseRecord || typeof responseRecord !== 'object') return responseRecord;
   const qid = String(questionId || '').trim().toLowerCase();
   const next = { ...responseRecord };
+  let changed = false;
 
   if (qid && decryptedStateSlice?.answers?.[qid]) {
+    const nextValue = decryptedStateSlice.answers[qid]?.value;
     next.answer = {
       ...(next.answer || {}),
-      value: decryptedStateSlice.answers[qid]?.value,
+      value: nextValue,
     };
+    changed = changed || responseRecord.answer?.value !== nextValue;
   }
   if (qid && decryptedStateSlice?.additionalComments?.[qid]) {
+    const nextValue = decryptedStateSlice.additionalComments[qid]?.value;
     next.additional = {
       ...(next.additional || {}),
-      value: decryptedStateSlice.additionalComments[qid]?.value,
+      value: nextValue,
     };
+    changed = changed || responseRecord.additional?.value !== nextValue;
   }
   if (decryptedImportance !== null && decryptedImportance !== undefined) {
     next.importance = decryptedImportance;
+    changed = changed || responseRecord.importance !== decryptedImportance;
   }
   if (decryptedConviction !== null && decryptedConviction !== undefined) {
     next.conviction = decryptedConviction;
+    changed = changed || responseRecord.conviction !== decryptedConviction;
   }
 
-  return next;
+  return changed ? next : responseRecord;
 };
 
 export const applyDecryptedQuestionResponseValuesToContainer = (
@@ -1548,14 +1555,17 @@ export const applyDecryptedQuestionResponseValuesToContainer = (
 
   if (Array.isArray(viewedResponseContainer.responses)) {
     const qid = String(options?.questionId || '').trim().toLowerCase();
+    let changed = false;
     const nextResponses = viewedResponseContainer.responses.map((responseRecord) => {
       const rid = String(
         responseRecord?.questionID || responseRecord?.questionId || '',
       ).trim().toLowerCase();
       if (qid && rid !== qid) return responseRecord;
-      return applyDecryptedQuestionResponseValues(responseRecord, options);
+      const nextResponseRecord = applyDecryptedQuestionResponseValues(responseRecord, options);
+      changed = changed || nextResponseRecord !== responseRecord;
+      return nextResponseRecord;
     });
-    return { ...viewedResponseContainer, responses: nextResponses };
+    return changed ? { ...viewedResponseContainer, responses: nextResponses } : viewedResponseContainer;
   }
 
   return applyDecryptedQuestionResponseValues(viewedResponseContainer, options);
@@ -1582,9 +1592,13 @@ export const buildViewedResponseDecryptSuccessState = (
     },
   );
 
+  const viewAddressAnswers = nextViewed && nextViewed !== prevState?.parsedViewAddressAnswers
+    ? JSON.stringify(nextViewed)
+    : prevState?.viewAddressAnswers;
+
   return {
     parsedViewAddressAnswers: nextViewed,
-    viewAddressAnswers: nextViewed ? JSON.stringify(nextViewed) : prevState?.viewAddressAnswers,
+    viewAddressAnswers,
     isDecrypting: false,
     decryptingByKey: clearQuestionFieldBusyMap(
       prevState?.decryptingByKey,

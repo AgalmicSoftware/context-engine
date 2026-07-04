@@ -707,6 +707,7 @@ class CreateSBTGroup extends Component<any, any> {
   _predictedAddressShapeSignature: string;
   _autoCreate2SaltForGroupPassword: boolean;
   _suppressFormCachePersistence: boolean;
+  _renderDerivationsMemo: { key: string; value: any } | null;
   fileInput: HTMLInputElement | null = null;
 
   constructor(props: CreateSbtGroupProps) {
@@ -729,6 +730,7 @@ class CreateSBTGroup extends Component<any, any> {
     this._predictedAddressShapeSignature = '';
     this._autoCreate2SaltForGroupPassword = false;
     this._suppressFormCachePersistence = false;
+    this._renderDerivationsMemo = null;
   }
 
   /* =========================
@@ -2926,7 +2928,9 @@ class CreateSBTGroup extends Component<any, any> {
     });
   };
 
-  buildMetadataPreview = (): TokenUriMetadata => {
+  buildMetadataPreview = ({
+    gateOptionsResult = null,
+  }: { gateOptionsResult?: GateOptionsResult | null } = {}): TokenUriMetadata => {
     const {
       sbtName,
       sbtDescription,
@@ -2937,7 +2941,7 @@ class CreateSBTGroup extends Component<any, any> {
       sbtImageFile,
     } = this.state;
     const chainID = this.getSelectedAuthoringChainId();
-    const { gateMap, defaultGateId } = this.resolveLockGateOptions();
+    const { gateMap, defaultGateId } = gateOptionsResult || this.resolveLockGateOptions();
     const validGateIds = Object.keys(gateMap || {});
     const previewEncryptedFieldGates: Record<string, unknown> = {};
     const previewEncryptedFields: Record<string, unknown> = {};
@@ -3019,6 +3023,160 @@ class CreateSBTGroup extends Component<any, any> {
     });
 
     return preview;
+  };
+
+  getCreateSbtRenderDerivations = ({
+    account,
+    authoringChain,
+    authoringChainId,
+    autoJoinUrl,
+    create2Salt,
+    currentTagInput,
+    deferredDeployMode,
+    documentIDHashes,
+    documentURLs,
+    documentUrl,
+    effectiveSessionSlug,
+    groupPassword,
+    imageChooserStatusText,
+    imageChooserStatusTone,
+    imageLoadError,
+    metadataLockGateIds,
+    network,
+    predictableAddressActive,
+    sbtAddress,
+    sbtDescription,
+    sbtDistribution,
+    sbtImageFile,
+    sbtImageUrl,
+    sbtName,
+    shareableUrl,
+    tags,
+    tokenURI,
+    useImageUrl,
+  }: any) => {
+    const imageFileKey = sbtImageFile && typeof sbtImageFile === 'object'
+      ? `${sbtImageFile.name || ''}:${sbtImageFile.size || ''}:${sbtImageFile.lastModified || ''}`
+      : '';
+    const memoKey = JSON.stringify({
+      account,
+      authoringChain,
+      authoringChainId,
+      autoJoinUrl,
+      create2Salt,
+      currentTagInput,
+      deferredDeployMode,
+      documentIDHashes,
+      documentURLs,
+      documentUrl,
+      effectiveSessionSlug,
+      groupPassword,
+      imageChooserStatusText,
+      imageChooserStatusTone,
+      imageFileKey,
+      imageLoadError,
+      defaultGateId: this.props.defaultGateId || '',
+      encryptionGates: this.props.encryptionGates || [],
+      lockGatePreferredSessionSlug: this.props.lockGatePreferredSessionSlug || '',
+      lockGateSessionSources: this.props.lockGateSessionSources || [],
+      metadataLockGateIds,
+      network,
+      propsNetwork: {
+        chainId: this.props.network?.chainId || '',
+        id: this.props.network?.id || '',
+      },
+      sessionConfigOverride: this.props.sessionConfigOverride || null,
+      sessionSlug: this.props.sessionSlug || '',
+      slug: this.props.slug || '',
+      predictableAddressActive,
+      sbtAddress,
+      sbtDescription,
+      sbtDistribution,
+      sbtImageUrl,
+      sbtName,
+      shareableUrl,
+      tags,
+      tokenURI,
+      useImageUrl,
+    });
+    if (this._renderDerivationsMemo?.key === memoKey) {
+      return this._renderDerivationsMemo.value;
+    }
+
+    const jsonData = buildCreateSbtJsonPreviewData({
+      authoringChain,
+      autoJoinUrl,
+      groupPassword,
+      network,
+      sbtName,
+      sbtAddress,
+      sbtDistribution,
+      shareableUrl,
+      tokenURI,
+    });
+    const lockGateOptions = this.resolveLockGateOptions();
+    const metadataPreview = this.buildMetadataPreview({ gateOptionsResult: lockGateOptions });
+    const documentUrlInputState = resolveCreateSbtDocumentUrlInputState({
+      documentURLs,
+      documentUrl,
+    });
+    const tagInputState = resolveCreateSbtTagInputState({
+      currentTagInput,
+    });
+    const openMintAutoJoinUrl = resolveCreateSbtOpenMintAutoJoinUrl({
+      autoJoinUrl,
+      buildSessionAutoJoinUrl: this.buildSessionAutoJoinUrl,
+      distributionOption: sbtDistribution.distributionOption,
+      sbtAddress,
+    });
+    const chainOptions = this.getAuthoringChainOptions();
+    const metadataLockSelectionState = buildCreateSbtMetadataLockSelectionState({
+      gateOptions: lockGateOptions.gateOptions,
+      metadataLockGateIds,
+    });
+    const imagePreviewState = buildCreateSbtImagePreviewState({
+      imageChooserStatusText,
+      imageChooserStatusTone,
+      imageLoadError,
+      sbtImageFile,
+      sbtImageUrl,
+      useImageUrl,
+    });
+    const createSbtRenderState = buildCreateSbtRenderState({
+      create2Salt,
+      deferredDeployMode,
+      deferredSurfaceBg: DEFERRED_MODAL_SURFACE_BG,
+      descriptionSelectedGateIds: metadataLockSelectionState.descriptionSelectedGateIds,
+      distributionConfigs: DISTRIBUTION_OPTION_CONFIGS,
+      distributionOption: sbtDistribution.distributionOption,
+      docsSelectedGateIds: metadataLockSelectionState.docsSelectedGateIds,
+      documentURLs,
+      documentUrl,
+      imageSelectedGateIds: metadataLockSelectionState.imageSelectedGateIds,
+      isLimited: sbtDistribution.isLimited,
+      nameSelectedGateIds: metadataLockSelectionState.nameSelectedGateIds,
+      normalizeDocumentUrlDraft: this.getNormalizedDocumentUrlDraft,
+      sbtDescription,
+      sbtImageFile,
+      sbtImageUrl,
+      sbtName,
+      tags,
+      tagsSelectedGateIds: metadataLockSelectionState.tagsSelectedGateIds,
+    });
+    const value = {
+      chainOptions,
+      createSbtRenderState,
+      documentUrlInputState,
+      imagePreviewState,
+      jsonData,
+      lockGateOptions,
+      metadataLockSelectionState,
+      metadataPreview,
+      openMintAutoJoinUrl,
+      tagInputState,
+    };
+    this._renderDerivationsMemo = { key: memoKey, value };
+    return value;
   };
 
   resolvePredictableDeployPlan = async ({
@@ -3716,45 +3874,57 @@ class CreateSBTGroup extends Component<any, any> {
       showJson,
       copyJsonSuccess,
       create2Salt,
-      predictableAddressEnabled,
       predictedAddressBusy
     } = this.state;
 
     const authoringChain = this.getSelectedAuthoringChain();
     const authoringChainId = authoringChain?.id || this.getSelectedAuthoringChainId() || '';
+    const effectiveSessionSlug = this.getEffectiveSessionSlug();
 
-    // JSON Data for Preview
-    const jsonData = buildCreateSbtJsonPreviewData({
-      authoringChain,
-      autoJoinUrl,
-      groupPassword,
-      network,
-      sbtName,
-      sbtAddress,
-      sbtDistribution,
-      shareableUrl,
-      tokenURI,
-    });
-    const metadataPreview = this.buildMetadataPreview();
     const deferredDeployMode = this.isDeferredDeployMode();
     const predictableAddressActive = this.isPredictableAddressEnabled();
-    const documentUrlInputState = resolveCreateSbtDocumentUrlInputState({
+    const {
+      chainOptions,
+      createSbtRenderState,
+      documentUrlInputState,
+      imagePreviewState,
+      jsonData,
+      lockGateOptions,
+      metadataLockSelectionState,
+      metadataPreview,
+      openMintAutoJoinUrl,
+      tagInputState,
+    } = this.getCreateSbtRenderDerivations({
+      account: this.props.account,
+      authoringChain,
+      authoringChainId,
+      autoJoinUrl,
+      create2Salt,
+      currentTagInput,
+      deferredDeployMode,
+      documentIDHashes,
       documentURLs,
       documentUrl,
-    });
-    const tagInputState = resolveCreateSbtTagInputState({
-      currentTagInput,
-    });
-    const openMintAutoJoinUrl = resolveCreateSbtOpenMintAutoJoinUrl({
-      autoJoinUrl,
-      buildSessionAutoJoinUrl: this.buildSessionAutoJoinUrl,
-      distributionOption: sbtDistribution.distributionOption,
+      effectiveSessionSlug,
+      groupPassword,
+      imageChooserStatusText,
+      imageChooserStatusTone,
+      imageLoadError,
+      metadataLockGateIds,
+      network,
+      predictableAddressActive,
       sbtAddress,
+      sbtDescription,
+      sbtDistribution,
+      sbtImageFile,
+      sbtImageUrl,
+      sbtName,
+      shareableUrl,
+      tags,
+      tokenURI,
+      useImageUrl,
     });
-
-    // Prepare chain options for dropdown
-    const chainOptions = this.getAuthoringChainOptions();
-    const { gateOptions, defaultGateId } = this.resolveLockGateOptions();
+    const { gateOptions, defaultGateId } = lockGateOptions;
     const {
       validGateIds,
       nameSelectedGateIds,
@@ -3762,43 +3932,12 @@ class CreateSBTGroup extends Component<any, any> {
       tagsSelectedGateIds,
       docsSelectedGateIds,
       imageSelectedGateIds,
-    } = buildCreateSbtMetadataLockSelectionState({
-      gateOptions,
-      metadataLockGateIds,
-    });
+    } = metadataLockSelectionState;
     const {
       effectiveImageStatusText,
       effectiveImageStatusTone,
       previewFile,
-    } = buildCreateSbtImagePreviewState({
-      imageChooserStatusText,
-      imageChooserStatusTone,
-      imageLoadError,
-      sbtImageFile,
-      sbtImageUrl,
-      useImageUrl,
-    });
-    const createSbtRenderState = buildCreateSbtRenderState({
-      create2Salt,
-      deferredDeployMode,
-      deferredSurfaceBg: DEFERRED_MODAL_SURFACE_BG,
-      descriptionSelectedGateIds,
-      distributionConfigs: DISTRIBUTION_OPTION_CONFIGS,
-      distributionOption: sbtDistribution.distributionOption,
-      docsSelectedGateIds,
-      documentURLs,
-      documentUrl,
-      imageSelectedGateIds,
-      isLimited: sbtDistribution.isLimited,
-      nameSelectedGateIds,
-      normalizeDocumentUrlDraft: this.getNormalizedDocumentUrlDraft,
-      sbtDescription,
-      sbtImageFile,
-      sbtImageUrl,
-      sbtName,
-      tags,
-      tagsSelectedGateIds,
-    });
+    } = imagePreviewState;
     const {
       createActionLabel,
       headerTitle,
