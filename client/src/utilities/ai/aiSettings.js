@@ -377,7 +377,7 @@ export const applyPreLoginAiProviderKeyChange = (settings = {}, {
   const nextProvider = toLower(provider || '');
   const current = normalizeAiSettings(settings, { includeUseLocal: true });
   const nextKey = toStr(apiKey || '');
-  const nextSettings = normalizeAiSettings({
+  const nextSettings = {
     ...current,
     providers: {
       ...(current.providers || {}),
@@ -386,7 +386,7 @@ export const applyPreLoginAiProviderKeyChange = (settings = {}, {
         apiKey: nextKey,
       },
     },
-  }, { includeUseLocal: true });
+  };
   const presetKey = PRELOGIN_PROVIDER_PRESETS[nextProvider];
 
   if (!presetKey) return nextSettings;
