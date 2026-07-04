@@ -597,6 +597,7 @@ import {
   type SurveyQuestionsPrimarySubmitPlan,
   type SurveyQuestionsRenderReadinessDescriptor,
   type SurveyQuestionsRouteViewDisplayState,
+  type SurveyQuestionsRuntimeStrategy,
   type SurveyQuestionsState,
   type SurveyQuestionsSubmitFooterDisplayState,
   type SurveyQuestionsSubmitReadinessDescriptor,
@@ -643,7 +644,7 @@ export const SurveyQuestions = (props: SurveyQuestionsProps): React.ReactElement
   engine.bottomRef = bottomRef;
   engine.topRef = topRef;
 
-const getRuntimeStrategy = () => (
+const getRuntimeStrategy = (): SurveyQuestionsRuntimeStrategy | null => (
     propsRef.current.runtimeStrategy && typeof propsRef.current.runtimeStrategy === 'object'
       ? propsRef.current.runtimeStrategy
       : null
@@ -8328,24 +8329,24 @@ const renderDefaultSurveyQuestionsRoute = () => {
     );
   };
 
-async function runComponentDidUpdate(prevProps: any, prevState: any): Promise<void> {
-    const runtimeStrategy: any = getRuntimeStrategy();
+async function runComponentDidUpdate(prevProps: SurveyQuestionsProps, prevState: SurveyQuestionsState): Promise<unknown> {
+    const runtimeStrategy = getRuntimeStrategy();
     if (typeof runtimeStrategy?.componentDidUpdate === 'function') {
       return runtimeStrategy.componentDidUpdate(engine, prevProps, prevState);
     }
     return runDefaultComponentDidUpdate(prevProps, prevState);
   }
 
-function runComponentDidMount(): any {
-    const runtimeStrategy: any = getRuntimeStrategy();
+function runComponentDidMount(): unknown {
+    const runtimeStrategy = getRuntimeStrategy();
     if (typeof runtimeStrategy?.componentDidMount === 'function') {
       return runtimeStrategy.componentDidMount(engine);
     }
     return runDefaultComponentDidMount();
   }
 
-function runComponentWillUnmount(): any {
-    const runtimeStrategy: any = getRuntimeStrategy();
+function runComponentWillUnmount(): unknown {
+    const runtimeStrategy = getRuntimeStrategy();
     if (typeof runtimeStrategy?.componentWillUnmount === 'function') {
       return runtimeStrategy.componentWillUnmount(engine);
     }
