@@ -1896,10 +1896,10 @@ const runDefaultComponentDidMount = () => {
     }
   };
 
-const runDefaultComponentDidUpdate = async (prevProps: any, prevState: any) => {
-    const diffInputsChanged: any = didEditDiffInputsChange(prevProps, prevState);
+const runDefaultComponentDidUpdate = async (prevProps: SurveyQuestionsProps, prevState: SurveyQuestionsState) => {
+    const diffInputsChanged = didEditDiffInputsChange(prevProps, prevState);
     if (diffInputsChanged) {
-      const propsHydrationContextChanged: any =
+      const propsHydrationContextChanged =
         prevProps.isStandalone !== propsRef.current.isStandalone ||
         prevProps.minifiedMode !== propsRef.current.minifiedMode ||
         prevProps.surveyIndex !== propsRef.current.surveyIndex ||
@@ -1942,7 +1942,7 @@ const runDefaultComponentDidUpdate = async (prevProps: any, prevState: any) => {
       inst._currentRenderedQuestionIdsCache = null;
     }
 
-    const pendingStats: any = diffInputsChanged
+    const pendingStats = diffInputsChanged
         ? ((typeof getPendingEditStats === 'function' && getPendingEditStats()) || getPendingStatsSnapshot())
       : getPendingStatsSnapshot();
     emitPendingStats(pendingStats);
@@ -1951,9 +1951,9 @@ const runDefaultComponentDidUpdate = async (prevProps: any, prevState: any) => {
     }
 
     try {
-      const slugSig: any = normalizeSessionSlugValue(inst._getEffectiveDraftSlug() || resolveEffectiveSlug(propsRef.current));
-      const acctSig: any = String(propsRef.current.account || '').trim().toLowerCase();
-      const nextSig: any = `${slugSig}|${acctSig}`;
+      const slugSig = normalizeSessionSlugValue(inst._getEffectiveDraftSlug() || resolveEffectiveSlug(propsRef.current));
+      const acctSig = String(propsRef.current.account || '').trim().toLowerCase();
+      const nextSig = `${slugSig}|${acctSig}`;
       if (nextSig !== inst._priorResponseHydrationContextSig) {
         inst._priorResponseHydrationContextSig = nextSig;
         inst._priorResponseBackfillAttempted = new Set();
@@ -1976,9 +1976,9 @@ const runDefaultComponentDidUpdate = async (prevProps: any, prevState: any) => {
     // Re-trigger auto-decrypt sweep when cache data arrives after initial render.
     // Without engine, an early sweep with empty cache never re-fires, leaving "Decrypt"
     // buttons visible even though the user has permission.
-    const cacheJustBecameReady: any = !prevProps.isResponsesCacheReady && propsRef.current.isResponsesCacheReady;
+    const cacheJustBecameReady = !prevProps.isResponsesCacheReady && propsRef.current.isResponsesCacheReady;
 
-    const shouldShortCircuitUpdate: any =
+    const shouldShortCircuitUpdate =
       !diffInputsChanged &&
       prevProps.provider === propsRef.current.provider &&
       prevProps.account === propsRef.current.account &&
@@ -2011,15 +2011,15 @@ const runDefaultComponentDidUpdate = async (prevProps: any, prevState: any) => {
 
     // Single question mode logic
     if (propsRef.current.singleQuestionMode) {
-      const identityChanged: any =
+      const identityChanged =
         prevProps.questionID !== propsRef.current.questionID ||
         prevProps.responderAddress !== propsRef.current.responderAddress;
-      const groupContextChanged: any =
+      const groupContextChanged =
         getSessionSlugHintFromProps(prevProps) !== getSessionSlugHintFromProps(propsRef.current) ||
         getSessionSlugPinnedFromProps(prevProps) !== getSessionSlugPinnedFromProps(propsRef.current);
 
       // Treat responses-cache-ready as a trigger too
-      const cacheTick: any =
+      const cacheTick =
         (prevProps.isQuestionCacheReady !== propsRef.current.isQuestionCacheReady &&
           propsRef.current.isQuestionCacheReady) ||
         (prevProps.isResponsesCacheReady !== propsRef.current.isResponsesCacheReady &&
@@ -2028,26 +2028,26 @@ const runDefaultComponentDidUpdate = async (prevProps: any, prevState: any) => {
           prevProps.questionsCacheNonce !== propsRef.current.questionsCacheNonce) ||
         (propsRef.current.isResponsesCacheReady &&
           prevProps.questionResponsesNonce !== propsRef.current.questionResponsesNonce);
-      const prevNetId: any = String(prevProps.network?.id ?? prevProps.networkChainId ?? '');
-      const currNetId: any = String(propsRef.current.network?.id ?? propsRef.current.networkChainId ?? '');
-      const authOrProviderBecameReady: any =
+      const prevNetId = String(prevProps.network?.id ?? prevProps.networkChainId ?? '');
+      const currNetId = String(propsRef.current.network?.id ?? propsRef.current.networkChainId ?? '');
+      const authOrProviderBecameReady =
         (!prevProps.loginComplete && !!propsRef.current.loginComplete) ||
         (!prevProps.account && !!propsRef.current.account) ||
         (!prevProps.provider && !!propsRef.current.provider);
-      const networkBecameReady: any = prevNetId !== currNetId && !!currNetId;
-      const waitingForViewedResponseBootstrap: any =
+      const networkBecameReady = prevNetId !== currNetId && !!currNetId;
+      const waitingForViewedResponseBootstrap =
         !!propsRef.current.responderAddress &&
         !stateRef.current.parsedViewAddressAnswers &&
         stateRef.current.noResponse !== true;
-      const singleQuestionBootstrapPending: any =
+      const singleQuestionBootstrapPending =
         waitingForViewedResponseBootstrap || (
           !stateRef.current.displayAnswerMode &&
           !stateRef.current.parsedViewAddressAnswers &&
           (!Array.isArray(stateRef.current.questionPool) || stateRef.current.questionPool.length === 0)
         );
-      const shouldRetrySingleQuestionBootstrap: any =
+      const shouldRetrySingleQuestionBootstrap =
         singleQuestionBootstrapPending && (authOrProviderBecameReady || networkBecameReady);
-      const retryMaskedOnReadiness: any = shouldRetryMaskedQuestionRefresh({
+      const retryMaskedOnReadiness = shouldRetryMaskedQuestionRefresh({
         masked: hasMaskedCurrentQuestionPayload(),
         prev: {
           account: prevProps.account,
@@ -2078,7 +2078,7 @@ const runDefaultComponentDidUpdate = async (prevProps: any, prevState: any) => {
           surveyLog.debug('baseline-guard: skipped rebuild');
           return;
         }
-        const pendingBootstrapRetryAttempt: any = getPendingSingleQuestionBootstrapRetryAttempt(propsRef.current.questionID);
+        const pendingBootstrapRetryAttempt = getPendingSingleQuestionBootstrapRetryAttempt(propsRef.current.questionID);
         await fetchSingleQuestionData(
           pendingBootstrapRetryAttempt > 0
             ? { bootstrapRetryAttempt: pendingBootstrapRetryAttempt }
@@ -2099,7 +2099,7 @@ const runDefaultComponentDidUpdate = async (prevProps: any, prevState: any) => {
             rehydrateDraftForRenderedIds({ responseHydrationOwned: true });
 
             // 2. Fetch Chain (Merges Chain into Draft)
-            const pendingBootstrapRetryAttempt: any = propsRef.current.singleQuestionMode
+            const pendingBootstrapRetryAttempt = propsRef.current.singleQuestionMode
               ? getPendingSingleQuestionBootstrapRetryAttempt(propsRef.current.questionID)
               : 0;
             await fetchSingleQuestionData(
@@ -2108,11 +2108,11 @@ const runDefaultComponentDidUpdate = async (prevProps: any, prevState: any) => {
                 : undefined
             );
 
-            const isViewingOwnResponse: any =
+            const isViewingOwnResponse =
               propsRef.current.account &&
               propsRef.current.responderAddress &&
               propsRef.current.account.toLowerCase() === propsRef.current.responderAddress.toLowerCase();
-            const isViewingNoSpecificResponder: any =
+            const isViewingNoSpecificResponder =
               propsRef.current.account && !propsRef.current.responderAddress;
 
             if (
@@ -2141,8 +2141,8 @@ const runDefaultComponentDidUpdate = async (prevProps: any, prevState: any) => {
 
     // Survey mode logic (not standalone and not minified)
     else if (!propsRef.current.isStandalone && !propsRef.current.minifiedMode) {
-      const surveyChanged: any = propsRef.current.surveyId !== prevProps.surveyId;
-      const cacheInvalidated: any =
+      const surveyChanged = propsRef.current.surveyId !== prevProps.surveyId;
+      const cacheInvalidated =
         (prevProps.isQuestionCacheReady !== propsRef.current.isQuestionCacheReady &&
           propsRef.current.isQuestionCacheReady) ||
         (prevProps.isResponsesCacheReady !== propsRef.current.isResponsesCacheReady &&
@@ -2166,7 +2166,7 @@ const runDefaultComponentDidUpdate = async (prevProps: any, prevState: any) => {
         );
       } else if (cacheInvalidated) {
         // Don’t rebuild while user has pending edits; keeps “Submit (X)” stable
-        const hasPendingQuestionPoolHydration: any = getSurveyQuestionPoolLoadState().isIncomplete;
+        const hasPendingQuestionPoolHydration = getSurveyQuestionPoolLoadState().isIncomplete;
         if ((stateRef.current.isDirty || (stateRef.current.modifiedCount || 0) > 0) && !hasPendingQuestionPoolHydration) {
           bumpSurveyPerfCounter('noopSkipCount');
           surveyLog.debug('baseline-guard: skipped rebuild');
@@ -2215,11 +2215,11 @@ const runDefaultComponentDidUpdate = async (prevProps: any, prevState: any) => {
             // 2. Fetch Chain (Merges Chain into Draft)
             await fetchSurveyResponse();
 
-            const isViewingOwnSurveyResponse: any =
+            const isViewingOwnSurveyResponse =
               propsRef.current.account &&
               propsRef.current.viewAddress &&
               propsRef.current.account.toLowerCase() === propsRef.current.viewAddress.toLowerCase();
-            const isViewingNoSpecificSurvey: any =
+            const isViewingNoSpecificSurvey =
               propsRef.current.account && !propsRef.current.viewAddress;
 
             if (
@@ -2263,7 +2263,7 @@ const runDefaultComponentDidUpdate = async (prevProps: any, prevState: any) => {
         rehydrateLocalCacheAnswersForRenderedIds();
       }
 
-      const standaloneAuthBecameReady: any =
+      const standaloneAuthBecameReady =
         (!prevProps.loginComplete && !!propsRef.current.loginComplete) ||
         (!prevProps.account && !!propsRef.current.account) ||
         (!prevProps.provider && !!propsRef.current.provider);
