@@ -493,6 +493,7 @@ import {
 import {
   createSurveyQuestionsInstanceFields,
   type SurveyQuestionsBootstrapRetryArgs,
+  type SurveyQuestionsCacheQuestion,
   type SurveyQuestionsCachedResponseEntryArgs,
   type SurveyQuestionsDraftHydrationEntryArgs,
   type SurveyQuestionsDraftTrackingState,
@@ -4700,15 +4701,17 @@ async function fetchQuestionPool() {
       ) as SurveyQuestionsRecord;
       const questionsNet = currentQuestionsCache[netIdStr] as SurveyQuestionsRecord;
       if (!questionsNet.questions || typeof questionsNet.questions !== 'object') questionsNet.questions = {};
+      const questionMap = questionsNet.questions as SurveyQuestionsRecord;
       temporaryDemoFixtureQuestions.forEach((question) => {
         const qid = normalizeQuestionIdKey(question?.id);
         if (!qid) return;
-        questionsNet.questions[qid] = {
+        questionMap[qid] = {
           ...question,
           id: qid,
         };
         if (questionsNet.pendingQuestionMetadata && typeof questionsNet.pendingQuestionMetadata === 'object') {
-          delete questionsNet.pendingQuestionMetadata[qid];
+          const pendingQuestionMetadata = questionsNet.pendingQuestionMetadata as SurveyQuestionsRecord;
+          delete pendingQuestionMetadata[qid];
         }
       });
       writeQuestionsCache(effectiveSlug, currentQuestionsCache);
@@ -4801,7 +4804,7 @@ async function fetchQuestionPool() {
 
       const questionPool = expectedQuestionIds
         .map((qid: string) => {
-          const qData = networkQuestions[qid];
+          const qData = networkQuestions[qid] as SurveyQuestionsCacheQuestion | undefined;
           if (isPendingQuestionMetadataPlaceholder(qData)) return null;
           if (qData) return { ...qData, id: qData.id.toLowerCase() };
           if (warnMissing) {
