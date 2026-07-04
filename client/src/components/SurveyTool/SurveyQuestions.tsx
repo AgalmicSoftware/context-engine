@@ -407,6 +407,8 @@ import {
   buildIndexedQuestionEntryKeys,
   computePendingEditStats,
   orchestrateGetChangedQidsAndFields,
+  type ChangedFieldsDiffCache,
+  type PendingEditStatsCache,
 } from './surveyToolChangedFieldsController';
 import {
   getQuestionEncryptionGates as getQuestionEncryptionGatesCore,
@@ -594,73 +596,143 @@ declare global {
 }
 
 type SurveyQuestionsRecord = Record<string, any>;
+type SurveyQuestionsSetStateCallback = () => void;
+type SurveyQuestionsSetState = (
+  update: SurveyQuestionsStateUpdate,
+  callback?: SurveyQuestionsSetStateCallback
+) => void;
+type SurveyQuestionsTimer = ReturnType<typeof setTimeout>;
+type SurveyQuestionsTimerRef = SurveyQuestionsTimer | null;
+type SurveyQuestionsRuntimeRecord = Record<string, unknown>;
+type SurveyQuestionsDraftParseCache = {
+  key?: unknown;
+  raw?: unknown;
+  parsed?: unknown;
+} | null;
+type SurveyQuestionsDraftTrackingState = {
+  draftParseCache?: SurveyQuestionsDraftParseCache;
+  lastDraftKey?: unknown;
+  lastDraftJSON?: unknown;
+  lastDraftSemanticSignature?: unknown;
+};
+type SurveyQuestionsPolicyCache = {
+  key: string;
+  cfgSignature: string;
+  cfg: unknown;
+  value: unknown;
+  ts: number;
+};
+type SurveyQuestionsLookupCache = {
+  stateQuestionPool: unknown[] | null;
+  statePileQuestions: unknown[] | null;
+  propsQuestionPool: unknown[] | null;
+  value: Map<string, unknown> | null;
+};
+type SurveyQuestionsCurrentRenderedIdsCache = string[] | null;
+type SurveyQuestionsMemoValue<T = unknown> = {
+  key: string;
+  value: T | null;
+  hasValue?: boolean;
+  source?: unknown;
+  poolRef?: unknown;
+  poolVersion?: number;
+};
+type SurveyQuestionsLockedGateDetailsMemo = {
+  key: string;
+  poolRef: unknown;
+  poolVersion: number;
+  value: unknown[];
+};
+type SurveyQuestionsCanDecryptRun = Promise<boolean> | null;
+type SurveyQuestionsBusyTokenMap = Record<string, unknown>;
+type SurveyQuestionsPendingStatsSnapshot = {
+  total: number;
+  encrypted: number;
+  submittedSinceLastEdit: boolean;
+  isSubmitting: boolean;
+};
+type SurveyQuestionsAutoDecryptQueueItem = {
+  qid: string;
+  field: string;
+  maskedSig?: string;
+};
+type SurveyQuestionsAutoDecryptSweepCache = SurveyQuestionsRuntimeRecord | null;
+type SurveyQuestionsHydrationSliceApplier = (args?: Record<string, unknown>) => boolean;
 
 export interface SurveyQuestions {
-  setState: (...args: any[]) => any;
-  _emptySubmitTimer: any;
+  setState: SurveyQuestionsSetState;
+  _emptySubmitTimer: SurveyQuestionsTimerRef;
 }
 
 type SurveyQuestionsInstanceFields = {
-  _persistTimer: any;
-  _draftParseCache: any;
-  _lastDraftKey: any;
-  _lastDraftJSON: any;
-  _lastDraftSemanticSignature: any;
-  _responseGatePolicyCache: any;
-  _changedQidsAndFieldsCache: any;
-  _pendingEditStatsCache: any;
-  _normalizedQuestionEntryKeyCache: any;
-  _questionByIdLookupCache: any;
-  _currentRenderedQuestionIdsCache: any;
-  _currentRenderedQuestionIdsCacheQuestionPool: any;
-  _currentRenderedQuestionIdsCacheQuestionPoolLength: any;
-  _currentRenderedQuestionIdsCachePileQuestions: any;
-  _currentRenderedQuestionIdsCachePileQuestionsLength: any;
-  _currentRenderedQuestionIdsCacheSingleQuestionMode: any;
-  _currentRenderedQuestionIdsCacheQuestionId: any;
-  _localCacheSliceMemo: any;
-  _rehydrateLocalCacheLastSig: any;
-  _autoDecryptVisibleSweepCache: any;
-  _userAnswersSliceCache: any;
-  _jsonPreviewTimer: any;
-  _surveyJsonMetaCache: any;
-  _lockedQuestionGateDetailsMemo: any;
-  _maskedQuestionVisibilityMemoByPool: any;
-  _canDecryptOtherResponsesKey: any;
-  _canDecryptOtherResponsesInFlight: any;
-  _canDecryptOtherResponsesSig: any;
-  _canDecryptOtherResponsesRunId: any;
-  _fetchSurveyResponseRunId: any;
-  _fetchSingleQuestionRunId: any;
-  _localCacheRehydrateRunId: any;
-  _responseHydrationStateUpdateDepth: any;
-  _surveyDecryptAttemptSeq: any;
-  _activeSurveyDecryptAttemptSeq: any;
-  _submitAttemptSeq: any;
-  _activeSubmitAttemptSeq: any;
-  _questionDecryptBusyTokenSeq: any;
-  _questionDecryptBusyTokens: any;
-  _singleQuestionBootstrapRetryTimer: any;
-  _singleQuestionBootstrapRetrySig: any;
-  _isMounted: any;
-  _hasMounted: any;
-  _autoDecProcessTimer: any;
-  _autoDecryptSweepMicrotaskScheduled: any;
-  _autoDecryptSweepFrameRequestId: any;
-  _queuedAutoDecryptSweepReasons: any;
-  _gateSbtHydrationSig: any;
-  _gateSbtHydrationRetryTimer: any;
-  _draftDirtyQids: any;
-  _submitGuard: any;
-  _lastPendingStats: any;
-  _priorResponseBackfillAttempted: any;
-  _priorResponseBackfillInFlight: any;
-  _priorResponseHydrationContextSig: any;
-  _autoDecQueue: any;
-  _autoDecProcessing: any;
-  _autoDecryptMaskedAttemptSignature: any;
-  _decryptFieldTaskInFlight: any;
-  _transientTimeouts: any;
+  _persistTimer: SurveyQuestionsTimerRef;
+  _draftParseCache: SurveyQuestionsDraftParseCache;
+  _lastDraftKey: string;
+  _lastDraftJSON: unknown;
+  _lastDraftSemanticSignature: unknown;
+  _responseGatePolicyCache: SurveyQuestionsPolicyCache;
+  _changedQidsAndFieldsCache: ChangedFieldsDiffCache | null;
+  _pendingEditStatsCache: PendingEditStatsCache | null;
+  _normalizedQuestionEntryKeyCache: WeakMap<object, unknown>;
+  _questionByIdLookupCache: SurveyQuestionsLookupCache;
+  _currentRenderedQuestionIdsCache: SurveyQuestionsCurrentRenderedIdsCache;
+  _currentRenderedQuestionIdsCacheQuestionPool: unknown[] | null;
+  _currentRenderedQuestionIdsCacheQuestionPoolLength: number;
+  _currentRenderedQuestionIdsCachePileQuestions: unknown[] | null;
+  _currentRenderedQuestionIdsCachePileQuestionsLength: number;
+  _currentRenderedQuestionIdsCacheSingleQuestionMode: boolean;
+  _currentRenderedQuestionIdsCacheQuestionId: string;
+  _localCacheSliceMemo: SurveyQuestionsMemoValue;
+  _rehydrateLocalCacheLastSig: string;
+  _autoDecryptVisibleSweepCache: SurveyQuestionsAutoDecryptSweepCache;
+  _userAnswersSliceCache: { source: unknown; value: unknown };
+  _jsonPreviewTimer: SurveyQuestionsTimerRef;
+  _surveyJsonMetaCache: SurveyQuestionsMemoValue;
+  _lockedQuestionGateDetailsMemo: SurveyQuestionsLockedGateDetailsMemo;
+  _maskedQuestionVisibilityMemoByPool: WeakMap<object, unknown>;
+  _canDecryptOtherResponsesKey: string;
+  _canDecryptOtherResponsesInFlight: SurveyQuestionsCanDecryptRun;
+  _canDecryptOtherResponsesSig: string;
+  _canDecryptOtherResponsesRunId: number;
+  _fetchSurveyResponseRunId: number;
+  _fetchSingleQuestionRunId: number;
+  _localCacheRehydrateRunId: number;
+  _responseHydrationStateUpdateDepth: number;
+  _surveyDecryptAttemptSeq: number;
+  _activeSurveyDecryptAttemptSeq: number;
+  _submitAttemptSeq: number;
+  _activeSubmitAttemptSeq: number;
+  _questionDecryptBusyTokenSeq: number;
+  _questionDecryptBusyTokens: SurveyQuestionsBusyTokenMap;
+  _singleQuestionBootstrapRetryTimer: SurveyQuestionsTimerRef;
+  _singleQuestionBootstrapRetrySig: string;
+  _isMounted: boolean;
+  _hasMounted: boolean;
+  _autoDecProcessTimer: SurveyQuestionsTimerRef;
+  _autoDecryptSweepMicrotaskScheduled: boolean;
+  _autoDecryptSweepFrameRequestId: number | null;
+  _queuedAutoDecryptSweepReasons: Set<string>;
+  _gateSbtHydrationSig: string;
+  _gateSbtHydrationRetryTimer: SurveyQuestionsTimerRef;
+  _draftDirtyQids: Set<string>;
+  _submitGuard: boolean;
+  _lastPendingStats: SurveyQuestionsPendingStatsSnapshot | null;
+  _priorResponseBackfillAttempted: Set<string>;
+  _priorResponseBackfillInFlight: Promise<boolean> | null;
+  _priorResponseHydrationContextSig: string;
+  _autoDecQueue: SurveyQuestionsAutoDecryptQueueItem[];
+  _autoDecProcessing: boolean;
+  _autoDecryptMaskedAttemptSignature: Record<string, string>;
+  _decryptFieldTaskInFlight: Map<string, Promise<unknown>>;
+  _transientTimeouts: Set<SurveyQuestionsTimer>;
+  _applyDraftTrackingState: (tracking?: SurveyQuestionsDraftTrackingState) => void;
+  _applyDraftHydrationEntryToSlice: SurveyQuestionsHydrationSliceApplier;
+  _applyResponseHydrationEntryToSlice: SurveyQuestionsHydrationSliceApplier;
+  _applyResponseHydrationListToSlice: SurveyQuestionsHydrationSliceApplier;
+  _applyCachedResponseEntryToSlice: SurveyQuestionsHydrationSliceApplier;
+  _applyLocalCacheHydrationEntryToSlice: SurveyQuestionsHydrationSliceApplier;
+  _getDraftScope: () => string;
+  _getEffectiveDraftSlug: () => string;
   [key: string]: any;
 };
 
@@ -730,6 +802,14 @@ const createSurveyQuestionsInstanceFields = (): SurveyQuestionsInstanceFields =>
   _autoDecryptMaskedAttemptSignature: {},
   _decryptFieldTaskInFlight: new Map(),
   _transientTimeouts: new Set(),
+  _applyDraftTrackingState: () => {},
+  _applyDraftHydrationEntryToSlice: () => false,
+  _applyResponseHydrationEntryToSlice: () => false,
+  _applyResponseHydrationListToSlice: () => false,
+  _applyCachedResponseEntryToSlice: () => false,
+  _applyLocalCacheHydrationEntryToSlice: () => false,
+  _getDraftScope: () => '',
+  _getEffectiveDraftSlug: () => '',
 });
 
 export const SurveyQuestions = (props: SurveyQuestionsProps): React.ReactElement => {
