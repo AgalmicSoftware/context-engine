@@ -24,6 +24,19 @@ export const buildMultichoiceOptionClassName = ({
   isSelected ? String(selectedClassName || '') : '',
 ].filter(Boolean).join(' '));
 
+export const findDuplicateMultichoiceOptionLabels = (options: unknown[] = []): string[] => {
+  const seen = new Set<string>();
+  const duplicates = new Set<string>();
+  options.forEach((option) => {
+    const label = String(option ?? '').trim();
+    const key = label.toLowerCase();
+    if (!key) return;
+    if (seen.has(key)) duplicates.add(label);
+    seen.add(key);
+  });
+  return Array.from(duplicates);
+};
+
 const MultichoiceQuestionInput = ({
   questionId,
   options = [],
@@ -34,6 +47,17 @@ const MultichoiceQuestionInput = ({
 }: MultichoiceQuestionInputProps) => {
   const normalizedOptions = Array.isArray(options) ? options : [];
   const normalizedSelectedValues = Array.isArray(selectedValues) ? selectedValues : [];
+  const duplicateLabels = findDuplicateMultichoiceOptionLabels(normalizedOptions);
+
+  if (duplicateLabels.length > 0) {
+    return (
+      <FormGroup id={styles.multiChoice}>
+        <div role="alert">
+          Multichoice options must have unique labels.
+        </div>
+      </FormGroup>
+    );
+  }
 
   return (
     <FormGroup id={styles.multiChoice}>

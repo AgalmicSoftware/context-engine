@@ -3831,9 +3831,8 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     if (slug && !this.getDisplaySessionChainId(slug)) {
       this.resolveSessionPathSlug(slug);
     }
-    // Track the active group chain id to detect changes without wallet involvement
-    const _net = this.getDisplaySessionNetwork(slug);
-    this._lastGroupChainId = _net?.id;
+    // Track the canonical active group chain id to detect changes without wallet involvement.
+    this._lastGroupChainId = this.getSessionChainId(slug);
     this.syncLitHooks();
     this.refreshSessionInfo();
     this.refreshSessionMetaFields();
@@ -4892,7 +4891,8 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
       mainSiteLog.error('Network ID undefined in onNewSurveyEventDetectedForGroup');
       return;
     }
-    const { fromBlock: baseFrom } = await chainScanReadsPort.getRelevantBlockWindowForFilter(slug);
+    const eventBlockWindow = await chainScanReadsPort.getRelevantBlockWindowForFilter(slug);
+    const { fromBlock: baseFrom } = eventBlockWindow;
     const initialLastBlockDefault = Math.max(0, baseFrom - 1);
 
     let eventBlockNumber = event.blockNumber;
@@ -4908,16 +4908,13 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
               eventBlockNumber = receipt?.blockNumber as number;
           } catch (e) {
               mainSiteLog.error("Failed to get block number from transaction hash for survey event", e);
-              const { toBlock: baseToFallback } = await chainScanReadsPort.getRelevantBlockWindowForFilter(slug);
-              eventBlockNumber = baseToFallback;
+              eventBlockNumber = eventBlockWindow.toBlock;
           }
         } else {
-          const { toBlock: baseToFallback } = await chainScanReadsPort.getRelevantBlockWindowForFilter(slug);
-          eventBlockNumber = baseToFallback;
+          eventBlockNumber = eventBlockWindow.toBlock;
         }
     } else if (!eventBlockNumber) {
-        const { toBlock: baseToFallback } = await chainScanReadsPort.getRelevantBlockWindowForFilter(slug);
-        eventBlockNumber = baseToFallback;
+        eventBlockNumber = eventBlockWindow.toBlock;
     }
 
     let surveysCache = (

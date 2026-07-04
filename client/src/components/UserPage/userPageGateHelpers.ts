@@ -927,7 +927,11 @@ export const buildUserPageResponseDecryptSurveyBindings = ({
       const questionData = toAnalysisRecord(entryRecord.questionData);
       const responseData = entryRecord.responseData;
       const entryQid = String(questionData.id || questionData.questionID || '').trim().toLowerCase();
-      if (responseData !== responseOverride && entryQid !== qid) return;
+      if (responseOverride == null) {
+        if (entryQid !== qid) return;
+      } else if (responseData !== responseOverride && entryQid !== qid) {
+        return;
+      }
       pushSurveyId(surveyId);
       addFromEntry(questionData);
       addFromEntry(responseData);
