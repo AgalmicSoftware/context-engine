@@ -20,7 +20,8 @@ declare global {
   }
 }
 
-export type SurveyQuestionsRecord = Record<string, any>;
+export type SurveyQuestionsRecord = Record<string, unknown>;
+export type SurveyQuestionsCacheQuestion = Record<string, unknown> & { id: string };
 export type SurveyQuestionsSetStateCallback = () => unknown;
 export type SurveyQuestionsSetState = (
   update: SurveyQuestionsStateUpdate,
@@ -152,6 +153,7 @@ export interface SurveyQuestions {
 }
 
 export type SurveyQuestionsInstanceFields = {
+  _emptySubmitTimer: SurveyQuestionsTimerRef;
   _persistTimer: SurveyQuestionsTimerRef;
   _draftParseCache: SurveyQuestionsDraftParseCache;
   _lastDraftKey: string;
@@ -220,10 +222,11 @@ export type SurveyQuestionsInstanceFields = {
   _applyLocalCacheHydrationEntryToSlice: SurveyQuestionsLocalCacheHydrationEntryApplier;
   _getDraftScope: () => string;
   _getEffectiveDraftSlug: () => string;
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 export const createSurveyQuestionsInstanceFields = (): SurveyQuestionsInstanceFields => ({
+  _emptySubmitTimer: null,
   _persistTimer: null,
   _draftParseCache: null,
   _lastDraftKey: '',
