@@ -828,6 +828,46 @@ describe('SurveyQuestions runtime helpers', () => {
     // the single scheduled pass plus attempted-key state builder.
   });
 
+  it('coalesces parent runtime auto-decrypt sweep reasons into one microtask', async () => {
+    let runtimeEngine = null;
+    const view = renderSurveyQuestions({
+      account: '0xabc',
+      isStandalone: true,
+      loginComplete: true,
+      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Question one' }],
+      runtimeStrategy: {
+        render: (engine) => {
+          runtimeEngine = engine;
+          return null;
+        },
+      },
+      sessionSlug: 'edge',
+    });
+
+    await waitFor(() => expect(runtimeEngine?._isMounted).toBe(true));
+    expect(runtimeEngine._queuedAutoDecryptSweepReasons.size).toBe(0);
+
+    runtimeEngine.queueAutoDecryptVisibleSweep('cache-ready');
+    runtimeEngine.queueAutoDecryptVisibleSweep('comments-toggle');
+    runtimeEngine.queueAutoDecryptVisibleSweep('cache-ready');
+    expect(runtimeEngine._autoDecryptSweepMicrotaskScheduled).toBe(true);
+    expect(Array.from(runtimeEngine._queuedAutoDecryptSweepReasons).sort())
+      .toEqual(['cache-ready', 'comments-toggle']);
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(runtimeEngine._autoDecryptSweepMicrotaskScheduled).toBe(false);
+    expect(runtimeEngine._autoDecryptSweepFrameRequestId).toBeNull();
+    expect(runtimeEngine._queuedAutoDecryptSweepReasons.size).toBe(0);
+
+    view.unmount();
+    runtimeEngine.queueAutoDecryptVisibleSweep('after-unmount');
+    expect(runtimeEngine._queuedAutoDecryptSweepReasons.size).toBe(0);
+  });
+
   it('deduplicates in-flight decrypt tasks keyed to the same field payload', async () => {
     const inFlightMap = new Map();
     const deferred = createDeferred();
