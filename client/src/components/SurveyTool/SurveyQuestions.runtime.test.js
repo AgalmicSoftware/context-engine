@@ -411,6 +411,52 @@ describe('SurveyQuestions runtime helpers', () => {
     // the extracted draft hydration controller receiving and applying the owned update.
   });
 
+  it('defers same-context hydration invalidation while an owned update is pending', async () => {
+    let runtimeEngine = null;
+    const view = renderSurveyQuestions({
+      account: '0xabc',
+      isStandalone: true,
+      loginComplete: true,
+      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Question one' }],
+      runtimeStrategy: {
+        componentDidMount: jest.fn(),
+        render: (engine) => {
+          runtimeEngine = engine;
+          return null;
+        },
+      },
+      sessionSlug: 'edge',
+    });
+
+    await waitFor(() => expect(runtimeEngine).not.toBeNull());
+    const prevProps = runtimeEngine.props;
+    const prevState = {
+      ...runtimeEngine.state,
+      userAnswers: { stale: true },
+    };
+    runtimeEngine._fetchSurveyResponseRunId = 4;
+    runtimeEngine._fetchSingleQuestionRunId = 5;
+    runtimeEngine._localCacheRehydrateRunId = 6;
+
+    runtimeEngine._responseHydrationStateUpdateDepth = 1;
+    await act(async () => {
+      await runtimeEngine.runDefaultComponentDidUpdate(prevProps, prevState);
+    });
+    expect(runtimeEngine._fetchSurveyResponseRunId).toBe(4);
+    expect(runtimeEngine._fetchSingleQuestionRunId).toBe(5);
+    expect(runtimeEngine._localCacheRehydrateRunId).toBe(6);
+
+    runtimeEngine._responseHydrationStateUpdateDepth = 0;
+    await act(async () => {
+      await runtimeEngine.runDefaultComponentDidUpdate(prevProps, prevState);
+    });
+    expect(runtimeEngine._fetchSurveyResponseRunId).toBe(5);
+    expect(runtimeEngine._fetchSingleQuestionRunId).toBe(6);
+    expect(runtimeEngine._localCacheRehydrateRunId).toBe(7);
+
+    view.unmount();
+  });
+
   it('keeps single-question prefill from invalidating its active hydration run', () => {
     const buildUpdatePlan = jest.fn(buildPrefilledSingleQuestionUpdatePlan);
     const invalidateResponseHydrationRuns = jest.fn();
