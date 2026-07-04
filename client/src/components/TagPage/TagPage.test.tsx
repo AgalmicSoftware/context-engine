@@ -123,11 +123,57 @@ const TagModalComponent = TagModal as React.ComponentType<any>;
 const buildTagInterpretationPromptAny = buildTagInterpretationPrompt as any;
 let queryClient: QueryClient;
 
-const AppQueryProvider = ({ children }: { children: React.ReactNode }) => {
-  const client = queryClient;
-  React.useEffect(() => installSessionRegistryQueryInvalidation(client), [client]);
-  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
-};
+describe('tag AI cache helpers', () => {
+  it('refreshes cache recency when reading an existing interpretation', () => {
+    const cache = new Map([
+      ['old', 'Old summary'],
+      ['keep', 'Kept summary'],
+      ['new', 'New summary'],
+    ]);
+
+    expect(readTagAiCacheEntry(cache, 'old')).toBe('Old summary');
+    expect([...cache.keys()]).toEqual(['keep', 'new', 'old']);
+    expect(readTagAiCacheEntry(cache, 'missing')).toBe('');
+    expect([...cache.keys()]).toEqual(['keep', 'new', 'old']);
+  });
+
+  it('evicts the least recent entries when writing beyond the cache limit', () => {
+    const cache = new Map([
+      ['first', 'First summary'],
+      ['second', 'Second summary'],
+    ]);
+
+    writeTagAiCacheEntry(cache, 'third', 'Third summary', 2);
+
+    expect([...cache.entries()]).toEqual([
+      ['second', 'Second summary'],
+      ['third', 'Third summary'],
+    ]);
+
+    writeTagAiCacheEntry(cache, 'second', 'Updated summary', 2);
+
+    expect([...cache.entries()]).toEqual([
+      ['third', 'Third summary'],
+      ['second', 'Updated summary'],
+    ]);
+  });
+});
+
+const createTagPageStore = (sessionStateOverrides: Record<string, any> = {}) => createStore(
+  (state = {
+    profile: {
+      network: { id: 84532 },
+    },
+    sessionState: {
+      activeSessionSlug: 'edge',
+      primarySessionSlug: 'edge',
+      primarySessionExplicit: false,
+      selectedSessionScope: 'active',
+      selectedSessionSlugs: [],
+      ...sessionStateOverrides,
+    },
+  }) => state
+);
 
 describe('tag AI cache helpers', () => {
   it('refreshes cache recency when reading an existing interpretation', () => {

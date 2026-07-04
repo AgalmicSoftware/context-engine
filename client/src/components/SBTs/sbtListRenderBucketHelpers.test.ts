@@ -147,4 +147,39 @@ describe('sbtListRenderBucketHelpers', () => {
     expect(buckets.mintingLiveList.map((sbt) => sbt.sbtAddress)).toEqual([demoAddress]);
     expect(buckets.baseFilteredList.map((sbt) => sbt.sbtAddress)).toEqual([demoAddress]);
   });
+
+  it('reads all-session group lists once per session slug while building buckets', () => {
+    const alphaFeatured = '0x0000000000000000000000000000000000000a01';
+    const alphaPlain = '0x0000000000000000000000000000000000000a02';
+    const betaFeatured = '0x0000000000000000000000000000000000000b01';
+    const getSessionListsForSlug = jest.fn((slug: string) => ({
+      featured_SBTs_LIST: slug === 'alpha' ? [alphaFeatured] : [betaFeatured],
+      ignored_SBTs_LIST: [],
+    }));
+
+    const buckets = buildSbtListRenderBuckets({
+      allSessionsMode: true,
+      excludePasswordLocked: false,
+      getSessionListsForSlug,
+      isListModeScopeEnabled: true,
+      isMintingLive: () => true,
+      isPasswordLocked: () => false,
+      listSlug: 'alpha',
+      resolveSbtSessionSlug: (sbt) => String(sbt.slug || ''),
+      sbtList: [
+        { sbtAddress: alphaFeatured, slug: 'alpha', sbtInfo: { name: 'Alpha Featured' } },
+        { sbtAddress: alphaPlain, slug: 'alpha', sbtInfo: { name: 'Alpha Plain' } },
+        { sbtAddress: betaFeatured, slug: 'beta', sbtInfo: { name: 'Beta Featured' } },
+      ],
+      sectionSessionSlugs: ['alpha', 'beta'],
+    });
+
+    expect(buckets.displayedFeatured.map((sbt) => sbt.sbtAddress)).toEqual([
+      alphaFeatured,
+      betaFeatured,
+    ]);
+    expect(getSessionListsForSlug).toHaveBeenCalledTimes(2);
+    expect(getSessionListsForSlug).toHaveBeenNthCalledWith(1, 'alpha');
+    expect(getSessionListsForSlug).toHaveBeenNthCalledWith(2, 'beta');
+  });
 });

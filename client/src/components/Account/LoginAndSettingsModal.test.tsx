@@ -1331,7 +1331,79 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     let sponsoredKeys: any = {
       ai: { encrypted: true },
     };
-    mockedGetSessionConfigBySlugOrDefault.mockImplementation((slug: any) =>
+    mockedGetSessionConfigBySlugOrDefault.mockImplementation((slug: any) => (
+      String(slug || '') === 'edge'
+        ? {
+          slug: 'edge',
+          sessionName: 'Edge 2025',
+          sponsoredKeys,
+        }
+        : {}
+    ));
+
+    const subject = new LoginAndSettingsModalSubject(buildProps({
+      activeSessionSlug: 'edge',
+    }));
+
+    expect(subject.getSponsoredSessionSources({ activeSlug: 'edge' }).byResource.rpc).toEqual([]);
+
+    sponsoredKeys = {
+      ...sponsoredKeys,
+      rpc: { encrypted: true },
+    };
+
+    expect(subject.getSponsoredSessionSources({ activeSlug: 'edge' }).byResource.rpc).toEqual([
+      expect.objectContaining({
+        slug: 'edge',
+        sponsoredKeys: expect.objectContaining({
+          rpc: expect.objectContaining({ encrypted: true }),
+        }),
+      }),
+    ]);
+  });
+
+  it('refreshes settings overview sponsorship cards when sponsored keys change without slug churn', () => {
+    mockedGetAllSessionSlugs.mockReturnValue(['edge']);
+    let sponsoredKeys: any = {
+      ai: { encrypted: true },
+    };
+    mockedGetSessionConfigBySlugOrDefault.mockImplementation((slug: any) => (
+      String(slug || '') === 'edge'
+        ? {
+          slug: 'edge',
+          sessionName: 'Edge 2025',
+          sponsoredKeys,
+        }
+        : {}
+    ));
+
+    const subject = new LoginAndSettingsModalSubject(buildProps({
+      activeSessionSlug: 'edge',
+      loginComplete: true,
+    }));
+
+    expect(subject.getSettingsOverviewContext().sponsorSessions.byResource.rpc).toEqual([]);
+
+    sponsoredKeys = {
+      ...sponsoredKeys,
+      rpc: { encrypted: true },
+    };
+
+    expect(subject.getSettingsOverviewContext().sponsorSessions.byResource.rpc).toEqual([
+      expect.objectContaining({
+        slug: 'edge',
+        sponsoredKeys: expect.objectContaining({
+          rpc: expect.objectContaining({ encrypted: true }),
+        }),
+      }),
+    ]);
+  });
+
+  it('uses demo-session sponsored keys for display-only active-session config when strict config is missing', () => {
+    mockedGetSessionConfigBySlugOrDefault.mockImplementation((slug: any) => (
+      String(slug || '') === '' ? {} : null
+    ));
+    mockedGetDemoSessionConfigBySlug.mockImplementation((slug: any) => (
       String(slug || '') === 'edge'
         ? {
             slug: 'edge',

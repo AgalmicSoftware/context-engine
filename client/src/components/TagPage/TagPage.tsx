@@ -39,7 +39,7 @@ export const writeTagAiCacheEntry = (
   cache: Map<string, string>,
   key: string,
   value: string,
-  limit = TAG_AI_CACHE_LIMIT,
+  limit = TAG_AI_CACHE_LIMIT
 ): void => {
   if (cache.has(key)) cache.delete(key);
   cache.set(key, value);

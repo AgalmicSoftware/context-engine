@@ -145,6 +145,70 @@ describe('CreateSBTGroup metadata and deferred upload helpers', () => {
     expect(preview.encryptedFields.image).not.toHaveProperty('name');
   });
 
+  it('refreshes memoized render metadata when document hashes or creator account change', () => {
+    const instance = makeInstance({
+      account: '0xCreatorA',
+      network: { id: 84532, name: 'Base Sepolia' },
+      sessionSlug: 'test',
+    });
+    const baseArgs = {
+      account: '0xCreatorA',
+      authoringChain: { id: 84532, name: 'Base Sepolia' },
+      authoringChainId: 84532,
+      autoJoinUrl: '',
+      create2Salt: '',
+      currentTagInput: '',
+      deferredDeployMode: false,
+      documentIDHashes: 'hash-a',
+      documentURLs: [],
+      documentUrl: '',
+      effectiveSessionSlug: 'test',
+      groupPassword: '',
+      imageChooserStatusText: '',
+      imageChooserStatusTone: '',
+      imageLoadError: '',
+      metadataLockGateIds: {},
+      network: 84532,
+      predictableAddressActive: false,
+      sbtAddress: '',
+      sbtDescription: 'Description',
+      sbtDistribution: instance.state.sbtDistribution,
+      sbtImageFile: null,
+      sbtImageUrl: '',
+      sbtName: 'Alpha',
+      shareableUrl: '',
+      tags: [],
+      tokenURI: '',
+      useImageUrl: true,
+    };
+    instance.state = {
+      ...instance.state,
+      sbtName: 'Alpha',
+      sbtDescription: 'Description',
+      documentIDHashes: 'hash-a',
+    };
+
+    const first = instance.getCreateSbtRenderDerivations(baseArgs).metadataPreview;
+    instance.props = {
+      ...instance.props,
+      account: '0xCreatorB',
+    };
+    instance.state = {
+      ...instance.state,
+      documentIDHashes: 'hash-b',
+    };
+    const second = instance.getCreateSbtRenderDerivations({
+      ...baseArgs,
+      account: '0xCreatorB',
+      documentIDHashes: 'hash-b',
+    }).metadataPreview;
+
+    expect(first.creator).toBe('0xCreatorA');
+    expect(first.documentIDHashes).toEqual(['hash-a']);
+    expect(second.creator).toBe('0xCreatorB');
+    expect(second.documentIDHashes).toEqual(['hash-b']);
+  });
+
   it('stores only the Lit-Arweave txId in public locked-image metadata', () => {
     const instance = makeInstance();
 

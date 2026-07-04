@@ -1833,11 +1833,57 @@ describe('surveyToolDecryptFlow', () => {
 
   it('preserves viewed-response state identity and serialized text when decrypted values do not change', () => {
     const parsedViewAddressAnswers = {
-      responses: [{ questionID: 'q1', answer: { value: 'clear answer' } }],
+      responses: [
+        { questionID: 'q1', answer: { value: 'clear answer' } },
+      ],
     };
 
-    expect(
-      applyDecryptedQuestionResponseValuesToContainer(parsedViewAddressAnswers, {
+    expect(applyDecryptedQuestionResponseValuesToContainer(
+      parsedViewAddressAnswers,
+      {
+        questionId: 'q1',
+        decryptedStateSlice: {
+          answers: { q1: { value: 'clear answer' } },
+        },
+      },
+    )).toBe(parsedViewAddressAnswers);
+
+    expect(buildViewedResponseDecryptSuccessState(
+      {
+        parsedViewAddressAnswers,
+        viewAddressAnswers: '{"already":"serialized"}',
+        decryptingByKey: { 'q1:answer': true },
+      },
+      {
+        questionId: 'q1',
+        clearMode: 'answer',
+        didUpdate: true,
+        decryptedStateSlice: {
+          answers: { q1: { value: 'clear answer' } },
+        },
+      },
+    )).toEqual({
+      parsedViewAddressAnswers,
+      viewAddressAnswers: '{"already":"serialized"}',
+      isDecrypting: false,
+      decryptingByKey: { 'q1:answer': false },
+    });
+  });
+
+  it('builds self-response decrypt success state and syncs the edit baseline', () => {
+    expect(buildSelfQuestionDecryptSuccessState(
+      {
+        surveysResponseState: [{
+          answers: { q1: { value: '*', encrypted: true } },
+          importance: { q1: 1 },
+          conviction: { q1: 2 },
+          additionalComments: { q1: { value: '*', encrypted: true } },
+        }],
+        decryptingByKey: { 'q1:answer': true, 'q1:additional': true },
+        editBaseline: null,
+      },
+      {
+        surveyIndex: 0,
         questionId: 'q1',
         decryptedStateSlice: {
           answers: { q1: { value: 'clear answer' } },
