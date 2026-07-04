@@ -83,9 +83,15 @@ test('session policy can switch the default Telegram demo session by date', () =
   const onMay30 = normalizeSessionPolicy(base, { now: '2026-05-30T12:00:00-07:00' });
 
   assert.equal(beforeMay30.defaultSessionSlug, 'ee-26-organizers');
-  assert.equal(resolveSessionInvocation(beforeMay30, '').session.sessionSlug, 'ee-26-organizers');
+  assert.equal(
+    resolveSessionInvocation(beforeMay30, beforeMay30.defaultSessionSlug).session.sessionSlug,
+    'ee-26-organizers'
+  );
   assert.equal(onMay30.defaultSessionSlug, 'ee-26-users');
-  assert.equal(resolveSessionInvocation(onMay30, '').session.sessionSlug, 'ee-26-users');
+  assert.equal(
+    resolveSessionInvocation(onMay30, onMay30.defaultSessionSlug).session.sessionSlug,
+    'ee-26-users'
+  );
   assert.equal(onMay30.configuredDefaultSessionSlug, 'ee-26-organizers');
 
   const invalidSchedule = normalizeSessionPolicy({

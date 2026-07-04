@@ -4472,7 +4472,33 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
         return null;
       };
 
+      const extractSbtMetadataTokenURI = (metadata: unknown) => {
+        if (!metadata) return null;
+        const indexedTokenUri = Array.isArray(metadata) ? metadata[8] : null;
+        const namedTokenUri = typeof metadata === 'object'
+          ? ((metadata as { tokenURI_?: unknown; tokenURI?: unknown }).tokenURI_ ||
+            (metadata as { tokenURI_?: unknown; tokenURI?: unknown }).tokenURI ||
+            null)
+          : null;
+        return namedTokenUri || indexedTokenUri || null;
+      };
+
       const sbt = new ethers.Contract(sbtAddress, CUSTOM_SBT_ABI, provider as any);
+      const readCollectionTokenURI = async () => {
+        try {
+          const metadata = await callWithRetry(() => sbt.getSBTMetadata(), 'SBT.getSBTMetadata');
+          const metadataTokenURI = extractSbtMetadataTokenURI(metadata);
+          if (metadataTokenURI) return metadataTokenURI;
+        } catch (_) {
+          // Legacy SBTs may not expose the aggregate metadata getter.
+        }
+
+        try { return await callWithRetry(() => sbt.tokenURI(), 'SBT.tokenURI()'); }
+        catch(_) {
+          try { return await callWithRetry(() => sbt.tokenURI(0), 'SBT.tokenURI(0)'); }
+          catch(__) { return null; }
+        }
+      };
 
       // OPTIMIZATION: Removed redundant provider.getNetwork() call.
       // We already know 'chId' from the config used to create the provider.
@@ -4486,13 +4512,7 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
             catch(__: any) { return ethers.constants.AddressZero; }
           }
         })(),
-        (async () => {
-          try { return await callWithRetry(() => sbt.tokenURI(), 'SBT.tokenURI()'); }
-          catch(_: any) {
-            try { return await callWithRetry(() => sbt.tokenURI(0), 'SBT.tokenURI(0)'); }
-            catch(__: any) { return null; }
-          }
-        })()
+        readCollectionTokenURI()
       ]);
 
       const tokenURI = normalizeUri(tokenURI_raw);
