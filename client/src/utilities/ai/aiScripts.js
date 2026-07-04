@@ -831,7 +831,13 @@ export async function rankQuestionsAI(userQuery, questionList, topX = 10, opts =
       parsed = JSON.parse(rawOutput.trim());
     } catch (_err) {
       const match = rawOutput.match(/\{[\s\S]*\}/);
-      if (match) parsed = JSON.parse(match[0]);
+      if (match) {
+        try {
+          parsed = JSON.parse(match[0]);
+        } catch (_fallbackErr) {
+          parsed = null;
+        }
+      }
     }
 
     if (!parsed || !Array.isArray(parsed.selectedQuestionIDs)) {

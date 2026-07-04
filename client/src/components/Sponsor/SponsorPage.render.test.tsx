@@ -673,6 +673,23 @@ describe('SponsorPage', () => {
     expect(getFieldInputByLabel('Cloudflare API token')).toHaveValue('');
   });
 
+  it('drops expired sponsor draft expiry values during restore', async () => {
+    localStorage.setItem('ce:sponsorPageDraft:v1', JSON.stringify({
+      v: 1,
+      persistBundleDraft: true,
+      bundleForm: {
+        label: 'Expired sponsor bundle',
+      },
+      expiresAt: '2000-01-01T00:00:00.000Z',
+    }));
+
+    await renderSponsorPage();
+
+    expect(await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('edge');
+    expect(getFieldInputByLabel('Label')).toHaveValue('Expired sponsor bundle');
+    expect(screen.getByTestId('ce-sponsor-expiry-input')).toHaveValue('');
+  });
+
   it('redacts legacy sponsor draft caches that contain raw secrets', async () => {
     localStorage.setItem('ce:sponsorPageDraft:v1', JSON.stringify({
       v: 1,

@@ -1,5 +1,6 @@
 import {
   appendSessionWizardRegisterTxEntry,
+  isSessionWizardRegisterDuplicatePreflightError,
   resolveSessionWizardPublishCompletionRequest,
   resolveSessionWizardPublishFailureSettlementDescriptor,
   resolveSessionWizardRegisterArgsDescriptor,
@@ -679,6 +680,27 @@ describe('resolveSessionWizardRegisterDuplicateCheckDescriptor', () => {
       slugDuplicateMessage: 'Session slug already exists on-chain: ',
       sessionIdDuplicateMessage: 'Session ID already exists on-chain. Generate a new session ID.',
     });
+  });
+
+  it('classifies only exact registry duplicate messages as fail-closed preflight errors', () => {
+    const descriptor = resolveSessionWizardRegisterDuplicateCheckDescriptor({
+      registryChainId: '84532',
+      registrySlug: 'writers-room',
+      sessionIdHexValue: '0x00000000000000000000000000000001',
+    });
+
+    expect(isSessionWizardRegisterDuplicatePreflightError(
+      'Session slug already exists on-chain: writers-room',
+      descriptor
+    )).toBe(true);
+    expect(isSessionWizardRegisterDuplicatePreflightError(
+      'Session ID already exists on-chain. Generate a new session ID.',
+      descriptor
+    )).toBe(true);
+    expect(isSessionWizardRegisterDuplicatePreflightError(
+      'could not detect network',
+      descriptor
+    )).toBe(false);
   });
 });
 

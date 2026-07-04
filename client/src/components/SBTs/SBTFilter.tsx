@@ -405,8 +405,6 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
         return false;
       }
 
-      this.setFilterLoading(true);
-
       if (this.isLatestApplyRun(effectiveRunId)) {
         this.setState(buildSbtFilterLastAppliedSnapshotPatch({ snapshot: newFilterSnapshot }));
       }
@@ -426,6 +424,8 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
         }
         return;
       }
+
+      this.setFilterLoading(true);
 
       const allSbtEntries = buildSbtFilterSelectedEntryList({
         selectedSBTGroupsCreator,

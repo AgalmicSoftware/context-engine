@@ -263,7 +263,7 @@ describe('useWhisper', () => {
       await flushPromises();
     });
 
-    expect(onStop).toHaveBeenCalled();
+    expect(onStop).toHaveBeenCalledWith(expect.any(Blob), 'audio/wav');
     expect(onComplete).toHaveBeenCalledWith('hello world');
     expect(ref.current.status).toBe(RECORDING_STATUS.READY);
     expect(ref.current.getLastRecordingBlob().blob).toBeInstanceOf(Blob);
@@ -276,6 +276,49 @@ describe('useWhisper', () => {
     const uploadedFile = requestInit.body?.get?.('file');
     expect(uploadedFile?.type).toBe('audio/wav');
     expect(String(uploadedFile?.name || '')).toMatch(/\.wav$/);
+  });
+
+  it('preserves repeated short phrases in final transcripts', async () => {
+    fetchWorkerWithAuth.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ text: 'yes yes yes' }),
+    });
+    const onComplete = jest.fn();
+
+    act(() => {
+      root.render(
+        <WhisperHarness
+          ref={ref}
+          options={{
+            silenceDetection: false,
+            onTranscriptionComplete: onComplete,
+          }}
+        />
+      );
+    });
+
+    await act(async () => {
+      await ref.current.startRecording();
+    });
+
+    if (!ref.current.audioContextRef.current) {
+      ref.current.audioContextRef.current = new MockAudioContext();
+    }
+    ref.current.audioContextRef.current.state = 'closed';
+    setNow(2000);
+
+    await act(async () => {
+      await ref.current.stopRecording();
+    });
+
+    await act(async () => {
+      await flushPromises();
+      await flushPromises();
+      await flushPromises();
+      await flushPromises();
+    });
+
+    expect(onComplete).toHaveBeenCalledWith('yes yes yes');
   });
 
   it('skips very short recordings', async () => {
