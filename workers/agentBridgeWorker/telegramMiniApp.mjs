@@ -6651,6 +6651,7 @@ function telegramMiniAppHtml() {
     const DRAFT_AUTOSAVE_DELAY_MS = 700;
     const SHOW_UNANSWERED_STORAGE_KEY = 'ce:telegram-mini-app:show-unanswered-first';
     const DEMO_RESULTS_STORAGE_KEY = 'ce:telegram-mini-app:demo-results';
+    const SUBMITTED_RESPONSE_STATUSES = new Set(['submit_request_created', 'direct_submitted', 'submit_queued']);
     const readShowUnansweredFirst = () => {
       try { return window.localStorage.getItem(SHOW_UNANSWERED_STORAGE_KEY) !== 'false'; } catch { return true; }
     };
@@ -10011,7 +10012,7 @@ function telegramMiniAppHtml() {
       ) {
         return true;
       }
-      if (['submit_request_created', 'direct_submitted'].includes(body.status)) {
+      if (SUBMITTED_RESPONSE_STATUSES.has(body.status)) {
         if (!suppressStatus) setStatus('');
         state.submittedAnswerKeys.add(question.questionKey);
         state.savedDraftKeys.delete(question.questionKey);

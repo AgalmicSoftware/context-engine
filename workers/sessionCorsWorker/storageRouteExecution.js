@@ -12,6 +12,10 @@ const encoder = new TextEncoder();
 const toStr = (value) => (typeof value === 'string' ? value : value == null ? '' : String(value));
 const trim = (value) => toStr(value).trim();
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
+const isJsonContentType = (contentType) => {
+  const mediaType = trim(contentType).split(';', 1)[0].trim().toLowerCase();
+  return mediaType === 'application/json' || mediaType.endsWith('+json');
+};
 
 const getStorageR2Binding = (env = {}) => env.CE_STORAGE_R2 || env.STORAGE_R2 || env.R2_BUCKET || null;
 const getStorageIndexBinding = (env = {}) => env.CE_STORAGE_INDEX_KV || env.STORAGE_INDEX_KV || env.STORAGE_KV || null;
@@ -39,30 +43,20 @@ const bytesToBase64url = (bytes) => {
   bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 };
-const fillDeterministicBytes = (seed) => {
-  const source = encoder.encode(trim(seed) || `ts-${Date.now()}-${Math.random()}`);
+const buildCloudflareStorageId = ({ randomBytes, getRandomValues: getRandomValuesDep } = {}) => {
   const bytes = new Uint8Array(32);
-  for (let index = 0; index < bytes.length; index += 1) {
-    bytes[index] = source[index % source.length] ^ ((index * 31) & 0xff);
-  }
-  return bytes;
-};
-const buildCloudflareStorageId = ({ randomBytes, randomUUID, getRandomValues: getRandomValuesDep, now = Date.now } = {}) => {
-  const bytes = new Uint8Array(32);
-  const suppliedBytes = typeof randomBytes === 'function' ? randomBytes() : null;
+  const suppliedBytes = typeof randomBytes === 'function' ? randomBytes(32) : null;
   const getRandomValues = typeof getRandomValuesDep === 'function'
     ? getRandomValuesDep
+    : getRandomValuesDep === null
+      ? null
     : globalThis?.crypto?.getRandomValues?.bind(globalThis.crypto);
   if (suppliedBytes && suppliedBytes.length >= 32) {
     bytes.set(new Uint8Array(suppliedBytes).slice(0, 32));
   } else if (typeof getRandomValues === 'function') {
     getRandomValues(bytes);
   } else {
-    bytes.set(fillDeterministicBytes(
-      typeof randomUUID === 'function'
-        ? randomUUID()
-        : `ts-${now()}-${Math.random().toString(36).slice(2)}`
-    ));
+    throw new Error('Secure randomness is required for Cloudflare storage references.');
   }
   // Contract pointer fields are bytes32. Keeping Cloudflare refs to the same
   // 32-byte base64url shape lets existing bytes32 helpers round-trip the id
@@ -113,7 +107,7 @@ const readJsonPayload = async (request) => {
   if (!isObj(raw)) return { ok: false, error: 'Invalid JSON.' };
   const data = Object.prototype.hasOwnProperty.call(raw, 'data') ? raw.data : '';
   const contentType = trim(raw.contentType) || (typeof data === 'string' ? 'text/plain' : 'application/json');
-  const serialized = contentType === 'application/json' && typeof data !== 'string'
+  const serialized = isJsonContentType(contentType) && typeof data !== 'string'
     ? JSON.stringify(data)
     : toStr(data);
   return {
@@ -375,12 +369,15 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, payl
     return responseJson(deps, { error: 'Cloudflare lit_encrypted storage requires payloadEncrypted=true.' }, 400, baseHeaders);
   }
 
-  const id = buildCloudflareStorageId({
-    randomBytes: deps?.randomBytes,
-    randomUUID: deps?.randomUUID,
-    getRandomValues: deps?.getRandomValues,
-    now: deps?.now,
-  });
+  let id = '';
+  try {
+    id = buildCloudflareStorageId({
+      randomBytes: deps?.randomBytes,
+      getRandomValues: deps?.getRandomValues,
+    });
+  } catch {
+    return responseJson(deps, { error: 'Secure randomness is required for Cloudflare storage references.' }, 500, baseHeaders);
+  }
   if (!isSafeCloudflareStorageRefId(id)) {
     return responseJson(deps, { error: 'Failed to create safe Cloudflare storage reference.' }, 500, baseHeaders);
   }
@@ -451,6 +448,29 @@ const readRequestId = async ({ request, url }) => {
   }
 };
 
+const readListResource = async ({ request, url }) => {
+  const fromQuery = trim(url.searchParams.get('resource'));
+  if (fromQuery) return { ok: true, resource: fromQuery };
+  if (request.method.toUpperCase() !== 'POST') return { ok: true, resource: 'docsContext' };
+
+  let raw = '';
+  try {
+    raw = await (typeof request?.clone === 'function' ? request.clone() : request).text();
+  } catch {
+    return { ok: false, error: 'Invalid JSON.' };
+  }
+  if (!trim(raw)) return { ok: true, resource: 'docsContext' };
+
+  let body;
+  try {
+    body = JSON.parse(raw);
+  } catch {
+    return { ok: false, error: 'Invalid JSON.' };
+  }
+  if (!isObj(body)) return { ok: false, error: 'Invalid JSON.' };
+  return { ok: true, resource: trim(body.resource) || 'docsContext' };
+};
+
 const handleCloudflareRead = async ({ request, env, config, slug, uploaderAddress, baseHeaders, deps }) => {
   const url = new URL(request.url);
   const id = await readRequestId({ request, url });
@@ -515,7 +535,9 @@ const handleCloudflareRead = async ({ request, env, config, slug, uploaderAddres
 
 const handleCloudflareList = async ({ request, env, config, slug, uploaderAddress, baseHeaders, deps }) => {
   const url = new URL(request.url);
-  const resource = trim(url.searchParams.get('resource')) || 'docsContext';
+  const resolvedResource = await readListResource({ request, url });
+  if (!resolvedResource.ok) return responseJson(deps, { error: resolvedResource.error }, 400, baseHeaders);
+  const resource = resolvedResource.resource;
   const access = await authorizeCloudflareStorageAccess({
     config,
     slug,
