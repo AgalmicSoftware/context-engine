@@ -367,6 +367,77 @@ describe('SurveyQuestions runtime helpers', () => {
     }));
   });
 
+  it('keeps primary submit pending until the transaction receipt resolves', async () => {
+    const receiptDeferred = createDeferred();
+    const events = [];
+    const submitResponsesSpy = jest
+      .spyOn(contractScripts, 'submitResponses')
+      .mockImplementation(async () => {
+        events.push({ type: 'contract' });
+        return {
+          wait: async () => {
+            events.push({ type: 'wait-start' });
+            return receiptDeferred.promise;
+          },
+        };
+      });
+    jest.spyOn(cryptoUtils, 'getProviderKind').mockReturnValue('browser');
+    jest.spyOn(cryptoUtils, 'hashIdentifier').mockImplementation((value) => `hashed:${String(value)}`);
+
+    let runtimeEngine = null;
+    renderSurveyQuestions({
+      account: '0xabc',
+      isStandalone: true,
+      loginComplete: true,
+      network: { id: 84532 },
+      networkChainId: 84532,
+      provider: { request: jest.fn() },
+      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Question one' }],
+      runtimeStrategy: {
+        render: (engine) => {
+          runtimeEngine = engine;
+          return null;
+        },
+      },
+      sessionSlug: 'edge',
+    });
+
+    await waitFor(() => expect(runtimeEngine).not.toBeNull());
+    await act(async () => {
+      runtimeEngine.handleAnswer(0, 'q1', 'pending receipt answer');
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(runtimeEngine.getPendingEditStats().total).toBe(1));
+
+    await act(async () => {
+      runtimeEngine.handlePrimarySubmitClick();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => expect(submitResponsesSpy).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(events.map((event) => event.type)).toEqual(['contract', 'wait-start']));
+    expect(runtimeEngine._submitGuard).toBe(true);
+    expect(runtimeEngine.state.isSubmitting).toBe(true);
+    expect(runtimeEngine.state.submissionComplete).toBe(false);
+    expect(runtimeEngine.state.currentStep).toBe(2);
+
+    await act(async () => {
+      receiptDeferred.resolve({
+        status: 1,
+        blockNumber: 43,
+        transactionHash: `0x${'8'.repeat(64)}`,
+        transactionIndex: 0,
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => expect(runtimeEngine.state.submissionComplete).toBe(true));
+    expect(runtimeEngine._submitGuard).toBe(false);
+    expect(runtimeEngine.state.isSubmitting).toBe(false);
+    expect(runtimeEngine.state.currentStep).toBe(3);
+  });
+
   it('runs mount-time survey draft hydration under the response hydration guard', () => {
     const setState = jest.fn((update, callback) => {
       const patch = typeof update === 'function'
