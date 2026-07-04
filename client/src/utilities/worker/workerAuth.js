@@ -855,6 +855,22 @@ export const clearAllWorkerSessionTokens = () => {
   } catch (_) {}
 };
 
+const buildWorkerAuthHeadersForToken = ({ token, slug } = {}) => {
+  const headers = {
+    Authorization: `Bearer ${token}`,
+  };
+  if (slug) {
+    // NOTE: Some deployed workers (ex: older "test-*" builds) only allow `X-Group-Slug`
+    // in CORS preflights. Sending `X-Session-Slug` can cause browsers to block requests
+    // with a generic "Load failed" network error even when the worker is healthy.
+    //
+    // The worker-side auth handler accepts either header (it checks `x-session-slug ?? x-group-slug`),
+    // so sending only `X-Group-Slug` keeps compatibility without sacrificing modern workers.
+    headers['X-Group-Slug'] = slug;
+  }
+  return headers;
+};
+
 const getWorkerAuthHeadersWithMeta = async ({
   sessionSlug,
   sessionConfig,
@@ -873,18 +889,7 @@ const getWorkerAuthHeadersWithMeta = async ({
   const token = await getWorkerSessionToken({
     requestContext: resolvedRequest,
   });
-  const headers = {
-    Authorization: `Bearer ${token}`,
-  };
-  if (resolvedRequest.slug) {
-    // NOTE: Some deployed workers (ex: older "test-*" builds) only allow `X-Group-Slug`
-    // in CORS preflights. Sending `X-Session-Slug` can cause browsers to block requests
-    // with a generic "Load failed" network error even when the worker is healthy.
-    //
-    // The worker-side auth handler accepts either header (it checks `x-session-slug ?? x-group-slug`),
-    // so sending only `X-Group-Slug` keeps compatibility without sacrificing modern workers.
-    headers['X-Group-Slug'] = resolvedRequest.slug;
-  }
+  const headers = buildWorkerAuthHeadersForToken({ token, slug: resolvedRequest.slug });
   return { headers, requestContext: resolvedRequest };
 };
 
@@ -1220,12 +1225,12 @@ export const fetchWorkerWithAuth = async (url, options = {}, opts = {}) => {
       workerUrl,
       allowDemoFallback: opts.allowDemoFallback,
     });
-    const retryAuth = await getWorkerAuthHeaders({
-      sessionSlug: slug,
-      sessionConfig: resolvedSession.sessionConfig,
-      context: opts.context,
-      workerUrl,
-      allowDemoFallback: opts.allowDemoFallback,
+    const retryToken = await getWorkerSessionToken({
+      requestContext: authRequestContext,
+    });
+    const retryAuth = buildWorkerAuthHeadersForToken({
+      token: retryToken,
+      slug: authRequestContext?.slug || slug,
     });
     const retryHeaders = mergeHeaders(options.headers, retryAuth);
     return fetch(url, { ...options, headers: retryHeaders });

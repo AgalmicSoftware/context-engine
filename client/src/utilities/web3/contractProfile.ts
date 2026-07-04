@@ -492,9 +492,20 @@ export function createContractProfileMethods(deps: ContractProfileDeps): Contrac
           }
 
           const totalBlocks = Math.max(0, resolvedToBlock - resolvedFromBlock + 1);
+          const parsedLogKeys = new Set<string>();
+          const getSbtCreatedLogKey = (log: any): string => [
+            log?.blockHash || log?.blockNumber || '',
+            log?.transactionHash || '',
+            log?.logIndex ?? log?.transactionIndex ?? '',
+            Array.isArray(log?.topics) ? log.topics.join('|') : '',
+            log?.data || '',
+          ].join(':');
           const collectAddressesFromLogs = (logs: any[] = []): string[] => {
             const next: string[] = [];
             (Array.isArray(logs) ? logs : []).forEach((log: any): void => {
+              const logKey = getSbtCreatedLogKey(log);
+              if (logKey && parsedLogKeys.has(logKey)) return;
+              if (logKey) parsedLogKeys.add(logKey);
               try {
                 const event = factory.interface.parseLog(log);
                 const address = String(event?.args?.sbtAddress ?? event?.args?.[0] ?? '').trim();
@@ -607,8 +618,6 @@ export function createContractProfileMethods(deps: ContractProfileDeps): Contrac
         });
       }
 
-      const fromKey = options?.fromBlock != null ? Number(options.fromBlock) : 'full';
-      const toKey = options?.toBlock != null ? options.toBlock : 'latest';
       const scopedGroupRef = (options && options.ignoreScope)
         ? { ...(cfg && typeof cfg === 'object' ? cfg : {}), __ignoreSessionScanScope: true }
         : groupKeyOrCfg;
@@ -616,7 +625,7 @@ export function createContractProfileMethods(deps: ContractProfileDeps): Contrac
         scopedGroupRef,
         scopedGroupRef && typeof scopedGroupRef === 'object' ? scopedGroupRef : null
       );
-      const memoKey = `${userAddress.toLowerCase()}:${fromKey}:${toKey}:${memoScopeTag}`;
+      const memoKey = `${userAddress.toLowerCase()}:${memoScopeTag}`;
 
       const TTL_MS = 45 * 1000;
       const now = Date.now();
@@ -892,7 +901,6 @@ export function createContractProfileMethods(deps: ContractProfileDeps): Contrac
       fromBlock: number = 0,
       opts: UserActivityOptions | null = {}
     ): Promise<UserActivity | MetaResult<UserActivity>> {
-      latestBlockCache._map = {};
       const returnMeta = !!(opts && opts.returnMeta);
       const ignoreScope = !!(opts && opts.ignoreScope);
       const includeSurveyActivity = !(
