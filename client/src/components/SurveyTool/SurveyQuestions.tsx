@@ -182,6 +182,10 @@ import {
 import {
   buildResponseGateConfigSignature,
 } from './surveyToolResponseAccess';
+import type {
+  ResponseSlice as SurveyToolResponseSlice,
+  UnknownRecord,
+} from './surveyToolTypes';
 import {
   decideAutoDecryptBlocked,
   decideAutomaticPromptDecryptByKind,
@@ -596,7 +600,7 @@ declare global {
 }
 
 type SurveyQuestionsRecord = Record<string, any>;
-type SurveyQuestionsSetStateCallback = () => void;
+type SurveyQuestionsSetStateCallback = () => unknown;
 type SurveyQuestionsSetState = (
   update: SurveyQuestionsStateUpdate,
   callback?: SurveyQuestionsSetStateCallback
@@ -657,7 +661,62 @@ type SurveyQuestionsAutoDecryptQueueItem = {
   maskedSig?: string;
 };
 type SurveyQuestionsAutoDecryptSweepCache = SurveyQuestionsRuntimeRecord | null;
-type SurveyQuestionsHydrationSliceApplier = (args?: Record<string, unknown>) => boolean;
+type SurveyQuestionsResponseFieldState = UnknownRecord & {
+  value?: unknown;
+  encryptedPortion?: unknown;
+};
+type SurveyQuestionsHydrationSlice = SurveyToolResponseSlice;
+type SurveyQuestionsHydrationPatch = {
+  answerState?: SurveyQuestionsResponseFieldState;
+  additionalState?: SurveyQuestionsResponseFieldState;
+  importanceChanged?: boolean;
+  importanceValue?: unknown;
+  convictionChanged?: boolean;
+  convictionValue?: unknown;
+  changed?: unknown;
+};
+type SurveyQuestionsParseValue = (value: unknown) => unknown;
+type SurveyQuestionsQuestionIdResolver = (response: unknown) => string | null | undefined;
+type SurveyQuestionsDraftHydrationEntryArgs = {
+  targetSlice?: SurveyQuestionsHydrationSlice | null;
+  questionId?: string;
+  draftEntry?: unknown;
+  allowOverwrite?: boolean;
+};
+type SurveyQuestionsResponseHydrationEntryArgs = {
+  targetSlice?: SurveyQuestionsHydrationSlice | null;
+  currentSlice?: SurveyQuestionsHydrationSlice | null;
+  questionId?: string;
+  response?: unknown;
+  allowOverwrite?: boolean;
+  parseValue?: SurveyQuestionsParseValue | null;
+};
+type SurveyQuestionsResponseHydrationListArgs = SurveyQuestionsResponseHydrationEntryArgs & {
+  responses?: unknown[] | unknown;
+  questionIdResolver?: SurveyQuestionsQuestionIdResolver | null;
+};
+type SurveyQuestionsCachedResponseEntryArgs = {
+  targetSlice?: SurveyQuestionsHydrationSlice | null;
+  questionId?: string;
+  response?: unknown;
+  parseValue?: SurveyQuestionsParseValue | null;
+};
+type SurveyQuestionsLocalCacheHydrationEntryArgs = {
+  targetSlice?: SurveyQuestionsHydrationSlice | null;
+  questionId?: string;
+  cachedAnswer?: SurveyQuestionsResponseFieldState | null;
+  cachedAdditional?: SurveyQuestionsResponseFieldState | null;
+  cachedImportance?: unknown;
+  cachedConviction?: unknown;
+  allowMaskedAnswerDraftEmpty?: boolean;
+  allowMaskedAdditionalDraftEmpty?: boolean;
+  debugLabel?: string;
+};
+type SurveyQuestionsDraftHydrationEntryApplier = (args?: SurveyQuestionsDraftHydrationEntryArgs) => boolean;
+type SurveyQuestionsResponseHydrationEntryApplier = (args?: SurveyQuestionsResponseHydrationEntryArgs) => boolean;
+type SurveyQuestionsResponseHydrationListApplier = (args?: SurveyQuestionsResponseHydrationListArgs) => boolean;
+type SurveyQuestionsCachedResponseEntryApplier = (args?: SurveyQuestionsCachedResponseEntryArgs) => boolean;
+type SurveyQuestionsLocalCacheHydrationEntryApplier = (args?: SurveyQuestionsLocalCacheHydrationEntryArgs) => boolean;
 
 export interface SurveyQuestions {
   setState: SurveyQuestionsSetState;
@@ -726,11 +785,11 @@ type SurveyQuestionsInstanceFields = {
   _decryptFieldTaskInFlight: Map<string, Promise<unknown>>;
   _transientTimeouts: Set<SurveyQuestionsTimer>;
   _applyDraftTrackingState: (tracking?: SurveyQuestionsDraftTrackingState) => void;
-  _applyDraftHydrationEntryToSlice: SurveyQuestionsHydrationSliceApplier;
-  _applyResponseHydrationEntryToSlice: SurveyQuestionsHydrationSliceApplier;
-  _applyResponseHydrationListToSlice: SurveyQuestionsHydrationSliceApplier;
-  _applyCachedResponseEntryToSlice: SurveyQuestionsHydrationSliceApplier;
-  _applyLocalCacheHydrationEntryToSlice: SurveyQuestionsHydrationSliceApplier;
+  _applyDraftHydrationEntryToSlice: SurveyQuestionsDraftHydrationEntryApplier;
+  _applyResponseHydrationEntryToSlice: SurveyQuestionsResponseHydrationEntryApplier;
+  _applyResponseHydrationListToSlice: SurveyQuestionsResponseHydrationListApplier;
+  _applyCachedResponseEntryToSlice: SurveyQuestionsCachedResponseEntryApplier;
+  _applyLocalCacheHydrationEntryToSlice: SurveyQuestionsLocalCacheHydrationEntryApplier;
   _getDraftScope: () => string;
   _getEffectiveDraftSlug: () => string;
   [key: string]: any;
@@ -837,8 +896,8 @@ export const SurveyQuestions = (props: SurveyQuestionsProps): React.ReactElement
   });
   const stateRef = useRef(state);
   stateRef.current = state;
-  const pendingSetStateCallbacksRef = useRef<Array<(...args: any[]) => any>>([]);
-  const setState = (update: SurveyQuestionsStateUpdate, callback?: (...args: any[]) => any): void => {
+  const pendingSetStateCallbacksRef = useRef<SurveyQuestionsSetStateCallback[]>([]);
+  const setState = (update: SurveyQuestionsStateUpdate, callback?: SurveyQuestionsSetStateCallback): void => {
     if (callback) pendingSetStateCallbacksRef.current.push(callback);
     dispatch(update);
   };
@@ -885,7 +944,7 @@ const shouldAttemptAutomaticPromptDecrypt = () => {
     }
   };
 
-const _applyDraftTrackingState = (tracking: any = {}) => {
+const _applyDraftTrackingState = (tracking: SurveyQuestionsDraftTrackingState = {}) => {
     if (!tracking || typeof tracking !== 'object') return;
     if (Object.prototype.hasOwnProperty.call(tracking, 'draftParseCache')) {
       inst._draftParseCache = tracking.draftParseCache ?? null;
@@ -910,9 +969,9 @@ const invalidateResponseHydrationRuns = () => {
     }
   };
 
-const setResponseHydrationState = (next: any, callback: any) => {
+const setResponseHydrationState = (next: SurveyQuestionsStateUpdate, callback?: SurveyQuestionsSetStateCallback) => {
     inst._responseHydrationStateUpdateDepth += 1;
-    const release: any = () => {
+    const release = () => {
       inst._responseHydrationStateUpdateDepth = Math.max(
         0,
         (Number(inst._responseHydrationStateUpdateDepth) || 0) - 1,
@@ -920,14 +979,14 @@ const setResponseHydrationState = (next: any, callback: any) => {
     };
 
     try {
-      return setState(next, (...args: any[]) => {
+      return setState(next, () => {
         try {
-          return typeof callback === 'function' ? callback(...args) : undefined;
+          return typeof callback === 'function' ? callback() : undefined;
         } finally {
           release();
         }
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       release();
       throw error;
     }
@@ -938,15 +997,19 @@ const _applyDraftHydrationEntryToSlice = ({
     questionId = '',
     draftEntry = null,
     allowOverwrite = false,
-  }: any = {}) => {
+  }: SurveyQuestionsDraftHydrationEntryArgs = {}) => {
     if (!targetSlice || !draftEntry) return false;
-    const patch: any = buildDraftHydrationPatchForQuestion({
+    const targetAnswers = targetSlice.answers as Record<string, SurveyQuestionsResponseFieldState>;
+    const targetAdditional = targetSlice.additionalComments as Record<string, SurveyQuestionsResponseFieldState>;
+    const targetImportance = targetSlice.importance as Record<string, unknown>;
+    const targetConviction = targetSlice.conviction as Record<string, unknown>;
+    const patch: SurveyQuestionsHydrationPatch = buildDraftHydrationPatchForQuestion({
       questionId,
       draftEntry,
-      currentAnswer: targetSlice.answers?.[questionId],
-      currentAdditional: targetSlice.additionalComments?.[questionId],
-      hasCurrentImportance: Object.prototype.hasOwnProperty.call(targetSlice.importance || {}, questionId),
-      hasCurrentConviction: Object.prototype.hasOwnProperty.call(targetSlice.conviction || {}, questionId),
+      currentAnswer: targetAnswers?.[questionId],
+      currentAdditional: targetAdditional?.[questionId],
+      hasCurrentImportance: Object.prototype.hasOwnProperty.call(targetImportance || {}, questionId),
+      hasCurrentConviction: Object.prototype.hasOwnProperty.call(targetConviction || {}, questionId),
       allowOverwrite,
       deps: {
         normalizeResponseEncryptionAudience: normalizeResponseEncryptionAudience,
@@ -955,10 +1018,10 @@ const _applyDraftHydrationEntryToSlice = ({
         buildEmptyResponseFieldState: buildEmptyResponseFieldState,
       },
     });
-    if (patch.answerState) targetSlice.answers[questionId] = patch.answerState;
-    if (patch.additionalState) targetSlice.additionalComments[questionId] = patch.additionalState;
-    if (patch.importanceChanged) targetSlice.importance[questionId] = patch.importanceValue;
-    if (patch.convictionChanged) targetSlice.conviction[questionId] = patch.convictionValue;
+    if (patch.answerState) targetAnswers[questionId] = patch.answerState;
+    if (patch.additionalState) targetAdditional[questionId] = patch.additionalState;
+    if (patch.importanceChanged) targetImportance[questionId] = patch.importanceValue;
+    if (patch.convictionChanged) targetConviction[questionId] = patch.convictionValue;
     return !!patch.changed;
   };
 
@@ -969,16 +1032,24 @@ const _applyResponseHydrationEntryToSlice = ({
     response = null,
     allowOverwrite = false,
     parseValue = parseAnswerValue,
-  }: any = {}) => {
+  }: SurveyQuestionsResponseHydrationEntryArgs = {}) => {
     if (!targetSlice || !response) return false;
-    const sourceSlice: any = currentSlice || targetSlice;
-    const patch: any = buildQuestionResponseHydrationPatch({
+    const sourceSlice = currentSlice || targetSlice;
+    const targetAnswers = targetSlice.answers as Record<string, SurveyQuestionsResponseFieldState>;
+    const targetAdditional = targetSlice.additionalComments as Record<string, SurveyQuestionsResponseFieldState>;
+    const targetImportance = targetSlice.importance as Record<string, unknown>;
+    const targetConviction = targetSlice.conviction as Record<string, unknown>;
+    const sourceAnswers = sourceSlice.answers as Record<string, SurveyQuestionsResponseFieldState>;
+    const sourceAdditional = sourceSlice.additionalComments as Record<string, SurveyQuestionsResponseFieldState>;
+    const sourceImportance = sourceSlice.importance as Record<string, unknown>;
+    const sourceConviction = sourceSlice.conviction as Record<string, unknown>;
+    const patch: SurveyQuestionsHydrationPatch = buildQuestionResponseHydrationPatch({
       questionId,
-      response,
-      currentAnswer: sourceSlice?.answers?.[questionId],
-      currentAdditional: sourceSlice?.additionalComments?.[questionId],
-      hasCurrentImportance: Object.prototype.hasOwnProperty.call(sourceSlice?.importance || {}, questionId),
-      hasCurrentConviction: Object.prototype.hasOwnProperty.call(sourceSlice?.conviction || {}, questionId),
+      response: response as UnknownRecord,
+      currentAnswer: sourceAnswers?.[questionId],
+      currentAdditional: sourceAdditional?.[questionId],
+      hasCurrentImportance: Object.prototype.hasOwnProperty.call(sourceImportance || {}, questionId),
+      hasCurrentConviction: Object.prototype.hasOwnProperty.call(sourceConviction || {}, questionId),
       allowOverwrite,
       deps: {
         parseValue,
@@ -991,10 +1062,10 @@ const _applyResponseHydrationEntryToSlice = ({
         buildEmptyResponseFieldState: buildEmptyResponseFieldState,
       },
     });
-    if (patch.answerState) targetSlice.answers[questionId] = patch.answerState;
-    if (patch.additionalState) targetSlice.additionalComments[questionId] = patch.additionalState;
-    if (patch.importanceChanged) targetSlice.importance[questionId] = patch.importanceValue;
-    if (patch.convictionChanged) targetSlice.conviction[questionId] = patch.convictionValue;
+    if (patch.answerState) targetAnswers[questionId] = patch.answerState;
+    if (patch.additionalState) targetAdditional[questionId] = patch.additionalState;
+    if (patch.importanceChanged) targetImportance[questionId] = patch.importanceValue;
+    if (patch.convictionChanged) targetConviction[questionId] = patch.convictionValue;
     return !!patch.changed;
   };
 
@@ -1004,13 +1075,18 @@ const _applyResponseHydrationListToSlice = ({
     responses = [],
     allowOverwrite = false,
     parseValue = parseAnswerValue,
-    questionIdResolver = (response: any) => normalizeQuestionIdKey(response?.questionID || response?.questionId),
-  }: any = {}) => {
+    questionIdResolver = (response: unknown) => {
+      const responseRecord = response && typeof response === 'object'
+        ? response as Record<string, unknown>
+        : {};
+      return normalizeQuestionIdKey(responseRecord.questionID || responseRecord.questionId);
+    },
+  }: SurveyQuestionsResponseHydrationListArgs = {}) => {
     if (!targetSlice) return false;
-    const list: any = Array.isArray(responses) ? responses : [responses];
-    let changed: any = false;
-    list.forEach((response: any) => {
-      const qid: any = questionIdResolver(response);
+    const list = Array.isArray(responses) ? responses : [responses];
+    let changed = false;
+    list.forEach((response: unknown) => {
+      const qid = (questionIdResolver as SurveyQuestionsQuestionIdResolver)(response);
       if (!qid) return;
       if (inst._applyResponseHydrationEntryToSlice({
         targetSlice,
@@ -1031,11 +1107,15 @@ const _applyCachedResponseEntryToSlice = ({
     questionId = '',
     response = null,
     parseValue = parseAnswerValue,
-  }: any = {}) => {
+  }: SurveyQuestionsCachedResponseEntryArgs = {}) => {
     if (!targetSlice || !response) return false;
-    const patch: any = buildQuestionCacheHydrationPatch({
+    const targetAnswers = targetSlice.answers as Record<string, SurveyQuestionsResponseFieldState>;
+    const targetAdditional = targetSlice.additionalComments as Record<string, SurveyQuestionsResponseFieldState>;
+    const targetImportance = targetSlice.importance as Record<string, unknown>;
+    const targetConviction = targetSlice.conviction as Record<string, unknown>;
+    const patch: SurveyQuestionsHydrationPatch = buildQuestionCacheHydrationPatch({
       questionId,
-      response,
+      response: response as UnknownRecord,
       deps: {
         parseValue,
         normalizeResponseEncryptionAudience: normalizeResponseEncryptionAudience,
@@ -1046,10 +1126,10 @@ const _applyCachedResponseEntryToSlice = ({
         buildEmptyResponseFieldState: buildEmptyResponseFieldState,
       },
     });
-    if (patch.answerState) targetSlice.answers[questionId] = patch.answerState;
-    if (patch.additionalState) targetSlice.additionalComments[questionId] = patch.additionalState;
-    if (patch.importanceChanged) targetSlice.importance[questionId] = patch.importanceValue;
-    if (patch.convictionChanged) targetSlice.conviction[questionId] = patch.convictionValue;
+    if (patch.answerState) targetAnswers[questionId] = patch.answerState;
+    if (patch.additionalState) targetAdditional[questionId] = patch.additionalState;
+    if (patch.importanceChanged) targetImportance[questionId] = patch.importanceValue;
+    if (patch.convictionChanged) targetConviction[questionId] = patch.convictionValue;
     return !!patch.changed;
   };
 
@@ -1063,23 +1143,27 @@ const _applyLocalCacheHydrationEntryToSlice = ({
     allowMaskedAnswerDraftEmpty = false,
     allowMaskedAdditionalDraftEmpty = false,
     debugLabel = '',
-  }: any = {}) => {
+  }: SurveyQuestionsLocalCacheHydrationEntryArgs = {}) => {
     if (!targetSlice || !questionId) return false;
-    let changed: any = false;
+    const targetAnswers = targetSlice.answers as Record<string, SurveyQuestionsResponseFieldState>;
+    const targetAdditional = targetSlice.additionalComments as Record<string, SurveyQuestionsResponseFieldState>;
+    const targetImportance = targetSlice.importance as Record<string, unknown>;
+    const targetConviction = targetSlice.conviction as Record<string, unknown>;
+    let changed = false;
 
     if (
       cachedAnswer &&
       (
         allowMaskedAnswerDraftEmpty ||
-        targetSlice.answers?.[questionId]?.value === undefined ||
+        targetAnswers?.[questionId]?.value === undefined ||
         (
-          targetSlice.answers?.[questionId]?.value === '' &&
-          !targetSlice.answers?.[questionId]?.encryptedPortion
+          targetAnswers?.[questionId]?.value === '' &&
+          !targetAnswers?.[questionId]?.encryptedPortion
         )
       )
     ) {
-      targetSlice.answers[questionId] = {
-        ...(targetSlice.answers[questionId] || {}),
+      targetAnswers[questionId] = {
+        ...(targetAnswers[questionId] || {}),
         ...cachedAnswer,
       };
       changed = true;
@@ -1094,15 +1178,15 @@ const _applyLocalCacheHydrationEntryToSlice = ({
       cachedAdditional &&
       (
         allowMaskedAdditionalDraftEmpty ||
-        targetSlice.additionalComments?.[questionId]?.value === undefined ||
+        targetAdditional?.[questionId]?.value === undefined ||
         (
-          targetSlice.additionalComments?.[questionId]?.value === '' &&
-          !targetSlice.additionalComments?.[questionId]?.encryptedPortion
+          targetAdditional?.[questionId]?.value === '' &&
+          !targetAdditional?.[questionId]?.encryptedPortion
         )
       )
     ) {
-      targetSlice.additionalComments[questionId] = {
-        ...(targetSlice.additionalComments[questionId] || {}),
+      targetAdditional[questionId] = {
+        ...(targetAdditional[questionId] || {}),
         ...cachedAdditional,
       };
       changed = true;
@@ -1116,9 +1200,9 @@ const _applyLocalCacheHydrationEntryToSlice = ({
     if (
       cachedImportance !== undefined &&
       cachedImportance !== null &&
-      !Object.prototype.hasOwnProperty.call(targetSlice.importance || {}, questionId)
+      !Object.prototype.hasOwnProperty.call(targetImportance || {}, questionId)
     ) {
-      targetSlice.importance[questionId] = Number(cachedImportance);
+      targetImportance[questionId] = Number(cachedImportance);
       changed = true;
       if (debugLabel) {
         DEBUG_PREFILL && surveyLog.log(`${debugLabel} Hydrated importance for qid=${questionId}`, {
@@ -1130,9 +1214,9 @@ const _applyLocalCacheHydrationEntryToSlice = ({
     if (
       cachedConviction !== undefined &&
       cachedConviction !== null &&
-      !Object.prototype.hasOwnProperty.call(targetSlice.conviction || {}, questionId)
+      !Object.prototype.hasOwnProperty.call(targetConviction || {}, questionId)
     ) {
-      targetSlice.conviction[questionId] = Number(cachedConviction);
+      targetConviction[questionId] = Number(cachedConviction);
       changed = true;
       if (debugLabel) {
         DEBUG_PREFILL && surveyLog.log(`${debugLabel} Hydrated conviction for qid=${questionId}`, {
