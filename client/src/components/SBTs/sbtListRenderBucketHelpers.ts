@@ -69,6 +69,22 @@ export const buildSbtListRenderBuckets = <T extends SbtListHelperItem>({
       .map((slug: unknown) => normalizeSessionSlug(slug || ''))
   );
   const keyOptions = { allSessionsMode, listSlug, resolveSbtSessionSlug };
+  const sessionGroupListsBySlug = new Map<string, {
+    featuredSet: Set<string>;
+    ignoredSet: Set<string>;
+  }>();
+  const getSessionGroupListSets = (slug: string) => {
+    const cacheKey = String(slug || '');
+    const cached = sessionGroupListsBySlug.get(cacheKey);
+    if (cached) return cached;
+    const lists = readSbtSessionGroupLists(cacheKey, getSessionListsForSlug);
+    const next = {
+      featuredSet: lowerSbtListAddressSet(lists.featured_SBTs_LIST),
+      ignoredSet: lowerSbtListAddressSet(lists.ignored_SBTs_LIST),
+    };
+    sessionGroupListsBySlug.set(cacheKey, next);
+    return next;
+  };
 
   (Array.isArray(sbtList) ? sbtList : []).forEach((candidate: unknown) => {
     const sbt = isSbtListHelperRecord(candidate) ? candidate as T : null;
@@ -89,10 +105,9 @@ export const buildSbtListRenderBuckets = <T extends SbtListHelperItem>({
       } else if (itemSlug !== activeSessionSlug) {
         return;
       }
-      const lists = readSbtSessionGroupLists(itemSlug, getSessionListsForSlug);
-      const ignoredSet = lowerSbtListAddressSet(lists.ignored_SBTs_LIST);
-      if (ignoredSet.has(addrLower)) return;
-      isFeaturedForItem = lowerSbtListAddressSet(lists.featured_SBTs_LIST).has(addrLower);
+      const { featuredSet: itemFeaturedSet, ignoredSet: itemIgnoredSet } = getSessionGroupListSets(itemSlug);
+      if (itemIgnoredSet.has(addrLower)) return;
+      isFeaturedForItem = itemFeaturedSet.has(addrLower);
       if (sbt.sbtInfo.unlisted && !isFeaturedForItem) return;
     }
 
