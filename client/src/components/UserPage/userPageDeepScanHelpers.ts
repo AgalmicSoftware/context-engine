@@ -211,6 +211,7 @@ export const buildUserPageDeepScanTooltipInputSignature = ({
     .sort((a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0));
   const slugProgress = slugs
     .map((slug) => {
+      const includeTimestamp = slugs.length === 1 && slug === '';
       const cacheEntry = peekCache('userCache', slug, { clone: false });
       const userNode = toAnalysisRecord(toAnalysisRecord(cacheEntry)[viewLower]);
       if (!Object.keys(userNode).length) return `${slug}:`;
@@ -222,7 +223,9 @@ export const buildUserPageDeepScanTooltipInputSignature = ({
           const lastScanTs = Number(entry?.lastScanTimestamp);
           const blockToken = Number.isFinite(lastBlock) ? String(lastBlock) : '';
           const tsToken = Number.isFinite(lastScanTs) ? String(lastScanTs) : '';
-          return `${netKey}:${blockToken}:${tsToken}`;
+          return includeTimestamp
+            ? `${netKey}:${blockToken}:${tsToken}`
+            : `${netKey}:${blockToken}`;
         })
         .join(',');
       return `${slug}:${netParts}`;

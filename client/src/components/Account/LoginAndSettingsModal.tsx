@@ -194,6 +194,35 @@ interface LoginAndSettingsModalState {
   walletBalanceWei: ethers.BigNumber | null;
 }
 
+type SponsoredSessionEntry = Record<string, unknown> & {
+  slug: string;
+  label: string;
+  sponsoredKeys: Record<string, unknown>;
+  isActive?: boolean;
+  inRpcScope?: boolean;
+};
+
+type SettingsSessionDescriptor = Record<string, unknown> & {
+  label: string;
+};
+
+type SponsoredSessionSources = {
+  byResource: Record<string, SponsoredSessionEntry[]>;
+  rpcScope: SponsoredSessionEntry[];
+};
+
+type SettingsOverviewContext = {
+  activeSession: SettingsSessionDescriptor;
+  cryptoTerminology: boolean;
+  needsNetworkSwitch: boolean;
+  showWalletNetwork: boolean;
+  sponsorshipCards: ReturnType<typeof buildLoginSettingsSponsorshipCards>;
+  sponsorSessions: SponsoredSessionSources;
+  targetNetworkName: string;
+  targetNetwork: unknown;
+  walletNetworkName: string;
+};
+
 export { buildBookmarksRoutePath };
 const getErrorCode = (error: unknown) => (
   error && typeof error === 'object' ? (error as { code?: unknown }).code : undefined
@@ -314,6 +343,8 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   _testFundsRequestId: number = 0;
   _portoSessionRestoreReqId: number = 0;
   _portoSessionActionId: number = 0;
+  _sponsoredSessionSourcesMemo: { key: string; value: SponsoredSessionSources } | null = null;
+  _settingsOverviewMemo: { key: string; value: SettingsOverviewContext } | null = null;
 
   getListModePrimarySessionSlug = (state: Partial<LoginAndSettingsModalState> = this.state) => {
     const scope = this.getSessionScanScopeValue(state);
@@ -1584,11 +1615,43 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     sessionScanSlugsInput = this.state.sessionScanSlugsInput,
   }: any = {}) => {
     const active = normalizeSettingsSessionSlug(activeSlug);
+    const scope = normalizeSessionScanScope(sessionScanScope || '');
+    const listSlugs = this.getConfiguredSessionScanSlugs({
+      sessionScanSlugs,
+      sessionScanSlugsInput,
+    });
+    const allSessionSlugs = getAllSessionSlugs({ includeEmpty: true }) || [];
+    const sourceSlugs = uniqueList([
+      ...allSessionSlugs.map((slug: unknown) => normalizeSettingsSessionSlug(slug)),
+      active,
+      '',
+    ]);
+    const configBySlug = new Map<string, Record<string, unknown>>();
+    const sponsoredSourceSignature = sourceSlugs.map((slug: string) => {
+      const cfg = this.getDisplaySessionConfig(slug);
+      configBySlug.set(slug, cfg);
+      return {
+        slug,
+        sessionName: cfg?.sessionName || cfg?.name || cfg?.title || '',
+        networkChainId: cfg?.networkChainId || cfg?.chainId || '',
+        sponsoredKeys: cfg?.sponsoredKeys && typeof cfg.sponsoredKeys === 'object' ? cfg.sponsoredKeys : {},
+      };
+    });
+    const memoKey = JSON.stringify({
+      active,
+      scope,
+      listSlugs,
+      allSessionSlugs,
+      sponsoredSourceSignature,
+    });
+    if (this._sponsoredSessionSourcesMemo?.key === memoKey) {
+      return this._sponsoredSessionSourcesMemo.value;
+    }
     const entries: any = new Map();
     const pushSession = (slugIn: any) => {
       const slug = normalizeSettingsSessionSlug(slugIn);
       if (entries.has(slug)) return;
-      const cfg = this.getDisplaySessionConfig(slug);
+      const cfg = configBySlug.has(slug) ? configBySlug.get(slug) : this.getDisplaySessionConfig(slug);
       const descriptor = this.getSessionDescriptor(slug, cfg, active);
       entries.set(slug, {
         ...descriptor,
@@ -1596,7 +1659,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       });
     };
 
-    (getAllSessionSlugs({ includeEmpty: true }) || []).forEach(pushSession);
+    allSessionSlugs.forEach(pushSession);
     pushSession(active);
     pushSession('');
 
@@ -1604,8 +1667,8 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     const knownSlugs = allSessions.map((entry: any) => entry.slug);
     const rpcScopeSlugs = this.getScanScopeSessionSlugs({
       activeSlug: active,
-      sessionScanScope,
-      sessionScanSlugs,
+      sessionScanScope: scope,
+      sessionScanSlugs: listSlugs,
       sessionScanSlugsInput,
       knownSlugs,
     });
@@ -1626,10 +1689,12 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       return acc;
     }, {});
 
-    return {
+    const value = {
       byResource,
       rpcScope: byResource.rpc.filter((entry: any) => rpcScopeSlugs.includes(entry.slug)),
     };
+    this._sponsoredSessionSourcesMemo = { key: memoKey, value };
+    return value;
   };
 
   toggleAiSettingsPanel = () => {
@@ -1908,13 +1973,32 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     const activeSession = this.getSessionDescriptor(sessionSlug, sessionConfig);
     const sponsoredAccess = this.state.sponsoredAccess || {};
     const sponsorSessions = this.getSponsoredSessionSources({ activeSlug: sessionSlug });
+    const memoKey = JSON.stringify({
+      activeSession,
+      loginComplete: this.props.loginComplete,
+      provider: this.props.provider,
+      selectedSessionScope: this.props.selectedSessionScope,
+      selectedSessionSlugs: this.props.selectedSessionSlugs || [],
+      sessionScanScope: this.getSessionScanScopeValue(),
+      sessionScanSlugs: this.state.sessionScanSlugs,
+      sessionScanSlugsInput: this.state.sessionScanSlugsInput,
+      sponsoredAccess,
+      sponsorSessions,
+      targetNetworkId: tn?.id,
+      targetNetworkName,
+      walletNetworkId: walletNet?.id,
+      walletNetworkName,
+    });
+    if (this._settingsOverviewMemo?.key === memoKey) {
+      return this._settingsOverviewMemo.value;
+    }
     const sponsorshipCards = buildLoginSettingsSponsorshipCards({
       activeSession,
       sponsoredAccess,
       sponsorSessions,
     });
 
-    return {
+    const value = {
       activeSession,
       cryptoTerminology: isCryptoMode(),
       needsNetworkSwitch,
@@ -1925,6 +2009,8 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       targetNetwork: tn,
       walletNetworkName,
     };
+    this._settingsOverviewMemo = { key: memoKey, value };
+    return value;
   };
 
   renderInlineNetworkSummary = ({

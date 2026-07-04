@@ -183,6 +183,31 @@ describe('buildUsersFromCaches', () => {
     expect(fallbackBullets(users).agreements).toEqual([]);
   });
 
+  it('compares fallback answers by semantic value instead of wrapper shape', () => {
+    const result = fallbackBullets([
+      {
+        sbts: [],
+        questions: [
+          {
+            prompt: 'Should we test?',
+            answer: { value: 'yes', encrypted: true },
+          },
+        ],
+      },
+      {
+        sbts: [],
+        questions: [
+          {
+            prompt: 'Should we test?',
+            answer: 'yes',
+          },
+        ],
+      },
+    ]);
+
+    expect(result.disagreements).toEqual([]);
+  });
+
   it('keeps reminted holders when count maps show a positive net balance', () => {
     const users = buildUsersFromCaches(
       ['0xUser1'],

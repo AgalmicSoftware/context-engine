@@ -318,7 +318,7 @@ class CommunityTab extends Component<any, any> {
     if (netKey && cacheObj[netKey]) return cacheObj[netKey] || {};
     const ks = Object.keys(cacheObj || {});
     if (ks.length === 1) return cacheObj[ks[0]] || {};
-    return netKey && cacheObj[netKey] ? (cacheObj[netKey] || {}) : {};
+    return {};
   }
 
   _buildScopeEntriesFromSlugs = (slugs: any = [], options: any = {}) => {
@@ -1107,6 +1107,10 @@ class CommunityTab extends Component<any, any> {
       signature = this._buildCacheSignature(scopeEntries);
       this._latestCoarseCacheSignature = coarseSignature;
     }
+    const nextBeeswarmPoints = this._buildCommunityBeeswarmPoints(scopeEntries);
+    this._beeswarmPoints = nextBeeswarmPoints;
+    const plottableQuestionsCount = this._countPlottableQuestionsFromBeeswarmPoints(nextBeeswarmPoints);
+
     if (force || signature !== this._latestCacheSignature) {
       snapshot = this._computeStatsSnapshot(scopeEntries);
       this._latestCacheSignature = signature;
@@ -1115,7 +1119,6 @@ class CommunityTab extends Component<any, any> {
     } else {
       this._statsUnchangedStreak += 1;
     }
-    this._beeswarmPoints = this._buildCommunityBeeswarmPoints(scopeEntries);
 
     let nextInitialLoadDone = this.state.initialLoadDone;
     if (!nextInitialLoadDone) {
@@ -1148,7 +1151,7 @@ class CommunityTab extends Component<any, any> {
         }
         next.stats = this._buildStatsArray(prevState.stats, {
           users: snapshot.uniqueUsers.length,
-          questions: snapshot.uniqueQuestionsCount,
+          questions: plottableQuestionsCount,
           surveys: snapshot.surveysCreatedCount,
           groups: snapshot.sbtsCreatedCount,
         });
@@ -1651,6 +1654,20 @@ class CommunityTab extends Component<any, any> {
         total,
       };
     });
+  }
+
+  _countPlottableQuestionsFromBeeswarmPoints = (points: unknown[] = []) => {
+    if (!Array.isArray(points)) return 0;
+    const ids = new Set();
+    points.forEach((point: unknown) => {
+      const questionId = String(
+        point && typeof point === 'object'
+          ? (point as { questionId?: unknown }).questionId || ''
+          : ''
+      ).trim().toLowerCase();
+      if (questionId) ids.add(questionId);
+    });
+    return ids.size;
   }
 
   renderLeaderboard() {

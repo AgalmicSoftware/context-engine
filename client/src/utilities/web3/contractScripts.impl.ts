@@ -32,6 +32,40 @@ import { notify } from '../ui/notify.js';
 
 // Default RPCs derive from chains.js; PATH defaults live in rpcDefaults.js (Pocket/POKT gateway).
 
+type SbtReadProviderRef = string | Record<string, unknown>;
+type SbtReadGroupKeyOrConfig = string | Record<string, unknown> | null | undefined;
+type SbtReadOptions = { allowInjectedReadFallback?: boolean; [key: string]: unknown };
+type SignGroupMintAuthorizationInput = {
+  password?: unknown;
+  sbtAddress?: string | null;
+  userAddress?: string | null;
+  walletScopeSbtAddress?: string | null;
+};
+type GenerateInvitePayloadsInput = {
+  password?: unknown;
+  sbtAddress?: string | null;
+  nonces?: Array<string | number>;
+  walletScopeSbtAddress?: string | null;
+};
+type InvitePayloadResult = {
+  nonce: string;
+  signature: string;
+  inviteCode: string;
+};
+type EncodedInvitePayload = {
+  n: string;
+  s: string;
+};
+type SbtMintBurnCountsByAddressResult = {
+  mintedCountByAddress: Record<string, number>;
+  burnedCountByAddress: Record<string, number>;
+  mintedEventCount?: number;
+  burnedEventCount?: number;
+  scannedToBlock?: number | null;
+  ok?: boolean;
+  [key: string]: unknown;
+};
+
 import SURVEYS from '../../contractsABI/SURVEYS_ABI.json';
 import SBT_FACTORY_ABI from '../../contractsABI/SBT_FACTORY_ABI.json';
 import CUSTOM_SBT_ABI from '../../contractsABI/CUSTOM_SBT_ABI.json';
@@ -1978,8 +2012,6 @@ const contractScripts: any = {
 
 
   async getSurveyResponsesByAddress(providerName: any, userAddress: any, fromBlock: any = null, toBlock: any = null, groupKeyOrCfg: any = null) {
-  // Ensure user-profile scans do not inherit stale latest-block bounds.
-  (latestBlockCache as any)._map = {};
   const cfg    = resolveSession(groupKeyOrCfg || '');
   const gAddrs = getSessionAddresses(cfg);
   const addr   = (gAddrs.surveys?.address);
@@ -2044,10 +2076,13 @@ const contractScripts: any = {
   const events = rawLogs.map((log: any) => SURVEYS_INTERFACE.parseLog(log));
 
   const surveyResponses: any = {};
-  for (const event of events) {
+  const responseEntries = await Promise.all(events.map(async (event: any) => {
     const responder = event.args.responder.toLowerCase();
     const surveyId = event.args.surveyId.toLowerCase();
     const responseData = await this.getSurveyResponse(providerName, responder, surveyId, groupKeyOrCfg);
+    return { responder, responseData, surveyId };
+  }));
+  for (const { responder, responseData, surveyId } of responseEntries) {
     if (responseData) {
       if (!surveyResponses[surveyId]) {
         surveyResponses[surveyId] = {};
@@ -2361,8 +2396,6 @@ const contractScripts: any = {
 },
 
   async getQuestionResponsesByAddress(providerName: any, userAddress: any, fromBlock: any = null, toBlock: any = null, groupKeyOrCfg: any = null, opts: any = {}) {
-  // Ensure user-profile scans do not inherit stale latest-block bounds.
-  (latestBlockCache as any)._map = {};
   const cfg    = resolveSession(groupKeyOrCfg || '');
   const gAddrs = getSessionAddresses(cfg);
   const addr   = (gAddrs.surveys?.address);
@@ -4348,6 +4381,26 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
       : baseFrom;
 
     const sbts = await this.getSbtsCreated('none', fromBlockNum, 'latest', groupKeyOrCfg);
+    try {
+      const holdings = await this.getUserSbtNetHoldings(
+        'none',
+        userAddress,
+        { fromBlock: fromBlockNum },
+        groupKeyOrCfg
+      );
+      const heldSet = new Set(
+        (Array.isArray(holdings?.addresses) ? holdings.addresses : [])
+          .map((address: any) => normalizeAddress(address))
+          .filter(Boolean)
+      );
+      if (heldSet.size > 0) {
+        return sbts.filter((sbt: any) => heldSet.has(normalizeAddress(sbt?.sbtAddress || '')));
+      }
+      return [];
+    } catch (error: any) {
+      contractsLog.warn('[getSBTsByUserAddress] holdings lookup failed; falling back to per-SBT checks:', error?.message || error);
+    }
+
     let claimedSBTs: any[] = [];
     for (let sbt of sbts) {
       const userHasClaimed = await this.userHasSBT('none', sbt.sbtAddress, userAddress, fromBlockNum, 'latest', groupKeyOrCfg);
@@ -5029,7 +5082,7 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
     sbtAddress,
     userAddress,
     walletScopeSbtAddress
-  }: any) {
+  }: SignGroupMintAuthorizationInput) {
     const resolvedWalletScopeSbtAddress = await resolveGroupPasswordWalletScopeSbtAddress({
       password,
       sbtAddress,
@@ -5078,7 +5131,7 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
       });
       inviteLog.log('[INVITE_DEBUG v4] derived groupPasswordHash:', localHash);
     } catch (_: any) {}
-    const out: any[] = [];
+    const out: InvitePayloadResult[] = [];
     for (const nonce of nonces) {
       const signature = await cryptoUtils.signInvite({
         password: normalizedPassword,
@@ -5086,7 +5139,7 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
         nonce,
         walletScopeSbtAddress: resolvedWalletScopeSbtAddress
       });
-      const payload: any = { n: String(nonce), s: signature };
+      const payload: EncodedInvitePayload = { n: String(nonce), s: signature };
       const inviteCode = cryptoUtils.encodeInvite(payload);
       out.push({ nonce: String(nonce), signature, inviteCode });
     }
@@ -5095,7 +5148,12 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
 
   // "Group" here refers to SBT token group/collection, not session group
   /** Read helper for on-chain groupPasswordHash */
-  async getGroupPasswordHash(providerName: any, SBTAddress: any, groupKeyOrCfg: any = null, options: any = {}) {
+  async getGroupPasswordHash(
+    providerName: SbtReadProviderRef,
+    SBTAddress: string,
+    groupKeyOrCfg: SbtReadGroupKeyOrConfig = null,
+    options: SbtReadOptions = {}
+  ) {
     try {
       const provider = getLocalAwareReadProviderForGroup(groupKeyOrCfg, SBT_READ_PROVIDER_OPTIONS);
       const CustomSBT = new ethers.Contract(SBTAddress, CUSTOM_SBT_ABI, provider as any);
@@ -5128,7 +5186,12 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
   },
 
   /** Read helper for on-chain mintedTokens */
-  async getMintedTokens(providerName: any, SBTAddress: any, groupKeyOrCfg: any = null, options: any = {}) {
+  async getMintedTokens(
+    providerName: SbtReadProviderRef,
+    SBTAddress: string,
+    groupKeyOrCfg: SbtReadGroupKeyOrConfig = null,
+    options: SbtReadOptions = {}
+  ) {
     try {
       if (!SBTAddress || !ethers.utils.isAddress(SBTAddress)) return null;
       const provider = getLocalAwareReadProviderForGroup(groupKeyOrCfg, SBT_READ_PROVIDER_OPTIONS);
@@ -5159,7 +5222,11 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
     }
   },
 
-  async getSbtHistorySummary(providerName: any, SBTAddress: any, groupKeyOrCfg: any = null) {
+  async getSbtHistorySummary(
+    providerName: SbtReadProviderRef,
+    SBTAddress: string,
+    groupKeyOrCfg: SbtReadGroupKeyOrConfig = null
+  ) {
     try {
       if (!SBTAddress || !ethers.utils.isAddress(SBTAddress)) return null;
       const provider = getLocalAwareReadProviderForGroup(groupKeyOrCfg, SBT_READ_PROVIDER_OPTIONS);
@@ -5379,8 +5446,49 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
     return false;
   },
 
+  async getCachedSbtMintBurnCountsByAddress(providerName: any, SBTAddress: any, fromBlock: any = 0, toBlock: any = "latest", groupKeyOrCfg: any = null) {
+    const scanFn = this.getSbtMintBurnCountsByAddress;
+    if (typeof scanFn !== 'function') {
+      return {
+        mintedCountByAddress: {},
+        burnedCountByAddress: {},
+        mintedEventCount: 0,
+        burnedEventCount: 0,
+        scannedToBlock: null,
+        ok: false,
+      };
+    }
+    const self = scanFn as any;
+    const memo = (self._sharedAddressMemo ??= {});
+    const inflight = (self._sharedAddressInflight ??= {});
+    const cfg = memoizedResolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
+    const scopeTag = buildSbtScopeMemoTag(groupKeyOrCfg, cfg);
+    const memoKey = [
+      String(providerName || 'none'),
+      normalizeAddress(SBTAddress || ''),
+      String(fromBlock ?? ''),
+      String(toBlock ?? ''),
+      scopeTag,
+    ].join(':');
+    const TTL_MS = 45 * 1000;
+    const now = Date.now();
+    const hit = memo[memoKey];
+    if (hit && (now - hit.ts) < TTL_MS) return hit.value;
+    if (inflight[memoKey]) return inflight[memoKey];
+    const run = Promise.resolve(
+      scanFn.call(this, providerName, SBTAddress, fromBlock, toBlock, groupKeyOrCfg)
+    ).then((value: SbtMintBurnCountsByAddressResult) => {
+      memo[memoKey] = { ts: Date.now(), value };
+      return value;
+    }).finally(() => {
+      if (inflight[memoKey] === run) delete inflight[memoKey];
+    });
+    inflight[memoKey] = run;
+    return run;
+  },
+
   async getAddressesWhoMintedSBT(providerName: any, SBTAddress: any, fromBlock: any = 0, toBlock: any = "latest", groupKeyOrCfg: any = null) {
-    const counts = await this.getSbtMintBurnCountsByAddress(
+    const counts = await this.getCachedSbtMintBurnCountsByAddress(
       providerName,
       SBTAddress,
       fromBlock,
@@ -5391,7 +5499,7 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
   },
 
   async getAddressesWhoBurnedSBT(providerName: any, SBTAddress: any, fromBlock: any = 0, toBlock: any = "latest", groupKeyOrCfg: any = null) {
-    const counts = await this.getSbtMintBurnCountsByAddress(
+    const counts = await this.getCachedSbtMintBurnCountsByAddress(
       providerName,
       SBTAddress,
       fromBlock,
@@ -5466,5 +5574,10 @@ export const __test__contractScriptsSbtHistory: any = {
 export const __test__contractScriptsErrors: any = {
   isNonexistentTokenError,
   isRetryableSurveyResponseReadError,
+};
+export const __test__contractScriptsReadCaches: any = {
+  clearLatestBlockCache: () => {
+    (latestBlockCache as any)._map = {};
+  },
 };
 export default contractScripts;

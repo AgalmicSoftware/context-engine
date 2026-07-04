@@ -12,6 +12,11 @@ import {
 } from '../session/sessionScanScope.js';
 import { resolvePersistedQuestionResponsesWatermark } from './questionResponsesWatermark.js';
 import { shouldFlushCoalescedRun } from '../session/mainSiteProgressHelpers.js';
+import {
+  compareResponseRecency,
+  toResponseRecencyPair,
+  type ResponseRecencyPair,
+} from './responseRecency';
 
 type CacheRecord = Record<string, unknown>;
 type StateRecord = {
@@ -44,13 +49,6 @@ export interface RefreshQuestionResponsesOptions {
   responder?: string;
   questionIDs?: string[];
   forceFull?: boolean;
-}
-
-interface ResponseRecencyPair extends CacheRecord {
-  bn: number;
-  txi: number;
-  li: number;
-  ts: number;
 }
 
 type QuestionResponseByResponder = Record<string, unknown>;
@@ -863,44 +861,6 @@ export const createSessionResponseHydrationController = (
         }
         ensureQuestionArweaveCacheBranches(net);
         return cacheRef;
-      };
-      const toResponseRecencyPair = (
-        value: unknown,
-        responseValue: unknown = null
-      ): ResponseRecencyPair => {
-        const src = (value && typeof value === 'object') ? (value as CacheRecord) : {};
-        const responseObj = (
-          responseValue && typeof responseValue === 'object'
-            ? (responseValue as CacheRecord)
-            : {}
-        );
-        return {
-          bn: Number(src.bn ?? src.blockNumber ?? responseObj.blockNumber ?? responseObj.bn ?? 0) || 0,
-          txi: Number(
-            src.txi ??
-            src.transactionIndex ??
-            src.txIndex ??
-            responseObj.transactionIndex ??
-            responseObj.txIndex ??
-            0
-          ) || 0,
-          li: Number(src.li ?? src.logIndex ?? responseObj.logIndex ?? responseObj.li ?? 0) || 0,
-          ts: Number(src.ts ?? src.timestamp ?? responseObj.timestamp ?? 0) || 0,
-        };
-      };
-      const compareResponseRecency = (
-        incomingRecency: ResponseRecencyPair,
-        existingRecency: ResponseRecencyPair
-      ): number => {
-        if (incomingRecency.bn > existingRecency.bn) return 1;
-        if (incomingRecency.bn < existingRecency.bn) return -1;
-        if (incomingRecency.txi > existingRecency.txi) return 1;
-        if (incomingRecency.txi < existingRecency.txi) return -1;
-        if (incomingRecency.li > existingRecency.li) return 1;
-        if (incomingRecency.li < existingRecency.li) return -1;
-        if (incomingRecency.ts > existingRecency.ts) return 1;
-        if (incomingRecency.ts < existingRecency.ts) return -1;
-        return 0;
       };
       const shouldApplyIncomingResponse = ({
         existingMeta,

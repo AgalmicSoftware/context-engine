@@ -251,6 +251,19 @@ export const normalizePayloadQuestionOptions = (
   return normalizedOptions;
 };
 
+export const findDuplicateQuestionOptionLabel = (options: unknown = []): string => {
+  if (!Array.isArray(options)) return '';
+  const seen = new Set<string>();
+  for (const option of options) {
+    const label = toOptionText(option).trim();
+    const key = label.toLowerCase();
+    if (!key) continue;
+    if (seen.has(key)) return label;
+    seen.add(key);
+  }
+  return '';
+};
+
 export const resolvePayloadSingleSelect = (
   questionType: unknown,
   singleSelect: unknown
@@ -525,6 +538,20 @@ export const findFirstBlankQuestionPromptIndex = (questions: unknown = []): numb
   })
 );
 
+export const findFirstDuplicateMultichoiceOptionQuestion = (questions: unknown = []): {
+  index: number;
+  label: string;
+} => {
+  const list = Array.isArray(questions) ? questions : [];
+  for (let index = 0; index < list.length; index += 1) {
+    const question = list[index] as CreateSurveyQuestionPatchEntry | null | undefined;
+    if (!isMultichoiceQuestionType(question?.type)) continue;
+    const label = findDuplicateQuestionOptionLabel(question?.options);
+    if (label) return { index, label };
+  }
+  return { index: -1, label: '' };
+};
+
 export const getCreateSurveyValidationError = ({
   title = '',
   isStandaloneQuestion = false,
@@ -536,6 +563,10 @@ export const getCreateSurveyValidationError = ({
   const blankQuestionIndex = findFirstBlankQuestionPromptIndex(questions);
   if (blankQuestionIndex !== -1) {
     return `Question ${blankQuestionIndex + 1} prompt cannot be blank.`;
+  }
+  const duplicateOption = findFirstDuplicateMultichoiceOptionQuestion(questions);
+  if (duplicateOption.index !== -1) {
+    return `Question ${duplicateOption.index + 1} has duplicate multichoice option "${duplicateOption.label}". Option labels must be unique.`;
   }
   return '';
 };

@@ -550,6 +550,16 @@ export const resolveSessionWizardRegisterDuplicateCheckDescriptor = ({
   };
 };
 
+export const isSessionWizardRegisterDuplicatePreflightError = (
+  errorMessage: unknown,
+  duplicateCheckDescriptor: Pick<SessionWizardRegisterDuplicateCheckDescriptor, 'slugDuplicateMessage' | 'sessionIdDuplicateMessage'> | null | undefined
+): boolean => {
+  const message = toStr(errorMessage);
+  if (!message || !duplicateCheckDescriptor) return false;
+  return message === duplicateCheckDescriptor.slugDuplicateMessage ||
+    message === duplicateCheckDescriptor.sessionIdDuplicateMessage;
+};
+
 export const resolveSessionWizardRegisterArgsDescriptor = ({
   providerLike,
   registryChainId,

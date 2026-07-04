@@ -6,6 +6,7 @@ import {
   buildCreateSurveySubmitGatePlan,
   buildCreateSurveyStandaloneToggleState,
   formatAiPromptModelLabel,
+  getCreateSurveyValidationError,
   isMultichoiceQuestionType,
   normalizeAuthoringQuestionOptions,
   normalizePayloadQuestionOptions,
@@ -34,6 +35,19 @@ describe('createQuestionsAndSurveysHelpers question options', () => {
   it('filters blank options only for submit and JSON payloads', () => {
     expect(normalizePayloadQuestionOptions('multichoice', ['Alpha', '', '  ', 'Beta']))
       .toEqual(['Alpha', 'Beta']);
+  });
+
+  it('rejects duplicate multichoice option labels during authoring validation', () => {
+    expect(getCreateSurveyValidationError({
+      title: 'Survey',
+      questions: [
+        {
+          type: 'multichoice',
+          prompt: 'Pick one',
+          options: ['Alpha', 'Beta', ' alpha '],
+        },
+      ],
+    })).toBe('Question 1 has duplicate multichoice option "alpha". Option labels must be unique.');
   });
 
   it('omits payload options when a multichoice question has no option array', () => {

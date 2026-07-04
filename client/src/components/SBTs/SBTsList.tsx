@@ -771,7 +771,11 @@ const SBTsList = ({
   ), [sectionSessionSlugs]);
 
   const resolvedListSlugForGroupLists = isSbtListSyntheticNoSessionSlug(listSlug) ? '' : listSlug;
-  const { featured_SBTs_LIST = [], ignored_SBTs_LIST = [] } = getSessionLists(resolvedListSlugForGroupLists);
+  const groupListRevision = Number(sbtCacheRevision || 0);
+  const { featured_SBTs_LIST = [], ignored_SBTs_LIST = [] } = useMemo(() => {
+    void groupListRevision;
+    return getSessionLists(resolvedListSlugForGroupLists);
+  }, [groupListRevision, resolvedListSlugForGroupLists]);
 
   const [sbtListBySlug, setSbtListBySlug] = useState<SbtListBySlug>({});
   const [sessionLoadStateBySlug, setSessionLoadStateBySlug] = useState<SbtListLoadStateBySlug>({});
