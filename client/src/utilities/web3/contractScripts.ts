@@ -53,6 +53,7 @@ export const __test__contractScriptsSbtMemo = _impl.__test__contractScriptsSbtMe
 export const __test__contractScriptsSbtProgress = _impl.__test__contractScriptsSbtProgress;
 export const __test__contractScriptsSbtHistory = _impl.__test__contractScriptsSbtHistory;
 export const __test__contractScriptsErrors = _impl.__test__contractScriptsErrors;
+export const __test__contractScriptsReadCaches = _impl.__test__contractScriptsReadCaches;
 
 if (commonJsExports) {
   commonJsExports.default = defaultExport;
@@ -81,4 +82,5 @@ if (commonJsExports) {
   commonJsExports.__test__contractScriptsSbtProgress = __test__contractScriptsSbtProgress;
   commonJsExports.__test__contractScriptsSbtHistory = __test__contractScriptsSbtHistory;
   commonJsExports.__test__contractScriptsErrors = __test__contractScriptsErrors;
+  commonJsExports.__test__contractScriptsReadCaches = __test__contractScriptsReadCaches;
 }

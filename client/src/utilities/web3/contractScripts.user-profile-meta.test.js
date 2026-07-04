@@ -1,4 +1,5 @@
 import contractScripts from './contractScripts.js';
+import { __test__contractScriptsReadCaches } from './contractScripts.js';
 import { ethers } from 'ethers';
 import { arweaveScripts } from '../arweave/arweaveScripts.js';
 
@@ -59,8 +60,11 @@ describe('contractScripts user profile metadata wrappers', () => {
     try { delete contractScripts.getAllSbtAddressesCached._runVersion; } catch (_) {}
     try { delete contractScripts.getUserSbtNetHoldings._memo; } catch (_) {}
     try { delete contractScripts.getUserSbtNetHoldings._inflight; } catch (_) {}
+    try { delete contractScripts.getSbtMintBurnCountsByAddress._sharedAddressMemo; } catch (_) {}
+    try { delete contractScripts.getSbtMintBurnCountsByAddress._sharedAddressInflight; } catch (_) {}
     try { delete contractScripts.getUserSBTsMinimal._memo; } catch (_) {}
     try { delete contractScripts.getUserSBTsMinimal._inflight; } catch (_) {}
+    try { __test__contractScriptsReadCaches.clearLatestBlockCache(); } catch (_) {}
     try { delete globalThis.CE_E2E_LIT_MOCK; } catch (_) {}
     try { delete window.__CE_E2E_MOCKED_VIEWED_RESPONSES__; } catch (_) {}
     try { window.sessionStorage.removeItem('ce:e2e:mockedViewedResponses:v1'); } catch (_) {}
@@ -205,11 +209,12 @@ describe('contractScripts user profile metadata wrappers', () => {
     expect(questionResponsesSpy).not.toHaveBeenCalled();
   });
 
-  it('refreshes latest block after getUserActivity resets profile scan cache', async () => {
+  it('does not clear latest-block cache when getUserActivity performs a profile scan', async () => {
     const slug = 'edge-refresh-profile';
     const groupCfg = makeProfileGroupCfg(slug, 1000);
 
     await runEmptyProfileScanToResetLatestBlockCache(slug);
+    __test__contractScriptsReadCaches.clearLatestBlockCache();
 
     const blockSpy = jest
       .spyOn(ethers.providers.FallbackProvider.prototype, 'getBlockNumber')
@@ -243,16 +248,17 @@ describe('contractScripts user profile metadata wrappers', () => {
     surveyResponsesSpy.mockRestore();
     questionResponsesSpy.mockRestore();
 
-    const refreshedLatest = await contractScripts.getLatestBlockNumber('none', groupCfg);
-    expect(refreshedLatest).toBe(7102);
-    expect(blockSpy.mock.calls.length).toBeGreaterThanOrEqual(2);
+    const cachedAfterProfileScan = await contractScripts.getLatestBlockNumber('none', groupCfg);
+    expect(cachedAfterProfileScan).toBe(7101);
+    expect(blockSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('forces a fresh latest block lookup in getSurveyResponsesByAddress', async () => {
+  it('does not clear latest-block cache in getSurveyResponsesByAddress', async () => {
     const slug = 'edge-refresh-survey-responses';
     const groupCfg = makeProfileGroupCfg(slug, 1000);
 
     await runEmptyProfileScanToResetLatestBlockCache(slug);
+    __test__contractScriptsReadCaches.clearLatestBlockCache();
 
     const blockSpy = jest
       .spyOn(ethers.providers.FallbackProvider.prototype, 'getBlockNumber')
@@ -274,16 +280,17 @@ describe('contractScripts user profile metadata wrappers', () => {
     );
     expect(surveyIds).toEqual([]);
 
-    const refreshedLatest = await contractScripts.getLatestBlockNumber('none', groupCfg);
-    expect(refreshedLatest).toBe(7202);
-    expect(blockSpy.mock.calls.length).toBeGreaterThanOrEqual(2);
+    const cachedAfterProfileScan = await contractScripts.getLatestBlockNumber('none', groupCfg);
+    expect(cachedAfterProfileScan).toBe(7201);
+    expect(blockSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('forces a fresh latest block lookup in getQuestionResponsesByAddress', async () => {
+  it('does not clear latest-block cache in getQuestionResponsesByAddress', async () => {
     const slug = 'edge-refresh-question-responses';
     const groupCfg = makeProfileGroupCfg(slug, 1000);
 
     await runEmptyProfileScanToResetLatestBlockCache(slug);
+    __test__contractScriptsReadCaches.clearLatestBlockCache();
 
     const blockSpy = jest
       .spyOn(ethers.providers.FallbackProvider.prototype, 'getBlockNumber')
@@ -305,9 +312,9 @@ describe('contractScripts user profile metadata wrappers', () => {
     );
     expect(questionIds).toEqual([]);
 
-    const refreshedLatest = await contractScripts.getLatestBlockNumber('none', groupCfg);
-    expect(refreshedLatest).toBe(7302);
-    expect(blockSpy.mock.calls.length).toBeGreaterThanOrEqual(2);
+    const cachedAfterProfileScan = await contractScripts.getLatestBlockNumber('none', groupCfg);
+    expect(cachedAfterProfileScan).toBe(7301);
+    expect(blockSpy).toHaveBeenCalledTimes(1);
   });
 
   it('ensures SBT metadata carries sessionName for profile scans', async () => {
@@ -492,6 +499,99 @@ describe('contractScripts user profile metadata wrappers', () => {
     expect(first).toEqual({ addresses: [] });
     expect(second).toEqual({ addresses: [] });
     expect(universeSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('reuses getUserSbtNetHoldings memo entries across equivalent block-window inputs', async () => {
+    const user = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const groupCfg = makeProfileGroupCfg('edge-current-holdings', 1000);
+    const universeSpy = jest
+      .spyOn(contractScripts, 'getAllSbtAddressesCached')
+      .mockResolvedValue([]);
+
+    const first = await contractScripts.getUserSbtNetHoldings(
+      'none',
+      user,
+      { fromBlock: 1, toBlock: 10, ignoreScope: true },
+      groupCfg
+    );
+    const second = await contractScripts.getUserSbtNetHoldings(
+      'none',
+      user,
+      { fromBlock: 100, toBlock: 200, ignoreScope: true },
+      groupCfg
+    );
+
+    expect(first).toEqual({ addresses: [] });
+    expect(second).toBe(first);
+    expect(universeSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('shares mint/burn count scans between minted and burned address helpers', async () => {
+    const sbtAddress = '0x5555555555555555555555555555555555555555';
+    const groupCfg = makeProfileGroupCfg('edge-sbt-history-share', 1000);
+    const countSpy = jest
+      .spyOn(contractScripts, 'getSbtMintBurnCountsByAddress')
+      .mockResolvedValue({
+        mintedCountByAddress: {
+          '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa': 1,
+        },
+        burnedCountByAddress: {
+          '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb': 1,
+        },
+        mintedEventCount: 1,
+        burnedEventCount: 1,
+        scannedToBlock: 200,
+        ok: true,
+      });
+
+    await expect(contractScripts.getAddressesWhoMintedSBT(
+      'none',
+      sbtAddress,
+      1,
+      200,
+      groupCfg
+    )).resolves.toEqual(['0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa']);
+    await expect(contractScripts.getAddressesWhoBurnedSBT(
+      'none',
+      sbtAddress,
+      1,
+      200,
+      groupCfg
+    )).resolves.toEqual(['0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb']);
+
+    expect(countSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses net holdings for getSBTsByUserAddress before falling back to per-SBT history scans', async () => {
+    const user = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const heldAddress = '0x6666666666666666666666666666666666666666';
+    const missedAddress = '0x7777777777777777777777777777777777777777777';
+    const groupCfg = makeProfileGroupCfg('edge-user-sbts-holdings', 1000);
+    jest.spyOn(contractScripts, 'getRelevantBlockWindowForFilter').mockResolvedValue({
+      fromBlock: 1000,
+      toBlock: 2000,
+    });
+    jest.spyOn(contractScripts, 'getSbtsCreated').mockResolvedValue([
+      { sbtAddress: missedAddress, name: 'Missed' },
+      { sbtAddress: heldAddress, name: 'Held' },
+    ]);
+    jest.spyOn(contractScripts, 'getUserSbtNetHoldings').mockResolvedValue({
+      addresses: [heldAddress],
+    });
+    const userHasSpy = jest.spyOn(contractScripts, 'userHasSBT').mockResolvedValue(true);
+    const mintedSpy = jest.spyOn(contractScripts, 'getAddressesWhoMintedSBT').mockResolvedValue([user]);
+    const burnedSpy = jest.spyOn(contractScripts, 'getAddressesWhoBurnedSBT').mockResolvedValue([]);
+
+    await expect(contractScripts.getSBTsByUserAddress(
+      'none',
+      user,
+      1000,
+      groupCfg
+    )).resolves.toEqual([{ sbtAddress: heldAddress, name: 'Held' }]);
+
+    expect(userHasSpy).not.toHaveBeenCalled();
+    expect(mintedSpy).not.toHaveBeenCalled();
+    expect(burnedSpy).not.toHaveBeenCalled();
   });
 
   it('partitions getUserSBTsMinimal memo entries by session in ignoreScope profile scans', async () => {
