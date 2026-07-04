@@ -117,6 +117,7 @@ describe('contractProfile session-aware provider selection', () => {
       }
       return [firstLog, secondLog];
     });
+    const parseLogSpy = jest.spyOn(ethers.utils.Interface.prototype, 'parseLog');
 
     const methods = createContractProfileMethods(deps);
     methods.getRelevantBlockWindowForFilter = jest.fn().mockResolvedValue({
@@ -146,5 +147,6 @@ describe('contractProfile session-aware provider selection', () => {
         toBlock: 15,
       },
     ]);
+    expect(parseLogSpy).toHaveBeenCalledTimes(2);
   });
 });

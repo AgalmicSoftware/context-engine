@@ -1978,8 +1978,6 @@ const contractScripts: any = {
 
 
   async getSurveyResponsesByAddress(providerName: any, userAddress: any, fromBlock: any = null, toBlock: any = null, groupKeyOrCfg: any = null) {
-  // Ensure user-profile scans do not inherit stale latest-block bounds.
-  (latestBlockCache as any)._map = {};
   const cfg    = resolveSession(groupKeyOrCfg || '');
   const gAddrs = getSessionAddresses(cfg);
   const addr   = (gAddrs.surveys?.address);
@@ -2044,10 +2042,13 @@ const contractScripts: any = {
   const events = rawLogs.map((log: any) => SURVEYS_INTERFACE.parseLog(log));
 
   const surveyResponses: any = {};
-  for (const event of events) {
+  const responseEntries = await Promise.all(events.map(async (event: any) => {
     const responder = event.args.responder.toLowerCase();
     const surveyId = event.args.surveyId.toLowerCase();
     const responseData = await this.getSurveyResponse(providerName, responder, surveyId, groupKeyOrCfg);
+    return { responder, responseData, surveyId };
+  }));
+  for (const { responder, responseData, surveyId } of responseEntries) {
     if (responseData) {
       if (!surveyResponses[surveyId]) {
         surveyResponses[surveyId] = {};
@@ -2361,8 +2362,6 @@ const contractScripts: any = {
 },
 
   async getQuestionResponsesByAddress(providerName: any, userAddress: any, fromBlock: any = null, toBlock: any = null, groupKeyOrCfg: any = null, opts: any = {}) {
-  // Ensure user-profile scans do not inherit stale latest-block bounds.
-  (latestBlockCache as any)._map = {};
   const cfg    = resolveSession(groupKeyOrCfg || '');
   const gAddrs = getSessionAddresses(cfg);
   const addr   = (gAddrs.surveys?.address);
@@ -4348,6 +4347,26 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
       : baseFrom;
 
     const sbts = await this.getSbtsCreated('none', fromBlockNum, 'latest', groupKeyOrCfg);
+    try {
+      const holdings = await this.getUserSbtNetHoldings(
+        'none',
+        userAddress,
+        { fromBlock: fromBlockNum },
+        groupKeyOrCfg
+      );
+      const heldSet = new Set(
+        (Array.isArray(holdings?.addresses) ? holdings.addresses : [])
+          .map((address: any) => normalizeAddress(address))
+          .filter(Boolean)
+      );
+      if (heldSet.size > 0) {
+        return sbts.filter((sbt: any) => heldSet.has(normalizeAddress(sbt?.sbtAddress || '')));
+      }
+      return [];
+    } catch (error: any) {
+      contractsLog.warn('[getSBTsByUserAddress] holdings lookup failed; falling back to per-SBT checks:', error?.message || error);
+    }
+
     let claimedSBTs: any[] = [];
     for (let sbt of sbts) {
       const userHasClaimed = await this.userHasSBT('none', sbt.sbtAddress, userAddress, fromBlockNum, 'latest', groupKeyOrCfg);
@@ -5379,8 +5398,49 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
     return false;
   },
 
+  async getCachedSbtMintBurnCountsByAddress(providerName: any, SBTAddress: any, fromBlock: any = 0, toBlock: any = "latest", groupKeyOrCfg: any = null) {
+    const scanFn = this.getSbtMintBurnCountsByAddress;
+    if (typeof scanFn !== 'function') {
+      return {
+        mintedCountByAddress: {},
+        burnedCountByAddress: {},
+        mintedEventCount: 0,
+        burnedEventCount: 0,
+        scannedToBlock: null,
+        ok: false,
+      };
+    }
+    const self = scanFn as any;
+    const memo = (self._sharedAddressMemo ??= {});
+    const inflight = (self._sharedAddressInflight ??= {});
+    const cfg = memoizedResolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
+    const scopeTag = buildSbtScopeMemoTag(groupKeyOrCfg, cfg);
+    const memoKey = [
+      String(providerName || 'none'),
+      normalizeAddress(SBTAddress || ''),
+      String(fromBlock ?? ''),
+      String(toBlock ?? ''),
+      scopeTag,
+    ].join(':');
+    const TTL_MS = 45 * 1000;
+    const now = Date.now();
+    const hit = memo[memoKey];
+    if (hit && (now - hit.ts) < TTL_MS) return hit.value;
+    if (inflight[memoKey]) return inflight[memoKey];
+    const run = Promise.resolve(
+      scanFn.call(this, providerName, SBTAddress, fromBlock, toBlock, groupKeyOrCfg)
+    ).then((value: any) => {
+      memo[memoKey] = { ts: Date.now(), value };
+      return value;
+    }).finally(() => {
+      if (inflight[memoKey] === run) delete inflight[memoKey];
+    });
+    inflight[memoKey] = run;
+    return run;
+  },
+
   async getAddressesWhoMintedSBT(providerName: any, SBTAddress: any, fromBlock: any = 0, toBlock: any = "latest", groupKeyOrCfg: any = null) {
-    const counts = await this.getSbtMintBurnCountsByAddress(
+    const counts = await this.getCachedSbtMintBurnCountsByAddress(
       providerName,
       SBTAddress,
       fromBlock,
@@ -5391,7 +5451,7 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
   },
 
   async getAddressesWhoBurnedSBT(providerName: any, SBTAddress: any, fromBlock: any = 0, toBlock: any = "latest", groupKeyOrCfg: any = null) {
-    const counts = await this.getSbtMintBurnCountsByAddress(
+    const counts = await this.getCachedSbtMintBurnCountsByAddress(
       providerName,
       SBTAddress,
       fromBlock,
@@ -5467,5 +5527,10 @@ export const __test__contractScriptsSbtHistory: any = {
 export const __test__contractScriptsErrors: any = {
   isNonexistentTokenError,
   isRetryableSurveyResponseReadError,
+};
+export const __test__contractScriptsReadCaches: any = {
+  clearLatestBlockCache: () => {
+    (latestBlockCache as any)._map = {};
+  },
 };
 export default contractScripts;
