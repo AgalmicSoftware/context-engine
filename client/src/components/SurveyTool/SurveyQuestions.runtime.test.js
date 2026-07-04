@@ -236,6 +236,66 @@ describe('SurveyQuestions runtime helpers', () => {
     view.unmount();
   });
 
+  it('keeps parent runtime drafts isolated by wallet account within the same question scope', async () => {
+    jest.useFakeTimers();
+    const baseProps = {
+      activeSessionSlug: 'edge',
+      isStandalone: true,
+      loginComplete: true,
+      network: { id: 84532 },
+      networkChainId: 84532,
+      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Question one' }],
+      sessionSlug: 'edge',
+    };
+
+    let firstRuntime = null;
+    const firstView = renderSurveyQuestions({
+      ...baseProps,
+      account: '0xabc',
+      runtimeStrategy: {
+        render: (engine) => {
+          firstRuntime = engine;
+          return null;
+        },
+      },
+    });
+
+    await waitFor(() => expect(firstRuntime).not.toBeNull());
+    const firstDraftKey = firstRuntime.getDraftKey();
+    await act(async () => {
+      firstRuntime.handleAnswer(0, 'q1', 'account scoped draft');
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(firstRuntime._persistTimer).toBeTruthy());
+    await act(async () => {
+      jest.runOnlyPendingTimers();
+      await Promise.resolve();
+    });
+    expect(JSON.parse(sessionStorage.getItem(firstDraftKey)).answers.q1.value)
+      .toBe('account scoped draft');
+    firstView.unmount();
+
+    let secondRuntime = null;
+    const secondView = renderSurveyQuestions({
+      ...baseProps,
+      account: '0xdef',
+      runtimeStrategy: {
+        render: (engine) => {
+          secondRuntime = engine;
+          return null;
+        },
+      },
+    });
+
+    await waitFor(() => expect(secondRuntime).not.toBeNull());
+    const secondDraftKey = secondRuntime.getDraftKey();
+    expect(secondDraftKey).not.toBe(firstDraftKey);
+    expect(sessionStorage.getItem(secondDraftKey)).toBeNull();
+    expect(secondRuntime.loadDraft()).toBeNull();
+
+    secondView.unmount();
+  });
+
   it('deduplicates and clears single-question bootstrap retry timers in the parent runtime', async () => {
     jest.useFakeTimers();
     let runtimeEngine = null;
