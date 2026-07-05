@@ -301,6 +301,74 @@ describe('SBTPage metadata load hydration', () => {
     expect(subject.state.userHasSBT).toBe(true);
   });
 
+  it('refreshes unloaded holder counts even when an approximate minted token fallback exists', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000a1';
+    const holderAddresses = [
+      '0x00000000000000000000000000000000000000b1',
+      '0x00000000000000000000000000000000000000b2',
+      '0x00000000000000000000000000000000000000b3',
+      '0x00000000000000000000000000000000000000b4',
+      '0x00000000000000000000000000000000000000b5',
+    ];
+    const refreshSpy = jest.fn().mockResolvedValue(undefined);
+    const readSpy = jest.spyOn(cacheScripts, 'readCache')
+      .mockResolvedValueOnce(createReadCachePayload({
+        sbtAddress,
+        mintedAddresses: [holderAddresses[0]],
+        burnedAddresses: [],
+        countsLoaded: false,
+        sbtInfoOverrides: {
+          name: 'Approx Count Badge',
+          tokenURI: 'ar://approx-count-token',
+          image: 'https://example.example.test/approx-count.png',
+          sessionSlug: 'edge',
+          sessionSlugExplicit: true,
+        },
+      }))
+      .mockResolvedValueOnce(createReadCachePayload({
+        sbtAddress,
+        mintedAddresses: holderAddresses,
+        burnedAddresses: [],
+        countsLoaded: true,
+        blockNumber: 1250,
+        sbtInfoOverrides: {
+          name: 'Approx Count Badge',
+          tokenURI: 'ar://approx-count-token',
+          image: 'https://example.example.test/approx-count.png',
+          sessionSlug: 'edge',
+          sessionSlugExplicit: true,
+        },
+      }));
+    jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
+    jest.spyOn(contractScripts, 'getMintedTokens').mockResolvedValue('1');
+
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      account: holderAddresses[0],
+      isSBTCacheReady: true,
+      refreshSbtData: refreshSpy,
+      sessionSlug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      network: { id: 84532, name: 'Base Sepolia' },
+    };
+
+    await subject.loadSBTInfo(false);
+
+    expect(readSpy).toHaveBeenCalledTimes(2);
+    expect(refreshSpy).toHaveBeenCalledWith(
+      sbtAddress,
+      'edge',
+      expect.objectContaining({ forceCounts: true })
+    );
+    expect(subject.state.countsLoaded).toBe(true);
+    expect(subject.getMemoizedNetHoldersList(
+      subject.state.mintedAddresses,
+      subject.state.burnedAddresses
+    )).toHaveLength(5);
+  });
+
   it('uses direct metadata reads instead of a duplicate parent-owned refresh during cold hydration', async () => {
     const sbtAddress = '0x00000000000000000000000000000000000000a1';
     const sbtLower = sbtAddress.toLowerCase();
