@@ -18,6 +18,7 @@
 - Publish port types: `client/src/domains/sessions/publish/sessionPublishPorts.ts` (**121 lines**)
 - Publish adapters: `client/src/domains/sessions/publish/sessionPublishAdapters.ts` (**232 lines**)
 - Contracts field file: `client/src/components/Sessions/SessionWizardContractsField.tsx` (**108 lines**)
+- Mode profile field file: `client/src/components/Sessions/SessionModeProfileField.tsx`
 - Storage profile field file: `client/src/components/Sessions/SessionWizardStorageProfileField.tsx` (**121 lines**)
 - Requirements display helper: `client/src/components/Sessions/sessionWizardRequirementsDisplay.ts` (**95 lines**)
 - Publish readiness helper: `client/src/components/Sessions/sessionWizardPublishReadiness.ts` (**326 lines**)
@@ -36,6 +37,7 @@
 - Normal-mode section visibility hook: `client/src/components/Sessions/hooks/useSessionWizardNormalModeSectionVisibility.ts` (**32 lines**)
 - Cleanup effect hook: `client/src/components/Sessions/hooks/useSessionWizardCleanupEffect.ts` (**44 lines**)
 - Draft state helper: `client/src/components/Sessions/sessionWizardDraftState.ts` (**344 lines**)
+- Session mode profile helper: `client/src/utilities/session/sessionModeProfile.ts`
 - AI config helper: `client/src/components/Sessions/sessionWizardAiConfig.ts` (**150 lines**)
 - Create-SBT support helper: `client/src/components/Sessions/sessionWizardCreateSbtSupport.ts` (**261 lines**)
 - Contract helper: `client/src/components/Sessions/sessionWizardContracts.ts` (**149 lines**)
@@ -65,6 +67,7 @@
 - Start in `SessionWizardInfoTooltip.tsx` for shared SessionWizard tooltip trigger markup.
 - Start in `SessionMetadataEditor.tsx` for the metadata panel composition, JSON preview controls, and More Options surface.
 - Start in `SessionWizardContractsField.tsx` for advanced contract row rendering, contract tooltips, modal-trigger buttons, and address input wiring.
+- Start in `SessionModeProfileField.tsx` for the `/new` preset-first session-mode screen, advanced per-axis overrides, preset-to-custom flip, and guardrail copy. `utilities/session/sessionModeProfile.ts` owns schema normalization, preset descriptors, validity checks, and pure compile-down to the storage profile / payload-access runtime fields.
 - Start in `SessionWizardStorageProfileField.tsx` for advanced storage backend and Cloudflare payload-access controls.
 - Start in `SessionPublishSummary.tsx` for publish panel composition. Use `SessionPublishActionControls.tsx` for publish button/settings affordance display, `SessionPublishBundleFallbackPanel.tsx` for sponsored/manual bundle fallback display, `SessionPublishAdvancedSettingsPanel.tsx` for manual metadata/gas override display, `SessionPublishProgressPanel.tsx` for publish-progress display, and `SessionPublishResultLinks.tsx` for generated metadata/register/session/admin/SBT links.
 - Start in `sessionWizardPublishReadiness.ts` for pure publish readiness, request identity, action display, metadata fallback identity/display, UI execution-step, and progress-display plans.
@@ -153,8 +156,10 @@ SessionWizard.tsx
   -> sessionWizardDraftState.ts
   -> SessionWizardInfoTooltip.tsx
   -> SessionWizardContractsField.tsx
+  -> SessionModeProfileField.tsx
   -> SessionWizardStorageProfileField.tsx
   -> sessionWizardNormalModeCards.ts
+  -> sessionModeProfile.ts
   -> hooks/useSponsoredBundleLifecycle.ts
   -> hooks/useSessionWizardWorkerDeploy.ts
   -> client/src/domains/sessions/publish/sessionPublishReducer.ts
@@ -199,6 +204,8 @@ SessionWizard.tsx
 | Passive publish result links (`SessionPublishResultLinks.tsx`) | 1-120 | Renders metadata URI, Arweave tx, register txs, session/admin URLs, published pending-SBT links, and status copy from explicit descriptors while routing admin-copy back to the parent | `SessionPublishResultLinks` |
 | Published pending-SBT link planning (`sessionWizardPublishLinks.ts`) | 1-50 | Builds pure published pending-SBT link display models from newly deployed drafts plus already-finalized pending draft snapshots without owning deploy/finalization, route, or state effects | `buildPublishedPendingSbtLinks` |
 | Passive contracts field (`SessionWizardContractsField.tsx`) | 1-108 | Renders advanced contract rows, explainer tooltip triggers, modal buttons, and address inputs while parent owns draft mutation and modal selection | `SessionWizardContractsField` |
+| Mode profile field (`SessionModeProfileField.tsx`) | current file | Renders the preset-first `/new` mode selection, advanced surface/storage/authority/encryption overrides, validation copy, and preset-to-custom transitions while parent owns draft mutation | `SessionModeProfileField` |
+| Session mode profile planning (`utilities/session/sessionModeProfile.ts`) | current file | Owns session mode schema normalization, `fast_cheap_cloudflare` / `trustless_public_decentralized` presets, validity matrix, compile-down to storage profile and payload-access fields, and legacy `telegramOnly` read-normalization | `cloneSessionModePreset`, `validateSessionModeProfile`, `compileSessionModeProfile`, `profileFromLegacyConfig` |
 | Passive storage profile field (`SessionWizardStorageProfileField.tsx`) | 1-121 | Renders advanced storage backend and Cloudflare payload-access controls while parent owns draft mutation and broader publish/storage side effects | `SessionWizardStorageProfileField` |
 | Requirements display planning (`sessionWizardRequirementsDisplay.ts`) | 1-95 | Derives `/new` requirements banner visibility, connected status, sponsored status, and pending requirement labels without owning wallet, sponsored bundle, publish, route, worker, storage, or state application side effects | `resolveSessionWizardNewSessionRequirementsDisplayState` |
 | Publish readiness/UI planning (`sessionWizardPublishReadiness.ts`) | 1-326 | Derives publish readiness, request identity, execution/action/progress display descriptors, and metadata identity/display state using an injected gateway URL builder without owning metadata upload, Arweave writes, worker deploy, registry, route, wallet, or state effects | `resolveSessionWizardPublishReadiness`, `resolveSessionWizardPublishRequestDescriptor`, `resolveSessionWizardPublishMetadataIdentityState`, `resolveSessionWizardPublishUiPlan` |

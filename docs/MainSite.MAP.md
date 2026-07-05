@@ -94,6 +94,10 @@ The characterization tests intentionally pin behavior as-is. The follow-up domai
   Session name/info/header display resolution.
 - `client/src/domains/sessions/sessionMediaUrls.ts`
   Typed domain wrapper for session media URL normalization. MainSite uses this instead of importing `utilities/arweave/arweaveUrls` directly.
+- `client/src/utilities/session/sessionBackendKind.ts`
+  Pure page-boundary classifier for session page backend mode. Shared render
+  bodies should receive the resolved mode instead of branching on inline
+  Telegram-specific ternaries.
 
 ### Domain ports
 
