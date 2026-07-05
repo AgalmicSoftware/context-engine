@@ -160,6 +160,7 @@ export type SessionWizardShellProps = {
   sessionHeaderPreviewModalOpen: WizardModalsProps['sessionHeaderPreviewModalOpen'];
   sessionHeaderPreviewSrc: WizardModalsProps['sessionHeaderPreviewSrc'];
   sessionMetadataHeaderAccessory: MetadataEditorProps['headerAccessory'];
+  sessionModeProfileControl?: React.ReactNode;
   sessionUrl: PublishSectionProps['sessionUrl'];
   setBundleFile: WorkerPanelProps['setBundleFile'];
   setBundleMode: WorkerPanelProps['setBundleMode'];
@@ -318,6 +319,7 @@ const SessionWizardShell = ({
   sessionHeaderPreviewModalOpen,
   sessionHeaderPreviewSrc,
   sessionMetadataHeaderAccessory,
+  sessionModeProfileControl = null,
   sessionUrl,
   setBundleFile,
   setBundleMode,
@@ -390,6 +392,8 @@ const SessionWizardShell = ({
       showNewSessionRequirementsBanner={showNewSessionRequirementsBanner}
       sponsoredBundleStatus={sponsoredBundleStatus}
     />
+
+    {sessionModeProfileControl}
 
     {(!isNormalMode || !collapsedSections.encryption) && (
       <EncryptionPanel
