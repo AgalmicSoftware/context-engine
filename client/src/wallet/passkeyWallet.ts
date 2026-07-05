@@ -16,6 +16,7 @@ import {
   getPasskeyWalletConfig,
 } from './config.js';
 import { chainHexId, chainHttpRpc, chainHttpRpcNoPath, getChainById, getDefaultChainId } from '../variables/chains.js';
+import { getReadProviderForChain } from '../utilities/web3/rpcProviders.js';
 import { createPasskeyCredential } from './passkey/createCredential.js';
 import { authenticatePasskeyCredential } from './passkey/authenticateCredential.js';
 import { bufferToBase64URL, base64URLToBuffer, randomBase64Url } from './passkey/encoding.js';
@@ -47,12 +48,15 @@ type PasskeyWalletClientDeps = {
   storage?: PasskeyWalletStorage;
   credentials?: PasskeyCredentialClient;
   sessionClient?: SoftSessionClient;
+  sessionClientFactory?: () => SoftSessionClient;
+  readProviderFactory?: (chainId: number) => unknown;
   privateKeyFactory?: () => HexString;
   now?: () => number;
 };
 
 const walletLog = createLogger('wallet');
 const MISSING_WALLET_CODE = 'CE_PASSKEY_WALLET_RECORD_MISSING';
+const PASSKEY_WALLET_LOCKED_MESSAGE = 'Passkey wallet is locked.';
 
 export class MissingPasskeyWalletRecordError extends Error {
   code = MISSING_WALLET_CODE;
@@ -70,6 +74,12 @@ export const isMissingPasskeyWalletRecordError = (error: unknown): boolean => (
     typeof error === 'object' &&
     (error as { code?: unknown }).code === MISSING_WALLET_CODE
   )
+);
+
+const isPasskeyWalletLockedError = (error: unknown): boolean => (
+  error instanceof Error
+    ? error.message === PASSKEY_WALLET_LOCKED_MESSAGE
+    : String((error as { message?: unknown })?.message || error || '') === PASSKEY_WALLET_LOCKED_MESSAGE
 );
 
 const defaultChain = (): ChainLike => (
@@ -126,6 +136,8 @@ export class PasskeyEoaWalletClient {
   private readonly storage: PasskeyWalletStorage;
   private readonly credentials?: PasskeyCredentialClient;
   private readonly privateKeyFactory: () => HexString;
+  private readonly sessionClientFactory: () => SoftSessionClient;
+  private readonly readProviderFactory: (chainId: number) => unknown;
   private readonly now: () => number;
   private sessionClient: SoftSessionClient;
   private activeRecord: PasskeyWalletRecord | null = null;
@@ -139,7 +151,9 @@ export class PasskeyEoaWalletClient {
     this.config = deps.config || getPasskeyWalletConfig();
     this.storage = deps.storage || indexedDbWalletStorage;
     this.credentials = deps.credentials;
-    this.sessionClient = deps.sessionClient || createWorkerSoftSessionClient();
+    this.sessionClientFactory = deps.sessionClientFactory || createWorkerSoftSessionClient;
+    this.sessionClient = deps.sessionClient || this.sessionClientFactory();
+    this.readProviderFactory = deps.readProviderFactory || getReadProviderForChain;
     this.privateKeyFactory = deps.privateKeyFactory || createRandomEoaPrivateKey;
     this.now = deps.now || (() => Date.now());
   }
@@ -306,35 +320,31 @@ export class PasskeyEoaWalletClient {
   }
 
   async signMessage(message: unknown): Promise<HexString> {
-    await this.ensureUnlocked();
-    return toHexString(await this.sessionClient.request({
+    return toHexString(await this.requestUnlocked(() => ({
       method: 'personal_sign',
       params: [message, this.activeAddress],
-    }));
+    })));
   }
 
   async signTypedData(typedData: unknown): Promise<HexString> {
-    await this.ensureUnlocked();
-    return toHexString(await this.sessionClient.request({
+    return toHexString(await this.requestUnlocked(() => ({
       method: 'eth_signTypedData_v4',
       params: [this.activeAddress, normalizeTypedData(typedData)],
-    }));
+    })));
   }
 
   async sendTransaction(tx: Record<string, unknown>): Promise<HexString> {
-    await this.ensureUnlocked();
-    return toHexString(await this.sessionClient.request({
+    return toHexString(await this.requestUnlocked(() => ({
       method: 'eth_sendTransaction',
       params: [{ ...tx, from: tx.from || this.activeAddress }],
-    }));
+    })));
   }
 
   async signTransaction(tx: Record<string, unknown>): Promise<HexString> {
-    await this.ensureUnlocked();
-    return toHexString(await this.sessionClient.request({
+    return toHexString(await this.requestUnlocked(() => ({
       method: 'eth_signTransaction',
       params: [{ ...tx, from: tx.from || this.activeAddress }],
-    }));
+    })));
   }
 
   async request({ method, params = [] }: { method: string; params?: unknown[] }): Promise<unknown> {
@@ -367,7 +377,7 @@ export class PasskeyEoaWalletClient {
           session: 'soft',
         };
       default:
-        return this.readProvider().send(method, params);
+        return this.requestReadOnlyRpc(method, params);
     }
   }
 
@@ -387,7 +397,7 @@ export class PasskeyEoaWalletClient {
     this.lockTimer = null;
     this.unlockExpiresAt = 0;
     await this.sessionClient.lock();
-    this.sessionClient = createWorkerSoftSessionClient();
+    this.sessionClient = this.sessionClientFactory();
   }
 
   async disconnect(): Promise<void> {
@@ -441,10 +451,88 @@ export class PasskeyEoaWalletClient {
     await this.unlockWallet();
   }
 
-  private readProvider(): ethers.providers.JsonRpcProvider {
+  private async requestUnlocked(buildArgs: () => { method: string; params?: unknown[] }): Promise<unknown> {
+    await this.ensureUnlocked();
+    const args = buildArgs();
+    try {
+      return await this.sessionClient.request(args);
+    } catch (error) {
+      if (!isPasskeyWalletLockedError(error)) throw error;
+
+      await this.lock();
+      await this.unlockWallet();
+      return this.sessionClient.request(buildArgs());
+    }
+  }
+
+  private async requestReadOnlyRpc(method: string, params: unknown[] = []): Promise<unknown> {
+    const provider = this.readProvider() as Record<string, any>;
+    switch (method) {
+      case 'eth_blockNumber':
+        return ethers.utils.hexValue(await provider.getBlockNumber());
+      case 'eth_gasPrice':
+        return ethers.utils.hexValue(await provider.getGasPrice());
+      case 'eth_maxPriorityFeePerGas': {
+        const feeData = await provider.getFeeData();
+        return feeData?.maxPriorityFeePerGas ? ethers.utils.hexValue(feeData.maxPriorityFeePerGas) : null;
+      }
+      case 'eth_getBalance':
+        return ethers.utils.hexValue(await provider.getBalance(params[0], params[1] ?? 'latest'));
+      case 'eth_getTransactionCount':
+        return ethers.utils.hexValue(await provider.getTransactionCount(params[0], params[1] ?? 'latest'));
+      case 'eth_getCode':
+        return provider.getCode(params[0], params[1] ?? 'latest');
+      case 'eth_getStorageAt':
+        return provider.getStorageAt(params[0], params[1], params[2] ?? 'latest');
+      case 'eth_call':
+        return provider.call(params[0] || {}, params[1] ?? 'latest');
+      case 'eth_estimateGas':
+        return ethers.utils.hexValue(await provider.estimateGas(params[0] || {}));
+      case 'eth_getLogs':
+        return provider.getLogs(params[0] || {});
+      case 'eth_getTransactionByHash':
+        return provider.getTransaction(params[0]);
+      case 'eth_getTransactionReceipt':
+        return provider.getTransactionReceipt(params[0]);
+      case 'eth_getBlockByNumber':
+      case 'eth_getBlockByHash':
+        return params[1]
+          ? provider.getBlockWithTransactions(params[0])
+          : provider.getBlock(params[0]);
+      default:
+        return this.requestRawReadProviderRpc(provider, method, params);
+    }
+  }
+
+  private async requestRawReadProviderRpc(
+    provider: Record<string, any>,
+    method: string,
+    params: unknown[]
+  ): Promise<unknown> {
+    if (typeof provider.send === 'function') return provider.send(method, params);
+
+    const configs = Array.isArray(provider.providerConfigs)
+      ? [...provider.providerConfigs].sort((left, right) => Number(left?.priority || 0) - Number(right?.priority || 0))
+      : [];
+    let lastError: unknown = null;
+    for (const config of configs) {
+      const childProvider = config?.provider;
+      if (typeof childProvider?.send !== 'function') continue;
+      try {
+        return await childProvider.send(method, params);
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    if (lastError) throw lastError;
+    throw new Error(`Read provider does not support ${method}.`);
+  }
+
+  private readProvider(): unknown {
+    const chainId = Number(this.activeChain?.id ?? this.activeChain?.chainId ?? 0) || undefined;
+    if (chainId) return this.readProviderFactory(chainId);
     const rpcUrl = resolveRpcUrl(this.activeChain);
     if (!rpcUrl) throw new Error('No RPC URL is configured for the passkey wallet chain.');
-    const chainId = Number(this.activeChain?.id ?? this.activeChain?.chainId ?? 0) || undefined;
     return new ethers.providers.JsonRpcProvider(rpcUrl, chainId);
   }
 }

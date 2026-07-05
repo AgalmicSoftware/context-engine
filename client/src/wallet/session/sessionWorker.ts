@@ -138,7 +138,7 @@ const handleRequest = async (message: RequestMessage): Promise<unknown> => {
       return wallet.signTransaction(tx as ethers.providers.TransactionRequest);
     }
     default:
-      return provider.send(message.method, message.params || []);
+      throw new Error(`Unsupported passkey session method: ${message.method}`);
   }
 };
 

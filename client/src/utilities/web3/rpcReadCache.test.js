@@ -8,10 +8,10 @@ const RPC_META = Object.freeze({
 });
 const LOG_ADDRESS = '0x00000000000000000000000000000000000000aa';
 
-const createWrappedProvider = (sendImpl) => {
+const createWrappedProvider = (sendImpl, meta = RPC_META) => {
   const originalSend = jest.fn(sendImpl);
   const provider = { send: originalSend };
-  wrapEthersJsonRpcSend(provider, RPC_META);
+  wrapEthersJsonRpcSend(provider, meta);
   return { originalSend, provider };
 };
 
@@ -118,7 +118,7 @@ describe('rpcReadCache evictExpiredEntries', () => {
     await expect(provider.send('eth_blockNumber', [])).rejects.toMatchObject({ status: 429 });
 
     let state = Array.from(getCache().rateLimits.values())[0];
-    expect(state.retryAfterMs).toBe(2000);
+    expect(state.retryAfterMs).toBe(60000);
 
     await expect(provider.send('eth_getBalance', [LOG_ADDRESS, 'latest'])).rejects.toMatchObject({
       code: 'CE_RPC_RATE_LIMIT_BACKOFF',
@@ -130,7 +130,7 @@ describe('rpcReadCache evictExpiredEntries', () => {
     await expect(provider.send('eth_getBalance', [LOG_ADDRESS, 'latest'])).rejects.toMatchObject({ status: 429 });
 
     state = Array.from(getCache().rateLimits.values())[0];
-    expect(state.retryAfterMs).toBe(4000);
+    expect(state.retryAfterMs).toBe(120000);
 
     await expect(provider.send('eth_chainId', [])).rejects.toMatchObject({
       code: 'CE_RPC_RATE_LIMIT_BACKOFF',
@@ -143,5 +143,56 @@ describe('rpcReadCache evictExpiredEntries', () => {
 
     expect(originalSend).toHaveBeenCalledTimes(3);
     expect(Array.from(getCache().rateLimits.values())).toEqual([]);
+  });
+
+  it('shields neighboring in-flight endpoint reads after the first request records a 429', async () => {
+    let rejectFirst;
+    let callCount = 0;
+    const { originalSend, provider } = createWrappedProvider(async () => {
+      callCount += 1;
+      if (callCount === 1) {
+        return new Promise((_, reject) => {
+          rejectFirst = reject;
+        });
+      }
+      return '0x14a34';
+    });
+
+    const first = provider.send('eth_blockNumber', []);
+    await Promise.resolve();
+    const second = provider.send('eth_getBalance', [LOG_ADDRESS, 'latest']);
+    await Promise.resolve();
+
+    rejectFirst(Object.assign(new Error('Too Many Requests'), { status: 429 }));
+
+    await expect(first).rejects.toMatchObject({ status: 429 });
+    await expect(second).rejects.toMatchObject({
+      code: 'CE_RPC_RATE_LIMIT_BACKOFF',
+      status: 429,
+    });
+    expect(originalSend).toHaveBeenCalledTimes(1);
+  });
+
+  it('lets fallback callers skip a cooling-down primary endpoint without another network send', async () => {
+    const primary = createWrappedProvider(async () => {
+      throw Object.assign(new Error('Too Many Requests'), { status: 429 });
+    });
+    const secondary = createWrappedProvider(async () => '0x14a34', {
+      ...RPC_META,
+      url: 'https://rpc-fallback.test.invalid',
+    });
+    const requestWithFallback = async () => {
+      try {
+        return await primary.provider.send('eth_getBalance', [LOG_ADDRESS, 'latest']);
+      } catch (_) {
+        return secondary.provider.send('eth_getBalance', [LOG_ADDRESS, 'latest']);
+      }
+    };
+
+    await expect(requestWithFallback()).resolves.toBe('0x14a34');
+    await expect(requestWithFallback()).resolves.toBe('0x14a34');
+
+    expect(primary.originalSend).toHaveBeenCalledTimes(1);
+    expect(secondary.originalSend).toHaveBeenCalledTimes(2);
   });
 });

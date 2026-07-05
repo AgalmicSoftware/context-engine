@@ -8,9 +8,9 @@ import styles from './AdminPage.module.scss';
 import {
   USE_ONCHAIN_SESSION_REGISTRY,
 } from '../../variables/appConfig.js';
-import { getDefaultHttpRpc } from '../../variables/chains.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { encryptedFieldsUtils } from '../../utilities/crypto/encryptedFields.js';
+import { getReadProviderForChain } from '../../utilities/web3/rpcProviders.js';
 import { normalizeOriginList } from '../../utilities/urlUtils.js';
 import { adminWorkerPorts } from '../../domains/worker/adminWorkerPorts.js';
 import { adminArweavePort } from '../../domains/storage/adminArweavePorts.js';
@@ -681,21 +681,9 @@ const AdminPage = ({
       setMetadataLatestBlockStatus('');
       return;
     }
-    const rpcUrl = (
-      getDefaultHttpRpc(relevantSessionChainId, { allowPath: false }) ||
-      getDefaultHttpRpc(relevantSessionChainId)
-    );
-    if (!rpcUrl) {
-      setMetadataLatestBlock(null);
-      setMetadataLatestBlockStatus('Current block unavailable for the selected session chain.');
-      return;
-    }
     let cancelled = false;
     setMetadataLatestBlockStatus('Loading current block…');
-    const readProvider = new ethers.providers.JsonRpcProvider(rpcUrl, {
-      chainId: relevantSessionChainId,
-      name: `chain-${relevantSessionChainId}`,
-    });
+    const readProvider = getReadProviderForChain(relevantSessionChainId);
     readProvider.getBlockNumber()
       .then((blockNumber: any) => {
         if (cancelled) return;
@@ -960,7 +948,7 @@ const AdminPage = ({
     }
 
     const sessionChainLabel = relevantSessionChainLabel || (sessionReadRpc.chainId ? String(sessionReadRpc.chainId) : '');
-    if (!sessionReadRpc.rpcUrl || !sessionReadRpc.chainId) {
+    if (!sessionReadRpc.chainId) {
       if (requestId !== faucetResourceRequestRef.current) return;
       setFaucetResource(buildAdminFaucetRpcUnavailableResource({
         address,
@@ -976,10 +964,7 @@ const AdminPage = ({
     }));
 
     try {
-      const readProvider = new ethers.providers.JsonRpcProvider(sessionReadRpc.rpcUrl, {
-        chainId: sessionReadRpc.chainId,
-        name: `chain-${sessionReadRpc.chainId}`,
-      });
+      const readProvider = getReadProviderForChain(sessionReadRpc.chainId);
       const balanceWei = await readProvider.getBalance(address);
       if (requestId !== faucetResourceRequestRef.current) return;
       setFaucetResource(buildAdminFaucetBalanceResource({
@@ -996,7 +981,7 @@ const AdminPage = ({
         shortAddress,
       }));
     }
-  }, [relevantSessionChainLabel, secrets.faucetPrivateKey, sessionReadRpc.chainId, sessionReadRpc.rpcUrl]);
+  }, [relevantSessionChainLabel, secrets.faucetPrivateKey, sessionReadRpc.chainId]);
 
   useEffect(() => {
     refreshArweaveResource();
