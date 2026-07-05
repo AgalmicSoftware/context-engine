@@ -48,6 +48,8 @@ Initial Telegram-facing capabilities:
 | Settings overview | `GET /api/agent/settings` | private, Mini App | planned contract-only |
 | Settings update | `POST /api/agent/settings/update-request` | private, Mini App | pending canonical handoff |
 | Questions | `GET /api/agent/questions` | group, private, Mini App | worker-local index until canonical |
+| Client session metadata | `GET /api/agent/session-meta` | web client, private | implemented telegram-first classification |
+| Client token exchange | `POST /api/agent/client-login/exchange` | web client, private | implemented short-lived browser credential exchange |
 | Response submit request | `POST /api/agent/responses/submit-request` | private, Mini App | direct on-chain when enabled; otherwise pending canonical handoff |
 | SBT claim/create, decrypt, storage access, OpenClaw events | existing `/api/agent/*` routes in the catalog | private or Mini App unless explicitly group-safe | planned or contract-only |
 
@@ -283,6 +285,15 @@ has a selectable Telegram session. The `/start` screen also exposes `Onboard
 Agent` so the setup path is not buried under `/me`. The default user-scoped
 agent token lifespan is 28 days, and the raw token is only included in the
 private copy payload, never in message body text.
+
+The web client login path never places a raw `ceagt_` token in a URL or durable
+browser storage. For Telegram-first sessions, users paste the token or copied
+install info into the login modal; the client calls
+`POST /api/agent/client-login/exchange` once and stores only the returned
+short-lived browser envelope in tab-scoped `sessionStorage`. The
+`GET /api/agent/session-meta?sessionSlug=<slug>` endpoint returns public
+session metadata, including `clientSubmitReady`, which tells the client whether
+direct answer submit is deploy-ready for that session.
 
 Account-created screens do not include `Open in CE`. Optional onboarding uses: `Enter startup info so I can suggest answers for you.` Confirmation copy is `Submit this response?` with `Save draft` and `Edit`.
 

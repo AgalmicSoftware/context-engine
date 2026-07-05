@@ -3039,6 +3039,7 @@ test('Telegram session-meta reports telegram-only status without auth', async ()
     sessionSlug: 'alpha',
     telegramOnly: true,
     telegramBridgeEnabled: true,
+    clientSubmitReady: true,
   });
   assert.equal(response.headers.get('access-control-allow-origin'), '*');
   assert.equal(response.headers.get('vary'), 'Origin');
@@ -3052,7 +3053,27 @@ test('Telegram session-meta reports telegram-only status without auth', async ()
     'sessionSlug',
     'telegramOnly',
     'telegramBridgeEnabled',
+    'clientSubmitReady',
   ].sort());
+});
+
+test('Telegram session-meta exposes public client submit readiness', async () => {
+  const env = telegramOnlyEnv({
+    AGENT_BRIDGE_DIRECT_SUBMIT_ENABLED: 'false',
+  });
+  const response = await handleTelegramAgentHandoffRequest({
+    request: new Request('https://bridge.example/api/agent/session-meta?sessionSlug=alpha', {
+      headers: { origin: 'https://client.example' },
+    }),
+    env,
+  });
+  const body = await jsonBody(response);
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(body.telegramOnly, true);
+  assert.equal(body.telegramBridgeEnabled, true);
+  assert.equal(body.clientSubmitReady, false);
+  assert.doesNotMatch(JSON.stringify(body), /token|secret|private/i);
 });
 
 test('Telegram session-meta reports non-telegram and unknown sessions as not telegram-only', async () => {
