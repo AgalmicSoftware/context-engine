@@ -29,6 +29,10 @@ const mockSetSessionFieldsOnChain = jest.fn();
 const mockUploadSessionMetadata = jest.fn();
 const mockUpdateSessionMetadataOnChain = jest.fn();
 const mockUpsertSessionRegistryCache = jest.fn();
+const mockReadProvider = {
+  getBlockNumber: jest.fn(),
+};
+const mockGetReadProviderForChain = jest.fn(() => mockReadProvider);
 
 jest.mock('../../utilities/worker/corsProxy.js', () => ({
   corsProxyUtils: {
@@ -61,6 +65,10 @@ jest.mock('../../utilities/crypto/encryptedFields.js', () => ({
   encryptedFieldsUtils: {
     resolveEncryptedValue: jest.fn(),
   },
+}));
+
+jest.mock('../../utilities/web3/rpcProviders.js', () => ({
+  getReadProviderForChain: (...args) => mockGetReadProviderForChain(...args),
 }));
 
 jest.mock('../../utilities/web3/sessionRegistry.js', () => ({
@@ -145,6 +153,8 @@ describe('AdminPage metadata controls', () => {
     sessionEntries = [['edge', buildSessionConfig()]];
     mockLoadSessionRegistryCache.mockResolvedValue(undefined);
     mockGetAllSessionEntries.mockImplementation(() => sessionEntries);
+    mockGetReadProviderForChain.mockImplementation(() => mockReadProvider);
+    mockReadProvider.getBlockNumber.mockResolvedValue(12345678);
     mockResolveCorsProxyUrl.mockResolvedValue({
       url: 'https://worker.example.test',
       source: 'session-config',
@@ -181,9 +191,7 @@ describe('AdminPage metadata controls', () => {
   });
 
   it('defaults metadata start block to the selected session chain and updates metadata in place', async () => {
-    const currentBlockSpy = jest
-      .spyOn(ethers.providers.JsonRpcProvider.prototype, 'getBlockNumber')
-      .mockResolvedValue(12345678);
+    mockReadProvider.getBlockNumber.mockResolvedValue(12345678);
     sessionEntries = [[
       'edge',
       buildSessionConfig({
@@ -198,52 +206,46 @@ describe('AdminPage metadata controls', () => {
       }),
     ]];
 
-    try {
-      await renderAdminPage();
-      await waitForResolvedWorkerUrl();
+    await renderAdminPage();
+    await waitForResolvedWorkerUrl();
 
-      const metadataPanel = screen.getByText('Session metadata').closest('section');
-      fireEvent.click(within(metadataPanel).getAllByRole('button')[0]);
+    const metadataPanel = screen.getByText('Session metadata').closest('section');
+    fireEvent.click(within(metadataPanel).getAllByRole('button')[0]);
 
-      await waitFor(() => {
-        expect(screen.getByText('Current block on Base (8453): 12,345,678')).toBeInTheDocument();
-      });
-      expect(screen.getByDisplayValue('12345678')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('Current block on Base (8453): 12,345,678')).toBeInTheDocument();
+    });
+    expect(screen.getByDisplayValue('12345678')).toBeInTheDocument();
 
-      await clickAndSettle(screen.getByRole('button', { name: 'Update metadata' }));
+    await clickAndSettle(screen.getByRole('button', { name: 'Update metadata' }));
 
-      await waitFor(() => {
-        expect(mockUploadSessionMetadata).toHaveBeenCalledTimes(1);
-      });
-      expect(mockUploadSessionMetadata).toHaveBeenCalledWith(expect.objectContaining({
+    await waitFor(() => {
+      expect(mockUploadSessionMetadata).toHaveBeenCalledTimes(1);
+    });
+    expect(mockUploadSessionMetadata).toHaveBeenCalledWith(expect.objectContaining({
+      slug: 'edge',
+      networkChainId: 8453,
+      blockLimits: {
+        start: 12345678,
+        end: null,
+      },
+    }), expect.any(Object));
+    const uploadedMetadata = mockUploadSessionMetadata.mock.calls[0][0];
+    expect(uploadedMetadata.__registry).toBeUndefined();
+    expect(uploadedMetadata.sponsoredKeys).toBeUndefined();
+
+    await waitFor(() => {
+      expect(mockUpdateSessionMetadataOnChain).toHaveBeenCalledWith(expect.objectContaining({
+        chainId: 84532,
         slug: 'edge',
-        networkChainId: 8453,
-        blockLimits: {
-          start: 12345678,
-          end: null,
-        },
-      }), expect.any(Object));
-      const uploadedMetadata = mockUploadSessionMetadata.mock.calls[0][0];
-      expect(uploadedMetadata.__registry).toBeUndefined();
-      expect(uploadedMetadata.sponsoredKeys).toBeUndefined();
-
-      await waitFor(() => {
-        expect(mockUpdateSessionMetadataOnChain).toHaveBeenCalledWith(expect.objectContaining({
-          chainId: 84532,
-          slug: 'edge',
-          metadataURI: 'ar://metadata_tx_id',
-        }));
-        expect(screen.getByText(/Session metadata updated\./)).toBeInTheDocument();
-      });
-    } finally {
-      currentBlockSpy.mockRestore();
-    }
+        metadataURI: 'ar://metadata_tx_id',
+      }));
+      expect(screen.getByText(/Session metadata updated\./)).toBeInTheDocument();
+    });
   });
 
   it('updates the metadata auto-feature flag from admin', async () => {
-    const currentBlockSpy = jest
-      .spyOn(ethers.providers.JsonRpcProvider.prototype, 'getBlockNumber')
-      .mockResolvedValue(12345678);
+    mockReadProvider.getBlockNumber.mockResolvedValue(12345678);
     sessionEntries = [[
       'edge',
       buildSessionConfig({
@@ -258,31 +260,27 @@ describe('AdminPage metadata controls', () => {
       }),
     ]];
 
-    try {
-      await renderAdminPage();
-      await waitForResolvedWorkerUrl();
+    await renderAdminPage();
+    await waitForResolvedWorkerUrl();
 
-      const metadataPanel = screen.getByText('Session metadata').closest('section');
-      fireEvent.click(within(metadataPanel).getAllByRole('button')[0]);
+    const metadataPanel = screen.getByText('Session metadata').closest('section');
+    fireEvent.click(within(metadataPanel).getAllByRole('button')[0]);
 
-      const autoFeatureToggle = await screen.findByLabelText('Auto-feature by session slug');
-      expect(autoFeatureToggle).not.toBeChecked();
+    const autoFeatureToggle = await screen.findByLabelText('Auto-feature by session slug');
+    expect(autoFeatureToggle).not.toBeChecked();
 
-      fireEvent.click(autoFeatureToggle);
-      expect(autoFeatureToggle).toBeChecked();
+    fireEvent.click(autoFeatureToggle);
+    expect(autoFeatureToggle).toBeChecked();
 
-      await clickAndSettle(screen.getByRole('button', { name: 'Update metadata' }));
+    await clickAndSettle(screen.getByRole('button', { name: 'Update metadata' }));
 
-      await waitFor(() => {
-        expect(mockUploadSessionMetadata).toHaveBeenCalledTimes(1);
-      });
-      expect(mockUploadSessionMetadata).toHaveBeenCalledWith(expect.objectContaining({
-        autoFeatureSBTsBySessionSlug: true,
-      }), expect.any(Object));
-      expect(mockUploadSessionMetadata.mock.calls[0][0]).not.toHaveProperty('autoFeatureSBTsWithFeaturedSbtTags');
-    } finally {
-      currentBlockSpy.mockRestore();
-    }
+    await waitFor(() => {
+      expect(mockUploadSessionMetadata).toHaveBeenCalledTimes(1);
+    });
+    expect(mockUploadSessionMetadata).toHaveBeenCalledWith(expect.objectContaining({
+      autoFeatureSBTsBySessionSlug: true,
+    }), expect.any(Object));
+    expect(mockUploadSessionMetadata.mock.calls[0][0]).not.toHaveProperty('autoFeatureSBTsWithFeaturedSbtTags');
   });
 
   it('prefers canonical metadata auto-feature flag over the legacy alias in admin', async () => {
@@ -377,9 +375,7 @@ describe('AdminPage metadata controls', () => {
   });
 
   it('saves advanced metadata fields from the updated metadata payload', async () => {
-    const currentBlockSpy = jest
-      .spyOn(ethers.providers.JsonRpcProvider.prototype, 'getBlockNumber')
-      .mockResolvedValue(12345678);
+    mockReadProvider.getBlockNumber.mockResolvedValue(12345678);
     sessionEntries = [[
       'edge',
       buildSessionConfig({
@@ -410,68 +406,64 @@ describe('AdminPage metadata controls', () => {
       }),
     ]];
 
-    try {
-      await renderAdminPage();
-      await waitForResolvedWorkerUrl();
+    await renderAdminPage();
+    await waitForResolvedWorkerUrl();
 
-      const metadataPanel = screen.getByText('Session metadata').closest('section');
-      fireEvent.click(within(metadataPanel).getAllByRole('button')[0]);
+    const metadataPanel = screen.getByText('Session metadata').closest('section');
+    fireEvent.click(within(metadataPanel).getAllByRole('button')[0]);
 
-      fireEvent.change(getFieldInputByLabel('Default tags'), {
-        target: { value: 'governance, research' },
-      });
-      fireEvent.change(getFieldInputByLabel('Question generation prompt'), {
-        target: { value: 'Ask better governance questions' },
-      });
-      fireEvent.change(getFieldInputByLabel('Default filter state'), {
-        target: { value: '{"sort":"recent"}' },
-      });
-      fireEvent.change(getFieldInputByLabel('Faucet amount (ETH)'), {
-        target: { value: '0.0002' },
-      });
-      fireEvent.change(getFieldInputByLabel('Faucet threshold (ETH)'), {
-        target: { value: '0.001' },
-      });
-      fireEvent.change(getFieldInputByLabel('Thinking provider'), {
-        target: { value: 'anthropic' },
-      });
-      fireEvent.change(getFieldInputByLabel('Thinking model'), {
-        target: { value: 'claude-3-7-sonnet' },
-      });
-      fireEvent.change(getFieldInputByLabel('Highlighted question IDs'), {
-        target: { value: 'q1\nq2' },
-      });
+    fireEvent.change(getFieldInputByLabel('Default tags'), {
+      target: { value: 'governance, research' },
+    });
+    fireEvent.change(getFieldInputByLabel('Question generation prompt'), {
+      target: { value: 'Ask better governance questions' },
+    });
+    fireEvent.change(getFieldInputByLabel('Default filter state'), {
+      target: { value: '{"sort":"recent"}' },
+    });
+    fireEvent.change(getFieldInputByLabel('Faucet amount (ETH)'), {
+      target: { value: '0.0002' },
+    });
+    fireEvent.change(getFieldInputByLabel('Faucet threshold (ETH)'), {
+      target: { value: '0.001' },
+    });
+    fireEvent.change(getFieldInputByLabel('Thinking provider'), {
+      target: { value: 'anthropic' },
+    });
+    fireEvent.change(getFieldInputByLabel('Thinking model'), {
+      target: { value: 'claude-3-7-sonnet' },
+    });
+    fireEvent.change(getFieldInputByLabel('Highlighted question IDs'), {
+      target: { value: 'q1\nq2' },
+    });
 
-      await clickAndSettle(screen.getByRole('button', { name: 'Update metadata' }));
+    await clickAndSettle(screen.getByRole('button', { name: 'Update metadata' }));
 
-      await waitFor(() => {
-        expect(mockUploadSessionMetadata).toHaveBeenCalledTimes(1);
-      });
-      expect(mockUploadSessionMetadata).toHaveBeenCalledWith(expect.objectContaining({
-        defaultTags: 'governance, research',
-        questionsGenPrompt: 'Ask better governance questions',
-        defaultFilterState: { sort: 'recent' },
-        HIGHLIGHTED_QUESTION_IDS: ['q1', 'q2'],
-        faucet: expect.objectContaining({
-          amountEth: '0.0002',
-          balanceThresholdEth: '0.001',
-        }),
-        ai: expect.objectContaining({
-          models: expect.objectContaining({
-            thinking: expect.objectContaining({
-              provider: 'anthropic',
-              model: 'claude-3-7-sonnet',
-            }),
+    await waitFor(() => {
+      expect(mockUploadSessionMetadata).toHaveBeenCalledTimes(1);
+    });
+    expect(mockUploadSessionMetadata).toHaveBeenCalledWith(expect.objectContaining({
+      defaultTags: 'governance, research',
+      questionsGenPrompt: 'Ask better governance questions',
+      defaultFilterState: { sort: 'recent' },
+      HIGHLIGHTED_QUESTION_IDS: ['q1', 'q2'],
+      faucet: expect.objectContaining({
+        amountEth: '0.0002',
+        balanceThresholdEth: '0.001',
+      }),
+      ai: expect.objectContaining({
+        models: expect.objectContaining({
+          thinking: expect.objectContaining({
+            provider: 'anthropic',
+            model: 'claude-3-7-sonnet',
           }),
         }),
-      }), expect.any(Object));
+      }),
+    }), expect.any(Object));
 
-      await waitFor(() => {
-        expect(screen.getByText(/Session metadata updated\./)).toBeInTheDocument();
-      });
-    } finally {
-      currentBlockSpy.mockRestore();
-    }
+    await waitFor(() => {
+      expect(screen.getByText(/Session metadata updated\./)).toBeInTheDocument();
+    });
   });
 
   it('requires explicit verification before saving synthesized fallback contract defaults', async () => {

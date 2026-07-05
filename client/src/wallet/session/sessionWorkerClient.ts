@@ -89,7 +89,7 @@ export const createInMemorySoftSessionClient = (): SoftSessionClient => {
           return wallet.signTransaction(tx as ethers.providers.TransactionRequest);
         }
         default:
-          return provider.send(method, params);
+          throw new Error(`Unsupported passkey session method: ${method}`);
       }
     },
 

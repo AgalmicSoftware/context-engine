@@ -1135,21 +1135,11 @@ export const buildSbtPageRefreshOptions = ({
 };
 
 export const resolveSbtPageShouldRefreshCounts = ({
-  burnedAddresses = [],
   countsLoaded = false,
   forceEventFetch = false,
-  mintedAddresses = [],
-  mintedTokensOverride = null,
 }: ResolveSbtPageShouldRefreshCountsArgs = {}): boolean => (
   forceEventFetch === true ||
-  (
-    !countsLoaded &&
-    Array.isArray(mintedAddresses) &&
-    mintedAddresses.length === 0 &&
-    Array.isArray(burnedAddresses) &&
-    burnedAddresses.length === 0 &&
-    mintedTokensOverride == null
-  )
+  countsLoaded !== true
 );
 
 export const resolveSbtPageRefreshLifecyclePlan = ({

@@ -32,6 +32,11 @@ const mockUpdateSessionMetadataOnChain = jest.fn();
 const mockUpsertSessionRegistryCache = jest.fn();
 const mockReadArweaveWalletBalance = jest.fn();
 const mockFormatWinstonToAr = jest.fn();
+const mockReadProvider = {
+  getBalance: jest.fn(),
+  getBlockNumber: jest.fn(),
+};
+const mockGetReadProviderForChain = jest.fn(() => mockReadProvider);
 
 jest.mock('../../utilities/worker/corsProxy.js', () => ({
   corsProxyUtils: {
@@ -64,6 +69,10 @@ jest.mock('../../utilities/crypto/encryptedFields.js', () => ({
   encryptedFieldsUtils: {
     resolveEncryptedValue: jest.fn(),
   },
+}));
+
+jest.mock('../../utilities/web3/rpcProviders.js', () => ({
+  getReadProviderForChain: (...args) => mockGetReadProviderForChain(...args),
 }));
 
 jest.mock('../../utilities/web3/sessionRegistry.js', () => ({
@@ -155,6 +164,9 @@ describe('AdminPage resource balance previews', () => {
       if (String(winston) === '5') return '0.000000';
       return '0.000000';
     });
+    mockGetReadProviderForChain.mockImplementation(() => mockReadProvider);
+    mockReadProvider.getBalance.mockResolvedValue(ethers.constants.Zero);
+    mockReadProvider.getBlockNumber.mockResolvedValue(12345678);
     sessionEntries = [['edge', buildSessionConfig()]];
     mockLoadSessionRegistryCache.mockResolvedValue(undefined);
     mockGetAllSessionEntries.mockImplementation(() => sessionEntries);
@@ -200,9 +212,7 @@ describe('AdminPage resource balance previews', () => {
     const faucetPrivateKey = faucetWallet.privateKey;
     const faucetAddress = faucetWallet.address;
     const faucetShort = `${faucetAddress.slice(0, 6)}…${faucetAddress.slice(-4)}`;
-    const arweaveBalanceSpy = jest
-      .spyOn(ethers.providers.JsonRpcProvider.prototype, 'getBalance')
-      .mockResolvedValue(ethers.utils.parseEther('0.1842'));
+    mockReadProvider.getBalance.mockResolvedValue(ethers.utils.parseEther('0.1842'));
     mockReadArweaveWalletBalance.mockResolvedValue({
       address: arweaveAddress,
       balanceUrl: `https://arweave.example.test/wallet/${arweaveAddress}/balance`,
@@ -210,43 +220,39 @@ describe('AdminPage resource balance previews', () => {
       winston: '12345678000000',
     });
 
-    try {
-      await renderAdminPage();
-      await waitForResolvedWorkerUrl();
+    await renderAdminPage();
+    await waitForResolvedWorkerUrl();
 
-      const workerSecretsPanel = await openWorkerSecretsPanel();
-      fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Arweave' }));
-      fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Faucet' }));
+    const workerSecretsPanel = await openWorkerSecretsPanel();
+    fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Arweave' }));
+    fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Faucet' }));
 
-      fireEvent.change(getSecretInputByLabel('Arweave JWK (JSON)'), {
-        target: { value: JSON.stringify(MOCK_ARWEAVE_JWK) },
-      });
-      fireEvent.change(getSecretInputByLabel('Faucet private key'), {
-        target: { value: faucetPrivateKey },
-      });
+    fireEvent.change(getSecretInputByLabel('Arweave JWK (JSON)'), {
+      target: { value: JSON.stringify(MOCK_ARWEAVE_JWK) },
+    });
+    fireEvent.change(getSecretInputByLabel('Faucet private key'), {
+      target: { value: faucetPrivateKey },
+    });
 
-      await waitFor(() => {
-        expect(mockReadArweaveWalletBalance).toHaveBeenCalledTimes(1);
-        expect(arweaveBalanceSpy).toHaveBeenCalledTimes(1);
-      });
-      expect(await within(workerSecretsPanel).findByText('12.345678 AR')).toBeInTheDocument();
-      expect(within(workerSecretsPanel).getByText('0.1842 ETH')).toBeInTheDocument();
-      expect(within(workerSecretsPanel).getByText(arweaveShort)).toBeInTheDocument();
-      expect(within(workerSecretsPanel).getByText(`${faucetShort} • Base Sepolia (84532)`)).toBeInTheDocument();
-      expect(screen.queryByText('Resources')).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(mockReadArweaveWalletBalance).toHaveBeenCalledTimes(1);
+      expect(mockReadProvider.getBalance).toHaveBeenCalledTimes(1);
+    });
+    expect(await within(workerSecretsPanel).findByText('12.345678 AR')).toBeInTheDocument();
+    expect(within(workerSecretsPanel).getByText('0.1842 ETH')).toBeInTheDocument();
+    expect(within(workerSecretsPanel).getByText(arweaveShort)).toBeInTheDocument();
+    expect(within(workerSecretsPanel).getByText(`${faucetShort} • Base Sepolia (84532)`)).toBeInTheDocument();
+    expect(screen.queryByText('Resources')).not.toBeInTheDocument();
 
-      expect(workerSecretsPanel).not.toHaveTextContent(faucetPrivateKey);
+    expect(workerSecretsPanel).not.toHaveTextContent(faucetPrivateKey);
 
-      await clickAndSettle(screen.getByRole('button', { name: 'Refresh Arweave balance' }));
-      await clickAndSettle(screen.getByRole('button', { name: 'Refresh faucet balance' }));
+    await clickAndSettle(screen.getByRole('button', { name: 'Refresh Arweave balance' }));
+    await clickAndSettle(screen.getByRole('button', { name: 'Refresh faucet balance' }));
 
-      await waitFor(() => {
-        expect(mockReadArweaveWalletBalance).toHaveBeenCalledTimes(2);
-        expect(arweaveBalanceSpy).toHaveBeenCalledTimes(2);
-      });
-    } finally {
-      arweaveBalanceSpy.mockRestore();
-    }
+    await waitFor(() => {
+      expect(mockReadArweaveWalletBalance).toHaveBeenCalledTimes(2);
+      expect(mockReadProvider.getBalance).toHaveBeenCalledTimes(2);
+    });
   });
 
   it('accepts bare hex faucet private keys when previewing faucet balance', async () => {
@@ -254,37 +260,29 @@ describe('AdminPage resource balance previews', () => {
     const faucetPrivateKey = faucetWallet.privateKey.slice(2);
     const faucetAddress = faucetWallet.address;
     const faucetShort = `${faucetAddress.slice(0, 6)}…${faucetAddress.slice(-4)}`;
-    const faucetBalanceSpy = jest
-      .spyOn(ethers.providers.JsonRpcProvider.prototype, 'getBalance')
-      .mockResolvedValue(ethers.utils.parseEther('0.1842'));
+    mockReadProvider.getBalance.mockResolvedValue(ethers.utils.parseEther('0.1842'));
 
-    try {
-      await renderAdminPage();
-      await waitForResolvedWorkerUrl();
+    await renderAdminPage();
+    await waitForResolvedWorkerUrl();
 
-      const workerSecretsPanel = await openWorkerSecretsPanel();
-      fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Faucet' }));
+    const workerSecretsPanel = await openWorkerSecretsPanel();
+    fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Faucet' }));
 
-      fireEvent.change(getSecretInputByLabel('Faucet private key'), {
-        target: { value: faucetPrivateKey },
-      });
+    fireEvent.change(getSecretInputByLabel('Faucet private key'), {
+      target: { value: faucetPrivateKey },
+    });
 
-      await waitFor(() => {
-        expect(faucetBalanceSpy).toHaveBeenCalledTimes(1);
-      });
-      expect(await within(workerSecretsPanel).findByText('0.1842 ETH')).toBeInTheDocument();
-      expect(within(workerSecretsPanel).getByText(`${faucetShort} • Base Sepolia (84532)`)).toBeInTheDocument();
-      expect(within(workerSecretsPanel).queryByText('Invalid key')).not.toBeInTheDocument();
-    } finally {
-      faucetBalanceSpy.mockRestore();
-    }
+    await waitFor(() => {
+      expect(mockReadProvider.getBalance).toHaveBeenCalledTimes(1);
+    });
+    expect(await within(workerSecretsPanel).findByText('0.1842 ETH')).toBeInTheDocument();
+    expect(within(workerSecretsPanel).getByText(`${faucetShort} • Base Sepolia (84532)`)).toBeInTheDocument();
+    expect(within(workerSecretsPanel).queryByText('Invalid key')).not.toBeInTheDocument();
   });
 
   it('hides zero-balance resource summaries in worker secrets', async () => {
     const faucetWallet = ethers.Wallet.createRandom();
-    const faucetBalanceSpy = jest
-      .spyOn(ethers.providers.JsonRpcProvider.prototype, 'getBalance')
-      .mockResolvedValue(ethers.constants.Zero);
+    mockReadProvider.getBalance.mockResolvedValue(ethers.constants.Zero);
     mockReadArweaveWalletBalance.mockResolvedValue({
       address: MOCK_ARWEAVE_ADDRESS,
       balanceUrl: 'https://arweave.example.test/wallet/test/balance',
@@ -292,58 +290,48 @@ describe('AdminPage resource balance previews', () => {
       winston: '5',
     });
 
-    try {
-      await renderAdminPage();
-      await waitForResolvedWorkerUrl();
+    await renderAdminPage();
+    await waitForResolvedWorkerUrl();
 
-      const workerSecretsPanel = await openWorkerSecretsPanel();
-      fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Arweave' }));
-      fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Faucet' }));
+    const workerSecretsPanel = await openWorkerSecretsPanel();
+    fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Arweave' }));
+    fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Faucet' }));
 
-      fireEvent.change(getSecretInputByLabel('Arweave JWK (JSON)'), {
-        target: { value: JSON.stringify(MOCK_ARWEAVE_JWK) },
-      });
-      fireEvent.change(getSecretInputByLabel('Faucet private key'), {
-        target: { value: faucetWallet.privateKey },
-      });
+    fireEvent.change(getSecretInputByLabel('Arweave JWK (JSON)'), {
+      target: { value: JSON.stringify(MOCK_ARWEAVE_JWK) },
+    });
+    fireEvent.change(getSecretInputByLabel('Faucet private key'), {
+      target: { value: faucetWallet.privateKey },
+    });
 
-      await waitFor(() => {
-        expect(mockReadArweaveWalletBalance).toHaveBeenCalledTimes(1);
-        expect(faucetBalanceSpy).toHaveBeenCalledTimes(1);
-        expect(within(workerSecretsPanel).queryByText('Arweave balance')).not.toBeInTheDocument();
-        expect(within(workerSecretsPanel).queryByText('Faucet balance')).not.toBeInTheDocument();
-        expect(within(workerSecretsPanel).queryByText('0.000000 AR')).not.toBeInTheDocument();
-        expect(within(workerSecretsPanel).queryByText('0.0000 ETH')).not.toBeInTheDocument();
-      });
-    } finally {
-      faucetBalanceSpy.mockRestore();
-    }
+    await waitFor(() => {
+      expect(mockReadArweaveWalletBalance).toHaveBeenCalledTimes(1);
+      expect(mockReadProvider.getBalance).toHaveBeenCalledTimes(1);
+      expect(within(workerSecretsPanel).queryByText('Arweave balance')).not.toBeInTheDocument();
+      expect(within(workerSecretsPanel).queryByText('Faucet balance')).not.toBeInTheDocument();
+      expect(within(workerSecretsPanel).queryByText('0.000000 AR')).not.toBeInTheDocument();
+      expect(within(workerSecretsPanel).queryByText('0.0000 ETH')).not.toBeInTheDocument();
+    });
   }, 15000);
 
   it('shows invalid resource states when the Arweave JWK or faucet key cannot be parsed', async () => {
-    const faucetBalanceSpy = jest.spyOn(ethers.providers.JsonRpcProvider.prototype, 'getBalance');
+    await renderAdminPage();
+    await waitForResolvedWorkerUrl();
 
-    try {
-      await renderAdminPage();
-      await waitForResolvedWorkerUrl();
+    const workerSecretsPanel = await openWorkerSecretsPanel();
+    fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Arweave' }));
+    fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Faucet' }));
 
-      const workerSecretsPanel = await openWorkerSecretsPanel();
-      fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Arweave' }));
-      fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Faucet' }));
+    fireEvent.change(getSecretInputByLabel('Arweave JWK (JSON)'), {
+      target: { value: '{' },
+    });
+    fireEvent.change(getSecretInputByLabel('Faucet private key'), {
+      target: { value: 'not-a-private-key' },
+    });
 
-      fireEvent.change(getSecretInputByLabel('Arweave JWK (JSON)'), {
-        target: { value: '{' },
-      });
-      fireEvent.change(getSecretInputByLabel('Faucet private key'), {
-        target: { value: 'not-a-private-key' },
-      });
-
-      expect(await within(workerSecretsPanel).findByText('Invalid JWK')).toBeInTheDocument();
-      expect(await within(workerSecretsPanel).findByText('Invalid key')).toBeInTheDocument();
-      expect(mockReadArweaveWalletBalance).not.toHaveBeenCalled();
-      expect(faucetBalanceSpy).not.toHaveBeenCalled();
-    } finally {
-      faucetBalanceSpy.mockRestore();
-    }
+    expect(await within(workerSecretsPanel).findByText('Invalid JWK')).toBeInTheDocument();
+    expect(await within(workerSecretsPanel).findByText('Invalid key')).toBeInTheDocument();
+    expect(mockReadArweaveWalletBalance).not.toHaveBeenCalled();
+    expect(mockReadProvider.getBalance).not.toHaveBeenCalled();
   });
 });

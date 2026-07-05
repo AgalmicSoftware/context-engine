@@ -227,6 +227,92 @@ describe('PasskeyEoaWalletClient', () => {
     }
   });
 
+  it('re-unlocks and retries a transaction once when the soft-session worker has locked', async () => {
+    const storage = createMemoryWalletStorage();
+    const credentials = makeCredentials();
+    const sessionClient = makeSessionClient();
+    const requestSpy = jest.spyOn(sessionClient, 'request');
+    requestSpy.mockImplementation(async ({ method }) => {
+      if (method === 'eth_sendTransaction' && requestSpy.mock.calls.length === 1) {
+        throw new Error('Passkey wallet is locked.');
+      }
+      if (method === 'eth_sendTransaction') return '0x' + '33'.repeat(32);
+      return null;
+    });
+    const client = new PasskeyEoaWalletClient({
+      config: derivedConfig,
+      storage,
+      credentials,
+      sessionClient,
+      sessionClientFactory: () => sessionClient,
+      privateKeyFactory: () => { throw new Error('derived mode must not generate a random key'); },
+    });
+
+    const address = await client.createWallet();
+    expect(client.isUnlocked()).toBe(true);
+
+    await expect(client.sendTransaction({ to: address, value: '0x0' })).resolves.toMatch(/^0x33/);
+
+    expect(credentials.get).toHaveBeenCalledTimes(2);
+    expect(sessionClient.calls).toHaveLength(2);
+    expect(requestSpy).toHaveBeenCalledTimes(2);
+    expect(sessionClient.locked).toBe(false);
+    expect(client.isUnlocked()).toBe(true);
+  });
+
+  it('routes passkey provider balance reads through the cached read provider', async () => {
+    const readProvider = {
+      getBalance: jest.fn().mockResolvedValue(ethers.BigNumber.from(5)),
+    };
+    const readProviderFactory = jest.fn(() => readProvider);
+    const client = new PasskeyEoaWalletClient({
+      config: derivedConfig,
+      storage: createMemoryWalletStorage(),
+      credentials: makeCredentials(),
+      sessionClient: makeSessionClient(),
+      readProviderFactory,
+      privateKeyFactory: () => { throw new Error('derived mode must not generate a random key'); },
+    });
+
+    await expect(client.request({
+      method: 'eth_getBalance',
+      params: [ADDRESS, 'latest'],
+    })).resolves.toBe('0x5');
+
+    expect(readProviderFactory).toHaveBeenCalledWith(11155420);
+    expect(readProvider.getBalance).toHaveBeenCalledWith(ADDRESS, 'latest');
+  });
+
+  it('falls back through cached read provider configs for unsupported raw read methods', async () => {
+    const firstProvider = {
+      send: jest.fn().mockRejectedValue(Object.assign(new Error('Too Many Requests'), { status: 429 })),
+    };
+    const secondProvider = {
+      send: jest.fn().mockResolvedValue('0x1234'),
+    };
+    const client = new PasskeyEoaWalletClient({
+      config: derivedConfig,
+      storage: createMemoryWalletStorage(),
+      credentials: makeCredentials(),
+      sessionClient: makeSessionClient(),
+      readProviderFactory: jest.fn(() => ({
+        providerConfigs: [
+          { priority: 2, provider: secondProvider },
+          { priority: 1, provider: firstProvider },
+        ],
+      })),
+      privateKeyFactory: () => { throw new Error('derived mode must not generate a random key'); },
+    });
+
+    await expect(client.request({
+      method: 'eth_feeHistory',
+      params: ['0x1', 'latest', []],
+    })).resolves.toBe('0x1234');
+
+    expect(firstProvider.send).toHaveBeenCalledWith('eth_feeHistory', ['0x1', 'latest', []]);
+    expect(secondProvider.send).toHaveBeenCalledWith('eth_feeHistory', ['0x1', 'latest', []]);
+  });
+
   it('fails closed before WebAuthn when no encrypted wallet record is stored', async () => {
     const credentials = makeCredentials();
     const client = new PasskeyEoaWalletClient({
@@ -328,6 +414,26 @@ describe('soft session policy', () => {
         gasLimit: 21000,
       }],
     })).rejects.toThrow(/does not allow eth_signTransaction/i);
+  });
+
+  it('does not forward unsupported session methods to the raw RPC provider', async () => {
+    const sessionClient = createInMemorySoftSessionClient();
+    const policy = createSoftSessionPolicy({
+      address: ADDRESS,
+      ttlSeconds: 60,
+      allowedChainIds: [11155420],
+    });
+    await sessionClient.init({
+      privateKey: PRIVATE_KEY,
+      rpcUrl: 'http://127.0.0.1:1',
+      chainId: 11155420,
+      policy,
+    });
+
+    await expect(sessionClient.request({
+      method: 'eth_feeHistory',
+      params: ['0x1', 'latest', []],
+    })).rejects.toThrow(/Unsupported passkey session method: eth_feeHistory/i);
   });
 
   it('applies sender, chain, target, and value policy to raw transaction signing', () => {
