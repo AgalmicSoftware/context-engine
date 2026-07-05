@@ -68,31 +68,48 @@ test('session policy resolves defaults and invocation by slug or name', () => {
 
 test('session policy can switch the default Telegram demo session by date', () => {
   const base = {
-    defaultSessionSlug: 'ee-26-organizers',
-    defaultSessionSchedule: [{
-      from: '2026-05-30T00:00:00-07:00',
-      sessionSlug: 'ee-26-users',
-    }],
+    default: 'ee-26-organizers',
+    defaultSessionSchedule: [
+      { sessionSlug: 'ee-26-organizers', until: '2026-05-30T00:00:00Z' },
+      { sessionSlug: 'ee-26-users', from: '2026-05-30T00:00:00Z' },
+    ],
     sessions: [
-      { sessionSlug: 'ee-26-test', sessionName: 'EE 26 Test', telegramBridgeEnabled: true, telegramOnly: true },
-      { sessionSlug: 'ee-26-organizers', sessionName: 'EE 26 Organizers', telegramBridgeEnabled: true, telegramOnly: true },
-      { sessionSlug: 'ee-26-users', sessionName: 'EE 26 Users', telegramBridgeEnabled: true, telegramOnly: true },
+      {
+        sessionSlug: 'ee-26-test',
+        sessionName: 'EE26 Test',
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+        createdAt: '2026-05-29T00:00:00Z',
+      },
+      {
+        sessionSlug: 'ee-26-organizers',
+        sessionName: 'EE26 Organizers',
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+        createdAt: '2026-05-29T01:00:00Z',
+      },
+      {
+        sessionSlug: 'ee-26-users',
+        sessionName: 'EE26 Users',
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+        createdAt: '2026-05-29T02:00:00Z',
+      },
     ],
   };
-  const beforeMay30 = normalizeSessionPolicy(base, { now: '2026-05-29T12:00:00-07:00' });
-  const onMay30 = normalizeSessionPolicy(base, { now: '2026-05-30T12:00:00-07:00' });
+  const beforeMay30 = normalizeSessionPolicy(base, { now: '2026-05-29T23:59:59Z' });
+  const onMay30 = normalizeSessionPolicy(base, { now: '2026-05-30T00:00:00Z' });
 
   assert.equal(beforeMay30.defaultSessionSlug, 'ee-26-organizers');
-  assert.equal(
-    resolveSessionInvocation(beforeMay30, beforeMay30.defaultSessionSlug).session.sessionSlug,
-    'ee-26-organizers'
-  );
+  assert.equal(resolveSessionInvocation(beforeMay30, '').session.sessionSlug, 'ee-26-organizers');
   assert.equal(onMay30.defaultSessionSlug, 'ee-26-users');
-  assert.equal(
-    resolveSessionInvocation(onMay30, onMay30.defaultSessionSlug).session.sessionSlug,
-    'ee-26-users'
-  );
+  assert.equal(resolveSessionInvocation(onMay30, '').session.sessionSlug, 'ee-26-users');
   assert.equal(onMay30.configuredDefaultSessionSlug, 'ee-26-organizers');
+  assert.deepEqual(onMay30.linkedSessions.map((session) => [session.sessionSlug, session.createdAt]), [
+    ['ee-26-test', '2026-05-29T00:00:00Z'],
+    ['ee-26-organizers', '2026-05-29T01:00:00Z'],
+    ['ee-26-users', '2026-05-29T02:00:00Z'],
+  ]);
 
   const invalidSchedule = normalizeSessionPolicy({
     ...base,
@@ -180,6 +197,7 @@ test('Telegram question cards preserve CE rating/comment/mic/doc conventions by 
   const ratingControls = buildTelegramQuestionControls({
     questionId: 'rating-1',
     questionType: 'rating',
+    ratingScale: { min: 1, max: 5 },
   }, {
     docsExist: true,
   });
@@ -219,11 +237,11 @@ test('Telegram question cards preserve CE rating/comment/mic/doc conventions by 
     rating.controls
       .filter((control) => control.controlType === 'rating_button')
       .map((control) => control.value),
-    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+    [1, 2, 3, 4, 5],
   );
-  assert.equal(rating.controls.find((control) => control.value === 10).label, '10');
-  assert.equal(rating.controls.find((control) => control.controlType === 'rating_button').min, 0);
-  assert.equal(rating.controls.find((control) => control.controlType === 'rating_button').max, 10);
+  assert.equal(rating.controls.find((control) => control.value === 5).label, '5');
+  assert.equal(rating.controls.find((control) => control.controlType === 'rating_button').min, 1);
+  assert.equal(rating.controls.find((control) => control.controlType === 'rating_button').max, 5);
   assert.equal(ratingControls.some((control) => control.action === TELEGRAM_BRIDGE_ACTIONS.ADDITIONAL_COMMENTS), true);
   assert.equal(ratingControls.some((control) => control.action === TELEGRAM_BRIDGE_ACTIONS.MICROPHONE_INPUT), true);
   assert.equal(ratingControls.some((control) => control.action === TELEGRAM_BRIDGE_ACTIONS.DOC_CONTEXT), true);

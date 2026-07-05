@@ -3,28 +3,43 @@ import assert from 'node:assert/strict';
 import { Buffer } from 'node:buffer';
 import {
   buildTelegramCommandResponse,
+  clearAdminDefaultSessionOverride,
+  clearAgentSkillUpdateFlag,
   dispatchTelegramCommandResponse,
   fetchUrlQuestionSource,
   handleTelegramWebhookUpdate,
+  loadQuestionsForSession,
   loadSubmittedResultRecords,
   loadSessionPolicy,
   parseTelegramCommandText,
+  readAgentSkillUpdateFlag,
+  readAdminDefaultSessionOverride,
+  writeAgentSkillUpdateFlag,
+  writeAdminDefaultSessionOverride,
 } from './telegramCommands.mjs';
+import { saveTelegramAgentSettingsPatch } from './telegramAgentSettings.mjs';
+import { DRAFT_EDIT_METRIC_KV_PREFIX } from './telegramDraftEditMetrics.mjs';
 import { deriveManagedDemoAccount } from './managedAccounts.mjs';
 import {
   loadTelegramAgentDelegationToken,
+  TELEGRAM_AGENT_DELEGATION_TOKEN_USER_KV_PREFIX,
   TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_TTL_SECONDS,
   TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES,
 } from './telegramAgentDelegationTokens.mjs';
 import { __test__sessionQuestions } from './sessionQuestions.mjs';
-import { submitRequestSessionKvKey } from './telegramSubmitQueue.mjs';
+import {
+  canonicalAnswerSessionKvKey,
+  submitRequestSessionKvKey,
+} from './telegramSubmitQueue.mjs';
 
 class MemoryKv {
   constructor() {
     this.store = new Map();
+    this.putCalls = [];
   }
 
-  async put(key, value) {
+  async put(key, value, options = undefined) {
+    this.putCalls.push({ key, value, options });
     this.store.set(key, value);
   }
 
@@ -175,6 +190,26 @@ function privateMessageFrom(text, {
   };
 }
 
+function privateVoiceMessage({
+  telegramUserId = '42',
+  username = 'participant',
+  fileId = 'voice-file-1',
+} = {}) {
+  return {
+    update_id: 7003,
+    message: {
+      message_id: 13,
+      voice: {
+        file_id: fileId,
+        duration: 4,
+        mime_type: 'audio/ogg',
+      },
+      chat: { id: Number(telegramUserId), type: 'private' },
+      from: { id: Number(telegramUserId), username },
+    },
+  };
+}
+
 async function withTimeout(promise, ms = 100, message = 'operation timed out') {
   let timeout = null;
   try {
@@ -219,6 +254,36 @@ function encodeRegistryStringResult(value = '') {
 
 function arweaveId(byte = 7) {
   return Buffer.from(Uint8Array.from({ length: 32 }, () => byte)).toString('base64url');
+}
+
+function u16le(bytes, offset) {
+  return bytes[offset] | (bytes[offset + 1] << 8);
+}
+
+function u32le(bytes, offset) {
+  return (bytes[offset] |
+    (bytes[offset + 1] << 8) |
+    (bytes[offset + 2] << 16) |
+    (bytes[offset + 3] << 24)) >>> 0;
+}
+
+function readZipTextFiles(bytes) {
+  const out = {};
+  const decoder = new TextDecoder();
+  let offset = 0;
+  while (offset + 30 <= bytes.length && u32le(bytes, offset) === 0x04034b50) {
+    const method = u16le(bytes, offset + 8);
+    const compressedSize = u32le(bytes, offset + 18);
+    const nameLength = u16le(bytes, offset + 26);
+    const extraLength = u16le(bytes, offset + 28);
+    const nameStart = offset + 30;
+    const dataStart = nameStart + nameLength + extraLength;
+    const name = decoder.decode(bytes.slice(nameStart, nameStart + nameLength));
+    const data = bytes.slice(dataStart, dataStart + compressedSize);
+    if (method === 0) out[name] = decoder.decode(data);
+    offset = dataStart + compressedSize;
+  }
+  return out;
 }
 
 function mockSessionWorkerFetch(calls = [], { txId = arweaveId() } = {}) {
@@ -278,6 +343,10 @@ function registryFetchForSlugs(slugs = []) {
 
 function flattenButtons(replyMarkup) {
   return (replyMarkup?.inline_keyboard || []).flat();
+}
+
+function nonNavigationButtons(replyMarkup) {
+  return flattenButtons(replyMarkup).filter((button) => button.text !== 'Back to Start');
 }
 
 function launchFromButton(button = {}) {
@@ -800,7 +869,8 @@ test('/sessions paginates tall Telegram session lists', async () => {
   const loadNext = buttons.find((button) => button.text === 'Load Next');
   assert.match(first.response.text, /Sessions \(5\/6\)/);
   assert.equal(first.response.text.includes('- six (six)'), false);
-  assert.equal(buttons.filter((button) => button.callback_data).length, 6);
+  assert.equal(nonNavigationButtons(first.response.replyMarkup).filter((button) => button.callback_data).length, 6);
+  assert.equal(buttons.some((button) => button.text === 'Back to Start'), true);
 
   const second = await buildTelegramCommandResponse({
     update: {
@@ -862,7 +932,8 @@ test('/sessions lists only Telegram-enabled sessions', async () => {
   assert.match(result.response.text, /- alpha \(Alpha Session\)/);
   assert.match(result.response.text, /- beta \(Beta Session\)/);
   assert.equal(result.response.text.includes('Gamma Session'), false);
-  assert.deepEqual(flattenButtons(result.response.replyMarkup).map((button) => button.text), ['Alpha Session', 'Beta Session']);
+  assert.deepEqual(nonNavigationButtons(result.response.replyMarkup).map((button) => button.text), ['Alpha Session', 'Beta Session']);
+  assert.equal(flattenButtons(result.response.replyMarkup).some((button) => button.text === 'Back to Start'), true);
 });
 
 test('/sessions and /start honor the Cloudflare Telegram session created-after cutoff', async () => {
@@ -899,16 +970,16 @@ test('/sessions and /start honor the Cloudflare Telegram session created-after c
   });
 
   const sessions = await buildTelegramCommandResponse({
-    update: groupMessage('/sessions'),
+    update: privateMessage('/sessions'),
     env,
     now: '2026-05-21T12:00:00.000Z',
   });
   assert.equal(sessions.ok, true);
-  assert.match(sessions.response.text, /Sessions \(1\/1\)/);
+  assert.match(sessions.response.text, /Sessions \(2\/2\)/);
+  assert.match(sessions.response.text, /- old-alpha \(Old Alpha\)/);
   assert.match(sessions.response.text, /- new-beta \(New Beta\)/);
-  assert.equal(sessions.response.text.includes('Old Alpha'), false);
   assert.equal(sessions.response.text.includes('Missing Created At'), false);
-  assert.deepEqual(flattenButtons(sessions.response.replyMarkup).map((button) => button.text), ['New Beta']);
+  assert.deepEqual(nonNavigationButtons(sessions.response.replyMarkup).map((button) => button.text), ['Old Alpha', 'New Beta']);
 
   const start = await buildTelegramCommandResponse({
     update: privateMessage('/start'),
@@ -916,14 +987,507 @@ test('/sessions and /start honor the Cloudflare Telegram session created-after c
     now: '2026-05-21T12:00:01.000Z',
   });
   assert.equal(start.ok, true);
-  assert.match(start.response.text, /Session: New Beta/);
-  assert.equal(start.response.text.includes('/sessions'), false);
-  const binding = JSON.parse(await env.AGENT_ACTION_KV.get('telegram:private-session:42'));
-  assert.equal(binding.sessionSlug, 'new-beta');
-  const miniApp = flattenButtons(start.response.replyMarkup).find((button) => button.text === 'Mini App');
-  const launch = new URL(miniApp.web_app.url).searchParams.get('launch');
-  const record = JSON.parse(await env.AGENT_ACTION_KV.get(`telegram:action:${launch}`));
-  assert.equal(record.serverContextRef.sessionSlug, 'new-beta');
+  assert.match(start.response.text, /\/sessions - choose session/);
+  const binding = await env.AGENT_ACTION_KV.get('telegram:private-session:42');
+  assert.equal(binding, null);
+});
+
+test('/sessions keeps the default visible when the cutoff is newer than its createdAt', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER: '2026-05-20T00:00:00.000Z',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'old-default',
+      riskCeiling: 'submit',
+      sessions: [
+        {
+          sessionSlug: 'old-default',
+          sessionName: 'Old Default',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          createdAt: '2026-05-19T00:00:00.000Z',
+        },
+        {
+          sessionSlug: 'old-non-default',
+          sessionName: 'Old Non Default',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          createdAt: '2026-05-19T12:00:00.000Z',
+        },
+        {
+          sessionSlug: 'new-non-default',
+          sessionName: 'New Non Default',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          createdAt: '2026-05-20T00:00:00.000Z',
+        },
+        {
+          sessionSlug: 'e2e-new',
+          sessionName: 'E2E New Session',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          createdAt: '2026-05-21T00:00:00.000Z',
+        },
+      ],
+    }),
+  });
+
+  const sessions = await buildTelegramCommandResponse({
+    update: privateMessage('/sessions'),
+    env,
+    now: '2026-05-21T12:00:00.000Z',
+  });
+
+  assert.equal(sessions.ok, true);
+  assert.match(sessions.response.text, /Sessions \(2\/2\)/);
+  assert.match(sessions.response.text, /- old-default \(Old Default\)/);
+  assert.match(sessions.response.text, /- new-non-default \(New Non Default\)/);
+  assert.equal(sessions.response.text.includes('Old Non Default'), false);
+  assert.equal(sessions.response.text.includes('E2E New Session'), false);
+  assert.deepEqual(nonNavigationButtons(sessions.response.replyMarkup).map((button) => button.text), [
+    'Old Default',
+    'New Non Default',
+  ]);
+});
+
+test('/sessions keeps the default visible when cutoff metadata is missing', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER: '2026-05-20T00:00:00.000Z',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'metadata-free-default',
+      riskCeiling: 'submit',
+      sessions: [
+        {
+          sessionSlug: 'metadata-free-default',
+          sessionName: 'Metadata Free Default',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+        },
+        {
+          sessionSlug: 'metadata-free-other',
+          sessionName: 'Metadata Free Other',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+        },
+        {
+          sessionSlug: 'fresh-session',
+          sessionName: 'Fresh Session',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          createdAt: '2026-05-21T00:00:00.000Z',
+        },
+      ],
+    }),
+  });
+
+  const sessions = await buildTelegramCommandResponse({
+    update: privateMessage('/sessions'),
+    env,
+    now: '2026-05-21T12:00:00.000Z',
+  });
+
+  assert.equal(sessions.ok, true);
+  assert.match(sessions.response.text, /Sessions \(2\/2\)/);
+  assert.match(sessions.response.text, /- metadata-free-default \(Metadata Free Default\)/);
+  assert.match(sessions.response.text, /- fresh-session \(Fresh Session\)/);
+  assert.equal(sessions.response.text.includes('Metadata Free Other'), false);
+  assert.deepEqual(nonNavigationButtons(sessions.response.replyMarkup).map((button) => button.text), [
+    'Metadata Free Default',
+    'Fresh Session',
+  ]);
+});
+
+test('/sessions can use the Edge 2026 cutoff to hide the test session', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER: '2026-05-29T01:00:00.000Z',
+    AGENT_BRIDGE_SESSION_POLICY_NOW: '2026-05-30T00:00:00.000Z',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'ee-26-organizers',
+      defaultSessionSchedule: [
+        { sessionSlug: 'ee-26-organizers', until: '2026-05-30T00:00:00Z' },
+        { sessionSlug: 'ee-26-users', from: '2026-05-30T00:00:00Z' },
+      ],
+      riskCeiling: 'submit',
+      sessions: [
+        {
+          sessionSlug: 'ee-26-test',
+          sessionName: 'EE26 Test',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          createdAt: '2026-05-29T00:00:00Z',
+        },
+        {
+          sessionSlug: 'ee-26-organizers',
+          sessionName: 'EE26 Organizers',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          telegramGroupOpenAccess: true,
+          createdAt: '2026-05-29T01:00:00Z',
+        },
+        {
+          sessionSlug: 'ee-26-users',
+          sessionName: 'EE26 Users',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          telegramGroupOpenAccess: true,
+          createdAt: '2026-05-29T02:00:00Z',
+        },
+      ],
+    }),
+  });
+
+  const sessions = await buildTelegramCommandResponse({
+    update: groupMessage('/sessions'),
+    env,
+    now: '2026-05-30T00:00:01.000Z',
+  });
+
+  assert.equal(sessions.ok, true);
+  assert.match(sessions.response.text, /Sessions \(2\/2\)/);
+  assert.equal(sessions.response.text.includes('EE26 Test'), false);
+  assert.match(sessions.response.text, /- ee-26-organizers \(EE26 Organizers\)/);
+  assert.match(sessions.response.text, /- ee-26-users \(EE26 Users\)/);
+  assert.deepEqual(nonNavigationButtons(sessions.response.replyMarkup).map((button) => button.text), [
+    'EE26 Organizers',
+    'EE26 Users',
+  ]);
+
+  const start = await buildTelegramCommandResponse({
+    update: privateMessage('/start'),
+    env,
+    now: '2026-05-30T00:00:02.000Z',
+  });
+  assert.equal(start.ok, true);
+  assert.match(start.response.text, /\/sessions - choose session/);
+});
+
+test('admin default-session override writes a durable KV record', async () => {
+  const kv = new MemoryKv();
+  const env = baseEnv({ AGENT_ACTION_KV: kv });
+  const written = await writeAdminDefaultSessionOverride({
+    env,
+    sessionSlug: 'Beta',
+    accountAddress: `0x${'ab'.repeat(20)}`,
+    createdAt: '2026-05-29T12:00:00.000Z',
+  });
+  const read = await readAdminDefaultSessionOverride(env);
+  const putCall = kv.putCalls.find((call) => call.key === 'telegram:admin-default-session:v1');
+
+  assert.deepEqual(written, { ok: true, sessionSlug: 'beta' });
+  assert.equal(read.sessionSlug, 'beta');
+  assert.equal(read.updatedBy, '0xabab...abab');
+  assert.equal(putCall.options?.expirationTtl, undefined);
+  assert.equal(putCall.options?.expiration, undefined);
+});
+
+test('agent skill-update flag writes a durable KV record', async () => {
+  const kv = new MemoryKv();
+  const env = baseEnv({ AGENT_ACTION_KV: kv });
+  const written = await writeAgentSkillUpdateFlag({
+    env,
+    latestVersion: '2026-05-30 (v19)',
+    note: 'Refresh before answering.',
+    accountAddress: `0x${'cd'.repeat(20)}`,
+    createdAt: '2026-05-30T00:00:00.000Z',
+  });
+  const read = await readAgentSkillUpdateFlag(env);
+  const putCall = kv.putCalls.find((call) => call.key === 'telegram:agent-skill-update:v1');
+  const cleared = await clearAgentSkillUpdateFlag(env);
+
+  assert.deepEqual(written, { ok: true, latestVersion: '2026-05-30 (v19)' });
+  assert.equal(read.updateAvailable, true);
+  assert.equal(read.latestVersion, '2026-05-30 (v19)');
+  assert.equal(read.note, 'Refresh before answering.');
+  assert.equal(read.updatedBy, '0xcdcd...cdcd');
+  assert.equal(putCall.options?.expirationTtl, undefined);
+  assert.equal(putCall.options?.expiration, undefined);
+  assert.deepEqual(cleared, { ok: true });
+  assert.deepEqual(await readAgentSkillUpdateFlag(env), {});
+});
+
+test('loadSessionPolicy applies a valid admin default-session pin', async () => {
+  const kv = new MemoryKv();
+  await kv.put('telegram:admin-default-session:v1', JSON.stringify({
+    version: 1,
+    sessionSlug: 'beta',
+    updatedBy: '0x1234...abcd',
+    updatedAt: '2026-05-29T12:00:00.000Z',
+  }));
+  const env = baseEnv({
+    AGENT_ACTION_KV: kv,
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      sessions: [
+        { sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true },
+        { sessionSlug: 'beta', sessionName: 'Beta', telegramBridgeEnabled: true, telegramOnly: true },
+      ],
+    }),
+  });
+
+  const policy = await loadSessionPolicy(env);
+
+  assert.equal(policy.defaultSessionSlug, 'beta');
+  assert.equal(policy.adminDefaultSessionSlug, 'beta');
+  assert.equal(policy.scheduledDefaultSessionSlug, 'alpha');
+});
+
+test('admin default-session pin wins over the schedule', async () => {
+  const kv = new MemoryKv();
+  await kv.put('telegram:admin-default-session:v1', JSON.stringify({
+    version: 1,
+    sessionSlug: 'beta',
+    updatedAt: '2026-05-29T12:00:00.000Z',
+  }));
+  const env = baseEnv({
+    AGENT_ACTION_KV: kv,
+    AGENT_BRIDGE_SESSION_POLICY_NOW: '2026-05-30T00:00:00.000Z',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      defaultSessionSchedule: [
+        { sessionSlug: 'alpha', until: '2026-05-30T00:00:00.000Z' },
+        { sessionSlug: 'alpha', from: '2026-05-30T00:00:00.000Z' },
+      ],
+      riskCeiling: 'submit',
+      sessions: [
+        { sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true },
+        { sessionSlug: 'beta', sessionName: 'Beta', telegramBridgeEnabled: true, telegramOnly: true },
+      ],
+    }),
+  });
+
+  const policy = await loadSessionPolicy(env);
+
+  assert.equal(policy.scheduledDefaultSessionSlug, 'alpha');
+  assert.equal(policy.defaultSessionSlug, 'beta');
+  assert.equal(policy.adminDefaultSessionSlug, 'beta');
+});
+
+test('loadSessionPolicy ignores a stale admin default-session pin', async () => {
+  const kv = new MemoryKv();
+  await kv.put('telegram:admin-default-session:v1', JSON.stringify({
+    version: 1,
+    sessionSlug: 'missing-session',
+    updatedAt: '2026-05-29T12:00:00.000Z',
+  }));
+  const env = baseEnv({
+    AGENT_ACTION_KV: kv,
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      sessions: [
+        { sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true },
+      ],
+    }),
+  });
+
+  const policy = await loadSessionPolicy(env);
+
+  assert.equal(policy.defaultSessionSlug, 'alpha');
+  assert.equal(policy.adminDefaultSessionSlug, '');
+  assert.equal(policy.adminDefaultSessionInvalidSlug, 'missing-session');
+});
+
+test('/set_default is private-chat only and admin-gated', async () => {
+  const now = '2026-05-29T12:00:00.000Z';
+  const kv = new MemoryKv();
+  const adminAddress = await privateManagedAccountAddress(baseEnv(), now);
+  const env = baseEnv({
+    AGENT_ACTION_KV: kv,
+    AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES: adminAddress,
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      sessions: [
+        { sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true },
+        { sessionSlug: 'beta', sessionName: 'Beta', telegramBridgeEnabled: true, telegramOnly: true },
+      ],
+    }),
+  });
+  const nonAdminEnv = baseEnv({
+    AGENT_BRIDGE_SESSION_POLICY_JSON: env.AGENT_BRIDGE_SESSION_POLICY_JSON,
+  });
+
+  const groupDenied = await buildTelegramCommandResponse({
+    update: groupMessage('/set_default beta'),
+    env,
+    now,
+  });
+  const adminDenied = await buildTelegramCommandResponse({
+    update: privateMessage('/set_default beta'),
+    env: nonAdminEnv,
+    now,
+  });
+  const unknown = await buildTelegramCommandResponse({
+    update: privateMessage('/set_default missing'),
+    env,
+    now,
+  });
+  const set = await buildTelegramCommandResponse({
+    update: privateMessage('/set_default beta'),
+    env,
+    now,
+  });
+  const putsAfterSet = kv.putCalls.length;
+  const status = await buildTelegramCommandResponse({
+    update: privateMessage('/set_default'),
+    env,
+    now,
+  });
+
+  assert.equal(groupDenied.screen, 'admin_default_session_private_required');
+  assert.equal(adminDenied.screen, 'admin_default_session_denied');
+  assert.equal(adminDenied.ok, false);
+  assert.equal(unknown.screen, 'admin_default_session_invalid');
+  assert.equal(unknown.ok, false);
+  assert.equal(set.screen, 'admin_default_session_set');
+  assert.match(set.response.text, /Default session pinned to Beta/);
+  assert.equal(JSON.parse(await kv.get('telegram:admin-default-session:v1')).sessionSlug, 'beta');
+  assert.equal(status.screen, 'admin_default_session_status');
+  assert.match(status.response.text, /Effective default: beta/);
+  assert.match(status.response.text, /Admin pin: beta/);
+  assert.equal(kv.putCalls.length, putsAfterSet);
+
+  const clear = await buildTelegramCommandResponse({
+    update: privateMessage('/set_default clear'),
+    env,
+    now,
+  });
+
+  assert.equal(clear.screen, 'admin_default_session_cleared');
+  assert.equal(await kv.get('telegram:admin-default-session:v1'), null);
+});
+
+test('private voice message updates the latest Mini App launch draft', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_MINI_APP_URL: 'https://bridge.example/telegram/mini-app',
+    AGENT_BRIDGE_DEPLOYMENT_ID: 'test-deploy',
+    AGENT_BRIDGE_OPENAI_API_KEY: 'sk-bridge-openai',
+    AGENT_BRIDGE_TRANSCRIBE_RATE_LIMIT: '1',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha Session',
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+        telegramGroupOpenAccess: true,
+        managedAccountSubmitAllowed: true,
+        sponsoredAiAllowed: true,
+        sessionWorkerUrl: 'https://session.example',
+      }],
+    }),
+  });
+  const launch = 'cecb_voice_draft';
+  await env.AGENT_ACTION_KV.put(`telegram:action:${launch}`, JSON.stringify({
+    action: 'submit_response',
+    lane: 'telegram_mini_app',
+    callbackData: launch,
+    miniAppLaunch: true,
+    serverContextRef: {
+      sessionSlug: 'alpha',
+      questionId: 'q-readiness',
+      questionSeries: {
+        questionIds: ['q-readiness'],
+        skippedQuestionIds: [],
+        draftAnswersByQuestionId: {
+          'q-readiness': { text: 'Existing draft' },
+        },
+      },
+    },
+  }));
+  await env.AGENT_ACTION_KV.put('telegram:mini-app-latest-launch:v1:42', JSON.stringify({
+    type: 'telegram_mini_app_latest_launch',
+    version: 1,
+    telegramUserId: '42',
+    sessionSlug: 'alpha',
+    launch,
+    questionIds: ['q-readiness'],
+    updatedAt: '2026-05-29T12:00:00.000Z',
+  }));
+  const calls = [];
+  const fetchImpl = async (url, init = {}) => {
+    const target = String(url);
+    calls.push({ url: target, init });
+    if (target.endsWith('/auth/nonce')) {
+      return new Response(JSON.stringify({ nonce: 'nonce-voice' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (target.endsWith('/auth/login')) {
+      return new Response(JSON.stringify({ token: 'worker-token' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (target.endsWith('/getFile')) {
+      const body = JSON.parse(init.body);
+      assert.equal(body.file_id, 'voice-file-1');
+      return new Response(JSON.stringify({
+        ok: true,
+        result: { file_path: 'voice/file_1.ogg' },
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (target.includes('/file/bot123456:test-token/voice/file_1.ogg')) {
+      return new Response(new Uint8Array([1, 2, 3]), {
+        status: 200,
+        headers: { 'content-type': 'audio/ogg' },
+      });
+    }
+    if (target.endsWith('/transcribe')) {
+      assert.equal(init.headers.Authorization, 'Bearer worker-token');
+      assert.equal(init.body.get('model'), 'whisper-1');
+      assert.equal(init.body.get('apiKey'), 'sk-bridge-openai');
+      assert.equal(init.body.get('file').name, 'file_1.ogg');
+      return new Response(JSON.stringify({ text: 'spoken update' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    return new Response(JSON.stringify({ error: `unexpected ${target}` }), {
+      status: 500,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+
+  const result = await buildTelegramCommandResponse({
+    update: privateVoiceMessage(),
+    env,
+    fetchImpl,
+    now: '2026-05-29T12:05:00.000Z',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.screen, 'mini_app_voice_draft_fallback');
+  assert.match(result.response.text, /Updated the Mini App draft/);
+  assert.equal(flattenButtons(result.response.replyMarkup)[0].text, 'Review Draft');
+  const stored = JSON.parse(await env.AGENT_ACTION_KV.get(`telegram:action:${launch}`));
+  assert.equal(
+    stored.serverContextRef.questionSeries.draftAnswersByQuestionId['q-readiness'].text,
+    'Existing draft\n\nspoken update'
+  );
+  assert.deepEqual(calls.map((call) => new URL(call.url).pathname), [
+    '/auth/nonce',
+    '/auth/login',
+    '/bot123456:test-token/getFile',
+    '/file/bot123456:test-token/voice/file_1.ogg',
+    '/transcribe',
+  ]);
+
+  const second = await buildTelegramCommandResponse({
+    update: privateVoiceMessage({ fileId: 'voice-file-2' }),
+    env,
+    fetchImpl,
+    now: '2026-05-29T12:06:00.000Z',
+  });
+  assert.equal(second.ok, false);
+  assert.equal(second.reason, 'transcribe_rate_limited');
+  assert.match(second.response.text, /temporarily rate limited/);
+  assert.equal(calls.length, 5);
 });
 
 test('/questions and callback dispatch list questions without leaking locked prompts', async () => {
@@ -956,7 +1520,7 @@ test('/questions and callback dispatch list questions without leaking locked pro
   assert.equal(callback.response.method, 'editMessageText');
   assert.match(callback.response.text, /^Questions \(2\/2\)\n\n1\. What should Alpha decide next\?/);
   assert.equal(callback.response.text.includes('Choose a question'), false);
-  assert.deepEqual(flattenButtons(callback.response.replyMarkup).map((button) => button.text), [
+  assert.deepEqual(nonNavigationButtons(callback.response.replyMarkup).map((button) => button.text), [
     'Pose 1',
     'Pose 2',
   ]);
@@ -997,16 +1561,97 @@ test('/questions handles bytes32 question IDs without putting them in opaque see
   assert.equal(result.response.text.includes('Locked bytes32 prompt must not leak'), false);
   assert.match(result.response.text, /2\. Encrypted question/);
   const buttons = flattenButtons(result.response.replyMarkup);
-  assert.equal(buttons.length, 2);
-  assert.deepEqual(buttons.map((button) => button.text), [
+  assert.equal(nonNavigationButtons(result.response.replyMarkup).length, 2);
+  assert.deepEqual(nonNavigationButtons(result.response.replyMarkup).map((button) => button.text), [
     'Pose 1',
     'Pose 2',
   ]);
+  assert.equal(buttons.some((button) => button.text === 'Back to Start'), true);
   for (const button of buttons) {
     assert.match(button.callback_data, /^cecb_[a-z0-9]{10,48}$/);
     assert.equal(button.callback_data.includes(publicQuestionId), false);
     assert.equal(button.callback_data.includes(lockedQuestionId), false);
   }
+});
+
+test('/questions assigns stable numbers that survive list reordering', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
+      {
+        questionId: 'q-alpha-first',
+        questionType: 'freeform',
+        prompt: 'Alpha first question?',
+      },
+      {
+        questionId: 'q-alpha-second',
+        questionType: 'freeform',
+        prompt: 'Alpha second question?',
+      },
+    ]),
+  });
+
+  const firstList = await buildTelegramCommandResponse({
+    update: groupMessage('/questions alpha'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+
+  assert.equal(firstList.ok, true);
+  assert.match(firstList.response.text, /1\. Alpha first question\?/);
+  assert.match(firstList.response.text, /2\. Alpha second question\?/);
+  assert.doesNotMatch(firstList.response.text, /\(#\d+\)/);
+  assert.match(firstList.response.text, /Alpha first question\?\n\n2\. Alpha second question\?/);
+  assert.equal(flattenButtons(firstList.response.replyMarkup).some((button) => button.text === 'Back to Start'), true);
+
+  env.AGENT_BRIDGE_DEMO_QUESTIONS_JSON = JSON.stringify([
+    {
+      questionId: 'q-alpha-second',
+      questionType: 'freeform',
+      prompt: 'Alpha second question?',
+    },
+    {
+      questionId: 'q-alpha-new',
+      questionType: 'freeform',
+      prompt: 'Alpha new question?',
+    },
+    {
+      questionId: 'q-alpha-first',
+      questionType: 'freeform',
+      prompt: 'Alpha first question?',
+    },
+  ]);
+
+  const reorderedList = await buildTelegramCommandResponse({
+    update: groupMessage('/questions alpha'),
+    env,
+    now: '2026-05-08T12:00:01.000Z',
+  });
+  const stablePose = await buildTelegramCommandResponse({
+    update: groupMessage('/q 2'),
+    env,
+    now: '2026-05-08T12:00:02.000Z',
+  });
+  const namedStablePose = await buildTelegramCommandResponse({
+    update: groupMessage('/q question 3'),
+    env,
+    now: '2026-05-08T12:00:03.000Z',
+  });
+
+  assert.match(reorderedList.response.text, /1\. Alpha second question\?/);
+  assert.match(reorderedList.response.text, /2\. Alpha new question\?/);
+  assert.match(reorderedList.response.text, /3\. Alpha first question\?/);
+  assert.doesNotMatch(reorderedList.response.text, /\(#\d+\)/);
+  assert.equal(stablePose.ok, true);
+  assert.match(stablePose.response.text, /Alpha second question\?/);
+  assert.equal(stablePose.response.text.includes('Alpha new question?'), false);
+  assert.equal(namedStablePose.ok, true);
+  assert.match(namedStablePose.response.text, /Alpha new question\?/);
+
+  const map = JSON.parse(await env.AGENT_ACTION_KV.get('telegram:question-number:alpha'));
+  assert.equal(map.questionIdToNumber['q-alpha-first'], 1);
+  assert.equal(map.questionIdToNumber['q-alpha-second'], 2);
+  assert.equal(map.questionIdToNumber['q-alpha-new'], 3);
+  assert.equal(map.nextNumber, 4);
 });
 
 test('/questions caps Telegram rows at five and keeps the chat page minimal', async () => {
@@ -1328,6 +1973,36 @@ test('submitted result reads use per-session indexes instead of capped global sc
   assert.deepEqual(records.map((record) => record.requestId), ['alpha-0', 'alpha-1', 'alpha-2']);
 });
 
+test('submitted result reads include durable canonical answer records', async () => {
+  const env = baseEnv();
+  const record = {
+    version: 1,
+    type: 'telegram_canonical_answer',
+    requestId: 'durable-result',
+    status: 'direct_submitted',
+    telegramUserId: '42',
+    sessionSlug: 'alpha',
+    questionId: 'q-durable-result',
+    answer: {
+      questionType: 'agree_unsure_disagree',
+      value: 'agree',
+      label: 'Agree',
+      comments: 'Durable comment',
+    },
+    createdAt: '2026-05-23T12:00:00.000Z',
+    updatedAt: '2026-05-23T12:00:00.000Z',
+  };
+  await env.AGENT_ACTION_KV.put(canonicalAnswerSessionKvKey(record), JSON.stringify(record));
+
+  const records = await loadSubmittedResultRecords(env, 'alpha');
+
+  assert.equal(records.length, 1);
+  assert.equal(records[0].requestId, 'durable-result');
+  assert.equal(records[0].questionId, 'q-durable-result');
+  assert.equal(records[0].label, 'Agree');
+  assert.equal(records[0].comments, 'Durable comment');
+});
+
 test('/results group shows participant graph with question legend', async () => {
   const env = baseEnv({
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
@@ -1549,11 +2224,12 @@ test('/results without arguments explains available result views', async () => {
   assert.equal(result.screen, 'results_options');
   assert.equal(result.response.method, 'sendMessage');
   assert.match(result.response.text, /^Results/);
-  assert.match(result.response.text, /Selected session: alpha/);
+  assert.match(result.response.text, /Selected session: Alpha Session/);
+  assert.equal(result.response.text.includes('Choose a results view'), false);
   assert.match(result.response.text, /Consensus: highlights questions with the most disagreement/);
-  assert.match(result.response.text, /Group: shows participant answer patterns/);
-  assert.match(result.response.text, /Topic map: circles view/);
-  assert.match(result.response.text, /\/results \[ consensus \| group \| topic \]/);
+  assert.match(result.response.text, /Consensus:[\s\S]*\n\nGroup: Response clusters across questions\.[\s\S]*\n\nTopic Map/);
+  assert.equal(result.response.text.includes('Topic map: circles view'), false);
+  assert.equal(result.response.text.includes('/results [ consensus | group | topic ]'), false);
   assert.deepEqual(flattenButtons(result.response.replyMarkup).map((button) => button.text), ['Consensus', 'Group', 'Topic Map']);
 });
 
@@ -1808,12 +2484,13 @@ test('/export_all falls back to Telegram submit records when storage payload lis
     telegramUserId: '42',
     questionId: `0x${'12'.repeat(32)}`,
     questionIdShort: '0x121212...1212',
-    answer: { label: 'Agree', value: 'agree', controlType: 'binary' },
-    onChain: {
-      ok: true,
-      accountAddress,
-      storageRef: { backend: 'cloudflare', id: arweaveId(51), resource: 'responses' },
+    answer: {
+      label: 'Agree',
+      value: 'agree',
+      controlType: 'binary',
+      comments: 'This needs a rollback plan.',
     },
+    onChain: null,
     createdAt: now,
   }));
   const env = baseEnv({
@@ -1875,6 +2552,23 @@ test('/export_all falls back to Telegram submit records when storage payload lis
   assert.match(result.response.text, /Responses were exported from Telegram submit records\./);
   assert.match(result.response.text, /Storage payloads unavailable: Storage route read\/list is only available for Cloudflare storage\./);
   assert.equal(result.response.document.filename, 'context-engine-telegram-demo-2-responses.zip');
+  const normalizedAccountAddress = accountAddress.toLowerCase();
+  const files = readZipTextFiles(result.response.document.bytes);
+  const responsePayload = JSON.parse(files['responses/001-storage-list-fallback.json']);
+  assert.equal(responsePayload.type, 'telegram_research_response');
+  assert.equal(responsePayload.participant.accountAddress, normalizedAccountAddress);
+  assert.equal(responsePayload.participant.stableRef, `evm:${normalizedAccountAddress}`);
+  assert.equal(responsePayload.answer.comments, 'This needs a rollback plan.');
+  assert.equal(responsePayload.answer.value, 'agree');
+  assert.equal(responsePayload.session.sessionSlug, 'telegram-demo-2');
+  assert.equal(responsePayload.question.questionId, `0x${'12'.repeat(32)}`);
+  assert.equal(Object.hasOwn(responsePayload, 'telegramUserId'), false);
+  assert.equal(Object.hasOwn(responsePayload, 'idempotencyKey'), false);
+  const responsesIndex = JSON.parse(files['responses.json']);
+  assert.equal(responsesIndex[0].payload.answer.comments, 'This needs a rollback plan.');
+  assert.equal(Object.hasOwn(responsesIndex[0], 'submitRecord'), false);
+  const submitRecords = JSON.parse(files['telegram-submit-records.json']);
+  assert.equal(submitRecords[0].answer.comments, 'This needs a rollback plan.');
 });
 
 test('/export_all denies non-allowlisted Telegram managed wallets', async () => {
@@ -2021,11 +2715,11 @@ test('/start and /me show admin actions only to the configured export admin', as
   const policyAfterToggle = await loadSessionPolicy(allowedEnv);
   const alphaAfterToggle = policyAfterToggle.linkedSessions.find((session) => session.sessionSlug === 'alpha');
 
-  assert.deepEqual(flattenButtons(allowedStart.response.replyMarkup).map((button) => button.text), ['Mini App', 'Onboard Agent', 'Admin Actions']);
+  assert.deepEqual(flattenButtons(allowedStart.response.replyMarkup).map((button) => button.text), ['Mini App', 'Onboard Agent', 'About', 'Admin Actions']);
   assert.equal(flattenButtons(allowedMe.response.replyMarkup).some((button) => button.text === 'Admin Actions'), true);
   assert.equal(flattenButtons(allowedMe.response.replyMarkup).some((button) => button.text === 'export_all'), false);
   assert.equal(flattenButtons(allowedMe.response.replyMarkup).some((button) => button.text === 'export_access'), false);
-  assert.deepEqual(flattenButtons(deniedStart.response.replyMarkup).map((button) => button.text), ['Mini App', 'Onboard Agent']);
+  assert.deepEqual(flattenButtons(deniedStart.response.replyMarkup).map((button) => button.text), ['Mini App', 'Onboard Agent', 'About']);
   assert.equal(adminView.screen, 'admin_actions');
   assert.deepEqual(flattenButtons(adminView.response.replyMarkup).map((button) => button.text), [
     'Export Responses',
@@ -2207,7 +2901,7 @@ test('configured export admin can grant and revoke another Telegram managed wall
 
   assert.equal(grant.screen, 'response_export_access_updated');
   assert.equal(grant.added, true);
-  assert.deepEqual(flattenButtons(guestStart.response.replyMarkup).map((button) => button.text), ['Mini App', 'Onboard Agent', 'Admin Actions']);
+  assert.deepEqual(flattenButtons(guestStart.response.replyMarkup).map((button) => button.text), ['Mini App', 'Onboard Agent', 'About', 'Admin Actions']);
   assert.equal(guestExport.screen, 'response_export');
   assert.equal(guestExport.response.method, 'sendDocument');
   assert.equal(guestGrantAttempt.screen, 'response_export_access_updated');
@@ -2361,6 +3055,68 @@ test('/questions does not invent demo questions when live question cache is empt
   assert.equal(result.response.text.includes('What should Alpha decide next'), false);
 });
 
+test('loadQuestionsForSession skips malformed live and proposed records', async () => {
+  __test__sessionQuestions.clearCaches();
+  const env = baseEnv({ AGENT_BRIDGE_QUESTION_SOURCE: 'live' });
+  const cachedAtMs = Date.now();
+  __test__sessionQuestions.questionMemoryCache.set(__test__sessionQuestions.cacheKey('alpha'), {
+    ok: true,
+    reason: 'live_questions_loaded',
+    source: 'unit_live_cache',
+    cachedAtMs,
+    complete: true,
+    questions: [
+      {
+        questionId: 'q-live-good',
+        questionType: 'freeform',
+        prompt: 'What should the live loader keep?',
+        sessionSlug: 'alpha',
+        tags: ['valid'],
+      },
+      {
+        questionType: 'freeform',
+        prompt: 'Missing ids should be skipped.',
+        sessionSlug: 'alpha',
+      },
+      {
+        questionId: 'q-null-tags',
+        questionType: 'freeform',
+        prompt: 'Null tags should be skipped.',
+        sessionSlug: 'alpha',
+        tags: null,
+      },
+      {
+        questionId: 'q-object-prompt',
+        questionType: 'freeform',
+        prompt: { text: 'Object prompts should be skipped.' },
+        sessionSlug: 'alpha',
+      },
+      {
+        questionId: 'q-number-prompt',
+        questionType: 'freeform',
+        prompt: 42,
+        sessionSlug: 'alpha',
+      },
+    ],
+  });
+  await env.AGENT_ACTION_KV.put('telegram:proposed-question:alpha:q-bad-proposed', JSON.stringify({
+    version: 1,
+    questionId: 'q-bad-proposed',
+    sessionSlug: 'alpha',
+    questionType: 'freeform',
+    prompt: { text: 'Malformed proposed prompt' },
+    status: 'active',
+    createdAt: '2026-05-29T12:00:00.000Z',
+  }));
+
+  const loaded = await loadQuestionsForSession(env, 'alpha');
+
+  assert.equal(loaded.ok, true);
+  assert.equal(loaded.questionCount, 1);
+  assert.deepEqual(loaded.questions.map((question) => question.questionId), ['q-live-good']);
+  assert.equal(loaded.skippedMalformed, 5);
+});
+
 test('/questions reads telegram_only preloaded policy questions without chain indexing', async () => {
   const result = await buildTelegramCommandResponse({
     update: groupMessage('/questions telegram-native'),
@@ -2482,10 +3238,136 @@ test('/questions reads telegram_only Cloudflare question payloads concurrently',
     'Questions (3/3)',
     '',
     '1. Loaded q-storage-1',
+    '',
     '2. Loaded q-storage-2',
+    '',
     '3. Loaded q-storage-3',
   ].join('\n'));
   assert.equal(maxActiveReads, 3);
+});
+
+test('/questions reads Cloudflare question storage without falling back to on-chain when no onchain mode is configured', async () => {
+  const fetchCalls = [];
+  const fetchImpl = async (url, init = {}) => {
+    const target = new URL(String(url));
+    fetchCalls.push({ url: target.toString(), init });
+    if (init?.body) {
+      const body = JSON.parse(init.body);
+      if (body?.jsonrpc || body?.method?.startsWith?.('eth_')) {
+        throw new Error(`unexpected_rpc_${body.method || 'call'}`);
+      }
+    }
+    if (target.pathname.endsWith('/auth/nonce')) {
+      return new Response(JSON.stringify({ nonce: 'nonce-1' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (target.pathname.endsWith('/auth/login')) {
+      return new Response(JSON.stringify({ token: 'worker-token' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (target.pathname.endsWith('/storage/list')) {
+      return new Response(JSON.stringify({ items: [{ id: 'q-storage-1' }] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (target.pathname.endsWith('/storage/read')) {
+      return new Response(JSON.stringify({
+        questionId: target.searchParams.get('id'),
+        questionType: 'binary',
+        prompt: 'Loaded from Cloudflare without chain indexing.',
+        sessionSlug: 'cloudflare-worker',
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    throw new Error(`unexpected_url_${target.pathname}`);
+  };
+
+  const result = await buildTelegramCommandResponse({
+    update: groupMessage('/questions cloudflare-worker'),
+    env: baseEnv({
+      AGENT_BRIDGE_DEPLOYMENT_ID: 'unit-deploy',
+      AGENT_BRIDGE_QUESTION_SOURCE: 'live',
+      AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+        defaultSessionSlug: 'cloudflare-worker',
+        sessions: [{
+          sessionSlug: 'cloudflare-worker',
+          sessionName: 'Cloudflare Worker',
+          telegramBridgeEnabled: true,
+          telegramGroupOpenAccess: true,
+          sessionMode: 'telegram_enabled',
+          sessionWorkerUrl: 'https://session.example',
+          workerSessionSlug: 'cloudflare-worker',
+          questionSource: 'cloudflare_storage',
+          storageProfile: { backend: 'cloudflare' },
+        }],
+      }),
+      QUESTION_FETCH: fetchImpl,
+      REGISTRY_FETCH: async () => {
+        throw new Error('registry_rpc_should_not_be_called');
+      },
+    }),
+    now: '2026-05-08T12:00:00.000Z',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.questionSourceReason, 'telegram_only_cloudflare_questions_loaded');
+  assert.equal(result.response.text, [
+    'Questions (1/1)',
+    '',
+    '1. Loaded from Cloudflare without chain indexing.',
+  ].join('\n'));
+  assert.deepEqual(
+    fetchCalls.map((call) => new URL(call.url).pathname),
+    ['/auth/nonce', '/auth/login', '/storage/list', '/storage/read']
+  );
+});
+
+test('telegram_only storage auth failures still surface proposed questions', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_DEPLOYMENT_ID: 'unit-deploy',
+    AGENT_BRIDGE_QUESTION_SOURCE: 'live',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha Session',
+        telegramOnly: true,
+        telegramBridgeEnabled: true,
+        telegramGroupOpenAccess: true,
+        sessionWorkerUrl: 'https://session.example',
+        workerSessionSlug: 'alpha',
+        questionSource: 'cloudflare_storage',
+        storageProfile: { backend: 'cloudflare' },
+      }],
+    }),
+    QUESTION_FETCH: async () => {
+      throw new Error('session auth unavailable');
+    },
+  });
+  await env.AGENT_ACTION_KV.put('telegram:proposed-question:alpha:q-proposed-ok', JSON.stringify({
+    version: 1,
+    questionId: 'q-proposed-ok',
+    sessionSlug: 'alpha',
+    questionType: 'binary',
+    prompt: 'Should proposed questions stay visible when storage auth fails?',
+    status: 'active',
+    createdAt: '2026-05-29T12:00:00.000Z',
+  }));
+
+  const loaded = await loadQuestionsForSession(env, 'alpha');
+
+  assert.equal(loaded.ok, true);
+  assert.equal(loaded.reason, 'proposed_questions_loaded_with_source_warning');
+  assert.equal(loaded.authReason, 'session_worker_auth_failed');
+  assert.equal(loaded.questionCount, 1);
+  assert.deepEqual(loaded.questions.map((question) => question.questionId), ['q-proposed-ok']);
 });
 
 test('/questions live_or_fixture does not show fixture questions when live loading is slow', async () => {
@@ -3399,7 +4281,7 @@ test('URL question generation falls back to source-grounded local drafts when AI
       allowGenerateQuestion: true,
       sessions: [{
         sessionSlug: 'alpha',
-        sessionName: 'Agent Village Organizers',
+        sessionName: 'Session Lab Organizers',
         default: true,
         telegramBridgeEnabled: true,
         telegramOnly: true,
@@ -3447,7 +4329,7 @@ test('URL question generation falls back to source-grounded local drafts when AI
 
   assert.equal(generated.ok, true);
   assert.equal(aiCalls, 2);
-  assert.match(generated.response.text, /Drafted 3 Agree questions for Agent Village Organizers/);
+  assert.match(generated.response.text, /Drafted 3 Agree questions for Session Lab Organizers/);
   assert.match(generated.response.text, /agent coordination|participant onboarding|community governance/i);
 });
 
@@ -3476,7 +4358,7 @@ test('private Telegram-only authoring accepts dotenv-escaped session policy JSON
       allowAddQuestion: true,
       sessions: [{
         sessionSlug: 'telegram-demo-4',
-        sessionName: 'Agent Village Organizers (Demo)',
+        sessionName: 'Session Lab Organizers (Demo)',
         default: true,
         telegramBridgeEnabled: true,
         telegramOnly: true,
@@ -3493,7 +4375,7 @@ test('private Telegram-only authoring accepts dotenv-escaped session policy JSON
     now: '2026-05-27T18:30:00.000Z',
   });
   assert.equal(start.ok, true);
-  assert.match(start.response.text, /Session: Agent Village Organizers \(Demo\)/);
+  assert.match(start.response.text, /Session: Session Lab Organizers \(Demo\)/);
 
   const added = await buildTelegramCommandResponse({
     update: privateMessage('/add_question binary: Organizers should publish explicit agent override rules.'),
@@ -3503,7 +4385,7 @@ test('private Telegram-only authoring accepts dotenv-escaped session policy JSON
 
   assert.equal(added.ok, true);
   assert.equal(added.screen, 'add_question');
-  assert.match(added.response.text, /Question added to Agent Village Organizers \(Demo\)/);
+  assert.match(added.response.text, /Question added to Session Lab Organizers \(Demo\)/);
 });
 
 test('/groups manages lightweight Telegram-only group selections from the private bot', async () => {
@@ -3645,6 +4527,8 @@ test('/q renders structured answer buttons and auto-submits from callbacks', asy
   assert.equal(binary.response.text.includes('0x1212121212121212121212121212121212121212121212121212121212121212'), false);
 
   const binaryButtons = flattenButtons(binary.response.replyMarkup);
+  const onboardAgent = binaryButtons.find((button) => button.text === 'Onboard Agent');
+  assert.match(onboardAgent?.url || '', /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,48}$/);
   const agree = binaryButtons.find((button) => button.text === 'Agree');
   const disagree = binaryButtons.find((button) => button.text === 'Disagree');
   const submitDraft = binaryButtons.find((button) => button.text === 'Submit Draft');
@@ -3711,6 +4595,14 @@ test('/q renders structured answer buttons and auto-submits from callbacks', asy
   assert.equal(replayedSubmit.submitRequest.requestId, saved.submitRequest.requestId);
   assert.equal(replayedSubmit.submitRequest.replayed, true);
 
+  await saveTelegramAgentSettingsPatch({
+    env,
+    sessionSlug: 'alpha',
+    telegramUserId: '42',
+    patch: { draftDivergenceOptIn: true },
+    createdAt: '2026-05-08T12:00:05.000Z',
+  });
+
   const submitRecords = Array.from(env.AGENT_ACTION_KV.store.entries())
     .filter(([key]) => key.startsWith('telegram:submit-request:'))
     .map(([, value]) => JSON.parse(value));
@@ -3741,6 +4633,7 @@ test('/q renders structured answer buttons and auto-submits from callbacks', asy
   assert.equal(changedSubmitted.ok, true);
   assert.equal(changedSubmitted.submitRequestCreated, true);
   assert.equal(changedSubmitted.submitRequest.replayed, false);
+  assert.equal(changedSubmitted.draftEditMetric.stored, true);
   assert.notEqual(changedSubmitted.submitRequest.requestId, saved.submitRequest.requestId);
   assert.notEqual(changedSubmitted.submitRequest.idempotencyKey, saved.submitRequest.idempotencyKey);
   const changedSubmitRecords = Array.from(env.AGENT_ACTION_KV.store.entries())
@@ -3749,6 +4642,16 @@ test('/q renders structured answer buttons and auto-submits from callbacks', asy
   assert.equal(changedSubmitRecords.length, 2);
   assert.equal(changedSubmitRecords.some((record) => record.answer.label === 'Agree'), true);
   assert.equal(changedSubmitRecords.some((record) => record.answer.label === 'Disagree'), true);
+  const draftEditRecords = Array.from(env.AGENT_ACTION_KV.store.entries())
+    .filter(([key]) => key.startsWith(DRAFT_EDIT_METRIC_KV_PREFIX))
+    .map(([, value]) => JSON.parse(value));
+  assert.equal(draftEditRecords.length, 1);
+  assert.equal(draftEditRecords[0].source, 'telegram_bot');
+  assert.equal(draftEditRecords[0].finality, 'submitted');
+  assert.equal(draftEditRecords[0].metrics.binaryFrom, 'agree');
+  assert.equal(draftEditRecords[0].metrics.binaryTo, 'disagree');
+  assert.equal(draftEditRecords[0].metrics.binaryTransition, 'opposite');
+  assert.equal(Object.hasOwn(draftEditRecords[0], 'telegramUserId'), false);
 
   const calls = [];
   const dispatched = await dispatchTelegramCommandResponse({
@@ -3825,6 +4728,57 @@ test('callback dispatch answers callback queries before editing messages', async
     cache_time: 0,
   });
   assert.equal(calls[1][0], 'https://api.telegram.org/bot123456:test-token/editMessageText');
+});
+
+test('callback dispatch sends a fresh message when editing an old message fails', async () => {
+  const env = baseEnv();
+  const joined = await buildTelegramCommandResponse({
+    update: groupMessage('/join alpha'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+  const viewQuestions = flattenButtons(joined.response.replyMarkup)
+    .find((button) => button.text === 'View Questions');
+  const commandResponse = await buildTelegramCommandResponse({
+    update: {
+      update_id: 7006,
+      callback_query: {
+        id: 'callback-old-message',
+        data: viewQuestions.callback_data,
+        from: { id: 42, username: 'host' },
+        message: {
+          message_id: 57,
+          chat: { id: -100123, type: 'supergroup' },
+        },
+      },
+    },
+    env,
+    now: '2026-05-08T12:00:01.000Z',
+  });
+  const calls = [];
+  const fetchMock = async (...args) => {
+    calls.push(args);
+    const method = String(args[0]).split('/').pop();
+    if (method === 'editMessageText') {
+      return new Response(JSON.stringify({ ok: false, description: 'Bad Request: message can not be edited' }), {
+        status: 400,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    return new Response(JSON.stringify({ ok: true, result: true }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+
+  const dispatched = await dispatchTelegramCommandResponse({
+    commandResponse,
+    env,
+    fetchImpl: fetchMock,
+  });
+
+  assert.equal(dispatched.telegram.ok, true);
+  assert.equal(calls.map((call) => String(call[0]).split('/').pop()).join(','), 'answerCallbackQuery,editMessageText,sendMessage');
 });
 
 test('/attachments lists public metadata and hides private storage refs', async () => {
@@ -3921,9 +4875,10 @@ test('/me returns managed demo account metadata without the root secret', async 
   assert.equal(result.ok, true);
   assert.equal(result.screen, 'my_account');
   assert.match(result.response.text, /Account/);
-  assert.match(result.response.text, /Address: <a href="https:\/\/optimism-sepolia\.blockscout\.com\/address\/0x[0-9a-f]{40}">0x[0-9a-f]{4}\.\.\.[0-9a-f]{4}<\/a>/i);
-  assert.match(result.response.text, /Chain: OP Sepolia Testnet \(11155420\)/);
-  assert.equal(result.response.parseMode, 'HTML');
+  assert.match(result.response.text, /Address: 0x[0-9a-f]{4}\.\.\.[0-9a-f]{4}/i);
+  assert.doesNotMatch(result.response.text, /Chain:/);
+  assert.doesNotMatch(result.response.text, /Use \/questions/);
+  assert.equal(result.response.parseMode, '');
   const addressButton = flattenButtons(result.response.replyMarkup)
     .find((button) => /^0x[0-9a-f]{40}$/i.test(button.text) || /address\//i.test(button.url || ''));
   assert.equal(addressButton, undefined);
@@ -3931,8 +4886,28 @@ test('/me returns managed demo account metadata without the root secret', async 
   const copyAddress = buttons.find((button) => button.text === 'Copy Address');
   assert.deepEqual(copyAddress?.copy_text, { text: accountAddress });
   assert.equal(buttons.some((button) => button.text === 'View Questions'), true);
-  assert.equal(buttons.some((button) => button.text === 'Copy Agent Install Info'), true);
+  assert.equal(buttons.some((button) => button.text === 'Onboard Agent'), true);
   assert.equal(buttons.some((button) => button.text === 'Activity'), true);
+  const backToStart = buttons.find((button) => button.text === 'Back to Start');
+  assert.match(backToStart?.callback_data || '', /^cecb_[a-z0-9]{10,48}$/);
+  const start = await buildTelegramCommandResponse({
+    update: {
+      update_id: 9203,
+      callback_query: {
+        id: 'account-back-start',
+        data: backToStart.callback_data,
+        from: { id: 42, username: 'participant' },
+        message: {
+          message_id: 79,
+          chat: { id: 42, type: 'private' },
+        },
+      },
+    },
+    env,
+    now,
+  });
+  assert.equal(start.screen, 'setup_welcome');
+  assert.equal(start.response.method, 'editMessageText');
   assert.equal(JSON.stringify(result).includes('unit-root'), false);
 });
 
@@ -3947,30 +4922,77 @@ test('/agent_token creates a 28-day scoped delegation token with masked chat bod
 
   assert.equal(result.ok, true);
   assert.equal(result.screen, 'agent_token');
-  assert.match(result.response.text, /^Agent install info/m);
-  assert.match(result.response.text, /Expires: 2026-06-05T12:00:00.000Z/);
-  const copyToken = flattenButtons(result.response.replyMarkup)
-    .find((button) => button.text === 'Copy Agent Install Info');
-  const installInfo = copyToken?.copy_text?.text || '';
-  const token = installInfo.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
+  assert.equal(result.response.text, [
+    'Press Copy Agent Info and paste to your agent or Claude Code',
+    '',
+    'Context Engine will ask questions, draft responses, and create a privacy-preserving opinion map',
+  ].join('\n'));
+  const copyInfoButton = flattenButtons(result.response.replyMarkup)
+    .find((button) => button.text === 'Copy Agent Info');
+  const copyInfo = copyInfoButton?.copy_text?.text || '';
+  const token = copyInfo.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
   assert.match(token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
+  assert.match(copyInfo, /^Bearer; GET \/api\/agent\/questions; ask answer/);
+  assert.doesNotMatch(copyInfo, /^CE Claude:/);
+  assert.doesNotMatch(copyInfo, /\/questions first/);
+  assert.match(copyInfo, /\ntoken=ceagt_/);
+  assert.match(copyInfo, /\nworker=https:\/\/ce-agent-bridge-worker\.agalmic\.workers\.dev/);
+  assert.match(copyInfo, /\nskill=https:\/\/ce-agent-bridge-worker\.agalmic\.workers\.dev\/api\/agent\/skill\?v=41/);
+  assert.equal(new TextEncoder().encode(copyInfo).length <= 256, true);
   assert.equal(result.response.text.includes(token), false);
-  assert.match(result.response.text, /ceagt_…[A-Za-z0-9_-]{4}/);
-  assert.match(result.response.text, /chat only shows the masked token/i);
-  assert.match(installInfo, /Worker: https:\/\/ce-agent-bridge-worker\.agalmic\.workers\.dev/);
-  assert.match(installInfo, /Skill: https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/edge-2026/);
-  assert.match(installInfo, /Authorization: Bearer <token>/);
+  assert.doesNotMatch(result.response.text, /Worker:/);
+  assert.doesNotMatch(result.response.text, /Skill:/);
+  assert.doesNotMatch(result.response.text, /Token:/);
+  assert.doesNotMatch(result.response.text, /Expires:/);
 
   const loaded = await loadTelegramAgentDelegationToken({ env, token, now });
   assert.equal(loaded.ok, true);
   assert.equal(loaded.record.telegramUserId, '42');
   assert.equal(loaded.record.sessionSlug, 'alpha');
+  const pointer = JSON.parse(await env.AGENT_ACTION_KV.get(`${TELEGRAM_AGENT_DELEGATION_TOKEN_USER_KV_PREFIX}42`));
+  assert.equal(pointer.tokenHash, loaded.tokenHash);
+  assert.equal(pointer.tokenHash.length, 64);
+  assert.equal(JSON.stringify(pointer).includes(token), false);
   assert.equal(loaded.record.ttlSeconds, TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_TTL_SECONDS);
   assert.equal(loaded.record.scopes.includes(TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS), true);
   assert.equal(loaded.record.scopes.includes(TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.DRAFT_ANSWERS), true);
   const storedRecords = Array.from(env.AGENT_ACTION_KV.store.values()).join('\n');
   assert.equal(storedRecords.includes(token), false);
   assert.equal(JSON.stringify(result).includes('unit-root'), false);
+});
+
+test('/agent_token re-onboard revokes the prior token pointer', async () => {
+  const now = '2026-05-08T12:00:00.000Z';
+  const env = agentTokenEnv();
+  const first = await buildTelegramCommandResponse({
+    update: privateMessage('/agent_token'),
+    env,
+    now,
+  });
+  const firstCopy = flattenButtons(first.response.replyMarkup)
+    .find((button) => button.text === 'Copy Agent Info')?.copy_text?.text || '';
+  const firstToken = firstCopy.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
+  const firstLoaded = await loadTelegramAgentDelegationToken({ env, token: firstToken, now });
+  assert.equal(firstLoaded.ok, true);
+
+  const second = await buildTelegramCommandResponse({
+    update: privateMessage('/agent_token'),
+    env,
+    now,
+  });
+  const secondCopy = flattenButtons(second.response.replyMarkup)
+    .find((button) => button.text === 'Copy Agent Info')?.copy_text?.text || '';
+  const secondToken = secondCopy.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
+  const oldLoaded = await loadTelegramAgentDelegationToken({ env, token: firstToken, now });
+  const secondLoaded = await loadTelegramAgentDelegationToken({ env, token: secondToken, now });
+  const pointer = JSON.parse(await env.AGENT_ACTION_KV.get(`${TELEGRAM_AGENT_DELEGATION_TOKEN_USER_KV_PREFIX}42`));
+
+  assert.equal(secondToken && secondToken !== firstToken, true);
+  assert.equal(oldLoaded.ok, false);
+  assert.equal(oldLoaded.reason, 'agent_token_not_found');
+  assert.equal(secondLoaded.ok, true);
+  assert.equal(pointer.tokenHash, secondLoaded.tokenHash);
+  assert.notEqual(pointer.tokenHash, firstLoaded.tokenHash);
 });
 
 test('private Onboard Agent callback renders the copy install screen on first tap', async () => {
@@ -4001,7 +5023,7 @@ test('private Onboard Agent callback renders the copy install screen on first ta
     now,
   });
   const copyInfo = flattenButtons(result.response.replyMarkup)
-    .find((button) => button.text === 'Copy Agent Install Info')?.copy_text?.text || '';
+    .find((button) => button.text === 'Copy Agent Info')?.copy_text?.text || '';
   const token = copyInfo.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
 
   assert.ok(onboard.callback_data);
@@ -4009,8 +5031,43 @@ test('private Onboard Agent callback renders the copy install screen on first ta
   assert.equal(result.screen, 'agent_token');
   assert.equal(result.response.method, 'editMessageText');
   assert.equal(result.callbackQueryId, 'onboard-first-tap');
-  assert.match(result.response.text, /Tap Copy Agent Install Info, then paste it into your trusted agent/);
-  assert.match(copyInfo, /Context Engine agent install info/);
+  assert.match(result.response.text, /Press Copy Agent Info and paste to your agent or Claude Code/);
+  assert.match(token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
+  assert.equal(result.response.text.includes(token), false);
+});
+
+test('expired private Onboard Agent callback mints a fresh copy token screen', async () => {
+  const now = '2026-05-08T12:00:00.000Z';
+  const env = agentTokenEnv();
+
+  const result = await buildTelegramCommandResponse({
+    update: {
+      update_id: 9202,
+      callback_query: {
+        id: 'onboard-expired-tap',
+        data: 'cecb_expired001',
+        from: { id: 42, username: 'participant' },
+        message: {
+          message_id: 78,
+          chat: { id: 42, type: 'private' },
+          reply_markup: {
+            inline_keyboard: [[
+              { text: 'Onboard Agent', callback_data: 'cecb_expired001' },
+            ]],
+          },
+        },
+      },
+    },
+    env,
+    now,
+  });
+  const copyToken = flattenButtons(result.response.replyMarkup)
+    .find((button) => button.text === 'Copy Agent Info')?.copy_text?.text || '';
+  const token = copyToken.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
+
+  assert.equal(result.screen, 'agent_token');
+  assert.equal(result.response.method, 'editMessageText');
+  assert.equal(result.callbackQueryId, 'onboard-expired-tap');
   assert.match(token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
   assert.equal(result.response.text.includes(token), false);
 });
@@ -4046,13 +5103,13 @@ test('/start Onboard Agent deep-link mints private install info without exposing
     now,
   });
   const copyInfo = flattenButtons(privateStart.response.replyMarkup)
-    .find((button) => button.text === 'Copy Agent Install Info')?.copy_text?.text || '';
+    .find((button) => button.text === 'Copy Agent Info')?.copy_text?.text || '';
   const token = copyInfo.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
 
   assert.equal(privateStart.screen, 'agent_token');
   assert.match(token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
   assert.equal(privateStart.response.text.includes(token), false);
-  assert.match(copyInfo, /Context Engine agent install info/);
+  assert.match(copyInfo, /https:\/\/ce-agent-bridge-worker\.agalmic\.workers\.dev/);
 });
 
 test('/start agent_onboarding slug deep-link opens the private copy install screen directly', async () => {
@@ -4064,15 +5121,188 @@ test('/start agent_onboarding slug deep-link opens the private copy install scre
     now,
   });
   const copyInfo = flattenButtons(result.response.replyMarkup)
-    .find((button) => button.text === 'Copy Agent Install Info')?.copy_text?.text || '';
+    .find((button) => button.text === 'Copy Agent Info')?.copy_text?.text || '';
   const token = copyInfo.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
 
   assert.equal(result.ok, true);
   assert.equal(result.screen, 'agent_token');
-  assert.match(result.response.text, /Tap Copy Agent Install Info, then paste it into your trusted agent/);
-  assert.match(copyInfo, /Session: alpha/);
+  assert.match(result.response.text, /Press Copy Agent Info and paste to your agent or Claude Code/);
+  assert.doesNotMatch(result.response.text, /Session: Alpha Session/);
   assert.match(token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
   assert.equal(result.response.text.includes(token), false);
+  const binding = JSON.parse(await env.AGENT_ACTION_KV.get('telegram:private-session:42'));
+  assert.equal(binding.sessionSlug, 'alpha');
+  assert.equal(binding.followDefault, true);
+});
+
+test('/start agent_onboarding opens Mini App when already onboarded', async () => {
+  const now = '2026-05-08T12:00:00.000Z';
+  const env = agentTokenEnv({ AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example' });
+  const first = await buildTelegramCommandResponse({
+    update: privateMessage('/start agent_onboarding__alpha'),
+    env,
+    now,
+  });
+  const firstCopy = flattenButtons(first.response.replyMarkup)
+    .find((button) => button.text === 'Copy Agent Info')?.copy_text?.text || '';
+  const firstToken = firstCopy.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
+  const firstLoaded = await loadTelegramAgentDelegationToken({ env, token: firstToken, now });
+  const firstPointer = JSON.parse(await env.AGENT_ACTION_KV.get(`${TELEGRAM_AGENT_DELEGATION_TOKEN_USER_KV_PREFIX}42`));
+
+  const linkedAgain = await buildTelegramCommandResponse({
+    update: privateMessage('/start agent_onboarding__alpha'),
+    env,
+    now,
+  });
+  const buttons = flattenButtons(linkedAgain.response.replyMarkup);
+  const miniApp = buttons.find((button) => button.text === 'Open Mini App');
+  const copyNew = buttons.find((button) => button.text === 'Copy New Agent Info');
+  const secondToken = copyNew?.copy_text?.text?.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
+  const secondPointer = JSON.parse(await env.AGENT_ACTION_KV.get(`${TELEGRAM_AGENT_DELEGATION_TOKEN_USER_KV_PREFIX}42`));
+  const oldLoaded = await loadTelegramAgentDelegationToken({ env, token: firstToken, now });
+  const secondLoaded = await loadTelegramAgentDelegationToken({ env, token: secondToken, now });
+
+  assert.equal(firstLoaded.ok, true);
+  assert.equal(linkedAgain.screen, 'agent_onboarded_mini_app');
+  assert.match(linkedAgain.response.text, /Context Engine is already enabled/);
+  assert.equal(buttons.some((button) => button.text === 'Copy Agent Info'), false);
+  assert.equal(buttons.some((button) => button.text === 'Copy New Agent Info'), true);
+  assert.ok(copyNew?.copy_text?.text);
+  assert.equal(copyNew.callback_data, undefined);
+  assert.match(secondToken, /^ceagt_[A-Za-z0-9_-]{32,}$/);
+  assert.match(miniApp.web_app.url, /^https:\/\/bridge\.example\/telegram\/mini-app\?launch=cecb_[a-z0-9]{10,48}$/);
+  assert.equal(linkedAgain.response.text.includes(secondToken), false);
+  assert.notEqual(secondPointer.tokenHash, firstPointer.tokenHash);
+  assert.equal(oldLoaded.ok, false);
+  assert.equal(secondLoaded.ok, true);
+  assert.equal(secondPointer.tokenHash, secondLoaded.tokenHash);
+});
+
+test('private Onboard Agent callback opens Mini App when already onboarded', async () => {
+  const now = '2026-05-08T12:00:00.000Z';
+  const env = agentTokenEnv({ AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example' });
+  await buildTelegramCommandResponse({
+    update: privateMessage('/start agent_onboarding__alpha'),
+    env,
+    now,
+  });
+  const start = await buildTelegramCommandResponse({
+    update: privateMessage('/start'),
+    env,
+    now,
+  });
+  const onboard = flattenButtons(start.response.replyMarkup)
+    .find((button) => button.text === 'Onboard Agent');
+
+  const result = await buildTelegramCommandResponse({
+    update: {
+      update_id: 9205,
+      callback_query: {
+        id: 'onboard-existing-tap',
+        data: onboard.callback_data,
+        from: { id: 42, username: 'participant' },
+        message: {
+          message_id: 79,
+          chat: { id: 42, type: 'private' },
+        },
+      },
+    },
+    env,
+    now,
+  });
+  const buttons = flattenButtons(result.response.replyMarkup);
+  const miniApp = buttons.find((button) => button.text === 'Open Mini App');
+  const copyNew = buttons.find((button) => button.text === 'Copy New Agent Info');
+
+  assert.equal(result.screen, 'agent_onboarded_mini_app');
+  assert.equal(result.response.method, 'editMessageText');
+  assert.equal(result.callbackQueryId, 'onboard-existing-tap');
+  assert.equal(buttons.some((button) => button.text === 'Copy Agent Info'), false);
+  assert.equal(buttons.some((button) => button.text === 'Copy New Agent Info'), true);
+  assert.ok(copyNew?.copy_text?.text);
+  assert.equal(copyNew.callback_data, undefined);
+  assert.match(miniApp.web_app.url, /^https:\/\/bridge\.example\/telegram\/mini-app\?launch=cecb_[a-z0-9]{10,48}$/);
+  const token = copyNew.copy_text.text.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
+  assert.match(token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
+  assert.equal(result.response.text.includes(token), false);
+});
+
+test('already-onboarded agent screen exposes fresh install info as a copy button', async () => {
+  const now = '2026-05-08T12:00:00.000Z';
+  const env = agentTokenEnv({ AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example' });
+  const first = await buildTelegramCommandResponse({
+    update: privateMessage('/start agent_onboarding__alpha'),
+    env,
+    now,
+  });
+  const firstCopy = flattenButtons(first.response.replyMarkup)
+    .find((button) => button.text === 'Copy Agent Info')?.copy_text?.text || '';
+  const firstToken = firstCopy.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
+  const firstLoaded = await loadTelegramAgentDelegationToken({ env, token: firstToken, now });
+  assert.equal(firstLoaded.ok, true);
+
+  const linkedAgain = await buildTelegramCommandResponse({
+    update: privateMessage('/start agent_onboarding__alpha'),
+    env,
+    now,
+  });
+  const copyNewButton = flattenButtons(linkedAgain.response.replyMarkup)
+    .find((button) => button.text === 'Copy New Agent Info');
+  const refreshedCopy = copyNewButton?.copy_text?.text || '';
+  const refreshedToken = refreshedCopy.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
+  const oldLoaded = await loadTelegramAgentDelegationToken({ env, token: firstToken, now });
+  const refreshedLoaded = await loadTelegramAgentDelegationToken({ env, token: refreshedToken, now });
+  const pointer = JSON.parse(await env.AGENT_ACTION_KV.get(`${TELEGRAM_AGENT_DELEGATION_TOKEN_USER_KV_PREFIX}42`));
+
+  assert.equal(linkedAgain.screen, 'agent_onboarded_mini_app');
+  assert.equal(copyNewButton.callback_data, undefined);
+  assert.match(refreshedToken, /^ceagt_[A-Za-z0-9_-]{32,}$/);
+  assert.notEqual(refreshedToken, firstToken);
+  assert.equal(oldLoaded.ok, false);
+  assert.equal(refreshedLoaded.ok, true);
+  assert.equal(pointer.tokenHash, refreshedLoaded.tokenHash);
+  assert.match(refreshedCopy, /\ntoken=ceagt_/);
+  assert.equal(linkedAgain.response.text.includes(refreshedToken), false);
+});
+
+test('/start agent_onboarding non-default slug pins the session', async () => {
+  const now = '2026-05-08T12:00:00.000Z';
+  const env = agentTokenEnv({
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          default: true,
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          telegramGroupOpenAccess: true,
+          managedAccountSubmitAllowed: true,
+        },
+        {
+          sessionSlug: 'beta',
+          sessionName: 'Beta Session',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          telegramGroupOpenAccess: true,
+          managedAccountSubmitAllowed: true,
+        },
+      ],
+    }),
+  });
+  const result = await buildTelegramCommandResponse({
+    update: privateMessage('/start agent_onboarding__beta'),
+    env,
+    now,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.screen, 'agent_token');
+  const binding = JSON.parse(await env.AGENT_ACTION_KV.get('telegram:private-session:42'));
+  assert.equal(binding.sessionSlug, 'beta');
+  assert.equal(binding.followDefault, false);
 });
 
 test('/agent_token refuses explicit sessions that are not selectable for the Telegram account', async () => {
@@ -4119,7 +5349,7 @@ test('/start includes a Mini App button that opens the session picker before a p
   assert.equal(result.ok, true);
   assert.equal(result.screen, 'setup_welcome');
   const buttonLabels = flattenButtons(result.response.replyMarkup).map((button) => button.text);
-  assert.deepEqual(buttonLabels, ['Mini App', 'Onboard Agent']);
+  assert.deepEqual(buttonLabels, ['Mini App', 'Onboard Agent', 'About']);
   assert.equal(result.response.text.includes('/results [ consensus | group ]'), false);
   assert.equal(result.response.text.split('\n').includes('/results'), true);
   assert.equal(result.response.text.includes('/q <number>'), false);
@@ -4131,7 +5361,9 @@ test('/start includes a Mini App button that opens the session picker before a p
   assert.equal(result.response.text.includes('/add_question'), false);
   assert.equal(result.response.text.includes('/attachments'), false);
   assert.equal(result.response.text.split('\n').includes('/questions'), true);
-  assert.equal(result.response.text.split('\n').includes('/me - My Account'), true);
+  assert.equal(result.response.text.split('\n').includes('Onboard Agent or use Mini-App'), true);
+  assert.equal(result.response.text.split('\n').includes('/me'), true);
+  assert.equal(result.response.text.includes('/me - My Account'), false);
   assert.equal(result.response.text.includes('/questions - view session questions'), false);
   const miniApp = flattenButtons(result.response.replyMarkup)
     .find((button) => button.text === 'Mini App');
@@ -4142,6 +5374,40 @@ test('/start includes a Mini App button that opens the session picker before a p
   assert.equal(record.action, 'view_questions');
   assert.equal(record.serverContextRef.sessionPicker, true);
   assert.equal(record.serverContextRef.sessionSlug, undefined);
+});
+
+test('/start About button explains Context Engine and links the OSS repo and worker skill', async () => {
+  const env = baseEnv();
+  const start = await buildTelegramCommandResponse({
+    update: privateMessage('/start'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+  const about = flattenButtons(start.response.replyMarkup).find((button) => button.text === 'About');
+  const result = await buildTelegramCommandResponse({
+    update: {
+      update_id: 9204,
+      callback_query: {
+        id: 'about-tap',
+        data: about.callback_data,
+        from: { id: 42, username: 'participant' },
+        message: {
+          message_id: 80,
+          chat: { id: 42, type: 'private' },
+        },
+      },
+    },
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+
+  assert.equal(result.screen, 'about_context_engine');
+  assert.match(result.response.text, /privacy-preserving opinion maps/);
+  assert.match(result.response.text, /Worker skill: https:\/\/github\.com\/AgalmicSoftware\/context-engine\/blob\/main\/workers\/agentBridgeWorker\/skills\/ce-telegram-agent-handoff\/SKILL\.md/);
+  const repo = flattenButtons(result.response.replyMarkup).find((button) => button.text === 'Open OSS Repo');
+  assert.equal(repo.url, 'https://github.com/AgalmicSoftware/context-engine/tree/main');
+  const skill = flattenButtons(result.response.replyMarkup).find((button) => button.text === 'Worker Skill.md');
+  assert.equal(skill.url, 'https://github.com/AgalmicSoftware/context-engine/blob/main/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md');
 });
 
 test('/start auto-joins a single Telegram-only session and keeps the welcome screen minimal', async () => {
@@ -4178,6 +5444,7 @@ test('/start auto-joins a single Telegram-only session and keeps the welcome scr
   const privateBinding = JSON.parse(await privateEnv.AGENT_ACTION_KV.get('telegram:private-session:42'));
   assert.equal(privateBinding.sessionSlug, 'alpha');
   assert.equal(privateBinding.source, 'private_chat');
+  assert.equal(privateBinding.followDefault, true);
   const privateMiniApp = flattenButtons(privateStart.response.replyMarkup).find((button) => button.text === 'Mini App');
   const privateLaunch = new URL(privateMiniApp.web_app.url).searchParams.get('launch');
   const privateRecord = JSON.parse(await privateEnv.AGENT_ACTION_KV.get(`telegram:action:${privateLaunch}`));
@@ -4198,9 +5465,11 @@ test('/start auto-joins a single Telegram-only session and keeps the welcome scr
   assert.equal(groupStart.response.text.includes('/sessions'), false);
   const groupBinding = JSON.parse(await groupEnv.AGENT_ACTION_KV.get('telegram:group-session:-100123'));
   assert.equal(groupBinding.sessionSlug, 'alpha');
+  assert.equal(groupBinding.followDefault, true);
   const groupUserBinding = JSON.parse(await groupEnv.AGENT_ACTION_KV.get('telegram:private-session:42'));
   assert.equal(groupUserBinding.sessionSlug, 'alpha');
   assert.equal(groupUserBinding.source, 'single_session_start');
+  assert.equal(groupUserBinding.followDefault, true);
   const groupMiniApp = flattenButtons(groupStart.response.replyMarkup).find((button) => button.text === 'Mini App');
   const groupLaunch = new URL(groupMiniApp.url).searchParams.get('start');
   const groupRecord = JSON.parse(await groupEnv.AGENT_ACTION_KV.get(`telegram:action:${groupLaunch}`));
@@ -4247,7 +5516,7 @@ test('group /start includes a Mini App deep link to the session picker', async (
 
   assert.equal(result.ok, true);
   assert.equal(result.screen, 'setup_welcome');
-  assert.deepEqual(flattenButtons(result.response.replyMarkup).map((button) => button.text), ['Mini App', 'Onboard Agent']);
+  assert.deepEqual(flattenButtons(result.response.replyMarkup).map((button) => button.text), ['Mini App', 'Onboard Agent', 'About']);
   assert.equal(result.response.text.includes('/sessions'), false);
   assert.equal(result.response.text.includes('/groups'), false);
   assert.equal(result.response.text.includes('/add_question'), false);
@@ -4259,6 +5528,55 @@ test('group /start includes a Mini App deep link to the session picker', async (
   const record = JSON.parse(await env.AGENT_ACTION_KV.get(`telegram:action:${launch}`));
   assert.equal(record.miniAppLaunch, true);
   assert.equal(record.serverContextRef.sessionPicker, true);
+  const putCall = env.AGENT_ACTION_KV.putCalls.find((call) => call.key === `telegram:action:${launch}`);
+  assert.equal(putCall?.options?.expirationTtl, 30 * 24 * 60 * 60);
+});
+
+test('expired private start payload refreshes Mini App entry point', async () => {
+  const env = agentTokenEnv({ AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example' });
+  const result = await buildTelegramCommandResponse({
+    update: privateMessage('/start cecb_expired001'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.screen, 'private_start_refreshed');
+  assert.equal(result.startPayload, 'cecb_expired001');
+  assert.equal(result.active, false);
+  assert.equal(result.refreshed, true);
+  assert.match(result.response.text, /refreshed the Mini App entry point/);
+  const miniApp = flattenButtons(result.response.replyMarkup)
+    .find((button) => button.text === 'Mini App');
+  assert.ok(miniApp?.web_app?.url);
+  const launch = new URL(miniApp.web_app.url).searchParams.get('launch');
+  const record = JSON.parse(await env.AGENT_ACTION_KV.get(`telegram:action:${launch}`));
+  assert.equal(record.miniAppLaunch, true);
+  assert.equal(record.serverContextRef.sessionSlug, 'alpha');
+});
+
+test('Mini App start payload shows session name instead of slug', async () => {
+  const env = baseEnv({ AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example' });
+  const launch = 'cecb_live000001';
+  await env.AGENT_ACTION_KV.put(`telegram:action:${launch}`, JSON.stringify({
+    action: 'view_questions',
+    lane: 'telegram_mini_app',
+    serverContextRef: { sessionSlug: 'alpha' },
+    callbackData: launch,
+    miniAppLaunch: true,
+    createdAt: '2026-05-08T12:00:00.000Z',
+  }));
+
+  const result = await buildTelegramCommandResponse({
+    update: privateMessage(`/start ${launch}`),
+    env,
+    now: '2026-05-08T12:00:01.000Z',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.screen, 'private_start');
+  assert.match(result.response.text, /Open the Mini App for Alpha Session\./);
+  assert.equal(result.response.text.includes('Open the Mini App for alpha.'), false);
 });
 
 test('dispatchTelegramCommandResponse uses mocked fetch and does not require real Telegram credentials', async () => {

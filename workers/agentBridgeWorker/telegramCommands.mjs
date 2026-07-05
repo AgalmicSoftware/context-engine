@@ -43,14 +43,20 @@ import {
 import { evaluateTelegramQuestionAuthoringPermission } from './telegramAuthoringPermissions.mjs';
 import {
   createTelegramAgentDelegationToken,
+  readTelegramAgentDelegationTokenUserPointer,
+  revokeTelegramAgentDelegationTokenHash,
   TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_TTL_SECONDS,
+  writeTelegramAgentDelegationTokenUserPointer,
 } from './telegramAgentDelegationTokens.mjs';
+import { loadTelegramAgentSettings } from './telegramAgentSettings.mjs';
 import {
-  listTelegramProposedQuestionsForSession,
+  answerFromStoredDraft,
+  persistDraftEditMetric,
+} from './telegramDraftEditMetrics.mjs';
+import {
+  listTelegramProposedQuestionsForSessionWithSummary,
   mergeTelegramProposedQuestions,
   inferQuestionTags,
-  geoTagsFromGeoRefs,
-  normalizeQuestionGeoRefs,
   normalizeQuestionTags,
   normalizeSessionContext,
   persistTelegramProposedQuestion,
@@ -60,6 +66,10 @@ import {
   loadTelegramQuestionQueueConfig,
   saveTelegramQuestionQueueConfig,
 } from './telegramQuestionQueue.mjs';
+import {
+  ensureTelegramQuestionNumbers,
+  findQuestionByStableNumber,
+} from './telegramQuestionNumbers.mjs';
 import {
   loadTelegramLightweightGroups,
   saveTelegramLightweightGroupMembership,
@@ -85,6 +95,7 @@ import {
 } from './telegramResponseExport.mjs';
 import {
   buildQueuedSubmitRecord,
+  canonicalAnswerSessionKvPrefix,
   persistTelegramSubmitRecord,
   queueTelegramSubmitRecord,
   SUBMIT_REQUEST_KV_PREFIX,
@@ -106,32 +117,45 @@ import {
   sendTelegramMessage,
   sendTelegramPhoto,
   setTelegramMessageReaction,
+  telegramBotApiRequest,
 } from './telegramSender.mjs';
 
 const ACTION_KV_PREFIX = 'telegram:action:';
 const GROUP_SESSION_KV_PREFIX = 'telegram:group-session:';
 const PRIVATE_SESSION_KV_PREFIX = 'telegram:private-session:';
 const ANSWER_DRAFT_KV_PREFIX = 'telegram:answer-draft:';
+const ANSWER_DRAFT_VIEW_KV_PREFIX = 'telegram:answer-draft-view:';
 const RESULT_PHOTO_KV_PREFIX = 'telegram:result-photo:';
 const RESULTS_EXPOSURE_OVERRIDE_KV_PREFIX = 'telegram:results-exposure:';
+const ADMIN_DEFAULT_SESSION_KV_KEY = 'telegram:admin-default-session:v1';
+const AGENT_SKILL_UPDATE_KV_KEY = 'telegram:agent-skill-update:v1';
 const AGENT_REQUEST_KV_PREFIX = 'telegram:agent-request:';
 const MINI_APP_DOCUMENT_KV_PREFIX = 'telegram:mini-app-document:v1:';
 const MINI_APP_DOCUMENT_BYTES_KV_PREFIX = 'telegram:mini-app-document-bytes:v1:';
 const QUESTION_GENERATION_BATCH_KV_PREFIX = 'telegram:question-generation-batch:v1:';
+const MINI_APP_LATEST_LAUNCH_KV_PREFIX = 'telegram:mini-app-latest-launch:v1:';
+const DM_VOICE_TRANSCRIBE_RATE_KV_PREFIX = 'telegram:dm-voice-transcribe-rate:v1:';
 const DEFAULT_ACTION_TTL_SECONDS = 30 * 60;
 const DEFAULT_GROUP_SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
+const GROUP_MINI_APP_LAUNCH_TTL_SECONDS = DEFAULT_GROUP_SESSION_TTL_SECONDS;
 const DEFAULT_GROUP_APPROVAL_LINK_TTL_SECONDS = 7 * 24 * 60 * 60;
 const QUESTION_GENERATION_BATCH_TTL_SECONDS = 24 * 60 * 60;
 const RESULT_PHOTO_TTL_SECONDS = 15 * 60;
 const SUBMIT_REQUEST_TTL_SECONDS = 30 * 24 * 60 * 60;
+const DEFAULT_DM_VOICE_TRANSCRIBE_MAX_BYTES = 25 * 1024 * 1024;
+const DEFAULT_DM_VOICE_TRANSCRIBE_RATE_LIMIT = 12;
+const DEFAULT_DM_VOICE_TRANSCRIBE_RATE_WINDOW_SECONDS = 10 * 60;
 const DEFAULT_AGENT_BRIDGE_PUBLIC_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev';
-const DEFAULT_AGENT_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/edge-2026/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
+const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/api/agent/skill?v=41';
+const CONTEXT_ENGINE_OSS_URL = 'https://github.com/AgalmicSoftware/context-engine/tree/main';
+const CONTEXT_ENGINE_WORKER_SKILL_URL = 'https://github.com/AgalmicSoftware/context-engine/blob/main/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
 const TELEGRAM_QUESTION_LIST_LIMIT = 5;
 const TELEGRAM_SESSION_LIST_LIMIT = 5;
 const TELEGRAM_RESULTS_PAGE_SIZE = 3;
 const TELEGRAM_GENERATED_QUESTION_COUNT = 5;
 const TELEGRAM_GENERATED_QUESTION_MAX_COUNT = 20;
 const TELEGRAM_BUTTON_LABEL_MAX_BYTES = 64;
+const TELEGRAM_COPY_TEXT_MAX_BYTES = 256;
 const URL_QUESTION_SOURCE_MAX_CHARS = 24_000;
 const URL_QUESTION_SOURCE_MAX_BYTES = 1_000_000;
 const DEFAULT_LIVE_QUESTION_FALLBACK_TIMEOUT_MS = 2500;
@@ -176,6 +200,7 @@ const COMMANDS = Object.freeze({
   EXPORT_ACCESS: '/export_access',
   EXPORT_ALLOW: '/export_allow',
   EXPORT_REVOKE: '/export_revoke',
+  SET_DEFAULT: '/set_default',
   QUESTION_QUEUE: '/question_queue',
   GROUP_ID: '/group_id',
   GROUP_LINK: '/group_link',
@@ -208,6 +233,9 @@ const LEGACY_COMMAND_ALIASES = Object.freeze({
   '/ce_export_access': COMMANDS.EXPORT_ACCESS,
   '/ce_export_allow': COMMANDS.EXPORT_ALLOW,
   '/ce_export_revoke': COMMANDS.EXPORT_REVOKE,
+  '/ce_set_default': COMMANDS.SET_DEFAULT,
+  '/default_session': COMMANDS.SET_DEFAULT,
+  '/ce_default_session': COMMANDS.SET_DEFAULT,
   '/ce_question_queue': COMMANDS.QUESTION_QUEUE,
   '/ce_group_id': COMMANDS.GROUP_ID,
   '/ce_group_link': COMMANDS.GROUP_LINK,
@@ -406,7 +434,9 @@ function urlButton(label = '', url = '') {
 function copyTextButton(label = '', value = '') {
   const text = safeString(label);
   const copyText = safeString(value);
-  return text && copyText ? { text, copy_text: { text: copyText } } : null;
+  if (!text || !copyText) return null;
+  if (new TextEncoder().encode(copyText).length > TELEGRAM_COPY_TEXT_MAX_BYTES) return null;
+  return { text, copy_text: { text: copyText } };
 }
 
 function agentBridgePublicUrl(env = {}) {
@@ -421,31 +451,52 @@ function agentSkillUrl(env = {}) {
   );
 }
 
-function maskAgentToken(token = '') {
-  const value = safeString(token);
-  if (!value) return '';
-  return value.length > 11 ? `${value.slice(0, 6)}…${value.slice(-4)}` : `${value.slice(0, 6)}…`;
+function compactGithubRawUrl(url = '') {
+  const value = safeString(url);
+  const rawPrefix = 'https://raw.githubusercontent.com/';
+  if (!value.startsWith(rawPrefix)) return value;
+  const parts = value.slice(rawPrefix.length).split('/').filter(Boolean);
+  if (parts.length < 4) return value;
+  const [owner, repo, branch, ...pathParts] = parts;
+  return `https://github.com/${owner}/${repo}/raw/${branch}/${pathParts.join('/')}`;
 }
 
-function buildAgentInstallInfo({
+function buildAgentInstallCopyInfo({
   token = '',
-  sessionSlug = '',
   workerUrl = '',
   skillUrl = '',
 } = {}) {
-  return [
-    'Context Engine agent install info',
-    '',
-    `Worker: ${workerUrl}`,
-    `Skill: ${skillUrl}`,
-    `Session: ${sessionSlug}`,
-    '',
-    'Use this token as the Context Engine agent token:',
-    token,
-    '',
-    'Install/read the skill, then call the worker with Authorization: Bearer <token>.',
-    'Start by listing active questions, drafting responses for user review, and checking /telegram/agent/api/actions for pending suggestions.',
-  ].join('\n');
+  const compactSkillUrl = compactGithubRawUrl(skillUrl);
+  const intro = 'Below is the information you need to install Context Engine in your agent, Claude Code, or any HTTPS-capable assistant - connect to worker and perform onboarding for your human, asking their preferences. The ceagt token identifies the Telegram user; do not ask for a handle, Telegram id, or group chat id.';
+  const candidates = [
+    `Bearer; GET /api/agent/questions; ask answer\ntoken=${safeString(token)}\nworker=${safeString(workerUrl)}\nskill=${safeString(compactSkillUrl)}`,
+    `${intro}\ntoken=${safeString(token)}\nworker=${safeString(workerUrl)}\nskill=${safeString(compactSkillUrl)}`,
+    `Install CE in your agent; no Telegram id needed.\ntoken=${safeString(token)}\nworker=${safeString(workerUrl)}\nskill=${safeString(compactSkillUrl)}`,
+    `token=${safeString(token)}\nworker=${safeString(workerUrl)}\nskill=${safeString(compactSkillUrl)}`,
+    `CEagent:noids\n${safeString(token)}\n${safeString(workerUrl)}\n${safeString(compactSkillUrl)}`,
+    `agent install\n${safeString(token)}\n${safeString(workerUrl)}\n${safeString(compactSkillUrl)}`,
+    `${safeString(token)}\n${safeString(workerUrl)}\n${safeString(compactSkillUrl)}`,
+    `${safeString(token)}\n${safeString(workerUrl)}\n${safeString(skillUrl)}`,
+  ];
+  return candidates.find((value) => new TextEncoder().encode(value).length <= TELEGRAM_COPY_TEXT_MAX_BYTES) || '';
+}
+
+function callbackMessageButtonTexts(message = {}) {
+  const keyboard = message?.reply_markup?.inline_keyboard;
+  if (!Array.isArray(keyboard)) return [];
+  return keyboard.flatMap((row) => (Array.isArray(row) ? row : []))
+    .map((button) => safeString(button?.text))
+    .filter(Boolean);
+}
+
+function callbackMessageLooksLikeAgentOnboarding(message = {}) {
+  const labels = callbackMessageButtonTexts(message);
+  return labels.some((label) => [
+    'Onboard Agent',
+    'Copy Agent Install Info',
+    'Copy Agent Info',
+    'Copy Agent Token',
+  ].includes(label));
 }
 
 function telegramButtonLabel(value = '', fallback = 'Question') {
@@ -561,13 +612,135 @@ async function applyResultsExposureOverrides(env = {}, policy = {}) {
   return { ...policy, linkedSessions };
 }
 
+async function readAdminDefaultSessionOverride(env = {}) {
+  const kv = env?.AGENT_ACTION_KV;
+  if (!kv || typeof kv.get !== 'function') return {};
+  const parsed = safeJsonParse(await kv.get(ADMIN_DEFAULT_SESSION_KV_KEY).catch(() => null), null);
+  const sessionSlug = sanitizeSessionSlug(parsed?.sessionSlug);
+  if (!sessionSlug) return {};
+  return {
+    sessionSlug,
+    updatedAt: safeString(parsed?.updatedAt).slice(0, 64),
+    updatedBy: safeString(parsed?.updatedBy).slice(0, 64),
+  };
+}
+
+async function writeAdminDefaultSessionOverride({
+  env = {},
+  sessionSlug = '',
+  accountAddress = '',
+  createdAt = null,
+} = {}) {
+  const kv = env?.AGENT_ACTION_KV;
+  if (!kv || typeof kv.put !== 'function') return { ok: false, reason: 'action_kv_unavailable' };
+  const slug = sanitizeSessionSlug(sessionSlug);
+  if (!slug) return { ok: false, reason: 'invalid_session_slug' };
+  const record = {
+    version: 1,
+    sessionSlug: slug,
+    updatedBy: accountAddress ? shortAddress(accountAddress) : '',
+    updatedAt: createdAt || nowIso(),
+  };
+  assertNoSecretShape(record, 'Telegram admin default-session override must not serialize secrets.');
+  await kv.put(ADMIN_DEFAULT_SESSION_KV_KEY, JSON.stringify(record));
+  return { ok: true, sessionSlug: slug };
+}
+
+async function clearAdminDefaultSessionOverride(env = {}) {
+  const kv = env?.AGENT_ACTION_KV;
+  if (!kv || typeof kv.delete !== 'function') return { ok: false, reason: 'action_kv_unavailable' };
+  await kv.delete(ADMIN_DEFAULT_SESSION_KV_KEY);
+  return { ok: true };
+}
+
+async function readAgentSkillUpdateFlag(env = {}) {
+  const kv = env?.AGENT_ACTION_KV;
+  if (!kv || typeof kv.get !== 'function') return {};
+  const parsed = safeJsonParse(await kv.get(AGENT_SKILL_UPDATE_KV_KEY).catch(() => null), null);
+  if (!parsed || typeof parsed !== 'object' || parsed.updateAvailable !== true) return {};
+  return {
+    updateAvailable: true,
+    latestVersion: safeString(parsed.latestVersion).slice(0, 40),
+    note: safeString(parsed.note).slice(0, 200),
+    updatedAt: safeString(parsed.updatedAt).slice(0, 64),
+    updatedBy: safeString(parsed.updatedBy).slice(0, 64),
+  };
+}
+
+async function writeAgentSkillUpdateFlag({
+  env = {},
+  latestVersion = '',
+  note = '',
+  accountAddress = '',
+  createdAt = null,
+} = {}) {
+  const kv = env?.AGENT_ACTION_KV;
+  if (!kv || typeof kv.put !== 'function') return { ok: false, reason: 'action_kv_unavailable' };
+  const record = {
+    version: 1,
+    updateAvailable: true,
+    latestVersion: safeString(latestVersion).slice(0, 40),
+    note: safeString(note).slice(0, 200),
+    updatedBy: accountAddress ? shortAddress(accountAddress) : '',
+    updatedAt: createdAt || nowIso(),
+  };
+  assertNoSecretShape(record, 'Telegram agent skill-update flag must not serialize secrets.');
+  await kv.put(AGENT_SKILL_UPDATE_KV_KEY, JSON.stringify(record));
+  return { ok: true, latestVersion: record.latestVersion };
+}
+
+async function clearAgentSkillUpdateFlag(env = {}) {
+  const kv = env?.AGENT_ACTION_KV;
+  if (!kv || typeof kv.delete !== 'function') return { ok: false, reason: 'action_kv_unavailable' };
+  await kv.delete(AGENT_SKILL_UPDATE_KV_KEY);
+  return { ok: true };
+}
+
+async function applyAdminDefaultSessionOverride(env = {}, policy = {}) {
+  const override = await readAdminDefaultSessionOverride(env);
+  const slug = sanitizeSessionSlug(override.sessionSlug);
+  if (!slug) return policy;
+  const resolved = resolveSessionInvocation(policy, slug);
+  if (!resolved.ok) {
+    return {
+      ...policy,
+      adminDefaultSessionSlug: '',
+      adminDefaultSessionInvalidSlug: slug,
+    };
+  }
+  return {
+    ...policy,
+    defaultSessionSlug: resolved.session.sessionSlug,
+    adminDefaultSessionSlug: resolved.session.sessionSlug,
+    scheduledDefaultSessionSlug: policy.defaultSessionSlug,
+  };
+}
+
+async function finalizeSessionPolicy(env = {}, normalizedPolicy = {}, {
+  includeResultsExposureOverrides = true,
+  includeAdminDefaultOverride = true,
+} = {}) {
+  const withExposure = includeResultsExposureOverrides
+    ? await applyResultsExposureOverrides(env, normalizedPolicy)
+    : normalizedPolicy;
+  return includeAdminDefaultOverride
+    ? applyAdminDefaultSessionOverride(env, withExposure)
+    : withExposure;
+}
+
 async function loadSessionPolicy(env = {}, {
   forceRefresh = false,
+  includeResultsExposureOverrides = true,
+  includeAdminDefaultOverride = true,
 } = {}) {
+  const finalizeOptions = {
+    includeResultsExposureOverrides,
+    includeAdminDefaultOverride,
+  };
   const policyNow = env.AGENT_BRIDGE_SESSION_POLICY_NOW || env.AGENT_BRIDGE_NOW || null;
   const configured = safeJsonParse(env.AGENT_BRIDGE_SESSION_POLICY_JSON, null);
   if (configured && typeof configured === 'object' && !Array.isArray(configured)) {
-    return applyResultsExposureOverrides(env, normalizeSessionPolicy(configured, { now: policyNow }));
+    return finalizeSessionPolicy(env, normalizeSessionPolicy(configured, { now: policyNow }), finalizeOptions);
   }
   const registry = await listRegistrySessionsForBridge({ env, forceRefresh }).catch((error) => ({
     ok: false,
@@ -576,7 +749,7 @@ async function loadSessionPolicy(env = {}, {
     sessions: [],
   }));
   if (registry.ok && registry.sessions.length) {
-    return applyResultsExposureOverrides(env, normalizeSessionPolicy({
+    return finalizeSessionPolicy(env, normalizeSessionPolicy({
       defaultSessionSlug: (
         sanitizeSessionSlug(env.AGENT_BRIDGE_DEFAULT_SESSION_SLUG || env.DEFAULT_SESSION_SLUG) ||
         registry.sessions.find((session) => session.default)?.sessionSlug ||
@@ -586,14 +759,14 @@ async function loadSessionPolicy(env = {}, {
       allowQuestionGeneration: true,
       allowGenerateQuestion: true,
       sessions: registry.sessions,
-    }, { now: policyNow }));
+    }, { now: policyNow }), finalizeOptions);
   }
   const defaultSessionSlug = sanitizeSessionSlug(
     env.AGENT_BRIDGE_DEFAULT_SESSION_SLUG ||
     env.DEFAULT_SESSION_SLUG ||
     'general'
   ) || 'general';
-  return applyResultsExposureOverrides(env, normalizeSessionPolicy({
+  return finalizeSessionPolicy(env, normalizeSessionPolicy({
     defaultSessionSlug,
     riskCeiling: RISK_CEILINGS.SUBMIT,
     allowQuestionGeneration: true,
@@ -610,7 +783,7 @@ async function loadSessionPolicy(env = {}, {
       sbtJoinModes: ['public', 'password'],
       docLibraryEnabled: true,
     }],
-  }, { now: policyNow }));
+  }, { now: policyNow }), finalizeOptions);
 }
 
 function loadDemoQuestions(env = {}) {
@@ -729,6 +902,57 @@ function filterQuestionsForSession(questions = [], sessionSlug = '') {
   });
 }
 
+function normalizeQuestionLoadLimit(value = 0) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return 0;
+  return Math.floor(parsed);
+}
+
+function questionIdLookupSet(values = []) {
+  return new Set((Array.isArray(values) ? values : [])
+    .map((value) => lower(value))
+    .filter(Boolean));
+}
+
+function cloudflareQuestionItemIds(item = {}) {
+  const storageRef = item?.storageRef && typeof item.storageRef === 'object' && !Array.isArray(item.storageRef)
+    ? item.storageRef
+    : {};
+  return [
+    storageRef.id,
+    storageRef.questionId,
+    item?.id,
+    item?.questionId,
+    item?.key,
+    item?.name,
+  ].map(lower).filter(Boolean);
+}
+
+function selectTelegramOnlyCloudflareQuestionItems(items = [], {
+  questionLimit = 0,
+  preferredQuestionIds = [],
+} = {}) {
+  const source = Array.isArray(items) ? items : [];
+  const limit = normalizeQuestionLoadLimit(questionLimit);
+  if (!limit) return source;
+  const preferred = questionIdLookupSet(preferredQuestionIds);
+  if (!preferred.size) return source.slice(0, limit);
+  const selected = [];
+  const selectedIndexes = new Set();
+  source.forEach((item, index) => {
+    if (cloudflareQuestionItemIds(item).some((id) => preferred.has(id))) {
+      selected.push(item);
+      selectedIndexes.add(index);
+    }
+  });
+  const targetCount = Math.max(limit, selected.length || 0);
+  for (let index = 0; index < source.length && selected.length < targetCount; index += 1) {
+    if (selectedIndexes.has(index)) continue;
+    selected.push(source[index]);
+  }
+  return selected;
+}
+
 function questionIsPayloadUnavailable(question = {}) {
   return question?.payloadUnavailable === true || lower(question?.visibility) === 'payload_unavailable';
 }
@@ -746,6 +970,135 @@ function allQuestionsPayloadUnavailable(questions = []) {
   return Array.isArray(questions) && questions.length > 0 && questions.every(questionIsPayloadUnavailable);
 }
 
+function questionTextValueIsString(value) {
+  if (value === undefined || value === null) return true;
+  return typeof value === 'string';
+}
+
+function questionTagsShapeIsValid(value) {
+  if (value === undefined) return true;
+  if (value === null) return false;
+  return Array.isArray(value) || typeof value === 'string';
+}
+
+function firstQuestionTextValue(question = {}) {
+  if (question.questionText !== undefined && question.questionText !== null) return question.questionText;
+  if (question.prompt !== undefined && question.prompt !== null) return question.prompt;
+  if (question.title !== undefined && question.title !== null) return question.title;
+  return '';
+}
+
+function cloudflareQuestionItemHasInlinePayload(item = {}) {
+  const root = questionPayloadRoot(item);
+  if (!root) return false;
+  for (const value of [root.questionText, root.prompt, item?.questionText, item?.prompt]) {
+    if (value === undefined || value === null || typeof value !== 'string') continue;
+    if (safeString(value)) return true;
+  }
+  return false;
+}
+
+function questionRecordMalformedReason(question = {}) {
+  if (!question || typeof question !== 'object' || Array.isArray(question)) return 'record_not_object';
+  let qid = '';
+  try {
+    qid = safeString(question.questionId || question.id);
+  } catch {
+    return 'question_id_invalid';
+  }
+  if (!qid) return 'question_id_missing';
+  if (!questionTagsShapeIsValid(question.tags)) return 'question_tags_invalid';
+  const textValue = firstQuestionTextValue(question);
+  if (!questionTextValueIsString(textValue)) return 'question_prompt_invalid';
+  let locked = false;
+  let unavailable = false;
+  try {
+    locked = questionIsLocked(question);
+    unavailable = questionIsPayloadUnavailable(question);
+  } catch {
+    return 'question_visibility_invalid';
+  }
+  if (!locked && !unavailable) {
+    let prompt = '';
+    try {
+      prompt = safeString(textValue);
+    } catch {
+      return 'question_prompt_invalid';
+    }
+    if (!prompt) return 'question_prompt_missing';
+  }
+  return '';
+}
+
+function orderQuestionsForPresentationWithSummary(questions = []) {
+  const rows = [];
+  let skippedMalformed = 0;
+  (Array.isArray(questions) ? questions : []).forEach((question, index) => {
+    try {
+      if (questionRecordMalformedReason(question)) {
+        skippedMalformed += 1;
+        return;
+      }
+      rows.push({ question, index });
+    } catch {
+      skippedMalformed += 1;
+    }
+  });
+  rows.sort((left, right) => {
+    let leftRank = 2;
+    let rightRank = 2;
+    try {
+      leftRank = questionPresentationRank(left.question);
+    } catch {
+      leftRank = 2;
+    }
+    try {
+      rightRank = questionPresentationRank(right.question);
+    } catch {
+      rightRank = 2;
+    }
+    return leftRank - rightRank || left.index - right.index;
+  });
+  return {
+    questions: rows.map(({ question }) => question),
+    skippedMalformed,
+  };
+}
+
+function questionAvailabilitySummary(questions = []) {
+  const entries = Array.isArray(questions) ? questions : [];
+  let skippedMalformed = 0;
+  let answerable = false;
+  let unavailableCount = 0;
+  entries.forEach((question) => {
+    try {
+      if (questionRecordMalformedReason(question)) {
+        skippedMalformed += 1;
+        return;
+      }
+      if (questionIsAnswerable(question)) answerable = true;
+      if (questionIsPayloadUnavailable(question)) unavailableCount += 1;
+    } catch {
+      skippedMalformed += 1;
+    }
+  });
+  const validCount = Math.max(0, entries.length - skippedMalformed);
+  return {
+    hasAnswerableQuestions: answerable,
+    allPayloadUnavailable: validCount > 0 && unavailableCount === validCount,
+    skippedMalformed,
+  };
+}
+
+function withSkippedMalformed(result = {}, skippedMalformed = 0) {
+  const count = Number(skippedMalformed || 0) || 0;
+  if (count <= 0) return result;
+  return {
+    ...result,
+    skippedMalformed: (Number(result.skippedMalformed || 0) || 0) + count,
+  };
+}
+
 function questionPresentationRank(question = {}) {
   if (questionIsPayloadUnavailable(question)) return 2;
   if (questionIsLocked(question)) return 1;
@@ -753,21 +1106,31 @@ function questionPresentationRank(question = {}) {
 }
 
 function orderQuestionsForPresentation(questions = []) {
-  return (Array.isArray(questions) ? questions : [])
-    .map((question, index) => ({ question, index }))
-    .sort((left, right) => (
-      questionPresentationRank(left.question) - questionPresentationRank(right.question) ||
-      left.index - right.index
-    ))
-    .map(({ question }) => question);
+  return orderQuestionsForPresentationWithSummary(questions).questions;
 }
 
 async function withTelegramProposedQuestions(env = {}, sessionSlug = '', result = {}) {
-  const proposed = await listTelegramProposedQuestionsForSession(env, sessionSlug).catch(() => []);
-  if (!proposed.length) return result;
-  const questions = orderQuestionsForPresentation(mergeTelegramProposedQuestions(result.questions || [], proposed));
+  const proposedSummary = await listTelegramProposedQuestionsForSessionWithSummary(env, sessionSlug)
+    .catch(() => ({ questions: [], skippedMalformed: 1 }));
+  const proposed = Array.isArray(proposedSummary.questions) ? proposedSummary.questions : [];
+  const baseSummary = orderQuestionsForPresentationWithSummary(result.questions || []);
+  const skippedMalformed = (Number(proposedSummary.skippedMalformed || 0) || 0) + baseSummary.skippedMalformed;
+  if (!proposed.length) {
+    if (skippedMalformed <= 0) return result;
+    return withSkippedMalformed({
+      ...result,
+      questions: baseSummary.questions,
+      questionCount: baseSummary.questions.length,
+    }, skippedMalformed);
+  }
+  const mergedSummary = orderQuestionsForPresentationWithSummary(mergeTelegramProposedQuestions(baseSummary.questions, proposed));
+  const questions = mergedSummary.questions;
   return {
-    ...result,
+    ...withSkippedMalformed(result, skippedMalformed + mergedSummary.skippedMalformed),
+    ok: result.ok !== false || questions.length > 0,
+    reason: result.ok === false && questions.length > 0
+      ? 'proposed_questions_loaded_with_source_warning'
+      : result.reason,
     questions,
     questionCount: questions.length,
     proposedQuestionCount: proposed.length,
@@ -803,6 +1166,78 @@ function liveQuestionFallbackTimeoutMs(env = {}) {
 function allowAdHocQuestions(env = {}) {
   return envFlagEnabled(env.AGENT_BRIDGE_ALLOW_AD_HOC_QUESTIONS)
     || questionSourceMode(env) === 'fixture';
+}
+
+function sessionStorageProfile(session = {}) {
+  return session?.storageProfile && typeof session.storageProfile === 'object' && !Array.isArray(session.storageProfile)
+    ? session.storageProfile
+    : {};
+}
+
+function sessionStorageConfig(session = {}) {
+  return session?.storage && typeof session.storage === 'object' && !Array.isArray(session.storage)
+    ? session.storage
+    : {};
+}
+
+function sessionUsesCloudflareQuestionStorage(session = {}) {
+  const storageProfile = sessionStorageProfile(session);
+  const storage = sessionStorageConfig(session);
+  const profiles = storage.profiles && typeof storage.profiles === 'object' && !Array.isArray(storage.profiles)
+    ? storage.profiles
+    : {};
+  const cloudflareProfile = profiles.cloudflare && typeof profiles.cloudflare === 'object' && !Array.isArray(profiles.cloudflare)
+    ? profiles.cloudflare
+    : {};
+  const backend = lower(
+    storageProfile.backend ||
+    storageProfile.defaultBackend ||
+    storage.defaultBackend ||
+    session.questionStorageBackend ||
+    session.storageBackend
+  );
+  const source = lower(session.questionSource || session.telegramQuestionSource);
+  const artifactTypes = Array.isArray(cloudflareProfile.artifactTypes)
+    ? cloudflareProfile.artifactTypes.map(lower)
+    : [];
+  return backend === 'cloudflare' ||
+    source === 'cloudflare_storage' ||
+    source === 'cloudflare' ||
+    (cloudflareProfile.enabled === true && (
+      lower(storage.defaultBackend) === 'cloudflare' ||
+      artifactTypes.includes('questions')
+    ));
+}
+
+function sessionUsesExplicitOnchainQuestionMode(session = {}) {
+  const values = [
+    session.sessionMode,
+    session.questionSource,
+    session.telegramQuestionSource,
+    session.questionRuntime,
+    session.backendMode,
+    session.backend,
+  ].map(lower).filter(Boolean);
+  return values.some((value) => [
+    'onchain',
+    'on_chain',
+    'chain',
+    'web3',
+    'registry',
+    'session_registry',
+    'contract',
+    'contracts',
+  ].includes(value));
+}
+
+function sessionUsesWorkerBackedQuestions(session = {}) {
+  if (!session || typeof session !== 'object') return false;
+  const mode = lower(session.sessionMode || session.backendMode || session.backend);
+  if (session.telegramOnly === true || mode === 'telegram_only' || mode === 'telegram-only' || mode === 'telegram') {
+    return true;
+  }
+  if (sessionUsesExplicitOnchainQuestionMode(session)) return false;
+  return sessionUsesCloudflareQuestionStorage(session);
 }
 
 function questionLoadIssueText(result = {}) {
@@ -926,10 +1361,23 @@ async function fetchTelegramOnlyCloudflareJson({
 async function loadTelegramOnlyCloudflareQuestions({
   env = {},
   session = {},
+  questionLimit = 0,
+  preferredQuestionIds = [],
   fetchImpl = env.QUESTION_FETCH || env.REGISTRY_FETCH || globalThis.fetch,
 } = {}) {
   const sessionSlug = sanitizeSessionSlug(session.sessionSlug || session.slug);
-  const auth = await buildTelegramOnlyStorageAuth({ env, session, fetchImpl });
+  let auth = null;
+  try {
+    auth = await buildTelegramOnlyStorageAuth({ env, session, fetchImpl });
+  } catch (error) {
+    return {
+      ok: false,
+      reason: 'telegram_only_cloudflare_questions_list_failed',
+      authReason: 'session_worker_auth_failed',
+      error: safeString(error?.message || error),
+      questions: [],
+    };
+  }
   if (!auth?.ok) {
     return {
       ok: false,
@@ -954,14 +1402,34 @@ async function loadTelegramOnlyCloudflareQuestions({
     };
   }
   const items = Array.isArray(listed.body?.items) ? listed.body.items : [];
+  const selectedItems = selectTelegramOnlyCloudflareQuestionItems(items, {
+    questionLimit,
+    preferredQuestionIds,
+  });
   const questions = [];
   const readErrors = [];
-  const readResults = await Promise.all(items.map(async (item, index) => {
+  const readResults = await Promise.all(selectedItems.map(async (item, index) => {
     const storageRef = item?.storageRef && typeof item.storageRef === 'object' && !Array.isArray(item.storageRef)
       ? item.storageRef
       : {};
     const id = safeString(storageRef.id || item?.id);
     if (!id) return null;
+    if (cloudflareQuestionItemHasInlinePayload(item)) {
+      const normalized = normalizePreloadedQuestionRecord(
+        {
+          ...(item && typeof item === 'object' && !Array.isArray(item) ? item : {}),
+          storageRef,
+        },
+        {
+          index,
+          fallbackSessionSlug: sessionSlug,
+          source: 'telegram_only_cloudflare_questions',
+        }
+      );
+      if (normalized && !questionIsPayloadUnavailable(normalized) && !questionRecordMalformedReason(normalized)) {
+        return { question: normalized };
+      }
+    }
     const read = await fetchTelegramOnlyCloudflareJson({
       auth,
       path: `/storage/read?id=${encodeURIComponent(id)}`,
@@ -996,16 +1464,21 @@ async function loadTelegramOnlyCloudflareQuestions({
     source: 'telegram_only_cloudflare_storage',
     questions,
     questionCount: questions.length,
+    complete: selectedItems.length >= items.length && readErrors.length === 0,
+    loadedCount: questions.length,
     discoveredCount: items.length,
     payloadFailureCount: readErrors.length,
     readErrors,
   };
 }
 
-async function loadTelegramOnlyQuestionsForSession(env = {}, sessionSlug = '') {
+async function loadTelegramOnlyQuestionsForSession(env = {}, sessionSlug = '', {
+  questionLimit = 0,
+  preferredQuestionIds = [],
+} = {}) {
   const policy = await loadSessionPolicy(env);
   const resolved = resolveSessionInvocation(policy, sessionSlug);
-  if (!resolved.ok || resolved.session?.telegramOnly !== true) return null;
+  if (!resolved.ok || !sessionUsesWorkerBackedQuestions(resolved.session)) return null;
   const session = resolved.session;
   const inlineQuestions = normalizePreloadedQuestionRecords(session.questions, {
     fallbackSessionSlug: session.sessionSlug,
@@ -1021,12 +1494,7 @@ async function loadTelegramOnlyQuestionsForSession(env = {}, sessionSlug = '') {
       discoveredCount: inlineQuestions.length,
     };
   }
-  const storageProfile = session.storageProfile && typeof session.storageProfile === 'object' && !Array.isArray(session.storageProfile)
-    ? session.storageProfile
-    : {};
-  const cloudflareSelected = lower(storageProfile.backend || session.questionStorageBackend || session.storageBackend) === 'cloudflare' ||
-    lower(session.questionSource || session.telegramQuestionSource) === 'cloudflare_storage';
-  if (!cloudflareSelected) {
+  if (!sessionUsesCloudflareQuestionStorage(session)) {
     return {
       ok: true,
       reason: 'telegram_only_questions_empty',
@@ -1036,7 +1504,12 @@ async function loadTelegramOnlyQuestionsForSession(env = {}, sessionSlug = '') {
       discoveredCount: 0,
     };
   }
-  const cloudflare = await loadTelegramOnlyCloudflareQuestions({ env, session });
+  const cloudflare = await loadTelegramOnlyCloudflareQuestions({
+    env,
+    session,
+    questionLimit,
+    preferredQuestionIds,
+  });
   return {
     ...cloudflare,
     questions: orderQuestionsForPresentation(cloudflare.questions || []),
@@ -1045,6 +1518,8 @@ async function loadTelegramOnlyQuestionsForSession(env = {}, sessionSlug = '') {
 
 async function loadQuestionsForSession(env = {}, sessionSlug = '', {
   waitUntil = null,
+  questionLimit = 0,
+  preferredQuestionIds = [],
 } = {}) {
   const mode = questionSourceMode(env);
   if (mode === 'fixture') {
@@ -1055,9 +1530,17 @@ async function loadQuestionsForSession(env = {}, sessionSlug = '', {
       questions: orderQuestionsForPresentation(filterQuestionsForSession(loadDemoQuestions(env), sessionSlug)),
     });
   }
-  const telegramOnly = await loadTelegramOnlyQuestionsForSession(env, sessionSlug);
+  const telegramOnly = await loadTelegramOnlyQuestionsForSession(env, sessionSlug, {
+    questionLimit,
+    preferredQuestionIds,
+  });
   if (telegramOnly) return withTelegramProposedQuestions(env, sessionSlug, telegramOnly);
-  const livePromise = listCachedSessionQuestionsForBridge({ env, sessionSlug, waitUntil }).catch((error) => ({
+  const livePromise = listCachedSessionQuestionsForBridge({
+    env,
+    sessionSlug,
+    waitUntil,
+    questionLimit,
+  }).catch((error) => ({
     ok: false,
     reason: 'live_question_cache_failed',
     error: safeString(error?.message || error),
@@ -1084,15 +1567,18 @@ async function loadQuestionsForSession(env = {}, sessionSlug = '', {
   } else {
     live = await livePromise;
   }
-  const liveQuestions = Array.isArray(live.questions) ? live.questions : [];
-  const liveHasAnswerableQuestions = liveQuestions.some(questionIsAnswerable);
-  const liveOnlyUnavailablePayloads = allQuestionsPayloadUnavailable(liveQuestions);
+  const liveQuestionSummary = orderQuestionsForPresentationWithSummary(Array.isArray(live.questions) ? live.questions : []);
+  const liveQuestions = liveQuestionSummary.questions;
+  const availability = questionAvailabilitySummary(liveQuestions);
+  const liveHasAnswerableQuestions = availability.hasAnswerableQuestions;
+  const liveOnlyUnavailablePayloads = availability.allPayloadUnavailable;
+  const liveMalformedCount = liveQuestionSummary.skippedMalformed + availability.skippedMalformed;
   if (live?.timedOut || liveOnlyUnavailablePayloads) {
     return withTelegramProposedQuestions(env, sessionSlug, {
       ...live,
       source: live.source || 'telegram_worker_question_cache',
-      questions: orderQuestionsForPresentation(liveQuestions),
-    });
+      questions: liveQuestions,
+    }).then((result) => withSkippedMalformed(result, liveMalformedCount));
   }
   if (
     (live.ok && liveQuestions.length && (liveHasAnswerableQuestions || !fallbackAllowed || !liveOnlyUnavailablePayloads)) ||
@@ -1101,8 +1587,8 @@ async function loadQuestionsForSession(env = {}, sessionSlug = '', {
     return withTelegramProposedQuestions(env, sessionSlug, {
       ...live,
       source: live.source || 'telegram_worker_question_cache',
-      questions: orderQuestionsForPresentation(liveQuestions),
-    });
+      questions: liveQuestions,
+    }).then((result) => withSkippedMalformed(result, liveMalformedCount));
   }
   return withTelegramProposedQuestions(env, sessionSlug, {
     ok: true,
@@ -1110,7 +1596,7 @@ async function loadQuestionsForSession(env = {}, sessionSlug = '', {
     source: 'demo_fixture',
     fallbackFrom: live.reason || (liveOnlyUnavailablePayloads ? 'live_questions_payload_unavailable' : 'live_question_cache_unavailable'),
     questions: orderQuestionsForPresentation(filterQuestionsForSession(loadDemoQuestions(env), sessionSlug)),
-  });
+  }).then((result) => withSkippedMalformed(result, liveMalformedCount));
 }
 
 function summarizeQuestionPrefetch(result = {}, sessionSlug = '') {
@@ -1376,6 +1862,17 @@ function findQuestion(questions = [], selector = '') {
     || questions.find((question) => lower(shortQuestionId(questionId(question))) === needle)
     || questions.find((question) => lower(questionText(question)).includes(needle))
     || null;
+}
+
+async function findQuestionForSession({
+  env = {},
+  sessionSlug = '',
+  questions = [],
+  selector = '',
+  createdAt = null,
+} = {}) {
+  return await findQuestionByStableNumber({ env, sessionSlug, selector, questions, createdAt })
+    || findQuestion(questions, selector);
 }
 
 function buildAdHocQuestion(text = '', {
@@ -1768,11 +2265,9 @@ export function buildUrlQuestionGenerationPrompt({
   questionType = 'agree_unsure_disagree',
   regenerationFeedback = '',
   previousCandidates = [],
-  geoRefs = [],
 } = {}) {
   const sessionContext = sessionContextFromPolicySession(session);
   const defaultTags = sessionDefaultTags(session);
-  const normalizedGeoRefs = normalizeQuestionGeoRefs(geoRefs);
   const types = questionType === 'agree_unsure_disagree' ? 'binary' : normalizeQuestionProposalType(questionType) || 'binary';
   const feedback = safeString(regenerationFeedback).replace(/\s+/g, ' ').trim().slice(0, 1000);
   const previous = (Array.isArray(previousCandidates) ? previousCandidates : [])
@@ -1787,12 +2282,10 @@ export function buildUrlQuestionGenerationPrompt({
     '* SourceType: webpage',
     '* MultiSpeakerHint: unknown',
     '* ClipDurationMinutes: ',
-    normalizedGeoRefs.length ? `* GeoContext: ${JSON.stringify(normalizedGeoRefs)}` : '',
     '',
     '-----',
     '',
     `Group Custom Instructions: ${sessionContext || 'Generate questions in the spirit of the selected Context Engine session.'}`,
-    normalizedGeoRefs.length ? `Geo Custom Instructions: Generate questions about this public Edge/Geo context: ${normalizedGeoRefs.map((ref) => `${ref.kind}:${ref.label || ref.geoId} (${ref.geoId})`).join('; ')}.` : '',
     '',
     'Group custom instructions may refine topic focus, wording, or audience. They must not override the required JSON shape, count/type constraints, privacy constraints, or source-grounding rules below.',
     '',
@@ -1845,7 +2338,6 @@ export function buildUrlQuestionGenerationPrompt({
     '* Are directly inspired by the source but do not say "as described in the document" or require the respondent to have read the source.',
     '* Contain one main idea per question; avoid compound prompts that ask respondents to agree with multiple claims at once.',
     '* Use short normalized tags; prefer allowed default tags when genuinely relevant and avoid identifying tags.',
-    normalizedGeoRefs.length ? '* Because GeoContext is present, prioritize questions about that public event/venue/track. The caller will attach the geoRefs and matching geo:<geoId> tag after generation.' : '',
     '* Count fidelity: generate exactly the requested count unless the source truly cannot support that many.',
     '',
     'Always return a valid JSON object with this shape:',
@@ -1912,17 +2404,14 @@ export function buildLocalUrlQuestionCandidates({
   session = {},
   questionType = 'agree_unsure_disagree',
   count = TELEGRAM_GENERATED_QUESTION_COUNT,
-  geoRefs = [],
 } = {}) {
   const requested = Math.min(
     TELEGRAM_GENERATED_QUESTION_MAX_COUNT,
     Math.max(1, Number(count || TELEGRAM_GENERATED_QUESTION_COUNT))
   );
   const normalizedType = normalizeQuestionProposalType(questionType) || 'agree_unsure_disagree';
-  const normalizedGeoRefs = normalizeQuestionGeoRefs(geoRefs);
   const themes = localGeneratedQuestionThemes(source, session);
-  const geoSubject = normalizedGeoRefs[0]?.label || normalizedGeoRefs[0]?.geoId || '';
-  const subject = safeString(geoSubject || session.sessionName || source.title || 'This session').replace(/\s+/g, ' ');
+  const subject = safeString(session.sessionName || source.title || 'This session').replace(/\s+/g, ' ');
   const binaryTemplates = [
     (theme) => `${subject} should prioritize ${theme} over adding more topics.`,
     (theme) => `The most useful questions for ${subject} are the ones that reveal tradeoffs around ${theme}.`,
@@ -1955,11 +2444,9 @@ export function buildLocalUrlQuestionCandidates({
       prompt,
       questionType: normalizedType,
       session,
-      geoRefs: normalizedGeoRefs,
       sessionContext: source.text,
     }),
-    geoRefs: normalizedGeoRefs,
-  })), { session, questionType: normalizedType, geoRefs: normalizedGeoRefs }).slice(0, requested);
+  })), { session, questionType: normalizedType }).slice(0, requested);
 }
 
 export async function requestUrlQuestionGenerationAi({
@@ -2009,10 +2496,8 @@ export async function requestUrlQuestionGenerationAi({
 export function normalizeGeneratedQuestionCandidates(questions = [], {
   session = {},
   questionType = 'agree_unsure_disagree',
-  geoRefs = [],
 } = {}) {
   const preferredType = normalizeQuestionProposalType(questionType) || 'agree_unsure_disagree';
-  const normalizedGeoRefs = normalizeQuestionGeoRefs(geoRefs);
   const candidates = [];
   for (const raw of Array.isArray(questions) ? questions : []) {
     const item = typeof raw === 'string' ? { prompt: raw } : raw;
@@ -2037,11 +2522,9 @@ export function normalizeGeneratedQuestionCandidates(questions = [], {
       questionType: normalizedType,
       options,
       tags: normalizeQuestionTags([
-        ...geoTagsFromGeoRefs(normalizedGeoRefs),
         ...(Array.isArray(item.tags) ? item.tags : []),
         ...sessionDefaultTags(session),
       ]),
-      geoRefs: normalizedGeoRefs,
     });
     if (candidates.length >= TELEGRAM_GENERATED_QUESTION_MAX_COUNT) break;
   }
@@ -2148,6 +2631,55 @@ async function readActionRecord(env = {}, actionId = '') {
   return parsed;
 }
 
+function latestMiniAppLaunchUserKeyPart(telegramUserId = '') {
+  return safeString(telegramUserId).replace(/[^0-9A-Za-z_-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 64);
+}
+
+function latestMiniAppLaunchKey(telegramUserId = '') {
+  const user = latestMiniAppLaunchUserKeyPart(telegramUserId);
+  return user ? `${MINI_APP_LATEST_LAUNCH_KV_PREFIX}${user}` : '';
+}
+
+async function persistLatestMiniAppLaunchPointer({
+  env = {},
+  telegramUserId = '',
+  sessionSlug = '',
+  launch = '',
+  questionIds = [],
+  createdAt = null,
+  ttlSeconds = DEFAULT_ACTION_TTL_SECONDS,
+} = {}) {
+  const key = latestMiniAppLaunchKey(telegramUserId);
+  const launchId = safeString(launch);
+  if (!key || !launchId || !env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.put !== 'function') {
+    return { ok: false, reason: 'action_kv_unavailable' };
+  }
+  const record = {
+    type: 'telegram_mini_app_latest_launch',
+    version: 1,
+    telegramUserId: safeString(telegramUserId),
+    sessionSlug: sanitizeSessionSlug(sessionSlug),
+    launch: launchId,
+    questionIds: Array.isArray(questionIds) ? questionIds.map(safeString).filter(Boolean).slice(0, 50) : [],
+    updatedAt: createdAt || nowIso(),
+  };
+  assertNoSecretShape(record, 'Telegram Mini App latest-launch pointers must not serialize secrets.');
+  await env.AGENT_ACTION_KV.put(key, JSON.stringify(record), {
+    expirationTtl: ttlSeconds,
+  });
+  return { ok: true, key };
+}
+
+async function readLatestMiniAppLaunchPointer(env = {}, telegramUserId = '') {
+  const key = latestMiniAppLaunchKey(telegramUserId);
+  if (!key || !env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.get !== 'function') return null;
+  const parsed = safeJsonParse(await env.AGENT_ACTION_KV.get(key).catch(() => null), null);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  assertNoSecretShape(parsed, 'Telegram Mini App latest-launch pointers must not serialize secrets.');
+  const launch = safeString(parsed.launch);
+  return launch ? { ...parsed, launch } : null;
+}
+
 function groupSessionBindingKey(normalized = {}) {
   const chatId = safeString(normalized.chat?.chatId);
   return chatId ? `${GROUP_SESSION_KV_PREFIX}${chatId}` : '';
@@ -2158,6 +2690,7 @@ async function persistGroupSessionBinding({
   normalized = {},
   session = {},
   createdAt = null,
+  followDefault = false,
 } = {}) {
   if (normalized.chat?.isPrivate) return { ok: false, reason: 'private_chat' };
   const key = groupSessionBindingKey(normalized);
@@ -2169,6 +2702,7 @@ async function persistGroupSessionBinding({
     chatId: safeString(normalized.chat?.chatId),
     sessionSlug: sanitizeSessionSlug(session.sessionSlug || session.slug),
     sessionName: sessionLabel(session),
+    followDefault: followDefault === true,
     linkedAt: createdAt || nowIso(),
   };
   if (!record.sessionSlug) return { ok: false, reason: 'session_slug_missing' };
@@ -2201,6 +2735,7 @@ async function persistTelegramUserSessionBinding({
   session = {},
   createdAt = null,
   source = 'private_chat',
+  followDefault = false,
 } = {}) {
   const key = privateSessionBindingKey(normalized);
   if (!key || !env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.put !== 'function') {
@@ -2211,6 +2746,7 @@ async function persistTelegramUserSessionBinding({
     telegramUserId: safeString(normalized.user?.telegramUserId),
     sessionSlug: sanitizeSessionSlug(session.sessionSlug || session.slug),
     sessionName: sessionLabel(session),
+    followDefault: followDefault === true,
     selectedAt: createdAt || nowIso(),
     source: safeString(source) || 'private_chat',
   };
@@ -2231,6 +2767,7 @@ async function persistPrivateSessionBinding({
   normalized = {},
   session = {},
   createdAt = null,
+  followDefault = false,
 } = {}) {
   if (!normalized.chat?.isPrivate) return { ok: false, reason: 'not_private_chat' };
   return persistTelegramUserSessionBinding({
@@ -2239,6 +2776,7 @@ async function persistPrivateSessionBinding({
     session,
     createdAt,
     source: 'private_chat',
+    followDefault,
   });
 }
 
@@ -2253,6 +2791,12 @@ async function readPrivateSessionBinding(env = {}, normalized = {}) {
   return sessionSlug ? { ...parsed, sessionSlug } : null;
 }
 
+function bindingSessionSlug(binding = {}, policy = {}) {
+  if (!binding || typeof binding !== 'object') return '';
+  if (binding.followDefault === true) return sanitizeSessionSlug(policy.defaultSessionSlug);
+  return sanitizeSessionSlug(binding.sessionSlug);
+}
+
 function answerDraftKey({
   normalized = {},
   sessionSlug = '',
@@ -2263,6 +2807,299 @@ function answerDraftKey({
   const qid = questionIdSeedPart(selectedQuestionId || 'question');
   return telegramUserId && slug && qid
     ? `${ANSWER_DRAFT_KV_PREFIX}${telegramUserId}:${slug}:${qid}`
+    : '';
+}
+
+function answerDraftViewKey({
+  normalized = {},
+  sessionSlug = '',
+  questionId: selectedQuestionId = '',
+} = {}) {
+  const telegramUserId = safeString(normalized.user?.telegramUserId);
+  const slug = sanitizeSessionSlug(sessionSlug);
+  const qid = questionIdSeedPart(selectedQuestionId || 'question');
+  return telegramUserId && slug && qid
+    ? `${ANSWER_DRAFT_VIEW_KV_PREFIX}${telegramUserId}:${slug}:${qid}`
+    : '';
+}
+
+function answerDraftFingerprint(record = {}) {
+  return stableFingerprint({
+    answerLabel: safeString(record.answerLabel),
+    answerValue: safeString(record.answerValue),
+    controlType: safeString(record.controlType),
+  });
+}
+
+function answerDraftOrigin(record = null) {
+  if (!record || typeof record !== 'object' || Array.isArray(record)) return null;
+  const origin = record.origin && typeof record.origin === 'object' && !Array.isArray(record.origin)
+    ? record.origin
+    : null;
+  if (origin) {
+    return {
+      source: safeString(origin.source) || null,
+      agentMetadata: origin.agentMetadata && typeof origin.agentMetadata === 'object' && !Array.isArray(origin.agentMetadata)
+        ? origin.agentMetadata
+        : null,
+      answerLabel: safeString(origin.answerLabel),
+      answerValue: safeString(origin.answerValue),
+      controlType: safeString(origin.controlType),
+      fingerprint: safeString(origin.fingerprint) || answerDraftFingerprint(origin),
+      savedAt: safeString(origin.savedAt) || null,
+    };
+  }
+  return {
+    source: safeString(record.source) || null,
+    agentMetadata: record.agentMetadata && typeof record.agentMetadata === 'object' && !Array.isArray(record.agentMetadata)
+      ? record.agentMetadata
+      : null,
+    answerLabel: safeString(record.answerLabel),
+    answerValue: safeString(record.answerValue),
+    controlType: safeString(record.controlType),
+    fingerprint: safeString(record.fingerprint) || answerDraftFingerprint(record),
+    savedAt: safeString(record.selectedAt) || null,
+  };
+}
+
+async function analyticsPrincipalFingerprint(env = {}, telegramUserId = '') {
+  const salt = safeString(env?.AGENT_BRIDGE_ANALYTICS_SALT);
+  const id = safeString(telegramUserId);
+  const subtle = globalThis.crypto?.subtle;
+  if (!salt || !id || !subtle) return '';
+  const encoder = new TextEncoder();
+  const key = await subtle.importKey(
+    'raw',
+    encoder.encode(salt),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const signature = await subtle.sign('HMAC', key, encoder.encode(id));
+  return Array.from(new Uint8Array(signature)).slice(0, 12)
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+async function writeDraftLifecycleEvent(env = {}, {
+  event = '',
+  sessionSlug = '',
+  questionId = '',
+  source = '',
+  originSource = '',
+  controlType = '',
+  editCount = 0,
+  draftToSubmitMs = null,
+  telegramUserId = '',
+} = {}) {
+  try {
+    const dataset = env?.AGENT_BRIDGE_ANALYTICS;
+    if (!dataset || typeof dataset.writeDataPoint !== 'function') return false;
+    const slug = sanitizeSessionSlug(sessionSlug);
+    const principalFingerprint = await analyticsPrincipalFingerprint(env, telegramUserId);
+    dataset.writeDataPoint({
+      blobs: [
+        safeString(event).slice(0, 64),
+        slug.slice(0, 256),
+        safeString(questionId).slice(0, 256),
+        safeString(source).slice(0, 64),
+        safeString(originSource).slice(0, 64),
+        safeString(controlType).slice(0, 64),
+        principalFingerprint,
+      ],
+      doubles: [
+        Number(editCount) || 0,
+        Number.isFinite(Number(draftToSubmitMs)) && draftToSubmitMs !== null ? Number(draftToSubmitMs) : -1,
+      ],
+      indexes: [slug.slice(0, 96)],
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const CANONICAL_ANSWER_KINDS = Object.freeze({
+  binary: 'binary',
+  agree_unsure_disagree: 'binary',
+  rating: 'rating',
+  rating_button: 'rating',
+  multichoice: 'multichoice',
+  multi_select_toggle: 'multichoice',
+  single_select: 'multichoice',
+  freeform: 'freeform',
+  freeform_text: 'freeform',
+});
+
+function canonicalDraftAnswerForm(record = {}) {
+  const raw = safeString(record.answerValue);
+  const parsed = safeJsonParse(raw, null);
+  const source = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+  const type = CANONICAL_ANSWER_KINDS[lower(safeString(source?.questionType))] ||
+    CANONICAL_ANSWER_KINDS[lower(safeString(record.controlType))] ||
+    'unknown';
+  const text = safeString(source ? (source.text ?? source.value ?? '') : raw);
+  const comments = safeString(source?.comments);
+  if (type === 'binary') {
+    return { type, value: lower(safeString(source?.value) || text), comments };
+  }
+  if (type === 'rating') {
+    const candidate = source?.value ?? (text === '' ? null : text);
+    const value = candidate === null || candidate === undefined || candidate === ''
+      ? NaN
+      : Number(candidate);
+    return { type, value: Number.isFinite(value) ? value : null, comments };
+  }
+  if (type === 'multichoice') {
+    const values = Array.isArray(source?.values)
+      ? source.values.map(safeString).filter(Boolean)
+      : (text ? [text] : []);
+    return { type, values: [...new Set(values)].sort(), comments };
+  }
+  return { type, text, comments };
+}
+
+function answerDraftSemanticFingerprint(record = {}) {
+  return stableFingerprint(canonicalDraftAnswerForm(record));
+}
+
+function buildDraftDelta(origin = null, finalAnswer = null) {
+  if (!origin || !finalAnswer) return null;
+  const before = canonicalDraftAnswerForm(origin);
+  const after = canonicalDraftAnswerForm(finalAnswer);
+  const changed = stableFingerprint(before) !== stableFingerprint(after);
+  const kind = after.type !== 'unknown' ? after.type : before.type;
+  const delta = { kind, changed };
+  if (kind === 'binary') {
+    delta.stanceBefore = safeString(before.value);
+    delta.stanceAfter = safeString(after.value);
+    delta.stanceChanged = delta.stanceBefore !== delta.stanceAfter;
+  } else if (kind === 'rating') {
+    delta.ratingBefore = Number.isFinite(before.value) ? before.value : null;
+    delta.ratingAfter = Number.isFinite(after.value) ? after.value : null;
+    delta.ratingShift = delta.ratingBefore !== null && delta.ratingAfter !== null
+      ? delta.ratingAfter - delta.ratingBefore
+      : null;
+  } else if (kind === 'multichoice') {
+    const valuesBefore = Array.isArray(before.values) ? before.values : [];
+    const valuesAfter = Array.isArray(after.values) ? after.values : [];
+    delta.addedValues = valuesAfter.filter((value) => !valuesBefore.includes(value));
+    delta.removedValues = valuesBefore.filter((value) => !valuesAfter.includes(value));
+  } else {
+    const textBefore = safeString(before.text);
+    const textAfter = safeString(after.text);
+    delta.lengthBefore = textBefore.length;
+    delta.lengthAfter = textAfter.length;
+    delta.lengthDelta = textAfter.length - textBefore.length;
+    delta.textChanged = textBefore !== textAfter;
+  }
+  const commentsBefore = safeString(before.comments);
+  const commentsAfter = safeString(after.comments);
+  if (commentsBefore || commentsAfter) delta.commentsChanged = commentsBefore !== commentsAfter;
+  return delta;
+}
+
+function buildDraftProvenance({
+  draft = null,
+  submittedAt = '',
+  firstViewedAt = '',
+} = {}) {
+  if (!draft || typeof draft !== 'object' || Array.isArray(draft)) return null;
+  const origin = draft.origin && typeof draft.origin === 'object' && !Array.isArray(draft.origin)
+    ? answerDraftOrigin(draft)
+    : null;
+  const finalAnswer = {
+    answerLabel: safeString(draft.answerLabel),
+    answerValue: safeString(draft.answerValue),
+    controlType: safeString(draft.controlType),
+  };
+  const finalFingerprint = safeString(draft.fingerprint) || answerDraftFingerprint(draft);
+  const finalSemanticFingerprint = safeString(draft.semanticFingerprint) ||
+    answerDraftSemanticFingerprint(draft);
+  const originSemanticFingerprint = origin ? answerDraftSemanticFingerprint(origin) : '';
+  const agentDrafted = safeString(origin?.source) === 'agent_handoff';
+  const editedFromOrigin = origin ? originSemanticFingerprint !== finalSemanticFingerprint : null;
+  const storedAgentRevision = draft.agentRevision &&
+    typeof draft.agentRevision === 'object' && !Array.isArray(draft.agentRevision)
+    ? draft.agentRevision
+    : null;
+  const agentRevision = storedAgentRevision ||
+    (agentDrafted ? { semanticFingerprint: originSemanticFingerprint, savedAt: origin?.savedAt || null } : null);
+  const submitted = safeString(submittedAt);
+  const originSavedAtMs = origin?.savedAt ? Date.parse(origin.savedAt) : NaN;
+  const submittedAtMs = submitted ? Date.parse(submitted) : NaN;
+  const viewed = safeString(firstViewedAt);
+  const viewedAtMs = viewed ? Date.parse(viewed) : NaN;
+  const validFirstViewedAt = viewed && (
+    !Number.isFinite(originSavedAtMs) ||
+    (Number.isFinite(viewedAtMs) && viewedAtMs >= originSavedAtMs)
+  ) ? viewed : '';
+  return {
+    version: 1,
+    source: safeString(draft.source) || null,
+    origin,
+    finalAnswer,
+    finalFingerprint,
+    finalSemanticFingerprint,
+    originSemanticFingerprint: originSemanticFingerprint || null,
+    editCount: Number(draft.editCount || 0),
+    humanEditCount: Number(draft.humanEditCount || 0),
+    lastEditSource: safeString(draft.lastEditSource) || null,
+    draftSavedAt: safeString(draft.selectedAt) || null,
+    lastEditedAt: safeString(draft.lastEditedAt) || null,
+    firstViewedAt: validFirstViewedAt || null,
+    submittedAt: submitted || null,
+    agentDrafted,
+    agentRevisionSavedAt: safeString(agentRevision?.savedAt) || null,
+    editedFromOrigin,
+    editedFromAgentDraft: agentRevision
+      ? safeString(agentRevision.semanticFingerprint) !== finalSemanticFingerprint
+      : false,
+    draftToSubmitMs: Number.isFinite(originSavedAtMs) && Number.isFinite(submittedAtMs) && submittedAtMs >= originSavedAtMs
+      ? submittedAtMs - originSavedAtMs
+      : null,
+    delta: buildDraftDelta(origin, finalAnswer),
+  };
+}
+
+async function markAnswerDraftViewed({
+  env = {},
+  normalized = {},
+  sessionSlug = '',
+  selectedQuestionId = '',
+  viewedAt = null,
+} = {}) {
+  const key = answerDraftViewKey({ normalized, sessionSlug, questionId: selectedQuestionId });
+  const kv = env?.AGENT_ACTION_KV;
+  if (!key || !kv || typeof kv.get !== 'function' || typeof kv.put !== 'function') {
+    return { ok: false, reason: 'action_kv_unavailable' };
+  }
+  const existing = safeJsonParse(await kv.get(key).catch(() => null), null);
+  const existingViewedAt = existing && typeof existing === 'object' && !Array.isArray(existing)
+    ? safeString(existing.firstViewedAt)
+    : '';
+  if (existingViewedAt) {
+    return { ok: true, key, firstViewedAt: existingViewedAt, alreadyViewed: true };
+  }
+  const record = { version: 1, firstViewedAt: safeString(viewedAt) || nowIso() };
+  await kv.put(key, JSON.stringify(record), {
+    expirationTtl: DEFAULT_GROUP_SESSION_TTL_SECONDS,
+  });
+  return { ok: true, key, firstViewedAt: record.firstViewedAt, alreadyViewed: false };
+}
+
+async function readAnswerDraftFirstViewedAt({
+  env = {},
+  normalized = {},
+  sessionSlug = '',
+  selectedQuestionId = '',
+} = {}) {
+  const key = answerDraftViewKey({ normalized, sessionSlug, questionId: selectedQuestionId });
+  const kv = env?.AGENT_ACTION_KV;
+  if (!key || !kv || typeof kv.get !== 'function') return '';
+  const parsed = safeJsonParse(await kv.get(key).catch(() => null), null);
+  return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+    ? safeString(parsed.firstViewedAt)
     : '';
 }
 
@@ -2290,7 +3127,24 @@ async function deleteAnswerDraft({
   if (!key || !env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.delete !== 'function') {
     return { ok: false, reason: 'action_kv_delete_unavailable' };
   }
+  const viewKey = answerDraftViewKey({ normalized, sessionSlug, questionId: selectedQuestionId });
+  const existing = typeof env.AGENT_ACTION_KV.get === 'function'
+    ? safeJsonParse(await env.AGENT_ACTION_KV.get(key).catch(() => null), null)
+    : null;
   await env.AGENT_ACTION_KV.delete(key);
+  if (viewKey) await env.AGENT_ACTION_KV.delete(viewKey).catch(() => null);
+  if (existing && typeof existing === 'object' && !Array.isArray(existing)) {
+    await writeDraftLifecycleEvent(env, {
+      event: 'draft_discarded',
+      sessionSlug: safeString(existing.sessionSlug) || sanitizeSessionSlug(sessionSlug),
+      questionId: safeString(existing.questionId) || safeString(selectedQuestionId),
+      source: safeString(existing.source),
+      originSource: safeString(existing.origin?.source),
+      controlType: safeString(existing.controlType),
+      editCount: Number(existing.editCount || 0),
+      telegramUserId: safeString(existing.telegramUserId),
+    });
+  }
   return { ok: true, key };
 }
 
@@ -2304,14 +3158,20 @@ async function persistAnswerDraft({
   controlType = '',
   submitLane = TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
   metadata = null,
+  agentMetadata = null,
   createdAt = null,
 } = {}) {
   const key = answerDraftKey({ normalized, sessionSlug, questionId: selectedQuestionId });
   if (!key || !env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.put !== 'function') {
     return { ok: false, reason: 'action_kv_unavailable' };
   }
+  const existing = typeof env.AGENT_ACTION_KV.get === 'function'
+    ? safeJsonParse(await env.AGENT_ACTION_KV.get(key).catch(() => null), null)
+    : null;
+  const previous = existing && typeof existing === 'object' && !Array.isArray(existing) ? existing : null;
+  const savedAt = createdAt || nowIso();
   const record = {
-    version: 1,
+    version: 2,
     telegramUserId: safeString(normalized.user?.telegramUserId),
     chatId: safeString(normalized.chat?.chatId),
     sessionSlug: sanitizeSessionSlug(sessionSlug),
@@ -2321,15 +3181,48 @@ async function persistAnswerDraft({
     controlType: safeString(controlType),
     status: 'draft_saved',
     submitLane: safeString(submitLane) || TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
-    selectedAt: createdAt || nowIso(),
+    selectedAt: savedAt,
   };
   if (metadata && typeof metadata === 'object' && !Array.isArray(metadata)) {
     record.source = safeString(metadata.source) || null;
     record.actionMetadata = { ...metadata };
   }
+  if (agentMetadata && typeof agentMetadata === 'object' && !Array.isArray(agentMetadata)) {
+    record.agentMetadata = { ...agentMetadata };
+  }
   if (!record.telegramUserId || !record.sessionSlug || !record.questionId || !record.answerLabel) {
     return { ok: false, reason: 'answer_draft_incomplete' };
   }
+  record.fingerprint = answerDraftFingerprint(record);
+  record.semanticFingerprint = answerDraftSemanticFingerprint(record);
+  record.origin = answerDraftOrigin(previous) || {
+    source: record.source || null,
+    agentMetadata: record.agentMetadata || null,
+    answerLabel: record.answerLabel,
+    answerValue: record.answerValue,
+    controlType: record.controlType,
+    fingerprint: record.fingerprint,
+    savedAt,
+  };
+  const previousSemanticFingerprint = previous
+    ? (safeString(previous.semanticFingerprint) || answerDraftSemanticFingerprint(previous))
+    : '';
+  const contentChanged = Boolean(previous) && previousSemanticFingerprint !== record.semanticFingerprint;
+  const isAgentWrite = record.source === 'agent_handoff';
+  record.editCount = Number(previous?.editCount || 0) + (contentChanged ? 1 : 0);
+  record.lastEditedAt = contentChanged ? savedAt : (safeString(previous?.lastEditedAt) || null);
+  record.humanEditCount = Number(previous?.humanEditCount || 0) +
+    (contentChanged && !isAgentWrite ? 1 : 0);
+  record.lastEditSource = contentChanged
+    ? (record.source || null)
+    : (safeString(previous?.lastEditSource) || null);
+  const previousAgentRevision = previous?.agentRevision &&
+    typeof previous.agentRevision === 'object' && !Array.isArray(previous.agentRevision)
+    ? previous.agentRevision
+    : null;
+  record.agentRevision = isAgentWrite
+    ? { semanticFingerprint: record.semanticFingerprint, savedAt }
+    : previousAgentRevision;
   assertNoSecretShape(record, 'Telegram answer drafts must not serialize secrets.');
   const activityMetadata = buildTelegramAgentActivityMetadata({
     type: 'answer_draft',
@@ -2339,11 +3232,25 @@ async function persistAnswerDraft({
     sessionSlug: record.sessionSlug,
     questionId: record.questionId,
     telegramUserId: record.telegramUserId,
+    editCount: record.editCount,
+    originSource: record.origin?.source || '',
   });
   await env.AGENT_ACTION_KV.put(key, JSON.stringify(record), {
     expirationTtl: DEFAULT_GROUP_SESSION_TTL_SECONDS,
     metadata: activityMetadata,
   });
+  if (!previous || contentChanged) {
+    await writeDraftLifecycleEvent(env, {
+      event: previous ? 'draft_edited' : 'draft_created',
+      sessionSlug: record.sessionSlug,
+      questionId: record.questionId,
+      source: safeString(record.source),
+      originSource: safeString(record.origin?.source),
+      controlType: record.controlType,
+      editCount: record.editCount,
+      telegramUserId: record.telegramUserId,
+    });
+  }
   return { ok: true, key, draft: record };
 }
 
@@ -2364,11 +3271,7 @@ async function persistTelegramSubmitRequest({
   if (!telegramUserId || !slug || !qid || draft.status !== 'draft_saved') {
     return { ok: false, reason: 'submit_request_incomplete' };
   }
-  const answerFingerprint = stableFingerprint({
-    answerLabel: safeString(draft.answerLabel),
-    answerValue: safeString(draft.answerValue),
-    controlType: safeString(draft.controlType),
-  });
+  const answerFingerprint = answerDraftFingerprint(draft);
   const idempotencyKey = `telegram_bot_submit:${telegramUserId}:${slug}:${questionIdSeedPart(qid)}:${answerFingerprint}`;
   const requestId = buildOpaqueActionId(idempotencyKey);
   const kvKey = submitRequestKvKey(requestId);
@@ -2390,6 +3293,25 @@ async function persistTelegramSubmitRequest({
   const policy = await loadSessionPolicy(env);
   const resolved = resolveSessionInvocation(policy, slug);
   const session = resolved.ok ? resolved.session : { sessionSlug: slug };
+  const submittedAt = safeString(createdAt) || nowIso();
+  const firstViewedAt = await readAnswerDraftFirstViewedAt({
+    env,
+    normalized,
+    sessionSlug: slug,
+    selectedQuestionId: qid,
+  });
+  const draftProvenance = buildDraftProvenance({ draft, submittedAt, firstViewedAt });
+  const emitSubmittedEvent = () => writeDraftLifecycleEvent(env, {
+    event: 'draft_submitted',
+    sessionSlug: slug,
+    questionId: qid,
+    source: safeString(draft.source),
+    originSource: safeString(draft.origin?.source),
+    controlType: safeString(draft.controlType),
+    editCount: Number(draft.editCount || 0),
+    draftToSubmitMs: draftProvenance?.draftToSubmitMs ?? null,
+    telegramUserId,
+  });
   if (telegramSubmitQueueEnabled(env)) {
     const record = buildQueuedSubmitRecord({
       session,
@@ -2419,6 +3341,7 @@ async function persistTelegramSubmitRequest({
         },
         onChainAnswer: onChainAnswerFromDraft(draft),
         answerRef: draft.key ? { kind: 'telegram_answer_draft', key: draft.key } : null,
+        draftProvenance,
         createdAt,
       },
     });
@@ -2428,6 +3351,7 @@ async function persistTelegramSubmitRequest({
       error: safeString(error?.message || error),
     }));
     if (queued.ok === true) {
+      await emitSubmittedEvent();
       return {
         ok: true,
         requestId,
@@ -2481,6 +3405,7 @@ async function persistTelegramSubmitRequest({
         controlType: safeString(draft.controlType),
       },
       answerRef: draft.key ? { kind: 'telegram_answer_draft', key: draft.key } : null,
+      draftProvenance,
       canonicalApiRequest: {
         method: 'POST',
         path: '/api/agent/responses/submit-request',
@@ -2497,6 +3422,7 @@ async function persistTelegramSubmitRequest({
     };
     assertNoSecretShape(record, 'Telegram direct submit records must not serialize secrets.');
     await persistTelegramSubmitRecord({ env, kvKey, record });
+    if (directSubmit.ok === true) await emitSubmittedEvent();
     return directSubmit.ok === true
       ? {
         ok: true,
@@ -2538,6 +3464,7 @@ async function persistTelegramSubmitRequest({
       controlType: safeString(draft.controlType),
     },
     answerRef: draft.key ? { kind: 'telegram_answer_draft', key: draft.key } : null,
+    draftProvenance,
     canonicalApiRequest: {
       method: 'POST',
       path: '/api/agent/responses/submit-request',
@@ -2554,6 +3481,7 @@ async function persistTelegramSubmitRequest({
   };
   assertNoSecretShape(record, 'Telegram submit requests must not serialize secrets.');
   await persistTelegramSubmitRecord({ env, kvKey, record });
+  await emitSubmittedEvent();
   return {
     ok: true,
     requestId,
@@ -2591,9 +3519,11 @@ async function resolveCommandSessionSlug({
   const explicit = sanitizeSessionSlug(explicitSessionSlug);
   if (explicit) return explicit;
   const privateBinding = await readPrivateSessionBinding(env, normalized);
-  if (privateBinding?.sessionSlug) return privateBinding.sessionSlug;
+  const privateSlug = bindingSessionSlug(privateBinding, policy);
+  if (privateSlug) return privateSlug;
   const binding = await readGroupSessionBinding(env, normalized);
-  return sanitizeSessionSlug(binding?.sessionSlug || policy.defaultSessionSlug || 'general') || 'general';
+  const groupSlug = bindingSessionSlug(binding, policy);
+  return sanitizeSessionSlug(groupSlug || policy.defaultSessionSlug || 'general') || 'general';
 }
 
 async function resolveResponseExportSessionSlug({
@@ -2606,7 +3536,8 @@ async function resolveResponseExportSessionSlug({
   const explicit = sanitizeSessionSlug(explicitSessionSlug);
   if (explicit) return explicit;
   const privateBinding = await readPrivateSessionBinding(env, normalized);
-  if (privateBinding?.sessionSlug) return privateBinding.sessionSlug;
+  const privateSlug = bindingSessionSlug(privateBinding, policy);
+  if (privateSlug) return privateSlug;
   const latestSubmittedSession = sanitizeSessionSlug(await findLatestResponseExportSessionSlugForTelegramUser({
     env,
     normalized,
@@ -2614,7 +3545,8 @@ async function resolveResponseExportSessionSlug({
   }));
   if (latestSubmittedSession) return latestSubmittedSession;
   const binding = await readGroupSessionBinding(env, normalized);
-  return sanitizeSessionSlug(binding?.sessionSlug || policy.defaultSessionSlug || 'general') || 'general';
+  const groupSlug = bindingSessionSlug(binding, policy);
+  return sanitizeSessionSlug(groupSlug || policy.defaultSessionSlug || 'general') || 'general';
 }
 
 async function makeCallbackButton({
@@ -2641,6 +3573,29 @@ async function makeCallbackButton({
     text: safeString(label),
     callback_data: callback.callbackData,
   };
+}
+
+async function makeBackToStartButton({
+  env = {},
+  normalized = {},
+  sessionSlug = '',
+  seed = '',
+  createdAt = null,
+} = {}) {
+  return makeCallbackButton({
+    env,
+    label: 'Back to Start',
+    action: TELEGRAM_BRIDGE_ACTIONS.START_MENU,
+    lane: normalized.chat?.isPrivate ? TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT : TELEGRAM_CHAT_LANES.GROUP_LOBBY,
+    serverContextRef: { sessionSlug: sanitizeSessionSlug(sessionSlug) },
+    seed: seed || `back_to_start|${sanitizeSessionSlug(sessionSlug) || 'default'}|${normalized.chat?.chatId || ''}|${normalized.user?.telegramUserId || ''}|${normalized.updateId || ''}`,
+    createdAt,
+  });
+}
+
+async function appendBackToStartRow(rows = [], options = {}) {
+  rows.push([await makeBackToStartButton(options)]);
+  return rows;
 }
 
 async function makeStartButton({
@@ -2790,14 +3745,34 @@ async function buildAgentOnboardingStartResponse({
   env,
   sessionSlugOverride = '',
   createdAt,
+  method = 'sendMessage',
+  messageId = '',
 } = {}) {
   if (normalized.chat?.isPrivate) {
+    const forceToken = normalized.forceAgentToken === true;
+    const pointer = await readTelegramAgentDelegationTokenUserPointer({
+      env,
+      telegramUserId: normalized.user.telegramUserId,
+    });
+    if (pointer.tokenHash && !forceToken) {
+      return buildAgentAlreadyOnboardedResponse({
+        normalized,
+        command,
+        env,
+        sessionSlugOverride,
+        createdAt,
+        method,
+        messageId,
+      });
+    }
     return buildAgentTokenResponse({
       normalized,
       command,
       env,
       sessionSlugOverride,
       createdAt,
+      method,
+      messageId,
     });
   }
   const button = await makePrivateStartActionButton({
@@ -2824,6 +3799,115 @@ async function buildAgentOnboardingStartResponse({
   });
 }
 
+async function buildAgentAlreadyOnboardedResponse({
+  normalized,
+  command,
+  env,
+  method = 'sendMessage',
+  messageId = '',
+  sessionSlugOverride = '',
+  createdAt,
+} = {}) {
+  const policy = await loadSessionPolicy(env);
+  const resolved = await resolveAgentTokenSession({
+    env,
+    normalized,
+    policy,
+    explicitSessionSlug: sessionSlugOverride,
+  });
+  const sessionSlug = resolved.ok ? resolved.session.sessionSlug : sanitizeSessionSlug(sessionSlugOverride);
+  const miniAppButton = await makeMiniAppButton({
+    env,
+    label: 'Open Mini App',
+    action: TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS,
+    serverContextRef: sessionSlug ? { sessionSlug } : { sessionPicker: true },
+    seed: `agent_onboarded|mini_app|${sessionSlug || 'session_picker'}|${normalized.user.telegramUserId}|${normalized.updateId}`,
+    createdAt,
+    privateChat: true,
+    botUsername: env.TELEGRAM_BOT_USERNAME,
+  });
+  let copyInfoButton = null;
+  try {
+    const account = await deriveManagedDemoAccount({
+      principal: normalizeTelegramPrincipal(normalized),
+      deploymentId: env.AGENT_BRIDGE_DEPLOYMENT_ID || 'agent-bridge-live-demo',
+      rootSecret: env.DEMO_SIGNER_ROOT_SECRET || '',
+      lifecycle: AGENT_BRIDGE_EVENT_TYPES.ACCOUNT_RECOVERED,
+      createdAt,
+    });
+    const previousPointer = await readTelegramAgentDelegationTokenUserPointer({
+      env,
+      telegramUserId: normalized.user.telegramUserId,
+    });
+    if (previousPointer.tokenHash) {
+      await revokeTelegramAgentDelegationTokenHash({
+        env,
+        tokenHash: previousPointer.tokenHash,
+      });
+    }
+    const issued = await createTelegramAgentDelegationToken({
+      env,
+      telegramUserId: normalized.user.telegramUserId,
+      username: normalized.user.username,
+      sessionSlug,
+      accountAddress: account.accountAddress,
+      ttlSeconds: TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_TTL_SECONDS,
+      createdAt,
+    });
+    if (issued.ok) {
+      const pointer = await writeTelegramAgentDelegationTokenUserPointer({
+        env,
+        telegramUserId: normalized.user.telegramUserId,
+        tokenHash: issued.tokenHash,
+        issuedAt: issued.record?.issuedAt || createdAt,
+        createdAt,
+      });
+      if (pointer.ok) {
+        copyInfoButton = copyTextButton('Copy New Agent Info', buildAgentInstallCopyInfo({
+          token: issued.token,
+          workerUrl: agentBridgePublicUrl(env),
+          skillUrl: agentSkillUrl(env),
+        }));
+      }
+    }
+  } catch {
+    copyInfoButton = null;
+  }
+  const rows = [];
+  if (miniAppButton) rows.push([miniAppButton]);
+  if (copyInfoButton) rows.push([copyInfoButton]);
+  await appendBackToStartRow(rows, {
+    env,
+    normalized,
+    sessionSlug,
+    seed: `agent_onboarded|start|${sessionSlug || 'default'}|${normalized.user.telegramUserId}|${normalized.updateId}`,
+    createdAt,
+  });
+  const text = [
+    'Context Engine is already enabled.',
+    '',
+    miniAppButton
+      ? 'Open the Mini App to answer questions or manage settings.'
+      : 'Use /start to continue.',
+  ].join('\n');
+  assertNoSecretShape({ text }, 'Already-onboarded agent response must not serialize secrets.');
+  return reply({
+    method,
+    chatId: normalized.chat.chatId,
+    messageId,
+    text,
+    replyMarkup: rows.length ? { inline_keyboard: rows } : null,
+    screen: 'agent_onboarded_mini_app',
+    command,
+    normalized,
+    extra: {
+      sessionSlug,
+      alreadyOnboarded: true,
+      miniAppAvailable: !!miniAppButton,
+    },
+  });
+}
+
 function resolveMiniAppBaseUrl(env = {}) {
   const configured = safeString(env.AGENT_BRIDGE_MINI_APP_URL);
   const publicUrl = safeString(env.AGENT_BRIDGE_PUBLIC_URL).replace(/\/+$/, '');
@@ -2846,6 +3930,255 @@ function miniAppUrlForLaunch(env = {}, launch = '') {
   const payload = safeString(launch);
   if (payload) url.searchParams.set('launch', payload);
   return url.toString();
+}
+
+function positiveIntegerEnv(value = '', fallback = 0) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
+}
+
+function dmVoiceTranscribeMaxBytes(env = {}) {
+  return positiveIntegerEnv(
+    env.AGENT_BRIDGE_TRANSCRIBE_MAX_BYTES || env.AGENT_BRIDGE_MINI_APP_TRANSCRIBE_MAX_BYTES,
+    DEFAULT_DM_VOICE_TRANSCRIBE_MAX_BYTES
+  );
+}
+
+function dmVoiceTranscribeRateLimit(env = {}) {
+  return positiveIntegerEnv(
+    env.AGENT_BRIDGE_TRANSCRIBE_RATE_LIMIT || env.AGENT_BRIDGE_MINI_APP_TRANSCRIBE_RATE_LIMIT,
+    DEFAULT_DM_VOICE_TRANSCRIBE_RATE_LIMIT
+  );
+}
+
+function dmVoiceTranscribeRateWindowSeconds(env = {}) {
+  return positiveIntegerEnv(
+    env.AGENT_BRIDGE_TRANSCRIBE_RATE_WINDOW_SECONDS || env.AGENT_BRIDGE_MINI_APP_TRANSCRIBE_RATE_WINDOW_SECONDS,
+    DEFAULT_DM_VOICE_TRANSCRIBE_RATE_WINDOW_SECONDS
+  );
+}
+
+function dmVoiceTranscribeRateKey({
+  telegramUserId = '',
+  sessionSlug = '',
+  createdAt = null,
+  windowSeconds = DEFAULT_DM_VOICE_TRANSCRIBE_RATE_WINDOW_SECONDS,
+} = {}) {
+  const userId = latestMiniAppLaunchUserKeyPart(telegramUserId);
+  const slug = sanitizeSessionSlug(sessionSlug || 'unknown');
+  const nowMs = createdAt ? Date.parse(createdAt) : Date.now();
+  const safeWindowSeconds = Math.max(1, Number(windowSeconds) || DEFAULT_DM_VOICE_TRANSCRIBE_RATE_WINDOW_SECONDS);
+  const bucket = Math.floor((Number.isFinite(nowMs) ? nowMs : Date.now()) / (safeWindowSeconds * 1000));
+  return userId && slug ? `${DM_VOICE_TRANSCRIBE_RATE_KV_PREFIX}${slug}:${userId}:${bucket}` : '';
+}
+
+async function checkDmVoiceTranscribeRateLimit({
+  env = {},
+  telegramUserId = '',
+  sessionSlug = '',
+  createdAt = null,
+} = {}) {
+  const kv = env?.AGENT_ACTION_KV;
+  if (!kv || typeof kv.get !== 'function' || typeof kv.put !== 'function') {
+    return { ok: false, status: 503, reason: 'transcribe_rate_limit_storage_unavailable' };
+  }
+  const limit = dmVoiceTranscribeRateLimit(env);
+  const windowSeconds = dmVoiceTranscribeRateWindowSeconds(env);
+  const key = dmVoiceTranscribeRateKey({ telegramUserId, sessionSlug, createdAt, windowSeconds });
+  if (!key) return { ok: false, status: 400, reason: 'transcribe_rate_limit_key_invalid' };
+  const current = safeJsonParse(await kv.get(key).catch(() => null), null);
+  const count = Math.max(0, Number(current?.count || 0) || 0);
+  if (count >= limit) {
+    return { ok: false, status: 429, reason: 'transcribe_rate_limited', retryAfterSeconds: windowSeconds };
+  }
+  const record = {
+    version: 1,
+    count: count + 1,
+    limit,
+    windowSeconds,
+    updatedAt: createdAt || nowIso(),
+  };
+  assertNoSecretShape(record, 'Telegram DM voice transcribe rate records must not serialize secrets.');
+  await kv.put(key, JSON.stringify(record), { expirationTtl: windowSeconds + 60 });
+  return { ok: true, count: count + 1, limit, windowSeconds };
+}
+
+function telegramVoiceFileId(normalized = {}) {
+  const message = normalized.raw?.message || {};
+  return safeString(message.voice?.file_id || message.audio?.file_id);
+}
+
+function telegramFileDownloadUrl(botToken = '', filePath = '') {
+  const token = safeString(botToken);
+  const path = safeString(filePath)
+    .split('/')
+    .map((part) => encodeURIComponent(part))
+    .join('/');
+  return token && path ? `https://api.telegram.org/file/bot${token}/${path}` : '';
+}
+
+async function downloadTelegramVoiceFile({
+  env = {},
+  fileId = '',
+  fetchImpl = globalThis.fetch,
+} = {}) {
+  const botToken = safeString(env.TELEGRAM_BOT_TOKEN);
+  const voiceFileId = safeString(fileId);
+  if (!botToken || !voiceFileId) return { ok: false, reason: 'telegram_voice_file_missing' };
+  if (typeof fetchImpl !== 'function') return { ok: false, reason: 'fetch_unavailable' };
+
+  const meta = await telegramBotApiRequest({
+    botToken,
+    method: 'getFile',
+    payload: { file_id: voiceFileId },
+    fetchImpl,
+    timeoutMs: telegramApiTimeoutMs(env),
+  });
+  if (!meta.ok) return { ok: false, reason: meta.error || 'telegram_get_file_failed', status: meta.status || 502 };
+  const filePath = safeString(meta.result?.file_path);
+  const fileUrl = telegramFileDownloadUrl(botToken, filePath);
+  if (!fileUrl) return { ok: false, reason: 'telegram_file_path_missing' };
+
+  let response;
+  try {
+    response = await fetchImpl(fileUrl, { method: 'GET' });
+  } catch {
+    return { ok: false, reason: 'telegram_file_download_failed', status: 502 };
+  }
+  if (!response?.ok) return { ok: false, reason: 'telegram_file_download_failed', status: response?.status || 502 };
+  const bytes = await response.arrayBuffer().catch(() => null);
+  const size = bytes?.byteLength || 0;
+  if (!size) return { ok: false, reason: 'telegram_voice_file_empty', status: 400 };
+  if (size > dmVoiceTranscribeMaxBytes(env)) return { ok: false, reason: 'telegram_voice_file_too_large', status: 413 };
+  const filename = safeString(filePath.split('/').pop()) || 'telegram-voice.ogg';
+  const mimeType = filename.toLowerCase().endsWith('.mp3') ? 'audio/mpeg' : 'audio/ogg';
+  return {
+    ok: true,
+    file: new Blob([bytes], { type: mimeType }),
+    filename,
+  };
+}
+
+function selectMiniAppVoiceDraftQuestionId(record = {}) {
+  const ref = record.serverContextRef || {};
+  const series = ref.questionSeries && typeof ref.questionSeries === 'object' && !Array.isArray(ref.questionSeries)
+    ? ref.questionSeries
+    : {};
+  const skipped = new Set(
+    (Array.isArray(series.skippedQuestionIds) ? series.skippedQuestionIds : [])
+      .map((questionIdRef) => lower(questionIdRef))
+      .filter(Boolean)
+  );
+  const ids = (Array.isArray(series.questionIds) ? series.questionIds : [])
+    .map(safeString)
+    .filter(Boolean);
+  return ids.find((questionIdRef) => !skipped.has(lower(questionIdRef))) || safeString(ref.questionId);
+}
+
+function appendMiniAppVoiceDraft(record = {}, questionIdRef = '', transcript = '', createdAt = null) {
+  const questionRef = safeString(questionIdRef);
+  const text = safeString(transcript).slice(0, 4000);
+  if (!questionRef || !text) return { ok: false, reason: 'voice_transcript_missing' };
+  const ref = record.serverContextRef && typeof record.serverContextRef === 'object' && !Array.isArray(record.serverContextRef)
+    ? { ...record.serverContextRef }
+    : {};
+  const series = ref.questionSeries && typeof ref.questionSeries === 'object' && !Array.isArray(ref.questionSeries)
+    ? { ...ref.questionSeries }
+    : { questionIds: [questionRef], skippedQuestionIds: [], draftAnswersByQuestionId: {} };
+  const drafts = series.draftAnswersByQuestionId && typeof series.draftAnswersByQuestionId === 'object' && !Array.isArray(series.draftAnswersByQuestionId)
+    ? { ...series.draftAnswersByQuestionId }
+    : {};
+  const existing = drafts[questionRef] && typeof drafts[questionRef] === 'object' && !Array.isArray(drafts[questionRef])
+    ? { ...drafts[questionRef] }
+    : {};
+  const existingText = safeString(existing.text || existing.answer || '');
+  const nextText = existingText ? `${existingText}\n\n${text}` : text;
+  drafts[questionRef] = {
+    ...existing,
+    text: nextText.slice(0, 4000),
+    updatedFromTelegramVoiceAt: createdAt || nowIso(),
+  };
+  series.draftAnswersByQuestionId = drafts;
+  ref.questionSeries = series;
+  ref.questionId = safeString(ref.questionId) || questionRef;
+  const updated = {
+    ...record,
+    serverContextRef: ref,
+    updatedAt: createdAt || nowIso(),
+  };
+  assertNoSecretShape(updated, 'Telegram Mini App launch records must not serialize secrets.');
+  return { ok: true, record: updated };
+}
+
+async function transcribeTelegramVoiceForMiniAppDraft({
+  env = {},
+  normalized = {},
+  sessionSlug = '',
+  fileId = '',
+  createdAt = null,
+  fetchImpl = globalThis.fetch,
+} = {}) {
+  const policy = await loadSessionPolicy(env);
+  const resolved = resolveSessionInvocation(policy, sanitizeSessionSlug(sessionSlug));
+  if (!resolved.ok) return { ok: false, reason: resolved.reason || 'session_not_available', status: 403 };
+  const eligibility = evaluateSponsoredResourceEligibility(resolved.session, {
+    resource: 'ai',
+    requestedRisk: 'submit',
+    riskCeiling: policy.riskCeiling,
+  });
+  if (!eligibility.ok) return { ok: false, reason: eligibility.reason || 'session_ai_not_allowed', status: 403 };
+  const workerUrl = resolveSessionWorkerUrl(env, resolved.session);
+  if (!workerUrl) return { ok: false, reason: 'session_worker_url_missing', status: 503 };
+
+  const principal = normalizeTelegramPrincipal(normalized);
+  const account = await deriveManagedDemoAccount({
+    principal,
+    deploymentId: env.AGENT_BRIDGE_DEPLOYMENT_ID || 'agent-bridge-live-demo',
+    rootSecret: env.DEMO_SIGNER_ROOT_SECRET || '',
+    lifecycle: 'account_created',
+    createdAt,
+  });
+  const sessionAuth = await authenticateSessionWorker({
+    env,
+    session: resolved.session,
+    account,
+    principal,
+    workerUrl,
+    fetchImpl,
+    now: createdAt ? new Date(createdAt) : new Date(),
+  }).catch((error) => ({ ok: false, reason: safeString(error?.message || error) || 'worker_auth_failed' }));
+  if (!sessionAuth.ok || !sessionAuth.token) {
+    return { ok: false, reason: sessionAuth.reason || 'worker_auth_failed', status: 503 };
+  }
+
+  const downloaded = await downloadTelegramVoiceFile({ env, fileId, fetchImpl });
+  if (!downloaded.ok) return downloaded;
+
+  const form = new FormData();
+  const model = safeString(env.AGENT_BRIDGE_TRANSCRIBE_MODEL || 'whisper-1') || 'whisper-1';
+  form.append('file', downloaded.file, downloaded.filename);
+  form.append('model', model);
+  const apiKey = bridgeOpenAiApiKey(env);
+  if (apiKey) form.append('apiKey', apiKey);
+
+  const response = await fetchImpl(`${sessionAuth.workerUrl}/transcribe`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${sessionAuth.token}`,
+    },
+    body: form,
+  });
+  if (!response?.ok) {
+    return {
+      ok: false,
+      reason: 'transcription_failed',
+      upstreamStatus: response?.status || 502,
+      status: response?.status || 502,
+    };
+  }
+  const body = await response.json().catch(() => ({}));
+  const text = safeString(body?.text);
+  return text ? { ok: true, text } : { ok: false, reason: 'transcript_empty', status: 502 };
 }
 
 async function makeMiniAppButton({
@@ -2874,6 +4207,8 @@ async function makeMiniAppButton({
     ...callback.record,
     callbackData: callback.callbackData,
     miniAppLaunch: true,
+  }, {
+    ttlSeconds: privateChat ? DEFAULT_ACTION_TTL_SECONDS : GROUP_MINI_APP_LAUNCH_TTL_SECONDS,
   });
   if (!stored.ok) return null;
   const url = miniAppUrlForLaunch(env, callback.callbackData);
@@ -3146,14 +4481,54 @@ function formatHelpText({
   if (session?.sessionSlug) {
     lines.push(`Session: ${sessionLabel(session)}`, '');
   }
-  lines.push('Onboard Agent: let your trusted agent pull questions and draft responses for review.', '');
+  lines.push('Onboard Agent or use Mini-App', '');
   if (showSessions) lines.push('/sessions - choose session');
   lines.push(
     '/questions',
     '/results',
-    '/me - My Account',
+    '/me',
   );
   return lines.join('\n');
+}
+
+async function buildAboutResponse({
+  normalized,
+  command = 'callback:about_context_engine',
+  env,
+  createdAt,
+  method = 'sendMessage',
+  messageId = '',
+} = {}) {
+  const rows = [[{
+    text: 'Open OSS Repo',
+    url: CONTEXT_ENGINE_OSS_URL,
+  }, {
+    text: 'Worker Skill.md',
+    url: CONTEXT_ENGINE_WORKER_SKILL_URL,
+  }]];
+  await appendBackToStartRow(rows, {
+    env,
+    normalized,
+    seed: `about|start|${normalized.chat?.chatId || ''}|${normalized.user?.telegramUserId || ''}|${normalized.updateId || ''}`,
+    createdAt,
+  });
+  return reply({
+    method,
+    chatId: normalized.chat.chatId,
+    messageId,
+    text: [
+      'About Context Engine',
+      '',
+      'Context Engine helps communities ask questions, draft responses, and create privacy-preserving opinion maps.',
+      '',
+      `Open source: ${CONTEXT_ENGINE_OSS_URL}`,
+      `Worker skill: ${CONTEXT_ENGINE_WORKER_SKILL_URL}`,
+    ].join('\n'),
+    replyMarkup: { inline_keyboard: rows },
+    screen: 'about_context_engine',
+    command,
+    normalized,
+  });
 }
 
 function timestampMs(value = '') {
@@ -3211,10 +4586,12 @@ function sessionVisibleInTelegram(session = {}, {
   if (Number.isFinite(createdAfterMs)) {
     const createdAtMs = sessionCreatedAtMs(session);
     const defaultTelegramSession = slug && slug === sanitizeSessionSlug(defaultSessionSlug);
-    if (!Number.isFinite(createdAtMs) && !defaultTelegramSession) return false;
-    if (Number.isFinite(createdAtMs) && createdAtMs < createdAfterMs) return false;
+    if (!defaultTelegramSession) {
+      if (!Number.isFinite(createdAtMs)) return false;
+      if (createdAtMs < createdAfterMs) return false;
+    }
   }
-  return session.telegramBridgeEnabled === true && session.telegramOnly === true;
+  return session.telegramBridgeEnabled === true && sessionUsesWorkerBackedQuestions(session);
 }
 
 async function sessionAllowedInCurrentTelegramChat(session = {}, normalized = {}, env = {}, {
@@ -3468,6 +4845,8 @@ async function buildHelpResponse({
   env,
   createdAt,
   waitUntil = null,
+  method = 'sendMessage',
+  messageId = '',
 } = {}) {
   const policy = await loadSessionPolicy(env);
   const visibleSessions = await telegramVisibleSessionsForChat(policy, env, normalized);
@@ -3475,13 +4854,16 @@ async function buildHelpResponse({
     ? await readPrivateSessionBinding(env, normalized)
     : await readGroupSessionBinding(env, normalized);
   if (activeBinding?.sessionSlug && !normalized.chat.isPrivate) {
-    const activeResolved = resolveSessionInvocation(policy, activeBinding.sessionSlug);
+    const activeResolved = resolveSessionInvocation(policy, bindingSessionSlug(activeBinding, policy));
     if (activeResolved.ok && !(await sessionAllowedInCurrentTelegramChat(activeResolved.session, normalized, env))) {
       activeBinding = null;
     }
   }
   let autoJoinedSession = null;
-  if (visibleSessions.length === 1 && activeBinding?.sessionSlug !== visibleSessions[0].sessionSlug) {
+  const visibleSession = visibleSessions[0] || {};
+  const followDefaultOnSingleSession = sanitizeSessionSlug(visibleSession.sessionSlug) === sanitizeSessionSlug(policy.defaultSessionSlug);
+  const activeSessionSlug = bindingSessionSlug(activeBinding, policy);
+  if (visibleSessions.length === 1 && activeSessionSlug !== visibleSession.sessionSlug) {
     autoJoinedSession = visibleSessions[0];
     if (normalized.chat.isPrivate) {
       const saved = await persistPrivateSessionBinding({
@@ -3489,8 +4871,9 @@ async function buildHelpResponse({
         normalized,
         session: autoJoinedSession,
         createdAt,
+        followDefault: followDefaultOnSingleSession,
       });
-      if (saved.ok) activeBinding = { sessionSlug: autoJoinedSession.sessionSlug };
+      if (saved.ok) activeBinding = { sessionSlug: autoJoinedSession.sessionSlug, followDefault: followDefaultOnSingleSession };
     } else {
       const [groupSaved, userSaved] = await Promise.all([
         persistGroupSessionBinding({
@@ -3498,6 +4881,7 @@ async function buildHelpResponse({
           normalized,
           session: autoJoinedSession,
           createdAt,
+          followDefault: followDefaultOnSingleSession,
         }),
         persistTelegramUserSessionBinding({
           env,
@@ -3505,9 +4889,10 @@ async function buildHelpResponse({
           session: autoJoinedSession,
           createdAt,
           source: 'single_session_start',
+          followDefault: followDefaultOnSingleSession,
         }),
       ]);
-      if (groupSaved.ok || userSaved.ok) activeBinding = { sessionSlug: autoJoinedSession.sessionSlug };
+      if (groupSaved.ok || userSaved.ok) activeBinding = { sessionSlug: autoJoinedSession.sessionSlug, followDefault: followDefaultOnSingleSession };
     }
     scheduleQuestionPrefetchForJoinedSession({
       env,
@@ -3515,18 +4900,19 @@ async function buildHelpResponse({
       waitUntil,
     });
   }
-  const resolvedActiveSession = activeBinding?.sessionSlug
-    ? resolveSessionInvocation(policy, activeBinding.sessionSlug)
+  const resolvedActiveSessionSlug = bindingSessionSlug(activeBinding, policy);
+  const resolvedActiveSession = resolvedActiveSessionSlug
+    ? resolveSessionInvocation(policy, resolvedActiveSessionSlug)
     : { ok: false };
   const activeSession = resolvedActiveSession.ok ? resolvedActiveSession.session : autoJoinedSession;
   const miniAppButton = await makeMiniAppButton({
     env,
     label: 'Open Mini App',
     action: TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS,
-    serverContextRef: activeBinding?.sessionSlug
-      ? { sessionSlug: activeBinding.sessionSlug }
+    serverContextRef: resolvedActiveSessionSlug
+      ? { sessionSlug: resolvedActiveSessionSlug }
       : { sessionPicker: true },
-    seed: `help|mini_app|${activeBinding?.sessionSlug || 'session_picker'}|${normalized.user.telegramUserId}|${normalized.updateId}`,
+    seed: `help|mini_app|${resolvedActiveSessionSlug || 'session_picker'}|${normalized.user.telegramUserId}|${normalized.updateId}`,
     createdAt,
     privateChat: normalized.chat.isPrivate,
     botUsername: env.TELEGRAM_BOT_USERNAME,
@@ -3539,27 +4925,38 @@ async function buildHelpResponse({
   const agentOnboardingButton = await makeAgentOnboardingButton({
     env,
     normalized,
-    sessionSlug: activeSession?.sessionSlug || activeBinding?.sessionSlug || '',
+    sessionSlug: activeSession?.sessionSlug || resolvedActiveSessionSlug || '',
     createdAt,
   });
   if (agentOnboardingButton) keyboard.push([agentOnboardingButton]);
   if (!normalized.chat.isPrivate) {
     const agentOnboardingMiniAppButton = makeAgentOnboardingMiniAppButton({
       env,
-      sessionSlug: activeSession?.sessionSlug || activeBinding?.sessionSlug || '',
+      sessionSlug: activeSession?.sessionSlug || resolvedActiveSessionSlug || '',
     });
     if (agentOnboardingMiniAppButton) keyboard.push([agentOnboardingMiniAppButton]);
   }
+  keyboard.push([await makeCallbackButton({
+    env,
+    label: 'About',
+    action: TELEGRAM_BRIDGE_ACTIONS.ABOUT_CONTEXT_ENGINE,
+    lane: normalized.chat.isPrivate ? TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT : TELEGRAM_CHAT_LANES.GROUP_LOBBY,
+    serverContextRef: { sessionSlug: activeSession?.sessionSlug || resolvedActiveSessionSlug || '' },
+    seed: `help|about|${activeSession?.sessionSlug || resolvedActiveSessionSlug || 'default'}|${normalized.chat.chatId}|${normalized.updateId}`,
+    createdAt,
+  })]);
   const adminActionsButton = await makeAdminActionsButton({
     env,
     normalized,
     policy,
-    sessionSlug: activeBinding?.sessionSlug || '',
+    sessionSlug: resolvedActiveSessionSlug || '',
     createdAt,
   });
   if (adminActionsButton) keyboard.push([adminActionsButton]);
   return reply({
+    method,
     chatId: normalized.chat.chatId,
+    messageId,
     text: formatHelpText({
       showSessions: visibleSessions.length > 1,
       session: activeSession,
@@ -3608,6 +5005,12 @@ async function buildSessionsResponse({
       createdAt,
     })]);
   }
+  await appendBackToStartRow(rows, {
+    env,
+    normalized,
+    seed: `sessions|start|${offset}|${normalized.chat.chatId}|${normalized.updateId}`,
+    createdAt,
+  });
   return reply({
     method,
     chatId: normalized.chat.chatId,
@@ -3728,6 +5131,13 @@ async function buildAgentActionsResponse({
     botUsername: env.TELEGRAM_BOT_USERNAME,
   });
   if (miniAppButton) rows.push([miniAppButton]);
+  await appendBackToStartRow(rows, {
+    env,
+    normalized,
+    sessionSlug,
+    seed: `agent_actions|start|${sessionSlug}|${normalized.updateId}`,
+    createdAt,
+  });
   return reply({
     method,
     chatId: normalized.chat.chatId,
@@ -3810,6 +5220,13 @@ async function buildJoinResponse({
       createdAt,
       waitUntil,
     });
+    const backToStartButton = await makeBackToStartButton({
+      env,
+      normalized,
+      sessionSlug: resolved.session.sessionSlug,
+      seed: `private_join|start|${resolved.session.sessionSlug}|${normalized.user.telegramUserId}`,
+      createdAt,
+    });
     return reply({
       chatId: normalized.chat.chatId,
       text: [
@@ -3839,6 +5256,8 @@ async function buildJoinResponse({
             seed: `private_join|me|${resolved.session.sessionSlug}|${normalized.user.telegramUserId}`,
             createdAt,
           }),
+        ], [
+          backToStartButton,
         ]],
       },
       screen: accountState.screen,
@@ -3988,7 +5407,13 @@ async function buildQuestionsResponse({
   });
   if (groupAccessError) return groupAccessError;
   const loadedQuestions = await loadQuestionsForSession(env, resolved.session.sessionSlug, { waitUntil });
-  const questions = loadedQuestions.questions;
+  const numbered = await ensureTelegramQuestionNumbers({
+    env,
+    sessionSlug: resolved.session.sessionSlug,
+    questions: loadedQuestions.questions,
+    createdAt,
+  });
+  const questions = numbered.questions || loadedQuestions.questions;
   const state = buildTelegramQuestionListState({
     sessionSlug: resolved.session.sessionSlug,
     questions,
@@ -4028,6 +5453,16 @@ async function buildQuestionsResponse({
       })]);
     }
   }
+  await appendBackToStartRow(rows, {
+    env,
+    normalized,
+    sessionSlug: resolved.session.sessionSlug,
+    seed: `questions|start|${resolved.session.sessionSlug}|${offset}|${normalized.updateId}`,
+    createdAt,
+  });
+  const promptBody = promptLines.length
+    ? promptLines.join('\n\n')
+    : 'No questions are available.';
   return reply({
     method,
     chatId: normalized.chat.chatId,
@@ -4035,7 +5470,7 @@ async function buildQuestionsResponse({
     text: [
       `Questions (${Math.min(offset + displayQuestions.length, state.questions.length)}/${state.questions.length})`,
       '',
-      ...(promptLines.length ? promptLines : ['No questions are available.']),
+      promptBody,
     ].join('\n'),
     replyMarkup: rows.length ? { inline_keyboard: rows } : null,
     screen: state.screen,
@@ -4238,10 +5673,18 @@ async function buildSetGroupSelectionResponse({
     else selected.add(option.optionId);
     selections[category.categoryId] = Array.from(selected);
   }
+  const account = await deriveManagedDemoAccount({
+    principal: normalized,
+    deploymentId: env.AGENT_BRIDGE_DEPLOYMENT_ID || 'agent-bridge-live-demo',
+    rootSecret: env.DEMO_SIGNER_ROOT_SECRET || '',
+    lifecycle: AGENT_BRIDGE_EVENT_TYPES.ACCOUNT_CREATED,
+    createdAt,
+  });
   const saved = await saveTelegramLightweightGroupMembership({
     env,
     session: resolved.session,
     telegramUserId: normalized.user.telegramUserId,
+    accountAddress: account.accountAddress,
     selections,
     details: groups.details || {},
     createdAt,
@@ -4490,11 +5933,6 @@ async function generateUrlQuestionCandidates({
   const fetchImpl = env.AGENT_BRIDGE_FETCH || globalThis.fetch;
   const source = await fetchUrlQuestionSource({ url: request.url, fetchImpl });
   if (!source.ok) return { ok: false, reason: source.reason || 'url_fetch_failed', source, permission };
-  const geoRefs = normalizeQuestionGeoRefs(request.geoRefs, {
-    geoId: request.geoId,
-    kind: request.geoKind || request.kind,
-    label: request.geoLabel || request.label,
-  });
 
   const principal = normalizeTelegramPrincipal(normalized);
   const account = await deriveManagedDemoAccount({
@@ -4524,7 +5962,6 @@ async function generateUrlQuestionCandidates({
     questionType: request.questionType,
     regenerationFeedback: request.regenerationFeedback,
     previousCandidates: request.previousCandidates,
-    geoRefs,
   });
   const firstAi = await requestUrlQuestionGenerationAi({
     env,
@@ -4546,7 +5983,6 @@ async function generateUrlQuestionCandidates({
   let candidates = normalizeGeneratedQuestionCandidates(extractGeneratedQuestionItems(parsed), {
     session,
     questionType: request.questionType,
-    geoRefs,
   }).slice(0, request.count || TELEGRAM_GENERATED_QUESTION_COUNT);
   if (!candidates.length) {
     const retryAi = await requestUrlQuestionGenerationAi({
@@ -4561,7 +5997,6 @@ async function generateUrlQuestionCandidates({
       candidates = normalizeGeneratedQuestionCandidates(extractGeneratedQuestionItems(parsed), {
         session,
         questionType: request.questionType,
-        geoRefs,
       }).slice(0, request.count || TELEGRAM_GENERATED_QUESTION_COUNT);
     }
   }
@@ -4571,7 +6006,6 @@ async function generateUrlQuestionCandidates({
       session,
       questionType: request.questionType,
       count: request.count || TELEGRAM_GENERATED_QUESTION_COUNT,
-      geoRefs,
     });
   }
   if (!candidates.length) {
@@ -4939,7 +6373,6 @@ async function buildGeneratedQuestionSelectionResponse({
       questionType: candidate.questionType,
       options: candidate.options,
       tags: candidate.tags,
-      geoRefs: candidate.geoRefs,
       sessionContext: record.sessionContext,
       createdAt,
     });
@@ -5048,7 +6481,11 @@ async function loadSubmittedResultRecords(env = {}, sessionSlug = '') {
     ? await listKvRecordsByPrefix(env, indexedPrefix, { limit: Infinity })
     : [];
   const legacyRecords = await listKvRecordsByPrefix(env, SUBMIT_REQUEST_KV_PREFIX, { limit: Infinity });
-  const records = dedupeSubmitRecords([...indexedRecords, ...legacyRecords]);
+  const canonicalPrefix = canonicalAnswerSessionKvPrefix(slug);
+  const canonicalRecords = canonicalPrefix
+    ? await listKvRecordsByPrefix(env, canonicalPrefix, { limit: Infinity })
+    : [];
+  const records = dedupeSubmitRecords([...indexedRecords, ...legacyRecords, ...canonicalRecords]);
   const submittedStatuses = new Set(SUBMITTED_RESULT_STATUSES);
   return records
     .filter((record) => (
@@ -5817,22 +7254,23 @@ async function buildResultsOptionsResponse({
   normalized,
   command,
   env,
+  session = null,
   sessionSlug = '',
-  intro = 'Choose a results view.',
+  intro = '',
   createdAt = null,
 } = {}) {
+  const label = sessionLabel(session || { sessionSlug });
   const lines = [
     'Results',
     '',
-    sessionSlug ? `Selected session: ${sessionSlug}` : 'Selected session: none',
+    sessionSlug ? `Selected session: ${label}` : 'Selected session: none',
     '',
-    intro,
-    '',
+    ...(intro ? [intro, ''] : []),
     'Consensus: highlights questions with the most disagreement across responses.',
-    'Group: shows participant answer patterns by question using P1, P2, etc.',
-    'Topic map: circles view of answered question topics.',
     '',
-    '/results [ consensus | group | topic ]',
+    'Group: Response clusters across questions.',
+    '',
+    'Topic Map',
   ];
   return reply({
     chatId: normalized.chat.chatId,
@@ -5843,7 +7281,7 @@ async function buildResultsOptionsResponse({
     screen: 'results_options',
     command,
     normalized,
-    extra: { sessionSlug },
+    extra: { sessionSlug, sessionName: label },
   });
 }
 
@@ -5885,6 +7323,7 @@ async function buildResultsResponse({
       normalized,
       command,
       env,
+      session: resolved.session,
       sessionSlug: resolved.session.sessionSlug,
       createdAt,
     });
@@ -5894,8 +7333,9 @@ async function buildResultsResponse({
       normalized,
       command,
       env,
+      session: resolved.session,
       sessionSlug: resolved.session.sessionSlug,
-      intro: `Unknown results view "${modeArg}". Choose one of these options.`,
+      intro: `Unknown results view "${modeArg}".`,
       createdAt,
     });
   }
@@ -6718,6 +8158,231 @@ async function buildTelegramGroupApprovalRevokeResponse({
   });
 }
 
+function resolveDefaultSessionAdminGateSession(policy = {}) {
+  const current = resolveSessionInvocation(policy, policy.defaultSessionSlug);
+  if (current.ok) return current;
+  const fallback = (Array.isArray(policy.linkedSessions) ? policy.linkedSessions : [])
+    .find((session) => session?.telegramBridgeEnabled === true) ||
+    (Array.isArray(policy.linkedSessions) ? policy.linkedSessions[0] : null);
+  if (fallback?.sessionSlug) return { ok: true, session: fallback, policy };
+  return { ok: false, reason: 'session_not_configured' };
+}
+
+async function requireDefaultSessionCommandAdmin({
+  env = {},
+  normalized = {},
+  command = COMMANDS.SET_DEFAULT,
+  policy = {},
+  session = {},
+  createdAt = null,
+  method = 'sendMessage',
+  messageId = '',
+  screen = 'admin_default_session_denied',
+} = {}) {
+  const manager = await canManageResponseExportAllowlist({
+    env,
+    normalized,
+    session,
+    createdAt,
+  });
+  if (manager.ok) return { ok: true, manager };
+  return {
+    ok: false,
+    response: reply({
+      method,
+      chatId: normalized.chat.chatId,
+      messageId,
+      text: [
+        'The default session can only be managed by a configured session admin.',
+        `Reason: ${manager.reason || 'response_export_admin_required'}.`,
+        manager.accountAddress ? `Account: ${shortAddress(manager.accountAddress)}` : '',
+      ].filter(Boolean).join('\n'),
+      screen,
+      command,
+      normalized,
+      extra: {
+        ok: false,
+        reason: manager.reason || 'response_export_admin_required',
+        accountAddress: manager.accountAddress || '',
+        sessionSlug: session.sessionSlug || policy.defaultSessionSlug || '',
+        adminDefaultSessionSlug: policy.adminDefaultSessionSlug || '',
+      },
+    }),
+  };
+}
+
+async function buildSetDefaultSessionResponse({
+  normalized,
+  command,
+  env,
+  args = [],
+  createdAt,
+  method = 'sendMessage',
+  messageId = '',
+} = {}) {
+  if (!normalized.chat.isPrivate) {
+    return reply({
+      method,
+      chatId: normalized.chat.chatId,
+      messageId,
+      text: 'The default session can be managed in private chat only.',
+      screen: 'admin_default_session_private_required',
+      command,
+      normalized,
+      extra: { ok: false, reason: 'private_chat_required' },
+    });
+  }
+  const intent = lower(args[0]);
+  const policy = await loadSessionPolicy(env);
+  const clearRequested = ['clear', 'reset', 'none', 'off'].includes(intent);
+  if (!intent || clearRequested) {
+    const current = resolveDefaultSessionAdminGateSession(policy);
+    if (!current.ok) {
+      return reply({
+        method,
+        chatId: normalized.chat.chatId,
+        messageId,
+        text: 'No Telegram sessions are configured.',
+        screen: 'admin_default_session_no_sessions',
+        command,
+        normalized,
+        extra: { ok: false, reason: current.reason || 'session_not_configured' },
+      });
+    }
+    const allowed = await requireDefaultSessionCommandAdmin({
+      env,
+      normalized,
+      command,
+      policy,
+      session: current.session,
+      createdAt,
+      method,
+      messageId,
+      screen: clearRequested ? 'admin_default_session_clear_denied' : 'admin_default_session_denied',
+    });
+    if (!allowed.ok) return allowed.response;
+    if (clearRequested) {
+      const cleared = await clearAdminDefaultSessionOverride(env);
+      if (!cleared.ok) {
+        return errorReply({
+          normalized,
+          command,
+          reason: cleared.reason || 'admin_default_session_clear_failed',
+          text: `Could not clear the default-session pin: ${cleared.reason || 'admin_default_session_clear_failed'}.`,
+          method,
+          messageId,
+        });
+      }
+      const fallback = policy.scheduledDefaultSessionSlug || policy.configuredDefaultSessionSlug || policy.defaultSessionSlug;
+      const payload = {
+        sessionSlug: fallback,
+        adminDefaultSessionSlug: '',
+      };
+      assertNoSecretShape(payload, 'Telegram admin default-session clear reply must not serialize secrets.');
+      return reply({
+        method,
+        chatId: normalized.chat.chatId,
+        messageId,
+        text: [
+          'Default-session pin cleared.',
+          `Default now follows the schedule/config: ${fallback}.`,
+        ].join('\n'),
+        screen: 'admin_default_session_cleared',
+        command,
+        normalized,
+        extra: payload,
+      });
+    }
+    const payload = {
+      sessionSlug: policy.defaultSessionSlug || '',
+      adminDefaultSessionSlug: policy.adminDefaultSessionSlug || '',
+    };
+    assertNoSecretShape(payload, 'Telegram admin default-session status reply must not serialize secrets.');
+    return reply({
+      method,
+      chatId: normalized.chat.chatId,
+      messageId,
+      text: [
+        `Effective default: ${policy.defaultSessionSlug || ''}`,
+        policy.adminDefaultSessionSlug ? `Admin pin: ${policy.adminDefaultSessionSlug}` : 'Admin pin: none',
+        `Configured base: ${policy.configuredDefaultSessionSlug || ''}`,
+        'Set:  /set_default <slug>',
+        'Clear: /set_default clear',
+      ].join('\n'),
+      screen: 'admin_default_session_status',
+      command,
+      normalized,
+      extra: payload,
+    });
+  }
+
+  const targetSlug = sanitizeSessionSlug(args[0]);
+  const resolved = resolveSessionInvocation(policy, targetSlug);
+  if (!resolved.ok) {
+    return reply({
+      method,
+      chatId: normalized.chat.chatId,
+      messageId,
+      text: `Session "${targetSlug}" is not an available Telegram session. Run /sessions to see options.`,
+      screen: 'admin_default_session_invalid',
+      command,
+      normalized,
+      extra: {
+        ok: false,
+        reason: resolved.reason || 'session_not_linked',
+        sessionSlug: targetSlug,
+        adminDefaultSessionSlug: policy.adminDefaultSessionSlug || '',
+      },
+    });
+  }
+  const allowed = await requireDefaultSessionCommandAdmin({
+    env,
+    normalized,
+    command,
+    policy,
+    session: resolved.session,
+    createdAt,
+    method,
+    messageId,
+  });
+  if (!allowed.ok) return allowed.response;
+  const saved = await writeAdminDefaultSessionOverride({
+    env,
+    sessionSlug: resolved.session.sessionSlug,
+    accountAddress: allowed.manager.accountAddress,
+    createdAt,
+  });
+  if (!saved.ok) {
+    return errorReply({
+      normalized,
+      command,
+      reason: saved.reason || 'admin_default_session_write_failed',
+      text: `Could not pin the default session: ${saved.reason || 'admin_default_session_write_failed'}.`,
+      method,
+      messageId,
+    });
+  }
+  const payload = {
+    sessionSlug: resolved.session.sessionSlug,
+    adminDefaultSessionSlug: resolved.session.sessionSlug,
+  };
+  assertNoSecretShape(payload, 'Telegram admin default-session set reply must not serialize secrets.');
+  return reply({
+    method,
+    chatId: normalized.chat.chatId,
+    messageId,
+    text: [
+      `Default session pinned to ${sessionLabel(resolved.session)}.`,
+      `Slug: ${resolved.session.sessionSlug}`,
+      'This overrides the schedule until you run /set_default clear.',
+    ].join('\n'),
+    screen: 'admin_default_session_set',
+    command,
+    normalized,
+    extra: payload,
+  });
+}
+
 async function buildAdminActionsResponse({
   normalized,
   command,
@@ -6797,6 +8462,7 @@ async function buildAdminActionsResponse({
       '',
       'Choose an admin action.',
       '',
+      'Default session: /set_default <slug>',
       `Revoke group access: /group_revoke ${sessionSlug} <telegram_group_id>`,
     ].join('\n'),
     replyMarkup: { inline_keyboard: rows },
@@ -6883,18 +8549,30 @@ function publicQuestionQueueCandidates(questions = []) {
     .filter((question) => questionId(question) && questionText(question));
 }
 
-function resolveQuestionQueueRefs(tokens = [], questions = []) {
+async function resolveQuestionQueueRefsForSession({
+  env = {},
+  sessionSlug = '',
+  tokens = [],
+  questions = [],
+  createdAt = null,
+} = {}) {
   const ids = [];
   const skipped = [];
-  tokens.forEach((token) => {
-    const selected = findQuestion(questions, token);
+  for (const token of tokens) {
+    const selected = await findQuestionForSession({
+      env,
+      sessionSlug,
+      questions,
+      selector: token,
+      createdAt,
+    });
     const selectedId = questionId(selected || {});
     if (!selected || !selectedId) {
       skipped.push(token);
-      return;
+      continue;
     }
     if (!ids.includes(selectedId)) ids.push(selectedId);
-  });
+  }
   return { ids, skipped };
 }
 
@@ -6915,7 +8593,7 @@ function formatQuestionQueueStatus({
     })
     : ['None.'];
   const availableLines = questions.slice(0, 10).map((question, index) => (
-    `${index + 1}. ${questionText(question)} (${shortQuestionId(questionId(question))})`
+    `${Number(question.stableQuestionNumber) > 0 ? `#${Number(question.stableQuestionNumber)}` : `${index + 1}.`} ${questionText(question)} (${shortQuestionId(questionId(question))})`
   ));
   return [
     `Question queue for ${sessionLabel(session)}`,
@@ -6962,7 +8640,13 @@ async function buildQuestionQueueSettingsResponse({
     });
   }
   const loaded = await loadQuestionsForSession(env, context.session.sessionSlug);
-  const questions = publicQuestionQueueCandidates(loaded.questions);
+  const numbered = await ensureTelegramQuestionNumbers({
+    env,
+    sessionSlug: context.session.sessionSlug,
+    questions: loaded.questions,
+    createdAt,
+  });
+  const questions = publicQuestionQueueCandidates(numbered.questions || loaded.questions);
   const tokens = questionQueueCommandTokens(args);
   const operation = lower(tokens[0]);
   let saved = null;
@@ -6970,7 +8654,15 @@ async function buildQuestionQueueSettingsResponse({
   if (tokens.length && !['list', 'show'].includes(operation)) {
     const requestedTokens = ['set', 'sponsored'].includes(operation) ? tokens.slice(1) : tokens;
     const clearRequested = ['clear', 'reset', 'none', 'empty'].includes(operation);
-    const resolvedRefs = clearRequested ? { ids: [], skipped: [] } : resolveQuestionQueueRefs(requestedTokens, questions);
+    const resolvedRefs = clearRequested
+      ? { ids: [], skipped: [] }
+      : await resolveQuestionQueueRefsForSession({
+        env,
+        sessionSlug: context.session.sessionSlug,
+        tokens: requestedTokens,
+        questions,
+        createdAt,
+      });
     const nextIds = clearRequested
       ? []
       : resolvedRefs.ids;
@@ -7345,8 +9037,20 @@ async function buildPoseQuestionResponse({
     });
   }
   const loadedQuestions = await loadQuestionsForSession(env, resolved.session.sessionSlug, { waitUntil });
-  const questions = loadedQuestions.questions;
-  const matched = findQuestion(questions, selector);
+  const numbered = await ensureTelegramQuestionNumbers({
+    env,
+    sessionSlug: resolved.session.sessionSlug,
+    questions: loadedQuestions.questions,
+    createdAt,
+  });
+  const questions = numbered.questions || loadedQuestions.questions;
+  const matched = await findQuestionForSession({
+    env,
+    sessionSlug: resolved.session.sessionSlug,
+    questions,
+    selector,
+    createdAt,
+  });
   let selected = matched || null;
   let selectedSource = matched ? 'existing_session_question' : 'telegram_command';
   if (!selected) {
@@ -7439,10 +9143,17 @@ async function buildPoseQuestionResponse({
     seed: `pose|questions|${resolved.session.sessionSlug}|${questionIdSeedPart(questionId(selected))}|${normalized.updateId}`,
     createdAt,
   });
+  const agentOnboardingButton = normalized.chat.isPrivate ? null : await makeAgentOnboardingButton({
+    env,
+    normalized,
+    sessionSlug: resolved.session.sessionSlug,
+    createdAt,
+  });
   const actionRows = [
     ...answerRows,
     [otherQuestionsButton],
     ...(miniAppButton ? [[miniAppButton]] : []),
+    ...(agentOnboardingButton ? [[agentOnboardingButton]] : []),
   ];
   return reply({
     method,
@@ -7464,6 +9175,42 @@ async function buildPoseQuestionResponse({
   });
 }
 
+async function persistTelegramBotDraftEditMetric({
+  env = {},
+  normalized = {},
+  sessionSlug = '',
+  selectedQuestionId = '',
+  questionType = '',
+  initialAnswer = null,
+  sentAnswer = null,
+  finality = 'submitted',
+  createdAt = null,
+} = {}) {
+  const settings = await loadTelegramAgentSettings({
+    env,
+    sessionSlug,
+    telegramUserId: normalized.user?.telegramUserId,
+  });
+  if (settings.draftDivergenceOptIn !== true) {
+    return { ok: true, stored: false, reason: 'draft_divergence_opt_out' };
+  }
+  if (!initialAnswer) {
+    return { ok: true, stored: false, reason: 'initial_draft_missing' };
+  }
+  return persistDraftEditMetric({
+    env,
+    telegramUserId: normalized.user?.telegramUserId,
+    sessionSlug,
+    questionId: selectedQuestionId,
+    questionType,
+    draftAnswer: initialAnswer,
+    sentAnswer,
+    source: 'telegram_bot',
+    finality,
+    createdAt,
+  });
+}
+
 async function buildAnswerDraftResponse({
   normalized,
   command,
@@ -7478,6 +9225,12 @@ async function buildAnswerDraftResponse({
   const answerLabel = safeString(ref.answerLabel);
   const answerValue = safeString(ref.answerValue || answerLabel);
   const controlType = safeString(ref.controlType);
+  const previousDraft = await readAnswerDraft({
+    env,
+    normalized,
+    sessionSlug,
+    selectedQuestionId,
+  });
   const saved = await persistAnswerDraft({
     env,
     normalized,
@@ -7519,6 +9272,19 @@ async function buildAnswerDraftResponse({
     })
     : null;
   const ok = saved.ok === true && submitted?.ok === true;
+  const draftEditMetric = ok
+    ? await persistTelegramBotDraftEditMetric({
+      env,
+      normalized,
+      sessionSlug,
+      selectedQuestionId,
+      questionType: controlType,
+      initialAnswer: answerFromStoredDraft(previousDraft),
+      sentAnswer: answerFromStoredDraft(saved.draft),
+      finality: 'submitted',
+      createdAt,
+    })
+    : null;
   return callbackOnly({
     normalized,
     command,
@@ -7540,6 +9306,10 @@ async function buildAnswerDraftResponse({
       submitRequest: submitted?.ok ? submitted : null,
       onChainSubmitted: submitted?.status === 'direct_submitted',
       submitLane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+      draftEditMetric: draftEditMetric ? {
+        stored: draftEditMetric.stored === true,
+        reason: draftEditMetric.reason || '',
+      } : null,
     },
   });
 }
@@ -7586,6 +9356,19 @@ async function buildSubmitDraftResponse({
     selectedQuestionId,
     createdAt,
   });
+  const draftEditMetric = submitted.ok
+    ? await persistTelegramBotDraftEditMetric({
+      env,
+      normalized,
+      sessionSlug,
+      selectedQuestionId,
+      questionType: draft.controlType,
+      initialAnswer: answerFromStoredDraft(draft),
+      sentAnswer: answerFromStoredDraft(draft),
+      finality: 'submitted',
+      createdAt,
+    })
+    : null;
   return callbackOnly({
     normalized,
     command,
@@ -7603,6 +9386,10 @@ async function buildSubmitDraftResponse({
       submitRequestCreated: submitted.ok === true,
       submitRequest: submitted.ok ? submitted : null,
       onChainSubmitted: submitted.status === 'direct_submitted',
+      draftEditMetric: draftEditMetric ? {
+        stored: draftEditMetric.stored === true,
+        reason: draftEditMetric.reason || '',
+      } : null,
     },
   });
 }
@@ -7747,11 +9534,8 @@ async function buildMeResponse({ normalized, command, env, createdAt, method = '
     joinedSbts: [],
     createdAt,
   });
-  const explorerUrl = addressExplorerUrl(account.accountAddress, env.DEFAULT_CHAIN_ID || '11155420');
   const addressLabel = shortAddress(account.accountAddress);
-  const addressDisplay = explorerUrl
-    ? `<a href="${escapeTelegramHtml(explorerUrl)}">${escapeTelegramHtml(addressLabel)}</a>`
-    : escapeTelegramHtml(addressLabel);
+  const addressDisplay = escapeTelegramHtml(addressLabel);
   const questionButton = await makeCallbackButton({
     env,
     label: 'View Questions',
@@ -7773,7 +9557,7 @@ async function buildMeResponse({ normalized, command, env, createdAt, method = '
     : null;
   const agentTokenButton = agentTokenSession?.ok ? await makeCallbackButton({
     env,
-    label: 'Copy Agent Install Info',
+    label: 'Onboard Agent',
     action: TELEGRAM_BRIDGE_ACTIONS.CREATE_AGENT_TOKEN,
     lane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
     serverContextRef: { sessionSlug: agentTokenSession.session.sessionSlug },
@@ -7797,6 +9581,13 @@ async function buildMeResponse({ normalized, command, env, createdAt, method = '
   if (agentTokenButton) rows.push([agentTokenButton]);
   if (activityButton) rows.push([activityButton]);
   if (adminActionsButton) rows.push([adminActionsButton]);
+  await appendBackToStartRow(rows, {
+    env,
+    normalized,
+    sessionSlug: agentTokenSession?.ok ? agentTokenSession.session.sessionSlug : policy.defaultSessionSlug,
+    seed: `me|start|${normalized.user.telegramUserId}|${normalized.updateId}`,
+    createdAt,
+  });
   return reply({
     method,
     chatId: normalized.chat.chatId,
@@ -7804,15 +9595,12 @@ async function buildMeResponse({ normalized, command, env, createdAt, method = '
     text: [
       'Account',
       `Address: ${addressDisplay}`,
-      `Chain: ${chainDisplayName(env.DEFAULT_CHAIN_ID || '11155420')}`,
       `Joined sessions: ${joinedSessions.map((session) => session.sessionSlug).join(', ') || 'none'}`,
-      '',
-      'Use /questions.',
     ].join('\n'),
     replyMarkup: {
       inline_keyboard: rows,
     },
-    parseMode: explorerUrl ? 'HTML' : '',
+    parseMode: '',
     screen: state.screen,
     command,
     normalized,
@@ -7840,7 +9628,7 @@ async function resolveActivitySessions({
     : await readGroupSessionBinding(env, normalized);
   const explicit = sanitizeSessionSlug(explicitSessionSlug);
   if (explicit) return visibleSlugs.includes(explicit) ? [explicit] : [];
-  const bound = sanitizeSessionSlug(binding?.sessionSlug);
+  const bound = bindingSessionSlug(binding, policy);
   if (bound && visibleSlugs.includes(bound)) return [bound];
   return normalized.chat?.isPrivate ? visibleSlugs : visibleSlugs.slice(0, 1);
 }
@@ -7853,6 +9641,7 @@ async function buildActivityResponse({
   sessionSlugOverride = '',
   method = 'sendMessage',
   messageId = '',
+  createdAt = null,
 } = {}) {
   const policy = await loadSessionPolicy(env);
   const sessionSlugs = await resolveActivitySessions({
@@ -7871,6 +9660,14 @@ async function buildActivityResponse({
   if (!normalized.chat?.isPrivate) {
     const counts = summarizeTelegramAgentActivityCounts(items);
     assertNoSecretShape(counts, 'Telegram group activity counts must not serialize secrets.');
+    const rows = [];
+    await appendBackToStartRow(rows, {
+      env,
+      normalized,
+      sessionSlug: sessionSlugs[0] || '',
+      seed: `activity|start|${sessionSlugs.join(',') || 'none'}|${normalized.updateId}`,
+      createdAt,
+    });
     return reply({
       method,
       chatId: normalized.chat.chatId,
@@ -7881,6 +9678,7 @@ async function buildActivityResponse({
         '',
         `${counts.drafts} drafts, ${counts.pendingVotes} pending vote suggestions, ${counts.voteDecisions} vote decisions, ${counts.proposedQuestions} proposed questions, ${counts.groupProposals} group suggestions.`,
       ].join('\n'),
+      replyMarkup: { inline_keyboard: rows },
       screen: 'agent_activity_counts',
       command,
       normalized,
@@ -7898,11 +9696,20 @@ async function buildActivityResponse({
     items.slice(0, 12).forEach((item) => lines.push(activityItemLine(item)));
   }
   assertNoSecretShape({ text: lines.join('\n') }, 'Telegram activity response must not serialize secrets.');
+  const rows = [];
+  await appendBackToStartRow(rows, {
+    env,
+    normalized,
+    sessionSlug: sessionSlugs[0] || '',
+    seed: `activity|start|${sessionSlugs.join(',') || 'none'}|${normalized.updateId}`,
+    createdAt,
+  });
   return reply({
     method,
     chatId: normalized.chat.chatId,
     messageId,
     text: lines.join('\n'),
+    replyMarkup: { inline_keyboard: rows },
     screen: 'agent_activity',
     command,
     normalized,
@@ -7919,7 +9726,7 @@ async function resolveAgentTokenSession({
   const activeBinding = await readPrivateSessionBinding(env, normalized);
   const visibleSessions = await telegramVisibleSessionsForChat(policy, env, normalized);
   const visibleSlugs = new Set(visibleSessions.map((session) => sanitizeSessionSlug(session.sessionSlug)));
-  const activeSlug = sanitizeSessionSlug(activeBinding?.sessionSlug);
+  const activeSlug = bindingSessionSlug(activeBinding, policy);
   const explicitSlug = sanitizeSessionSlug(explicitSessionSlug);
   const defaultSlug = sanitizeSessionSlug(policy.defaultSessionSlug);
   const candidateSlug = explicitSlug ||
@@ -7980,6 +9787,26 @@ async function buildAgentTokenResponse({
     lifecycle: AGENT_BRIDGE_EVENT_TYPES.ACCOUNT_RECOVERED,
     createdAt,
   });
+  const previousPointer = await readTelegramAgentDelegationTokenUserPointer({
+    env,
+    telegramUserId: normalized.user.telegramUserId,
+  });
+  if (previousPointer.tokenHash) {
+    await revokeTelegramAgentDelegationTokenHash({
+      env,
+      tokenHash: previousPointer.tokenHash,
+    });
+  }
+  if (sanitizeSessionSlug(sessionSlugOverride)) {
+    const followDefault = sanitizeSessionSlug(resolved.session.sessionSlug) === sanitizeSessionSlug(policy.defaultSessionSlug);
+    await persistPrivateSessionBinding({
+      env,
+      normalized,
+      session: resolved.session,
+      createdAt,
+      followDefault,
+    });
+  }
   const issued = await createTelegramAgentDelegationToken({
     env,
     telegramUserId: normalized.user.telegramUserId,
@@ -7997,16 +9824,29 @@ async function buildAgentTokenResponse({
       text: 'Could not create an agent token for this account.',
     });
   }
+  const pointer = await writeTelegramAgentDelegationTokenUserPointer({
+    env,
+    telegramUserId: normalized.user.telegramUserId,
+    tokenHash: issued.tokenHash,
+    issuedAt: issued.record?.issuedAt || createdAt,
+    createdAt,
+  });
+  if (!pointer.ok) {
+    return errorReply({
+      normalized,
+      command,
+      reason: pointer.reason || 'agent_token_pointer_write_failed',
+      text: 'Could not save the agent token pointer for this account.',
+    });
+  }
   const workerUrl = agentBridgePublicUrl(env);
   const skillUrl = agentSkillUrl(env);
-  const installInfo = buildAgentInstallInfo({
+  const copyInfo = buildAgentInstallCopyInfo({
     token: issued.token,
-    sessionSlug: resolved.session.sessionSlug,
     workerUrl,
     skillUrl,
   });
-  const maskedToken = maskAgentToken(issued.token);
-  const copyToken = copyTextButton('Copy Agent Install Info', installInfo);
+  const copyInfoButton = copyTextButton('Copy Agent Info', copyInfo);
   const accountButton = await makeCallbackButton({
     env,
     label: 'Back to Account',
@@ -8017,18 +9857,19 @@ async function buildAgentTokenResponse({
     createdAt,
   });
   const rows = [];
-  if (copyToken) rows.push([copyToken]);
+  if (copyInfoButton) rows.push([copyInfoButton]);
   rows.push([accountButton]);
+  await appendBackToStartRow(rows, {
+    env,
+    normalized,
+    sessionSlug: resolved.session.sessionSlug,
+    seed: `agent_token|start|${resolved.session.sessionSlug}|${normalized.user.telegramUserId}|${normalized.updateId}`,
+    createdAt,
+  });
   const bodyText = [
-    'Agent install info',
-    `Session: ${sessionLabel(resolved.session)}`,
-    `Token: ${maskedToken}`,
-    `Expires: ${issued.record.expiresAt}`,
+    'Press Copy Agent Info and paste to your agent or Claude Code',
     '',
-    'Tap Copy Agent Install Info, then paste it into your trusted agent.',
-    `Skill: ${skillUrl}`,
-    '',
-    'The copied text includes the full token and worker URL. The chat only shows the masked token.',
+    'Context Engine will ask questions, draft responses, and create a privacy-preserving opinion map',
   ].join('\n');
   assertNoSecretShape({ bodyText }, 'Agent token response body must not expose secret-shaped values.');
   return reply({
@@ -8351,7 +10192,7 @@ function isMiniAppLaunchRecord(record = {}) {
     ].includes(record.action);
 }
 
-function buildMiniAppStartResponse({
+async function buildMiniAppStartResponse({
   normalized,
   command,
   env,
@@ -8359,6 +10200,12 @@ function buildMiniAppStartResponse({
   launch = '',
 } = {}) {
   const sessionSlug = sanitizeSessionSlug(record.serverContextRef?.sessionSlug) || 'general';
+  let sessionDisplayName = sessionSlug;
+  if (sessionSlug && sessionSlug !== 'general') {
+    const policy = await loadSessionPolicy(env).catch(() => null);
+    const resolved = policy ? resolveSessionInvocation(policy, sessionSlug) : { ok: false };
+    sessionDisplayName = resolved.ok ? sessionLabel(resolved.session) : sessionSlug;
+  }
   const url = miniAppUrlForLaunch(env, launch);
   if (!normalized.chat.isPrivate) {
     return reply({
@@ -8391,7 +10238,9 @@ function buildMiniAppStartResponse({
   return reply({
     chatId: normalized.chat.chatId,
     text: [
-      `Open the Mini App for ${sessionSlug}.`,
+      sessionSlug === 'general'
+        ? 'Open the Mini App.'
+        : `Open the Mini App for ${sessionDisplayName}.`,
       '',
       'Use this private button for agent actions, settings, answers, and queued submissions.',
     ].join('\n'),
@@ -8405,6 +10254,150 @@ function buildMiniAppStartResponse({
     command,
     normalized,
     extra: { sessionSlug, miniAppLaunch: true },
+  });
+}
+
+async function buildMiniAppVoiceDraftFallbackResponse({
+  normalized,
+  command = 'voice',
+  env = {},
+  createdAt = null,
+  fetchImpl = globalThis.fetch,
+} = {}) {
+  if (!normalized.chat?.isPrivate) {
+    return reply({
+      chatId: normalized.chat?.chatId,
+      text: 'Voice draft updates work in a private chat with the bot. Open the Mini App link or DM the bot first.',
+      screen: 'mini_app_voice_private_required',
+      command,
+      normalized,
+    });
+  }
+  const telegramUserId = safeString(normalized.user?.telegramUserId);
+  const fileId = telegramVoiceFileId(normalized);
+  if (!telegramUserId || !fileId) {
+    return errorReply({
+      normalized,
+      command,
+      reason: 'telegram_voice_missing',
+      text: 'I could not read that voice message. Please try again from your private chat.',
+    });
+  }
+  const pointer = await readLatestMiniAppLaunchPointer(env, telegramUserId);
+  if (!pointer?.launch) {
+    return reply({
+      chatId: normalized.chat.chatId,
+      text: [
+        'Open a CE Mini App question link first, then send a Telegram voice message here.',
+        '',
+        'I will transcribe it and add it to the current draft for review.',
+      ].join('\n'),
+      screen: 'mini_app_voice_no_launch',
+      command,
+      normalized,
+      extra: { voiceDraftFallback: true, launchFound: false },
+    });
+  }
+  const record = await readActionRecord(env, pointer.launch);
+  if (
+    !record ||
+    record.miniAppLaunch !== true ||
+    record.action !== TELEGRAM_BRIDGE_ACTIONS.SUBMIT_RESPONSE ||
+    record.lane !== TELEGRAM_CHAT_LANES.MINI_APP
+  ) {
+    return reply({
+      chatId: normalized.chat.chatId,
+      text: 'That Mini App question link has expired. Ask the agent for a fresh question link and send the voice note again.',
+      screen: 'mini_app_voice_launch_expired',
+      command,
+      normalized,
+      extra: { voiceDraftFallback: true, launchFound: true, launchExpired: true },
+    });
+  }
+  const sessionSlug = sanitizeSessionSlug(pointer.sessionSlug || record.serverContextRef?.sessionSlug);
+  const questionIdRef = selectMiniAppVoiceDraftQuestionId(record);
+  if (!sessionSlug || !questionIdRef) {
+    return errorReply({
+      normalized,
+      command,
+      reason: 'mini_app_voice_context_missing',
+      text: 'That Mini App question link is missing its session or question. Ask the agent for a fresh link.',
+    });
+  }
+  const rateLimit = await checkDmVoiceTranscribeRateLimit({
+    env,
+    telegramUserId,
+    sessionSlug,
+    createdAt,
+  });
+  if (!rateLimit.ok) {
+    return errorReply({
+      normalized,
+      command,
+      reason: rateLimit.reason || 'transcribe_rate_limited',
+      text: 'Voice transcription is temporarily rate limited. Please wait a bit, or edit the draft directly in the Mini App.',
+    });
+  }
+  const transcript = await transcribeTelegramVoiceForMiniAppDraft({
+    env,
+    normalized,
+    sessionSlug,
+    fileId,
+    createdAt,
+    fetchImpl,
+  });
+  if (!transcript.ok) {
+    return errorReply({
+      normalized,
+      command,
+      reason: transcript.reason || 'transcription_failed',
+      text: 'I could not transcribe that voice note. Please try again, or edit the draft directly in the Mini App.',
+    });
+  }
+  const updated = appendMiniAppVoiceDraft(record, questionIdRef, transcript.text, createdAt);
+  if (!updated.ok) {
+    return errorReply({
+      normalized,
+      command,
+      reason: updated.reason || 'mini_app_voice_draft_update_failed',
+      text: 'I could not update the Mini App draft. Please edit it directly in the Mini App.',
+    });
+  }
+  const stored = await persistActionRecord(env, pointer.launch, updated.record);
+  if (!stored.ok) {
+    return errorReply({
+      normalized,
+      command,
+      reason: stored.reason || 'action_record_unavailable',
+      text: 'I transcribed the note, but could not save it back to the Mini App draft.',
+    });
+  }
+  const url = miniAppUrlForLaunch(env, pointer.launch);
+  const preview = safeString(transcript.text).slice(0, 240);
+  return reply({
+    chatId: normalized.chat.chatId,
+    text: [
+      'Updated the Mini App draft from your voice note.',
+      '',
+      preview ? `Transcript: ${preview}` : '',
+      '',
+      'Open the Mini App to review and send the answer.',
+    ].filter((line) => line !== '').join('\n'),
+    replyMarkup: url ? {
+      inline_keyboard: [[{
+        text: 'Review Draft',
+        web_app: { url },
+      }]],
+    } : null,
+    screen: 'mini_app_voice_draft_fallback',
+    command,
+    normalized,
+    extra: {
+      voiceDraftFallback: true,
+      sessionSlug,
+      questionId: questionIdRef,
+      launch: pointer.launch,
+    },
   });
 }
 
@@ -8551,6 +10544,27 @@ async function buildStartPayloadResponse({
   }
   const record = await readActionRecord(env, parsed.actionId);
   if (!record) {
+    if (normalized.chat?.isPrivate) {
+      const refreshed = await buildHelpResponse({
+        normalized,
+        command,
+        env,
+        createdAt,
+        waitUntil,
+      });
+      if (refreshed?.response?.text) {
+        refreshed.response.text = [
+          'That link expired, so I refreshed the Mini App entry point.',
+          '',
+          refreshed.response.text,
+        ].join('\n');
+      }
+      refreshed.screen = 'private_start_refreshed';
+      refreshed.startPayload = parsed.actionId;
+      refreshed.active = false;
+      refreshed.refreshed = true;
+      return refreshed;
+    }
     return reply({
       chatId: normalized.chat.chatId,
       text: [
@@ -8613,8 +10627,11 @@ async function buildStartPayloadResponse({
     });
   }
   if (record.action === TELEGRAM_BRIDGE_ACTIONS.CREATE_AGENT_TOKEN) {
-    return buildAgentTokenResponse({
-      normalized,
+    return buildAgentOnboardingStartResponse({
+      normalized: {
+        ...normalized,
+        forceAgentToken: record.serverContextRef?.forceToken === true,
+      },
       command,
       env,
       sessionSlugOverride: record.serverContextRef?.sessionSlug || '',
@@ -8656,6 +10673,16 @@ async function buildCallbackResponse({
   }
   const record = await readActionRecord(env, parsed.actionId);
   if (!record) {
+    if (normalized.chat?.isPrivate && callbackMessageLooksLikeAgentOnboarding(message)) {
+      return attachCallbackQueryId(await buildAgentOnboardingStartResponse({
+        normalized,
+        command: 'callback:create_agent_token',
+        env,
+        method,
+        messageId,
+        createdAt,
+      }), callbackQueryId);
+    }
     return attachCallbackQueryId(errorReply({
       normalized,
       command: 'callback',
@@ -8666,6 +10693,27 @@ async function buildCallbackResponse({
     }), callbackQueryId);
   }
   const sessionSlug = record.serverContextRef?.sessionSlug || '';
+  if (record.action === TELEGRAM_BRIDGE_ACTIONS.START_MENU) {
+    return attachCallbackQueryId(await buildHelpResponse({
+      normalized,
+      command: 'callback:start_menu',
+      env,
+      createdAt,
+      waitUntil,
+      method,
+      messageId,
+    }), callbackQueryId);
+  }
+  if (record.action === TELEGRAM_BRIDGE_ACTIONS.ABOUT_CONTEXT_ENGINE) {
+    return attachCallbackQueryId(await buildAboutResponse({
+      normalized,
+      command: 'callback:about_context_engine',
+      env,
+      createdAt,
+      method,
+      messageId,
+    }), callbackQueryId);
+  }
   if (record.action === TELEGRAM_BRIDGE_ACTIONS.AGENT_ACTION_MENU) {
     return attachCallbackQueryId(await buildAgentActionsResponse({
       normalized,
@@ -8930,11 +10978,15 @@ async function buildCallbackResponse({
       sessionSlugOverride: sessionSlug,
       method,
       messageId,
+      createdAt,
     }), callbackQueryId);
   }
   if (record.action === TELEGRAM_BRIDGE_ACTIONS.CREATE_AGENT_TOKEN) {
-    return attachCallbackQueryId(await buildAgentTokenResponse({
-      normalized,
+    return attachCallbackQueryId(await buildAgentOnboardingStartResponse({
+      normalized: {
+        ...normalized,
+        forceAgentToken: record.serverContextRef?.forceToken === true,
+      },
       command: 'callback:create_agent_token',
       env,
       sessionSlugOverride: sessionSlug,
@@ -8966,6 +11018,7 @@ async function buildCallbackResponse({
 export async function buildTelegramCommandResponse({
   update = {},
   env = {},
+  fetchImpl = globalThis.fetch,
   now = null,
   waitUntil = null,
 } = {}) {
@@ -8982,6 +11035,15 @@ export async function buildTelegramCommandResponse({
   const createdAt = nowIso(now);
   if (normalized.kind === 'callback') {
     return buildCallbackResponse({ normalized, env, createdAt, waitUntil });
+  }
+  if (telegramVoiceFileId(normalized)) {
+    return buildMiniAppVoiceDraftFallbackResponse({
+      normalized,
+      command: 'voice',
+      env,
+      createdAt,
+      fetchImpl,
+    });
   }
 
   const parsed = parseTelegramCommandText(normalized.text, {
@@ -9187,6 +11249,15 @@ export async function buildTelegramCommandResponse({
       createdAt,
     });
   }
+  if (parsed.command === COMMANDS.SET_DEFAULT) {
+    return buildSetDefaultSessionResponse({
+      normalized,
+      command: parsed.command,
+      env,
+      args: parsed.args,
+      createdAt,
+    });
+  }
   if (parsed.command === COMMANDS.QUESTION_QUEUE) {
     return buildQuestionQueueSettingsResponse({
       normalized,
@@ -9220,6 +11291,7 @@ export async function buildTelegramCommandResponse({
       command: parsed.command,
       env,
       args: parsed.args,
+      createdAt,
     });
   }
   if ([COMMANDS.AGENT_TOKEN, COMMANDS.EXPORT_TOKEN].includes(parsed.command)) {
@@ -9369,6 +11441,17 @@ export async function dispatchTelegramCommandResponse({
       fetchImpl,
       timeoutMs,
     });
+    if (!sendResult?.ok) {
+      sendResult = await sendTelegramMessage({
+        botToken,
+        chatId: response.chatId,
+        text: response.text,
+        replyMarkup: response.replyMarkup,
+        parseMode: response.parseMode,
+        fetchImpl,
+        timeoutMs,
+      });
+    }
   } else if (response.method === 'sendPhoto' && response.photo) {
     const photoForTelegram = await materializeTelegramResultPhoto({
       env,
@@ -9475,7 +11558,7 @@ export async function handleTelegramWebhookUpdate({
       timeoutMs: telegramApiTimeoutMs(env),
     })
     : null;
-  const commandResponse = await buildTelegramCommandResponse({ update, env, now, waitUntil });
+  const commandResponse = await buildTelegramCommandResponse({ update, env, fetchImpl, now, waitUntil });
   if (!commandResponse.ok && !commandResponse.response) {
     return commandResponse;
   }
@@ -9560,29 +11643,46 @@ export {
   ACTION_KV_PREFIX,
   AGENT_REQUEST_KV_PREFIX,
   ANSWER_DRAFT_KV_PREFIX,
+  ANSWER_DRAFT_VIEW_KV_PREFIX,
   COMMANDS,
+  answerDraftFingerprint,
   deleteAnswerDraft,
   analyzeParticipantResultGroup,
+  buildDraftProvenance,
   buildParticipantGraph,
   consensusQuestionsForResults,
   formatCounts,
   loadSubmittedResultRecords,
   loadSessionPolicy,
   loadQuestionsForSession,
+  latestMiniAppLaunchKey,
+  markAnswerDraftViewed,
   parseAgentOnboardingStartParam,
   parseTelegramCommandText,
   persistActionRecord,
   persistAnswerDraft,
+  persistLatestMiniAppLaunchPointer,
+  persistTelegramSubmitRequest,
   persistTelegramUserSessionBinding,
   questionId,
   readActionRecord,
   readAnswerDraft,
+  readAnswerDraftFirstViewedAt,
   readGroupSessionBinding,
+  readLatestMiniAppLaunchPointer,
   readPrivateSessionBinding,
   resolveAgentTokenSession,
   shortQuestionId,
   summarizeQuestionResults,
   SUBMIT_REQUEST_KV_PREFIX,
   telegramVisibleSessions,
+  readAgentSkillUpdateFlag,
+  readAdminDefaultSessionOverride,
+  sessionUsesWorkerBackedQuestions,
+  writeAgentSkillUpdateFlag,
+  writeAdminDefaultSessionOverride,
+  writeDraftLifecycleEvent,
+  clearAgentSkillUpdateFlag,
+  clearAdminDefaultSessionOverride,
   writeResultsExposureOverride,
 };

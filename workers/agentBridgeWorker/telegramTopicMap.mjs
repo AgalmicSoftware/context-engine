@@ -1,6 +1,6 @@
-export const TELEGRAM_TOPIC_MAP_CACHE_PREFIX = 'telegram:topic-map:v1:';
+export const TELEGRAM_TOPIC_MAP_CACHE_PREFIX = 'telegram:topic-map:v2:';
 
-const TOPIC_MAP_VERSION = 1;
+const TOPIC_MAP_VERSION = 2;
 const TOPIC_MAP_VIEWBOX = Object.freeze({ width: 720, height: 420 });
 const MIN_TOPIC_MAP_QUESTIONS = 2;
 const MIN_TOPIC_MAP_RESPONSES = 2;
@@ -9,7 +9,7 @@ const MAX_QUESTIONS_PER_TOPIC = 6;
 const TOPIC_MAP_RESPONSE_REFRESH_FRACTION = 0.15;
 
 const STOP_WORDS = new Set([
-  'about', 'after', 'again', 'against', 'agent', 'agents', 'allow', 'also',
+  'able', 'about', 'after', 'again', 'against', 'agent', 'agents', 'allow', 'also',
   'and', 'answer', 'answers', 'are', 'because', 'before', 'being', 'best',
   'between', 'both', 'can', 'could', 'during', 'each', 'every', 'from',
   'group', 'groups', 'have', 'into', 'more', 'most', 'need', 'people',
@@ -17,6 +17,45 @@ const STOP_WORDS = new Set([
   'than', 'that', 'the', 'their', 'there', 'these', 'this', 'through',
   'user', 'users', 'want', 'what', 'when', 'where', 'which', 'while', 'with',
   'would', 'your',
+]);
+
+const LOW_SIGNAL_TOPIC_TAGS = new Set([
+  'agree', 'unsure', 'disagree', 'agree-unsure-disagree', 'binary', 'freeform',
+  'rating', 'demo', 'general', 'question', 'questions', 'response', 'responses',
+  'session', 'sessions', 'telegram', 'user', 'users',
+]);
+
+const CONTENT_TOPIC_RULES = Object.freeze([
+  {
+    topicId: 'event-experience',
+    label: 'Event Experience',
+    terms: ['edge city', 'shared meal', 'shared meals', 'meals', 'formal talk', 'formal talks', 'live event', 'live events', 'during live events'],
+  },
+  {
+    topicId: 'participant-agency',
+    label: 'Participant Agency',
+    terms: ['participants should be able', 'add questions', 'participant questions', 'approve every submission', 'user approval', 'users should approve'],
+  },
+  {
+    topicId: 'agent-workflows',
+    label: 'Agent Workflows',
+    terms: ['ai agents', 'agent draft', 'agents should draft', 'draft responses', 'agent actions', 'agent help'],
+  },
+  {
+    topicId: 'privacy-control',
+    label: 'Privacy And Control',
+    terms: ['hide individual', 'wallet addresses', 'raw responses', 'private', 'privacy', 'admin', 'admins', 'control whether', 'anonymized groups', 'avoid blockchain', 'blockchain writes', 'telegram-only sessions'],
+  },
+  {
+    topicId: 'results-interpretation',
+    label: 'Results And Groups',
+    terms: ['result summaries', 'results should', 'inside telegram', 'web client', 'group summaries', 'group differences', 'country and role', 'role filters', 'filters', 'interpreting group', 'ai group summaries', 'summaries'],
+  },
+  {
+    topicId: 'mobile-ux',
+    label: 'Mobile UX',
+    terms: ['fast onboarding', 'onboarding', 'controls are simplified', 'microphone', 'mobile', 'interface', 'smoke test', 'pizza preference'],
+  },
 ]);
 
 function safeString(value) {
@@ -96,15 +135,17 @@ function titleCaseTag(tag = '') {
     .join(' ');
 }
 
+function tagIsMeaningful(tag = '') {
+  const value = lower(tag);
+  return value && !LOW_SIGNAL_TOPIC_TAGS.has(value) && !STOP_WORDS.has(value);
+}
+
 function inferKeywordTags(question = {}, session = {}) {
-  const text = [
-    questionText(question),
-    safeString(question.questionType || question.type || question.controlType),
-    safeString(session.sessionName || session.name),
-  ].join(' ');
+  const text = questionText(question);
   const counts = new Map();
   for (const word of lower(text).split(/[^a-z0-9]+/).filter(Boolean)) {
     if (word.length < 4 || STOP_WORDS.has(word)) continue;
+    if (LOW_SIGNAL_TOPIC_TAGS.has(word)) continue;
     counts.set(word, (counts.get(word) || 0) + 1);
   }
   return Array.from(counts.entries())
@@ -113,11 +154,50 @@ function inferKeywordTags(question = {}, session = {}) {
     .map(([word]) => word);
 }
 
-function topicTagsForQuestion(question = {}, session = {}) {
-  const explicit = normalizeTags(question.tags || question.questionTags || question.generatedTags);
-  if (explicit.length) return explicit;
+function contentRuleScore(text = '', rule = {}) {
+  const haystack = lower(text);
+  let score = 0;
+  for (const term of rule.terms || []) {
+    const needle = lower(term);
+    if (!needle) continue;
+    if (haystack.includes(needle)) score += needle.includes(' ') ? 4 : 2;
+  }
+  return score;
+}
+
+function semanticTopicForQuestion(question = {}) {
+  const text = questionText(question);
+  const matches = CONTENT_TOPIC_RULES
+    .map((rule) => ({ ...rule, score: contentRuleScore(text, rule) }))
+    .filter((rule) => rule.score > 0)
+    .sort((left, right) => right.score - left.score || left.label.localeCompare(right.label));
+  return matches[0] || null;
+}
+
+function topicForQuestion(question = {}, session = {}) {
+  const semantic = semanticTopicForQuestion(question);
+  if (semantic) {
+    return {
+      topicId: semantic.topicId,
+      label: semantic.label,
+      source: 'semantic_question_content',
+    };
+  }
+  const explicit = normalizeTags(question.tags || question.questionTags || question.generatedTags).filter(tagIsMeaningful);
+  if (explicit.length) {
+    return {
+      topicId: explicit[0],
+      label: titleCaseTag(explicit[0]),
+      source: 'question_tag',
+    };
+  }
   const inferred = inferKeywordTags(question, session);
-  return inferred.length ? inferred : ['general'];
+  const topicId = inferred[0] || 'discussion';
+  return {
+    topicId,
+    label: inferred[0] ? titleCaseTag(inferred[0]) : 'Discussion',
+    source: inferred[0] ? 'semantic_keyword_fallback' : 'fallback',
+  };
 }
 
 function recordsByQuestion(records = []) {
@@ -226,10 +306,12 @@ export function buildTelegramTopicMap({
     .map((question) => {
       const qid = questionId(question);
       const stats = byQuestion.get(qid);
+      const topic = topicForQuestion(question, session);
       return {
         questionId: qid,
         prompt: questionText(question),
-        tags: topicTagsForQuestion(question, session),
+        tags: normalizeTags(question.tags || question.questionTags || question.generatedTags),
+        topic,
         responseCount: Number(stats?.responseCount || 0),
         participantCount: Number(stats?.participants?.size || 0),
       };
@@ -238,11 +320,12 @@ export function buildTelegramTopicMap({
   const renderableResponseCount = orderedQuestions.reduce((sum, question) => sum + question.responseCount, 0);
 
   orderedQuestions.forEach((question, index) => {
-    const primaryTag = question.tags[0] || 'general';
-    if (!topicBuckets.has(primaryTag)) {
-      topicBuckets.set(primaryTag, {
-        topicId: primaryTag,
-        label: titleCaseTag(primaryTag),
+    const topicId = safeString(question.topic?.topicId) || 'discussion';
+    if (!topicBuckets.has(topicId)) {
+      topicBuckets.set(topicId, {
+        topicId,
+        label: safeString(question.topic?.label) || titleCaseTag(topicId),
+        source: safeString(question.topic?.source),
         questionCount: 0,
         responseCount: 0,
         participants: new Set(),
@@ -250,7 +333,7 @@ export function buildTelegramTopicMap({
         firstIndex: index,
       });
     }
-    const bucket = topicBuckets.get(primaryTag);
+    const bucket = topicBuckets.get(topicId);
     bucket.questionCount += 1;
     bucket.responseCount += question.responseCount;
     const stats = byQuestion.get(question.questionId);
@@ -266,6 +349,7 @@ export function buildTelegramTopicMap({
       prompt: question.prompt,
       responseCount: question.responseCount,
       participantCount: question.participantCount,
+      topicSource: safeString(question.topic?.source),
       tags: question.tags,
     });
   });
@@ -277,6 +361,7 @@ export function buildTelegramTopicMap({
       questionCount: topic.questionCount,
       responseCount: topic.responseCount,
       participantCount: topic.participants.size,
+      source: topic.source || 'semantic_question_content',
       score: topic.responseCount + topic.questionCount,
       questions: topic.questions
         .sort((left, right) => right.responseCount - left.responseCount || left.prompt.localeCompare(right.prompt))

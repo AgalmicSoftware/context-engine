@@ -93,7 +93,7 @@ test('deploy apply validation rejects placeholder session worker URLs before mut
   assert.equal(result.validation.missing.some((entry) => entry.includes('CE_SESSION_WORKER_BASE_URL')), true);
 });
 
-test('writeAgentBridgeWorkerSecrets stores optional bridge OpenAI key when present', async () => {
+test('writeAgentBridgeWorkerSecrets stores optional bridge secrets when present', async () => {
   const written = [];
   const result = await writeAgentBridgeWorkerSecrets({
     apiToken: 'cf-token',

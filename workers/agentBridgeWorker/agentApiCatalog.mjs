@@ -141,6 +141,7 @@ const CAPABILITIES = Object.freeze([
     groupSafe: true,
     botCommands: ['/questions'],
     miniAppRoutes: ['questions'],
+    optionalFields: ['limit', 'count', 'topN'],
   }),
   freezeEntry({
     id: 'agent.telegram.questions.next',
@@ -246,14 +247,14 @@ const CAPABILITIES = Object.freeze([
     path: '/telegram/agent/api/preferences',
     handoffStatus: AGENT_API_HANDOFF_STATUS.WORKER_LOCAL_UNTIL_CANONICAL,
     requiredFields: ['telegramUserId', 'sessionSlug', 'preferences.answersByQuestionId'],
-    optionalFields: ['groupChatId'],
+    optionalFields: ['groupChatId', 'submit', 'humanApproved'],
     safeTelegramLanes: [
       TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
       TELEGRAM_CHAT_LANES.MINI_APP,
     ],
     groupSafe: false,
     notes: [
-      'Writes drafts for user review only; it must not submit answers without explicit user approval.',
+      'Writes drafts by default. When the user explicitly authorizes the agent to answer on their behalf, submit=true plus humanApproved=true submits the same answers without requiring Mini App finalization.',
     ],
   }),
   freezeEntry({
@@ -311,6 +312,25 @@ const CAPABILITIES = Object.freeze([
     groupSafe: false,
     notes: [
       'Returns this user’s mutation history and pending agent suggestions for the token-scoped session.',
+    ],
+  }),
+  freezeEntry({
+    id: 'agent.telegram.mini_app_launch.create',
+    category: 'launcher',
+    label: 'Create Mini App Question Link',
+    canonicalActionId: 'agent.telegram.mini_app_launch.create',
+    method: 'POST',
+    path: '/telegram/agent/api/mini-app-launch',
+    handoffStatus: AGENT_API_HANDOFF_STATUS.WORKER_LOCAL_UNTIL_CANONICAL,
+    requiredFields: ['sessionSlug', 'questionIds'],
+    optionalFields: ['skippedQuestionIds', 'draftAnswersByQuestionId'],
+    safeTelegramLanes: [
+      TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+      TELEGRAM_CHAT_LANES.MINI_APP,
+    ],
+    groupSafe: false,
+    notes: [
+      'Mints an expiring Mini App launch record for an ordered question series with editable prefilled drafts.',
     ],
   }),
   freezeEntry({

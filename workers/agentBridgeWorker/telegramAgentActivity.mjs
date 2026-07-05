@@ -106,6 +106,8 @@ export function buildTelegramAgentActivityMetadata({
   questionId = '',
   telegramUserId = '',
   targetTelegramUserId = '',
+  editCount = null,
+  originSource = '',
 } = {}) {
   const metadata = {
     v: 1,
@@ -120,6 +122,11 @@ export function buildTelegramAgentActivityMetadata({
   const targetUserId = safeString(targetTelegramUserId);
   if (userId) metadata.u = userId;
   if (targetUserId) metadata.tu = targetUserId;
+  if (editCount !== null && editCount !== undefined && Number.isFinite(Number(editCount))) {
+    metadata.e = Number(editCount);
+  }
+  const origin = safeString(originSource);
+  if (origin) metadata.o = origin.slice(0, 64);
   assertNoSecretShape(metadata, 'Telegram agent activity metadata must not serialize secrets.');
   return metadata;
 }
@@ -143,6 +150,8 @@ function recordFromActivityMetadata(metadata = {}, key = '') {
       answerLabel: '',
       answerValue: '',
       controlType: '',
+      editCount: Number(metadata.e || 0),
+      originSource: safeString(metadata.o),
     };
   }
   if (type === 'proposed_question') {
@@ -185,6 +194,8 @@ function draftItem(record = {}, options = {}) {
     questionId: safeString(record.questionId),
     createdAt: safeString(record.selectedAt || record.createdAt),
     status: safeString(record.status || 'draft_saved'),
+    editCount: Number(record.editCount || 0),
+    originSource: safeString(record.originSource || record.origin?.source),
     summary: options.includeContent
       ? `Draft: ${safeString(record.answerLabel).slice(0, 140)}`
       : 'Answer draft saved for review',

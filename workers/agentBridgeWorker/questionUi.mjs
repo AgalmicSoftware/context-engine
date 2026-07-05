@@ -18,7 +18,6 @@ import { evaluateSbtJoinPolicy, evaluateSessionSbtGateJoin } from './sessionPoli
 const OPAQUE_CALLBACK_LAUNCH = 'callback:<opaque-action-id>';
 const OPAQUE_DEEP_LINK_LAUNCH = 't.me/<bot>?start=<opaque-action-id>';
 const POSE_QUESTION_CALLBACK_LAUNCH = 'callback:<pose_question_action>';
-const RATING_BUTTON_VALUES = Object.freeze([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 const SBT_ADDRESS_RE = /^0x[a-f0-9]{40}$/i;
 const SBT_GROUP_ID_RE = /^[a-z0-9][a-z0-9_-]{2,127}$/i;
 const SESSION_SLUG_RE = /^[a-z0-9][a-z0-9_-]{0,127}$/i;
@@ -111,6 +110,43 @@ export const TELEGRAM_SCREEN_LAUNCHES = Object.freeze({
 
 function safeString(value) {
   return String(value || '').trim();
+}
+
+function numberOrFallback(value, fallback) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
+}
+
+export function normalizeTelegramRatingScale(question = {}) {
+  const source = question?.ratingScale && typeof question.ratingScale === 'object' && !Array.isArray(question.ratingScale)
+    ? question.ratingScale
+    : (
+      question?.rating_scale && typeof question.rating_scale === 'object' && !Array.isArray(question.rating_scale)
+        ? question.rating_scale
+        : {}
+    );
+  let min = Math.floor(numberOrFallback(source.min, DEFAULT_RATING_SCALE.min));
+  let max = Math.floor(numberOrFallback(source.max, DEFAULT_RATING_SCALE.max));
+  let step = Math.floor(numberOrFallback(source.step, DEFAULT_RATING_SCALE.step || 1));
+  if (step < 1) step = 1;
+  min = Math.max(-100, Math.min(100, min));
+  max = Math.max(-100, Math.min(100, max));
+  if (max < min) {
+    min = DEFAULT_RATING_SCALE.min;
+    max = DEFAULT_RATING_SCALE.max;
+    step = DEFAULT_RATING_SCALE.step || 1;
+  }
+  while (Math.floor((max - min) / step) + 1 > 21 && step < 10) step += 1;
+  return { min, max, step };
+}
+
+function ratingButtonValuesForScale(scale = {}) {
+  const normalized = normalizeTelegramRatingScale({ ratingScale: scale });
+  const values = [];
+  for (let value = normalized.min; value <= normalized.max && values.length < 25; value += normalized.step) {
+    values.push(value);
+  }
+  return values;
 }
 
 function safeOpaqueSeedPart(value = '') {
@@ -517,7 +553,7 @@ function buildDefaultScreenCopy(screen) {
   }
   if (screen === 'my_account') {
     return {
-      title: 'My Account',
+      title: 'Account',
       text: 'Managed account summary.',
     };
   }
@@ -734,6 +770,7 @@ function questionGateMode(question = {}) {
 
 function summarizeQuestionForList(question = {}, index = 0) {
   const questionId = safeString(question.questionId || question.id);
+  const stableQuestionNumber = Math.floor(Number(question.stableQuestionNumber || question.questionNumber));
   const visibility = normalizeQuestionVisibility(question);
   const payloadUnavailable = question.payloadUnavailable === true || visibility === QUESTION_VISIBILITY.PAYLOAD_UNAVAILABLE;
   const visible = visibility === QUESTION_VISIBILITY.PUBLIC && !payloadUnavailable;
@@ -742,6 +779,7 @@ function summarizeQuestionForList(question = {}, index = 0) {
   return sanitizeForGroup({
     type: 'telegram_question_list_item',
     displayIndex: index + 1,
+    stableQuestionNumber: Number.isInteger(stableQuestionNumber) && stableQuestionNumber > 0 ? stableQuestionNumber : null,
     questionId,
     questionType: normalizeQuestionType(question.questionType || question.type),
     title: payloadUnavailable
@@ -1026,12 +1064,26 @@ export function buildTelegramAgentSettingsOverviewState({
   const normalizedSettings = sanitizeForGroup({
     draftStyle: normalizeDraftStyle(settings.draftStyle),
     showUnansweredFirst: normalizeBoolean(settings.showUnansweredFirst, true),
+    showAgentResponses: normalizeBoolean(settings.showAgentResponses, true),
     agentAutoApplyQuestionVotes: normalizeBoolean(settings.agentAutoApplyQuestionVotes, false),
+    topicPreferences: Array.isArray(settings.topicPreferences) ? settings.topicPreferences : [],
+    demographicLinkOptIn: normalizeBoolean(settings.demographicLinkOptIn, false),
+    attendanceLinkOptIn: normalizeBoolean(settings.attendanceLinkOptIn, false),
+    draftDivergenceOptIn: normalizeBoolean(settings.draftDivergenceOptIn, false),
   });
   return buildTelegramScreenState('agent_settings_overview', {
     sessionSlug: safeString(sessionSlug),
     settings: normalizedSettings,
-    editableFields: ['draftStyle', 'showUnansweredFirst', 'agentAutoApplyQuestionVotes'],
+    editableFields: [
+      'draftStyle',
+      'showUnansweredFirst',
+      'showAgentResponses',
+      'agentAutoApplyQuestionVotes',
+      'topicPreferences',
+      'demographicLinkOptIn',
+      'attendanceLinkOptIn',
+      'draftDivergenceOptIn',
+    ],
     canonicalApiRequest: canonicalAgentRequest({
       capabilityId: 'agent.settings.read',
       body: {
@@ -1051,7 +1103,12 @@ export function buildTelegramAgentSettingsEditState({
   const current = sanitizeForGroup({
     draftStyle: normalizeDraftStyle(settings.draftStyle),
     showUnansweredFirst: normalizeBoolean(settings.showUnansweredFirst, true),
+    showAgentResponses: normalizeBoolean(settings.showAgentResponses, true),
     agentAutoApplyQuestionVotes: normalizeBoolean(settings.agentAutoApplyQuestionVotes, false),
+    topicPreferences: Array.isArray(settings.topicPreferences) ? settings.topicPreferences : [],
+    demographicLinkOptIn: normalizeBoolean(settings.demographicLinkOptIn, false),
+    attendanceLinkOptIn: normalizeBoolean(settings.attendanceLinkOptIn, false),
+    draftDivergenceOptIn: normalizeBoolean(settings.draftDivergenceOptIn, false),
   });
   return buildTelegramScreenState('agent_settings_edit', {
     preferredLane: TELEGRAM_CHAT_LANES.MINI_APP,
@@ -1068,10 +1125,35 @@ export function buildTelegramAgentSettingsEditState({
     input: 'toggle',
     value: current.showUnansweredFirst,
   }, {
+    field: 'showAgentResponses',
+    label: 'Show agent responses',
+    input: 'toggle',
+    value: current.showAgentResponses,
+  }, {
     field: 'agentAutoApplyQuestionVotes',
     label: 'Allow agents to auto-apply question votes',
     input: 'toggle',
     value: current.agentAutoApplyQuestionVotes,
+  }, {
+    field: 'topicPreferences',
+    label: 'Topics',
+    input: 'textarea',
+    value: current.topicPreferences,
+  }, {
+    field: 'demographicLinkOptIn',
+    label: 'Link demographics',
+    input: 'toggle',
+    value: current.demographicLinkOptIn,
+  }, {
+    field: 'attendanceLinkOptIn',
+    label: 'Share attendance buckets',
+    input: 'toggle',
+    value: current.attendanceLinkOptIn,
+  }, {
+    field: 'draftDivergenceOptIn',
+    label: 'Draft edit research',
+    input: 'toggle',
+    value: current.draftDivergenceOptIn,
   }],
     canonicalApiRequest: canonicalAgentRequest({
       capabilityId: 'agent.settings.update',
@@ -1554,19 +1636,14 @@ export function buildTelegramQuestionControls(question = {}, {
       baseControl(TELEGRAM_BRIDGE_ACTIONS.DRAFT_RESPONSE, 'Unsure', questionId, TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, { controlType: 'agree_unsure_disagree', value: 'unsure', selectionMode: 'single' }),
     );
   } else if (questionType === QUESTION_TYPES.RATING) {
-    const scale = {
-      ...DEFAULT_RATING_SCALE,
-      ...(question.ratingScale || {}),
-    };
-    for (const value of RATING_BUTTON_VALUES) {
+    const scale = normalizeTelegramRatingScale(question);
+    for (const value of ratingButtonValuesForScale(scale)) {
       controls.push(baseControl(TELEGRAM_BRIDGE_ACTIONS.DRAFT_RESPONSE, String(value), questionId, TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, {
         controlType: 'rating_button',
         value,
-        min: 0,
-        max: 10,
-        step: 1,
-        requestedMin: scale.min,
-        requestedMax: scale.max,
+        min: scale.min,
+        max: scale.max,
+        step: scale.step,
         selectionMode: 'single',
       }));
     }
@@ -1607,6 +1684,55 @@ export function buildTelegramQuestionControls(question = {}, {
   return controls;
 }
 
+export function buildTelegramQuestionAnswerSchema(question = {}) {
+  const questionType = normalizeQuestionType(question.questionType || question.type);
+  if (questionType === QUESTION_TYPES.AGREE_UNSURE_DISAGREE) {
+    const values = buildTelegramQuestionControls(question, { microphoneSupported: false })
+      .filter((control) => control.controlType === 'agree_unsure_disagree')
+      .map((control) => control.value)
+      .filter((value, index, list) => value !== undefined && value !== null && list.indexOf(value) === index);
+    return {
+      questionType: 'binary',
+      answerSchema: { kind: 'choice', values },
+    };
+  }
+  if (questionType === QUESTION_TYPES.RATING) {
+    const scale = normalizeTelegramRatingScale(question);
+    const values = ratingButtonValuesForScale(scale);
+    return {
+      questionType: 'rating',
+      answerSchema: {
+        kind: 'rating',
+        min: scale.min,
+        max: scale.max,
+        step: scale.step,
+        values,
+      },
+    };
+  }
+  if (questionType === QUESTION_TYPES.MULTICHOICE) {
+    const selectionMode = normalizeChoiceSelectionMode(question);
+    const options = buildTelegramQuestionControls(question, { microphoneSupported: false })
+      .filter((control) => ['single_select', 'multi_select_toggle'].includes(control.controlType))
+      .map((control) => safeString(control.value || control.label))
+      .filter((value, index, list) => value && list.indexOf(value) === index);
+    return {
+      questionType: 'multichoice',
+      answerSchema: {
+        kind: 'multichoice',
+        options,
+        minSelections: 1,
+        maxSelections: selectionMode === 'single' ? 1 : options.length,
+        selectionMode,
+      },
+    };
+  }
+  return {
+    questionType: 'freeform',
+    answerSchema: { kind: 'text', maxChars: 280 },
+  };
+}
+
 export function buildTelegramQuestionCard(question = {}, options = {}) {
   const questionId = safeString(question.questionId || question.id);
   const questionType = normalizeQuestionType(question.questionType || question.type);
@@ -1616,7 +1742,7 @@ export function buildTelegramQuestionCard(question = {}, options = {}) {
     questionId,
     questionType,
     selectionMode: questionType === QUESTION_TYPES.MULTICHOICE ? normalizeChoiceSelectionMode(question) : null,
-    ratingScale: questionType === QUESTION_TYPES.RATING ? { min: 0, max: 10, step: 1 } : null,
+    ratingScale: questionType === QUESTION_TYPES.RATING ? normalizeTelegramRatingScale(question) : null,
     questionText: safeString(question.questionText || question.prompt),
     answerLabels: normalizeOptions(question),
     docsContextAvailable,
@@ -1648,8 +1774,8 @@ export function assertQuestionCardParity(card = {}) {
     const ratingValues = controls
       .filter((control) => control.controlType === 'rating_button')
       .map((control) => control.value);
-    if (JSON.stringify(ratingValues) !== JSON.stringify(RATING_BUTTON_VALUES)) {
-      return { ok: false, reason: 'rating_scale_must_match_ce_client_0_10' };
+    if (JSON.stringify(ratingValues) !== JSON.stringify(ratingButtonValuesForScale(card.ratingScale || {}))) {
+      return { ok: false, reason: 'rating_scale_must_match_card_scale' };
     }
   }
   if (card.questionType === QUESTION_TYPES.MULTICHOICE) {

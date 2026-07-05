@@ -212,6 +212,13 @@ export default {
         broadcastEnabled: directSubmitFeatureEnabled(env),
       });
     }
+    if (url.pathname === '/session-wrapped' && (request.method === 'GET' || request.method === 'HEAD')) {
+      return handleTelegramAgentHandoffRequest({
+        request,
+        env,
+        waitUntil: typeof ctx.waitUntil === 'function' ? (promise) => ctx.waitUntil(promise) : null,
+      });
+    }
     if (url.pathname === '/mock/telegram/demo-flow' && request.method === 'POST') {
       const body = await request.json().catch(() => ({}));
       return json(await runMockTelegramDemoFlow({
@@ -268,7 +275,7 @@ export default {
         waitUntil: typeof ctx.waitUntil === 'function' ? (promise) => ctx.waitUntil(promise) : null,
       });
     }
-    if (url.pathname.startsWith('/telegram/agent/api/')) {
+    if (url.pathname.startsWith('/api/agent/') || url.pathname.startsWith('/telegram/agent/api/')) {
       return handleTelegramAgentHandoffRequest({
         request,
         env,

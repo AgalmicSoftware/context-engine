@@ -7,6 +7,8 @@ import { normalizeTelegramPrincipal } from './telegramUpdates.mjs';
 export const SUBMIT_REQUEST_KV_PREFIX = 'telegram:submit-request:';
 export const SUBMIT_REQUEST_SESSION_KV_PREFIX = 'telegram:submit-request-by-session:v1:';
 export const SUBMIT_REQUEST_USER_KV_PREFIX = 'telegram:submit-request-by-user:v1:';
+export const CANONICAL_ANSWER_KV_PREFIX = 'telegram:canonical-answer:v1:';
+export const CANONICAL_ANSWER_SESSION_KV_PREFIX = 'telegram:canonical-answer-by-session:v1:';
 export const SUBMIT_REQUEST_TTL_SECONDS = 30 * 24 * 60 * 60;
 export const TELEGRAM_SUBMIT_QUEUE_MESSAGE_TYPE = 'telegram_submit_direct_v1';
 export const SUBMITTED_RESULT_STATUSES = Object.freeze([
@@ -17,6 +19,10 @@ export const SUBMITTED_RESULT_STATUSES = Object.freeze([
 
 function safeString(value) {
   return String(value || '').trim();
+}
+
+function nowIso() {
+  return new Date().toISOString();
 }
 
 function lower(value) {
@@ -80,6 +86,22 @@ export function submitRequestUserKvKey(record = {}) {
   return prefix && requestId ? `${prefix}${questionId || 'question'}:${requestId}` : '';
 }
 
+export function canonicalAnswerKvKey(record = {}) {
+  const requestId = safeString(record.requestId || record.idempotencyKey).replace(/[^0-9A-Za-z_-]/g, '').slice(0, 160);
+  return requestId ? `${CANONICAL_ANSWER_KV_PREFIX}${requestId}` : '';
+}
+
+export function canonicalAnswerSessionKvPrefix(sessionSlug = '') {
+  const slug = sanitizeSessionSlug(sessionSlug);
+  return slug ? `${CANONICAL_ANSWER_SESSION_KV_PREFIX}${slug}:` : '';
+}
+
+export function canonicalAnswerSessionKvKey(record = {}) {
+  const prefix = canonicalAnswerSessionKvPrefix(record.sessionSlug);
+  const requestId = safeString(record.requestId || record.idempotencyKey).replace(/[^0-9A-Za-z_-]/g, '').slice(0, 160);
+  return prefix && requestId ? `${prefix}${requestId}` : '';
+}
+
 export function telegramSubmitQueueEnabled(env = {}) {
   if (envFlagDisabled(env.AGENT_BRIDGE_ASYNC_SUBMIT_ENABLED)) return false;
   if (!envFlagEnabled(env.AGENT_BRIDGE_ASYNC_SUBMIT_ENABLED)) return false;
@@ -98,6 +120,56 @@ export function safeSessionSnapshotForSubmitQueue(session = {}) {
     rpcUrl: safeString(session.rpcUrl || session.defaultRpcUrl),
     additionalRpcUrl: safeString(session.additionalRpcUrl || session.fallbackRpcUrl),
   };
+}
+
+function objectOrNull(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+}
+
+function normalizeSubmitRecordTimestamps(record = {}) {
+  const createdAt = safeString(record.createdAt || record.processedAt || record.updatedAt) || nowIso();
+  return {
+    ...record,
+    createdAt,
+  };
+}
+
+export function buildCanonicalAnswerRecord(record = {}, {
+  sourceKey = '',
+} = {}) {
+  const requestId = safeString(record.requestId || record.idempotencyKey);
+  const sessionSlug = sanitizeSessionSlug(record.sessionSlug);
+  const questionId = safeString(record.questionId);
+  if (!requestId || !sessionSlug || !questionId) return null;
+  const createdAt = safeString(record.createdAt || record.processedAt || record.updatedAt);
+  const updatedAt = safeString(record.processedAt || record.updatedAt || createdAt);
+  const canonical = {
+    version: 1,
+    type: 'telegram_canonical_answer',
+    requestId,
+    idempotencyKey: safeString(record.idempotencyKey),
+    status: safeString(record.status),
+    lane: safeString(record.lane),
+    telegramUserId: safeString(record.telegramUserId),
+    username: safeString(record.username),
+    languageCode: safeString(record.languageCode),
+    chatId: safeString(record.chatId),
+    sessionSlug,
+    questionId,
+    questionIdShort: safeString(record.questionIdShort),
+    answerFingerprint: safeString(record.answerFingerprint),
+    answer: objectOrNull(record.answer),
+    onChainAnswer: objectOrNull(record.onChainAnswer),
+    answerRef: objectOrNull(record.answerRef),
+    canonicalApiRequest: objectOrNull(record.canonicalApiRequest),
+    onChain: objectOrNull(record.onChain),
+    directSubmitAttempt: objectOrNull(record.directSubmitAttempt),
+    sourceKey: safeString(sourceKey),
+    createdAt,
+    updatedAt,
+  };
+  assertNoSecretShape(canonical, 'Canonical Telegram answer records must not serialize secrets.');
+  return canonical;
 }
 
 export function buildQueuedSubmitRecord({
@@ -134,6 +206,29 @@ export async function persistQueuedSubmitRecord({
   return { ok: true };
 }
 
+async function persistCanonicalAnswerRecord({
+  kv,
+  record = {},
+  sourceKey = '',
+} = {}) {
+  if (!kv || typeof kv.put !== 'function') return { ok: false, reason: 'action_kv_unavailable' };
+  const canonical = buildCanonicalAnswerRecord(record, { sourceKey });
+  if (!canonical) return { ok: false, reason: 'canonical_answer_incomplete' };
+  const keys = [
+    canonicalAnswerKvKey(canonical),
+    canonicalAnswerSessionKvKey(canonical),
+  ].filter(Boolean);
+  if (!keys.length) return { ok: false, reason: 'canonical_answer_key_missing' };
+
+  // KV is eventually consistent and last-write-wins. Submit-request records are
+  // rolling operational indexes with TTLs; canonical answer records intentionally
+  // have no expirationTtl. Keep any KV metadata compact (<=1024 bytes) and keep
+  // values bounded because Cloudflare enforces per-value size limits.
+  const serialized = JSON.stringify(canonical);
+  await Promise.all(keys.map((key) => kv.put(key, serialized)));
+  return { ok: true, keys, record: canonical };
+}
+
 export async function persistTelegramSubmitRecord({
   env = {},
   kvKey = '',
@@ -146,22 +241,25 @@ export async function persistTelegramSubmitRecord({
   const requestId = safeString(record.requestId);
   const canonicalKey = kvKey || submitRequestKvKey(requestId);
   if (!canonicalKey) return { ok: false, reason: 'submit_request_key_missing' };
-  assertNoSecretShape(record, 'Telegram submit records must not serialize secrets.');
-  const serialized = JSON.stringify(record);
+  const storedRecord = normalizeSubmitRecordTimestamps(record);
+  assertNoSecretShape(storedRecord, 'Telegram submit records must not serialize secrets.');
+  const serialized = JSON.stringify(storedRecord);
+  const canonical = await persistCanonicalAnswerRecord({ kv, record: storedRecord, sourceKey: canonicalKey });
+  if (!canonical.ok) return canonical;
   const submitMetadata = {
     v: 1,
     t: 'submit_request',
-    st: safeString(record.status).replace(/[^0-9A-Za-z_-]/g, '').slice(0, 64),
-    sg: sanitizeSessionSlug(record.sessionSlug),
-    u: safeString(record.telegramUserId).replace(/[^0-9A-Za-z_-]/g, '').slice(0, 128),
-    c: safeString(record.createdAt).slice(0, 32),
+    st: safeString(storedRecord.status).replace(/[^0-9A-Za-z_-]/g, '').slice(0, 64),
+    sg: sanitizeSessionSlug(storedRecord.sessionSlug),
+    u: safeString(storedRecord.telegramUserId).replace(/[^0-9A-Za-z_-]/g, '').slice(0, 128),
+    c: safeString(storedRecord.createdAt).slice(0, 32),
   };
   assertNoSecretShape(submitMetadata, 'Telegram submit record metadata must not serialize secrets.');
   const putOptions = { expirationTtl: SUBMIT_REQUEST_TTL_SECONDS, metadata: submitMetadata };
   await kv.put(canonicalKey, serialized, putOptions);
   const indexKeys = [
-    submitRequestSessionKvKey(record),
-    submitRequestUserKvKey(record),
+    submitRequestSessionKvKey(storedRecord),
+    submitRequestUserKvKey(storedRecord),
   ].filter((key) => key && key !== canonicalKey);
   await Promise.all(indexKeys.map((key) => kv.put(key, serialized, putOptions)));
   return { ok: true, key: canonicalKey, indexKeys };
