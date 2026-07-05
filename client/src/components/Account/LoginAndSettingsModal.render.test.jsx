@@ -124,6 +124,7 @@ const DEFAULT_NETWORK = {
 
 const PASSKEY_ADDRESS = '0x1111111111111111111111111111111111111111';
 const WAGMI_ADDRESS = '0x2222222222222222222222222222222222222222';
+const RAW_AGENT_TOKEN = 'ceagt_abcdefghijklmnopqrstuvwxyz123456';
 const ORIGINAL_TERMINOLOGY_MODE = process.env.REACT_APP_TERMINOLOGY_MODE;
 const ORIGINAL_PUBLIC_URL = process.env.PUBLIC_URL;
 
@@ -1383,5 +1384,70 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     expect(screen.queryByTestId('ce-settings-get-test-gas')).not.toBeInTheDocument();
     expect(screen.queryByTestId('ce-settings-get-test-gas-status')).not.toBeInTheDocument();
     expect(screen.queryByText(/Auto-funding failed/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('LoginAndSettingsModal agent token login', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+    window.history.replaceState({}, '', '/session/alpha');
+    global.fetch = jest.fn(async () => new Response(JSON.stringify({
+      ok: true,
+      tokenType: 'session_worker_jwt',
+      sessionSlug: 'alpha',
+      accountAddress: '0x3333333333333333333333333333333333333333',
+      workerUrl: 'https://session-worker.example',
+      workerToken: 'jwt-session-token',
+      expiresAt: '2027-07-05T00:00:00.000Z',
+    }), { status: 200, headers: { 'content-type': 'application/json' } }));
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+    delete global.__CE_AGENT_CLIENT_LOGIN_ENVELOPES__;
+  });
+
+  it('shows agent-token login only for telegram-first sessions and clears raw token after exchange', async () => {
+    const props = buildProps({
+      activeSessionSlug: 'alpha',
+      sessionConfig: { slug: 'alpha', telegramOnly: true, sessionMode: 'telegram_only' },
+    });
+    render(<LoginAndSettingsModal {...props} />);
+
+    fireEvent.click(screen.getByTestId('ce-agent-token-login-toggle'));
+    const input = screen.getByTestId('ce-agent-token-login-input');
+    fireEvent.change(input, { target: { value: RAW_AGENT_TOKEN } });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('ce-agent-token-login-submit'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(props.updateLoginInfo).toHaveBeenCalledWith(expect.objectContaining({
+        loginComplete: true,
+        provider: 'telegram_agent',
+      }));
+    });
+
+    expect(input).toHaveValue('');
+    expect(window.location.href).not.toContain(RAW_AGENT_TOKEN);
+    expect(JSON.stringify(window.localStorage)).not.toContain(RAW_AGENT_TOKEN);
+    expect(Object.values(window.sessionStorage).join('\n')).not.toContain(RAW_AGENT_TOKEN);
+    expect(JSON.stringify(props.changeAccount.mock.calls)).not.toContain(RAW_AGENT_TOKEN);
+    expect(JSON.stringify(props.updateLoginInfo.mock.calls)).not.toContain(RAW_AGENT_TOKEN);
+  });
+
+  it('hides agent-token login for normal sessions', () => {
+    render(<LoginAndSettingsModal {...buildProps({
+      activeSessionSlug: 'alpha',
+      sessionConfig: { slug: 'alpha', sessionName: 'Normal Session' },
+    })} />);
+
+    expect(screen.queryByTestId('ce-agent-token-login-toggle')).not.toBeInTheDocument();
   });
 });
