@@ -333,9 +333,68 @@ const getWizardResourceCard = (resourceKey) => (
     .find((card) => card.getAttribute('data-ce-resource-key') === resourceKey)
 );
 const enableAdvancedMode = () => {
-  fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
+  act(() => {
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
+  });
+  if (hasCommittedSessionModeProfile()) return;
+  const preset = screen.queryByTestId(resolveSessionModePresetTestId());
+  if (preset) {
+    act(() => {
+      fireEvent.click(preset);
+    });
+  }
+};
+const readCachedSessionWizardDraft = () => {
+  try {
+    const cached = JSON.parse(localStorage.getItem('ce:sessionWizardDraft:v1') || '{}');
+    return cached?.draft && typeof cached.draft === 'object' ? cached.draft : {};
+  } catch (_) {
+    return {};
+  }
+};
+const resolveSessionModePresetTestId = () => {
+  const cachedDraft = readCachedSessionWizardDraft();
+  const storageProfile = cachedDraft.storageProfile && typeof cachedDraft.storageProfile === 'object'
+    ? cachedDraft.storageProfile
+    : {};
+  return storageProfile.backend === 'cloudflare'
+    ? 'ce-new-preset-fast_cheap_cloudflare'
+    : 'ce-new-preset-trustless_public_decentralized';
+};
+const hasCommittedSessionModeProfile = () => {
+  const continueButton = screen.queryByTestId('ce-new-preset-continue');
+  return !!continueButton && !continueButton.disabled;
+};
+const ensureSessionModeProfileSelected = () => {
+  if (hasCommittedSessionModeProfile()) return;
+  const presetTestId = resolveSessionModePresetTestId();
+  if (screen.queryByTestId(presetTestId)) {
+    act(() => {
+      fireEvent.click(screen.getByTestId(presetTestId));
+    });
+    return;
+  }
+  const normalModeButton = screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_NORMAL);
+  const advancedModeButton = screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED);
+  if (!normalModeButton || !advancedModeButton) return;
+  const wasNormalMode = normalModeButton.getAttribute('aria-pressed') === 'true';
+  act(() => {
+    fireEvent.click(advancedModeButton);
+  });
+  const preset = screen.queryByTestId(presetTestId);
+  if (preset) {
+    act(() => {
+      fireEvent.click(preset);
+    });
+  }
+  if (wasNormalMode) {
+    act(() => {
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_NORMAL));
+    });
+  }
 };
 const selectNormalModeCard = (label) => {
+  ensureSessionModeProfileSelected();
   fireEvent.click(screen.getByRole('button', { name: new RegExp(label, 'i') }));
 };
 const getMockSelectorById = (selectorId) => (

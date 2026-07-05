@@ -1,4 +1,5 @@
 import { ethers } from 'ethers';
+import type { BigNumberish } from 'ethers';
 import type {
   Eip1193Provider,
   EncryptedWalletRecord,
@@ -38,6 +39,38 @@ import {
 import { createLogger } from '../utilities/logging.js';
 
 type ChainLike = Record<string, any>;
+
+type ReadOnlyRpcChildProvider = {
+  send?: (method: string, params: unknown[]) => Promise<unknown>;
+};
+
+type ReadOnlyRpcProviderConfig = {
+  priority?: number | string | null;
+  provider?: ReadOnlyRpcChildProvider | null;
+};
+
+type ReadOnlyRpcFeeData = {
+  maxPriorityFeePerGas?: BigNumberish | null;
+};
+
+type ReadOnlyRpcProvider = {
+  getBlockNumber: () => Promise<number>;
+  getGasPrice: () => Promise<BigNumberish>;
+  getFeeData: () => Promise<ReadOnlyRpcFeeData | null | undefined>;
+  getBalance: (address: unknown, blockTag?: unknown) => Promise<BigNumberish>;
+  getTransactionCount: (address: unknown, blockTag?: unknown) => Promise<number>;
+  getCode: (address: unknown, blockTag?: unknown) => Promise<string>;
+  getStorageAt: (address: unknown, position: unknown, blockTag?: unknown) => Promise<string>;
+  call: (transaction: unknown, blockTag?: unknown) => Promise<string>;
+  estimateGas: (transaction: unknown) => Promise<BigNumberish>;
+  getLogs: (filter: unknown) => Promise<unknown>;
+  getTransaction: (hash: unknown) => Promise<unknown>;
+  getTransactionReceipt: (hash: unknown) => Promise<unknown>;
+  getBlockWithTransactions: (blockHashOrBlockTag: unknown) => Promise<unknown>;
+  getBlock: (blockHashOrBlockTag: unknown) => Promise<unknown>;
+  send?: (method: string, params: unknown[]) => Promise<unknown>;
+  providerConfigs?: ReadOnlyRpcProviderConfig[];
+};
 
 type RestoreOptions = {
   requireSigner?: boolean;
@@ -466,7 +499,7 @@ export class PasskeyEoaWalletClient {
   }
 
   private async requestReadOnlyRpc(method: string, params: unknown[] = []): Promise<unknown> {
-    const provider = this.readProvider() as Record<string, any>;
+    const provider = this.readProvider() as ReadOnlyRpcProvider;
     switch (method) {
       case 'eth_blockNumber':
         return ethers.utils.hexValue(await provider.getBlockNumber());
@@ -505,7 +538,7 @@ export class PasskeyEoaWalletClient {
   }
 
   private async requestRawReadProviderRpc(
-    provider: Record<string, any>,
+    provider: ReadOnlyRpcProvider,
     method: string,
     params: unknown[]
   ): Promise<unknown> {

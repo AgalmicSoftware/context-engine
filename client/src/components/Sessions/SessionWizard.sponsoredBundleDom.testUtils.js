@@ -13,7 +13,54 @@ const getToggleCheckbox = (labelText) => (
 );
 
 const enableAdvancedMode = () => {
-  fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
+  act(() => {
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
+  });
+  if (hasCommittedSessionModeProfile()) return;
+  const arweavePreset = screen.queryByTestId('ce-new-preset-trustless_public_decentralized');
+  if (arweavePreset) {
+    act(() => {
+      fireEvent.click(arweavePreset);
+    });
+  }
+};
+
+const hasCommittedSessionModeProfile = () => {
+  const continueButton = screen.queryByTestId('ce-new-preset-continue');
+  return !!continueButton && !continueButton.disabled;
+};
+
+const ensureSessionModeProfileSelected = () => {
+  if (hasCommittedSessionModeProfile()) return;
+  if (screen.queryByTestId('ce-new-preset-trustless_public_decentralized')) {
+    act(() => {
+      fireEvent.click(screen.getByTestId('ce-new-preset-trustless_public_decentralized'));
+    });
+    return;
+  }
+  const normalModeButton = screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_NORMAL);
+  const advancedModeButton = screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED);
+  if (!normalModeButton || !advancedModeButton) return;
+  const wasNormalMode = normalModeButton.getAttribute('aria-pressed') === 'true';
+  act(() => {
+    fireEvent.click(advancedModeButton);
+  });
+  const arweavePreset = screen.queryByTestId('ce-new-preset-trustless_public_decentralized');
+  if (arweavePreset) {
+    act(() => {
+      fireEvent.click(arweavePreset);
+    });
+  }
+  if (wasNormalMode) {
+    act(() => {
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_NORMAL));
+    });
+  }
+};
+
+const selectNormalModeCard = (label) => {
+  ensureSessionModeProfileSelected();
+  fireEvent.click(screen.getByRole('button', { name: new RegExp(label, 'i') }));
 };
 
 const openWorkerPanel = () => {
@@ -118,5 +165,6 @@ export {
   getFieldInputByLabel,
   getToggleCheckbox,
   openWorkerPanel,
+  selectNormalModeCard,
   setCloudflareTokenValue,
 };
