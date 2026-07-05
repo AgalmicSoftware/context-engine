@@ -24,6 +24,7 @@ import {
   isWorkerSbtGateCloudflareStorageProfile,
   normalizeSessionStorageProfileConfig,
 } from './sessionWizardStorageProfile';
+import { isTelegramFirstSessionConfig } from '../../utilities/session/sessionBackendKind';
 import type {
   AnyRecord,
   ChainIdLike,
@@ -109,14 +110,7 @@ export const sanitizeSessionWizardMetadataPayload = (metadata: AnyRecord, {
   next = normalizeSessionNaming(next) as AnyRecord;
   next.sessionName = trimString(next.sessionName);
   next.sessionInfo = trimString(next.sessionInfo);
-  next.telegramOnly = next.telegramOnly === true ||
-    next.telegram_only === true ||
-    trimString(next.sessionMode).toLowerCase() === 'telegram_only' ||
-    trimString(next.telegramMode).toLowerCase() === 'telegram_only' ||
-    (isObj(next.telegram) && (
-      next.telegram.only === true ||
-      trimString(next.telegram.mode).toLowerCase() === 'telegram_only'
-    ));
+  next.telegramOnly = isTelegramFirstSessionConfig(next);
   delete next.telegram_only;
   delete next.telegramMode;
   if (next.telegramOnly) {
