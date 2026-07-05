@@ -716,18 +716,31 @@ async function applyAdminDefaultSessionOverride(env = {}, policy = {}) {
   };
 }
 
-async function finalizeSessionPolicy(env = {}, normalizedPolicy = {}) {
-  const withExposure = await applyResultsExposureOverrides(env, normalizedPolicy);
-  return applyAdminDefaultSessionOverride(env, withExposure);
+async function finalizeSessionPolicy(env = {}, normalizedPolicy = {}, {
+  includeResultsExposureOverrides = true,
+  includeAdminDefaultOverride = true,
+} = {}) {
+  const withExposure = includeResultsExposureOverrides
+    ? await applyResultsExposureOverrides(env, normalizedPolicy)
+    : normalizedPolicy;
+  return includeAdminDefaultOverride
+    ? applyAdminDefaultSessionOverride(env, withExposure)
+    : withExposure;
 }
 
 async function loadSessionPolicy(env = {}, {
   forceRefresh = false,
+  includeResultsExposureOverrides = true,
+  includeAdminDefaultOverride = true,
 } = {}) {
+  const finalizeOptions = {
+    includeResultsExposureOverrides,
+    includeAdminDefaultOverride,
+  };
   const policyNow = env.AGENT_BRIDGE_SESSION_POLICY_NOW || env.AGENT_BRIDGE_NOW || null;
   const configured = safeJsonParse(env.AGENT_BRIDGE_SESSION_POLICY_JSON, null);
   if (configured && typeof configured === 'object' && !Array.isArray(configured)) {
-    return finalizeSessionPolicy(env, normalizeSessionPolicy(configured, { now: policyNow }));
+    return finalizeSessionPolicy(env, normalizeSessionPolicy(configured, { now: policyNow }), finalizeOptions);
   }
   const registry = await listRegistrySessionsForBridge({ env, forceRefresh }).catch((error) => ({
     ok: false,
@@ -746,7 +759,7 @@ async function loadSessionPolicy(env = {}, {
       allowQuestionGeneration: true,
       allowGenerateQuestion: true,
       sessions: registry.sessions,
-    }, { now: policyNow }));
+    }, { now: policyNow }), finalizeOptions);
   }
   const defaultSessionSlug = sanitizeSessionSlug(
     env.AGENT_BRIDGE_DEFAULT_SESSION_SLUG ||
@@ -770,7 +783,7 @@ async function loadSessionPolicy(env = {}, {
       sbtJoinModes: ['public', 'password'],
       docLibraryEnabled: true,
     }],
-  }, { now: policyNow }));
+  }, { now: policyNow }), finalizeOptions);
 }
 
 function loadDemoQuestions(env = {}) {

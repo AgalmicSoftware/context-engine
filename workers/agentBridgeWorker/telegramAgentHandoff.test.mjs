@@ -3084,6 +3084,63 @@ test('Telegram session-meta reports non-telegram and unknown sessions as not tel
   assert.equal(unknown.telegramBridgeEnabled, false);
 });
 
+test('Telegram session-meta stays within KV read budget with warm registry cache', async () => {
+  const slugs = ['alpha', 'beta', 'gamma'];
+  const hexWord = (value) => BigInt(value).toString(16).padStart(64, '0');
+  const abiString = (value) => {
+    const bytes = new TextEncoder().encode(value);
+    const hex = [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+    return `0x${hexWord(32)}${hexWord(bytes.length)}${hex.padEnd(Math.ceil(hex.length / 64) * 64, '0')}`;
+  };
+  let registryFetchCalls = 0;
+  const registryFetch = async (_url, init = {}) => {
+    registryFetchCalls += 1;
+    const data = JSON.parse(init.body).params[0].data;
+    if (data === '0x6e6734bf') {
+      return new Response(JSON.stringify({ result: `0x${hexWord(slugs.length)}` }), {
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    const index = Number(BigInt(`0x${data.slice(-64)}`));
+    return new Response(JSON.stringify({ result: abiString(slugs[index] || '') }), {
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+  const env = baseEnv({
+    AGENT_BRIDGE_SESSION_POLICY_JSON: '',
+    DEFAULT_RPC_URL: 'https://rpc.session-meta-budget.test',
+    REGISTRY_FETCH: registryFetch,
+  });
+
+  const warmResponse = await handleTelegramAgentHandoffRequest({
+    request: new Request('https://bridge.example/api/agent/session-meta?sessionSlug=alpha'),
+    env,
+  });
+  assert.equal(warmResponse.status, 200);
+  assert.ok(registryFetchCalls > 0);
+
+  env.AGENT_ACTION_KV.resetGetCalls();
+  const callsBeforeWarmRead = registryFetchCalls;
+  const response = await handleTelegramAgentHandoffRequest({
+    request: new Request('https://bridge.example/api/agent/session-meta?sessionSlug=alpha'),
+    env,
+  });
+  const body = await jsonBody(response);
+
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(body.sessionSlug, 'alpha');
+  assert.equal(registryFetchCalls, callsBeforeWarmRead);
+  assert.ok(
+    env.AGENT_ACTION_KV.getCalls <= 2,
+    `session-meta should use <=2 KV reads with warm registry cache; read ${env.AGENT_ACTION_KV.getCalls}: ${env.AGENT_ACTION_KV.getKeys.join(', ')}`,
+  );
+  assert.deepEqual(
+    env.AGENT_ACTION_KV.getKeys.filter((key) => key.startsWith('telegram:results-exposure:')),
+    [],
+  );
+});
+
 test('Telegram session-meta validates slug and CORS preflight', async () => {
   const env = telegramOnlyEnv();
   const missingResponse = await handleTelegramAgentHandoffRequest({

@@ -544,7 +544,10 @@ function sessionMetaFromPolicy(policy = {}, sessionSlug = '') {
 async function resolveSessionMetaPayload(env = {}, sessionSlug = '') {
   const configured = configuredSessionMetaPolicy(env);
   if (configured) return sessionMetaFromPolicy(configured, sessionSlug);
-  const policy = await loadSessionPolicy(env);
+  const policy = await loadSessionPolicy(env, {
+    includeResultsExposureOverrides: false,
+    includeAdminDefaultOverride: false,
+  });
   return sessionMetaFromPolicy(policy, sessionSlug);
 }
 
