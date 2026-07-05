@@ -1,5 +1,5 @@
 import type { AgentClientLoginEnvelope } from './agentClientLogin';
-import { buildAgentBridgeAuthHeaders } from './agentClientLogin';
+import { buildAgentClientAuthHeaders } from './agentClientLogin';
 import {
   buildTelegramPolisDataset,
   fetchTelegramAgentQuestions,
@@ -37,8 +37,11 @@ export type TelegramResultsDataset = TelegramAgentResultsResult & {
   approximate: boolean;
 };
 
-const toRecord = (value: unknown): UnknownRecord =>
-  value && typeof value === 'object' && !Array.isArray(value) ? (value as UnknownRecord) : {};
+const toRecord = (value: unknown): UnknownRecord => (
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? value as UnknownRecord
+    : {}
+);
 
 const toStr = (value: unknown): string => String(value ?? '').trim();
 
@@ -51,8 +54,9 @@ const normalizeAnswerValue = (value: unknown): string => {
   return lower || raw;
 };
 
-const resolveAgentBridgeUrl = (envelope: AgentClientLoginEnvelope | null, agentBridgeUrl?: unknown): string =>
-  toStr(agentBridgeUrl || envelope?.agentBridgeUrl).replace(/\/+$/g, '');
+const resolveAgentBridgeUrl = (envelope: AgentClientLoginEnvelope | null, agentBridgeUrl?: unknown): string => (
+  toStr(agentBridgeUrl || envelope?.agentBridgeUrl).replace(/\/+$/g, '')
+);
 
 export const buildTelegramPreferenceAnswer = (
   question: TelegramAgentQuestion,
@@ -60,9 +64,7 @@ export const buildTelegramPreferenceAnswer = (
 ): UnknownRecord => {
   const source = Array.isArray(answer)
     ? { values: answer }
-    : answer && typeof answer === 'object'
-      ? (answer as TelegramAnswerInput)
-      : { value: answer };
+    : (answer && typeof answer === 'object' ? answer as TelegramAnswerInput : { value: answer });
   const questionType = toStr(question.questionType || 'freeform').toLowerCase();
   const comments = toStr(source.comments);
   if (questionType === 'binary') return { questionType: 'binary', value: normalizeAnswerValue(source.value), comments };
@@ -79,11 +81,14 @@ export const buildTelegramPreferenceAnswer = (
 export const envelopeAllowsSubmit = (
   envelope: AgentClientLoginEnvelope | null,
   sessionMeta: TelegramSessionMeta | null,
-): boolean => envelope?.capabilities?.submitAnswers === true && sessionMeta?.clientSubmitReady === true;
+): boolean => (
+  envelope?.capabilities?.submitAnswers === true &&
+  sessionMeta?.clientSubmitReady === true
+);
 
-export const loadQuestions = async (
-  args: Parameters<typeof fetchTelegramAgentQuestions>[0],
-): Promise<TelegramAgentQuestionsResult> => fetchTelegramAgentQuestions(args);
+export const loadQuestions = async (args: Parameters<typeof fetchTelegramAgentQuestions>[0]): Promise<TelegramAgentQuestionsResult> => (
+  fetchTelegramAgentQuestions(args)
+);
 
 export const loadResultsDataset = async (
   args: Parameters<typeof fetchTelegramAgentResults>[0],
@@ -112,19 +117,16 @@ export const submitAnswer = async ({
   fetchImpl?: typeof fetch;
 }): Promise<TelegramSubmitAnswerResult> => {
   const base = resolveAgentBridgeUrl(envelope, agentBridgeUrl);
-  if (!envelope?.bridgeCredential?.token || !base)
-    return { ok: false, status: 0, reason: 'telegram_agent_credentials_missing' };
+  if (!envelope?.credential?.token || !base) return { ok: false, status: 0, reason: 'telegram_agent_credentials_missing' };
   const questionId = toStr(question.questionId);
   if (!questionId) return { ok: false, status: 0, reason: 'telegram_question_id_missing' };
   const url = `${base}/api/agent/preferences`;
   const payload = {
     sessionSlug: envelope.sessionSlug,
-    preferences: [
-      {
-        questionId,
-        answer: buildTelegramPreferenceAnswer(question, answer),
-      },
-    ],
+    preferences: [{
+      questionId,
+      answer: buildTelegramPreferenceAnswer(question, answer),
+    }],
     submit: true,
     humanApproved: true,
   };
@@ -132,7 +134,7 @@ export const submitAnswer = async ({
     const response = await fetchImpl(url, {
       method: 'POST',
       headers: {
-        ...buildAgentBridgeAuthHeaders(envelope),
+        ...buildAgentClientAuthHeaders(envelope),
         'content-type': 'application/json',
       },
       body: JSON.stringify(payload),

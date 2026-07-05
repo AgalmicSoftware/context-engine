@@ -15,6 +15,7 @@ import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
 import { getPolisDemoQuestionPool } from '../SurveyTool/surveyPolisDemoQuestionPool';
+import { writeAgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
 
 const mockSurveyPage = jest.fn();
 const mockPolisReport = jest.fn();
@@ -259,7 +260,7 @@ describe('OnePageSession view gating', () => {
     expect(screen.getByTestId('survey-page-pile')).toBeInTheDocument();
   });
 
-  it('shows a Telegram-only notice instead of the web session UI', async () => {
+  it('shows a Telegram-first sign-in prompt instead of the web session UI when unauthenticated', async () => {
     render(<OnePageSession
       {...buildProps()}
       sessionConfig={{
@@ -270,10 +271,89 @@ describe('OnePageSession view gating', () => {
     />);
 
     expect(await screen.findByTestId(E2E_TESTIDS.SESSION_TELEGRAM_ONLY_NOTICE)).toHaveTextContent(
-      /Telegram-only session/i
+      /Telegram-first session/i
     );
+    expect(screen.getByTestId('ce-session-telegram-login-open')).toBeInTheDocument();
     expect(screen.queryByTestId('survey-page-pile')).not.toBeInTheDocument();
     expect(mockSurveyPage).not.toHaveBeenCalled();
+  });
+
+  it('renders telegram parity surfaces from an exchanged envelope', async () => {
+    writeAgentClientLoginEnvelope({
+      v: 1,
+      sessionSlug: 'edge',
+      expiresAt: '2027-07-05T00:00:00.000Z',
+      address: '0x3333333333333333333333333333333333333333',
+      capabilities: { readQuestions: true, readResults: true, submitAnswers: false },
+      credential: { kind: 'session_worker_jwt', token: 'jwt-session-token' },
+      agentBridgeUrl: 'https://bridge.example',
+    });
+    Object.defineProperty(global, 'fetch', {
+      writable: true,
+      value: jest.fn(async (url) => {
+        const parsed = new URL(String(url));
+        if (parsed.pathname.endsWith('/api/agent/session-meta')) {
+          return new Response(JSON.stringify({
+            ok: true,
+            sessionSlug: 'edge',
+            telegramOnly: true,
+            telegramBridgeEnabled: true,
+            clientSubmitReady: true,
+          }), { status: 200, headers: { 'content-type': 'application/json' } });
+        }
+        if (parsed.pathname.endsWith('/api/agent/questions')) {
+          return new Response(JSON.stringify({
+            ok: true,
+            questions: [{
+              questionId: 'q1',
+              questionType: 'binary',
+              prompt: 'Should the client render Telegram questions?',
+              options: [],
+              tags: ['client'],
+              answeredByUser: false,
+              answerable: true,
+            }],
+            answerState: { answeredCount: 0, unansweredCount: 1, sort: 'unanswered_first' },
+          }), { status: 200, headers: { 'content-type': 'application/json' } });
+        }
+        if (parsed.pathname.endsWith('/api/agent/results')) {
+          const view = parsed.searchParams.get('view');
+          if (view === 'consensus' || view === 'difference') {
+            return new Response(JSON.stringify({
+              ok: true,
+              questions: [{
+                questionId: 'q1',
+                prompt: 'Should the client render Telegram questions?',
+                participants: 3,
+                counts: [{ label: 'Agree', count: 2 }, { label: 'Disagree', count: 1 }],
+              }],
+            }), { status: 200, headers: { 'content-type': 'application/json' } });
+          }
+          return new Response(JSON.stringify({ ok: true, counts: { questions: 1 } }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+        return new Response(JSON.stringify({ ok: false }), { status: 404, headers: { 'content-type': 'application/json' } });
+      }),
+    });
+
+    render(<OnePageSession
+      {...buildProps()}
+      loginComplete={true}
+      sessionConfig={{
+        ...buildProps().sessionConfig,
+        telegramOnly: true,
+        sessionMode: 'telegram_only',
+      }}
+    />);
+
+    expect(await screen.findByTestId('ce-session-telegram-questions')).toHaveTextContent(
+      /Should the client render Telegram questions/i
+    );
+    expect(await screen.findByTestId('ce-session-telegram-report-approx')).toHaveTextContent(/Approximate report/i);
+    expect(await screen.findByTestId('polis-report')).toBeInTheDocument();
+    expect(screen.queryByTestId('survey-page-pile')).not.toBeInTheDocument();
   });
 
   it('derives scoped Chipotle Lit hooks for embedded survey pages from session config', async () => {

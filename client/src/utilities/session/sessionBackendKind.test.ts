@@ -1,5 +1,7 @@
-import { isTelegramFirstSessionConfig, resolveSessionBackendKind } from './sessionBackendKind';
-import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from './sessionModeProfile';
+import {
+  isTelegramFirstSessionConfig,
+  resolveSessionBackendKind,
+} from './sessionBackendKind';
 
 describe('sessionBackendKind', () => {
   it.each([
@@ -14,35 +16,11 @@ describe('sessionBackendKind', () => {
     expect(resolveSessionBackendKind({ sessionConfig: metadata })).toBe('telegram');
   });
 
-  it('prefers sessionModeProfile for new Telegram-capable worker sessions', () => {
-    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
-    profile.surfaces.telegram = true;
-    expect(isTelegramFirstSessionConfig({ sessionModeProfile: profile })).toBe(true);
-    expect(resolveSessionBackendKind({ sessionConfig: { sessionModeProfile: profile } })).toBe('telegram');
-  });
-
   it('uses session-meta probe results when config is not locally available', () => {
-    expect(
-      resolveSessionBackendKind({
-        sessionConfig: {},
-        probeResult: { ok: true, telegramOnly: true, telegramBridgeEnabled: true },
-      }),
-    ).toBe('telegram');
-  });
-
-  it('ignores stale session-meta probe results from a different session slug', () => {
-    expect(
-      resolveSessionBackendKind({
-        sessionConfig: { slug: 'demo' },
-        sessionSlug: 'demo',
-        probeResult: {
-          ok: true,
-          sessionSlug: 'edge',
-          telegramOnly: true,
-          telegramBridgeEnabled: true,
-        },
-      }),
-    ).toBe('onchain');
+    expect(resolveSessionBackendKind({
+      sessionConfig: {},
+      probeResult: { ok: true, telegramOnly: true, telegramBridgeEnabled: true },
+    })).toBe('telegram');
   });
 
   it('defaults ordinary sessions to onchain', () => {

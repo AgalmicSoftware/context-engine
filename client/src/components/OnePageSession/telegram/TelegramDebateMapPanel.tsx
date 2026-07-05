@@ -23,7 +23,10 @@ const buildPrompt = (questions: TelegramAgentQuestion[], results: TelegramAgentR
   return lines.join('\n');
 };
 
-const TelegramDebateMapPanel = ({ questions, results }: TelegramDebateMapPanelProps): React.ReactElement => {
+const TelegramDebateMapPanel = ({
+  questions,
+  results,
+}: TelegramDebateMapPanelProps): React.ReactElement => {
   const [copied, setCopied] = useState(false);
   const prompt = useMemo(() => buildPrompt(questions, results), [questions, results]);
   const topicCounts = results?.views?.topicMap?.data?.counts || {};
@@ -52,15 +55,11 @@ const TelegramDebateMapPanel = ({ questions, results }: TelegramDebateMapPanelPr
         </button>
       </div>
       <div className={styles.telegramTopicCounts}>
-        {Object.keys(topicCounts).length ? (
-          Object.entries(topicCounts).map(([key, value]) => (
-            <span key={key} className={styles.telegramChipDark}>
-              {key}: {String(value)}
-            </span>
+        {Object.keys(topicCounts).length
+          ? Object.entries(topicCounts).map(([key, value]) => (
+            <span key={key} className={styles.telegramChipDark}>{key}: {String(value)}</span>
           ))
-        ) : (
-          <span className={styles.telegramListEmpty}>Topic-map counts are not available yet.</span>
-        )}
+          : <span className={styles.telegramListEmpty}>Topic-map counts are not available yet.</span>}
       </div>
       <pre className={styles.telegramTopicPrompt}>{prompt}</pre>
     </section>

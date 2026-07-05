@@ -1641,34 +1641,20 @@ describe('LoginAndSettingsModal agent token login', () => {
   beforeEach(() => {
     window.localStorage.clear();
     window.sessionStorage.clear();
-    clearAgentClientLoginEnvelope('alpha');
     window.history.replaceState({}, '', '/session/alpha');
-    global.fetch = jest.fn(
-      async () =>
-        new Response(
-          JSON.stringify({
-            ok: true,
-            sessionSlug: 'alpha',
-            accountAddress: '0x3333333333333333333333333333333333333333',
-            workerUrl: 'https://session-worker.example',
-            bridgeCredential: {
-              kind: 'agent_bridge_browser_token',
-              token: 'bridge-browser-token',
-            },
-            workerCredential: {
-              kind: 'session_worker_jwt',
-              token: 'jwt-session-token',
-            },
-            expiresAt: '2027-07-05T00:00:00.000Z',
-          }),
-          { status: 200, headers: { 'content-type': 'application/json' } },
-        ),
-    );
+    global.fetch = jest.fn(async () => new Response(JSON.stringify({
+      ok: true,
+      tokenType: 'session_worker_jwt',
+      sessionSlug: 'alpha',
+      accountAddress: '0x3333333333333333333333333333333333333333',
+      workerUrl: 'https://session-worker.example',
+      workerToken: 'jwt-session-token',
+      expiresAt: '2027-07-05T00:00:00.000Z',
+    }), { status: 200, headers: { 'content-type': 'application/json' } }));
   });
 
   afterEach(() => {
     jest.restoreAllMocks();
-    clearAgentClientLoginEnvelope('alpha');
     window.localStorage.clear();
     window.sessionStorage.clear();
     delete global.__CE_AGENT_CLIENT_LOGIN_ENVELOPES__;
@@ -1692,33 +1678,25 @@ describe('LoginAndSettingsModal agent token login', () => {
     });
 
     await waitFor(() => {
-      expect(props.updateLoginInfo).toHaveBeenCalledWith(
-        expect.objectContaining({
-          loginComplete: true,
-          provider: 'telegram_agent',
-        }),
-      );
+      expect(props.updateLoginInfo).toHaveBeenCalledWith(expect.objectContaining({
+        loginComplete: true,
+        provider: 'telegram_agent',
+      }));
     });
 
     expect(input).toHaveValue('');
     expect(window.location.href).not.toContain(RAW_AGENT_TOKEN);
     expect(JSON.stringify(window.localStorage)).not.toContain(RAW_AGENT_TOKEN);
     expect(Object.values(window.sessionStorage).join('\n')).not.toContain(RAW_AGENT_TOKEN);
-    expect(Object.values(window.sessionStorage).join('\n')).not.toContain('bridge-browser-token');
-    expect(Object.values(window.sessionStorage).join('\n')).not.toContain('jwt-session-token');
     expect(JSON.stringify(props.changeAccount.mock.calls)).not.toContain(RAW_AGENT_TOKEN);
     expect(JSON.stringify(props.updateLoginInfo.mock.calls)).not.toContain(RAW_AGENT_TOKEN);
   });
 
   it('hides agent-token login for normal sessions', () => {
-    render(
-      <LoginAndSettingsModal
-        {...buildProps({
-          activeSessionSlug: 'alpha',
-          sessionConfig: { slug: 'alpha', sessionName: 'Normal Session' },
-        })}
-      />,
-    );
+    render(<LoginAndSettingsModal {...buildProps({
+      activeSessionSlug: 'alpha',
+      sessionConfig: { slug: 'alpha', sessionName: 'Normal Session' },
+    })} />);
 
     expect(screen.queryByTestId('ce-agent-token-login-toggle')).not.toBeInTheDocument();
   });

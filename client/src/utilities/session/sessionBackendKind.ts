@@ -1,4 +1,4 @@
-import { hasLegacyTelegramFirstSessionFlags, isSessionModeProfileTelegramFirst } from './sessionModeProfile';
+type UnknownRecord = Record<string, unknown>;
 
 export type SessionBackendKind = 'onchain' | 'telegram';
 
@@ -13,30 +13,40 @@ export type TelegramSessionMeta = {
 export type ResolveSessionBackendKindArgs = {
   sessionConfig?: unknown;
   probeResult?: TelegramSessionMeta | null;
-  sessionSlug?: unknown;
 };
 
-const normalizeSessionSlug = (value: unknown): string => {
-  const slug = String(value || '')
-    .trim()
-    .toLowerCase();
-  return slug === 'general' ? '' : slug;
-};
+const toUnknownRecord = (value: unknown): UnknownRecord => (
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? value as UnknownRecord
+    : {}
+);
+
+const normalizeModeValue = (value: unknown): string => (
+  String(value || '').trim().toLowerCase()
+);
 
 export const isTelegramFirstSessionConfig = (metadata: unknown): boolean => {
-  return isSessionModeProfileTelegramFirst(metadata) || hasLegacyTelegramFirstSessionFlags(metadata);
+  const config = toUnknownRecord(metadata);
+  const telegramConfig = toUnknownRecord(config.telegram);
+  return (
+    config.telegramOnly === true ||
+    config.telegram_only === true ||
+    normalizeModeValue(config.sessionMode) === 'telegram_only' ||
+    normalizeModeValue(config.telegramMode) === 'telegram_only' ||
+    telegramConfig.only === true ||
+    normalizeModeValue(telegramConfig.mode) === 'telegram_only'
+  );
 };
 
 export const resolveSessionBackendKind = ({
   sessionConfig = null,
   probeResult = null,
-  sessionSlug = '',
-}: ResolveSessionBackendKindArgs = {}): SessionBackendKind =>
-  isTelegramFirstSessionConfig(sessionConfig) ||
-  (probeResult?.telegramOnly === true &&
-    (!normalizeSessionSlug(sessionSlug) ||
-      normalizeSessionSlug(probeResult.sessionSlug) === normalizeSessionSlug(sessionSlug)))
+}: ResolveSessionBackendKindArgs = {}): SessionBackendKind => (
+  isTelegramFirstSessionConfig(sessionConfig) || probeResult?.telegramOnly === true
     ? 'telegram'
-    : 'onchain';
+    : 'onchain'
+);
 
-export const isTelegramSessionBackendKind = (kind: SessionBackendKind): boolean => kind === 'telegram';
+export const isTelegramSessionBackendKind = (kind: SessionBackendKind): boolean => (
+  kind === 'telegram'
+);

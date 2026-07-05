@@ -16,6 +16,7 @@ import {
   resolveSessionWizardAutoFeatureBySessionSlug,
 } from './sessionWizardAiConfig';
 import { normalizeSessionStorageProfileConfig } from './sessionWizardStorageProfile';
+import { isTelegramFirstSessionConfig } from '../../utilities/session/sessionBackendKind';
 import type { AnyRecord } from '../shellTypes';
 
 const { getPathRpcUrl } = rpcDefaults;
@@ -40,12 +41,7 @@ export const normalizeSessionWizardDraftShape = (draftIn: AnyRecord = {}): AnyRe
   const chainId = Number(draft.networkChainId || DEFAULT_CHAIN_ID || 0) || DEFAULT_CHAIN_ID;
   draft.sessionName = toStr(draft.sessionName || '').trim();
   draft.sessionInfo = toStr(draft.sessionInfo || '').trim();
-  draft.telegramOnly = draft.telegramOnly === true ||
-    draft.telegram_only === true ||
-    draft.sessionMode === 'telegram_only' ||
-    draft.telegramMode === 'telegram_only' ||
-    draft.telegram?.mode === 'telegram_only' ||
-    draft.telegram?.only === true;
+  draft.telegramOnly = isTelegramFirstSessionConfig(draft);
   delete draft.telegram_only;
   delete draft.telegramMode;
   if (!draft.sessionInfoEncrypted) {
