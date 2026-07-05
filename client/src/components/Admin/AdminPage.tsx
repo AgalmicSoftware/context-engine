@@ -10,8 +10,8 @@ import {
 } from '../../variables/appConfig.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { encryptedFieldsUtils } from '../../utilities/crypto/encryptedFields.js';
-import { getReadProviderForChain } from '../../utilities/web3/rpcProviders.js';
 import { normalizeOriginList } from '../../utilities/urlUtils.js';
+import { rpcProvidersChainReadsPort } from '../../domains/chain/rpcProvidersChainReadsPort';
 import { adminWorkerPorts } from '../../domains/worker/adminWorkerPorts.js';
 import { adminArweavePort } from '../../domains/storage/adminArweavePorts.js';
 import {
@@ -683,9 +683,8 @@ const AdminPage = ({
     }
     let cancelled = false;
     setMetadataLatestBlockStatus('Loading current block…');
-    const readProvider = getReadProviderForChain(relevantSessionChainId);
-    readProvider.getBlockNumber()
-      .then((blockNumber: any) => {
+    rpcProvidersChainReadsPort.getLatestBlockNumberForChain(relevantSessionChainId)
+      .then((blockNumber: number) => {
         if (cancelled) return;
         setMetadataLatestBlock(blockNumber);
         setMetadataLatestBlockStatus('');
@@ -964,8 +963,10 @@ const AdminPage = ({
     }));
 
     try {
-      const readProvider = getReadProviderForChain(sessionReadRpc.chainId);
-      const balanceWei = await readProvider.getBalance(address);
+      const balanceWei = await rpcProvidersChainReadsPort.getNativeBalanceWeiForChain(
+        sessionReadRpc.chainId,
+        address
+      );
       if (requestId !== faucetResourceRequestRef.current) return;
       setFaucetResource(buildAdminFaucetBalanceResource({
         address,
