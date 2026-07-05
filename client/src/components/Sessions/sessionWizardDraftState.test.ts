@@ -202,6 +202,114 @@ describe('sessionWizardDraftState', () => {
     }));
   });
 
+  it('migrates cached Cloudflare Lit storage drafts into a session mode profile', () => {
+    const normalized = buildSessionWizardInitialDraftFromCache({
+      cachedWizard: {
+        draft: {
+          sessionName: 'Cached Lit Cloudflare Session',
+          storageProfile: {
+            backend: 'cloudflare',
+            payloadAccessControl: { mode: 'lit_encrypted' },
+          },
+        },
+      },
+    });
+
+    expect(normalized.sessionModeProfile).toEqual(expect.objectContaining({
+      preset: 'custom',
+      authority: { mode: 'worker_canonical' },
+      storage: { backend: 'cloudflare' },
+      encryption: { mode: 'lit' },
+    }));
+    expect(normalized.storageProfile).toEqual(expect.objectContaining({
+      backend: 'cloudflare',
+      payloadAccessControl: expect.objectContaining({ mode: 'lit_encrypted' }),
+      sbtGatedAccess: expect.objectContaining({
+        litRequired: 'required_for_cloudflare_payload_encryption',
+      }),
+    }));
+  });
+
+  it('applies registry-chain contract defaults and worker RPC fallbacks without mutating the draft', () => {
+    const draft = {
+      networkChainId: 84532,
+      contracts: {
+        surveys: { address: '', chainId: 84532 },
+        custom: { address: '0xCustom', chainId: 84532 },
+      },
+      rpc: {
+        providers: {
+          path: { rpcUrl: '' },
+        },
+      },
+      faucet: {},
+    };
+
+    const next = applySessionWizardRegistryChainDraftDefaults({
+      draft,
+      chainId: 11155420,
+      contractDefaults: {
+        surveys: ' 0xSurveys ',
+        sessionRegistry: '0xRegistry',
+      },
+      pathRpc: ' https://rpc.example ',
+    });
+
+    expect(next).toEqual(expect.objectContaining({
+      networkChainId: 11155420,
+      contracts: expect.objectContaining({
+        surveys: { address: '0xSurveys', chainId: 11155420 },
+        sessionRegistry: { address: '0xRegistry', chainId: 11155420 },
+        custom: { address: '0xCustom', chainId: 11155420 },
+      }),
+      rpc: {
+        provider: 'path',
+        providers: {
+          path: { rpcUrl: 'https://rpc.example' },
+        },
+      },
+      faucet: { rpcUrl: 'https://rpc.example' },
+    }));
+    expect(draft).toEqual({
+      networkChainId: 84532,
+      contracts: {
+        surveys: { address: '', chainId: 84532 },
+        custom: { address: '0xCustom', chainId: 84532 },
+      },
+      rpc: {
+        providers: {
+          path: { rpcUrl: '' },
+        },
+      },
+      faucet: {},
+    });
+  });
+
+  it('preserves existing RPC and faucet values when registry-chain fallbacks are applied', () => {
+    const next = applySessionWizardRegistryChainDraftDefaults({
+      draft: {
+        rpc: {
+          provider: 'custom',
+          providers: {
+            path: { rpcUrl: 'https://existing-rpc.example' },
+          },
+        },
+        faucet: { rpcUrl: 'https://existing-faucet.example' },
+      },
+      chainId: 11155420,
+      contractDefaults: {},
+      pathRpc: 'https://fallback-rpc.example',
+    });
+
+    expect(next.rpc).toEqual({
+      provider: 'custom',
+      providers: {
+        path: { rpcUrl: 'https://existing-rpc.example' },
+      },
+    });
+    expect(next.faucet).toEqual({ rpcUrl: 'https://existing-faucet.example' });
+  });
+
   it('builds cache write payloads with redacted worker secrets and durable pending draft isolation', () => {
     const payload = buildSessionWizardCacheWritePayload({
       sessionId: 'session-1',

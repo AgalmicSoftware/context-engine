@@ -349,16 +349,20 @@ const getWizardResourceCard = (resourceKey) =>
     .getAllByTestId(E2E_TESTIDS.WIZARD_RESOURCE_CARD)
     .find((card) => card.getAttribute('data-ce-resource-key') === resourceKey);
 const enableAdvancedMode = () => {
-  ensureSessionModeProfileReady();
-  const customizeButton = screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED);
-  if (customizeButton.getAttribute('aria-pressed') === 'true') return;
   act(() => {
-    fireEvent.click(customizeButton);
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
   });
+  if (hasCommittedSessionModeProfile()) return;
+  const preset = screen.queryByTestId(resolveSessionModePresetTestId());
+  if (preset) {
+    act(() => {
+      fireEvent.click(preset);
+    });
+  }
 };
 const readCachedSessionWizardDraft = () => {
   try {
-    const cached = JSON.parse(sessionStorage.getItem('ce:sessionWizardDraft:v1') || '{}');
+    const cached = JSON.parse(localStorage.getItem('ce:sessionWizardDraft:v1') || '{}');
     return cached?.draft && typeof cached.draft === 'object' ? cached.draft : {};
   } catch (_) {
     return {};
@@ -366,71 +370,47 @@ const readCachedSessionWizardDraft = () => {
 };
 const resolveSessionModePresetTestId = () => {
   const cachedDraft = readCachedSessionWizardDraft();
-  const storageProfile =
-    cachedDraft.storageProfile && typeof cachedDraft.storageProfile === 'object' ? cachedDraft.storageProfile : {};
+  const storageProfile = cachedDraft.storageProfile && typeof cachedDraft.storageProfile === 'object'
+    ? cachedDraft.storageProfile
+    : {};
   return storageProfile.backend === 'cloudflare'
     ? 'ce-new-preset-fast_cheap_cloudflare'
     : 'ce-new-preset-trustless_public_decentralized';
 };
-const clickSessionModePresetForTest = (testId) => {
-  const preset = screen.queryByTestId(testId);
-  if (!preset) return false;
-  const originalConfirm = window.confirm;
-  window.confirm = jest.fn(() => true);
-  try {
+const hasCommittedSessionModeProfile = () => {
+  const continueButton = screen.queryByTestId('ce-new-preset-continue');
+  return !!continueButton && !continueButton.disabled;
+};
+const ensureSessionModeProfileSelected = () => {
+  if (hasCommittedSessionModeProfile()) return;
+  const presetTestId = resolveSessionModePresetTestId();
+  if (screen.queryByTestId(presetTestId)) {
+    act(() => {
+      fireEvent.click(screen.getByTestId(presetTestId));
+    });
+    return;
+  }
+  const normalModeButton = screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_NORMAL);
+  const advancedModeButton = screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED);
+  if (!normalModeButton || !advancedModeButton) return;
+  const wasNormalMode = normalModeButton.getAttribute('aria-pressed') === 'true';
+  act(() => {
+    fireEvent.click(advancedModeButton);
+  });
+  const preset = screen.queryByTestId(presetTestId);
+  if (preset) {
     act(() => {
       fireEvent.click(preset);
     });
-  } finally {
-    window.confirm = originalConfirm;
   }
-  return true;
-};
-const hasSelectedSessionModeProfile = () => {
-  const continueButton = screen.queryByTestId('ce-new-preset-continue');
-  if (continueButton) return !continueButton.disabled;
-  return !!screen.queryByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-};
-function ensureSessionModeProfileReady() {
-  if (hasSelectedSessionModeProfile()) return true;
-  let continueButton = screen.queryByTestId('ce-new-preset-continue');
-  if (!continueButton || continueButton.disabled) {
-    const candidatePresets = [
-      resolveSessionModePresetTestId(),
-      'ce-new-preset-fast_cheap_cloudflare',
-      'ce-new-preset-trustless_public_decentralized',
-    ];
-    for (const presetTestId of [...new Set(candidatePresets)]) {
-      if (!clickSessionModePresetForTest(presetTestId)) continue;
-      if (hasSelectedSessionModeProfile()) break;
-      continueButton = screen.queryByTestId('ce-new-preset-continue');
-      if (continueButton && !continueButton.disabled) break;
-    }
-  }
-  continueButton = screen.queryByTestId('ce-new-preset-continue');
-  if (!hasSelectedSessionModeProfile() && continueButton && !continueButton.disabled) {
+  if (wasNormalMode) {
     act(() => {
-      fireEvent.click(continueButton);
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_NORMAL));
     });
   }
-  return hasSelectedSessionModeProfile();
-}
-function commitSessionModeProfileGateIfPresent() {
-  ensureSessionModeProfileReady();
-}
-const ensureSessionModeProfileSelected = () => {
-  if (hasSelectedSessionModeProfile()) return;
-  commitSessionModeProfileGateIfPresent();
-  if (hasSelectedSessionModeProfile()) return;
-  const presetTestId = resolveSessionModePresetTestId();
-  clickSessionModePresetForTest(presetTestId);
 };
 const selectNormalModeCard = (label) => {
   ensureSessionModeProfileSelected();
-  const customizeButton = screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED);
-  if (customizeButton?.getAttribute('aria-pressed') === 'true') {
-    fireEvent.click(customizeButton);
-  }
   fireEvent.click(screen.getByRole('button', { name: new RegExp(label, 'i') }));
 };
 const createPublicWorkerVerificationResponder = () => {

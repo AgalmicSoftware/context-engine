@@ -40,6 +40,52 @@ const mergeSessionWizardDraftDeep = (target: AnyRecord, source: AnyRecord): AnyR
   });
   return out;
 };
+const getCachedStorageProfilePayloadAccessMode = (draft: AnyRecord): string => {
+  const storageProfile = (
+    draft.storageProfile &&
+    typeof draft.storageProfile === 'object'
+  ) ? draft.storageProfile as AnyRecord : {};
+  const payloadAccessControl = (
+    storageProfile.payloadAccessControl &&
+    typeof storageProfile.payloadAccessControl === 'object'
+  ) ? storageProfile.payloadAccessControl as AnyRecord : {};
+  const cloudflare = (
+    storageProfile.cloudflare &&
+    typeof storageProfile.cloudflare === 'object'
+  ) ? storageProfile.cloudflare as AnyRecord : {};
+  return toStr(
+    payloadAccessControl.mode ||
+    cloudflare.payloadAccessMode ||
+    storageProfile.payloadAccessMode ||
+    storageProfile.accessControlMode
+  ).trim().toLowerCase();
+};
+const buildCachedDraftSessionModeProfile = (draft: AnyRecord): SessionModeProfile => {
+  const profile = profileFromLegacyConfig(draft);
+  const storageProfile = (
+    draft.storageProfile &&
+    typeof draft.storageProfile === 'object'
+  ) ? draft.storageProfile as AnyRecord : {};
+  const backend = toStr(storageProfile.backend).trim().toLowerCase();
+  if (
+    backend === 'cloudflare' &&
+    getCachedStorageProfilePayloadAccessMode(draft) === 'lit_encrypted'
+  ) {
+    const nextProfile: SessionModeProfile = {
+      ...profile,
+      storage: {
+        ...profile.storage,
+        backend: 'cloudflare',
+      },
+      encryption: {
+        ...profile.encryption,
+        mode: 'lit',
+      },
+    };
+    return nextProfile;
+  }
+  return profile;
+};
 
 export const normalizeSessionWizardDraftShape = (draftIn: AnyRecord = {}): AnyRecord => {
   const draft = normalizeSessionNaming(draftIn && typeof draftIn === 'object' ? draftIn : {}) as AnyRecord;
@@ -233,6 +279,9 @@ export const buildSessionWizardInitialDraftFromCache = ({
     base.embeddedDeployHelperEnabled = sourceEmbeddedDeployHelperDefault;
   }
   const merged = cachedDraft ? mergeSessionWizardDraftDeep(base, cachedDraft) : base;
+  if (cachedDraft && !merged.sessionModeProfile) {
+    merged.sessionModeProfile = buildCachedDraftSessionModeProfile(merged);
+  }
   const normalized = normalizeSessionWizardDraftShape(merged);
   if (normalModeSharedHostedWorkerEnabled === false && !cachedWizard?.deployComplete) {
     normalized.corsWorkerUrl = '';

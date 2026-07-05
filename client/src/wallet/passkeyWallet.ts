@@ -1,4 +1,5 @@
 import { ethers } from 'ethers';
+import type { BigNumberish } from 'ethers';
 import type {
   Eip1193Provider,
   EncryptedWalletRecord,
@@ -37,6 +38,38 @@ import {
 import { createLogger } from '../utilities/logging.js';
 
 type ChainLike = Record<string, any>;
+
+type ReadOnlyRpcChildProvider = {
+  send?: (method: string, params: unknown[]) => Promise<unknown>;
+};
+
+type ReadOnlyRpcProviderConfig = {
+  priority?: number | string | null;
+  provider?: ReadOnlyRpcChildProvider | null;
+};
+
+type ReadOnlyRpcFeeData = {
+  maxPriorityFeePerGas?: BigNumberish | null;
+};
+
+type ReadOnlyRpcProvider = {
+  getBlockNumber: () => Promise<number>;
+  getGasPrice: () => Promise<BigNumberish>;
+  getFeeData: () => Promise<ReadOnlyRpcFeeData | null | undefined>;
+  getBalance: (address: unknown, blockTag?: unknown) => Promise<BigNumberish>;
+  getTransactionCount: (address: unknown, blockTag?: unknown) => Promise<number>;
+  getCode: (address: unknown, blockTag?: unknown) => Promise<string>;
+  getStorageAt: (address: unknown, position: unknown, blockTag?: unknown) => Promise<string>;
+  call: (transaction: unknown, blockTag?: unknown) => Promise<string>;
+  estimateGas: (transaction: unknown) => Promise<BigNumberish>;
+  getLogs: (filter: unknown) => Promise<unknown>;
+  getTransaction: (hash: unknown) => Promise<unknown>;
+  getTransactionReceipt: (hash: unknown) => Promise<unknown>;
+  getBlockWithTransactions: (blockHashOrBlockTag: unknown) => Promise<unknown>;
+  getBlock: (blockHashOrBlockTag: unknown) => Promise<unknown>;
+  send?: (method: string, params: unknown[]) => Promise<unknown>;
+  providerConfigs?: ReadOnlyRpcProviderConfig[];
+};
 
 type RestoreOptions = {
   requireSigner?: boolean;
@@ -441,7 +474,86 @@ export class PasskeyEoaWalletClient {
     await this.unlockWallet();
   }
 
-  private readProvider(): ethers.providers.JsonRpcProvider {
+  private async requestUnlocked(buildArgs: () => { method: string; params?: unknown[] }): Promise<unknown> {
+    await this.ensureUnlocked();
+    const args = buildArgs();
+    try {
+      return await this.sessionClient.request(args);
+    } catch (error) {
+      if (!isPasskeyWalletLockedError(error)) throw error;
+
+      await this.lock();
+      await this.unlockWallet();
+      return this.sessionClient.request(buildArgs());
+    }
+  }
+
+  private async requestReadOnlyRpc(method: string, params: unknown[] = []): Promise<unknown> {
+    const provider = this.readProvider() as ReadOnlyRpcProvider;
+    switch (method) {
+      case 'eth_blockNumber':
+        return ethers.utils.hexValue(await provider.getBlockNumber());
+      case 'eth_gasPrice':
+        return ethers.utils.hexValue(await provider.getGasPrice());
+      case 'eth_maxPriorityFeePerGas': {
+        const feeData = await provider.getFeeData();
+        return feeData?.maxPriorityFeePerGas ? ethers.utils.hexValue(feeData.maxPriorityFeePerGas) : null;
+      }
+      case 'eth_getBalance':
+        return ethers.utils.hexValue(await provider.getBalance(params[0], params[1] ?? 'latest'));
+      case 'eth_getTransactionCount':
+        return ethers.utils.hexValue(await provider.getTransactionCount(params[0], params[1] ?? 'latest'));
+      case 'eth_getCode':
+        return provider.getCode(params[0], params[1] ?? 'latest');
+      case 'eth_getStorageAt':
+        return provider.getStorageAt(params[0], params[1], params[2] ?? 'latest');
+      case 'eth_call':
+        return provider.call(params[0] || {}, params[1] ?? 'latest');
+      case 'eth_estimateGas':
+        return ethers.utils.hexValue(await provider.estimateGas(params[0] || {}));
+      case 'eth_getLogs':
+        return provider.getLogs(params[0] || {});
+      case 'eth_getTransactionByHash':
+        return provider.getTransaction(params[0]);
+      case 'eth_getTransactionReceipt':
+        return provider.getTransactionReceipt(params[0]);
+      case 'eth_getBlockByNumber':
+      case 'eth_getBlockByHash':
+        return params[1]
+          ? provider.getBlockWithTransactions(params[0])
+          : provider.getBlock(params[0]);
+      default:
+        return this.requestRawReadProviderRpc(provider, method, params);
+    }
+  }
+
+  private async requestRawReadProviderRpc(
+    provider: ReadOnlyRpcProvider,
+    method: string,
+    params: unknown[]
+  ): Promise<unknown> {
+    if (typeof provider.send === 'function') return provider.send(method, params);
+
+    const configs = Array.isArray(provider.providerConfigs)
+      ? [...provider.providerConfigs].sort((left, right) => Number(left?.priority || 0) - Number(right?.priority || 0))
+      : [];
+    let lastError: unknown = null;
+    for (const config of configs) {
+      const childProvider = config?.provider;
+      if (typeof childProvider?.send !== 'function') continue;
+      try {
+        return await childProvider.send(method, params);
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    if (lastError) throw lastError;
+    throw new Error(`Read provider does not support ${method}.`);
+  }
+
+  private readProvider(): unknown {
+    const chainId = Number(this.activeChain?.id ?? this.activeChain?.chainId ?? 0) || undefined;
+    if (chainId) return this.readProviderFactory(chainId);
     const rpcUrl = resolveRpcUrl(this.activeChain);
     if (!rpcUrl) throw new Error('No RPC URL is configured for the passkey wallet chain.');
     const chainId = Number(this.activeChain?.id ?? this.activeChain?.chainId ?? 0) || undefined;

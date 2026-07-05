@@ -166,6 +166,7 @@ import {
   getFieldInputByLabel,
   getToggleCheckbox,
   openWorkerPanel,
+  selectNormalModeCard,
   setCloudflareTokenValue,
 } from './SessionWizard.sponsoredBundleDom.testUtils.js';
 import {

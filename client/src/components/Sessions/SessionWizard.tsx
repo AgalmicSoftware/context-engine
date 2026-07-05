@@ -46,18 +46,8 @@ import {
   getSessionRegistryAddress,
   getSessionRegistryChains,
 } from '../../variables/chains.js';
-import {
-  buildSignedAdminActionAuth,
-  buildSignedBootstrapAdminAuth,
-  normalizeWorkerUrl as normalizeWorkerAuthUrl,
-} from '../../utilities/worker/workerAuth.js';
-import { resolveSbtAddressFromFactoryReceipt } from '../../utilities/web3/sbtFactoryReceipt.js';
-import {
-  normalizeLitMetadataNetwork,
-  normalizeSessionNaming,
-} from '../../utilities/session/sessionMetadata.js';
-import type { UnknownRecord } from '../../utilities/session/sessionTypes.js';
-import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
+import type { SessionConfig, UnknownRecord } from '../../utilities/session/sessionTypes.js';
+import type { SessionModeProfile } from '../../utilities/session/sessionModeProfile';
 import { normalizeBlockLimitsForConfig } from '../../utilities/session/blockLimits.js';
 import { normalizeBaseUrl } from '../../utilities/urlUtils.js';
 import { t } from '../../utilities/ui/terminology.js';
@@ -5036,10 +5026,11 @@ const SessionWizard = ({
     <SessionModeProfileField
       registryChainId={registryChainId}
       value={draft.sessionModeProfile}
-      onChange={(profile, compiled) => {
+      onChange={(profile: SessionModeProfile, compiled) => {
         setDraft((prev) => {
           const next = deepClone(prev);
-          next.sessionModeProfile = profile as unknown as UnknownRecord;
+          const profileRecord: UnknownRecord = { ...profile };
+          next.sessionModeProfile = profileRecord;
           next.storageProfile = normalizeSessionStorageProfileConfig(compiled.storageProfile);
           delete next.telegramOnly;
           delete next.telegram_only;
