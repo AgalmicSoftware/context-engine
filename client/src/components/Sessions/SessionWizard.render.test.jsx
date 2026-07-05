@@ -325,6 +325,9 @@ const enableAdvancedMode = () => {
 const selectNormalModeCard = (label) => {
   fireEvent.click(screen.getByRole('button', { name: new RegExp(label, 'i') }));
 };
+const selectCloudflarePreset = () => {
+  fireEvent.click(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare'));
+};
 const getMockSelectorById = (selectorId) => (
   screen.queryAllByTestId('mock-wizard-sbt-selector')
     .find((node) => node.getAttribute('data-selector-id') === selectorId)
@@ -823,6 +826,7 @@ describe('SessionWizard rendered validation', () => {
 
   it('blocks publish with a required-slug status message when the slug is blank', async () => {
     renderSessionWizard();
+    selectCloudflarePreset();
     enableAdvancedMode();
     const slugInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG);
 
@@ -834,12 +838,24 @@ describe('SessionWizard rendered validation', () => {
     expect(await screen.findByText(REQUIRED_SESSION_SLUG_ERROR)).toBeInTheDocument();
   });
 
+  it('gates the first screen until a session mode preset is chosen', () => {
+    renderSessionWizard();
+
+    expect(screen.getByTestId('ce-new-preset-continue')).toBeDisabled();
+    expect(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare')).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByTestId('ce-new-preset-trustless_public_decentralized')).toHaveAttribute('aria-checked', 'false');
+
+    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_PUBLISH)).not.toBeInTheDocument();
+    expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
+  });
+
   it('checks session slug collisions before publish upload or register side effects', async () => {
     const { arweaveScripts } = require('../../utilities/arweave/arweaveScripts.js');
     let publishClicked = false;
     mockSessionExists.mockImplementation(async () => publishClicked);
 
     renderLoggedInSessionWizard();
+    selectCloudflarePreset();
     enableAdvancedMode();
     const sessionNameInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
     const slugInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG);

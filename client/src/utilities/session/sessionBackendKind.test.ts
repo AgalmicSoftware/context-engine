@@ -2,6 +2,10 @@ import {
   isTelegramFirstSessionConfig,
   resolveSessionBackendKind,
 } from './sessionBackendKind';
+import {
+  SESSION_MODE_PRESET_IDS,
+  cloneSessionModePreset,
+} from './sessionModeProfile';
 
 describe('sessionBackendKind', () => {
   it.each([
@@ -14,6 +18,13 @@ describe('sessionBackendKind', () => {
   ])('detects legacy telegram-first config variant %#', (metadata) => {
     expect(isTelegramFirstSessionConfig(metadata)).toBe(true);
     expect(resolveSessionBackendKind({ sessionConfig: metadata })).toBe('telegram');
+  });
+
+  it('prefers sessionModeProfile for new Telegram-capable worker sessions', () => {
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    profile.surfaces.telegram = true;
+    expect(isTelegramFirstSessionConfig({ sessionModeProfile: profile })).toBe(true);
+    expect(resolveSessionBackendKind({ sessionConfig: { sessionModeProfile: profile } })).toBe('telegram');
   });
 
   it('uses session-meta probe results when config is not locally available', () => {
