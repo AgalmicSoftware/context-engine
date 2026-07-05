@@ -166,10 +166,6 @@ export type SessionWizardShellProps = {
   sessionHeaderPreviewSrc: WizardModalsProps['sessionHeaderPreviewSrc'];
   sessionMetadataHeaderAccessory: MetadataEditorProps['headerAccessory'];
   sessionModeProfileControl?: React.ReactNode;
-  sessionModeProfilePrivacyControl?: React.ReactNode;
-  sessionModeProfileWorkerControl?: WorkerPanelProps['sessionModeProfileWorkerControl'];
-  sessionModeProfilePublishControl?: PublishSectionProps['sessionModeProfilePublishControl'];
-  sessionModeProfileStepComplete?: boolean;
   sessionUrl: PublishSectionProps['sessionUrl'];
   setBundleFile: WorkerPanelProps['setBundleFile'];
   setBundleMode: WorkerPanelProps['setBundleMode'];
@@ -336,10 +332,6 @@ const SessionWizardShell = ({
   sessionHeaderPreviewSrc,
   sessionMetadataHeaderAccessory,
   sessionModeProfileControl = null,
-  sessionModeProfilePrivacyControl = null,
-  sessionModeProfileWorkerControl = null,
-  sessionModeProfilePublishControl = null,
-  sessionModeProfileStepComplete = true,
   sessionUrl,
   setBundleFile,
   setBundleMode,
@@ -423,16 +415,10 @@ const SessionWizardShell = ({
     return <div className={styles.groupWizard}>{header}</div>;
   }
 
-  return (
-    <div className={styles.groupWizard}>
-      {header}
+    {sessionModeProfileControl}
 
-      <SessionWizardIntroStatusRail
-        activeNormalModeIndex={activeNormalModeIndex}
-        cloudflareTokenSlug={draft.slug}
-        collapsedSections={collapsedSections}
-        fundingRequirementHref={newSessionFundingRequirementHref}
-        fundingRequirementLabel={newSessionFundingRequirementLabel}
+    {(!isNormalMode || !collapsedSections.encryption) && (
+      <EncryptionPanel
         isNormalMode={isNormalMode}
         newSessionRequiresLitCredential={newSessionRequiresLitCredential}
         normalModeCards={normalModeCards}

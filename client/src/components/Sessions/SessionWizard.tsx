@@ -123,8 +123,7 @@ import {
 import SessionWizardInfoTooltip, { type SessionWizardTooltipRenderOptions } from './SessionWizardInfoTooltip';
 import SessionWizardShell from './SessionWizardShell';
 import SessionWizardSessionIdBadge from './SessionWizardSessionIdBadge';
-import useSessionWizardModeProfileControls from './hooks/useSessionWizardModeProfileControls';
-import { buildNormalModeCards, buildNormalModePublishSummary } from './sessionWizardNormalModeCards';
+import SessionModeProfileField from './SessionModeProfileField';
 import {
   buildNormalModeCards,
   buildNormalModePublishSummary,
@@ -470,6 +469,10 @@ type DraftState = UnknownRecord & NonNullable<WorkerPanelProps['draft']> & {
   faucet?: UnknownRecord;
   ai?: UnknownRecord;
   lit?: UnknownRecord;
+  rpc?: UnknownRecord;
+  sponsored?: DraftSponsoredState;
+  sessionModeProfile?: UnknownRecord;
+  __registry?: UnknownRecord;
 };
 
 type TooltipRenderOptions = {
@@ -2457,6 +2460,7 @@ const SessionWizard = ({
     const isSessionHeaderField = keyString === 'sessionHeader';
     const isCorsWorkerField = keyString === 'corsWorkerUrl';
     const isNetworkChainField = keyString === 'networkChainId';
+    if (path.length === 0 && key === 'sessionModeProfile') return null;
     const e2eTestId = (() => {
       if (keyString === 'sessionName') return E2E_TESTIDS.WIZARD_SESSION_NAME;
       if (keyString === 'sessionInfo') return E2E_TESTIDS.WIZARD_SESSION_INFO;
@@ -2760,64 +2764,39 @@ const SessionWizard = ({
           onToggleCollapsed={() =>
             setMetadataObjectCollapsed((prev) => ({ ...prev, storageProfile: !prev.storageProfile }))
           }
-        >
-          {!isCollapsed && (
-            <>
-              <div
-                className={styles.inlineToggleRow}
-                role="radiogroup"
-                aria-label="Session storage profile"
-              >
-                {storageProfileDisplay.backendOptions.map((option) => (
-                  <Button
-                    key={option.backend}
-                    type="button"
-                    role="radio"
-                    aria-checked={option.selected}
-                    className={`${styles.workerModePill} ${option.selected ? styles.workerModePillActive : ''}`}
-                    onClick={() => updateStorageBackend(option.backend)}
-                  >
-                    {option.label}
-                  </Button>
-                ))}
-              </div>
-              {storageProfileDisplay.backendHelperText &&
-              !storageProfileDisplay.showCloudflarePayloadAccessControls ? (
-                <div className={styles.helperText}>
-                  {storageProfileDisplay.backendHelperText}
-                </div>
-              ) : null}
-              {storageProfileDisplay.showCloudflarePayloadAccessControls ? (
-                <>
-                  <div className={styles.helperText}>
-                    {storageProfileDisplay.backendHelperText}
-                  </div>
-                  <div
-                    className={styles.inlineToggleRow}
-                    role="radiogroup"
-                    aria-label="Cloudflare payload access mode"
-                  >
-                    {storageProfileDisplay.cloudflarePayloadAccessOptions.map((option) => (
-                      <Button
-                        key={option.mode}
-                        type="button"
-                        role="radio"
-                        aria-checked={option.selected}
-                        className={`${styles.workerModePill} ${option.selected ? styles.workerModePillActive : ''}`}
-                        onClick={() => updateCloudflarePayloadAccessMode(option.mode)}
-                      >
-                        {option.label}
-                      </Button>
-                    ))}
-                  </div>
-                  <div className={styles.helperText}>
-                    {storageProfileDisplay.cloudflarePayloadAccessHelperText}
-                  </div>
-                </>
-              ) : null}
-            </>
-          )}
-        </CollapsibleFieldGroup>
+          onStorageProfileChange={(nextProfile) => {
+            setDraft((prev) => {
+              const next = deepClone(prev);
+              const normalizedProfile = normalizeSessionStorageProfileConfig(nextProfile);
+              next.storageProfile = normalizedProfile;
+              if (next.sessionModeProfile && typeof next.sessionModeProfile === 'object') {
+                const modeProfile = deepClone(next.sessionModeProfile) as UnknownRecord;
+                const backend = toStr(normalizedProfile.backend).trim();
+                modeProfile.preset = 'custom';
+                modeProfile.storage = {
+                  ...((modeProfile.storage && typeof modeProfile.storage === 'object') ? modeProfile.storage : {}),
+                  backend: backend === 'cloudflare' ? 'cloudflare' : 'arweave',
+                };
+                modeProfile.authority = {
+                  ...((modeProfile.authority && typeof modeProfile.authority === 'object') ? modeProfile.authority : {}),
+                  mode: backend === 'cloudflare' ? 'worker_canonical' : 'evm_registry_canonical',
+                };
+                modeProfile.encryption = {
+                  ...((modeProfile.encryption && typeof modeProfile.encryption === 'object') ? modeProfile.encryption : {}),
+                  mode: backend === 'lit-arweave' || normalizedProfile.payloadAccessControl?.mode === 'lit_encrypted'
+                    ? 'lit'
+                    : 'none',
+                };
+                if (modeProfile.surfaces && typeof modeProfile.surfaces === 'object') {
+                  (modeProfile.surfaces as UnknownRecord).web = true;
+                }
+                next.sessionModeProfile = modeProfile;
+              }
+              draftRef.current = next;
+              return next;
+            });
+          }}
+        />
       );
     }
 
@@ -3810,6 +3789,35 @@ const SessionWizard = ({
   const handlePublish = async () => {
     if (!draft?.sessionModeProfile) {
       setStatus('Choose a session mode before publishing.');
+      return;
+    }
+    if (publishRequestInFlightRef.current) {
+      setStatus('Publish already in progress.');
+      return;
+    }
+    publishRequestInFlightRef.current = true;
+    try {
+    const publishStartPreflightDescriptor = resolveSessionWizardPublishStartPreflightDescriptor({
+      publishBusy,
+      draftSlug: draft?.slug,
+      loginComplete,
+      loginInProgress,
+    });
+    if (publishStartPreflightDescriptor.status === 'blocked') {
+      if (publishStartPreflightDescriptor.shouldResetPublishState) {
+        dispatchSessionPublish({ type: 'edit' });
+        setSessionUrl('');
+        setPublishedPendingSbtLinks([]);
+      }
+      if (
+        publishStartPreflightDescriptor.shouldOpenLoginModal &&
+        typeof toggleLoginModal === 'function'
+      ) {
+        toggleLoginModal(true);
+      }
+      if (publishStartPreflightDescriptor.statusMessage) {
+        setStatus(publishStartPreflightDescriptor.statusMessage);
+      }
       return;
     }
     try {
@@ -5015,464 +5023,201 @@ const SessionWizard = ({
   const wizardContractViewerContracts = wizardContractViewerPlan.contracts;
   const selectedWizardContract = wizardContractViewerPlan.selectedContract;
   const selectedWizardContractHref = wizardContractViewerPlan.selectedContractHref;
-  const sessionMetadataHeaderAccessory =
-    wizardMode === 'advanced' ? (
-      <SessionWizardSessionIdBadge
-        isRegenerating={isSessionIdRegenerating}
-        onCopy={handleCopySessionId}
-        onRegenerate={handleRegenerateSessionId}
-        renderInfoTooltip={renderSessionWizardInfoTooltip}
-        sessionIdDisplay={sessionIdDisplay}
-      />
-    ) : null;
-  const showSessionModeProfileEntryStep = isNewSessionWizardRoute && !effectiveSessionModeProfileStepComplete;
-  const sessionModeProfileControls = useSessionWizardModeProfileControls({
-    draft,
-    draftRef,
-    entryOnly: showSessionModeProfileEntryStep,
-    onContinue: () => setSessionModeProfileStepComplete(true),
-    onEnterAdvancedMode: handleEnterAdvancedMode,
-    onEnterNormalMode: handleEnterNormalMode,
-    customizing: wizardMode === 'advanced',
-    registryChainId,
-    setCollapsedSections,
-    setDraft,
-    showContinue: showSessionModeProfileEntryStep || !isNewSessionWizardRoute,
-  });
+  const sessionMetadataHeaderAccessory = wizardMode === 'advanced' ? (
+    <SessionWizardSessionIdBadge
+      isRegenerating={isSessionIdRegenerating}
+      onCopy={handleCopySessionId}
+      onRegenerate={handleRegenerateSessionId}
+      renderInfoTooltip={renderSessionWizardInfoTooltip}
+      sessionIdDisplay={sessionIdDisplay}
+    />
+  ) : null;
+  const sessionModeProfileControl = (
+    <SessionModeProfileField
+      registryChainId={registryChainId}
+      value={draft.sessionModeProfile}
+      onChange={(profile, compiled) => {
+        setDraft((prev) => {
+          const next = deepClone(prev);
+          next.sessionModeProfile = profile as unknown as UnknownRecord;
+          next.storageProfile = normalizeSessionStorageProfileConfig(compiled.storageProfile);
+          delete next.telegramOnly;
+          delete next.telegram_only;
+          delete next.telegramMode;
+          delete next.sessionMode;
+          delete next.telegramBridgeEnabled;
+          if (next.telegram && typeof next.telegram === 'object') {
+            const telegram = next.telegram as UnknownRecord;
+            delete telegram.only;
+            delete telegram.mode;
+            if (!Object.keys(telegram).length) delete next.telegram;
+          }
+          draftRef.current = next;
+          return next;
+        });
+      }}
+    />
+  );
 
   return (
-    <div className={styles.groupWizard}>
-      <header className={styles.header}>
-        <div className={styles.headerTitleBlock}>
-          <h1>Session Setup</h1>
-          {!isNormalMode && (
-            <div className={styles.modeHint}>
-              Advanced mode shows the full session configuration.
-            </div>
-          )}
-        </div>
-        <div className={styles.headerActions}>
-          {hasSponsoredBundleLink ? (
-            <div className={styles.wizardSettingsMenu}>
-              {wizardDisplaySettingsOpen ? (
-                <button
-                  type="button"
-                  className={styles.wizardSettingsBackdrop}
-                  aria-label="Close session wizard display settings"
-                  onClick={() => setWizardDisplaySettingsOpen(false)}
-                />
-              ) : null}
-              <button
-                type="button"
-                className={`${styles.iconButton} ${styles.wizardSettingsButton} ${wizardDisplaySettingsOpen ? styles.iconButtonActive : ''}`}
-                onClick={() => setWizardDisplaySettingsOpen((prev) => !prev)}
-                title="Session wizard display settings"
-                aria-label="Session wizard display settings"
-                aria-expanded={wizardDisplaySettingsOpen}
-                aria-haspopup="dialog"
-              >
-                <FontAwesomeIcon icon={faCog} />
-              </button>
-              <div
-                className={styles.wizardSettingsPanel}
-                role="dialog"
-                aria-label="Session wizard display settings"
-                hidden={!wizardDisplaySettingsOpen}
-              >
-                <div className={styles.wizardSettingsLabel}>Display mode</div>
-                {wizardModeControls}
-              </div>
-            </div>
-          ) : wizardModeControls}
-          {wizardMode === 'advanced' && (
-            <div className={styles.headerChainSelector}>
-              <span className={styles.headerChainLabel}>Network:</span>
-              <Input
-                type="select"
-                value={registryChainId || ''}
-                onChange={(e) => setRegistryChainId(e.target.value)}
-                className={styles.headerChainInput}
-              >
-                {registryChainOptions.length ? (
-                  registryChainOptions.map((chain) => (
-                    <option key={chain.id} value={chain.id}>
-                      {chain.name} ({chain.id})
-                    </option>
-                  ))
-                ) : (
-                  <option value={registryChainId || ''}>
-                    {registryChainName || registryChainId || 'Select a chain'}
-                  </option>
-                )}
-              </Input>
-              {renderSessionWizardInfoTooltip({
-                id: 'gw-registry-chain',
-                content: `Chain for session deployment. Registry: ${registryAddress || 'Unavailable'}`,
-                placement: 'bottom',
-                testId: 'ce-wizard-tooltip-gw-registry-chain',
-                ariaLabel: 'Registry chain info',
-              })}
-            </div>
-          )}
-        </div>
-      </header>
-
-      {showNewSessionRequirementsBanner ? (
-        <section className={styles.newSessionBanner} aria-labelledby="new-session-requirements-title">
-          <div className={styles.newSessionBannerHeader}>
-            <h2 id="new-session-requirements-title" className={styles.newSessionBannerTitle}>
-              To create a session you&apos;ll need:
-            </h2>
-            <button
-              type="button"
-              className={`${styles.iconButton} ${styles.newSessionBannerDismissButton}`}
-              aria-label="Dismiss session setup requirements"
-              title="Dismiss session setup requirements"
-              onClick={handleDismissNewSessionRequirementsBanner}
-            >
-              <FontAwesomeIcon icon={faTimes} />
-            </button>
-          </div>
-          <div className={styles.newSessionBannerBody}>
-            <ul className={styles.newSessionBannerList}>
-              <li>
-                <a
-                  href={NEW_SESSION_RESOURCE_LINKS.openaiApiKey}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={styles.newSessionBannerLink}
-                >
-                  OpenAI API key
-                </a>
-                {' '}for text and transcription
-              </li>
-              <li>
-                {newSessionRequiresLitCredential ? (
-                  <>
-                    <a
-                      href={NEW_SESSION_RESOURCE_LINKS.litApiKeys}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={styles.newSessionBannerLink}
-                    >
-                      Lit API key
-                    </a>
-                    {' '}for encrypted access automation
-                  </>
-                ) : 'No Lit key is required for Cloudflare worker-enforced SBT access control'}
-              </li>
-              <li>
-                <a
-                  href={NEW_SESSION_RESOURCE_LINKS.arweaveWallet}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={styles.newSessionBannerLink}
-                >
-                  Arweave wallet (JWK)
-                </a>
-                {' '}for permanent storage
-              </li>
-              <li>
-                {newSessionFundingRequirementHref ? (
-                  <a
-                    href={newSessionFundingRequirementHref}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={styles.newSessionBannerLink}
-                  >
-                    {newSessionFundingRequirementLabel}
-                  </a>
-                ) : newSessionFundingRequirementLabel}
-              </li>
-              <li>(Optional) A faucet private key for sponsoring user gas</li>
-            </ul>
-            <p className={styles.newSessionBannerCopy}>
-              A turnkey tool for bundling these resources is in development.
-            </p>
-            <p className={styles.newSessionBannerCopy}>
-              In the meantime, you can get a sponsored session URL by contacting{' '}
-              <a
-                href="mailto:contextengine@protonmail.com"
-                className={styles.newSessionBannerLink}
-              >
-                contextengine@protonmail.com
-              </a>
-              .
-            </p>
-          </div>
-        </section>
-      ) : null}
-
-      {sponsoredBundleStatus ? (
-        <div
-          className={`${styles.statusNote} ${styles.sponsoredBundleStatus} ${
-            sponsoredBundleStatus.tone === 'success'
-              ? styles.sponsoredBundleStatusSuccess
-              : sponsoredBundleStatus.tone === 'error'
-                ? styles.sponsoredBundleStatusError
-                : styles.sponsoredBundleStatusInfo
-          }`}
-          data-testid={E2E_TESTIDS.WIZARD_SPONSORED_STATUS}
-        >
-          <div className={styles.sponsoredBundleStatusContent}>
-            <span>{sponsoredBundleStatus.message}</span>
-            {sponsoredBundleStatus.retryable ? (
-              <Button
-                type="button"
-                size="sm"
-                color="secondary"
-                outline
-                className={styles.sponsoredBundleRetryButton}
-                onClick={() => setSponsoredBundleRetryNonce((prev) => prev + 1)}
-              >
-                Retry
-              </Button>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
-
-      {isNormalMode && (
-        <section
-          className={styles.normalModeRail}
-          aria-label="Normal mode sections"
-          style={{ '--session-wizard-card-count': String(normalModeCards.length) }}
-        >
-          {normalModeCards.map((card, index) => {
-            const isOpen = !collapsedSections[card.key];
-            const showExpandedDetails = activeNormalModeIndex > index;
-            const toneClass = card.tone === 'ready'
-              ? styles.normalModeCardReady
-              : card.tone === 'pending'
-                ? styles.normalModeCardPending
-                : styles.normalModeCardNeutral;
-            return (
-              <button
-                key={card.key}
-                type="button"
-                className={`${styles.normalModeCard} ${toneClass} ${isOpen ? styles.normalModeCardActive : ''}`}
-                onClick={() => focusNormalModeSection(card.key)}
-                aria-label={`Step ${card.stepNumber}: ${card.title}`}
-              >
-                <span className={styles.normalModeCardNumber}>{card.stepNumber}</span>
-                <span className={styles.normalModeCardContent}>
-                  <span className={styles.normalModeCardTitle}>{card.title}</span>
-                  {showExpandedDetails && (
-                    <span className={styles.normalModeCardSummary}>{card.summary}</span>
-                  )}
-                </span>
-              </button>
-            );
-          })}
-        </section>
-      )}
-
-      {(!isNormalMode || !collapsedSections.encryption) && (
-        <EncryptionPanel
-          isNormalMode={isNormalMode}
-          t={t}
-          renderSessionWizardInfoTooltip={renderSessionWizardInfoTooltip}
-          isCollapsed={collapsedSections.encryption}
-          onToggleCollapsed={() => toggleSection('encryption')}
-          launchCreateSbtModal={launchCreateSbtModal}
-          activeCreateSbtTargetGateId={activeCreateSbtTargetGateId}
-          activeCreateSbtTargetGate={activeCreateSbtTargetGate}
-          encryptionGates={encryptionGates}
-          focusCreateSbtTargetGate={focusCreateSbtTargetGate}
-          updateEncryptionGate={updateEncryptionGate}
-          removeEncryptionGate={removeEncryptionGate}
-          normalizeSbtSelection={normalizeSbtSelection}
-          handleGateAddSbt={handleGateAddSbt}
-          handleGateRemoveSbt={handleGateRemoveSbt}
-          network={network}
-          pendingSbtSelectorOptions={pendingSbtSelectorOptions}
-          selectorSourceChainId={selectorSourceChainId}
-          selectorSourceSessionConfig={selectorSourceSessionConfig}
-          resolvedActiveSessionSlug={resolvedActiveSessionSlug}
-          sbtCacheRevision={sbtCacheRevision}
-          ensureLightSbtUniverse={ensureLightSbtUniverse}
-          addEncryptionGate={addEncryptionGate}
-          pendingSbtDrafts={pendingSbtDrafts}
-          removePendingSbtDraft={removePendingSbtDraft}
-        />
-      )}
-
-      {(!isNormalMode || !collapsedSections.metadata) && (
-        <SessionMetadataEditor
-          isNormalMode={isNormalMode}
-          wizardMode={wizardMode}
-          isCollapsed={collapsedSections.metadata}
-          onToggleCollapsed={() => toggleSection('metadata')}
-          headerAccessory={sessionMetadataHeaderAccessory}
-          primaryEntries={primaryDraftEntries}
-          moreOptionsEntries={moreOptionsEntries}
-          moreOptionsOpen={moreOptionsOpen}
-          onToggleMoreOptions={() => setMoreOptionsOpen((prev) => !prev)}
-          renderField={renderField}
-          draft={draft}
-          showJsonPreview={showJsonPreview}
-          onToggleJsonPreview={() => setShowJsonPreview((prev) => !prev)}
-          onCopyDraftJson={handleCopyDraftJson}
-          jsonCopied={jsonCopied}
-        />
-      )}
-
-      {(!isNormalMode || (showNormalModeWorkerStep && !collapsedSections.worker)) && (
-        <WorkerPanel
-          isNormalMode={isNormalMode}
-          t={t}
-          renderSessionWizardInfoTooltip={renderSessionWizardInfoTooltip}
-          isCollapsed={collapsedSections.worker}
-          onToggleCollapsed={() => toggleSection('worker')}
-          showSharedWorkerChoice={showSharedWorkerChoice}
-          workerMode={workerMode}
-          onWorkerModeChange={setWorkerMode}
-          setWorkerUrlAutoFilled={setWorkerUrlAutoFilled}
-          updateDraftValue={updateDraftValue}
-          getDefaultWorkerUrl={getSessionWizardDefaultWorkerUrl}
-          draft={draft}
-          deployWorkerUrl={deployWorkerUrl}
-          deployComplete={deployComplete}
-          devPersistWorkerSecrets={DEV_PERSIST_WORKER_SECRETS}
-          persistWorkerSecrets={persistWorkerSecrets}
-          setPersistWorkerSecrets={setPersistWorkerSecrets}
-          workerSecretsEnabled={workerSecretsEnabled}
-          setWorkerSecretsEnabled={setWorkerSecretsEnabled}
-          clearWorkerSecretFields={clearWorkerSecretFields}
-          effectivePersistWorkerSecrets={effectivePersistWorkerSecrets}
-          workerResourceKeys={visibleWorkerResourceKeys}
-          renderResourceCard={renderResourceCard}
-          workerAllowOrigins={workerAllowOrigins}
-          setWorkerAllowOrigins={setWorkerAllowOrigins}
-          defaultAllowedOrigins={DEFAULT_ALLOWED_ORIGINS}
-          shouldUseSponsoredAutoDeployFlow={shouldUseSponsoredAutoDeployFlow}
-          deployForm={deployForm}
-          deployHelperToggle={(
-            <WorkerDeployHelperToggle
-              checked={embeddedDeployHelperEnabled}
-              onChange={(nextValue) => updateDraftValue(['embeddedDeployHelperEnabled'], nextValue)}
-              renderInfoTooltip={renderSessionWizardInfoTooltip}
-            />
-          )}
-          shouldShowDeployHelperUrlInput={shouldShowDeployHelperUrlInput}
-          deployHelperUrl={deployHelperUrl}
-          setDeployHelperUrl={setDeployHelperUrl}
-          bundleMode={bundleMode}
-          setBundleMode={setBundleMode}
-          normalModeBundleUrl={normalModeBundleUrl}
-          normalModeBundleHelpText={normalModeBundleHelpText}
-          showNormalModeManualBundleControls={showNormalModeManualBundleControls}
-          normalModeBundleUrlOverride={normalModeBundleUrlOverride}
-          setNormalModeBundleUrlOverride={setNormalModeBundleUrlOverride}
-          normalModeBundleUrlOverrideValidationError={normalModeBundleUrlOverrideValidationError}
-          manualBundleUrlOverrideHelp={MANUAL_BUNDLE_URL_OVERRIDE_HELP}
-          normalModeRetryBundleFileInputRef={normalModeRetryBundleFileInputRef}
-          setBundleFile={setBundleFile}
-          clearSelectedBundleFile={clearSelectedBundleFile}
-          bundleFile={bundleFile}
-          normalModeManualBundleHelpText={normalModeManualBundleHelpText}
-          localWorkerBundleFallbackFilePath={LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH}
-          advancedBundleFileInputRef={advancedBundleFileInputRef}
-          showSponsoredDeployAccessNotice={showSponsoredDeployAccessNotice}
-          account={account}
-          resolvedActiveSessionSlug={resolvedActiveSessionSlug}
-          setDeployForm={setDeployForm}
-          handleDeployWorker={handleDeployWorker}
-          deployInFlight={deployInFlight}
-          deployStatus={deployStatus}
-          deployStatusIsError={deployStatusIsError}
-          showWorkerUrlField={showWorkerUrlField}
-          displayedWorkerUrl={displayedWorkerUrl}
-          renderField={renderField}
-          workerUrlAutoFilled={workerUrlAutoFilled}
-        />
-      )}
-
-      {(!isNormalMode || !collapsedSections.publish) && (
-        <SessionPublishSummary
-          isNormalMode={isNormalMode}
-          wizardMode={wizardMode}
-          isCollapsed={collapsedSections.publish}
-          onToggleCollapsed={() => toggleSection('publish')}
-          normalModePublishSummary={normalModePublishSummary}
-          onPublish={handlePublish}
-          publishBusy={publishBusy}
-          canPublishNow={canPublishNow}
-          publishAdvancedOpen={publishAdvancedOpen}
-          onTogglePublishAdvanced={() => setPublishAdvancedOpen((prev) => !prev)}
-          showSponsoredBundleFallbackInput={showSponsoredBundleFallbackInput}
-          normalModeBundleUrlOverride={normalModeBundleUrlOverride}
-          onNormalModeBundleUrlOverrideChange={setNormalModeBundleUrlOverride}
-          normalModeBundleUrlOverrideValidationError={normalModeBundleUrlOverrideValidationError}
-          manualBundleUrlOverrideHelp={MANUAL_BUNDLE_URL_OVERRIDE_HELP}
-          bundleFileInputRef={sponsoredPublishBundleFileInputRef}
-          onBundleFileChange={setBundleFile}
-          onClearBundleFile={clearSelectedBundleFile}
-          bundleFile={bundleFile}
-          localWorkerBundleFallbackFilePath={LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH}
-          sponsoredManualBundleRetryMessage={SPONSORED_MANUAL_BUNDLE_RETRY_MESSAGE}
-          showPublishProgress={publishBusy || publishStep > 0}
-          activePublishProgressStepLabel={activePublishProgressStep?.label || 'Preparing'}
-          publishProgressPercent={publishProgressPercent}
-          publishProgressPercentRounded={publishProgressPercentRounded}
-          publishStep={publishStep}
-          publishProgressSteps={publishProgressSteps}
-          uploadBlockedReason={uploadBlockedReason}
-          hasManualMetadata={hasManualMetadata}
-          hasUploadedMetadata={hasUploadedMetadata}
-          renderInfoTooltip={renderSessionWizardInfoTooltip}
-          resolvedWorkerBaseUrl={resolvedWorkerBaseUrl}
-          workerUrlSource={workerUrlSource}
-          manualMetadataUrl={manualMetadataUrl}
-          onManualMetadataUrlChange={setManualMetadataUrl}
-          manualGasLimit={manualGasLimit}
-          onManualGasLimitChange={setManualGasLimit}
-          manualGasPriceGwei={manualGasPriceGwei}
-          onManualGasPriceGweiChange={setManualGasPriceGwei}
-          manualMaxFeePerGasGwei={manualMaxFeePerGasGwei}
-          onManualMaxFeePerGasGweiChange={setManualMaxFeePerGasGwei}
-          manualMaxPriorityFeePerGasGwei={manualMaxPriorityFeePerGasGwei}
-          onManualMaxPriorityFeePerGasGweiChange={setManualMaxPriorityFeePerGasGwei}
-          metadataUrl={metadataUrl}
-          effectiveMetadataTxId={effectiveMetadataTxId}
-          effectiveMetadataGatewayUrl={effectiveMetadataGatewayUrl}
-          registerTxs={registerTxs}
-          registerExplorerBaseUrl={registerExplorerBaseUrl}
-          sessionUrl={sessionUrl}
-          adminUrl={adminUrl}
-          publishedPendingSbtLinks={publishedPendingSbtLinks}
-          onCopyAdminUrl={handleCopyAdminUrl}
-          adminUrlStatus={adminUrlStatus}
-          status={status}
-          normalizeArweaveUri={normalizeArweaveUri}
-        />
-      )}
-      <SessionWizardModals
-        account={account}
-        provider={provider}
-        createSbtModalState={createSbtModalState}
-        closeCreateSbtModal={closeCreateSbtModal}
-        createSbtModalNetwork={createSbtModalNetwork}
-        toggleLoginModal={toggleLoginModal}
-        createSbtModalSessionSlug={createSbtModalSessionSlug}
-        draft={draft}
-        createSbtModalChainId={createSbtModalChainId}
-        createSbtModalArweaveJwkOverride={createSbtModalArweaveJwkOverride}
-        encryptionGates={encryptionGates}
-        normalizeSbtSelection={normalizeSbtSelection}
-        defaultGateId={defaultGateId}
-        signBootstrapAdminAction={signBootstrapAdminAction}
-        handleSavePendingSbtDraft={handleSavePendingSbtDraft}
-        contractViewerModalState={contractViewerModalState}
-        selectedWizardContract={selectedWizardContract}
-        closeContractViewerModal={closeContractViewerModal}
-        selectedWizardContractHref={selectedWizardContractHref}
-        sessionHeaderPreviewModalOpen={sessionHeaderPreviewModalOpen}
-        onCloseSessionHeaderPreviewModal={() => setSessionHeaderPreviewModalOpen(false)}
-        sessionHeaderPreviewSrc={sessionHeaderPreviewSrc}
-        t={t}
-      />
-    </div>
+    <SessionWizardShell
+      account={account}
+      activeCreateSbtTargetGate={activeCreateSbtTargetGate}
+      activeCreateSbtTargetGateId={activeCreateSbtTargetGateId}
+      activeNormalModeIndex={activeNormalModeIndex}
+      addEncryptionGate={addEncryptionGate}
+      adminUrl={adminUrl}
+      adminUrlStatus={adminUrlStatus}
+      advancedBundleFileInputRef={advancedBundleFileInputRef}
+      bundleFile={bundleFile}
+      bundleMode={bundleMode}
+      clearSelectedBundleFile={clearSelectedBundleFile}
+      clearWorkerSecretFields={clearWorkerSecretFields}
+      closeContractViewerModal={closeContractViewerModal}
+      closeCreateSbtModal={closeCreateSbtModal}
+      collapsedSections={collapsedSections}
+      contractViewerModalState={contractViewerModalState}
+      createSbtModalArweaveJwkOverride={createSbtModalArweaveJwkOverride}
+      createSbtModalChainId={createSbtModalChainId}
+      createSbtModalNetwork={createSbtModalNetwork}
+      createSbtModalSessionSlug={createSbtModalSessionSlug}
+      createSbtModalState={createSbtModalState}
+      defaultAllowedOrigins={DEFAULT_ALLOWED_ORIGINS}
+      defaultGateId={defaultGateId}
+      deployComplete={deployComplete}
+      deployForm={deployForm}
+      deployHelperUrl={deployHelperUrl}
+      deployStatusDisplayState={deployStatusDisplayState}
+      deployWorkerUrl={deployWorkerUrl}
+      devPersistWorkerSecrets={DEV_PERSIST_WORKER_SECRETS}
+      displayedWorkerUrl={displayedWorkerUrl}
+      draft={draft}
+      effectivePersistWorkerSecrets={effectivePersistWorkerSecrets}
+      embeddedDeployHelperEnabled={embeddedDeployHelperEnabled}
+      encryptionGates={encryptionGates}
+      ensureLightSbtUniverse={ensureLightSbtUniverse}
+      focusCreateSbtTargetGate={focusCreateSbtTargetGate}
+      focusNormalModeSection={focusNormalModeSection}
+      getSessionWizardDefaultWorkerUrl={getSessionWizardDefaultWorkerUrl}
+      handleCopyAdminUrl={handleCopyAdminUrl}
+      handleDeployWorker={handleDeployWorker}
+      handleGateAddSbt={handleGateAddSbt}
+      handleGateRemoveSbt={handleGateRemoveSbt}
+      handleSavePendingSbtDraft={handleSavePendingSbtDraft}
+      hasSponsoredBundleLink={hasSponsoredBundleLink}
+      isNormalMode={isNormalMode}
+      jsonCopied={jsonCopied}
+      launchCreateSbtModal={launchCreateSbtModal}
+      localWorkerBundleFallbackFilePath={LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH}
+      manualBundleUrlOverrideHelp={MANUAL_BUNDLE_URL_OVERRIDE_HELP}
+      manualGasLimit={manualGasLimit}
+      manualGasPriceGwei={manualGasPriceGwei}
+      manualMaxFeePerGasGwei={manualMaxFeePerGasGwei}
+      manualMaxPriorityFeePerGasGwei={manualMaxPriorityFeePerGasGwei}
+      manualMetadataUrl={manualMetadataUrl}
+      moreOptionsEntries={moreOptionsEntries}
+      moreOptionsOpen={moreOptionsOpen}
+      network={network}
+      newSessionFundingRequirementHref={newSessionFundingRequirementHref}
+      newSessionFundingRequirementLabel={newSessionFundingRequirementLabel}
+      newSessionRequiresLitCredential={newSessionRequiresLitCredential}
+      normalModeBundleHelpText={normalModeBundleHelpText}
+      normalModeBundleUrl={normalModeBundleUrl}
+      normalModeBundleUrlOverride={normalModeBundleUrlOverride}
+      normalModeBundleUrlOverrideValidationError={normalModeBundleUrlOverrideValidationError}
+      normalModeCards={normalModeCards}
+      normalModeManualBundleHelpText={normalModeManualBundleHelpText}
+      normalModePublishSummary={normalModePublishSummary}
+      normalModeRetryBundleFileInputRef={normalModeRetryBundleFileInputRef}
+      onCloseDisplaySettings={() => setWizardDisplaySettingsOpen(false)}
+      onCloseSessionHeaderPreviewModal={() => setSessionHeaderPreviewModalOpen(false)}
+      onCopyDraftJson={handleCopyDraftJson}
+      onDismissNewSessionRequirementsBanner={handleDismissNewSessionRequirementsBanner}
+      onEnterAdvancedMode={handleEnterAdvancedMode}
+      onEnterNormalMode={handleEnterNormalMode}
+      onManualGasLimitChange={setManualGasLimit}
+      onManualGasPriceGweiChange={setManualGasPriceGwei}
+      onManualMaxFeePerGasGweiChange={setManualMaxFeePerGasGwei}
+      onManualMaxPriorityFeePerGasGweiChange={setManualMaxPriorityFeePerGasGwei}
+      onManualMetadataUrlChange={setManualMetadataUrl}
+      onNormalModeBundleUrlOverrideChange={setNormalModeBundleUrlOverride}
+      onPublish={handlePublish}
+      onRegistryChainIdChange={handleRegistryChainIdChange}
+      onRetrySponsoredBundle={() => setSponsoredBundleRetryNonce((prev) => prev + 1)}
+      onToggleDisplaySettings={() => setWizardDisplaySettingsOpen((prev) => !prev)}
+      onToggleJsonPreview={() => setShowJsonPreview((prev) => !prev)}
+      onToggleMoreOptions={() => setMoreOptionsOpen((prev) => !prev)}
+      onTogglePublishAdvanced={() => setPublishAdvancedOpen((prev) => !prev)}
+      pendingSbtDrafts={pendingSbtDrafts}
+      pendingSbtSelectorOptions={pendingSbtSelectorOptions}
+      persistWorkerSecrets={persistWorkerSecrets}
+      primaryDraftEntries={primaryDraftEntries}
+      provider={provider}
+      publishUiPlan={publishUiPlan}
+      publishedPendingSbtLinks={publishedPendingSbtLinks}
+      registerExplorerBaseUrl={registerExplorerBaseUrl}
+      registerTxs={registerTxs}
+      registryAddress={registryAddress}
+      registryChainId={registryChainId}
+      registryChainName={registryChainName}
+      registryChainOptions={registryChainOptions}
+      removeEncryptionGate={removeEncryptionGate}
+      removePendingSbtDraft={removePendingSbtDraft}
+      renderField={renderField}
+      renderResourceCard={renderResourceCard}
+      renderSessionWizardInfoTooltip={renderSessionWizardInfoTooltip}
+      resolvedActiveSessionSlug={resolvedActiveSessionSlug}
+      resolvedWorkerBaseUrl={resolvedWorkerBaseUrl}
+      sbtCacheRevision={sbtCacheRevision}
+      selectedWizardContract={selectedWizardContract}
+      selectedWizardContractHref={selectedWizardContractHref}
+      selectorSourceChainId={selectorSourceChainId}
+      selectorSourceSessionConfig={selectorSourceSessionConfig}
+      sessionHeaderPreviewModalOpen={sessionHeaderPreviewModalOpen}
+      sessionHeaderPreviewSrc={sessionHeaderPreviewSrc}
+      sessionMetadataHeaderAccessory={sessionMetadataHeaderAccessory}
+      sessionModeProfileControl={sessionModeProfileControl}
+      sessionUrl={sessionUrl}
+      setBundleFile={setBundleFile}
+      setBundleMode={setBundleMode}
+      setDeployForm={setDeployForm}
+      setDeployHelperUrl={setDeployHelperUrl}
+      setNormalModeBundleUrlOverride={setNormalModeBundleUrlOverride}
+      setPersistWorkerSecrets={setPersistWorkerSecrets}
+      setWorkerAllowOrigins={setWorkerAllowOrigins}
+      setWorkerMode={setWorkerMode}
+      setWorkerSecretsEnabled={setWorkerSecretsEnabled}
+      setWorkerUrlAutoFilled={setWorkerUrlAutoFilled}
+      shouldShowDeployHelperUrlInput={shouldShowDeployHelperUrlInput}
+      shouldUseSponsoredAutoDeployFlow={shouldUseSponsoredAutoDeployFlow}
+      showJsonPreview={showJsonPreview}
+      showNewSessionRequirementsBanner={showNewSessionRequirementsBanner}
+      showNormalModeManualBundleControls={showNormalModeManualBundleControls}
+      showNormalModeWorkerStep={showNormalModeWorkerStep}
+      showSharedWorkerChoice={showSharedWorkerChoice}
+      showSponsoredBundleFallbackInput={showSponsoredBundleFallbackInput}
+      showSponsoredDeployAccessNotice={showSponsoredDeployAccessNotice}
+      showWorkerUrlField={showWorkerUrlField}
+      signBootstrapAdminAction={signBootstrapAdminAction}
+      sponsoredBundleStatus={sponsoredBundleStatus}
+      sponsoredManualBundleRetryMessage={SPONSORED_MANUAL_BUNDLE_RETRY_MESSAGE}
+      sponsoredPublishBundleFileInputRef={sponsoredPublishBundleFileInputRef}
+      status={status}
+      t={t}
+      toggleLoginModal={toggleLoginModal}
+      toggleSection={toggleSection}
+      updateDraftValue={updateDraftValue}
+      updateEncryptionGate={updateEncryptionGate}
+      visibleWorkerResourceKeys={visibleWorkerResourceKeys}
+      workerAllowOrigins={workerAllowOrigins}
+      workerMode={workerMode}
+      workerSecretsEnabled={workerSecretsEnabled}
+      workerUrlAutoFilled={workerUrlAutoFilled}
+      workerUrlSource={workerUrlSource}
+      wizardDisplaySettingsOpen={wizardDisplaySettingsOpen}
+      wizardMode={wizardMode}
+      normalizeSbtSelection={normalizeSbtSelection}
+    />
   );
 };
 

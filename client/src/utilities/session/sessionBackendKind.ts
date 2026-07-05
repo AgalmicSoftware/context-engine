@@ -1,4 +1,7 @@
-type UnknownRecord = Record<string, unknown>;
+import {
+  hasLegacyTelegramFirstSessionFlags,
+  isSessionModeProfileTelegramFirst,
+} from './sessionModeProfile';
 
 export type SessionBackendKind = 'onchain' | 'telegram';
 
@@ -15,27 +18,13 @@ export type ResolveSessionBackendKindArgs = {
   probeResult?: TelegramSessionMeta | null;
 };
 
-const toUnknownRecord = (value: unknown): UnknownRecord => (
-  value && typeof value === 'object' && !Array.isArray(value)
-    ? value as UnknownRecord
-    : {}
-);
-
-const normalizeModeValue = (value: unknown): string => (
-  String(value || '').trim().toLowerCase()
-);
+const normalizeSessionSlug = (value: unknown): string => {
+  const slug = String(value || '').trim().toLowerCase();
+  return slug === 'general' ? '' : slug;
+};
 
 export const isTelegramFirstSessionConfig = (metadata: unknown): boolean => {
-  const config = toUnknownRecord(metadata);
-  const telegramConfig = toUnknownRecord(config.telegram);
-  return (
-    config.telegramOnly === true ||
-    config.telegram_only === true ||
-    normalizeModeValue(config.sessionMode) === 'telegram_only' ||
-    normalizeModeValue(config.telegramMode) === 'telegram_only' ||
-    telegramConfig.only === true ||
-    normalizeModeValue(telegramConfig.mode) === 'telegram_only'
-  );
+  return isSessionModeProfileTelegramFirst(metadata) || hasLegacyTelegramFirstSessionFlags(metadata);
 };
 
 export const resolveSessionBackendKind = ({

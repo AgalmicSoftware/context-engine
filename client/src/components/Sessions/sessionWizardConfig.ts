@@ -22,7 +22,7 @@ export const METADATA_FIELD_ORDER = [
   'slug',
   'sessionName',
   'sessionInfo',
-  'telegramOnly',
+  'sessionModeProfile',
   'sessionHeaderImg',
   'corsWorkerUrl',
   'storageProfile',
