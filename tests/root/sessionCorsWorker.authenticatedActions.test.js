@@ -53,6 +53,17 @@ const createWorkerEnv = ({ sessionSlug, config, secrets, tokenSecret = 'test-sec
   };
 };
 
+const createAuthOnlyWorkerEnv = (sourceEnv, tokenSecret = 'test-secret') => {
+  const authTokenRecords = Object.fromEntries(
+    [...sourceEnv.GROUP_KV._dump()]
+      .filter(([key]) => String(key || '').startsWith('authToken:'))
+  );
+  return {
+    GROUP_KV: createMemoryKv(authTokenRecords),
+    TOKEN_HMAC_SECRET: tokenSecret,
+  };
+};
+
 const buildHtmlFetchResponse = (html) => ({
   ok: true,
   status: 200,
@@ -449,10 +460,7 @@ describe('sessionCorsWorker authenticated fetch/faucet actions', () => {
       rpcUrl: RPC_URL,
       registryAddress: REGISTRY_ADDRESS,
     });
-    const requestEnv = {
-      GROUP_KV: createMemoryKv(),
-      TOKEN_HMAC_SECRET: 'test-secret',
-    };
+    const requestEnv = createAuthOnlyWorkerEnv(issuingEnv);
 
     const response = await sessionCorsWorker.fetch(
       makeActionRequest({
