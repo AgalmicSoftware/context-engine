@@ -57,6 +57,8 @@ describe('sessionWizardStorageProfile', () => {
     expect(profile.resources.questions).toBe('active');
     expect(profile.resources.surveys).toBe('active');
     expect(profile.resources.responses).toBe('active');
+    expect(profile.payloadAccessControl.gate).toBe('sbt_gate');
+    expect(profile.payloadAccessControl.encryption).toBe('none');
     expect(profile.payloadAccessControl.mode).toBe(SESSION_STORAGE_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE);
     expect(profile.payloadAccessControl.enforcement).toBe('session_worker_sbt_gate');
     expect(profile.payloadAccessControl.resources.docsContext).toBe('docUploads');
@@ -82,6 +84,8 @@ describe('sessionWizardStorageProfile', () => {
     });
 
     expect(profile.payloadAccessControl.mode).toBe(SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED);
+    expect(profile.payloadAccessControl.gate).toBe('none');
+    expect(profile.payloadAccessControl.encryption).toBe('lit');
     expect(profile.payloadAccessControl.enforcement).toBe('lit_access_control_conditions');
     expect(profile.payloadAccessControl.litRequired).toBe(true);
     expect(profile.sbtGatedAccess.litRequired).toBe('required_for_cloudflare_payload_encryption');
@@ -95,11 +99,27 @@ describe('sessionWizardStorageProfile', () => {
     });
 
     expect(profile.payloadAccessControl.mode).toBe(SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ);
+    expect(profile.payloadAccessControl.gate).toBe('none');
+    expect(profile.payloadAccessControl.encryption).toBe('none');
     expect(profile.payloadAccessControl.enforcement).toBe('session_worker_public_read');
     expect(profile.payloadAccessControl.litRequired).toBe(false);
     expect(profile.payloadAccessControl.label).toBe('Public-read Cloudflare payloads');
     expect(profile.sbtGatedAccess.litRequired).toBe('not_required_public_read');
     expect(profile.cloudflare.payloadAccessMode).toBe(SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ);
+  });
+
+  test('normalizes v2 worker_envelope payload access while keeping the legacy display mode', () => {
+    const profile = normalizeSessionStorageProfileConfig({
+      backend: 'cloudflare',
+      payloadAccessControl: { gate: 'sbt_gate', encryption: 'worker_envelope' },
+    });
+
+    expect(profile.payloadAccessControl.gate).toBe('sbt_gate');
+    expect(profile.payloadAccessControl.encryption).toBe('worker_envelope');
+    expect(profile.payloadAccessControl.mode).toBe(SESSION_STORAGE_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE);
+    expect(profile.payloadAccessControl.litRequired).toBe(false);
+    expect(profile.sbtGatedAccess.litRequired).toBe('not_required_worker_enforced');
+    expect(profile.cloudflare.payloadAccessMode).toBe(SESSION_STORAGE_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE);
   });
 
   test('describes backend display options and helper copy', () => {

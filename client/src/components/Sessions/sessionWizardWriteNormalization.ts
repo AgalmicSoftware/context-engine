@@ -27,6 +27,7 @@ import {
 import {
   compileSessionModeProfile,
   hasLegacyTelegramFirstSessionFlags,
+  mergeSessionModeProfileStorageAccess,
   profileFromLegacyConfig,
   type SessionModeProfile,
 } from '../../utilities/session/sessionModeProfile';
@@ -178,7 +179,11 @@ export const sanitizeSessionWizardMetadataPayload = (metadata: AnyRecord, {
   }
 
   if (isObj(next.sessionModeProfile)) {
-    const compiled = compileSessionModeProfile(next.sessionModeProfile as SessionModeProfile);
+    next.sessionModeProfile = mergeSessionModeProfileStorageAccess(
+      next.sessionModeProfile as SessionModeProfile,
+      next.storageProfile
+    ) as unknown as AnyRecord;
+    const compiled = compileSessionModeProfile(next.sessionModeProfile as unknown as SessionModeProfile);
     next.storageProfile = normalizeSessionStorageProfileConfig(compiled.storageProfile);
   } else if (Object.prototype.hasOwnProperty.call(next, 'storageProfile')) {
     next.storageProfile = normalizeSessionStorageProfileConfig(next.storageProfile);
@@ -268,16 +273,19 @@ export const buildSessionWizardWorkerConfigPayload = ({
     };
   });
 
+  const rawStorageProfile = resolvedDraft.storageProfile || resolvedDeployPayload.storageProfile;
   const sessionModeProfile = isObj(resolvedDraft.sessionModeProfile)
     ? resolvedDraft.sessionModeProfile as SessionModeProfile
     : (hasLegacyTelegramFirstSessionFlags(resolvedDraft)
       ? profileFromLegacyConfig(resolvedDraft)
       : null);
-  const compiledProfile = sessionModeProfile ? compileSessionModeProfile(sessionModeProfile) : null;
+  const effectiveSessionModeProfile = sessionModeProfile
+    ? mergeSessionModeProfileStorageAccess(sessionModeProfile, rawStorageProfile)
+    : null;
+  const compiledProfile = effectiveSessionModeProfile ? compileSessionModeProfile(effectiveSessionModeProfile) : null;
   const storageProfile = normalizeSessionStorageProfileConfig(
     compiledProfile?.storageProfile ||
-    resolvedDraft.storageProfile ||
-    resolvedDeployPayload.storageProfile
+    rawStorageProfile
   );
   const next: AnyRecord = {
     slug: trimString(slug),
@@ -301,7 +309,7 @@ export const buildSessionWizardWorkerConfigPayload = ({
     litCredentials: isWorkerSbtGateCloudflareStorageProfile(storageProfile)
       ? {}
       : buildWorkerLitCredentialsConfig(workerSecrets),
-    ...(sessionModeProfile ? { sessionModeProfile: cloneValue(sessionModeProfile) } : {}),
+    ...(effectiveSessionModeProfile ? { sessionModeProfile: cloneValue(effectiveSessionModeProfile) } : {}),
     storageProfile,
   };
 

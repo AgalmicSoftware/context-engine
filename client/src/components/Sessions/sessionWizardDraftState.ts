@@ -22,6 +22,7 @@ import { normalizeSessionStorageProfileConfig } from './sessionWizardStorageProf
 import {
   compileSessionModeProfile,
   hasLegacyTelegramFirstSessionFlags,
+  mergeSessionModeProfileStorageAccess,
   profileFromLegacyConfig,
   type SessionModeProfile,
 } from '../../utilities/session/sessionModeProfile';
@@ -127,6 +128,10 @@ export const normalizeSessionWizardDraftShape = (draftIn: AnyRecord = {}): AnyRe
     draft.embeddedDeployHelperEnabled = CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED !== false;
   }
   if (draft.sessionModeProfile && typeof draft.sessionModeProfile === 'object') {
+    draft.sessionModeProfile = mergeSessionModeProfileStorageAccess(
+      draft.sessionModeProfile as SessionModeProfile,
+      draft.storageProfile
+    );
     const compiled = compileSessionModeProfile(draft.sessionModeProfile as SessionModeProfile);
     draft.storageProfile = normalizeSessionStorageProfileConfig(compiled.storageProfile);
   } else {

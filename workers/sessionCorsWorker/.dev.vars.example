@@ -1,0 +1,8 @@
+# Local sessionCorsWorker placeholders only. Copy to untracked .dev.vars for wrangler dev.
+TOKEN_HMAC_SECRET=""
+
+# Required only for storageProfile.payloadAccessControl.encryption = "worker_envelope".
+CE_STORAGE_ENVELOPE_KEK=""
+
+# Optional during deployment-key rotation while old session KEKs are rewrapped.
+# CE_STORAGE_ENVELOPE_PREVIOUS_KEK=""

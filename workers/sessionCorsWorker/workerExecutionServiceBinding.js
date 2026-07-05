@@ -139,6 +139,7 @@ export const createWorkerExecutionServicesWithWorkerDeps = ({
       randomUUID: deps?.randomUUID,
       now: deps?.now,
       log: workerLog,
+      putSessionConfig: deps?.putSessionConfig,
       readResourceGateOnChain: deps?.readResourceGateOnChain,
       resolveRegistryRpcUrls: deps?.resolveRegistryRpcUrls,
       toRegistrySessionSlug: deps?.toRegistrySessionSlug,
