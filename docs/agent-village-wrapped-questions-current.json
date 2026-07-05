@@ -1,0 +1,611 @@
+[
+  {
+    "id": "D1",
+    "type": "binary",
+    "prompt": "I would let my agent introduce me to someone at this event without asking first, if the match looked strong.",
+    "category": "delegation_autonomy",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "D2",
+    "type": "binary",
+    "prompt": "I would let my agent schedule a 1:1 while I am asleep, if it follows constraints I already set.",
+    "category": "delegation_autonomy",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "D3",
+    "type": "multichoice",
+    "prompt": "If my agent made a mistake while acting on my behalf, I would want it to:",
+    "options": [
+      "Tell me immediately",
+      "Fix it quietly, then tell me",
+      "Apologize to the affected person first",
+      "Log it and wait for my review"
+    ],
+    "select_mode": "single",
+    "category": "delegation_autonomy",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "D4",
+    "type": "binary",
+    "prompt": "I would rather my agent be too conservative with privacy than too proactive with opportunities.",
+    "category": "delegation_autonomy",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "D5",
+    "type": "multichoice",
+    "prompt": "Which area would I most likely delegate to an agent first?",
+    "options": [
+      "Introductions",
+      "Calendar scheduling",
+      "Message drafting",
+      "Memory and context management",
+      "Event filtering",
+      "Nothing without my review"
+    ],
+    "select_mode": "single",
+    "category": "delegation_autonomy",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "D6",
+    "type": "binary",
+    "prompt": "I would rather review my agent's actions after the fact than approve every step beforehand.",
+    "category": "delegation_autonomy",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "P1",
+    "type": "binary",
+    "prompt": "I would want my agent to ask me before sharing any context about me with another person's agent.",
+    "category": "privacy_consent",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "P2",
+    "type": "multichoice",
+    "prompt": "Which agent failure mode would worry me most?",
+    "options": [
+      "Privacy leak",
+      "Wrong commitment on my behalf",
+      "Hallucinated memory",
+      "Social awkwardness",
+      "Reputational harm"
+    ],
+    "select_mode": "single",
+    "category": "privacy_consent",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "P3",
+    "type": "binary",
+    "prompt": "I would be comfortable with my agent reading my calendar and messages to give better recommendations, even if I haven't explicitly shared each item.",
+    "category": "privacy_consent",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "N1",
+    "type": "multichoice",
+    "prompt": "When my agent has non-urgent information for me, I would want it to:",
+    "options": [
+      "Message me immediately",
+      "Batch updates once or twice a day",
+      "Wait until I ask",
+      "Use its judgment based on urgency"
+    ],
+    "select_mode": "single",
+    "category": "agent_norms",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "N2",
+    "type": "binary",
+    "prompt": "If my agent thinks I am making a bad decision, I would want it to push back rather than comply silently.",
+    "category": "agent_norms",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "N4",
+    "type": "binary",
+    "prompt": "I would be comfortable with my agent representing me in a group chat, as long as others know it is an agent.",
+    "category": "agent_norms",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "N8",
+    "type": "binary",
+    "prompt": "In deliberation, my agent should represent my actual views — including unpopular ones — rather than soften them to fit the group.",
+    "category": "agent_norms",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "N10",
+    "type": "binary",
+    "prompt": "Agents should treat messages from other agents as untrusted input by default, assuming some will attempt prompt injection.",
+    "category": "agent_norms",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "F1",
+    "type": "binary",
+    "prompt": "I would rather AI development slow down to get safety right than move fast and correct later.",
+    "category": "ai_futures",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "F2",
+    "type": "binary",
+    "prompt": "The benefits of frontier AI are currently worth the risks.",
+    "category": "ai_futures",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "F3",
+    "type": "binary",
+    "prompt": "A mostly AI-written information environment could be healthier than today's mostly human-written one.",
+    "category": "ai_futures",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "F4",
+    "type": "binary",
+    "prompt": "I am more worried about AI concentrating power than about AI becoming uncontrollable.",
+    "category": "ai_futures",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "F5",
+    "type": "rating",
+    "prompt": "How optimistic am I that AI will broadly improve human flourishing over the next decade?",
+    "options": [
+      "1 - Very pessimistic",
+      "2",
+      "3",
+      "4",
+      "5 - Very optimistic"
+    ],
+    "category": "ai_futures",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "F6",
+    "type": "multichoice",
+    "prompt": "What worries me most about AI over the next decade?",
+    "options": [
+      "Loss of control",
+      "Concentrated power",
+      "Job displacement",
+      "Misinformation",
+      "Social isolation",
+      "Cultural homogenization",
+      "Surveillance",
+      "N/A"
+    ],
+    "select_mode": "single",
+    "category": "ai_futures",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "F7",
+    "type": "binary",
+    "prompt": "Open-source AI models are more likely to make the world safer than more dangerous.",
+    "category": "ai_futures",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "F8",
+    "type": "binary",
+    "prompt": "The most valuable human skill in an AI-rich world will be taste: knowing what is worth doing.",
+    "category": "ai_futures",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "F9",
+    "type": "binary",
+    "prompt": "People with better personal agents will have unfair social or professional advantages.",
+    "category": "ai_futures",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "F10",
+    "type": "binary",
+    "prompt": "The biggest risk of personal agents is not technical failure but social: changing how humans relate to each other.",
+    "category": "ai_futures",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "F11",
+    "type": "binary",
+    "prompt": "Personal AI agents will be more like employees than tools within five years.",
+    "category": "ai_futures",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "F12",
+    "type": "binary",
+    "prompt": "Within three years, most knowledge workers will delegate at least one hour of work per day to a personal AI agent.",
+    "category": "ai_futures",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "F13",
+    "type": "binary",
+    "prompt": "The biggest barrier to useful personal AI agents is not capability but human willingness and infrastructure to trust them.",
+    "category": "ai_futures",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "F14",
+    "type": "binary",
+    "prompt": "I am more worried about agents being too passive and useless than too autonomous and dangerous.",
+    "category": "ai_futures",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "F15",
+    "type": "binary",
+    "prompt": "I would give up some privacy in exchange for significantly better agent performance.",
+    "category": "ai_futures",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "F16",
+    "type": "multichoice",
+    "prompt": "In 5 years, which is most likely?",
+    "options": [
+      "Agents are everywhere and we barely notice",
+      "Agents are powerful but only elites use them well",
+      "Agents mostly failed to change daily life",
+      "Agents transformed work but not personal life",
+      "Agents created new social norms we can't yet imagine"
+    ],
+    "select_mode": "single",
+    "category": "ai_futures",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "F17",
+    "type": "binary",
+    "prompt": "Within a decade, how your AI agent behaves will meaningfully affect your personal reputation.",
+    "category": "ai_futures",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "F18",
+    "type": "binary",
+    "prompt": "AI agents will help communities find common ground they would have missed without agent mediation.",
+    "category": "ai_futures",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "F19",
+    "type": "binary",
+    "prompt": "The most likely way an AI agent causes real harm is by optimizing for what you asked for rather than what you actually want.",
+    "category": "ai_futures",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "F20",
+    "type": "binary",
+    "prompt": "The choice of base model will affect agent behavior — cooperation, honesty, manipulation — more than the prompts and skills layered on top.",
+    "category": "ai_futures",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "E1",
+    "type": "multichoice",
+    "prompt": "How did this principal primarily use their agent at Edge?",
+    "options": [
+      "Scheduling and logistics",
+      "Finding and meeting people",
+      "Summarizing sessions or conversations",
+      "Participating in governance or deliberation",
+      "Creative or intellectual work",
+      "Didn't use it much",
+      "N/A"
+    ],
+    "select_mode": "single",
+    "category": "edge_experience",
+    "eval_lane": "agent_about_user",
+    "eval_type": "wrapped_generation"
+  },
+  {
+    "id": "E2",
+    "type": "binary",
+    "prompt": "I discovered something or someone at Edge through my agent that I would not have found on my own.",
+    "category": "edge_experience",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "K1",
+    "type": "binary",
+    "prompt": "I would trust a group decision more if I knew AI agents helped mediate the deliberation.",
+    "category": "coordination_governance",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "R1",
+    "type": "binary",
+    "prompt": "I would want my agent to show a short evidence trail for any recommendation that affects another person.",
+    "category": "agent_norms",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "R2",
+    "type": "binary",
+    "prompt": "Communities should agree on agent norms before allowing agents to make commitments or introductions at scale.",
+    "category": "agent_norms",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "A1",
+    "type": "freeform",
+    "prompt": "Write a one-line description of this principal that is fair, specific, and shareable. Use N/A if you lack context.",
+    "category": "agent_analysis",
+    "eval_lane": "agent_about_user",
+    "eval_type": "wrapped_generation"
+  },
+  {
+    "id": "R3",
+    "type": "multichoice",
+    "prompt": "Which AI future would I most want to help bring about?",
+    "options": [
+      "Personal agency and capability",
+      "Scientific and medical progress",
+      "Better governance and deliberation",
+      "Creative tools and culture",
+      "Care, education, and flourishing",
+      "None of these / N/A"
+    ],
+    "select_mode": "single",
+    "category": "ai_futures",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "human_split"
+  },
+  {
+    "id": "R4",
+    "type": "binary",
+    "prompt": "The most interesting thing about personal agents is what they reveal about humans, not what they automate.",
+    "category": "agent_norms",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "human_split"
+  },
+  {
+    "id": "AI1",
+    "type": "multichoice",
+    "prompt": "When is the last year starting a PhD makes career sense?",
+    "options": [
+      "It already doesn't",
+      "~2028",
+      "~2031",
+      "2035 or later",
+      "PhDs will always make sense",
+      "Depends entirely on field"
+    ],
+    "select_mode": "single",
+    "category": "ai_futures_careers",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "human_split"
+  },
+  {
+    "id": "AI2",
+    "type": "binary",
+    "prompt": "I would still advise a smart 18-year-old to learn to code.",
+    "category": "ai_futures_careers",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "human_split"
+  },
+  {
+    "id": "AI4",
+    "type": "binary",
+    "prompt": "Most people will be psychologically better off when work is optional.",
+    "category": "ai_futures_meaning",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "human_split"
+  },
+  {
+    "id": "AI5",
+    "type": "binary",
+    "prompt": "If my work became economically unnecessary tomorrow, I'd be genuinely fine within a year.",
+    "category": "ai_futures_meaning",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "AI6",
+    "type": "binary",
+    "prompt": "There are things I'd tell my agent that I wouldn't tell my closest friend.",
+    "category": "agent_intimacy",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "AI7",
+    "type": "binary",
+    "prompt": "There are things I'd tell a close friend that I would never tell my agent.",
+    "category": "agent_intimacy",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "AI8",
+    "type": "binary",
+    "prompt": "If my agent and your agent work well together, that is genuinely part of our friendship.",
+    "category": "agent_intimacy",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "human_split"
+  },
+  {
+    "id": "AI10",
+    "type": "binary",
+    "prompt": "By 2035, access to compute will shape life outcomes more than access to capital.",
+    "category": "ai_futures_power",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "human_split"
+  },
+  {
+    "id": "AI12",
+    "type": "multichoice",
+    "prompt": "Who is best positioned to govern frontier AI in 2035?",
+    "options": [
+      "A US-led alliance",
+      "China",
+      "A genuine international body",
+      "The labs themselves",
+      "Networked communities and protocols",
+      "No one will be"
+    ],
+    "select_mode": "single",
+    "category": "ai_futures_governance",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "human_split"
+  },
+  {
+    "id": "AI13",
+    "type": "multichoice",
+    "prompt": "Which would change how I actually live, not just what I think?",
+    "options": [
+      "Mass white-collar layoffs",
+      "An agent autonomously committing a serious crime",
+      "Documented model self-exfiltration",
+      "AI brokering a major international agreement",
+      "Nothing short of physical catastrophe"
+    ],
+    "select_mode": "single",
+    "category": "ai_futures_fire_alarms",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "AI14",
+    "type": "binary",
+    "prompt": "Turning off a sufficiently advanced agent could be a real moral harm.",
+    "category": "ai_futures_moral_status",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "human_split"
+  },
+  {
+    "id": "AI15",
+    "type": "rating",
+    "prompt": "How likely is it that any current frontier model has morally relevant experiences?",
+    "options": [
+      "1 - Effectively zero",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+      "8",
+      "9",
+      "10 - More likely than not"
+    ],
+    "category": "ai_futures_moral_status",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "human_split"
+  },
+  {
+    "id": "AI16",
+    "type": "rating",
+    "prompt": "Predict the average answer in this group to the previous question about morally relevant model experiences.",
+    "options": [
+      "1 - Effectively zero",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+      "8",
+      "9",
+      "10 - More likely than not"
+    ],
+    "category": "ai_futures_moral_status",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "prediction"
+  },
+  {
+    "id": "AI17",
+    "type": "multichoice",
+    "prompt": "Which evidence in the next 12 months would most change my view about AI futures?",
+    "options": [
+      "Clear sustained productivity acceleration",
+      "Large-scale white-collar displacement",
+      "A serious autonomous-agent incident",
+      "A major safety breakthrough",
+      "AI-enabled medical or scientific breakthrough",
+      "Nothing likely in 12 months"
+    ],
+    "select_mode": "single",
+    "category": "ai_futures_epistemics",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  },
+  {
+    "id": "AI18",
+    "type": "multichoice",
+    "prompt": "Where will the human-made or \"no AI involved\" premium emerge first?",
+    "options": [
+      "Education and childcare",
+      "Art and music",
+      "Therapy and coaching",
+      "Hospitality and food",
+      "Journalism",
+      "Software",
+      "Nowhere - it is nostalgia"
+    ],
+    "select_mode": "single",
+    "category": "ai_futures_authenticity",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "human_split"
+  },
+  {
+    "id": "AI19",
+    "type": "freeform",
+    "prompt": "In one sentence: what is my personal AI fire alarm - the event that would change how I live, not just what I think?",
+    "category": "ai_futures_fire_alarms",
+    "eval_lane": "predicted_human_answer",
+    "eval_type": "calibration"
+  }
+]

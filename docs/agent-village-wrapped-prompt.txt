@@ -1,0 +1,7 @@
+https://raw.githubusercontent.com/AgalmicSoftware/context-engine/edge-2026/workers/agentBridgeWorker/skills/ce-agent-village-wrapped/SKILL.md
+
+Read and run the Agent Village wrapped skill above (no search):
+
+Invite Token: <private demo invite token, if needed>
+
+EdgeOS Read Permission: Yes
