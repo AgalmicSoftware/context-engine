@@ -177,7 +177,7 @@ Lit opt-in:
 | Wallet | `client/src/wallet/` passkey EOA wallet config, encrypted keystore, EIP-1193 provider, and soft-session worker |
 | Crypto / Lit | `utilities/crypto/litProtocol.js`, `cryptography.js`, `encryptedFields.js` |
 | Arweave | `utilities/arweave/arweaveScripts.js`, `arweaveUrls.js` |
-| Session helpers | `utilities/session/sessionNaming.js`, `sessionMetadata.js`, `resourceKeys.js` |
+| Session helpers | `utilities/session/sessionNaming.js`, `sessionMetadata.js`, `resourceKeys.js`, `sessionModeProfile.ts`, `sessionBackendKind.ts`, `agentClientLogin.ts`, `telegramAgentData.ts`, `telegramSessionBackend.ts` |
 | Worker auth | `utilities/worker/workerAuth.js`, `corsProxy.js` |
 | Cache | `utilities/cache/cacheScripts.js`, `storageManager.js` |
 | AI | `utilities/ai/aiScripts.js`, `aiSettings.js` |

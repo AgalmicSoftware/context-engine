@@ -222,85 +222,20 @@ The same wallet is used for:
 
 Open `/new`. The app canonicalizes that route to `/session/new`, but `/new` is the intended entry point.
 
-The first screen is the session-mode choice. A blank draft has nothing
-preselected. If this browser already has an explicit saved profile, the header
-shows that profile and offers `Continue with saved settings` instead of silently
-discarding or replacing it. Choosing a new preset immediately opens the
-four-stage setup with fields prefilled from the chosen mode; there is no
-separate Continue action for a new selection:
+The first screen is the session-mode choice. Nothing is preselected, and
+Continue stays disabled until the creator chooses a preset:
 
 - `Fast & Cheap (Cloudflare)` compiles to a Cloudflare-backed,
-  worker-canonical session shape with Cloudflare-internal worker encryption
-  (`worker_envelope`) enabled by default. After selection, the requirements
-  banner lists exactly a Cloudflare account and one AI-provider key. It does
-  not ask for Arweave, Lit, RPC, funding, faucet, or gas inputs.
+  worker-canonical session shape.
 - `Trustless & Public (Decentralized)` compiles to the public Arweave +
-  EVM-registry session shape. Its requirements banner lists the Arweave
-  wallet/JWK, RPC URL/key, AI provider key, and optional Lit key needed when
-  encryption is enabled.
+  EVM-registry session shape.
 
-The validated version-1 profile, rather than legacy top-level fields, determines
-which capabilities are reachable:
-
-| Reachable `/new` profile                   | Canonical authority and storage                              | Identity and Groups                                                                                | Chain-dependent capabilities                                                          |
-| ------------------------------------------ | ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| Fast & Cheap default                       | Session Worker + Cloudflare; `worker_envelope`               | Passkey + **Native Worker Groups**                                                                 | None; `evm.registryChainId` is `null`                                                 |
-| Custom Cloudflare, no encryption           | Session Worker + Cloudflare; `encryption: "none"`            | Passkey + **Native Worker Groups**                                                                 | None; `evm.registryChainId` is `null`                                                 |
-| Custom Cloudflare, Worker envelope         | Session Worker + Cloudflare; `encryption: "worker_envelope"` | Passkey + **Native Worker Groups**                                                                 | None unless an explicit `sbt_onchain` condition is added                              |
-| Custom Cloudflare + explicit `sbt_onchain` | Session Worker + Cloudflare; Worker envelope                 | Passkey + **Native Worker Groups**; SBT conditions are separate **Advanced on-chain access gates** | Positive chain ID and RPC; wallet/gas only when `/new` must create an SBT             |
-| Custom Cloudflare + Lit                    | Session Worker + Cloudflare; `encryption: "lit"`             | Passkey + **Native Worker Groups**                                                                 | Positive chain ID, RPC, and Lit credential; this does not make the registry canonical |
-| Trustless or custom Arweave                | EVM registry + Arweave; `encryption: "none"` or `"lit"`      | Wallet with passkey support + on-chain SBT Groups                                                  | Chain/RPC, registry transactions, gas, and Arweave; Lit also needs its credential     |
-
-Telegram, Mini App, Agent Session Wrapped, result-visibility, and export choices
-do not change that ownership split. Mini App requires Telegram. Profiles marked
-schema-only or unavailable, and malformed or cross-lineage profiles, do not
-receive partial capabilities: publication and downstream projection fail
-closed. A stored config with no version-1 profile may use the bounded legacy
-registry compatibility path only when its registry identity and positive chain
-are present; legacy chain fields never turn a validated chain-free Worker
-profile into a hybrid.
-
-After selection, the profile remains visible in the setup header. `Customize`
-switches to Advanced mode and opens Privacy instead of opening a separate
-technical popover. Profile settings follow the existing stages:
-
-- Privacy owns storage, encryption, decryption access, result visibility, and
-  small-group protection. Switching from Arweave to Cloudflare installs an
-  explicit role gate; switching back removes Cloudflare-only access fields.
-  Admin-only and public-redacted result modes remain visible as unavailable
-  until their complete read paths are enforced.
-- Worker owns optional participation channels such as Telegram, Telegram Mini App, and
-  Agent Session Wrapped. The website remains enabled. Wrapped is off by
-  default, deploys one additional dedicated per-session Bridge, and does not
-  implicitly enable Telegram. Telegram Mini App is independently selectable but
-  requires Telegram; disabling Telegram also disables its Mini App.
-- Deploy owns the export policy. Selected-channel export remains visible as
-  unavailable until the export runtime consumes that filter.
-
-Changing one of these values flips the profile to `custom`. Profile-based
-drafts do not also show the older `Session Storage` metadata editor, so storage
-has one visible authority. New session publishes write the
-`sessionModeProfile` profile as the source of truth and compile it down to the
-existing storage profile / payload-access fields for runtime compatibility.
-The publish boundary sends one canonical object-valued `storageProfile`; its
-backend, payload gate, encryption mode, and effective access-condition document
-must agree with the validated profile. Deploy, signed config mutation, and
-public Worker readback all fail closed on missing, ambiguous, or divergent
-profile/storage policy.
-Switching storage also replaces the mode-specific identity and authorization
-lineage: Cloudflare uses passkey plus Worker roles, while Arweave uses wallet
-plus on-chain SBT authorization. A stale wallet, Worker role, or legacy
-top-level chain ID cannot survive that switch as a hidden capability.
-The wizard validates that profile at the publish boundary and rechecks the live
-draft after asynchronous identity and duplicate-session preflight. A profile
-edit made while preflight is running therefore still stops before upload,
-worker, or registry side effects. Invalid settings are also shown in the stage
-where they are edited. Mode values are exact enums at every write boundary:
-explicit blanks, friendly aliases, unknown values, and reserved key providers
-are rejected rather than normalized to a less-protective default. Legacy aliases
-remain readable only for stored compatibility.
-Legacy `telegramOnly` fields are read only as a migration fallback and are not
-written by new sessions.
+Advanced per-axis changes, such as enabling the Telegram surface or changing
+storage/authority/encryption independently, flip the profile to `custom`. New
+session publishes write the `sessionModeProfile` profile as the source of truth
+and compile it down to the existing storage profile / payload-access fields for
+runtime compatibility. Legacy `telegramOnly` fields are read only as a migration
+fallback and are not written by new sessions.
 
 The normal-mode wizard is effectively four stages:
 

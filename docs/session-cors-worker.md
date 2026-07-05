@@ -54,6 +54,30 @@ origins.
 
 It also exposes canonical session storage routes for future backend routing: `POST /storage/upload`, `GET|POST /storage/read`, and `GET|POST /storage/list`. `/arweave/upload` remains supported for compatibility.
 
+## Agent Bridge Client Handoff
+
+The Telegram/agent bridge worker exposes the browser-facing agent handoff under
+canonical `/api/agent/*` routes:
+
+- `GET /api/agent/session-meta?sessionSlug=<slug>` returns public metadata for
+  the selected session, including the sanctioned `clientSubmitReady` boolean the
+  client uses to decide whether direct submit is deploy-ready.
+- `POST /api/agent/client-login/exchange` accepts a pasted raw `ceagt_` token
+  once and returns a short-TTL browser envelope. The web client stores only that
+  versioned envelope in tab-scoped `sessionStorage`; raw tokens must not be put
+  in URLs, localStorage, sessionStorage, Redux, or logs.
+- Telegram-first session reads and submits use the shared browser components
+  after one page-boundary backend-mode decision. `/session/demo` keeps its
+  existing demo/off-chain behavior.
+
+Hosted origin allowlists for the bridge live in deploy environment variables,
+not repo source: `AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS` for browser token
+exchange/result cache reads and `AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS` for Mini
+App origins. The current first-party set should include
+`https://contextengine.xyz`, `https://www.contextengine.xyz`, and the planned
+`https://contextengine.sh`, `https://www.contextengine.sh` origins before DNS
+cutover.
+
 ## OSS worker model
 
 - The project hosts a worker for the `demo-sh` session with embedded deploy-helper capability disabled.
