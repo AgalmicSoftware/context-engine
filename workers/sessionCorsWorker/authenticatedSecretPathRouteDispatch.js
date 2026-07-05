@@ -29,7 +29,7 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
     : (isStorageRoute ? 'storage' : 'arweave');
   const scope = isTranscribeRoute
     ? 'transcribe'
-    : 'arweave';
+    : (isStorageRoute && scopes?.storage === true ? 'storage' : 'arweave');
   const preflight = await deps?.evaluateAuthenticatedRoutePreflight?.({
     scopes,
     scope,

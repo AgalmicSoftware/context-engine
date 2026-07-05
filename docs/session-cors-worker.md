@@ -170,7 +170,7 @@ If you deploy via the Group Wizard and a deploy-helper:
   - If the hosted release-asset fetch fails, the normal-mode worker step or sponsored normal-mode Publish panel keeps the GitHub release asset URL as the default path and offers either a manual bundle URL override or `nvm use 20 && npm run worker:bundle` plus `/dist/sessionCorsWorker.bundle.js` as an optional local upload override.
   - `dist/sessionCorsWorker.bundle.js` remains a generated local/manual fallback bundle for upload retries, but the client build no longer serves `/worker/sessionCorsWorker.bundle.js`.
   - Advanced mode still keeps `Use URL` as the default path and preserves the manual `Upload file` override for testing.
-  - Scoped Chipotle identifiers and `litUsageApiKey` already flow end-to-end for worker-mediated Lit execution.
+  - Scoped Chipotle identifiers and `litUsageApiKey` already flow through the worker-mediated Lit execution path.
   - Authority-bundle bootstrap now centers on `litAccountApiKey` rather than payer-wallet delegation.
 - Login-stage auto-funding now retries the faucet request against `meta.sourceSessionSlug` / `meta.sourceWorkerUrl` when the new sponsored session has not published its own worker yet, so the freshly connected wallet can still get publish gas from the originating sponsored session.
 - After that first worker deploy, later worker config/secrets adjustments are expected to flow through the signed `/admin/set-config` and `/admin/set-secrets` routes rather than the streamlined normal-mode auto-deploy banner.
@@ -1252,4 +1252,4 @@ Warning: passing a Cloudflare API token to a deploy-helper requires trust.
 ## Future work
 
 We plan to explore TEE/attested proxy options for stronger trust guarantees in a future version.
-We may also migrate the proxy to a decentralized compute host (e.g., Akash or similar) to remove reliance on a single edge provider.
+We may also migrate the proxy to alternate compute hosts to reduce reliance on a single edge provider.
