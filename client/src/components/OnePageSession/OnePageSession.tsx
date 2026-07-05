@@ -779,10 +779,14 @@ class OnePageSession extends Component<any, any> {
     ).trim().replace(/\/+$/g, '');
   }
 
-  isTelegramBackendMode(sessionConfig: any = this.resolveCurrentSessionConfig()) {
+  isTelegramBackendMode(
+    sessionConfig: any = this.resolveCurrentSessionConfig(),
+    sessionSlug: any = this.resolveCurrentSessionSlug(),
+  ) {
     return resolveSessionBackendKind({
       sessionConfig,
       probeResult: this.state.telegramSessionMeta,
+      sessionSlug,
     }) === 'telegram';
   }
 
@@ -2845,6 +2849,7 @@ class OnePageSession extends Component<any, any> {
     const sessionBackendKind = resolveSessionBackendKind({
       sessionConfig: resolvedSessionConfig,
       probeResult: this.state.telegramSessionMeta,
+      sessionSlug: displaySessionSlug,
     });
 
     if (sessionBackendKind === 'telegram') {

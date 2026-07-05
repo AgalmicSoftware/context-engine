@@ -357,6 +357,26 @@ describe('OnePageSession view gating', () => {
     expect(screen.queryByTestId('survey-page-pile')).not.toBeInTheDocument();
   });
 
+  it('keeps /session/demo in the normal shell when stale telegram session-meta belongs to another slug', () => {
+    const subject = createSubject({
+      slug: 'demo',
+      sessionConfig: {
+        ...buildProps().sessionConfig,
+        slug: 'demo',
+        sessionMode: 'standard',
+      },
+    });
+    subject.state.telegramSessionMeta = {
+      ok: true,
+      sessionSlug: 'edge',
+      telegramOnly: true,
+      telegramBridgeEnabled: true,
+      clientSubmitReady: true,
+    };
+
+    expect(subject.isTelegramBackendMode(subject.resolveCurrentSessionConfig(), 'demo')).toBe(false);
+  });
+
   it('derives scoped Chipotle Lit hooks for embedded survey pages from session config', async () => {
     render(<OnePageSession
       {...buildProps()}
