@@ -51,6 +51,11 @@ passkey EOA-style test wallet.
     - `artifacts/session-workflows/gated-decrypt-all-types-<run-tag>.json`
     - `artifacts/screenshots/gated-decrypt-all-types-<run-tag>.png`
 - Expanded CE E2E backlog coverage runners:
+  - PRD 648 close-out smokes:
+    - `BASE_URL=http://127.0.0.1:3000 npm run ai:test-prd648:telegram-client`
+    - `BASE_URL=http://127.0.0.1:3000 npm run ai:test-prd648:new-mode`
+    - `BASE_URL=http://127.0.0.1:3000 npm run ai:test-prd648:session-demo`
+    - `BASE_URL=http://127.0.0.1:3000 npm run ai:test-prd648:closeout-smoke`
   - Session setup:
     - `npm run ai:test-session-setup:default-worker`
     - `npm run ai:test-session-setup:custom-worker-secrets`
