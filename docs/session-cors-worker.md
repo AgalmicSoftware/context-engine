@@ -262,33 +262,79 @@ Authenticated clients can use the worker as the session storage boundary:
 
 Cloudflare storage bindings are optional until a session selects `storageProfile.backend = "cloudflare"` at creation time in `/new`; legacy doc-library configs with `docLibrary.provider = "cloudflare"` are also accepted by the worker for storage route compatibility. Backend mutation/migration is out of scope for now. This is payload storage for session context, docs, media, questions, surveys, responses, and generated artifacts; it is not user preference/profile storage. Tests use mocked R2/KV contracts; no Cloudflare credentials are needed for local verification. The worker accepts `CE_STORAGE_R2`/`STORAGE_R2`/`R2_BUCKET` for preferred blob storage and `CE_STORAGE_INDEX_KV`/`STORAGE_INDEX_KV`/`STORAGE_KV` for metadata indexes plus the KV-only payload fallback. One-click deploys that receive a Cloudflare storage profile bind the created session KV namespace as both `GROUP_KV` and `CE_STORAGE_INDEX_KV`, then persist a sanitized `storageProfile` in `session:{slug}:config`. If the deploy request explicitly asks for R2 storage, it must provide an existing bucket name so the helper can bind it as `CE_STORAGE_R2`; otherwise the helper fails before provisioning partial Cloudflare resources. Cloudflare refs must not include account IDs, bucket names, raw object keys, worker tokens, long-lived URLs, or secrets.
 
-`storageProfile.payloadAccessControl.mode` controls Cloudflare payload access:
+`storageProfile.payloadAccessControl` is the worker enforcement contract. New configs use:
 
-- `worker_sbt_gate` is the default for Cloudflare-backed Telegram/demo sessions. It is worker-enforced access control, not end-to-end encryption. The worker resolves the resource gate (`docsContext` -> `docUploads`, `questions`/`responses` -> `questionResponses`, `surveys`/`generatedArtifacts` -> `surveyResponses`) and checks the requester against the configured SBTs on the gate chain using the configured RPC before upload, list, or read bytes are exposed.
-- `public_read` keeps canonical payloads in Cloudflare but serves read/list requests without wallet auth. Uploads still require authenticated session worker requests. Use this for public question prompts or public response summaries that should render identically across Arweave, Cloudflare, Telegram, Mini App, and the CE client.
-- `lit_encrypted` is the stronger scaffolded mode. Cloudflare stores only encrypted payload envelopes and Lit governs decrypt. The worker rejects plaintext Cloudflare uploads in this mode until the client/session path supplies `payloadEncrypted=true` with a Lit-encrypted envelope.
+```json
+{ "gate": "none|sbt_gate|group_gate|role_gate", "encryption": "none|worker_envelope|lit" }
+```
 
-Lit credentials are required only for `lit-arweave` storage or Cloudflare `lit_encrypted` payload mode. Cloudflare `worker_sbt_gate` and `public_read` hide the `/new` Lit key input; `worker_sbt_gate` relies on the session worker SBT check while `public_read` relies on the operator intentionally publishing the payload.
+The worker still read-normalizes legacy `payloadAccessControl.mode`, `cloudflare.payloadAccessMode`, and stored `payloadAccessMode` values forever:
+
+- `public_read` -> `{ "gate": "none", "encryption": "none" }`
+- `worker_sbt_gate` -> `{ "gate": "sbt_gate", "encryption": "none" }`
+- `lit_encrypted` -> `{ "gate": "none", "encryption": "lit" }`
+
+Where older clients still need one string, the worker and client derive the legacy `payloadAccessMode` from the v2 object.
+
+- `gate: "sbt_gate"` is the default for Cloudflare-backed Telegram/demo sessions. It is worker-enforced access control, not end-to-end encryption. The worker resolves the resource gate (`docsContext` -> `docUploads`, `questions`/`responses` -> `questionResponses`, `surveys`/`generatedArtifacts` -> `surveyResponses`) and checks the requester against the configured SBTs on the gate chain using the configured RPC before upload, list, or read bytes are exposed.
+- `gate: "none"` keeps canonical payloads in Cloudflare but serves read/list requests without wallet auth. Uploads still require authenticated session worker requests unless the caller is already on an anonymous read/list route. Use this for public question prompts or public response summaries that should render identically across Arweave, Cloudflare, Telegram, Mini App, and the CE client.
+- `encryption: "lit"` keeps the existing Lit scaffold. Cloudflare stores only caller-supplied encrypted payload envelopes and Lit governs decrypt. The worker rejects plaintext Cloudflare uploads in this mode until the client/session path supplies `payloadEncrypted=true` with a Lit-encrypted envelope.
+- `encryption: "worker_envelope"` encrypts payload bytes at rest inside the session worker trust domain, then releases keys only after worker-evaluated conditions pass. The operator and Cloudflare runtime can decrypt. This mode protects against storage-layer dumps of R2/KV/D1 data, backups, or bucket/index misconfiguration; it is not decentralized, not end-to-end, and not private from the session operator or Cloudflare runtime. Audience removal stops future key release, but cannot un-read plaintext already fetched.
+
+Lit credentials are required only for `lit-arweave` storage or Cloudflare `encryption: "lit"` payload mode. Cloudflare `sbt_gate`, `worker_envelope`, and `none` modes hide the `/new` Lit key input; `sbt_gate` relies on the session worker SBT check while `none` relies on the operator intentionally publishing the payload. `worker_envelope` is accepted by profile validation only when the explicit worker-envelope feature flag is enabled and is not selectable in `/new` in this phase.
+
+### Worker Envelope Encryption
+
+`worker_envelope` uses WebCrypto AES-256-GCM and the existing session config/index stores:
+
+- Deployment KEK: read from the Worker secret `CE_STORAGE_ENVELOPE_KEK` through the `worker_secret` key provider. The plaintext KEK is never stored in KV, D1, or R2. `CE_STORAGE_ENVELOPE_PREVIOUS_KEK` is optional during deployment-key rotation so old session KEKs can be unwrapped and rewrapped under the current secret.
+- Session KEK: generated on the first envelope write for a session, wrapped by the deployment KEK, and stored in `session:{slug}:config` under `storageEnvelope.sessionKey`.
+- Payload DEK: generated per payload, used to encrypt the stored bytes, wrapped by the session KEK, and stored in payload metadata with the envelope algorithm, IVs, key id, and condition reference.
+
+Reads authorize first, then unwrap the DEK, decrypt the payload, return `Cache-Control: private, no-store`, and write one key-release audit event. The audit store is D1 when a `CE_STORAGE_AUDIT_D1`/`STORAGE_AUDIT_D1`/`DB` binding is present; otherwise it uses `CE_STORAGE_AUDIT_KV` or the storage index KV. If no audit store is available, key release fails closed.
+
+Access conditions may be attached per payload or at session level:
+
+```json
+{
+  "match": "any",
+  "conditions": [
+    { "kind": "worker_role", "role": "admin" },
+    { "kind": "sbt_onchain", "chainId": 11155420, "contract": "0x..." },
+    { "kind": "agent_grant_scope", "scope": "storage" }
+  ]
+}
+```
+
+`match: "any"` releases when any condition passes; `match: "all"` requires every condition. Empty or missing conditions fall back to the configured gate. Unknown condition kinds fail closed. `worker_group` is recognized but reserved and currently fails closed with `reserved_condition_kind`.
+
+`POST /admin/rotate-envelope-keys` is admin-signed. It rewraps payload DEKs under a new session KEK and stores the session KEK wrapped by the current deployment KEK without re-encrypting payload bytes.
 
 ## Required bindings
 
 KV:
 - `GROUP_KV`
 - `CE_STORAGE_INDEX_KV` (or `STORAGE_INDEX_KV` / `STORAGE_KV`) when Cloudflare payload storage uses KV metadata/index rows, and required for KV-only payload fallback. The deploy helper aliases the same newly created namespace as `GROUP_KV` and `CE_STORAGE_INDEX_KV` for Cloudflare-backed sessions.
+- `CE_STORAGE_AUDIT_KV` (optional) for worker-envelope key-release audit events. If omitted, the worker uses the storage index KV for audit rows when no D1 audit binding is present.
 
 R2/D1:
 - `CE_STORAGE_R2` (or `STORAGE_R2` / `R2_BUCKET`) for preferred Cloudflare payload blobs. One-click deploys bind this only when the request supplies an existing R2 bucket name.
+- `CE_STORAGE_AUDIT_D1` (or `STORAGE_AUDIT_D1` / `DB`) for worker-envelope key-release audit events when the deployment wants a queryable audit table.
 - D1 may be linked for queryable metadata/indexes where a deployment models those indexes in D1 instead of KV; ordinary payload bytes should stay in R2.
 - Durable Objects are for signer/runtime coordination only, not ordinary session payload blobs.
 
 Vars:
 - `TOKEN_HMAC_SECRET` (HMAC secret for session tokens)
+- `CE_STORAGE_ENVELOPE_KEK` (Worker secret for `worker_envelope`; required only when sessions use `encryption: "worker_envelope"`)
+- `CE_STORAGE_ENVELOPE_PREVIOUS_KEK` (optional Worker secret used only while rewrapping old session KEKs after deployment-key rotation)
 - `DEFAULT_SESSION_SLUG` (optional; canonical)
 - `DEFAULT_GROUP_SLUG` (optional; legacy alias still read for compatibility)
 - `DEPLOY_HELPER_ENABLED` (optional; only if you embed deploy endpoints in the same worker)
 - `LIT_ACCOUNT_API_KEY` or `LIT_USAGE_API_KEY` (optional; used for worker-mediated Lit Chipotle execution when no per-session Lit account or usage key has been stored yet, or when a sponsor intentionally runs a shared-account model)
 - `LIT_API_BASE` (optional; defaults to `https://api.chipotle.litprotocol.com`; production requests are restricted to the approved Chipotle API host)
 - `LIT_CHIPOTLE_ALLOW_LOCAL_API_BASE` (optional; dev/test only, allows `LIT_API_BASE` to target localhost/loopback Chipotle stubs over `http` or `https`)
+
+For local `wrangler dev` placeholders, see `workers/sessionCorsWorker/.dev.vars.example`. Keep real `.dev.vars` files untracked.
 
 Runtime:
 - Enable Node.js compatibility when deploying from the dashboard.
@@ -302,7 +348,20 @@ Runtime:
     "storageProfile": {
       "backend": "cloudflare",
       "resources": { "docsContext": "active", "questions": "active", "surveys": "active", "responses": "active" },
-      "payloadAccessControl": { "mode": "worker_sbt_gate" }
+      "payloadAccessControl": { "gate": "sbt_gate", "encryption": "none" },
+      "cloudflare": { "payloadAccessMode": "worker_sbt_gate" }
+    },
+    "storageEnvelope": {
+      "version": 1,
+      "keyProvider": "worker_secret",
+      "sessionKey": {
+        "version": 1,
+        "keyProvider": "worker_secret",
+        "alg": "AES-256-GCM",
+        "wrapAlg": "AES-GCM-KW-v1",
+        "iv": "base64url-wrapped-iv",
+        "wrappedKey": "base64url-wrapped-session-kek"
+      }
     },
     "slug": "test-72",
     "networkChainId": 11155420,

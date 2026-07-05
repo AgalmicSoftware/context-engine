@@ -44,10 +44,7 @@ const SessionWizardStorageProfileField = ({
     onStorageProfileChange(normalizeSessionStorageProfileConfig({
       ...rawValue,
       backend: SESSION_STORAGE_BACKENDS.CLOUDFLARE,
-      payloadAccessControl: {
-        ...toObject(storageProfile.payloadAccessControl),
-        mode,
-      },
+      payloadAccessControl: { mode },
     }));
   };
 

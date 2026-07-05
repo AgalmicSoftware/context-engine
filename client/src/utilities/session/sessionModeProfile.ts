@@ -3,7 +3,10 @@ import {
   normalizeStorageBackend,
 } from '../storage/storageRefs.js';
 import {
-  SESSION_STORAGE_PAYLOAD_ACCESS_MODES,
+  SESSION_STORAGE_PAYLOAD_ACCESS_GATES,
+  SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES,
+  deriveLegacyPayloadAccessMode,
+  normalizeSessionStoragePayloadAccessControl,
 } from '../storage/sessionStorageConfig.js';
 
 type UnknownRecord = Record<string, unknown>;
@@ -65,6 +68,11 @@ export type SessionModeProfile = {
   evm: { registryChainId: number | null };
   storage: {
     backend: SessionModeStorageBackend;
+    payloadAccessControl?: {
+      gate?: typeof SESSION_STORAGE_PAYLOAD_ACCESS_GATES[keyof typeof SESSION_STORAGE_PAYLOAD_ACCESS_GATES];
+      encryption?: typeof SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES[keyof typeof SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES];
+      mode?: string;
+    };
     resources?: Partial<Record<SessionModeResourceKey, {
       stage: 'active' | 'staged';
       backendOverride?: string;
@@ -105,6 +113,10 @@ export type SessionModeProfileValidationIssue = {
 
 export type CompiledSessionModeProfile = {
   storageProfile: UnknownRecord;
+  payloadAccessControl: {
+    gate: typeof SESSION_STORAGE_PAYLOAD_ACCESS_GATES[keyof typeof SESSION_STORAGE_PAYLOAD_ACCESS_GATES];
+    encryption: typeof SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES[keyof typeof SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES];
+  };
   payloadAccessMode: string;
   authorityMode: SessionModeAuthorityMode;
   telegramBridgeEnabled: boolean;
@@ -196,6 +208,25 @@ const hasParticipantGate = (profile: SessionModeProfile): boolean => (
   ))
 );
 
+const resolveProfilePayloadAccessControl = (profile: SessionModeProfile): CompiledSessionModeProfile['payloadAccessControl'] => {
+  const explicitStorageAccess = isRecord(profile.storage.payloadAccessControl)
+    ? normalizeSessionStoragePayloadAccessControl(profile.storage.payloadAccessControl)
+    : null;
+  const encryption = profile.encryption.mode === 'lit'
+    ? SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES.LIT
+    : (profile.encryption.mode === 'worker_envelope'
+      ? SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE
+      : SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES.NONE);
+  const gate = encryption === SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES.LIT
+    ? SESSION_STORAGE_PAYLOAD_ACCESS_GATES.NONE
+    : (explicitStorageAccess?.gate || (
+      hasParticipantGate(profile)
+        ? SESSION_STORAGE_PAYLOAD_ACCESS_GATES.SBT_GATE
+        : SESSION_STORAGE_PAYLOAD_ACCESS_GATES.NONE
+    ));
+  return { gate, encryption };
+};
+
 export const SESSION_MODE_PRESETS: Readonly<Record<Exclude<SessionModePresetId, 'custom'>, SessionModeProfile>> = Object.freeze({
   fast_cheap_cloudflare: {
     profileVersion: SESSION_MODE_PROFILE_VERSION,
@@ -257,8 +288,32 @@ export const cloneSessionModePreset = (
   preset: Exclude<SessionModePresetId, 'custom'>
 ): SessionModeProfile => deepClone(SESSION_MODE_PRESETS[preset]);
 
+export const mergeSessionModeProfileStorageAccess = (
+  profile: SessionModeProfile,
+  storageProfile: unknown
+): SessionModeProfile => {
+  const next = deepClone(profile);
+  const storage = isRecord(storageProfile) ? storageProfile : {};
+  const backend = normalizeStorageBackend(storage.backend);
+  if (backend === STORAGE_BACKENDS.CLOUDFLARE && isRecord(storage.payloadAccessControl)) {
+    const accessControl = normalizeSessionStoragePayloadAccessControl(storage.payloadAccessControl);
+    next.storage = {
+      ...next.storage,
+      payloadAccessControl: {
+        gate: accessControl.gate,
+        encryption: accessControl.encryption,
+      },
+    };
+  } else if (next.storage?.payloadAccessControl) {
+    next.storage = { ...next.storage };
+    delete next.storage.payloadAccessControl;
+  }
+  return next;
+};
+
 export const validateSessionModeProfile = (
-  profile: SessionModeProfile
+  profile: SessionModeProfile,
+  opts: { enableWorkerEnvelope?: boolean } = {}
 ): { valid: boolean; issues: SessionModeProfileValidationIssue[] } => {
   const issues: SessionModeProfileValidationIssue[] = [];
   const addIssue = (path: string, code: string, message: string) => {
@@ -271,8 +326,17 @@ export const validateSessionModeProfile = (
   if (profile.authority?.mode === 'org_private_chain') {
     addIssue('authority.mode', 'reserved', 'Private-chain authority is reserved for a later implementation.');
   }
-  if (profile.encryption?.mode === 'worker_envelope') {
-    addIssue('encryption.mode', 'reserved', 'Worker envelope encryption is reserved for a later implementation.');
+  const workerEnvelopeEnabled = opts.enableWorkerEnvelope === true ||
+    String(process.env.REACT_APP_CE_ENABLE_WORKER_ENVELOPE || '').trim().toLowerCase() === 'true';
+  if (profile.encryption?.mode === 'worker_envelope' && !workerEnvelopeEnabled) {
+    addIssue('encryption.mode', 'worker_envelope_feature_disabled', 'Worker envelope encryption requires the explicit feature flag.');
+  }
+  if (
+    profile.encryption?.mode === 'worker_envelope' &&
+    profile.encryption?.keyProvider &&
+    profile.encryption.keyProvider !== 'worker_secret'
+  ) {
+    addIssue('encryption.keyProvider', 'reserved', 'Only the worker_secret key provider is implemented for worker envelope encryption.');
   }
   if (profile.encryption?.mode === 'lit' && profile.authority?.mode === 'org_private_chain') {
     addIssue('encryption.mode', 'lit_private_chain_invalid', 'Lit encryption cannot evaluate private-chain state.');
@@ -310,11 +374,8 @@ export const compileSessionModeProfile = (
   const storageBackend = profile.storage.backend === 'cloudflare'
     ? STORAGE_BACKENDS.CLOUDFLARE
     : STORAGE_BACKENDS.ARWEAVE;
-  const payloadAccessMode = profile.encryption.mode === 'lit'
-    ? SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED
-    : (hasParticipantGate(profile)
-      ? SESSION_STORAGE_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE
-      : SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ);
+  const payloadAccessControl = resolveProfilePayloadAccessControl(profile);
+  const payloadAccessMode = deriveLegacyPayloadAccessMode(payloadAccessControl);
   const storageProfile: UnknownRecord = {
     type: 'session_storage_profile',
     version: 'session-storage-profile-v1',
@@ -325,12 +386,13 @@ export const compileSessionModeProfile = (
   };
 
   if (storageBackend === STORAGE_BACKENDS.CLOUDFLARE) {
-    storageProfile.payloadAccessControl = { mode: payloadAccessMode };
+    storageProfile.payloadAccessControl = { ...payloadAccessControl };
     storageProfile.cloudflare = { payloadAccessMode };
   }
 
   return {
     storageProfile,
+    payloadAccessControl,
     payloadAccessMode,
     authorityMode: profile.authority.mode,
     telegramBridgeEnabled: profile.surfaces.telegram === true,

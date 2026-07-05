@@ -62,6 +62,7 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
         config,
         slug,
         uploaderAddress: address,
+        authScopes: scopes,
         baseHeaders: headers,
       }),
     };

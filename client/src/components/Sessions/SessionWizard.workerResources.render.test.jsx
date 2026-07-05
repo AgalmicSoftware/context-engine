@@ -24,10 +24,22 @@ describe('SessionWizard worker resource rendering', () => {
     return screen.findByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
   };
 
+  const selectPreset = async (presetId) => {
+    const testId = `ce-new-preset-${presetId}`;
+    fireEvent.click(screen.getByTestId(testId));
+    await waitFor(() => {
+      expect(screen.getByTestId(testId)).toHaveAttribute('aria-checked', 'true');
+    });
+  };
+
+  const selectFastCheapPreset = async () => selectPreset('fast_cheap_cloudflare');
+  const selectTrustlessPublicPreset = async () => selectPreset('trustless_public_decentralized');
+
   it('keeps session storage profile selection in advanced mode and defaults to Arweave', async () => {
     renderLoggedInSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    await selectTrustlessPublicPreset();
     expect(screen.queryByText('Session Storage')).not.toBeInTheDocument();
 
     enableAdvancedMode();
@@ -61,6 +73,7 @@ describe('SessionWizard worker resource rendering', () => {
     renderLoggedInSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    await selectTrustlessPublicPreset();
     enableAdvancedMode();
     fireEvent.click(screen.getByRole('button', { name: 'Session Storage expand' }));
 
@@ -94,6 +107,7 @@ describe('SessionWizard worker resource rendering', () => {
     renderLoggedInSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    await selectTrustlessPublicPreset();
     enableAdvancedMode();
     fireEvent.click(screen.getByRole('button', { name: 'Session Storage expand' }));
 
@@ -147,6 +161,8 @@ describe('SessionWizard worker resource rendering', () => {
     }));
 
     renderLoggedInSessionWizard();
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    await selectFastCheapPreset();
     enableAdvancedMode();
 
     const publishButton = await openPublishSection();
