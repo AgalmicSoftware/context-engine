@@ -3076,6 +3076,71 @@ test('Telegram session-meta exposes public client submit readiness', async () =>
   assert.doesNotMatch(JSON.stringify(body), /token|secret|private/i);
 });
 
+test('Telegram session-meta reads sessionModeProfile before legacy flags', async () => {
+  const env = telegramOnlyEnv({
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'profile-telegram',
+      sessions: [{
+        sessionSlug: 'profile-telegram',
+        sessionName: 'Profile Telegram',
+        telegramBridgeEnabled: false,
+        telegramOnly: false,
+        sessionModeProfile: {
+          profileVersion: 1,
+          preset: 'custom',
+          authority: { mode: 'worker_canonical' },
+          evm: { registryChainId: null },
+          storage: { backend: 'cloudflare' },
+          identity: { default: 'passkey', enabled: ['passkey', 'telegram'] },
+          authorization: { mechanisms: ['worker_roles'] },
+          encryption: { mode: 'none' },
+          surfaces: { web: true, telegram: true, miniApp: true, agentHttp: false, mcp: false, ceCc: false },
+          results: { visibility: 'participant_aggregate' },
+          export: { scope: 'admin_raw' },
+        },
+      }, {
+        sessionSlug: 'profile-web',
+        sessionName: 'Profile Web',
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+        sessionModeProfile: {
+          profileVersion: 1,
+          preset: 'custom',
+          authority: { mode: 'worker_canonical' },
+          evm: { registryChainId: null },
+          storage: { backend: 'cloudflare' },
+          identity: { default: 'passkey', enabled: ['passkey'] },
+          authorization: { mechanisms: ['worker_roles'] },
+          encryption: { mode: 'none' },
+          surfaces: { web: true, telegram: false, miniApp: false, agentHttp: false, mcp: false, ceCc: false },
+          results: { visibility: 'participant_aggregate' },
+          export: { scope: 'admin_raw' },
+        },
+      }],
+    }),
+  });
+
+  const profileTelegramResponse = await handleTelegramAgentHandoffRequest({
+    request: new Request('https://bridge.example/api/agent/session-meta?sessionSlug=profile-telegram'),
+    env,
+  });
+  const profileTelegram = await jsonBody(profileTelegramResponse);
+  assert.equal(profileTelegramResponse.status, 200);
+  assert.equal(profileTelegram.telegramOnly, true);
+  assert.equal(profileTelegram.telegramBridgeEnabled, true);
+  assert.equal(profileTelegram.clientSubmitReady, true);
+
+  const profileWebResponse = await handleTelegramAgentHandoffRequest({
+    request: new Request('https://bridge.example/api/agent/session-meta?sessionSlug=profile-web'),
+    env,
+  });
+  const profileWeb = await jsonBody(profileWebResponse);
+  assert.equal(profileWebResponse.status, 200);
+  assert.equal(profileWeb.telegramOnly, false);
+  assert.equal(profileWeb.telegramBridgeEnabled, false);
+  assert.equal(profileWeb.clientSubmitReady, false);
+});
+
 test('Telegram session-meta reports non-telegram and unknown sessions as not telegram-only', async () => {
   const env = baseEnv();
   const alphaResponse = await handleTelegramAgentHandoffRequest({

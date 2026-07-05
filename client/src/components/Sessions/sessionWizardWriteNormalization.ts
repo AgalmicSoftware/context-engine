@@ -24,7 +24,12 @@ import {
   isWorkerSbtGateCloudflareStorageProfile,
   normalizeSessionStorageProfileConfig,
 } from './sessionWizardStorageProfile';
-import { isTelegramFirstSessionConfig } from '../../utilities/session/sessionBackendKind';
+import {
+  compileSessionModeProfile,
+  hasLegacyTelegramFirstSessionFlags,
+  profileFromLegacyConfig,
+  type SessionModeProfile,
+} from '../../utilities/session/sessionModeProfile';
 import type {
   AnyRecord,
   ChainIdLike,
@@ -110,26 +115,18 @@ export const sanitizeSessionWizardMetadataPayload = (metadata: AnyRecord, {
   next = normalizeSessionNaming(next) as AnyRecord;
   next.sessionName = trimString(next.sessionName);
   next.sessionInfo = trimString(next.sessionInfo);
-  next.telegramOnly = isTelegramFirstSessionConfig(next);
   delete next.telegram_only;
+  if (!next.sessionModeProfile && hasLegacyTelegramFirstSessionFlags(next)) {
+    next.sessionModeProfile = profileFromLegacyConfig(next);
+  }
+  delete next.telegramOnly;
   delete next.telegramMode;
-  if (next.telegramOnly) {
-    next.sessionMode = 'telegram_only';
-    next.telegramBridgeEnabled = true;
-    next.telegram = {
-      ...(isObj(next.telegram) ? next.telegram : {}),
-      mode: 'telegram_only',
-      only: true,
-    };
-  } else {
-    delete next.telegramOnly;
-    delete next.telegramBridgeEnabled;
-    delete next.sessionMode;
-    if (isObj(next.telegram)) {
-      delete next.telegram.only;
-      delete next.telegram.mode;
-      if (!Object.keys(next.telegram).length) delete next.telegram;
-    }
+  delete next.telegramBridgeEnabled;
+  delete next.sessionMode;
+  if (isObj(next.telegram)) {
+    delete next.telegram.only;
+    delete next.telegram.mode;
+    if (!Object.keys(next.telegram).length) delete next.telegram;
   }
   if (!next.sessionName) delete next.sessionName;
   if (!next.sessionInfo) delete next.sessionInfo;
@@ -180,7 +177,10 @@ export const sanitizeSessionWizardMetadataPayload = (metadata: AnyRecord, {
     }
   }
 
-  if (Object.prototype.hasOwnProperty.call(next, 'storageProfile')) {
+  if (isObj(next.sessionModeProfile)) {
+    const compiled = compileSessionModeProfile(next.sessionModeProfile as SessionModeProfile);
+    next.storageProfile = normalizeSessionStorageProfileConfig(compiled.storageProfile);
+  } else if (Object.prototype.hasOwnProperty.call(next, 'storageProfile')) {
     next.storageProfile = normalizeSessionStorageProfileConfig(next.storageProfile);
   }
 
@@ -268,7 +268,17 @@ export const buildSessionWizardWorkerConfigPayload = ({
     };
   });
 
-  const storageProfile = normalizeSessionStorageProfileConfig(resolvedDraft.storageProfile || resolvedDeployPayload.storageProfile);
+  const sessionModeProfile = isObj(resolvedDraft.sessionModeProfile)
+    ? resolvedDraft.sessionModeProfile as SessionModeProfile
+    : (hasLegacyTelegramFirstSessionFlags(resolvedDraft)
+      ? profileFromLegacyConfig(resolvedDraft)
+      : null);
+  const compiledProfile = sessionModeProfile ? compileSessionModeProfile(sessionModeProfile) : null;
+  const storageProfile = normalizeSessionStorageProfileConfig(
+    compiledProfile?.storageProfile ||
+    resolvedDraft.storageProfile ||
+    resolvedDeployPayload.storageProfile
+  );
   const next: AnyRecord = {
     slug: trimString(slug),
     adminAddress: trimString(resolvedDeployPayload.adminAddress || account),
@@ -291,13 +301,9 @@ export const buildSessionWizardWorkerConfigPayload = ({
     litCredentials: isWorkerSbtGateCloudflareStorageProfile(storageProfile)
       ? {}
       : buildWorkerLitCredentialsConfig(workerSecrets),
+    ...(sessionModeProfile ? { sessionModeProfile: cloneValue(sessionModeProfile) } : {}),
     storageProfile,
   };
-  if (resolvedDraft.telegramOnly === true) {
-    next.telegramOnly = true;
-    next.sessionMode = 'telegram_only';
-    next.telegramBridgeEnabled = true;
-  }
 
   if (
     typeof resolvedDeployPayload.embeddedDeployHelperEnabled === 'boolean' ||
