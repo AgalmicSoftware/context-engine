@@ -74,6 +74,41 @@ function plainObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value);
 }
 
+function sessionModeProfile(session = {}) {
+  return plainObject(session.sessionModeProfile) ? session.sessionModeProfile : null;
+}
+
+function sessionModeProfileSurfaces(session = {}) {
+  const profile = sessionModeProfile(session);
+  return plainObject(profile?.surfaces) ? profile.surfaces : null;
+}
+
+function sessionModeProfileAuthority(session = {}) {
+  const profile = sessionModeProfile(session);
+  return plainObject(profile?.authority) ? profile.authority : null;
+}
+
+function legacyTelegramOnlySession(session = {}) {
+  return (
+    normalizeBool(session.telegramOnly) ||
+    normalizeBool(session.telegram_only) ||
+    normalizeBool(session.telegram?.only) ||
+    safeString(session.sessionMode || session.mode || session.telegramMode || session.telegram?.mode).toLowerCase() === 'telegram_only'
+  );
+}
+
+function sessionModeProfileTelegramEnabled(session = {}) {
+  const surfaces = sessionModeProfileSurfaces(session);
+  return surfaces ? surfaces.telegram === true : null;
+}
+
+function sessionModeProfileTelegramFirst(session = {}) {
+  const surfaces = sessionModeProfileSurfaces(session);
+  const authority = sessionModeProfileAuthority(session);
+  if (!surfaces || !authority) return null;
+  return surfaces.telegram === true && authority.mode === 'worker_canonical';
+}
+
 function normalizeLightweightGroups(session = {}) {
   const groups = Array.isArray(session.lightweightGroups)
     ? session.lightweightGroups
@@ -234,7 +269,10 @@ export function normalizeSessionPolicy(input = {}, {
   const sessions = Array.isArray(input.sessions)
     ? input.sessions
     : (Array.isArray(input.linkedSessions) ? input.linkedSessions : []);
-  const linkedSessions = sessions.map((session) => ({
+  const linkedSessions = sessions.map((session) => {
+    const profileTelegramEnabled = sessionModeProfileTelegramEnabled(session);
+    const profileTelegramFirst = sessionModeProfileTelegramFirst(session);
+    return {
     sessionMode: safeString(session.sessionMode || session.mode || session.telegramMode || session.telegram?.mode).toLowerCase(),
     sessionSlug: safeString(session.sessionSlug || session.slug || session.name).toLowerCase(),
     sessionName: safeString(session.sessionName || session.name || session.slug),
@@ -285,13 +323,11 @@ export function normalizeSessionPolicy(input = {}, {
       .filter(Boolean)
       .slice(0, 20),
     default: session.default === true,
-    telegramBridgeEnabled: session.telegramBridgeEnabled !== false,
-    telegramOnly: (
-      normalizeBool(session.telegramOnly) ||
-      normalizeBool(session.telegram_only) ||
-      normalizeBool(session.telegram?.only) ||
-      safeString(session.sessionMode || session.mode || session.telegramMode || session.telegram?.mode).toLowerCase() === 'telegram_only'
-    ),
+    telegramBridgeEnabled: profileTelegramEnabled === null
+      ? session.telegramBridgeEnabled !== false
+      : profileTelegramEnabled,
+    telegramOnly: profileTelegramFirst === null ? legacyTelegramOnlySession(session) : profileTelegramFirst,
+    sessionModeProfile: sessionModeProfile(session) ? { ...sessionModeProfile(session) } : null,
     managedAccountSubmitAllowed: session.managedAccountSubmitAllowed === true,
     sponsoredAiAllowed: session.sponsoredAiAllowed === true,
     sponsoredRpcAllowed: session.sponsoredRpcAllowed === true,
@@ -416,7 +452,8 @@ export function normalizeSessionPolicy(input = {}, {
       input.surveyContractAddress
     ) || null,
     chainId: safeString(session.chainId || input.chainId || input.defaultChainId) || null,
-  })).filter((session) => SESSION_SLUG_RE.test(session.sessionSlug));
+  };
+  }).filter((session) => SESSION_SLUG_RE.test(session.sessionSlug));
   const baseDefaultSessionSlug = safeString(
     input.defaultSessionSlug ||
     input.defaultSession ||

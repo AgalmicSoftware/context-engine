@@ -19,7 +19,12 @@ import {
   resolveSessionWizardAutoFeatureBySessionSlug,
 } from './sessionWizardAiConfig';
 import { normalizeSessionStorageProfileConfig } from './sessionWizardStorageProfile';
-import { isTelegramFirstSessionConfig } from '../../utilities/session/sessionBackendKind';
+import {
+  compileSessionModeProfile,
+  hasLegacyTelegramFirstSessionFlags,
+  profileFromLegacyConfig,
+  type SessionModeProfile,
+} from '../../utilities/session/sessionModeProfile';
 import type { AnyRecord } from '../shellTypes';
 
 const { getPathRpcUrl } = rpcDefaults;
@@ -44,9 +49,19 @@ export const normalizeSessionWizardDraftShape = (draftIn: AnyRecord = {}): AnyRe
   const chainId = Number(draft.networkChainId || DEFAULT_CHAIN_ID || 0) || DEFAULT_CHAIN_ID;
   draft.sessionName = toStr(draft.sessionName || '').trim();
   draft.sessionInfo = toStr(draft.sessionInfo || '').trim();
-  draft.telegramOnly = isTelegramFirstSessionConfig(draft);
   delete draft.telegram_only;
+  delete draft.telegramOnly;
   delete draft.telegramMode;
+  delete draft.sessionMode;
+  delete draft.telegramBridgeEnabled;
+  if (draft.telegram && typeof draft.telegram === 'object') {
+    delete draft.telegram.only;
+    delete draft.telegram.mode;
+    if (!Object.keys(draft.telegram).length) delete draft.telegram;
+  }
+  if (!draft.sessionModeProfile && hasLegacyTelegramFirstSessionFlags(draftIn)) {
+    draft.sessionModeProfile = profileFromLegacyConfig(draftIn);
+  }
   if (!draft.sessionInfoEncrypted) {
     delete draft.sessionInfoEncrypted;
   }
@@ -111,7 +126,12 @@ export const normalizeSessionWizardDraftShape = (draftIn: AnyRecord = {}): AnyRe
   if (typeof draft.embeddedDeployHelperEnabled !== 'boolean') {
     draft.embeddedDeployHelperEnabled = CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED !== false;
   }
-  draft.storageProfile = normalizeSessionStorageProfileConfig(draft.storageProfile || draft.sessionStorageProfile || draft.storage);
+  if (draft.sessionModeProfile && typeof draft.sessionModeProfile === 'object') {
+    const compiled = compileSessionModeProfile(draft.sessionModeProfile as SessionModeProfile);
+    draft.storageProfile = normalizeSessionStorageProfileConfig(compiled.storageProfile);
+  } else {
+    draft.storageProfile = normalizeSessionStorageProfileConfig(draft.storageProfile || draft.sessionStorageProfile || draft.storage);
+  }
   delete draft.sessionStorageProfile;
   delete draft.storage;
 
@@ -125,7 +145,13 @@ export const buildSessionWizardDefaultTemplate = (): AnyRecord => {
   draft.sessionName = '';
   draft.sessionInfo = '';
   draft.sessionHeader = '';
-  draft.telegramOnly = false;
+  delete draft.sessionModeProfile;
+  delete draft.telegramOnly;
+  delete draft.telegram_only;
+  delete draft.telegramMode;
+  delete draft.sessionMode;
+  delete draft.telegramBridgeEnabled;
+  delete draft.telegram;
   delete draft.sessionHeaderImg;
   delete draft.sessionInfoEncrypted;
   draft.corsWorkerUrl = '';

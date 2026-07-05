@@ -115,6 +115,7 @@ import SessionWizardInfoTooltip, {
 import { SESSION_WIZARD_REQUIREMENT_LINKS } from './SessionWizardRequirementsBanner';
 import SessionWizardShell from './SessionWizardShell';
 import SessionWizardSessionIdBadge from './SessionWizardSessionIdBadge';
+import SessionModeProfileField from './SessionModeProfileField';
 import {
   buildNormalModeCards,
   buildNormalModePublishSummary,
@@ -485,6 +486,7 @@ type DraftState = UnknownRecord & NonNullable<WorkerPanelProps['draft']> & {
   lit?: UnknownRecord;
   rpc?: UnknownRecord;
   sponsored?: DraftSponsoredState;
+  sessionModeProfile?: UnknownRecord;
   __registry?: UnknownRecord;
 };
 
@@ -2254,6 +2256,7 @@ const SessionWizard = ({
     const isSessionHeaderField = keyString === 'sessionHeader';
     const isCorsWorkerField = keyString === 'corsWorkerUrl';
     const isNetworkChainField = keyString === 'networkChainId';
+    if (path.length === 0 && key === 'sessionModeProfile') return null;
     const e2eTestId = (() => {
       if (keyString === 'sessionName') return E2E_TESTIDS.WIZARD_SESSION_NAME;
       if (keyString === 'sessionInfo') return E2E_TESTIDS.WIZARD_SESSION_INFO;
@@ -2496,7 +2499,38 @@ const SessionWizard = ({
           onToggleCollapsed={() =>
             setMetadataObjectCollapsed((prev) => ({ ...prev, storageProfile: !prev.storageProfile }))
           }
-          onStorageProfileChange={(nextProfile) => updateDraftValue(['storageProfile'], nextProfile)}
+          onStorageProfileChange={(nextProfile) => {
+            setDraft((prev) => {
+              const next = deepClone(prev);
+              const normalizedProfile = normalizeSessionStorageProfileConfig(nextProfile);
+              next.storageProfile = normalizedProfile;
+              if (next.sessionModeProfile && typeof next.sessionModeProfile === 'object') {
+                const modeProfile = deepClone(next.sessionModeProfile) as UnknownRecord;
+                const backend = toStr(normalizedProfile.backend).trim();
+                modeProfile.preset = 'custom';
+                modeProfile.storage = {
+                  ...((modeProfile.storage && typeof modeProfile.storage === 'object') ? modeProfile.storage : {}),
+                  backend: backend === 'cloudflare' ? 'cloudflare' : 'arweave',
+                };
+                modeProfile.authority = {
+                  ...((modeProfile.authority && typeof modeProfile.authority === 'object') ? modeProfile.authority : {}),
+                  mode: backend === 'cloudflare' ? 'worker_canonical' : 'evm_registry_canonical',
+                };
+                modeProfile.encryption = {
+                  ...((modeProfile.encryption && typeof modeProfile.encryption === 'object') ? modeProfile.encryption : {}),
+                  mode: backend === 'lit-arweave' || normalizedProfile.payloadAccessControl?.mode === 'lit_encrypted'
+                    ? 'lit'
+                    : 'none',
+                };
+                if (modeProfile.surfaces && typeof modeProfile.surfaces === 'object') {
+                  (modeProfile.surfaces as UnknownRecord).web = true;
+                }
+                next.sessionModeProfile = modeProfile;
+              }
+              draftRef.current = next;
+              return next;
+            });
+          }}
         />
       );
     }
@@ -3417,6 +3451,10 @@ const SessionWizard = ({
   };
 
   const handlePublish = async () => {
+    if (!draft?.sessionModeProfile) {
+      setStatus('Choose a session mode before publishing.');
+      return;
+    }
     if (publishRequestInFlightRef.current) {
       setStatus('Publish already in progress.');
       return;
@@ -4386,6 +4424,32 @@ const SessionWizard = ({
       sessionIdDisplay={sessionIdDisplay}
     />
   ) : null;
+  const sessionModeProfileControl = (
+    <SessionModeProfileField
+      registryChainId={registryChainId}
+      value={draft.sessionModeProfile}
+      onChange={(profile, compiled) => {
+        setDraft((prev) => {
+          const next = deepClone(prev);
+          next.sessionModeProfile = profile as unknown as UnknownRecord;
+          next.storageProfile = normalizeSessionStorageProfileConfig(compiled.storageProfile);
+          delete next.telegramOnly;
+          delete next.telegram_only;
+          delete next.telegramMode;
+          delete next.sessionMode;
+          delete next.telegramBridgeEnabled;
+          if (next.telegram && typeof next.telegram === 'object') {
+            const telegram = next.telegram as UnknownRecord;
+            delete telegram.only;
+            delete telegram.mode;
+            if (!Object.keys(telegram).length) delete next.telegram;
+          }
+          draftRef.current = next;
+          return next;
+        });
+      }}
+    />
+  );
 
   return (
     <SessionWizardShell
@@ -4504,6 +4568,7 @@ const SessionWizard = ({
       sessionHeaderPreviewModalOpen={sessionHeaderPreviewModalOpen}
       sessionHeaderPreviewSrc={sessionHeaderPreviewSrc}
       sessionMetadataHeaderAccessory={sessionMetadataHeaderAccessory}
+      sessionModeProfileControl={sessionModeProfileControl}
       sessionUrl={sessionUrl}
       setBundleFile={setBundleFile}
       setBundleMode={setBundleMode}

@@ -66,6 +66,71 @@ test('session policy resolves defaults and invocation by slug or name', () => {
   assert.deepEqual(workerSlugSession.allowOrigins, ['http://localhost:3000', 'https://contextengine.xyz']);
 });
 
+test('session policy prefers sessionModeProfile with legacy fallback', () => {
+  const profilePolicy = normalizeSessionPolicy({
+    defaultSessionSlug: 'profile-telegram',
+    sessions: [
+      {
+        sessionSlug: 'profile-telegram',
+        sessionName: 'Profile Telegram',
+        telegramBridgeEnabled: false,
+        sessionModeProfile: {
+          profileVersion: 1,
+          preset: 'custom',
+          authority: { mode: 'worker_canonical' },
+          evm: { registryChainId: null },
+          storage: { backend: 'cloudflare' },
+          identity: { default: 'passkey', enabled: ['passkey', 'telegram'] },
+          authorization: { mechanisms: ['worker_roles'] },
+          encryption: { mode: 'none' },
+          surfaces: { web: true, telegram: true, miniApp: true, agentHttp: false, mcp: false, ceCc: false },
+          results: { visibility: 'participant_aggregate' },
+          export: { scope: 'admin_raw' },
+        },
+      },
+      {
+        sessionSlug: 'profile-web',
+        sessionName: 'Profile Web',
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+        sessionModeProfile: {
+          profileVersion: 1,
+          preset: 'custom',
+          authority: { mode: 'worker_canonical' },
+          evm: { registryChainId: null },
+          storage: { backend: 'cloudflare' },
+          identity: { default: 'passkey', enabled: ['passkey'] },
+          authorization: { mechanisms: ['worker_roles'] },
+          encryption: { mode: 'none' },
+          surfaces: { web: true, telegram: false, miniApp: false, agentHttp: false, mcp: false, ceCc: false },
+          results: { visibility: 'participant_aggregate' },
+          export: { scope: 'admin_raw' },
+        },
+      },
+      {
+        sessionSlug: 'legacy-telegram',
+        sessionName: 'Legacy Telegram',
+        telegramOnly: true,
+      },
+    ],
+  });
+
+  const profileTelegram = resolveSessionInvocation(profilePolicy, 'profile-telegram');
+  assert.equal(profileTelegram.ok, true);
+  assert.equal(profileTelegram.session.telegramBridgeEnabled, true);
+  assert.equal(profileTelegram.session.telegramOnly, true);
+  assert.equal(profileTelegram.session.sessionModeProfile.surfaces.telegram, true);
+
+  const profileWeb = resolveSessionInvocation(profilePolicy, 'profile-web');
+  assert.equal(profileWeb.ok, false);
+  assert.equal(profileWeb.reason, 'telegram_bridge_disabled');
+
+  const legacyTelegram = resolveSessionInvocation(profilePolicy, 'legacy-telegram');
+  assert.equal(legacyTelegram.ok, true);
+  assert.equal(legacyTelegram.session.telegramBridgeEnabled, true);
+  assert.equal(legacyTelegram.session.telegramOnly, true);
+});
+
 test('session policy can switch the default Telegram demo session by date', () => {
   const base = {
     default: 'ee-26-organizers',
