@@ -99,6 +99,13 @@ import { initCacheManager, listNamespaceEntriesSync, removeCache } from '../../u
 import { toStr } from '../../utilities/shared/primitives.js';
 import { derivePrimarySessionSlugFromList } from '../../utilities/session/globalSessionState.js';
 import { isCryptoMode } from '../../utilities/ui/terminology.js';
+import { isTelegramFirstSessionConfig } from '../../utilities/session/sessionBackendKind';
+import {
+  exchangeAgentClientLogin,
+  extractAgentClientToken,
+  readAgentClientLoginEnvelope,
+  type AgentClientLoginEnvelope,
+} from '../../utilities/session/agentClientLogin';
 
 // Chain helpers
 import { chainHexId, chainHttpRpc, chainHttpRpcNoPath, chainCurrency, getChainById } from '../../variables/chains.js'
@@ -121,6 +128,7 @@ import {
 } from './loginSettingsAiDisplayHelpers';
 
 const accountLog = createLogger('account');
+const DEFAULT_AGENT_BRIDGE_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev';
 const normalizeAccountForComparison = (value: unknown): string => String(value || '').trim().toLowerCase();
 type AccountUserPageProps = {
   viewAddress?: string;
@@ -193,6 +201,10 @@ interface LoginAndSettingsModalState {
   sessionScanStatus: string;
   preLoginSettingsOpen: boolean;
   preLoginConfigOpen: boolean;
+  agentTokenLoginOpen: boolean;
+  agentTokenInput: string;
+  agentTokenStatus: string;
+  agentTokenError: string;
   walletBalanceWei: ethers.BigNumber | null;
 }
 
@@ -346,6 +358,10 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       sessionScanStatus: '',
       preLoginSettingsOpen: false,
       preLoginConfigOpen: false,
+      agentTokenLoginOpen: false,
+      agentTokenInput: '',
+      agentTokenStatus: '',
+      agentTokenError: '',
       walletBalanceWei: null,
     };
   })();
@@ -1438,11 +1454,213 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
 
   getDisplaySessionConfig = (slugIn: any = '', cfgIn: any = null) => {
     const slug = normalizeSettingsSessionSlug(slugIn || cfgIn?.slug || '');
+    const propSessionConfig = (
+      this.props.sessionConfig && typeof this.props.sessionConfig === 'object'
+    ) ? this.props.sessionConfig as any : null;
+    const propConfigSlug = normalizeSettingsSessionSlug(propSessionConfig?.slug || slug);
+    if (!cfgIn && propSessionConfig && propConfigSlug === slug) {
+      return propSessionConfig;
+    }
     return (
       cfgIn
       || getSessionConfigBySlugOrDefault(slug)
       || getDemoSessionConfigBySlug(slug, { allowDemoFallback: true })
       || {}
+    );
+  };
+
+  resolveAgentBridgeUrl = (sessionConfig: any = null) => {
+    const cfg = sessionConfig && typeof sessionConfig === 'object' ? sessionConfig : {};
+    const telegram = cfg.telegram && typeof cfg.telegram === 'object' ? cfg.telegram : {};
+    return toStr(
+      cfg.agentBridgeUrl ||
+      cfg.agentBridgeWorkerUrl ||
+      cfg.telegramAgentBridgeUrl ||
+      telegram.agentBridgeUrl ||
+      telegram.workerUrl ||
+      DEFAULT_AGENT_BRIDGE_URL
+    ).replace(/\/+$/g, '');
+  };
+
+  getAgentTokenLoginSessionContext = () => {
+    const sessionSlug = this.getActiveSessionSlug();
+    const sessionConfig = this.getDisplaySessionConfig(sessionSlug);
+    return {
+      sessionSlug,
+      sessionConfig,
+      agentBridgeUrl: this.resolveAgentBridgeUrl(sessionConfig),
+    };
+  };
+
+  shouldShowAgentTokenLogin = () => {
+    const { sessionSlug, sessionConfig } = this.getAgentTokenLoginSessionContext();
+    if (!sessionSlug) return false;
+    return isTelegramFirstSessionConfig(sessionConfig);
+  };
+
+  formatAgentTokenError = (error: any): string => {
+    const reason = toStr(error?.message || error);
+    if (reason.includes('expired')) return 'This token is expired. Create a fresh agent token in Telegram and paste it again.';
+    if (reason.includes('session_mismatch')) return 'This token is for a different session.';
+    if (reason.includes('scope_denied')) return 'This token does not have permission to unlock the client view.';
+    if (reason.includes('origin_denied') || reason.includes('origin_not_allowed')) return 'This browser origin is not allowed for this session.';
+    if (reason.includes('not_enabled') || reason.includes('disabled')) return 'Client token login is not enabled for this session.';
+    if (reason.includes('empty')) return 'Paste a Context Engine agent token first.';
+    if (reason.includes('multiline')) return 'Paste one token or token link on a single line.';
+    if (reason.includes('unsupported_format')) return 'Paste a ceagt_ token or a Context Engine token link.';
+    return 'Agent token login failed. Create a fresh token in Telegram and try again.';
+  };
+
+  handleAgentTokenInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    this.setState({
+      agentTokenInput: event.target.value,
+      agentTokenError: '',
+      agentTokenStatus: '',
+    });
+  };
+
+  toggleAgentTokenLogin = () => {
+    this.setState((prev: Readonly<LoginAndSettingsModal['state']>) => ({
+      agentTokenLoginOpen: !prev.agentTokenLoginOpen,
+      agentTokenError: '',
+      agentTokenStatus: '',
+      agentTokenInput: '',
+    }));
+  };
+
+  completeAgentClientLogin = (envelope: AgentClientLoginEnvelope) => {
+    const targetNetwork = this.getTargetNetwork();
+    try {
+      const globalTarget = globalThis as any;
+      if (!globalTarget.__CE_AGENT_CLIENT_LOGIN_ENVELOPES__ || typeof globalTarget.__CE_AGENT_CLIENT_LOGIN_ENVELOPES__ !== 'object') {
+        globalTarget.__CE_AGENT_CLIENT_LOGIN_ENVELOPES__ = {};
+      }
+      globalTarget.__CE_AGENT_CLIENT_LOGIN_ENVELOPES__[envelope.sessionSlug || 'general'] = envelope;
+      if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+        window.dispatchEvent(new CustomEvent('ce-agent-client-login', {
+          detail: { sessionSlug: envelope.sessionSlug, envelope },
+        }));
+      }
+    } catch (_) {}
+    this.props.changeAccount({
+      account: envelope.address,
+      provider: 'telegram_agent',
+      network: targetNetwork,
+      userImageURL: undefined,
+      agentClientSession: {
+        sessionSlug: envelope.sessionSlug,
+        expiresAt: envelope.expiresAt,
+        capabilities: envelope.capabilities,
+      },
+    });
+    this.props.updateLoginInfo({
+      loginInProgress: false,
+      loginComplete: true,
+      provider: 'telegram_agent',
+    });
+  };
+
+  handleAgentTokenLoginSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!this.shouldShowAgentTokenLogin()) return;
+    const { sessionSlug, agentBridgeUrl } = this.getAgentTokenLoginSessionContext();
+    const tokenOrLink = this.state.agentTokenInput;
+    const validation = extractAgentClientToken(tokenOrLink);
+    this.setState({
+      agentTokenInput: '',
+      agentTokenError: validation.ok ? '' : this.formatAgentTokenError(new Error(validation.reason)),
+      agentTokenStatus: validation.ok ? 'loading' : 'error',
+    });
+    if (!validation.ok) return;
+
+    this.props.updateLoginInfo({
+      loginInProgress: true,
+      loginComplete: false,
+      provider: 'telegram_agent',
+    });
+
+    try {
+      const envelope = await exchangeAgentClientLogin({
+        agentBridgeUrl,
+        sessionSlug,
+        tokenOrLink,
+      });
+      this.setStateIfMounted({
+        agentTokenInput: '',
+        agentTokenStatus: 'success',
+        agentTokenError: '',
+      });
+      this.completeAgentClientLogin(envelope);
+    } catch (error) {
+      this.props.updateLoginInfo({
+        loginInProgress: false,
+        loginComplete: false,
+        provider: null,
+      });
+      this.setStateIfMounted({
+        agentTokenInput: '',
+        agentTokenStatus: 'error',
+        agentTokenError: this.formatAgentTokenError(error),
+      });
+    }
+  };
+
+  renderAgentTokenLoginPanel = () => {
+    if (!this.shouldShowAgentTokenLogin()) return null;
+    const { sessionSlug } = this.getAgentTokenLoginSessionContext();
+    const cachedEnvelope = readAgentClientLoginEnvelope(sessionSlug);
+    return (
+      <div className={styles.agentTokenLoginPanel} data-testid="ce-agent-token-login-panel">
+        <button
+          type="button"
+          className={styles.agentTokenLoginToggle}
+          onClick={this.toggleAgentTokenLogin}
+          data-testid="ce-agent-token-login-toggle"
+          aria-expanded={this.state.agentTokenLoginOpen}
+        >
+          Log in with agent token
+        </button>
+        {cachedEnvelope ? (
+          <div className={styles.agentTokenLoginHint}>
+            A Telegram client session is already saved in this tab.
+          </div>
+        ) : null}
+        {this.state.agentTokenLoginOpen ? (
+          <form onSubmit={this.handleAgentTokenLoginSubmit}>
+            <p className={styles.agentTokenLoginCopy}>
+              Only paste tokens from the Context Engine bot. Tokens grant limited access until they expire.
+            </p>
+            <label className={styles.agentTokenLoginLabel}>
+              <span>Agent token or link</span>
+              <input
+                type="password"
+                autoComplete="one-time-code"
+                value={this.state.agentTokenInput}
+                onChange={this.handleAgentTokenInputChange}
+                className={styles.agentTokenLoginInput}
+                data-testid="ce-agent-token-login-input"
+              />
+            </label>
+            <div className={styles.agentTokenLoginHint}>
+              Telegram bot → /me → Create Agent Token
+            </div>
+            {this.state.agentTokenError ? (
+              <div className={styles.agentTokenLoginError} role="alert" data-testid="ce-agent-token-login-error">
+                {this.state.agentTokenError}
+              </div>
+            ) : null}
+            <Button
+              type="submit"
+              color="primary"
+              size="sm"
+              disabled={this.state.agentTokenStatus === 'loading'}
+              data-testid="ce-agent-token-login-submit"
+            >
+              {this.state.agentTokenStatus === 'loading' ? 'Logging in...' : 'Login'}
+            </Button>
+          </form>
+        ) : null}
+      </div>
     );
   };
 
@@ -2905,6 +3123,8 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
                 {this.state.passkeyWalletStatusMessage}
               </div>
             )}
+
+            {this.renderAgentTokenLoginPanel()}
 
             <button
               type="button"

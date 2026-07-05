@@ -226,7 +226,9 @@ Use this generic flow for Claude Code, Claude cowork, OpenClaw, Hermes, or any a
 9. When the user wants editable Telegram review, call `POST <Worker>/api/agent/mini-app-launch` to create a one-click Mini App link with the ordered questions and editable prefilled drafts.
 10. Check `GET <Worker>/api/agent/actions` to show pending drafts, vote suggestions, and prior agent actions.
 11. Check `GET <Worker>/api/agent/results?view=topic-map` when the user asks what the session is about or wants a graphical aggregate result.
-12. For an interactive report, give the user a private client auto-login link built from their copied `ceagt_` token.
+12. For an interactive report, give the user the CE client session link and ask
+    them to paste their copied agent info into the client login modal. Never
+    build a URL containing the raw `ceagt_` token.
 13. Use the suggest/review endpoints for votes and group suggestions. Prefer user approval unless the user has explicitly opted into auto-apply behavior.
 
 ## Onboarding Options
@@ -389,13 +391,16 @@ Optional fallback link shapes, using existing link builders only:
 
 ```text
 https://t.me/contextengineer_bot/<mini-app-short-name>?startapp=<payload-from-mini-app-launch>
-https://contextengine.xyz/session/<session-slug>/questions/results?telegramToken=<urlencoded-ceagt-token>&agentBridgeUrl=<urlencoded-worker-url>
+https://contextengine.xyz/session/<session-slug>/questions/results
 ```
 
 This flow composes existing tags, questions, geo-linked questions, Mini App
-launches, and client links. Do not invent a new CE endpoint for it. If a link
-does not open the exact relevant question or ordered question series, omit the
-link and continue the response flow directly in the agent chat.
+launches, and client links. Do not put a raw `ceagt_` token in the client URL;
+ask the user to paste their copied Telegram agent info into the CE client login
+modal, where the browser exchanges it once through `/api/agent/client-login/exchange`.
+Do not invent a new CE endpoint for it. If a link does not open the exact
+relevant question or ordered question series, omit the link and continue the
+response flow directly in the agent chat.
 
 ## Non-Telegram Agent Token Flow
 
@@ -1041,24 +1046,20 @@ view and materially new questions or responses create a new cache entry.
 
 ### Interactive Client Report
 
-When the user wants the full interactive report, create a private client link
+When the user wants the full interactive report, send a client session link
 instead of asking them to connect a wallet. Use the public CE client origin
 (`https://contextengine.xyz` unless the operator gives you a different client
-URL), the copied worker URL, the current session slug, and the user's
-copied `ceagt_...` token:
+URL) and the current session slug:
 
 ```text
-https://contextengine.xyz/session/<session-slug>/questions/results?telegramToken=<urlencoded-ceagt-token>&agentBridgeUrl=<urlencoded-worker-url>
+https://contextengine.xyz/session/<session-slug>/questions/results
 ```
 
-The client accepts `telegramToken`, `ceTelegramToken`, `ceagt`, `agentToken`, or
-`token`, extracts a bare `ceagt_...` token even when the user pasted the full
-Telegram install message, exchanges it through
-`POST <Worker>/api/agent/client-login/exchange`, and then strips the
-token query parameter from browser history. Treat this URL as a login
-credential: only send it in a private channel controlled by the user. If the
-user does not want a token-bearing URL, send `/session/<session-slug>` and ask
-them to paste the copied Telegram bot install info into the login box.
+Do not put a raw `ceagt_...` token or copied install payload into the URL. The
+client login box accepts the copied token or install message, extracts the token
+in component state only, exchanges it through
+`POST <Worker>/api/agent/client-login/exchange`, and stores only the returned
+short-lived browser envelope in tab-scoped `sessionStorage`.
 
 If the response has `available: false`, do not invent a map. Explain the
 `unavailableReason` and ask the user to gather more answered questions. For demos

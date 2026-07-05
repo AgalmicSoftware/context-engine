@@ -118,7 +118,7 @@ import {
   submitRequestSessionKvPrefix,
   submitRequestUserKvPrefix,
 } from './telegramSubmitQueue.mjs';
-import { authenticateSessionWorker } from './onChainResponses.mjs';
+import { authenticateSessionWorker, directSubmitFeatureEnabled } from './onChainResponses.mjs';
 
 const DEFAULT_AGENT_BRIDGE_PUBLIC_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev';
 const LEGACY_AGENT_API_PREFIX = '/telegram/agent/api';
@@ -526,29 +526,31 @@ function configuredSessionMetaPolicy(env = {}) {
   });
 }
 
-function sessionMetaFromPolicy(policy = {}, sessionSlug = '') {
+function sessionMetaFromPolicy(policy = {}, sessionSlug = '', env = {}) {
   const slug = sanitizeSessionSlug(sessionSlug);
   const session = Array.isArray(policy.linkedSessions)
     ? policy.linkedSessions.find((entry) => (
       entry.sessionSlug === slug || lower(entry.sessionName) === slug
     ))
     : null;
+  const telegramBridgeEnabled = session?.telegramBridgeEnabled === true;
   return {
     ok: true,
     sessionSlug: slug,
     telegramOnly: session?.telegramOnly === true,
-    telegramBridgeEnabled: session?.telegramBridgeEnabled === true,
+    telegramBridgeEnabled,
+    clientSubmitReady: telegramBridgeEnabled && directSubmitFeatureEnabled(env),
   };
 }
 
 async function resolveSessionMetaPayload(env = {}, sessionSlug = '') {
   const configured = configuredSessionMetaPolicy(env);
-  if (configured) return sessionMetaFromPolicy(configured, sessionSlug);
+  if (configured) return sessionMetaFromPolicy(configured, sessionSlug, env);
   const policy = await loadSessionPolicy(env, {
     includeResultsExposureOverrides: false,
     includeAdminDefaultOverride: false,
   });
-  return sessionMetaFromPolicy(policy, sessionSlug);
+  return sessionMetaFromPolicy(policy, sessionSlug, env);
 }
 
 function jsonClientLogin(request, env, data, init = {}) {
