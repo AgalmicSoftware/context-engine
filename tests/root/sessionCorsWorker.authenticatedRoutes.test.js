@@ -62,6 +62,17 @@ const createWorkerEnv = ({ sessionSlug, config, secrets, tokenSecret = 'test-sec
   };
 };
 
+const createAuthOnlyWorkerEnv = (sourceEnv, tokenSecret = 'test-secret') => {
+  const authTokenRecords = Object.fromEntries(
+    [...sourceEnv.GROUP_KV._dump()]
+      .filter(([key]) => String(key || '').startsWith('authToken:'))
+  );
+  return {
+    GROUP_KV: createMemoryKv(authTokenRecords),
+    TOKEN_HMAC_SECRET: tokenSecret,
+  };
+};
+
 describe('sessionCorsWorker authenticated ai/transcribe routes', () => {
   const originalFetch = global.fetch;
   const originalCrypto = global.crypto;
@@ -343,10 +354,7 @@ describe('sessionCorsWorker authenticated ai/transcribe routes', () => {
       rpcUrl: RPC_URL,
       registryAddress: REGISTRY_ADDRESS,
     });
-    const requestEnv = {
-      GROUP_KV: createMemoryKv(),
-      TOKEN_HMAC_SECRET: 'test-secret',
-    };
+    const requestEnv = createAuthOnlyWorkerEnv(issuingEnv);
 
     const response = await sessionCorsWorker.fetch(
       createJsonRequest({
