@@ -56,11 +56,8 @@ import {
 } from './telegramGroups.mjs';
 import { evaluateTelegramQuestionAuthoringPermission } from './telegramAuthoringPermissions.mjs';
 import {
-  geoTagsFromGeoRefs,
   inferQuestionTags,
-  normalizeQuestionGeoRefs,
   normalizeQuestionTags,
-  questionSourceGeoRefs,
   normalizeSessionContext,
   persistTelegramProposedQuestion,
   sessionContextFromPolicySession,
@@ -70,6 +67,11 @@ import {
   normalizeTelegramAgentSettingsPatch,
   saveTelegramAgentSettingsPatch,
 } from './telegramAgentSettings.mjs';
+import {
+  DRAFT_EDIT_METRIC_KV_PREFIX,
+  answerFromStoredDraft,
+  persistDraftEditMetric,
+} from './telegramDraftEditMetrics.mjs';
 import { listTelegramAgentActivity } from './telegramAgentActivity.mjs';
 import {
   addResponseExportAllowedAddress,
@@ -85,6 +87,7 @@ import {
 } from './telegramQuestionQueue.mjs';
 import {
   analyzeParticipantResultGroup,
+  buildDraftProvenance,
   buildLocalUrlQuestionCandidates,
   buildUrlQuestionGenerationPrompt,
   buildParticipantGraph,
@@ -96,19 +99,23 @@ import {
   deleteAnswerDraft,
   formatCounts,
   loadSubmittedResultRecords,
+  markAnswerDraftViewed,
   persistActionRecord,
   persistAnswerDraft,
+  readAnswerDraftFirstViewedAt,
   questionId as readQuestionId,
   readActionRecord,
   readAnswerDraft,
   readPrivateSessionBinding,
   requestUrlQuestionGenerationAi,
   shortQuestionId,
+  sessionUsesWorkerBackedQuestions,
   summarizeQuestionResults,
   telegramVisibleSessions,
   normalizeGeneratedQuestionCandidates,
   bridgeOpenAiApiKey,
   withBridgeOpenAiApiKey,
+  writeDraftLifecycleEvent,
   writeResultsExposureOverride,
 } from './telegramCommands.mjs';
 import { normalizeTelegramPrincipal } from './telegramUpdates.mjs';
@@ -118,15 +125,27 @@ import {
   TELEGRAM_MINI_APP_LOADING_GIF_SOURCE,
   TELEGRAM_MINI_APP_LOADING_GIF_WIDTH,
 } from './telegramMiniAppLoadingAsset.mjs';
+import {
+  loadAgentOnlyModeConfig,
+  loadAgentOnlyPredictionsForPrincipal,
+  recordAgentOnlyHumanReview,
+  semanticFingerprintForAgentOnlyAnswer,
+  submitAgentOnlyHumanVoteTaps,
+} from './telegramAgentOnlyMode.mjs';
 
 const DEFAULT_MINI_APP_AUTH_MAX_AGE_SECONDS = 24 * 60 * 60;
 const DEFAULT_MINI_APP_PAGE_SIZE = 50;
+const DEFAULT_MINI_APP_FAST_INITIAL_QUESTION_LIMIT = 1;
+const DEFAULT_MINI_APP_FAST_FOLLOWUP_QUESTION_COUNT = 5;
+const DEFAULT_MINI_APP_FAST_FOLLOWUP_DELAY_MS = 220;
+const DEFAULT_MINI_APP_BACKGROUND_PAGE_DELAY_MS = 650;
 const MAX_MINI_APP_QUESTION_LIMIT = 500;
 const QUESTION_ACTION_TTL_SECONDS = 30 * 60;
 const AGENT_REQUEST_KV_PREFIX = 'telegram:agent-request:';
 const MINI_APP_DOCUMENT_KV_PREFIX = 'telegram:mini-app-document:v1:';
 const MINI_APP_DOCUMENT_BYTES_KV_PREFIX = 'telegram:mini-app-document-bytes:v1:';
 const MINI_APP_QUESTION_VOTE_KV_PREFIX = 'telegram:mini-app-question-vote:v1:';
+const MINI_APP_DRAFT_DIVERGENCE_KV_PREFIX = DRAFT_EDIT_METRIC_KV_PREFIX;
 const MINI_APP_DOCUMENT_TTL_SECONDS = 180 * 24 * 60 * 60;
 const MINI_APP_DOCUMENT_MAX_BYTES = 1024 * 1024;
 const MINI_APP_DOCUMENT_URL_MAX_LENGTH = 2048;
@@ -134,8 +153,13 @@ const MINI_APP_TRANSCRIBE_RATE_KV_PREFIX = 'telegram:mini-app-transcribe-rate:v1
 const DEFAULT_MINI_APP_TRANSCRIBE_MAX_BYTES = 8 * 1024 * 1024;
 const DEFAULT_MINI_APP_TRANSCRIBE_RATE_LIMIT = 12;
 const DEFAULT_MINI_APP_TRANSCRIBE_RATE_WINDOW_SECONDS = 10 * 60;
+const DEFAULT_OPENAI_TRANSCRIBE_URL = 'https://api.openai.com/v1/audio/transcriptions';
 const MINI_APP_URL_QUESTION_COUNT = 5;
 const MINI_APP_URL_QUESTION_MAX_COUNT = 20;
+const MINI_APP_RESULT_GROUP_COUNT = 2;
+const MINI_APP_LOADING_VISUAL_SPINNER = 'spinner';
+const MINI_APP_LOADING_VISUAL_GIF = 'gif';
+const MINI_APP_LAUNCH_RECOVERY_MESSAGE = 'This Mini App launch expired or Telegram reopened an old view. Close this screen, open the Context Engine bot, and send /start to get a fresh Mini App button.';
 const MINI_APP_GROUP_APPROVAL_LINK_TTL_SECONDS = 7 * 24 * 60 * 60;
 const MINI_APP_RESULTS_EXPOSURE_FIELDS = Object.freeze({
   published_questions: 'publishedQuestionsEnabled',
@@ -182,6 +206,22 @@ function safeString(value) {
   return String(value || '').trim();
 }
 
+function normalizeMiniAppLoadingVisual(value = MINI_APP_LOADING_VISUAL_GIF) {
+  const normalized = lower(value);
+  if (['spinner', 'css', 'loader'].includes(normalized)) return MINI_APP_LOADING_VISUAL_SPINNER;
+  return MINI_APP_LOADING_VISUAL_GIF;
+}
+
+function miniAppLoadingVisualMode({ url = null, env = {} } = {}) {
+  const requested = url?.searchParams?.get('loadingVisual') ||
+    url?.searchParams?.get('loading') ||
+    url?.searchParams?.get('loadingAsset') ||
+    env.AGENT_BRIDGE_MINI_APP_LOADING_VISUAL ||
+    env.AGENT_BRIDGE_MINI_APP_LOADING_ASSET ||
+    '';
+  return normalizeMiniAppLoadingVisual(requested);
+}
+
 function safeAnswerString(value) {
   if (value === undefined || value === null) return '';
   return String(value).trim();
@@ -189,6 +229,32 @@ function safeAnswerString(value) {
 
 function firstAnswerValue(...values) {
   return values.find((value) => safeAnswerString(value) !== '');
+}
+
+function answerChoiceString(value) {
+  if (value === undefined || value === null) return '';
+  if (Array.isArray(value)) {
+    return value.map(answerChoiceString).filter(Boolean).join(', ');
+  }
+  if (typeof value === 'object') {
+    return safeAnswerString(firstAnswerValue(
+      value.label,
+      value.value,
+      value.text,
+      value.answer,
+      value.name,
+      value.id,
+    ));
+  }
+  return safeAnswerString(value);
+}
+
+function firstAnswerChoice(...values) {
+  for (const value of values) {
+    const text = answerChoiceString(value);
+    if (text) return text;
+  }
+  return '';
 }
 
 function safeJsonParse(value, fallback = null) {
@@ -220,9 +286,10 @@ function normalizeResultBoolean(value, fallback = false) {
   return fallback;
 }
 
-function normalizeMiniResultClusterCount(value, fallback = 3) {
-  const count = normalizePositiveInteger(value, fallback);
-  return Math.max(1, Math.min(6, count));
+function normalizeMiniResultClusterCount(value, fallback = MINI_APP_RESULT_GROUP_COUNT) {
+  void value;
+  void fallback;
+  return MINI_APP_RESULT_GROUP_COUNT;
 }
 
 function miniResultsExposurePolicy(session = {}) {
@@ -272,13 +339,16 @@ function miniAppQuestionLimitFromRequest(url, pageSize = DEFAULT_MINI_APP_PAGE_S
   return Math.max(1, Math.min(MAX_MINI_APP_QUESTION_LIMIT, Math.floor(parsed)));
 }
 
-function pagedMiniAppQuestions(questions = [], limit = DEFAULT_MINI_APP_PAGE_SIZE) {
-  const source = Array.isArray(questions) ? questions : [];
+function pagedMiniAppQuestionEntries(entries = [], limit = DEFAULT_MINI_APP_PAGE_SIZE, launchQuestionId = '') {
+  const source = Array.isArray(entries) ? entries : [];
   const boundedLimit = Math.max(1, Math.min(MAX_MINI_APP_QUESTION_LIMIT, Number(limit) || DEFAULT_MINI_APP_PAGE_SIZE));
   const page = source.slice(0, boundedLimit);
-  const launchQuestion = source.find((question) => question?.activeFromLaunch === true);
-  if (launchQuestion && !page.some((question) => question?.questionKey === launchQuestion.questionKey)) {
-    return [launchQuestion, ...page].slice(0, boundedLimit);
+  const launchId = lower(launchQuestionId);
+  const launchEntry = launchId
+    ? source.find((entry) => lower(readQuestionId(entry?.question)) === launchId)
+    : null;
+  if (launchEntry && !page.some((entry) => lower(readQuestionId(entry?.question)) === launchId)) {
+    return [launchEntry, ...page].slice(0, boundedLimit);
   }
   return page;
 }
@@ -529,8 +599,6 @@ async function buildMiniAppAdminState({
       { action: 'results_settings', label: 'Results settings' },
       { action: 'question_queue', label: 'Question queue' },
       { action: 'group_link', label: 'Add group link' },
-      { action: 'export_allow', label: 'Add admin' },
-      { action: 'export_revoke', label: 'Remove admin' },
     ],
   };
 }
@@ -757,11 +825,109 @@ async function resolveLaunchRecord(env = {}, launch = '') {
   return readActionRecord(env, parsed.actionId);
 }
 
+function normalizeMiniAppQuestionIdList(value = []) {
+  const source = Array.isArray(value)
+    ? value
+    : safeString(value).split(/[\s,;|]+/);
+  return source
+    .map((entry) => safeString(entry && typeof entry === 'object' ? (entry.questionId || entry.id || entry.key) : entry))
+    .filter(Boolean)
+    .filter((entry, index, values) => values.findIndex((candidate) => lower(candidate) === lower(entry)) === index)
+    .slice(0, 50);
+}
+
+function normalizeMiniAppPrefilledDraftAnswer(value = {}) {
+  if (typeof value === 'string') {
+    const text = normalizeText(value, 4000);
+    return text ? { text } : null;
+  }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const draft = {};
+  const text = normalizeText(value.text || value.answer || value.value || '', 4000);
+  const comments = normalizeText(value.comments || value.additionalComments || '', 1000);
+  const rawValue = safeString(value.value || value.answerValue || '');
+  if (text) draft.text = text;
+  if (rawValue) draft.value = rawValue.slice(0, 1000);
+  if (comments) draft.comments = comments;
+  if (Array.isArray(value.values) || Array.isArray(value.selectedValues)) {
+    const values = (Array.isArray(value.values) ? value.values : value.selectedValues)
+      .map(safeString)
+      .filter(Boolean)
+      .slice(0, 20);
+    if (values.length) draft.values = values;
+  }
+  return Object.keys(draft).length ? draft : null;
+}
+
+function normalizeMiniAppPrefilledDraftsByQuestionId(value = {}) {
+  const out = new Map();
+  if (Array.isArray(value)) {
+    value.forEach((entry) => {
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return;
+      const questionId = safeString(entry.questionId || entry.id || entry.key);
+      const draft = normalizeMiniAppPrefilledDraftAnswer(entry.draft || entry.answer || entry);
+      if (questionId && draft) out.set(lower(questionId), draft);
+    });
+    return out;
+  }
+  if (!value || typeof value !== 'object') return out;
+  Object.entries(value).forEach(([questionId, draftValue]) => {
+    const draft = normalizeMiniAppPrefilledDraftAnswer(draftValue);
+    if (safeString(questionId) && draft) out.set(lower(questionId), draft);
+  });
+  return out;
+}
+
+function miniAppLaunchSeriesRef(record = {}) {
+  const ref = record?.serverContextRef || {};
+  const series = ref.questionSeries && typeof ref.questionSeries === 'object' && !Array.isArray(ref.questionSeries)
+    ? ref.questionSeries
+    : {};
+  const questionIds = normalizeMiniAppQuestionIdList(
+    series.questionIds ||
+    series.orderedQuestionIds ||
+    ref.questionIds ||
+    ref.orderedQuestionIds ||
+    ref.questionIdList ||
+    (ref.questionId ? [ref.questionId] : [])
+  );
+  const skippedQuestionIds = normalizeMiniAppQuestionIdList(
+    series.skippedQuestionIds ||
+    series.skipQuestionIds ||
+    ref.skippedQuestionIds ||
+    ref.skipQuestionIds
+  );
+  const draftsByQuestionId = normalizeMiniAppPrefilledDraftsByQuestionId(
+    series.draftAnswersByQuestionId ||
+    series.prefilledDraftsByQuestionId ||
+    series.draftsByQuestionId ||
+    ref.draftAnswersByQuestionId ||
+    ref.prefilledDraftsByQuestionId ||
+    ref.draftsByQuestionId ||
+    ref.drafts
+  );
+  const singleDraft = normalizeMiniAppPrefilledDraftAnswer(ref.prefilledDraft || ref.draftAnswer || ref.draft);
+  if (singleDraft && ref.questionId) draftsByQuestionId.set(lower(ref.questionId), singleDraft);
+  return {
+    enabled: Boolean(
+      series.enabled === true ||
+      questionIds.length > 1 ||
+      Array.isArray(ref.questionIds) ||
+      Array.isArray(ref.orderedQuestionIds) ||
+      Array.isArray(series.questionIds) ||
+      Array.isArray(series.orderedQuestionIds)
+    ),
+    questionIds,
+    skippedQuestionIds,
+    draftsByQuestionId,
+  };
+}
+
 function miniAppLaunchMatchesQuestion(launchRecord = {}, questionRef = {}) {
   const launchRef = launchRecord?.serverContextRef || {};
   const launchSessionSlug = sanitizeSessionSlug(launchRef.sessionSlug);
   const questionSessionSlug = sanitizeSessionSlug(questionRef.sessionSlug);
-  const launchQuestionId = safeString(launchRef.questionId);
+  const launchQuestionIds = miniAppLaunchSeriesRef(launchRecord).questionIds;
   const questionId = safeString(questionRef.questionId);
   if (launchRecord?.miniAppLaunch !== true || launchRecord?.lane !== TELEGRAM_CHAT_LANES.MINI_APP) return false;
   if (![TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS, TELEGRAM_BRIDGE_ACTIONS.SUBMIT_RESPONSE].includes(launchRecord.action)) {
@@ -769,7 +935,7 @@ function miniAppLaunchMatchesQuestion(launchRecord = {}, questionRef = {}) {
   }
   if (launchRef.sessionPicker !== true && (!launchSessionSlug || !questionSessionSlug || launchSessionSlug !== questionSessionSlug)) return false;
   if (launchRef.sessionPicker === true && !questionSessionSlug) return false;
-  if (launchQuestionId && questionId && lower(launchQuestionId) !== lower(questionId)) return false;
+  if (launchQuestionIds.length && questionId && !launchQuestionIds.some((candidate) => lower(candidate) === lower(questionId))) return false;
   return true;
 }
 
@@ -810,6 +976,7 @@ function defaultAgentSettingsState({
     settings: {
       draftStyle: 'balanced',
       showUnansweredFirst: true,
+      showAgentResponses: true,
       agentAutoApplyQuestionVotes: false,
       ...settings,
     },
@@ -897,16 +1064,16 @@ async function miniQuestionFromRecord({
   const questionType = safeString(card.questionType || group.questionType || 'freeform');
   const prompt = locked || payloadUnavailable ? '' : safeString(card.questionText || group.questionText || 'Untitled question');
   const options = locked || payloadUnavailable ? [] : (Array.isArray(card.answerLabels) ? card.answerLabels : []);
+  const explicitTags = locked || payloadUnavailable ? [] : normalizeQuestionTags(question.tags);
   const tags = locked || payloadUnavailable
     ? []
-    : inferQuestionTags({
+    : (explicitTags.length ? explicitTags : inferQuestionTags({
       question,
       prompt,
       questionType,
       options,
       session,
-    });
-  const geoRefs = locked || payloadUnavailable ? [] : questionSourceGeoRefs(question);
+    }));
   const lockMessage = payloadUnavailable
     ? 'Question payload is not available yet. The app will keep retrying.'
     : encrypted
@@ -936,7 +1103,6 @@ async function miniQuestionFromRecord({
     prompt,
     options,
     tags,
-    geoRefs,
     locked,
     encrypted,
     requiredSbtAddresses,
@@ -1008,12 +1174,12 @@ function linkedPolicySessions(policy = {}, env = {}) {
         sessionName: safeString(session.sessionName || session.sessionSlug),
         default: session.default === true,
         telegramBridgeEnabled: session.telegramBridgeEnabled !== false,
-        telegramOnly: session.telegramOnly === true,
+        telegramOnly: session.telegramOnly === true || sessionUsesWorkerBackedQuestions(session),
         sessionContext,
         tags: inferQuestionTags({ session, sessionContext }),
       };
     })
-    .filter((session) => session.sessionSlug && session.telegramBridgeEnabled && session.telegramOnly);
+    .filter((session) => session.sessionSlug && session.telegramBridgeEnabled && sessionUsesWorkerBackedQuestions(session));
 }
 
 function buildMiniAppSessionPicker(policy = {}, selectedSessionSlugs = [], env = {}) {
@@ -1250,19 +1416,14 @@ async function loadSubmittedMiniAppAnswers({
     if (!question) return;
     const existing = byQuestionKey.get(question.questionKey);
     if (existing && safeString(existing.createdAt).localeCompare(safeString(record.createdAt)) >= 0) return;
+    const answer = miniAnswerFromSubmittedRecord(record, question);
     byQuestionKey.set(question.questionKey, {
       questionKey: question.questionKey,
       displayIndex: question.displayIndex,
       sessionSlug: question.sessionSlug,
       prompt: question.prompt || question.title || '',
-      answerLabel: safeAnswerString(firstAnswerValue(
-        record.answer?.label,
-        record.answer?.value,
-        record.answer?.text,
-        record.answerLabel,
-        record.answerValue,
-      )),
-      answer: miniAnswerFromSubmittedRecord(record, question),
+      answerLabel: miniSubmittedAnswerLabel(question, answer, record),
+      answer,
       status: safeString(record.status),
       submittedAt: safeString(record.createdAt),
       requestId: safeString(record.requestId),
@@ -1275,27 +1436,60 @@ async function loadSubmittedMiniAppAnswers({
   };
 }
 
+function miniSubmittedAnswerLabel(question = {}, answer = {}, record = {}) {
+  const type = safeString(question.questionType || record.answer?.questionType || record.controlType);
+  if (type === 'rating' && answer.value !== undefined && answer.value !== null && safeAnswerString(answer.value) !== '') {
+    return safeAnswerString(answer.value);
+  }
+  if (type === 'multichoice' && Array.isArray(answer.values) && answer.values.length) {
+    return answer.values.map(safeAnswerString).filter(Boolean).join(', ');
+  }
+  if (type === 'freeform' && safeAnswerString(answer.text)) {
+    return safeAnswerString(answer.text);
+  }
+  const binaryValue = lower(answer.value);
+  if (binaryValue && AGREE_UNSURE_DISAGREE_LABELS[binaryValue]) {
+    return AGREE_UNSURE_DISAGREE_LABELS[binaryValue];
+  }
+  if (safeAnswerString(answer.value) && !safeAnswerString(answer.value).startsWith('{')) {
+    return safeAnswerString(answer.value);
+  }
+  return safeAnswerString(firstAnswerValue(record.answer?.label, record.answerLabel, record.answer?.text, record.answerValue));
+}
+
 function miniAnswerFromSubmittedRecord(record = {}, question = {}) {
   const source = record.answer && typeof record.answer === 'object' && !Array.isArray(record.answer)
     ? record.answer
     : {};
   const type = safeString(question.questionType || source.questionType || record.controlType);
   const rawValue = firstAnswerValue(source.value, source.answer, source.text, record.answerValue, record.answerLabel);
-  const comments = safeAnswerString(firstAnswerValue(source.comments, source.additionalComments, record.comments));
+  const parsedRawValue = safeJsonParse(safeString(rawValue), null);
+  const parsedSource = parsedRawValue && typeof parsedRawValue === 'object' && !Array.isArray(parsedRawValue)
+    ? parsedRawValue
+    : {};
+  const comments = safeAnswerString(firstAnswerValue(
+    source.comments,
+    source.additionalComments,
+    parsedSource.comments,
+    parsedSource.additionalComments,
+    record.comments,
+  ));
   if (type === 'multichoice') {
     const values = Array.isArray(source.values)
-      ? source.values.map(safeAnswerString).filter(Boolean)
-      : [rawValue].map(safeAnswerString).filter(Boolean);
+      ? source.values.map(answerChoiceString).filter(Boolean)
+      : Array.isArray(parsedSource.values)
+        ? parsedSource.values.map(answerChoiceString).filter(Boolean)
+        : [firstAnswerChoice(parsedSource.value, source.value, source.answer, rawValue)].filter(Boolean);
     return { values, comments };
   }
   if (type === 'freeform') {
-    return { text: safeAnswerString(firstAnswerValue(source.text, source.value, source.answer, record.answerValue, record.answerLabel)), comments };
+    return { text: safeAnswerString(firstAnswerValue(source.text, parsedSource.text, source.value, parsedSource.value, source.answer, record.answerValue, record.answerLabel)), comments };
   }
   if (type === 'rating') {
-    const value = Number(firstAnswerValue(source.value, source.rating, source.answer, record.answerValue, record.answerLabel));
+    const value = Number(firstAnswerValue(parsedSource.value, parsedSource.rating, source.rating, source.answer, source.value, record.answerValue, record.answerLabel));
     return { value: Number.isFinite(value) ? value : safeAnswerString(rawValue), comments };
   }
-  return { value: lower(rawValue), comments };
+  return { value: lower(firstAnswerValue(parsedSource.value, rawValue)), comments };
 }
 
 function miniAnswerFromSavedDraft(draft = {}, question = {}) {
@@ -1332,6 +1526,7 @@ async function loadSavedMiniAppDrafts({
   sessionSlug = '',
   questions = [],
   submittedAnswerKeys = [],
+  createdAt = null,
 } = {}) {
   const telegramUserId = safeString(auth.user?.telegramUserId);
   if (!telegramUserId) return { savedDrafts: [], draftAnswersByQuestionKey: {} };
@@ -1349,6 +1544,13 @@ async function loadSavedMiniAppDrafts({
       selectedQuestionId: question.questionId,
     });
     if (!draft || safeString(draft.status) !== 'draft_saved') return null;
+    await markAnswerDraftViewed({
+      env,
+      normalized,
+      sessionSlug: questionSessionSlug,
+      selectedQuestionId: question.questionId,
+      viewedAt: createdAt,
+    }).catch(() => null);
     return {
       question,
       draft,
@@ -1371,6 +1573,88 @@ async function loadSavedMiniAppDrafts({
       selectedAt: safeString(entry.draft.selectedAt),
     })),
   };
+}
+
+async function buildMiniAppAgentOnlyState({
+  env = {},
+  auth = {},
+  sessionSlug = '',
+  questions = [],
+  settings = {},
+  createdAt = null,
+} = {}) {
+  const loadedConfig = await loadMiniAppAgentOnlyConfig({ env, sessionSlug });
+  if (!loadedConfig) return null;
+  const telegramUserId = safeString(auth.user?.telegramUserId);
+  if (!telegramUserId) return null;
+  const questionKeyById = new Map();
+  for (const question of Array.isArray(questions) ? questions : []) {
+    const qid = safeString(question.questionId);
+    const questionKey = safeString(question.questionKey);
+    if (!qid || !questionKey) continue;
+    questionKeyById.set(qid, questionKey);
+  }
+  const review = await loadAgentOnlyPredictionsForPrincipal({
+    env,
+    sessionSlug,
+    telegramUserId,
+    now: createdAt,
+  });
+  const flaggedQuestionKeys = (Array.isArray(review.flaggedQuestionIds) ? review.flaggedQuestionIds : [])
+    .map((questionId) => questionKeyById.get(questionId))
+    .filter(Boolean);
+  const predictionQuestionIds = Object.keys(review.predictionsByQuestionId || {});
+  const humanVoteNets = {};
+  Object.entries(review.humanVote?.nets || {}).forEach(([questionId, value]) => {
+    const questionKey = questionKeyById.get(questionId);
+    if (questionKey) humanVoteNets[questionKey] = Number(value) || 0;
+  });
+  const showAgentResponses = settings.showAgentResponses !== false;
+  const block = {
+    windowId: safeString(review.windowId),
+    flaggedQuestionKeys,
+    humanVote: {
+      nets: humanVoteNets,
+      budgetUsed: Number(review.humanVote?.budgetUsed || 0) || 0,
+      budget: 100,
+    },
+    showAgentResponses,
+    counts: {
+      flaggedQuestions: Array.isArray(review.flaggedQuestionIds) ? review.flaggedQuestionIds.length : 0,
+      loadedFlaggedQuestions: flaggedQuestionKeys.length,
+      predictions: predictionQuestionIds.length,
+      loadedPredictions: predictionQuestionIds.filter((questionId) => questionKeyById.has(questionId)).length,
+      loadedQuestions: Array.isArray(questions) ? questions.length : 0,
+    },
+  };
+  if (showAgentResponses) {
+    const predictions = {};
+    Object.entries(review.predictionsByQuestionId || {}).forEach(([questionId, prediction]) => {
+      const questionKey = questionKeyById.get(questionId);
+      const valueLabel = safeString(prediction?.valueLabel);
+      if (questionKey && valueLabel) {
+        predictions[questionKey] = {
+          valueLabel,
+          answerKind: safeString(prediction?.answerKind),
+          confirmed: prediction?.confirmed === true,
+        };
+      }
+    });
+    block.predictions = predictions;
+  }
+  return block;
+}
+
+async function loadMiniAppAgentOnlyConfig({
+  env = {},
+  sessionSlug = '',
+} = {}) {
+  const loadedConfig = await loadAgentOnlyModeConfig({ env, sessionSlug });
+  const enabledQuestionIds = Array.isArray(loadedConfig.config?.enabledQuestionIds)
+    ? loadedConfig.config.enabledQuestionIds
+    : [];
+  if (loadedConfig.source !== 'kv' && !enabledQuestionIds.length) return null;
+  return loadedConfig;
 }
 
 async function buildMiniAppState({
@@ -1432,6 +1716,7 @@ async function buildMiniAppState({
       ok: false,
       httpStatus: 404,
       error: 'mini_app_launch_invalid',
+      message: MINI_APP_LAUNCH_RECOVERY_MESSAGE,
       app: 'ce-telegram-mini-app',
       auth: authSummary,
       launch: {
@@ -1439,6 +1724,7 @@ async function buildMiniAppState({
         launch,
         reason: 'launch_action_missing_or_expired',
       },
+      launchRecovery: miniAppLaunchRecovery(env),
       session: {
         sessionSlug: '',
         title: '',
@@ -1555,90 +1841,168 @@ async function buildMiniAppState({
     };
   }
   const sessionSlug = effectiveSelectedSessionSlugs[0] || launchSessionSlug(launchRecord, env);
-  const launchQuestionId = safeString(launchRecord?.serverContextRef?.questionId);
+  const launchSeries = miniAppLaunchSeriesRef(launchRecord);
+  const launchQuestionId = launchSeries.questionIds[0] || safeString(launchRecord?.serverContextRef?.questionId);
+  const preferredQuestionIds = launchSeries.questionIds.length
+    ? launchSeries.questionIds
+    : [launchQuestionId].filter(Boolean);
   const loadedEntries = await Promise.all(effectiveSelectedSessionSlugs.map(async (slug) => ({
     sessionSlug: slug,
     session: linkedSessionBySlug.get(slug) || { sessionSlug: slug },
-    loaded: await loadQuestionsForSession(env, slug, { waitUntil }),
+    loaded: await loadQuestionsForSession(env, slug, {
+      waitUntil,
+      questionLimit: Math.max(requestedQuestionLimit, preferredQuestionIds.length || 0),
+      preferredQuestionIds,
+    }),
   })));
   let questionIndex = 0;
-  const questionGroups = await Promise.all(loadedEntries.map(async ({ sessionSlug: slug, session, loaded }) => {
+  const sourceQuestionEntries = loadedEntries.flatMap(({ sessionSlug: slug, session, loaded }) => {
     const sourceQuestions = Array.isArray(loaded.questions) ? loaded.questions : [];
-    return Promise.all(sourceQuestions.map((question) => miniQuestionFromRecord({
-      env,
+    return sourceQuestions.map((question) => ({
       sessionSlug: slug,
       session,
       question,
       index: questionIndex++,
-      launchQuestionId,
-      createdAt,
-    })));
-  }));
-  const allQuestions = questionGroups.flat();
-  const questions = pagedMiniAppQuestions(allQuestions, requestedQuestionLimit);
-  const availableQuestionCount = allQuestions.filter((question) => question?.canAnswer).length;
-  const unavailableQuestionCount = allQuestions.filter((question) => question?.payloadUnavailable === true).length;
-  const lockedQuestionCount = allQuestions.filter((question) => question?.locked === true).length;
+    }));
+  });
+  const totalSourceQuestionCount = loadedEntries.reduce((sum, entry) => (
+    sum + (Number(entry.loaded.discoveredCount || entry.loaded.indexedQuestionCount || entry.loaded.questionCount || entry.loaded.questions?.length || 0) || 0)
+  ), 0) || sourceQuestionEntries.length;
+  const sourceQuestionEntriesById = new Map();
+  sourceQuestionEntries.forEach((entry) => {
+    const qid = readQuestionId(entry.question);
+    if (qid) sourceQuestionEntriesById.set(lower(qid), entry);
+  });
+  const skippedLaunchQuestionIds = new Set(launchSeries.skippedQuestionIds.map(lower));
+  const seriesSourceEntries = launchSeries.enabled
+    ? launchSeries.questionIds
+      .map((questionId) => sourceQuestionEntriesById.get(lower(questionId)))
+      .filter(Boolean)
+    : [];
+  const allQuestionEntries = seriesSourceEntries.length
+    ? seriesSourceEntries.filter((entry) => !skippedLaunchQuestionIds.has(lower(readQuestionId(entry.question))))
+    : sourceQuestionEntries;
+  const fastInitialStateLoad = !seriesSourceEntries.length
+    && requestedQuestionLimit <= DEFAULT_MINI_APP_FAST_INITIAL_QUESTION_LIMIT
+    && totalSourceQuestionCount > requestedQuestionLimit
+    && requestedQuestionLimit < pageSize;
+  const questionEntries = seriesSourceEntries.length
+    ? allQuestionEntries
+    : pagedMiniAppQuestionEntries(allQuestionEntries, requestedQuestionLimit, launchQuestionId);
+  const questions = await Promise.all(questionEntries.map(({ sessionSlug: slug, session, question, index }) => miniQuestionFromRecord({
+    env,
+    sessionSlug: slug,
+    session,
+    question,
+    index,
+    launchQuestionId,
+    createdAt,
+  })));
+  const questionsById = new Map();
+  questions.forEach((question) => {
+    if (question?.questionId) questionsById.set(lower(question.questionId), question);
+  });
+  const availableQuestionCount = questions.filter((question) => question?.canAnswer).length;
+  const unavailableQuestionCount = questions.filter((question) => question?.payloadUnavailable === true).length;
+  const lockedQuestionCount = questions.filter((question) => question?.locked === true).length;
   const discoveredQuestionCount = loadedEntries.reduce((sum, entry) => (
     sum + (Number(entry.loaded.discoveredCount || entry.loaded.indexedQuestionCount || entry.loaded.questions?.length || 0) || 0)
-  ), 0) || allQuestions.length;
-  const activeQuestionKey = questions.find((question) => question.activeFromLaunch)?.questionKey ||
+  ), 0) || totalSourceQuestionCount;
+  const activeQuestionKey = (seriesSourceEntries.length
+    ? questions.find((question) => question.canAnswer)?.questionKey || questions[0]?.questionKey
+    : '') ||
+    questions.find((question) => question.activeFromLaunch)?.questionKey ||
     questions.find((question) => question.canAnswer)?.questionKey ||
     questions[0]?.questionKey ||
     '';
-  const submittedAnswerState = await loadSubmittedMiniAppAnswers({
-    env,
-    auth,
-    questions,
+  const submittedAnswerState = fastInitialStateLoad
+    ? { submittedAnswerKeys: [], submittedAnswers: [] }
+    : await loadSubmittedMiniAppAnswers({
+      env,
+      auth,
+      questions,
+    });
+  if (!fastInitialStateLoad) {
+    await applyMiniAppQuestionResponseCounts({
+      env,
+      questions,
+    });
+  }
+  const savedDraftState = fastInitialStateLoad
+    ? { savedDrafts: [], draftAnswersByQuestionKey: {} }
+    : await loadSavedMiniAppDrafts({
+      env,
+      auth,
+      sessionSlug,
+      questions,
+      submittedAnswerKeys: submittedAnswerState.submittedAnswerKeys,
+      createdAt,
+    });
+  const prefilledDraftAnswersByQuestionKey = {};
+  questions.forEach((question) => {
+    const draft = launchSeries.draftsByQuestionId.get(lower(question.questionId));
+    if (draft && question.questionKey) prefilledDraftAnswersByQuestionKey[question.questionKey] = draft;
   });
-  await applyMiniAppQuestionResponseCounts({
-    env,
-    questions,
-  });
-  const savedDraftState = await loadSavedMiniAppDrafts({
-    env,
-    auth,
-    sessionSlug,
-    questions,
-    submittedAnswerKeys: submittedAnswerState.submittedAnswerKeys,
-  });
-  await applyMiniAppQuestionVoteSummaries({
-    env,
-    auth,
-    questions,
-  });
-  const agentSettingsValues = await loadTelegramAgentSettings({
-    env,
-    sessionSlug,
-    telegramUserId: auth.user?.telegramUserId,
-  });
+  if (!fastInitialStateLoad) {
+    await applyMiniAppQuestionVoteSummaries({
+      env,
+      auth,
+      questions,
+    });
+  }
+  const agentSettingsValues = fastInitialStateLoad
+    ? {}
+    : await loadTelegramAgentSettings({
+      env,
+      sessionSlug,
+      telegramUserId: auth.user?.telegramUserId,
+    });
   const agentSettings = defaultAgentSettingsState({
     sessionSlug,
     settings: agentSettingsValues,
     createdAt,
   });
-  const primaryResolved = resolveSessionInvocation(policy, sessionSlug);
-  const groups = primaryResolved.ok
-    ? await loadTelegramLightweightGroups({
-      env,
-      session: primaryResolved.session,
-      telegramUserId: auth.user?.telegramUserId,
-    })
-    : emptyMiniAppGroupState(sessionSlug);
-  const admin = primaryResolved.ok
-    ? await buildMiniAppAdminState({
+  const agentOnly = fastInitialStateLoad
+    ? null
+    : await buildMiniAppAgentOnlyState({
       env,
       auth,
-      session: primaryResolved.session,
+      sessionSlug,
+      questions,
+      settings: agentSettingsValues,
       createdAt,
-    })
-    : emptyMiniAppAdminState(sessionSlug, primaryResolved.reason || 'session_not_available');
+    });
+  const primaryResolved = resolveSessionInvocation(policy, sessionSlug);
+  const groups = fastInitialStateLoad
+    ? emptyMiniAppGroupState(sessionSlug)
+    : (primaryResolved.ok
+      ? await loadTelegramLightweightGroups({
+        env,
+        session: primaryResolved.session,
+        telegramUserId: auth.user?.telegramUserId,
+      })
+      : emptyMiniAppGroupState(sessionSlug));
+  const admin = fastInitialStateLoad
+    ? emptyMiniAppAdminState(sessionSlug, 'deferred_fast_initial_load')
+    : (primaryResolved.ok
+      ? await buildMiniAppAdminState({
+        env,
+        auth,
+        session: primaryResolved.session,
+        createdAt,
+      })
+      : emptyMiniAppAdminState(sessionSlug, primaryResolved.reason || 'session_not_available'));
   const selectedSessionTitles = effectiveSelectedSessionSlugs.map((slug) => (
     linkedSessions.find((session) => session.sessionSlug === slug)?.sessionName || slug
   ));
   const sourceOk = loadedEntries.every((entry) => entry.loaded.ok !== false);
   const sourceReasons = [...new Set(loadedEntries.map((entry) => safeString(entry.loaded.reason)).filter(Boolean))];
   const sourceNames = [...new Set(loadedEntries.map((entry) => safeString(entry.loaded.source)).filter(Boolean))];
+  const questionSeriesKeys = seriesSourceEntries
+    .filter((entry) => !skippedLaunchQuestionIds.has(lower(readQuestionId(entry.question))))
+    .map((entry) => questionsById.get(lower(readQuestionId(entry.question)))?.questionKey)
+    .filter(Boolean);
+  const questionSeriesActiveIndex = Math.max(0, questionSeriesKeys.indexOf(activeQuestionKey));
   return {
     ok: true,
     app: 'ce-telegram-mini-app',
@@ -1660,11 +2024,25 @@ async function buildMiniAppState({
     submittedAnswers: submittedAnswerState.submittedAnswers,
     submittedAnswerKeys: submittedAnswerState.submittedAnswerKeys,
     draftAnswersByQuestionKey: savedDraftState.draftAnswersByQuestionKey,
+    prefilledDraftAnswersByQuestionKey,
+    questionSeries: {
+      enabled: Boolean(seriesSourceEntries.length),
+      questionCount: seriesSourceEntries.length,
+      questionKeys: questionSeriesKeys,
+      activeIndex: questionSeriesActiveIndex,
+      currentQuestionKey: activeQuestionKey,
+      skippedQuestionKeys: seriesSourceEntries
+        .filter((entry) => skippedLaunchQuestionIds.has(lower(readQuestionId(entry.question))))
+        .map((entry) => questionsById.get(lower(readQuestionId(entry.question)))?.questionKey)
+        .filter(Boolean),
+      skippedQuestionCount: skippedLaunchQuestionIds.size,
+    },
     activeQuestionKey,
-    questionCount: allQuestions.length,
+    questionCount: seriesSourceEntries.length ? allQuestionEntries.length : totalSourceQuestionCount,
     loadedQuestionCount: questions.length,
     loadedQuestionLimit: requestedQuestionLimit,
-    hasMoreQuestions: allQuestions.length > questions.length,
+    hasMoreQuestions: (seriesSourceEntries.length ? allQuestionEntries.length : totalSourceQuestionCount) > questions.length,
+    deferredPanels: fastInitialStateLoad ? ['groups', 'admin'] : [],
     availableQuestionCount,
     unavailableQuestionCount,
     lockedQuestionCount,
@@ -1678,6 +2056,7 @@ async function buildMiniAppState({
     questionSourceReason: sourceReasons.join(', '),
     sourceOk,
     sourceError: sourceOk ? '' : (sourceReasons.join(', ') || 'question_source_unavailable'),
+    ...(agentOnly ? { agentOnly } : {}),
     admin,
     agent: {
       actions: listAgentApiCapabilities({ lane: TELEGRAM_CHAT_LANES.MINI_APP, includeGroupUnsafe: true })
@@ -1744,6 +2123,48 @@ function audioFileExtension(file = {}) {
   if (mime.includes('mp4')) return 'mp4';
   if (mime.includes('wav')) return 'wav';
   return 'webm';
+}
+
+function bridgeOpenAiTranscribeUrl(env = {}) {
+  return safeString(env.AGENT_BRIDGE_OPENAI_TRANSCRIBE_URL || env.OPENAI_TRANSCRIBE_URL) ||
+    DEFAULT_OPENAI_TRANSCRIBE_URL;
+}
+
+async function transcribeMiniAppAudioWithBridgeOpenAi({
+  env = {},
+  audio = null,
+  model = 'whisper-1',
+  fetchImpl = globalThis.fetch,
+} = {}) {
+  const apiKey = bridgeOpenAiApiKey(env);
+  if (!apiKey) return { ok: false, reason: 'bridge_openai_key_missing', status: 503 };
+  if (!audio || typeof audio.arrayBuffer !== 'function') {
+    return { ok: false, reason: 'audio_file_required', status: 400 };
+  }
+  const upstream = new FormData();
+  upstream.append('file', audio, audio.name || `telegram-comment.${audioFileExtension(audio)}`);
+  upstream.append('model', safeString(model) || 'whisper-1');
+  const response = await fetchImpl(bridgeOpenAiTranscribeUrl(env), {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: upstream,
+  }).catch((error) => ({
+    ok: false,
+    status: 502,
+    json: async () => ({ error: safeString(error?.message || error) || 'transcription_failed' }),
+  }));
+  const body = await response.json().catch(() => ({}));
+  if (!response?.ok) {
+    return {
+      ok: false,
+      reason: safeString(body?.error?.message || body?.error || body?.message || response?.status) || 'transcription_failed',
+      status: response?.status || 502,
+    };
+  }
+  const text = safeString(body?.text);
+  return text ? { ok: true, text } : { ok: false, reason: 'transcript_empty', status: 502 };
 }
 
 function positiveIntegerEnv(value = '', fallback = 0) {
@@ -1866,6 +2287,7 @@ async function persistSubmitRequest({
   questionRef = {},
   answer = {},
   draftKey = '',
+  draft = null,
   createdAt = null,
 } = {}) {
   if (!env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.put !== 'function') {
@@ -1902,6 +2324,25 @@ async function persistSubmitRequest({
   const policy = await loadSessionPolicy(env);
   const resolved = resolveSessionInvocation(policy, sessionSlug);
   const session = resolved.ok ? resolved.session : { sessionSlug };
+  const submittedAt = safeString(createdAt) || new Date().toISOString();
+  const firstViewedAt = draft ? await readAnswerDraftFirstViewedAt({
+    env,
+    normalized: miniAppTelegramPrincipal(auth),
+    sessionSlug,
+    selectedQuestionId: qid,
+  }) : '';
+  const draftProvenance = buildDraftProvenance({ draft, submittedAt, firstViewedAt });
+  const emitSubmittedEvent = () => writeDraftLifecycleEvent(env, {
+    event: 'draft_submitted',
+    sessionSlug,
+    questionId: qid,
+    source: safeString(draft?.source || 'mini_app'),
+    originSource: safeString(draft?.origin?.source),
+    controlType: safeString(draft?.controlType || questionRef.questionType),
+    editCount: Number(draft?.editCount || 0),
+    draftToSubmitMs: draftProvenance?.draftToSubmitMs ?? null,
+    telegramUserId,
+  });
   if (telegramSubmitQueueEnabled(env)) {
     const record = buildQueuedSubmitRecord({
       session,
@@ -1927,6 +2368,7 @@ async function persistSubmitRequest({
         answer,
         onChainAnswer: answer,
         answerRef: draftKey ? { kind: 'telegram_answer_draft', key: draftKey } : null,
+        draftProvenance,
         createdAt,
       },
     });
@@ -1936,6 +2378,7 @@ async function persistSubmitRequest({
       error: safeString(error?.message || error),
     }));
     if (queued.ok === true) {
+      await emitSubmittedEvent();
       return {
         ok: true,
         requestId,
@@ -1981,6 +2424,7 @@ async function persistSubmitRequest({
       questionIdShort: shortQuestionId(qid),
       answer,
       answerRef: draftKey ? { kind: 'telegram_answer_draft', key: draftKey } : null,
+      draftProvenance,
       canonicalApiRequest: {
         method: 'POST',
         path: '/api/agent/responses/submit-request',
@@ -1998,6 +2442,7 @@ async function persistSubmitRequest({
     };
     assertNoSecretShape(record, 'Telegram direct submit records must not serialize secrets.');
     await persistTelegramSubmitRecord({ env, kvKey, record });
+    if (directSubmit.ok === true) await emitSubmittedEvent();
     return directSubmit.ok === true
       ? {
         ok: true,
@@ -2034,6 +2479,7 @@ async function persistSubmitRequest({
     questionIdShort: shortQuestionId(qid),
     answer,
     answerRef: draftKey ? { kind: 'telegram_answer_draft', key: draftKey } : null,
+    draftProvenance,
     canonicalApiRequest: {
       method: 'POST',
       path: '/api/agent/responses/submit-request',
@@ -2050,6 +2496,7 @@ async function persistSubmitRequest({
     createdAt,
   };
   await persistTelegramSubmitRecord({ env, kvKey, record });
+  await emitSubmittedEvent();
   return {
     ok: true,
     requestId,
@@ -2059,6 +2506,36 @@ async function persistSubmitRequest({
     directSubmitAttempt: directSubmit,
     replayed: false,
   };
+}
+
+async function persistMiniAppDraftDivergence({
+  env = {},
+  auth = {},
+  questionRef = {},
+  draftAnswer = null,
+  sentAnswer = null,
+  finality = 'submitted',
+  createdAt = null,
+} = {}) {
+  const metric = await persistDraftEditMetric({
+    env,
+    telegramUserId: auth.user?.telegramUserId,
+    sessionSlug: questionRef.sessionSlug,
+    questionId: questionRef.questionId,
+    questionType: questionRef.questionType,
+    draftAnswer,
+    sentAnswer,
+    source: 'mini_app',
+    finality,
+    createdAt,
+  });
+  return metric.ok ? {
+    ok: true,
+    stored: metric.stored === true,
+    changed: metric.metrics?.changed === true,
+    answerChanged: metric.metrics?.answerChanged === true,
+    commentChanged: metric.metrics?.commentChanged === true,
+  } : { ok: false, stored: false, reason: metric.reason || 'draft_divergence_metric_failed' };
 }
 
 async function persistSettingsUpdateRequest({
@@ -2166,8 +2643,9 @@ async function handleDraftRequest({
   ) {
     return json({ ok: false, error: 'question_action_expired' }, { status: 404 });
   }
+  let launchRecord = null;
   if (auth.authMode === 'telegram') {
-    const launchRecord = await resolveLaunchRecord(env, launch);
+    launchRecord = await resolveLaunchRecord(env, launch);
     if (!launchRecord) {
       return json({ ok: false, error: 'mini_app_launch_invalid' }, { status: 404 });
     }
@@ -2180,6 +2658,12 @@ async function handleDraftRequest({
     return json({ ok: false, error: normalizedAnswer.reason || 'answer_invalid' }, { status: 400 });
   }
   const normalized = miniAppTelegramPrincipal(auth);
+  const previousDraft = await readAnswerDraft({
+    env,
+    normalized,
+    sessionSlug: questionRef.sessionSlug,
+    selectedQuestionId: questionRef.questionId,
+  });
   const saved = await persistAnswerDraft({
     env,
     normalized,
@@ -2189,6 +2673,11 @@ async function handleDraftRequest({
     answerValue: JSON.stringify(normalizedAnswer.answer),
     controlType: safeString(questionRef.questionType),
     submitLane: TELEGRAM_CHAT_LANES.MINI_APP,
+    metadata: {
+      source: 'mini_app',
+      endpoint: '/telegram/mini-app/api/draft',
+      submitRequested: body.submit === true,
+    },
     createdAt,
   });
   if (!saved.ok) {
@@ -2202,6 +2691,7 @@ async function handleDraftRequest({
       questionRef,
       answer: normalizedAnswer.answer,
       draftKey: saved.key,
+      draft: saved.draft,
       createdAt,
     })
     : null;
@@ -2217,6 +2707,70 @@ async function handleDraftRequest({
     }, { status: 503 });
   }
 
+  let draftDivergence = { stored: false, reason: 'draft_divergence_opt_out' };
+  const settings = await loadTelegramAgentSettings({
+    env,
+    sessionSlug: questionRef.sessionSlug,
+    telegramUserId: auth.user?.telegramUserId,
+  });
+  if (settings.draftDivergenceOptIn === true) {
+    const launchDraft = launchRecord
+      ? miniAppLaunchSeriesRef(launchRecord).draftsByQuestionId.get(lower(questionRef.questionId))
+      : null;
+    const initialDraft = launchDraft || answerFromStoredDraft(previousDraft);
+    if (initialDraft) {
+      draftDivergence = await persistMiniAppDraftDivergence({
+        env,
+        auth,
+        questionRef,
+        draftAnswer: initialDraft,
+        sentAnswer: normalizedAnswer.answer,
+        finality: body.submit === true ? 'submitted' : 'draft_saved',
+        createdAt,
+      });
+    } else {
+      draftDivergence = { stored: false, reason: 'initial_draft_missing' };
+    }
+  }
+  let agentOnlyReview = { recorded: false, reason: 'not_submitted' };
+  if (body.submit === true && submitRequest?.ok === true) {
+    try {
+      const loadedAgentOnlyConfig = await loadMiniAppAgentOnlyConfig({ env, sessionSlug: questionRef.sessionSlug });
+      if (!loadedAgentOnlyConfig) {
+        agentOnlyReview = { recorded: false, reason: 'agent_only_not_configured' };
+      } else {
+        const review = await loadAgentOnlyPredictionsForPrincipal({
+          env,
+          sessionSlug: questionRef.sessionSlug,
+          telegramUserId: auth.user?.telegramUserId,
+          now: createdAt,
+        });
+        const prediction = review.predictionsByQuestionId?.[safeString(questionRef.questionId)];
+        if (review.windowId && prediction) {
+          const humanFingerprint = await semanticFingerprintForAgentOnlyAnswer(normalizedAnswer.answer);
+          const kind = safeString(prediction.semanticFingerprint) === humanFingerprint ? 'confirm' : 'edit';
+          agentOnlyReview = await recordAgentOnlyHumanReview({
+            env,
+            sessionSlug: questionRef.sessionSlug,
+            windowId: review.windowId,
+            telegramUserId: auth.user?.telegramUserId,
+            questionId: questionRef.questionId,
+            answer: normalizedAnswer.answer,
+            kind,
+            now: createdAt,
+          });
+        } else {
+          agentOnlyReview = { recorded: false, reason: 'agent_prediction_missing' };
+        }
+      }
+    } catch {
+      agentOnlyReview = {
+        recorded: false,
+        reason: 'agent_only_review_unavailable',
+      };
+    }
+  }
+
   return json({
     ok: true,
     status: submitRequest?.ok ? (submitRequest.status || 'submit_request_created') : 'draft_saved',
@@ -2228,6 +2782,8 @@ async function handleDraftRequest({
       submitLane: TELEGRAM_CHAT_LANES.MINI_APP,
     },
     submitRequest,
+    draftDivergence,
+    agentOnlyReview,
   });
 }
 
@@ -2394,6 +2950,145 @@ async function handleQuestionVoteRequest({
   });
 }
 
+async function miniAppQuestionRefForKey({
+  env = {},
+  questionKey = '',
+  launchRecord = null,
+  authMode = 'telegram',
+} = {}) {
+  const parsed = parseOpaqueActionId(questionKey);
+  if (!parsed.ok) return { ok: false, status: 400, error: 'question_action_invalid' };
+  const actionRecord = await readActionRecord(env, parsed.actionId);
+  const questionRef = actionRecord?.serverContextRef || {};
+  if (
+    !actionRecord ||
+    actionRecord.action !== TELEGRAM_BRIDGE_ACTIONS.DRAFT_RESPONSE ||
+    actionRecord.lane !== TELEGRAM_CHAT_LANES.MINI_APP ||
+    actionRecord.miniAppQuestionAction !== true
+  ) {
+    return { ok: false, status: 404, error: 'question_action_expired' };
+  }
+  if (authMode === 'telegram' && !miniAppLaunchMatchesQuestion(launchRecord, questionRef)) {
+    return { ok: false, status: 403, error: 'mini_app_launch_mismatch' };
+  }
+  return { ok: true, questionRef };
+}
+
+async function miniAppLaunchForAgentOnlyRequest({ auth = {}, env = {}, launch = '' } = {}) {
+  if (auth.authMode !== 'telegram') return { ok: true, launchRecord: null };
+  const launchRecord = await resolveLaunchRecord(env, launch);
+  if (!launchRecord) return { ok: false, status: 404, error: 'mini_app_launch_invalid' };
+  return { ok: true, launchRecord };
+}
+
+async function handleAgentOnlyHumanVoteRequest({
+  request,
+  env = {},
+  createdAt = new Date().toISOString(),
+} = {}) {
+  const auth = await authorizeMiniAppRequest(request, env);
+  if (!auth.ok) return json({ ok: false, error: auth.reason || 'telegram_init_data_invalid' }, { status: 401 });
+  const telegramUserId = safeString(auth.user?.telegramUserId);
+  if (!telegramUserId) return json({ ok: false, error: 'telegram_user_missing' }, { status: 401 });
+  const body = await request.json().catch(() => ({}));
+  const url = new URL(request.url);
+  const launch = safeString(body.launch || url.searchParams.get('launch') || url.searchParams.get('tgWebAppStartParam'));
+  const launchResult = await miniAppLaunchForAgentOnlyRequest({ auth, env, launch });
+  if (!launchResult.ok) return json({ ok: false, error: launchResult.error }, { status: launchResult.status });
+  const taps = Array.isArray(body.taps) ? body.taps : [];
+  if (!taps.length || taps.length > 50) return json({ ok: false, error: 'tap_batch_size_invalid' }, { status: 400 });
+  const normalizedTaps = [];
+  let sessionSlug = '';
+  for (const tap of taps) {
+    const questionKey = safeString(tap?.questionKey);
+    const ref = await miniAppQuestionRefForKey({
+      env,
+      questionKey,
+      launchRecord: launchResult.launchRecord,
+      authMode: auth.authMode,
+    });
+    if (!ref.ok) return json({ ok: false, error: ref.error, questionKey }, { status: ref.status });
+    const refSessionSlug = sanitizeSessionSlug(ref.questionRef.sessionSlug);
+    if (!sessionSlug) sessionSlug = refSessionSlug;
+    if (sessionSlug !== refSessionSlug) return json({ ok: false, error: 'tap_session_mismatch' }, { status: 400 });
+    normalizedTaps.push({
+      questionId: safeString(ref.questionRef.questionId),
+      delta: Number(tap.delta),
+    });
+  }
+  const review = await loadAgentOnlyPredictionsForPrincipal({
+    env,
+    sessionSlug,
+    telegramUserId,
+    now: createdAt,
+  });
+  if (!review.windowId) return json({ ok: false, error: 'agent_only_window_not_open' }, { status: 409 });
+  const saved = await submitAgentOnlyHumanVoteTaps({
+    env,
+    sessionSlug,
+    windowId: review.windowId,
+    telegramUserId,
+    taps: normalizedTaps,
+    now: createdAt,
+  });
+  if (!saved.ok) return json({ ok: false, error: saved.reason || 'agent_only_human_vote_failed' }, { status: saved.status || 400 });
+  return json(saved);
+}
+
+async function handleAgentOnlyConfirmRequest({
+  request,
+  env = {},
+  createdAt = new Date().toISOString(),
+} = {}) {
+  const auth = await authorizeMiniAppRequest(request, env);
+  if (!auth.ok) return json({ ok: false, error: auth.reason || 'telegram_init_data_invalid' }, { status: 401 });
+  const telegramUserId = safeString(auth.user?.telegramUserId);
+  if (!telegramUserId) return json({ ok: false, error: 'telegram_user_missing' }, { status: 401 });
+  const body = await request.json().catch(() => ({}));
+  const url = new URL(request.url);
+  const launch = safeString(body.launch || url.searchParams.get('launch') || url.searchParams.get('tgWebAppStartParam'));
+  const launchResult = await miniAppLaunchForAgentOnlyRequest({ auth, env, launch });
+  if (!launchResult.ok) return json({ ok: false, error: launchResult.error }, { status: launchResult.status });
+  const questionKey = safeString(body.questionKey);
+  const ref = await miniAppQuestionRefForKey({
+    env,
+    questionKey,
+    launchRecord: launchResult.launchRecord,
+    authMode: auth.authMode,
+  });
+  if (!ref.ok) return json({ ok: false, error: ref.error }, { status: ref.status });
+  const sessionSlug = sanitizeSessionSlug(ref.questionRef.sessionSlug);
+  const review = await loadAgentOnlyPredictionsForPrincipal({
+    env,
+    sessionSlug,
+    telegramUserId,
+    now: createdAt,
+  });
+  if (!review.windowId) return json({ ok: false, error: 'agent_only_window_not_open' }, { status: 409 });
+  const question = {
+    questionKey,
+    displayIndex: 1,
+    sessionSlug,
+    questionId: safeString(ref.questionRef.questionId),
+    questionType: safeString(ref.questionRef.questionType),
+    options: Array.isArray(ref.questionRef.options) ? ref.questionRef.options : [],
+  };
+  const submitted = await loadSubmittedMiniAppAnswers({ env, auth, questions: [question] });
+  const answer = submitted.submittedAnswers?.[0]?.answer || null;
+  const recorded = await recordAgentOnlyHumanReview({
+    env,
+    sessionSlug,
+    windowId: review.windowId,
+    telegramUserId,
+    questionId: question.questionId,
+    answer,
+    kind: 'confirm',
+    now: createdAt,
+  });
+  if (!recorded.ok) return json({ ok: false, error: recorded.reason || 'agent_only_confirm_failed' }, { status: recorded.status || 400 });
+  return json({ ok: true, status: recorded.recorded ? 'agent_prediction_confirmed' : 'agent_prediction_confirm_noop', recorded: recorded.recorded === true });
+}
+
 async function handleTranscribeRequest({
   request,
   env = {},
@@ -2501,6 +3196,27 @@ async function handleTranscribeRequest({
     return json({ ok: false, error: eligibility.reason || 'session_ai_not_allowed' }, { status: 403 });
   }
 
+  const fetchImpl = env.AGENT_BRIDGE_FETCH || globalThis.fetch;
+  const model = safeString(form.get('model') || env.AGENT_BRIDGE_TRANSCRIBE_MODEL || 'whisper-1') || 'whisper-1';
+  if (bridgeOpenAiApiKey(env)) {
+    const bridgeTranscription = await transcribeMiniAppAudioWithBridgeOpenAi({
+      env,
+      audio,
+      model,
+      fetchImpl,
+    });
+    if (!bridgeTranscription.ok) {
+      return json({
+        ok: false,
+        error: bridgeTranscription.reason || 'transcription_failed',
+      }, { status: bridgeTranscription.status || 502 });
+    }
+    return json({
+      ok: true,
+      text: bridgeTranscription.text,
+    });
+  }
+
   const workerUrl = resolveSessionWorkerUrl(env, resolved.session);
   if (!workerUrl) {
     return json({ ok: false, error: 'session_worker_url_missing' }, { status: 503 });
@@ -2514,7 +3230,6 @@ async function handleTranscribeRequest({
     lifecycle: 'account_created',
     createdAt,
   });
-  const fetchImpl = env.AGENT_BRIDGE_FETCH || globalThis.fetch;
   const sessionAuth = await authenticateSessionWorker({
     env,
     session: resolved.session,
@@ -2529,11 +3244,8 @@ async function handleTranscribeRequest({
   }
 
   const upstream = new FormData();
-  const model = safeString(form.get('model') || env.AGENT_BRIDGE_TRANSCRIBE_MODEL || 'whisper-1') || 'whisper-1';
   upstream.append('file', audio, audio.name || `telegram-comment.${audioFileExtension(audio)}`);
   upstream.append('model', model);
-  const bridgeApiKey = bridgeOpenAiApiKey(env);
-  if (bridgeApiKey) upstream.append('apiKey', bridgeApiKey);
   const response = await fetchImpl(`${sessionAuth.workerUrl}/transcribe`, {
     method: 'POST',
     headers: {
@@ -3016,6 +3728,15 @@ function telegramAddBotToGroupUrl(env = {}, payload = '') {
     : '';
 }
 
+function miniAppLaunchRecovery(env = {}) {
+  const username = safeString(env.TELEGRAM_BOT_USERNAME).replace(/^@+/, '');
+  return {
+    command: '/start',
+    message: MINI_APP_LAUNCH_RECOVERY_MESSAGE,
+    botUrl: username ? `https://t.me/${username}` : '',
+  };
+}
+
 async function resolveMiniAppAdminContext({
   request,
   env = {},
@@ -3356,7 +4077,7 @@ async function buildMiniAppResultsSummary({
   session = {},
   demo = false,
   filters = {},
-  clusterCount = 3,
+  clusterCount = MINI_APP_RESULT_GROUP_COUNT,
   createdAt = new Date().toISOString(),
 } = {}) {
   const sessionSlug = sanitizeSessionSlug(session.sessionSlug);
@@ -3790,11 +4511,20 @@ async function handleGroupsRequest({
   if (context.session?.telegramOnly !== true) {
     return json({ ok: false, error: 'telegram_only_session_required' }, { status: 403 });
   }
+  const principal = normalizeTelegramPrincipal(context.auth.user || {});
+  const account = await deriveManagedDemoAccount({
+    principal,
+    deploymentId: env.AGENT_BRIDGE_DEPLOYMENT_ID || 'agent-bridge-live-demo',
+    rootSecret: env.DEMO_SIGNER_ROOT_SECRET || '',
+    lifecycle: 'account_created',
+    createdAt,
+  });
   if (request.method === 'POST') {
     const saved = await saveTelegramLightweightGroupMembership({
       env,
       session: context.session,
       telegramUserId: context.auth.user?.telegramUserId,
+      accountAddress: account.accountAddress,
       selections: body.selections || {},
       details: body.details || {},
       createdAt,
@@ -3806,6 +4536,7 @@ async function handleGroupsRequest({
     env,
     session: context.session,
     telegramUserId: context.auth.user?.telegramUserId,
+    accountAddress: account.accountAddress,
   });
   return json({ ok: true, groups });
 }
@@ -4161,7 +4892,6 @@ function normalizeFormattedMiniAppQuestionDraft(parsed = {}, {
   questionType = '',
   fallbackText = '',
   tags = [],
-  geoRefs = [],
   session = {},
   sessionContext = '',
   inferQuestionType = false,
@@ -4179,18 +4909,15 @@ function normalizeFormattedMiniAppQuestionDraft(parsed = {}, {
   const options = type === 'multichoice'
     ? (parsedOptions.length >= 2 ? parsedOptions : inferMiniAppQuestionOptionsFromDraft(fallbackText))
     : [];
-  const normalizedGeoRefs = normalizeQuestionGeoRefs(geoRefs);
   const inferredTags = inferQuestionTags({
     prompt,
     questionType: type,
     options,
     session,
     explicitTags: [
-      ...geoTagsFromGeoRefs(normalizedGeoRefs),
       ...normalizeQuestionTags(tags),
       ...normalizeQuestionTags(parsed?.tags || parsed?.tagIds || parsed?.topics),
     ],
-    geoRefs: normalizedGeoRefs,
     sessionContext,
   });
   return {
@@ -4198,7 +4925,6 @@ function normalizeFormattedMiniAppQuestionDraft(parsed = {}, {
     prompt,
     options,
     tags: inferredTags,
-    geoRefs: normalizedGeoRefs,
   };
 }
 
@@ -4206,7 +4932,6 @@ function fallbackFormattedMiniAppQuestionDraft({
   text = '',
   questionType = '',
   tags = [],
-  geoRefs = [],
   session = {},
   sessionContext = '',
   inferQuestionType = false,
@@ -4224,7 +4949,6 @@ function fallbackFormattedMiniAppQuestionDraft({
     questionType: type,
     fallbackText: text,
     tags,
-    geoRefs,
     session,
     sessionContext,
     inferQuestionType: false,
@@ -4267,23 +4991,16 @@ async function handleAddQuestionRequest({
   const options = questionType === 'multichoice' ? normalizeMiniAppQuestionOptions(body.options || body.choices) : [];
   const metadataSession = miniAppPolicySessionForContext(context);
   const sessionContext = normalizeSessionContext(body.sessionContext || body.context || sessionContextFromPolicySession(metadataSession));
-  const geoRefs = normalizeQuestionGeoRefs(body.geoRefs, {
-    geoId: body.geoId,
-    kind: body.geoKind || body.kind,
-    label: body.geoLabel || body.label,
-  });
-  const tags = inferQuestionTags({
-    prompt,
-    questionType,
-    options,
-    session: metadataSession,
-    explicitTags: [
-      ...geoTagsFromGeoRefs(geoRefs),
-      ...normalizeQuestionTags(body.tags),
-    ],
-    geoRefs,
-    sessionContext,
-  });
+  const explicitTags = normalizeQuestionTags(body.tags);
+  const tags = explicitTags.length
+    ? explicitTags
+    : inferQuestionTags({
+      prompt,
+      questionType,
+      options,
+      session: metadataSession,
+      sessionContext,
+    });
   if (!prompt) return json({ ok: false, error: 'question_prompt_required' }, { status: 400 });
   if (questionType === 'multichoice' && options.length < 2) {
     return json({ ok: false, error: 'multichoice_options_required' }, { status: 400 });
@@ -4304,7 +5021,6 @@ async function handleAddQuestionRequest({
     questionType,
     options,
     tags,
-    geoRefs,
     sessionContext,
     createdAt,
   });
@@ -4338,18 +5054,12 @@ async function handleFormatQuestionRequest({
   const metadataSession = miniAppPolicySessionForContext(context);
   const sessionContext = normalizeSessionContext(body.sessionContext || body.context || sessionContextFromPolicySession(metadataSession));
   const tags = normalizeQuestionTags(body.tags);
-  const geoRefs = normalizeQuestionGeoRefs(body.geoRefs, {
-    geoId: body.geoId,
-    kind: body.geoKind || body.kind,
-    label: body.geoLabel || body.label,
-  });
   if (!text) return json({ ok: false, error: 'question_draft_required' }, { status: 400 });
 
   const fallback = fallbackFormattedMiniAppQuestionDraft({
     text,
     questionType,
     tags,
-    geoRefs,
     session: metadataSession,
     sessionContext,
     inferQuestionType,
@@ -4396,14 +5106,6 @@ async function handleFormatQuestionRequest({
         question: fallback,
       });
     }
-    const formatInput = {
-      questionType,
-      inferQuestionType,
-      draft: text,
-      sessionContext,
-      existingTags: tags,
-    };
-    if (geoRefs.length) formatInput.geoRefs = geoRefs;
     const response = await fetchImpl(`${sessionAuth.workerUrl}/ai`, {
       method: 'POST',
       headers: {
@@ -4420,7 +5122,13 @@ async function handleFormatQuestionRequest({
           },
           {
             role: 'user',
-            content: JSON.stringify(formatInput),
+            content: JSON.stringify({
+              questionType,
+              inferQuestionType,
+              draft: text,
+              sessionContext,
+              existingTags: tags,
+            }),
           },
         ],
         max_output_tokens: 700,
@@ -4442,7 +5150,6 @@ async function handleFormatQuestionRequest({
       questionType,
       fallbackText: text,
       tags,
-      geoRefs,
       session: metadataSession,
       sessionContext,
       inferQuestionType,
@@ -4488,11 +5195,6 @@ async function handleGenerateQuestionsFromUrlRequest({
   const questionType = normalizeMiniAppQuestionType(body.questionType || body.type || 'agree_unsure_disagree');
   const regenerationFeedback = normalizeText(body.feedback || body.regenerationFeedback || '', 1000);
   const previousCandidates = Array.isArray(body.previousCandidates) ? body.previousCandidates : [];
-  const geoRefs = normalizeQuestionGeoRefs(body.geoRefs, {
-    geoId: body.geoId,
-    kind: body.geoKind || body.kind,
-    label: body.geoLabel || body.label,
-  });
   const authoring = await evaluateMiniAppQuestionAuthoring({ env, context });
   if (!authoring.ok) {
     return json({
@@ -4518,7 +5220,6 @@ async function handleGenerateQuestionsFromUrlRequest({
     session: metadataSession,
     questionType,
     count,
-    geoRefs,
   }).slice(0, count);
   const fallbackResponse = (reason = 'question_generation_empty') => json({
     ok: true,
@@ -4567,7 +5268,6 @@ async function handleGenerateQuestionsFromUrlRequest({
     questionType,
     regenerationFeedback,
     previousCandidates,
-    geoRefs,
   });
   const firstAi = await requestUrlQuestionGenerationAi({
     env,
@@ -4583,7 +5283,6 @@ async function handleGenerateQuestionsFromUrlRequest({
   let candidates = normalizeGeneratedQuestionCandidates(extractGeneratedQuestionItems(parsed), {
     session: metadataSession,
     questionType,
-    geoRefs,
   }).slice(0, count);
   if (!candidates.length) {
     const retryAi = await requestUrlQuestionGenerationAi({
@@ -4598,7 +5297,6 @@ async function handleGenerateQuestionsFromUrlRequest({
       candidates = normalizeGeneratedQuestionCandidates(extractGeneratedQuestionItems(parsed), {
         session: metadataSession,
         questionType,
-        geoRefs,
       }).slice(0, count);
     }
   }
@@ -4815,7 +5513,14 @@ async function handleSettingsRequest({
   });
 }
 
-function telegramMiniAppHtml() {
+function miniAppLoadingVisualHtml(mode = MINI_APP_LOADING_VISUAL_GIF) {
+  return normalizeMiniAppLoadingVisual(mode) === MINI_APP_LOADING_VISUAL_GIF
+    ? '<img class="loadingGif" src="/telegram/mini-app/loading.gif" alt="" aria-hidden="true">'
+    : '<span class="loadingSpinner" aria-hidden="true"></span>';
+}
+
+function telegramMiniAppHtml({ loadingVisual = MINI_APP_LOADING_VISUAL_GIF } = {}) {
+  const normalizedLoadingVisual = normalizeMiniAppLoadingVisual(loadingVisual);
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -5055,6 +5760,14 @@ function telegramMiniAppHtml() {
       background: var(--settings-accent);
       border-color: var(--settings-accent);
     }
+    .draftsButton {
+      border-color: rgba(98, 255, 191, 0.45);
+      color: var(--accent);
+    }
+    .draftsButton.active {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
     .headerIconButton.filterButton.active,
     .headerIconButton.addQuestionButton.active,
     .sessionEditButton.sessionsButton.active {
@@ -5183,6 +5896,7 @@ function telegramMiniAppHtml() {
     }
     .status { min-height: 20px; color: var(--muted); font-size: 13px; }
     .settingsPanel select,
+    .settingsPanel textarea,
     .documentsPanel select,
     .addQuestionPanel select,
     .groupCountrySelect {
@@ -5196,6 +5910,7 @@ function telegramMiniAppHtml() {
     .settingsPanel,
     .adminPanel,
     .activityPanel,
+    .draftsPanel,
     .documentsPanel,
     .addQuestionPanel,
     .groupsPanel,
@@ -5209,7 +5924,8 @@ function telegramMiniAppHtml() {
       align-items: end;
     }
     .settingsPanel {
-      grid-template-columns: minmax(0, 1fr) auto auto;
+      grid-template-columns: minmax(0, 1fr);
+      align-items: stretch;
       border-color: rgba(255, 209, 102, 0.52);
       background: rgba(92, 71, 31, 0.36);
     }
@@ -5224,6 +5940,12 @@ function telegramMiniAppHtml() {
       align-items: stretch;
       border-color: rgba(44, 195, 255, 0.52);
       background: rgba(20, 70, 104, 0.28);
+    }
+    .draftsPanel {
+      grid-template-columns: minmax(0, 1fr);
+      align-items: stretch;
+      border-color: rgba(98, 255, 191, 0.52);
+      background: rgba(24, 92, 71, 0.24);
     }
     .documentsPanel {
       grid-template-columns: minmax(0, 1fr);
@@ -5255,7 +5977,7 @@ function telegramMiniAppHtml() {
       border-color: rgba(98, 255, 191, 0.52);
       background: rgba(24, 92, 71, 0.28);
     }
-    .settingsPanel.open, .adminPanel.open, .activityPanel.open, .documentsPanel.open, .addQuestionPanel.open, .groupsPanel.open, .filterPanel.open, .resultsPanel.open { display: grid; }
+    .settingsPanel.open, .adminPanel.open, .activityPanel.open, .draftsPanel.open, .documentsPanel.open, .addQuestionPanel.open, .groupsPanel.open, .filterPanel.open, .resultsPanel.open { display: grid; }
     .resultsHeader {
       display: flex;
       align-items: center;
@@ -5451,6 +6173,7 @@ function telegramMiniAppHtml() {
       color: var(--muted);
       overflow-wrap: anywhere;
     }
+    .resultsLoadingSpinner[hidden] { display: none; }
     .resultsTitleRow .headerIconButton,
     .resultsTitleRow .headerIconButton.active,
     .resultsTitleRow .headerIconButton:active {
@@ -5514,7 +6237,8 @@ function telegramMiniAppHtml() {
     .groupActionsTop {
       justify-content: flex-start;
     }
-    .groupCountryDetails {
+    .groupCountryDetails,
+    .groupOtherDetails {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
       gap: 8px;
@@ -5532,6 +6256,9 @@ function telegramMiniAppHtml() {
       border-radius: 8px;
       padding: 10px;
       background: rgba(255, 255, 255, 0.05);
+    }
+    .resultFilters[hidden] {
+      display: none !important;
     }
     .resultFilterHeader {
       display: flex;
@@ -5737,6 +6464,23 @@ function telegramMiniAppHtml() {
       color: var(--muted);
       background: rgba(255, 255, 255, 0.06);
       font-size: 12px;
+      overflow-wrap: anywhere;
+    }
+    .adminAddressList {
+      display: grid;
+      gap: 5px;
+    }
+    .adminAddressButton {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 11px;
+      line-height: 1.35;
+      min-height: 34px;
+      padding: 7px 8px;
+      text-align: left;
       overflow-wrap: anywhere;
     }
     .documentPreviewButton {
@@ -5960,8 +6704,30 @@ function telegramMiniAppHtml() {
     }
     .sessionOption input { width: 18px; height: 18px; accent-color: var(--accent); }
     .sessionActions { display: flex; justify-content: flex-end; }
-    .questionStack { display: grid; gap: 18px; min-height: 0; padding: 2px 0 8px; }
+    .questionStack {
+      display: grid;
+      gap: 18px;
+      min-height: 0;
+      min-width: 0;
+      max-width: 100%;
+      overflow-x: hidden;
+      padding: 2px 0 8px;
+    }
     .loadMoreQuestions { justify-self: center; min-width: min(100%, 280px); }
+    .questionLoadingRow {
+      justify-self: center;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      min-width: min(100%, 280px);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 10px 14px;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.07);
+      font-size: 13px;
+    }
     .questionVotes {
       display: grid;
       grid-template-columns: 30px minmax(28px, auto) 30px;
@@ -5972,6 +6738,85 @@ function telegramMiniAppHtml() {
     .questionVoteRow {
       display: flex;
       justify-content: flex-end;
+    }
+    .agentOnlyBadgeRow {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+    .agentOnlyBadgeRow.stackedPredictionRow {
+      display: block;
+      width: 100%;
+    }
+    .agentPredictionBadge, .agentVoteMarker {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      background: rgba(255,255,255,0.07);
+      font-size: 15px;
+      font-weight: 800;
+      line-height: 1.25;
+      padding: 8px 10px;
+      overflow-wrap: anywhere;
+    }
+    .agentPredictionBadge {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      max-width: 100%;
+    }
+    .agentPredictionBadge.stackedPrediction {
+      display: grid;
+      width: min(100%, 560px);
+      gap: 7px;
+      justify-items: start;
+      align-items: start;
+      padding: 12px 14px;
+    }
+    .agentPredictionBadge.choicePrediction {
+      gap: 10px;
+      border-color: rgba(255,255,255,0.14);
+      background: rgba(255,255,255,0.07);
+      color: var(--text);
+      padding: 7px;
+    }
+    .agentPredictionLabel {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+    .agentPredictionValue {
+      color: var(--text);
+      font-size: 17px;
+      font-weight: 850;
+    }
+    .agentPredictionChoice {
+      min-width: 112px;
+      min-height: 42px;
+      border-radius: 8px;
+      padding: 9px 16px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      font-weight: 850;
+      line-height: 1;
+    }
+    .agentPredictionChoice.agree {
+      background: #4caf50;
+      color: #ffffff;
+    }
+    .agentPredictionChoice.unsure {
+      background: #ffeb3b;
+      color: #202458;
+    }
+    .agentPredictionChoice.disagree {
+      background: #f44336;
+      color: #ffffff;
     }
     .voteButton {
       min-height: 30px;
@@ -6037,6 +6882,9 @@ function telegramMiniAppHtml() {
       background: var(--surface);
       display: grid;
       grid-template-rows: auto auto;
+      min-width: 0;
+      max-width: 100%;
+      overflow: hidden;
       box-shadow: var(--question-card-shadow);
     }
     .card[data-active="true"] {
@@ -6055,7 +6903,7 @@ function telegramMiniAppHtml() {
       gap: 10px;
       align-items: start;
     }
-    .cardHeadText { min-width: 0; }
+    .cardHeadText { min-width: 0; max-width: 100%; }
     .cardToggle {
       min-width: 36px;
       min-height: 36px;
@@ -6076,12 +6924,19 @@ function telegramMiniAppHtml() {
       stroke-linecap: round;
       stroke-linejoin: round;
     }
-    .prompt { margin: 0; font-size: 19px; line-height: 1.28; letter-spacing: 0; }
-    .cardBody { padding: 16px; display: grid; align-content: start; gap: 14px; }
+    .prompt {
+      margin: 0;
+      font-size: 19px;
+      line-height: 1.28;
+      letter-spacing: 0;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+    .cardBody { padding: 16px; display: grid; align-content: start; gap: 14px; min-width: 0; max-width: 100%; }
     .card.collapsed .expandedOnly { display: none; }
     .cardActions { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
     .cardActions[hidden] { display: none; }
-    .segmented, .choices, .ratingTicks { display: grid; gap: 8px; }
+    .segmented, .choices, .ratingTicks { display: grid; gap: 8px; min-width: 0; max-width: 100%; }
     .segmented { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .choices { grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); }
     .choice, .segment {
@@ -6092,6 +6947,9 @@ function telegramMiniAppHtml() {
       background: rgba(255, 255, 255, 0.06);
       color: var(--text);
       text-align: center;
+      min-width: 0;
+      max-width: 100%;
+      overflow-wrap: anywhere;
     }
     .choice.selected {
       background: var(--accent);
@@ -6133,8 +6991,8 @@ function telegramMiniAppHtml() {
       border-color: #f44336;
       color: #ffffff;
     }
-    .ratingValue { font-size: 34px; font-weight: 700; letter-spacing: 0; color: var(--accent); }
-    input[type="range"] { width: 100%; accent-color: var(--accent); }
+    .ratingValue { font-size: 34px; font-weight: 700; letter-spacing: 0; color: var(--accent); overflow-wrap: anywhere; }
+    input[type="range"] { width: 100%; min-width: 0; max-width: 100%; accent-color: var(--accent); }
     textarea {
       width: 100%;
       min-height: 104px;
@@ -6150,6 +7008,8 @@ function telegramMiniAppHtml() {
       grid-template-columns: minmax(0, 3fr) minmax(56px, 1fr);
       gap: 8px;
       align-items: stretch;
+      min-width: 0;
+      max-width: 100%;
     }
     .freeformAnswerBox textarea,
     .freeformAnswerBox .micButton {
@@ -6258,6 +7118,22 @@ function telegramMiniAppHtml() {
       font-weight: 800;
       color: var(--text);
     }
+    .loadingProgress {
+      width: min(72vw, 340px);
+      height: 10px;
+      overflow: hidden;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      background: rgba(255, 255, 255, 0.08);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    }
+    .loadingProgressBar {
+      width: var(--progress, 18%);
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--accent), var(--ok));
+      transition: width 260ms ease;
+    }
     .inlineSpinner {
       width: 18px;
       height: 18px;
@@ -6271,6 +7147,17 @@ function telegramMiniAppHtml() {
     @keyframes ceSpin {
       to { transform: rotate(360deg); }
     }
+    .loadingSpinner {
+      width: min(34vw, 112px);
+      height: min(34vw, 112px);
+      border: 8px solid rgba(255, 255, 255, 0.15);
+      border-top-color: var(--accent);
+      border-right-color: var(--ok);
+      border-radius: 50%;
+      animation: ceSpin 0.9s linear infinite;
+      flex: 0 0 auto;
+      box-shadow: 0 0 28px rgba(98, 255, 191, 0.14);
+    }
     .loadingGif {
       width: min(68vw, 240px);
       height: min(68vw, 240px);
@@ -6281,7 +7168,7 @@ function telegramMiniAppHtml() {
     }
     @media (max-width: 760px) {
       .toolMenu { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .settingsPanel, .adminPanel, .activityPanel, .documentsPanel, .addQuestionPanel, .groupsPanel, .filterPanel { grid-template-columns: 1fr; }
+      .settingsPanel, .adminPanel, .activityPanel, .draftsPanel, .documentsPanel, .addQuestionPanel, .groupsPanel, .filterPanel { grid-template-columns: 1fr; }
       .resultColumns { grid-template-columns: 1fr; }
       .filterSearchRow { grid-template-columns: minmax(0, 1fr) 44px auto; }
     }
@@ -6334,9 +7221,19 @@ function telegramMiniAppHtml() {
             </svg>
             <span>Settings</span>
           </button>
+          <button class="iconButton draftsButton" id="showDrafts" type="button" aria-label="Drafts" aria-expanded="false" title="Drafts">
+            <svg class="filterIcon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+              <path d="M4 5h16"></path><path d="M4 12h16"></path><path d="M4 19h10"></path><path d="M17 17l2 2 3-5"></path>
+            </svg>
+            <span>Drafts</span>
+          </button>
           <label class="iconButton resultsButton menuCheckbox" title="Demo data">
             <input id="demoDataResults" type="checkbox" aria-label="Demo data">
             <span>Demo data</span>
+          </label>
+          <label class="iconButton settingsButton menuCheckbox" title="Agent predictions">
+            <input id="showAgentResponses" type="checkbox" aria-label="Agent predictions">
+            <span>Agent predictions</span>
           </label>
           <button class="iconButton activityButton" id="showActivity" type="button" aria-label="Activity" aria-expanded="false" title="Activity">
             <svg class="filterIcon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
@@ -6368,7 +7265,11 @@ function telegramMiniAppHtml() {
           </div>
         </div>
       </section>
-      <div class="status loadingStatus" id="status"><img class="loadingGif" src="/telegram/mini-app/loading.gif" alt="" aria-hidden="true"><span>Loading...</span></div>
+      <div class="status loadingStatus" id="status">
+        ${miniAppLoadingVisualHtml(normalizedLoadingVisual)}
+        <span>Loading questions and agent predictions</span>
+        <div class="loadingProgress" aria-hidden="true"><div class="loadingProgressBar" style="--progress: 18%"></div></div>
+      </div>
       <section class="adminPanel" id="adminPanel" aria-label="Admin actions">
         <div class="resultsHeader">
           <div class="sectionTitle">Admin Actions</div>
@@ -6388,6 +7289,19 @@ function telegramMiniAppHtml() {
         </div>
         <div class="filterSummary" id="activitySummary"></div>
         <div class="activityList" id="activityList"></div>
+      </section>
+      <section class="draftsPanel" id="draftsPanel" aria-label="Drafts">
+        <div class="resultsHeader">
+          <div class="sectionTitle">Drafts</div>
+          <button class="iconButton panelCloseButton" id="closeDrafts" type="button" aria-label="Close drafts" title="Close drafts">
+            <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M18 6 6 18"></path><path d="M6 6l12 12"></path></svg>
+          </button>
+        </div>
+        <div class="savedDrafts" id="savedDrafts"></div>
+        <div class="draftActions">
+          <button class="primary" id="submitDrafts" type="button">Submit drafts</button>
+          <button class="secondary" id="clearDrafts" type="button">Clear drafts</button>
+        </div>
       </section>
       <section class="documentsPanel" id="documentsPanel" aria-label="Documents">
         <div class="resultsHeader">
@@ -6420,7 +7334,7 @@ function telegramMiniAppHtml() {
       <section class="resultsPanel" id="resultsPanel" aria-label="Results">
         <div class="resultsHeader">
           <div class="resultsTitleRow">
-            <div class="sectionTitle resultsTitle">Results <span class="resultsTitleSession" id="resultsTitleSession"></span></div>
+            <div class="sectionTitle resultsTitle">Results <span class="inlineSpinner resultsLoadingSpinner" id="resultsLoadingSpinner" aria-label="Loading results" hidden></span><span class="resultsTitleSession" id="resultsTitleSession"></span></div>
             <button class="iconButton headerIconButton filterButton" id="showResultFilters" type="button" aria-label="Filter results" aria-expanded="false" title="Filter results">
               <svg class="filterIcon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
                 <path d="M3 5h18l-7 8v5l-4 2v-7L3 5z"></path>
@@ -6433,10 +7347,10 @@ function telegramMiniAppHtml() {
         </div>
         <div class="resultsPanelBody" id="resultsPanelBody">
           <div class="filterSummary" id="resultsSummary"></div>
-          <section class="resultFilters collapsed" id="resultFilters" aria-label="Result filters">
+          <section class="resultFilters collapsed" id="resultFilters" aria-label="Result filters" hidden>
             <div class="resultFilterHeader">
               <button class="collapsibleHeader" id="toggleResultFilters" type="button" aria-expanded="false">
-                <span>Filter live results</span>
+                <span>Filter Results</span>
                 <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"></path></svg>
               </button>
               <button class="secondary" id="clearResultFilters" type="button">Clear</button>
@@ -6556,6 +7470,10 @@ function telegramMiniAppHtml() {
             <input id="filterUnansweredFirst" type="checkbox" checked>
             <span>Show un-answered questions first</span>
           </label>
+          <label class="toggle">
+            <input id="filterAnsweredOnly" type="checkbox">
+            <span>Only answered questions</span>
+          </label>
           <div class="topPopularFilter" aria-label="Top popular questions">
             <div class="topPopularInline">
               <label class="toggle">
@@ -6615,16 +7533,27 @@ function telegramMiniAppHtml() {
           <label for="draftStyle">Draft style</label>
           <select id="draftStyle"></select>
         </div>
+        <div class="field">
+          <label for="topicPreferences">Topics</label>
+          <textarea id="topicPreferences" rows="2" placeholder="AI futures, governance, Edge City"></textarea>
+        </div>
+        <label class="toggle">
+          <input id="demographicLinkOptIn" type="checkbox">
+          <span>Link demographics</span>
+        </label>
+        <label class="toggle">
+          <input id="attendanceLinkOptIn" type="checkbox">
+          <span>Ask about Edge events</span>
+        </label>
+        <label class="toggle">
+          <input id="draftDivergenceOptIn" type="checkbox">
+          <span>Draft edit research</span>
+        </label>
         <label class="toggle">
           <input id="agentAutoApplyQuestionVotes" type="checkbox">
           <span>Agent auto-votes</span>
         </label>
         <button class="primary" id="saveSettings" type="button">Save</button>
-        <div class="savedDrafts" id="savedDrafts"></div>
-        <div class="draftActions">
-          <button class="primary" id="submitDrafts" type="button">Submit drafts</button>
-          <button class="secondary" id="clearDrafts" type="button">Clear drafts</button>
-        </div>
       </section>
     </header>
     <section class="layout">
@@ -6649,9 +7578,12 @@ function telegramMiniAppHtml() {
     const launch = params.get('launch') || params.get('tgWebAppStartParam') || (tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param) || '';
     const QUESTION_RETRY_DELAY_MS = 4000;
     const DRAFT_AUTOSAVE_DELAY_MS = 700;
+    const ANSWER_CHANGE_SUBMIT_GUARD_MS = 900;
+    const RESULT_GROUP_COUNT = 2;
     const SHOW_UNANSWERED_STORAGE_KEY = 'ce:telegram-mini-app:show-unanswered-first';
-    const DEMO_RESULTS_STORAGE_KEY = 'ce:telegram-mini-app:demo-results';
-    const SUBMITTED_RESPONSE_STATUSES = new Set(['submit_request_created', 'direct_submitted', 'submit_queued']);
+    const DEMO_RESULTS_STORAGE_KEY = 'ce:telegram-mini-app:demo-results:v2';
+    const LOADING_VISUAL_MODE = ${JSON.stringify(normalizedLoadingVisual)};
+    const MINI_APP_LAUNCH_RECOVERY_MESSAGE = ${JSON.stringify(MINI_APP_LAUNCH_RECOVERY_MESSAGE)};
     const readShowUnansweredFirst = () => {
       try { return window.localStorage.getItem(SHOW_UNANSWERED_STORAGE_KEY) !== 'false'; } catch { return true; }
     };
@@ -6668,6 +7600,11 @@ function telegramMiniAppHtml() {
     const POPULAR_QUESTION_LIMIT_MIN = 2;
     const POPULAR_QUESTION_LIMIT_MAX = 50;
     const POPULAR_QUESTION_LIMIT_STEP = 2;
+    const FAST_INITIAL_QUESTION_LIMIT = ${DEFAULT_MINI_APP_FAST_INITIAL_QUESTION_LIMIT};
+    const FAST_FOLLOWUP_QUESTION_COUNT = ${DEFAULT_MINI_APP_FAST_FOLLOWUP_QUESTION_COUNT};
+    const FAST_FOLLOWUP_DELAY_MS = ${DEFAULT_MINI_APP_FAST_FOLLOWUP_DELAY_MS};
+    const BACKGROUND_PAGE_DELAY_MS = ${DEFAULT_MINI_APP_BACKGROUND_PAGE_DELAY_MS};
+    const MAX_QUESTION_LIMIT = ${MAX_MINI_APP_QUESTION_LIMIT};
     const QUESTION_TAG_LIMIT = 10;
     const QUESTION_TAG_FILTER_COLLAPSED_LIMIT = 5;
     const state = {
@@ -6677,6 +7614,7 @@ function telegramMiniAppHtml() {
       draftAutosaveTimers: new Map(),
       draftAutosaveVersions: new Map(),
       retryTimer: null,
+      autoQuestionLoadTimer: null,
       aiSearchTimer: null,
       aiSearchResultQuery: '',
       aiSearchResultScores: new Map(),
@@ -6686,9 +7624,12 @@ function telegramMiniAppHtml() {
       savedDraftKeys: new Set(),
       submittedAnswerKeys: new Set(),
       submittedAnswersByQuestionKey: new Map(),
+      answerChangedAtByQuestionKey: new Map(),
+      answerSubmitGuardTimers: new Map(),
       submitDraftsBusy: false,
       submitDraftsMessage: '',
       showUnansweredFirst: readShowUnansweredFirst(),
+      answeredQuestionsOnly: false,
       popularQuestionsOnly: false,
       popularQuestionLimit: POPULAR_QUESTION_LIMIT_DEFAULT,
       selectedQuestionTypes: new Set(),
@@ -6703,7 +7644,7 @@ function telegramMiniAppHtml() {
       resultsSessionSlug: '',
       resultsDemoData: readDemoResults(),
       resultVisibleCounts: { consensus: 5, divisive: 5 },
-      resultClusterCount: 3,
+      resultClusterCount: RESULT_GROUP_COUNT,
       resultSectionsOpen: {
         filters: false,
         consensus: false,
@@ -6760,9 +7701,16 @@ function telegramMiniAppHtml() {
       expandedQuestionKeys: new Set(),
       highlightedQuestionKey: '',
       highlightScrollDone: false,
+      seriesActiveIndex: 0,
+      seriesSkippedKeys: new Set(),
       sessionsPanelOpen: false,
-      questionLimit: 0,
+      questionLimit: FAST_INITIAL_QUESTION_LIMIT,
       loadedOnce: false,
+      questionsLoading: false,
+      loadingMoreQuestions: false,
+      backgroundQuestionLoadPending: false,
+      loadingProgressTimer: null,
+      loadingProgressPercent: 18,
     };
     const el = {
       meta: document.getElementById('meta'),
@@ -6794,6 +7742,9 @@ function telegramMiniAppHtml() {
       activitySummary: document.getElementById('activitySummary'),
       activityList: document.getElementById('activityList'),
       closeActivity: document.getElementById('closeActivity'),
+      showDrafts: document.getElementById('showDrafts'),
+      draftsPanel: document.getElementById('draftsPanel'),
+      closeDrafts: document.getElementById('closeDrafts'),
       sessionPicker: document.getElementById('sessionPicker'),
       sessionSummary: document.getElementById('sessionSummary'),
       sessionPickerBody: document.getElementById('sessionPickerBody'),
@@ -6806,6 +7757,7 @@ function telegramMiniAppHtml() {
       resultsPanelBody: document.getElementById('resultsPanelBody'),
       closeResults: document.getElementById('closeResults'),
       resultsTitleSession: document.getElementById('resultsTitleSession'),
+      resultsLoadingSpinner: document.getElementById('resultsLoadingSpinner'),
       showResultFilters: document.getElementById('showResultFilters'),
       resultFilters: document.getElementById('resultFilters'),
       toggleResultFilters: document.getElementById('toggleResultFilters'),
@@ -6861,6 +7813,7 @@ function telegramMiniAppHtml() {
       filterPanel: document.getElementById('filterPanel'),
       closeFilter: document.getElementById('closeFilter'),
       filterUnansweredFirst: document.getElementById('filterUnansweredFirst'),
+      filterAnsweredOnly: document.getElementById('filterAnsweredOnly'),
       filterTopPopular: document.getElementById('filterTopPopular'),
       filterTopPopularLimit: document.getElementById('filterTopPopularLimit'),
       decrementTopPopular: document.getElementById('decrementTopPopular'),
@@ -6881,6 +7834,11 @@ function telegramMiniAppHtml() {
       settingsPanel: document.getElementById('settingsPanel'),
       closeSettings: document.getElementById('closeSettings'),
       draftStyle: document.getElementById('draftStyle'),
+      topicPreferences: document.getElementById('topicPreferences'),
+      demographicLinkOptIn: document.getElementById('demographicLinkOptIn'),
+      attendanceLinkOptIn: document.getElementById('attendanceLinkOptIn'),
+      draftDivergenceOptIn: document.getElementById('draftDivergenceOptIn'),
+      showAgentResponses: document.getElementById('showAgentResponses'),
       demoDataResults: document.getElementById('demoDataResults'),
       agentAutoApplyQuestionVotes: document.getElementById('agentAutoApplyQuestionVotes'),
       saveSettings: document.getElementById('saveSettings'),
@@ -6929,7 +7887,8 @@ function telegramMiniAppHtml() {
       export_allow: 'Add admin',
       export_revoke: 'Remove admin',
     };
-    const DEFAULT_ADMIN_ACTIONS = Object.keys(ADMIN_ACTION_LABELS).map((action) => ({
+    const DEFAULT_ADMIN_ACTION_IDS = ['export_all', 'export_access', 'results_settings', 'question_queue', 'group_link'];
+    const DEFAULT_ADMIN_ACTIONS = DEFAULT_ADMIN_ACTION_IDS.map((action) => ({
       action,
       label: ADMIN_ACTION_LABELS[action],
     }));
@@ -6940,6 +7899,12 @@ function telegramMiniAppHtml() {
       const out = json ? { 'content-type': 'application/json' } : {};
       if (tg && tg.initData) out['x-telegram-init-data'] = tg.initData;
       return out;
+    };
+    const userFacingErrorMessage = (body = {}, fallback = 'Something went wrong.') => {
+      if (body?.error === 'mini_app_launch_invalid') {
+        return body.message || body.launchRecovery?.message || MINI_APP_LAUNCH_RECOVERY_MESSAGE;
+      }
+      return body?.message || body?.error || fallback;
     };
     const selectedSessionQuery = () => Array.from(state.selectedSessionSlugs).filter(Boolean).join(',');
     const selectedResultsSessions = () => {
@@ -6961,7 +7926,7 @@ function telegramMiniAppHtml() {
     const currentResultsCacheKey = () => [
       state.resultsDemoData ? 'demo' : 'live',
       state.resultsSessionSlug || '',
-      String(state.resultClusterCount || 3),
+      String(RESULT_GROUP_COUNT),
       state.resultsDemoData ? '' : resultFilterCacheKey(),
     ].join('|');
     const restoreCachedResults = () => {
@@ -7047,16 +8012,35 @@ function telegramMiniAppHtml() {
       if (!submittedAnswer?.answer) return false;
       return normalizeAnswerForCompare(answerPayload(question)) === normalizeAnswerForCompare(submittedAnswer.answer);
     };
+    const answerChangeGuardActive = (question) => {
+      const changedAt = Number(state.answerChangedAtByQuestionKey.get(question?.questionKey) || 0);
+      return changedAt > 0 && Date.now() - changedAt < ANSWER_CHANGE_SUBMIT_GUARD_MS;
+    };
+    const cardsForQuestion = (question, sourceElement = null) => {
+      const sourceCard = sourceElement?.closest?.('.card');
+      if (sourceCard) return [sourceCard];
+      const key = question?.questionKey || '';
+      if (!key) return [];
+      return Array.from(el.questionStack?.querySelectorAll?.('.card') || [])
+        .filter((card) => card.dataset?.questionKey === key);
+    };
     const applySubmitButtonState = (button, question, { busy = false } = {}) => {
       if (!button) return;
       const submittedCurrentAnswer = !busy && currentAnswerMatchesSubmitted(question);
+      const guarded = !busy && !submittedCurrentAnswer && answerChangeGuardActive(question);
       button.classList.toggle('submittedCheck', submittedCurrentAnswer);
-      button.disabled = busy || !question?.canAnswer || submittedCurrentAnswer;
+      button.disabled = busy || !question?.canAnswer || submittedCurrentAnswer || guarded;
       button.setAttribute('aria-busy', busy ? 'true' : 'false');
       if (submittedCurrentAnswer) {
         button.innerHTML = CHECK_ICON;
         button.setAttribute('aria-label', 'Submitted');
         button.title = 'Submitted';
+        return;
+      }
+      if (guarded) {
+        button.textContent = 'Review';
+        button.setAttribute('aria-label', 'Review answer before submitting');
+        button.title = 'Review answer before submitting';
         return;
       }
       button.textContent = busy ? 'Submitting...' : 'Submit';
@@ -7070,14 +8054,27 @@ function telegramMiniAppHtml() {
       return !currentAnswerMatchesSubmitted(question);
     };
     const refreshQuestionActionControls = (question, sourceElement) => {
-      const card = sourceElement?.closest?.('.card');
-      const actions = card?.querySelector?.('.cardActions');
-      const visible = shouldShowAnswerActions(question);
-      if (actions) actions.hidden = !visible;
-      const button = card?.querySelector?.('.submitButton');
-      applySubmitButtonState(button, question);
+      const visible = shouldShowAnswerActions(question) || seriesModeEnabled();
+      cardsForQuestion(question, sourceElement).forEach((card) => {
+        const actions = card?.querySelector?.('.cardActions');
+        if (actions) actions.hidden = !visible;
+        const button = card?.querySelector?.('.submitButton');
+        applySubmitButtonState(button, question);
+      });
     };
     const refreshQuestionSubmitButton = refreshQuestionActionControls;
+    function markAnswerChanged(question) {
+      const key = question?.questionKey || '';
+      if (!key) return;
+      state.answerChangedAtByQuestionKey.set(key, Date.now());
+      const existing = state.answerSubmitGuardTimers.get(key);
+      if (existing) window.clearTimeout(existing);
+      const timer = window.setTimeout(() => {
+        state.answerSubmitGuardTimers.delete(key);
+        refreshQuestionActionControls(question);
+      }, ANSWER_CHANGE_SUBMIT_GUARD_MS);
+      state.answerSubmitGuardTimers.set(key, timer);
+    }
     const bumpDraftAutosaveVersion = (question) => {
       const key = question?.questionKey || '';
       if (!key) return 0;
@@ -7110,8 +8107,45 @@ function telegramMiniAppHtml() {
     };
     const questionAnswered = (question) => {
       if (state.submittedAnswerKeys.has(question?.questionKey)) return true;
-      if (state.savedDraftKeys.has(question?.questionKey)) return true;
       return false;
+    };
+    const questionSeriesState = () => state.data?.questionSeries || {};
+    const questionSeriesKeys = () => {
+      const series = questionSeriesState();
+      return Array.isArray(series.questionKeys) ? series.questionKeys.filter(Boolean) : [];
+    };
+    const seriesModeEnabled = () => questionSeriesState().enabled === true && questionSeriesKeys().length > 0;
+    const currentSeriesQuestionKey = () => {
+      const keys = questionSeriesKeys();
+      if (!keys.length) return '';
+      let index = Math.max(0, Math.min(keys.length - 1, Number(state.seriesActiveIndex || 0)));
+      while (
+        index < keys.length - 1 &&
+        (state.seriesSkippedKeys.has(keys[index]) || state.submittedAnswerKeys.has(keys[index]))
+      ) {
+        index += 1;
+      }
+      state.seriesActiveIndex = index;
+      return keys[index] || '';
+    };
+    const advanceSeriesQuestion = (question, { skip = false, renderNow = true } = {}) => {
+      if (!seriesModeEnabled() || !question?.questionKey) return false;
+      const keys = questionSeriesKeys();
+      const currentIndex = Math.max(0, keys.indexOf(question.questionKey));
+      if (skip) state.seriesSkippedKeys.add(question.questionKey);
+      const nextIndex = keys.findIndex((key, index) => (
+        index > currentIndex &&
+        !state.seriesSkippedKeys.has(key) &&
+        !state.submittedAnswerKeys.has(key)
+      ));
+      if (nextIndex >= 0) {
+        state.seriesActiveIndex = nextIndex;
+        state.activeKey = keys[nextIndex];
+        const nextQuestion = (state.data?.questions || []).find((entry) => entry.questionKey === keys[nextIndex]);
+        if (nextQuestion) expandQuestion(nextQuestion);
+      }
+      if (renderNow) render();
+      return nextIndex >= 0;
     };
     const normalizePopularQuestionLimit = (value) => {
       const parsed = Number.parseInt(String(value || ''), 10);
@@ -7245,6 +8279,7 @@ function telegramMiniAppHtml() {
       return score;
     };
     const questionMatchesFilters = (question) => {
+      if (state.answeredQuestionsOnly && !questionAnswered(question)) return false;
       if (state.selectedQuestionTypes.size && !state.selectedQuestionTypes.has(questionTypeFilterValue(question))) return false;
       if (state.selectedQuestionTags.size) {
         const tags = new Set(questionTags(question));
@@ -7260,22 +8295,39 @@ function telegramMiniAppHtml() {
       if (!state.popularQuestionsOnly) return entries;
       return entries.sort(popularitySort).slice(0, normalizePopularQuestionLimit(state.popularQuestionLimit));
     };
+    const questionHasAgentPrediction = (question) => {
+      if (!question?.questionKey || state.data?.agentOnly?.showAgentResponses === false) return false;
+      return Boolean(state.data?.agentOnly?.predictions?.[question.questionKey]);
+    };
+    const predictionPrioritySort = (left, right) => (
+      Number(questionHasAgentPrediction(right.question)) - Number(questionHasAgentPrediction(left.question))
+    );
     const orderedQuestions = () => {
       const questions = filteredQuestionEntries();
+      if (seriesModeEnabled()) {
+        const activeSeriesKey = currentSeriesQuestionKey();
+        return questions
+          .map((entry) => entry.question)
+          .filter((question) => question.questionKey === activeSeriesKey);
+      }
       if (state.popularQuestionsOnly) {
         return questions.map((entry) => entry.question);
       }
       if (state.aiSearchQuery) {
         questions.sort((left, right) => (
           right.score - left.score ||
+          predictionPrioritySort(left, right) ||
           Number(questionAnswered(left.question)) - Number(questionAnswered(right.question)) ||
           left.index - right.index
         ));
         return questions.map((entry) => entry.question);
       }
-      if (state.showUnansweredFirst) {
+      if (state.showUnansweredFirst || questions.some((entry) => questionHasAgentPrediction(entry.question))) {
         questions.sort((left, right) => (
-          Number(questionAnswered(left.question)) - Number(questionAnswered(right.question)) ||
+          predictionPrioritySort(left, right) ||
+          (state.showUnansweredFirst
+            ? Number(questionAnswered(left.question)) - Number(questionAnswered(right.question))
+            : 0) ||
           left.index - right.index
         ));
       }
@@ -7319,10 +8371,62 @@ function telegramMiniAppHtml() {
       else state.expandedQuestionKeys.delete(question.questionKey);
       if (!syncQuestionCardExpanded(question, expanded)) renderQuestionStack();
     };
+    function stopLoadingProgressTimer() {
+      if (state.loadingProgressTimer && typeof window.clearInterval === 'function') {
+        window.clearInterval(state.loadingProgressTimer);
+      }
+      state.loadingProgressTimer = null;
+    }
     const setStatus = (message, kind = '') => {
+      stopLoadingProgressTimer();
       el.status.className = 'status ' + kind;
       el.status.textContent = message || '';
     };
+    const setLoadingProgress = (message, percent = 18) => {
+      el.status.className = 'status loadingStatus';
+      el.status.innerHTML = '';
+      const visual = document.createElement(LOADING_VISUAL_MODE === 'gif' ? 'img' : 'span');
+      if (LOADING_VISUAL_MODE === 'gif') {
+        visual.className = 'loadingGif';
+        visual.src = '/telegram/mini-app/loading.gif';
+        visual.alt = '';
+      } else {
+        visual.className = 'loadingSpinner';
+      }
+      visual.setAttribute('aria-hidden', 'true');
+      const label = document.createElement('span');
+      label.textContent = message || 'Loading questions and agent predictions';
+      const track = document.createElement('div');
+      track.className = 'loadingProgress';
+      track.setAttribute('aria-hidden', 'true');
+      const bar = document.createElement('div');
+      bar.className = 'loadingProgressBar';
+      const boundedPercent = Math.max(8, Math.min(96, Number(percent) || 18));
+      bar.style.setProperty('--progress', boundedPercent + '%');
+      track.appendChild(bar);
+      el.status.appendChild(visual);
+      el.status.appendChild(label);
+      el.status.appendChild(track);
+    };
+    function startLoadingProgress({
+      message = 'Loading questions and agent predictions',
+      initialPercent = 22,
+      maxPercent = 72,
+    } = {}) {
+      stopLoadingProgressTimer();
+      state.loadingProgressPercent = Math.max(8, Math.min(96, Number(initialPercent) || 22));
+      setLoadingProgress(message, state.loadingProgressPercent);
+      if (typeof window.setInterval !== 'function' || typeof window.clearInterval !== 'function') return;
+      state.loadingProgressTimer = window.setInterval(() => {
+        const current = Number(state.loadingProgressPercent || initialPercent) || initialPercent;
+        const step = current < 42 ? 5 : current < 60 ? 3 : 1.5;
+        state.loadingProgressPercent = Math.min(Number(maxPercent) || 72, current + step);
+        setLoadingProgress(message, state.loadingProgressPercent);
+        if (state.loadingProgressPercent >= (Number(maxPercent) || 72)) {
+          stopLoadingProgressTimer();
+        }
+      }, 420);
+    }
     function shouldRetryQuestions(data) {
       if (data?.sessionPicker?.required === true) return false;
       const questions = Array.isArray(data?.questions) ? data.questions : [];
@@ -7337,6 +8441,10 @@ function telegramMiniAppHtml() {
     function clearQuestionRetry() {
       if (state.retryTimer) window.clearTimeout(state.retryTimer);
       state.retryTimer = null;
+    }
+    function clearAutoQuestionLoadTimer() {
+      if (state.autoQuestionLoadTimer) window.clearTimeout(state.autoQuestionLoadTimer);
+      state.autoQuestionLoadTimer = null;
     }
     function scheduleQuestionRetry() {
       clearQuestionRetry();
@@ -7442,8 +8550,74 @@ function telegramMiniAppHtml() {
       const score = document.createElement('span');
       score.className = 'voteScore' + (summary.score > 0 ? ' positive' : (summary.score < 0 ? ' negative' : ''));
       score.textContent = String(summary.score);
-      wrap.append(makeButton('up', VOTE_UP_ICON, 'Upvote question'), score, makeButton('down', VOTE_DOWN_ICON, 'Downvote question'));
+      wrap.append(makeButton('down', VOTE_DOWN_ICON, 'Downvote question'), score, makeButton('up', VOTE_UP_ICON, 'Upvote question'));
       return wrap;
+    }
+    const agentOnlyState = () => state.data?.agentOnly || {};
+    const agentOnlyPredictionFor = (question) => {
+      if (!question?.questionKey || agentOnlyState().showAgentResponses === false) return null;
+      return agentOnlyState().predictions?.[question.questionKey] || null;
+    };
+    async function confirmAgentPrediction(question, button) {
+      if (!question?.questionKey) return;
+      if (button) button.disabled = true;
+      try {
+        const response = await fetch('/telegram/mini-app/api/agent-only/confirm', {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify({ launch, questionKey: question.questionKey }),
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok || body.ok === false) throw new Error(body.error || body.reason || 'agent_only_confirm_failed');
+        const prediction = agentOnlyPredictionFor(question);
+        if (prediction) prediction.confirmed = true;
+        renderQuestionStack();
+      } catch (error) {
+        setStatus(String(error?.message || error || 'Could not confirm agent prediction.'), 'error');
+        if (button) button.disabled = false;
+      }
+    }
+    function renderAgentOnlyPredictionBadge(question) {
+      const prediction = agentOnlyPredictionFor(question);
+      if (!prediction?.valueLabel) return null;
+      const questionType = questionTypeFilterValue(question);
+      const stacked = questionType === 'freeform' || questionType === 'multichoice';
+      const row = document.createElement('div');
+      row.className = 'agentOnlyBadgeRow' + (stacked ? ' stackedPredictionRow' : '');
+      const badge = document.createElement('span');
+      const answerKind = ['agree', 'unsure', 'disagree'].includes(String(prediction.answerKind || ''))
+        ? String(prediction.answerKind)
+        : '';
+      if (stacked) {
+        badge.className = 'agentPredictionBadge stackedPrediction';
+        const label = document.createElement('span');
+        label.className = 'agentPredictionLabel';
+        label.textContent = 'Agent prediction';
+        const value = document.createElement('span');
+        value.className = 'agentPredictionValue';
+        value.textContent = prediction.valueLabel;
+        badge.append(label, value);
+      } else if (answerKind) {
+        badge.className = 'agentPredictionBadge choicePrediction';
+        const label = document.createElement('span');
+        label.className = 'agentPredictionLabel';
+        label.textContent = 'Agent prediction';
+        const choice = document.createElement('span');
+        choice.className = 'agentPredictionChoice ' + answerKind;
+        choice.textContent = prediction.valueLabel;
+        badge.append(label, choice);
+      } else {
+        badge.className = 'agentPredictionBadge';
+        const label = document.createElement('span');
+        label.className = 'agentPredictionLabel';
+        label.textContent = 'Agent prediction';
+        const value = document.createElement('span');
+        value.className = 'agentPredictionValue';
+        value.textContent = prediction.valueLabel;
+        badge.append(label, value);
+      }
+      row.appendChild(badge);
+      return row;
     }
     function renderQuestionStack() {
       const questions = orderedQuestions();
@@ -7473,6 +8647,8 @@ function telegramMiniAppHtml() {
         prompt.className = 'prompt';
         prompt.textContent = question.prompt || question.title || '';
         headText.appendChild(prompt);
+        const predictionBadge = renderAgentOnlyPredictionBadge(question);
+        if (predictionBadge) headText.appendChild(predictionBadge);
         const toggle = document.createElement('button');
         toggle.type = 'button';
         toggle.className = 'cardToggle';
@@ -7496,7 +8672,21 @@ function telegramMiniAppHtml() {
       });
       updateFooterControls();
       scrollHighlightedQuestionIntoView();
-      if (state.data?.hasMoreQuestions === true) {
+      const isLoadingMore = state.loadingMoreQuestions === true || state.backgroundQuestionLoadPending === true;
+      if (isLoadingMore) {
+        const loading = document.createElement('div');
+        loading.className = 'questionLoadingRow';
+        const spinner = document.createElement('span');
+        spinner.className = 'inlineSpinner';
+        spinner.setAttribute('aria-label', 'Loading more questions');
+        const label = document.createElement('span');
+        label.textContent = state.backgroundQuestionLoadPending
+          ? backgroundQuestionLoadMessage()
+          : 'Loading more questions...';
+        loading.append(spinner, label);
+        el.questionStack.appendChild(loading);
+      }
+      if (state.data?.hasMoreQuestions === true && !isLoadingMore) {
         const loadMore = document.createElement('button');
         loadMore.type = 'button';
         loadMore.className = 'secondary loadMoreQuestions';
@@ -7507,10 +8697,17 @@ function telegramMiniAppHtml() {
         el.questionStack.appendChild(loadMore);
       }
     }
+    function backgroundQuestionLoadMessage() {
+      const loaded = Number(state.data?.loadedQuestionLimit || state.data?.loadedQuestionCount || 0) || 0;
+      return loaded <= FAST_INITIAL_QUESTION_LIMIT
+        ? 'Loading the next questions...'
+        : 'Loading the rest in the background...';
+    }
     function selectValue(question, value) {
       activate(question);
       const draft = draftFor(question);
       draft.value = value;
+      markAnswerChanged(question);
       renderQuestionStack();
       scheduleDraftAutosave(question);
     }
@@ -7522,6 +8719,7 @@ function telegramMiniAppHtml() {
         ? (values.includes(option) ? [] : [option])
         : (values.includes(option) ? values.filter((value) => value !== option) : values.concat(option));
       draft.values = next;
+      markAnswerChanged(question);
       renderQuestionStack();
       scheduleDraftAutosave(question);
     }
@@ -7567,6 +8765,7 @@ function telegramMiniAppHtml() {
           activate(question);
           draft.value = Number(input.value);
           label.textContent = input.value;
+          markAnswerChanged(question);
           refreshQuestionSubmitButton(question, input);
           scheduleDraftAutosave(question);
           updateFooterControls();
@@ -7600,6 +8799,7 @@ function telegramMiniAppHtml() {
           }
           activate(question);
           draft.text = input.value;
+          markAnswerChanged(question);
           refreshQuestionSubmitButton(question, input);
           scheduleDraftAutosave(question);
           updateFooterControls();
@@ -7635,6 +8835,7 @@ function telegramMiniAppHtml() {
         }
         activate(question);
         draft.comments = comments.value;
+        markAnswerChanged(question);
         refreshQuestionSubmitButton(question, comments);
         scheduleDraftAutosave(question);
         updateFooterControls();
@@ -7672,7 +8873,18 @@ function telegramMiniAppHtml() {
       }
       const actions = document.createElement('div');
       actions.className = 'cardActions';
-      actions.hidden = !shouldShowAnswerActions(question);
+      actions.hidden = !(shouldShowAnswerActions(question) || seriesModeEnabled());
+      if (seriesModeEnabled()) {
+        const skip = document.createElement('button');
+        skip.type = 'button';
+        skip.className = 'secondary';
+        skip.textContent = 'Skip';
+        skip.onclick = (event) => {
+          event.stopPropagation();
+          advanceSeriesQuestion(question, { skip: true });
+        };
+        actions.appendChild(skip);
+      }
       const submit = document.createElement('button');
       submit.type = 'button';
       submit.className = 'primary submitButton';
@@ -7680,6 +8892,7 @@ function telegramMiniAppHtml() {
       submit.onclick = (event) => {
         event.stopPropagation();
         if (currentAnswerMatchesSubmitted(question)) return;
+        if (answerChangeGuardActive(question)) return;
         sendAnswer(true, question, submit);
       };
       actions.appendChild(submit);
@@ -7741,6 +8954,7 @@ function telegramMiniAppHtml() {
       textarea.value = base + prefix + text;
       draft.text = textarea.value;
       activate(question);
+      markAnswerChanged(question);
       refreshQuestionSubmitButton(question, textarea);
       scheduleDraftAutosave(question);
       updateFooterControls();
@@ -7781,6 +8995,7 @@ function telegramMiniAppHtml() {
       textarea.value = base + prefix + text;
       draft.comments = textarea.value;
       activate(question);
+      markAnswerChanged(question);
       refreshQuestionSubmitButton(question, textarea);
       scheduleDraftAutosave(question);
       updateFooterControls();
@@ -8455,11 +9670,13 @@ function telegramMiniAppHtml() {
       return state.selectedQuestionTypes.size +
         state.selectedQuestionTags.size +
         (String(state.aiSearchQuery || '').trim() ? 1 : 0) +
+        (state.answeredQuestionsOnly ? 1 : 0) +
         (state.popularQuestionsOnly ? 1 : 0);
     }
     function clearQuestionFilters() {
       state.selectedQuestionTypes.clear();
       state.selectedQuestionTags.clear();
+      state.answeredQuestionsOnly = false;
       state.popularQuestionsOnly = false;
       state.popularQuestionLimit = POPULAR_QUESTION_LIMIT_DEFAULT;
       state.aiDraftQuery = '';
@@ -8515,6 +9732,17 @@ function telegramMiniAppHtml() {
       empty.appendChild(text);
       mount.appendChild(empty);
     }
+    function appendLoadingResult(mount, message) {
+      const row = document.createElement('div');
+      row.className = 'resultRow';
+      const spinner = document.createElement('span');
+      spinner.className = 'inlineSpinner';
+      spinner.setAttribute('aria-label', 'Loading');
+      const text = document.createElement('span');
+      text.textContent = message;
+      row.append(spinner, text);
+      mount.appendChild(row);
+    }
     function renderResultRows(mount, rows, emptyText, scoreKind, visibleCount = 5, moreButton = null) {
       mount.innerHTML = '';
       if (!rows.length) {
@@ -8555,6 +9783,7 @@ function telegramMiniAppHtml() {
     }
     function setResultSectionOpen(key, section, toggle) {
       const open = state.resultSectionsOpen[key] === true;
+      if (key === 'filters') section.hidden = !open;
       section.classList.toggle('collapsed', !open);
       toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
       const path = toggle.querySelector('path');
@@ -8574,19 +9803,20 @@ function telegramMiniAppHtml() {
       el.resultClusterControls.innerHTML = '';
       el.resultGroupChart.innerHTML = '';
       el.groupAnalysisSection.hidden = true;
-      const participantCount = Number(state.resultsData?.participantCount || state.resultsData?.counts?.uniqueParticipants || 0) || 0;
       if (state.resultsData?.groupView?.enabled === false) {
-        appendEmptyResult(el.resultGroups, 'Anonymized group view is level 4 and needs admin enablement.');
+        el.resultGroupsSection.hidden = true;
         return;
       }
-      if (participantCount >= 2) renderResultClusterControls();
-      if (!groups.length) {
+      el.resultGroupsSection.hidden = false;
+      state.resultClusterCount = RESULT_GROUP_COUNT;
+      const visibleGroups = groups.slice(0, RESULT_GROUP_COUNT);
+      if (!visibleGroups.length) {
         appendEmptyResult(el.resultGroups, 'Not enough participant response data for groups yet.');
         return;
       }
-      renderResultGroupChart(groups);
+      renderResultGroupChart(visibleGroups);
       el.groupAnalysisSection.hidden = false;
-      groups.forEach((group) => {
+      visibleGroups.forEach((group) => {
         const analyze = document.createElement('button');
         analyze.type = 'button';
         analyze.className = 'secondary';
@@ -8740,36 +9970,12 @@ function telegramMiniAppHtml() {
       return ['#1f7ae0', '#f59e0b', '#12b569', '#b8a2ff', '#ff443d', '#2cc3ff'][index % 6];
     }
     function resultClusterOptionCounts() {
-      const participantCount = Number(state.resultsData?.participantCount || state.resultsData?.counts?.uniqueParticipants || 0) || 0;
-      const maxCount = Math.min(5, Math.floor(participantCount || 0));
-      if (maxCount < 2) return [];
-      if (state.resultClusterCount > maxCount) state.resultClusterCount = maxCount;
-      if (state.resultClusterCount < 2) state.resultClusterCount = 2;
-      return Array.from({ length: maxCount - 1 }, (_, index) => index + 2);
+      state.resultClusterCount = RESULT_GROUP_COUNT;
+      return [];
     }
     function renderResultClusterControls() {
       el.resultClusterControls.innerHTML = '';
-      const counts = resultClusterOptionCounts();
-      if (!counts.length) return;
-      const label = document.createElement('span');
-      label.className = 'filterSummary';
-      label.textContent = 'Clusters';
-      el.resultClusterControls.appendChild(label);
-      counts.forEach((count) => {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = 'secondary';
-        if (state.resultClusterCount === count) button.classList.add('active');
-        button.textContent = String(count);
-        button.onclick = () => {
-          state.resultClusterCount = count;
-          state.groupAnalysisById = {};
-          stopGroupAnalysisProgressTimer();
-          restoreCachedResults();
-          loadResults({ force: true });
-        };
-        el.resultClusterControls.appendChild(button);
-      });
+      resultClusterOptionCounts();
     }
     function renderResultGroupChart(groups) {
       el.resultGroupChart.innerHTML = '';
@@ -8830,6 +10036,10 @@ function telegramMiniAppHtml() {
     function renderTopicMap(topicMap) {
       el.topicMapChart.innerHTML = '';
       el.topicMapSummary.textContent = '';
+      if (state.resultsLoading === true && !topicMap) {
+        appendLoadingResult(el.topicMapChart, 'Loading topic map...');
+        return;
+      }
       const available = topicMap?.availability?.available === true;
       if (!available) {
         const reason = topicMap?.availability?.reason || 'not_enough_data';
@@ -8912,22 +10122,23 @@ function telegramMiniAppHtml() {
       const sessions = ensureResultsSessionSlug();
       const currentSession = sessions.find((session) => session.sessionSlug === state.resultsSessionSlug) || {};
       el.resultsTitleSession.textContent = currentSession.sessionName || state.resultsSessionSlug || '';
-      if (state.resultsLoading) {
-        el.resultsSummary.textContent = 'Loading results...';
-      } else if (!state.resultsSessionSlug) {
+      if (el.resultsLoadingSpinner) el.resultsLoadingSpinner.hidden = state.resultsLoading !== true;
+      if (!state.resultsSessionSlug) {
         el.resultsSummary.textContent = 'Select a session to view results.';
       } else if (state.resultsData?.ok === false) {
         el.resultsSummary.textContent = 'Could not load results: ' + (state.resultsData.error || 'results_unavailable');
       } else if (state.resultsData) {
         const filterText = state.resultsData.filters?.applied
-          ? ' | filtered to ' + state.resultsData.filters.matchedParticipants + ' participants' +
-            (state.resultsData.filters.suppressed ? ' (hidden below minimum group size)' : '')
+          ? ' (Filtered: ' + state.resultsData.filters.matchedParticipants +
+            (state.resultsData.filters.suppressed ? ', hidden below minimum group size' : '') + ')'
           : '';
+        const demoQuestionText = state.resultsData.demo ? ' (Demo Data)' : '';
         el.resultsSummary.textContent = state.resultsData.responseCount + ' responses | ' +
-          state.resultsData.participantCount + ' participants | ' +
-          state.resultsData.binaryQuestionCount + ' binary questions' +
-          filterText +
+          state.resultsData.participantCount + ' participants' + filterText + ' | ' +
+          state.resultsData.binaryQuestionCount + ' binary questions' + demoQuestionText +
           (state.resultsLoadError ? ' | refresh failed: ' + state.resultsLoadError : '');
+      } else if (state.resultsLoading) {
+        el.resultsSummary.textContent = '';
       } else {
         el.resultsSummary.textContent = 'Open results for the selected session.';
       }
@@ -8949,17 +10160,22 @@ function telegramMiniAppHtml() {
     }
     function normalizeAdminActions(adminActions = []) {
       const source = Array.isArray(adminActions) && adminActions.length ? adminActions : DEFAULT_ADMIN_ACTIONS;
+      const seen = new Set();
       const normalized = source.map((action) => {
         const actionId = typeof action === 'string'
           ? action
           : String(action?.action || action?.id || '').trim();
         if (!actionId) return null;
+        const remappedAccessAction = ['export_allow', 'export_revoke'].includes(actionId);
+        const canonicalAction = remappedAccessAction ? 'export_access' : actionId;
+        if (seen.has(canonicalAction)) return null;
+        seen.add(canonicalAction);
         const label = typeof action === 'string'
-          ? ADMIN_ACTION_LABELS[actionId]
-          : (String(action?.label || '').trim() || ADMIN_ACTION_LABELS[actionId]);
+          ? ADMIN_ACTION_LABELS[canonicalAction]
+          : ((remappedAccessAction ? '' : String(action?.label || '').trim()) || ADMIN_ACTION_LABELS[canonicalAction]);
         return {
-          action: actionId,
-          label: label || actionId.replace(/_/g, ' '),
+          action: canonicalAction,
+          label: label || canonicalAction.replace(/_/g, ' '),
         };
       }).filter(Boolean);
       return normalized.length ? normalized : DEFAULT_ADMIN_ACTIONS;
@@ -9087,35 +10303,59 @@ function telegramMiniAppHtml() {
       state.adminBusy = false;
       renderAdmin();
     }
+    async function copyTextToClipboard(text) {
+      const value = String(text || '');
+      const clipboard = typeof navigator !== 'undefined' ? navigator.clipboard : null;
+      if (!value || !clipboard || typeof clipboard.writeText !== 'function') return false;
+      try {
+        await clipboard.writeText(value);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+    async function copyAdminCommand(command, message) {
+      const copied = await copyTextToClipboard(command);
+      state.adminPanelMessage = copied
+        ? message
+        : 'Copy this command in the CE bot: ' + command;
+      renderAdmin();
+    }
+    async function copyAdminAddress(address) {
+      const value = String(address || '').trim();
+      if (!value) return;
+      state.adminAddress = value;
+      const copied = await copyTextToClipboard(value);
+      state.adminPanelMessage = copied
+        ? 'Address copied and pasted into the wallet address field.'
+        : 'Address pasted into the wallet address field.';
+      renderAdmin();
+    }
+    function adminAddressValue(entry) {
+      return String((entry && typeof entry === 'object' ? entry.address : entry) || '').trim();
+    }
+    function appendAdminAddressList(panel, title, entries = []) {
+      const values = (Array.isArray(entries) ? entries : []).map(adminAddressValue).filter(Boolean);
+      const list = document.createElement('div');
+      list.className = 'adminAddressList';
+      const heading = document.createElement('span');
+      heading.textContent = title + ': ' + (values.length ? 'tap an address to copy/fill' : 'None');
+      list.appendChild(heading);
+      values.forEach((value) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'adminAddressButton';
+        button.textContent = value;
+        button.title = value;
+        button.onclick = () => copyAdminAddress(value);
+        list.appendChild(button);
+      });
+      panel.appendChild(list);
+    }
     async function downloadAdminExport() {
       const sessionSlug = activeAdminSessionSlug();
       if (!sessionSlug) return;
-      state.adminBusy = true;
-      state.adminPanelMessage = 'Preparing export...';
-      renderAdmin();
-      try {
-        const url = new URL('/telegram/mini-app/api/admin/export', location.origin);
-        url.searchParams.set('launch', launch);
-        url.searchParams.set('sessionSlug', sessionSlug);
-        const response = await fetch(url.pathname + url.search, { headers: headers() });
-        if (!response.ok) {
-          const body = await response.json().catch(() => ({}));
-          state.adminPanelMessage = 'Could not export data: ' + (body.error || 'response_export_failed');
-        } else {
-          const blob = await response.blob();
-          const href = URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = href;
-          link.download = 'context-engine-' + sessionSlug + '-responses.zip';
-          link.click();
-          window.setTimeout(() => URL.revokeObjectURL(href), 5000);
-          state.adminPanelMessage = 'Export ready.';
-        }
-      } catch {
-        state.adminPanelMessage = 'Could not export data. Check connection and try again.';
-      }
-      state.adminBusy = false;
-      renderAdmin();
+      await copyAdminCommand('/export_all ' + sessionSlug, 'Export command copied. Paste it in the CE bot.');
     }
     async function createAdminGroupLink() {
       const sessionSlug = activeAdminSessionSlug();
@@ -9160,7 +10400,7 @@ function telegramMiniAppHtml() {
         button.type = 'button';
         button.className = 'secondary';
         button.disabled = state.adminBusy;
-        button.textContent = state.adminBusy ? 'Preparing...' : 'Download response export';
+        button.textContent = 'Copy export command';
         button.onclick = downloadAdminExport;
         const command = document.createElement('div');
         command.className = 'adminCommand';
@@ -9194,15 +10434,14 @@ function telegramMiniAppHtml() {
         remove.textContent = 'Remove admin';
         remove.onclick = () => submitAdminAccess('remove');
         row.append(add, remove);
-        const list = document.createElement('span');
-        const configured = (access.configuredAdmins || []).map(shortQuestionLabel).join(', ') || 'None';
-        const added = (access.additionalAdmins || []).map((entry) => shortQuestionLabel(entry.address || entry)).join(', ') || 'None';
-        list.textContent = 'Configured admins: ' + configured + ' | Added admins: ' + added;
         const commands = document.createElement('div');
         commands.className = 'adminCommand';
         const address = state.adminAddress || '0x...';
         commands.textContent = 'Bot commands: /export_allow ' + address + ' ' + sessionSlug + ' | /export_revoke ' + address + ' ' + sessionSlug;
-        panel.append(inputLabel, row, list, commands);
+        panel.append(inputLabel, row);
+        appendAdminAddressList(panel, 'Configured admins', access.configuredAdmins || []);
+        appendAdminAddressList(panel, 'Added admins', access.additionalAdmins || []);
+        panel.appendChild(commands);
       } else if (action === 'results_settings') {
         const settings = state.adminData?.resultsExposure || {};
         [
@@ -9681,6 +10920,32 @@ function telegramMiniAppHtml() {
           if (selected.has('citizen_of')) renderCountrySelect('citizen_of_country', 'Citizen of country');
           options.appendChild(countryDetails);
         }
+        if (categoryId === 'contribution_role' && selected.has('other')) {
+          const otherDetails = document.createElement('div');
+          otherDetails.className = 'groupOtherDetails';
+          const fieldWrap = document.createElement('label');
+          fieldWrap.className = 'field';
+          const fieldLabel = document.createElement('span');
+          fieldLabel.textContent = 'Other role';
+          const input = document.createElement('input');
+          input.type = 'text';
+          input.value = details.contribution_role?.other_text || '';
+          input.placeholder = 'Describe your role';
+          input.oninput = () => {
+            state.groupsSaveMessage = '';
+            state.groupDetails.contribution_role = state.groupDetails.contribution_role || { ...(details.contribution_role || {}) };
+            state.groupDetails.contribution_role.other_text = input.value;
+          };
+          const save = document.createElement('button');
+          save.type = 'button';
+          save.className = 'secondary';
+          save.textContent = 'Save';
+          save.disabled = state.groupsSaving || state.groupsLoading || !state.groupsSessionSlug;
+          save.onclick = () => saveGroups();
+          fieldWrap.append(fieldLabel, input);
+          otherDetails.append(fieldWrap, save);
+          options.appendChild(otherDetails);
+        }
         section.append(header, options);
         el.groupCategories.appendChild(section);
       });
@@ -9773,6 +11038,7 @@ function telegramMiniAppHtml() {
     }
     function renderFilters() {
       el.filterUnansweredFirst.checked = state.showUnansweredFirst;
+      el.filterAnsweredOnly.checked = state.answeredQuestionsOnly === true;
       el.filterTopPopular.checked = state.popularQuestionsOnly === true;
       state.popularQuestionLimit = normalizePopularQuestionLimit(state.popularQuestionLimit);
       el.filterTopPopularLimit.value = String(state.popularQuestionLimit);
@@ -9860,6 +11126,7 @@ function telegramMiniAppHtml() {
       const total = questions.length;
       const shown = filteredQuestionEntries().length;
       const active = [];
+      if (state.answeredQuestionsOnly) active.push('answered only');
       if (state.popularQuestionsOnly) active.push('top ' + state.popularQuestionLimit + ' popular');
       if (state.selectedQuestionTypes.size) active.push(Array.from(state.selectedQuestionTypes).map(questionTypeLabel).join(', '));
       if (state.selectedQuestionTags.size) active.push(Array.from(state.selectedQuestionTags).map(questionTagLabel).join(', '));
@@ -9891,6 +11158,25 @@ function telegramMiniAppHtml() {
       if (el.agentAutoApplyQuestionVotes) {
         el.agentAutoApplyQuestionVotes.checked = values.agentAutoApplyQuestionVotes === true;
       }
+      if (el.topicPreferences) {
+        el.topicPreferences.value = Array.isArray(values.topicPreferences) ? values.topicPreferences.join(', ') : '';
+      }
+      if (el.demographicLinkOptIn) {
+        el.demographicLinkOptIn.checked = values.demographicLinkOptIn === true;
+      }
+      if (el.attendanceLinkOptIn) {
+        el.attendanceLinkOptIn.checked = values.attendanceLinkOptIn === true;
+      }
+      if (el.draftDivergenceOptIn) {
+        el.draftDivergenceOptIn.checked = values.draftDivergenceOptIn === true;
+      }
+      if (el.showAgentResponses) {
+        el.showAgentResponses.checked = values.showAgentResponses !== false;
+        const agentPredictionsMenuButton = typeof el.showAgentResponses.closest === 'function'
+          ? el.showAgentResponses.closest('.menuCheckbox')
+          : null;
+        if (agentPredictionsMenuButton) agentPredictionsMenuButton.classList.toggle('active', values.showAgentResponses !== false);
+      }
       const submittedAnswers = Array.isArray(state.data?.submittedAnswers) ? state.data.submittedAnswers : [];
       const savedDrafts = Array.isArray(state.data?.savedDrafts) ? state.data.savedDrafts : [];
       el.savedDrafts.innerHTML = '';
@@ -9910,7 +11196,37 @@ function telegramMiniAppHtml() {
         } else {
           rows.forEach((answer) => {
             const row = document.createElement('div');
-            row.textContent = 'Q' + answer.displayIndex + ': ' + answer.answerLabel;
+            row.className = 'agentOnlyBadgeRow';
+            const text = document.createElement('span');
+            text.textContent = 'Q' + answer.displayIndex + ': ' + answer.answerLabel;
+            row.appendChild(text);
+            const prediction = agentOnlyPredictionFor({ questionKey: answer.questionKey });
+            if (prediction?.valueLabel) {
+              const badge = document.createElement('span');
+              const answerKind = ['agree', 'unsure', 'disagree'].includes(String(prediction.answerKind || ''))
+                ? String(prediction.answerKind)
+                : '';
+              if (answerKind) {
+                badge.className = 'agentPredictionBadge choicePrediction';
+                const label = document.createElement('span');
+                label.className = 'agentPredictionLabel';
+                label.textContent = 'Agent prediction';
+                const choice = document.createElement('span');
+                choice.className = 'agentPredictionChoice ' + answerKind;
+                choice.textContent = prediction.valueLabel;
+                badge.append(label, choice);
+              } else {
+                badge.className = 'agentPredictionBadge';
+                const label = document.createElement('span');
+                label.className = 'agentPredictionLabel';
+                label.textContent = 'Agent prediction';
+                const value = document.createElement('span');
+                value.className = 'agentPredictionValue';
+                value.textContent = prediction.valueLabel;
+                badge.append(label, value);
+              }
+              row.appendChild(badge);
+            }
             section.appendChild(row);
           });
         }
@@ -10002,7 +11318,7 @@ function telegramMiniAppHtml() {
       }
       if (submit) setSubmitBusy(false, triggerButton, question);
       if (!response.ok || !body.ok) {
-        if (!suppressStatus) setStatus(body.message || body.error || 'Could not save answer.', 'error');
+        if (!suppressStatus) setStatus(userFacingErrorMessage(body, 'Could not save answer.'), 'error');
         return false;
       }
       if (
@@ -10012,7 +11328,7 @@ function telegramMiniAppHtml() {
       ) {
         return true;
       }
-      if (SUBMITTED_RESPONSE_STATUSES.has(body.status)) {
+      if (['submit_request_created', 'direct_submitted'].includes(body.status)) {
         if (!suppressStatus) setStatus('');
         state.submittedAnswerKeys.add(question.questionKey);
         state.savedDraftKeys.delete(question.questionKey);
@@ -10035,6 +11351,7 @@ function telegramMiniAppHtml() {
           state.data.savedDrafts = state.data.savedDrafts.filter((draft) => draft.questionKey !== question.questionKey);
         }
         if (state.data?.draftAnswersByQuestionKey) delete state.data.draftAnswersByQuestionKey[question.questionKey];
+        advanceSeriesQuestion(question, { renderNow: false });
       } else {
         if (!suppressStatus) setStatus('Draft saved.', 'ok');
         state.submitDraftsMessage = '';
@@ -10077,6 +11394,11 @@ function telegramMiniAppHtml() {
           sessionSlug: state.data?.session?.sessionSlug || '',
           settings: {
             draftStyle: el.draftStyle.value,
+            topicPreferences: el.topicPreferences ? el.topicPreferences.value : '',
+            demographicLinkOptIn: el.demographicLinkOptIn ? el.demographicLinkOptIn.checked : false,
+            attendanceLinkOptIn: el.attendanceLinkOptIn ? el.attendanceLinkOptIn.checked : false,
+            draftDivergenceOptIn: el.draftDivergenceOptIn ? el.draftDivergenceOptIn.checked : false,
+            showAgentResponses: el.showAgentResponses ? el.showAgentResponses.checked : true,
             agentAutoApplyQuestionVotes: el.agentAutoApplyQuestionVotes ? el.agentAutoApplyQuestionVotes.checked : false,
           },
         }),
@@ -10139,7 +11461,7 @@ function telegramMiniAppHtml() {
         return;
       }
       if (!response.ok || !body.ok) {
-        setStatus(body.error || 'Could not clear drafts.', 'error');
+        setStatus(userFacingErrorMessage(body, 'Could not clear drafts.'), 'error');
         el.clearDrafts.disabled = false;
         return;
       }
@@ -10177,7 +11499,8 @@ function telegramMiniAppHtml() {
         const resultsUrl = new URL('/telegram/mini-app/api/results', location.origin);
         resultsUrl.searchParams.set('launch', launch);
         resultsUrl.searchParams.set('sessionSlug', state.resultsSessionSlug);
-        resultsUrl.searchParams.set('clusters', String(state.resultClusterCount));
+        state.resultClusterCount = RESULT_GROUP_COUNT;
+        resultsUrl.searchParams.set('clusters', String(RESULT_GROUP_COUNT));
         if (state.resultsDemoData) resultsUrl.searchParams.set('demo', '1');
         if (!state.resultsDemoData && activeResultFilterCount() > 0) {
           resultsUrl.searchParams.set('filters', JSON.stringify(resultFilterPayload()));
@@ -10536,7 +11859,6 @@ function telegramMiniAppHtml() {
               options: candidateOptions,
               sessionContext: state.addQuestionSessionContext,
               tags: normalizeQuestionTags(candidate.tags || state.addQuestionTags),
-              geoRefs: Array.isArray(candidate.geoRefs) ? candidate.geoRefs : [],
             }),
           });
           body = await response.json().catch(() => ({}));
@@ -10584,7 +11906,7 @@ function telegramMiniAppHtml() {
             sessionSlug: state.resultsSessionSlug,
             groupId,
             demo: state.resultsDemoData,
-            clusterCount: state.resultClusterCount,
+            clusterCount: RESULT_GROUP_COUNT,
             filters: state.resultsDemoData ? {} : resultFilterPayload(),
           }),
         });
@@ -10615,9 +11937,25 @@ function telegramMiniAppHtml() {
       renderResults();
       scrollPanelIntoView(el.groupAnalysisSection);
     }
-    async function load({ retry = false } = {}) {
+    async function load({ retry = false, backgroundAuto = false } = {}) {
       let response;
       let body;
+      const backgroundLoad = state.loadedOnce && state.data?.hasMoreQuestions === true;
+      if (!state.loadedOnce) {
+        state.questionsLoading = true;
+        state.loadingMoreQuestions = false;
+        state.backgroundQuestionLoadPending = false;
+        startLoadingProgress({
+          message: 'Loading questions and agent predictions',
+          initialPercent: retry ? 34 : 22,
+          maxPercent: retry ? 74 : 72,
+        });
+      } else if (backgroundLoad) {
+        state.questionsLoading = true;
+        state.loadingMoreQuestions = !backgroundAuto;
+        state.backgroundQuestionLoadPending = backgroundAuto;
+        renderQuestionStack();
+      }
       try {
         const stateUrl = new URL('/telegram/mini-app/api/state', location.origin);
         stateUrl.searchParams.set('launch', launch);
@@ -10629,14 +11967,28 @@ function telegramMiniAppHtml() {
         });
         body = await response.json().catch(() => ({}));
       } catch (error) {
+        state.questionsLoading = false;
+        state.loadingMoreQuestions = false;
+        state.backgroundQuestionLoadPending = false;
+        clearAutoQuestionLoadTimer();
+        if (state.loadedOnce) renderQuestionStack();
         setStatus('Could not load Mini App. Retrying...', 'error');
         scheduleQuestionRetry();
         return;
       }
       if (!response.ok || !body.ok) {
-        setStatus(body.error || 'Could not load Mini App.', 'error');
+        state.questionsLoading = false;
+        state.loadingMoreQuestions = false;
+        state.backgroundQuestionLoadPending = false;
+        clearAutoQuestionLoadTimer();
+        if (state.loadedOnce) renderQuestionStack();
+        setStatus(userFacingErrorMessage(body, 'Could not load Mini App.'), 'error');
         clearQuestionRetry();
         return;
+      }
+      if (!state.loadedOnce) {
+        stopLoadingProgressTimer();
+        setLoadingProgress('Loading questions and agent predictions', 86);
       }
       state.data = body;
       const loadedLimit = Number(body.loadedQuestionLimit || body.loadedQuestionCount || body.pageSize || 0);
@@ -10663,7 +12015,17 @@ function telegramMiniAppHtml() {
           state.drafts[questionKey] = { ...(draft || {}) };
         }
       });
+      const prefilledDrafts = body.prefilledDraftAnswersByQuestionKey || {};
+      Object.entries(prefilledDrafts).forEach(([questionKey, draft]) => {
+        if (!answerHasContent(state.drafts[questionKey])) {
+          state.drafts[questionKey] = { ...(draft || {}) };
+        }
+      });
       const questions = Array.isArray(body.questions) ? body.questions : [];
+      if (body.questionSeries?.enabled === true && !state.loadedOnce) {
+        state.seriesActiveIndex = Number(body.questionSeries.activeIndex || 0) || 0;
+        state.seriesSkippedKeys = new Set((body.questionSeries.skippedQuestionKeys || []).filter(Boolean));
+      }
       const launchQuestion = questions.find((question) => question.activeFromLaunch === true && question.questionKey);
       if (launchQuestion && !state.loadedOnce) {
         state.highlightedQuestionKey = launchQuestion.questionKey;
@@ -10683,18 +12045,55 @@ function telegramMiniAppHtml() {
         clearQuestionRetry();
         setStatus('');
       }
+      const willAutoExpand = shouldAutoExpandQuestions(body);
+      state.questionsLoading = false;
+      state.loadingMoreQuestions = false;
+      state.backgroundQuestionLoadPending = willAutoExpand;
       render();
       state.loadedOnce = true;
+      if (willAutoExpand) scheduleAutoQuestionLoad(body);
       if (state.aiSearchQuery) scheduleAiSearch(0);
     }
     function loadMoreQuestions() {
+      if (state.loadingMoreQuestions === true) return;
+      clearAutoQuestionLoadTimer();
       const current = Number(state.data?.loadedQuestionLimit || state.questionLimit || state.data?.loadedQuestionCount || state.data?.pageSize || 0);
       const increment = Number(state.data?.pageSize || 50) || 50;
-      state.questionLimit = current + increment;
+      state.questionLimit = current < increment ? increment : current + increment;
+      state.loadingMoreQuestions = true;
+      state.backgroundQuestionLoadPending = false;
+      renderQuestionStack();
       load();
+    }
+    function shouldAutoExpandQuestions(data) {
+      const loaded = Number(data?.loadedQuestionLimit || data?.loadedQuestionCount || 0) || 0;
+      return data?.hasMoreQuestions === true && loaded > 0 && loaded < MAX_QUESTION_LIMIT;
+    }
+    function nextQuestionLimit(data) {
+      const loadedLimit = Number(data?.loadedQuestionLimit || 0) || 0;
+      const loadedCount = Number(data?.loadedQuestionCount || 0) || 0;
+      const pageSize = Number(data?.pageSize || 50) || 50;
+      const current = Math.max(loadedLimit, loadedCount, Number(state.questionLimit || 0) || 0);
+      const fastFollowupLimit = FAST_INITIAL_QUESTION_LIMIT + FAST_FOLLOWUP_QUESTION_COUNT;
+      if (current <= FAST_INITIAL_QUESTION_LIMIT && fastFollowupLimit > current) return Math.min(MAX_QUESTION_LIMIT, fastFollowupLimit);
+      if (current < pageSize) return Math.min(MAX_QUESTION_LIMIT, pageSize);
+      return Math.min(MAX_QUESTION_LIMIT, Math.max(current + 1, current + pageSize));
+    }
+    function autoQuestionLoadDelay(data) {
+      const loaded = Number(data?.loadedQuestionLimit || data?.loadedQuestionCount || 0) || 0;
+      return loaded <= FAST_INITIAL_QUESTION_LIMIT ? FAST_FOLLOWUP_DELAY_MS : BACKGROUND_PAGE_DELAY_MS;
+    }
+    function scheduleAutoQuestionLoad(data) {
+      clearAutoQuestionLoadTimer();
+      state.questionLimit = nextQuestionLimit(data);
+      state.autoQuestionLoadTimer = window.setTimeout(() => {
+        state.autoQuestionLoadTimer = null;
+        load({ backgroundAuto: true });
+      }, autoQuestionLoadDelay(data));
     }
     el.continueSessions.onclick = () => {
       if (!state.selectedSessionSlugs.size) return;
+      clearAutoQuestionLoadTimer();
       state.activeKey = '';
       state.loadedOnce = false;
       resetResultsForSelection();
@@ -10705,7 +12104,7 @@ function telegramMiniAppHtml() {
       state.expandedQuestionKeys = new Set();
       state.highlightedQuestionKey = '';
       state.highlightScrollDone = false;
-      state.questionLimit = 0;
+      state.questionLimit = FAST_INITIAL_QUESTION_LIMIT;
       state.sessionsPanelOpen = false;
       load();
     };
@@ -10777,6 +12176,11 @@ function telegramMiniAppHtml() {
       scrollPanelIntoView(el.activityPanel);
       loadActivity({ force: true });
     };
+    el.showDrafts.onclick = () => {
+      setPanelOpen(el.draftsPanel, el.showDrafts, true);
+      setToolMenuOpen(false);
+      scrollPanelIntoView(el.draftsPanel);
+    };
     el.showFilter.onclick = () => {
       setPanelOpen(el.filterPanel, el.showFilter, true);
       setToolMenuOpen(false);
@@ -10813,6 +12217,7 @@ function telegramMiniAppHtml() {
     bindPanelClose(el.closeDocuments, el.documentsPanel, el.showDocuments);
     bindPanelClose(el.closeAdmin, el.adminPanel, el.showAdmin);
     bindPanelClose(el.closeActivity, el.activityPanel, el.showActivity);
+    bindPanelClose(el.closeDrafts, el.draftsPanel, el.showDrafts);
     bindPanelClose(el.closeFilter, el.filterPanel, el.showFilter);
     bindPanelClose(el.closeSettings, el.settingsPanel, el.showSettings);
     bindPanelClose(el.closeGroups, el.groupsPanel, el.showGroups);
@@ -10919,6 +12324,10 @@ function telegramMiniAppHtml() {
       writeShowUnansweredFirst(state.showUnansweredFirst);
       render();
     };
+    el.filterAnsweredOnly.onchange = () => {
+      state.answeredQuestionsOnly = el.filterAnsweredOnly.checked;
+      render();
+    };
     el.filterTopPopular.onchange = () => {
       state.popularQuestionsOnly = el.filterTopPopular.checked;
       render();
@@ -10974,6 +12383,15 @@ function telegramMiniAppHtml() {
       render();
     }
     el.demoDataResults.onchange = () => setResultsDemoData(el.demoDataResults.checked);
+    if (el.showAgentResponses) {
+      el.showAgentResponses.onchange = () => {
+        if (state.data?.agent?.settings?.values) {
+          state.data.agent.settings.values.showAgentResponses = el.showAgentResponses.checked;
+        }
+        render();
+        sendSettings();
+      };
+    }
     el.saveSettings.onclick = () => sendSettings();
     el.submitDrafts.onclick = () => submitSavedDrafts();
     el.clearDrafts.onclick = () => clearSavedDrafts();
@@ -11003,10 +12421,13 @@ export async function handleTelegramMiniAppRequest({
   request,
   env = {},
   waitUntil = null,
+  createdAt = null,
 } = {}) {
   const url = new URL(request.url);
   if (url.pathname === '/telegram/mini-app' && request.method === 'GET') {
-    return html(telegramMiniAppHtml());
+    return html(telegramMiniAppHtml({
+      loadingVisual: miniAppLoadingVisualMode({ url, env }),
+    }));
   }
   if (url.pathname === '/telegram/mini-app/loading.gif' && request.method === 'GET') {
     return telegramMiniAppLoadingGifResponse();
@@ -11016,17 +12437,24 @@ export async function handleTelegramMiniAppRequest({
       request,
       env,
       waitUntil,
+      ...(createdAt ? { createdAt } : {}),
     });
     return json(state, { status: Number(state.httpStatus || (state.ok === false ? 401 : 200)) });
   }
   if (url.pathname === '/telegram/mini-app/api/draft' && request.method === 'POST') {
-    return handleDraftRequest({ request, env });
+    return handleDraftRequest({ request, env, ...(createdAt ? { createdAt } : {}) });
   }
   if (url.pathname === '/telegram/mini-app/api/clear-drafts' && request.method === 'POST') {
     return handleClearDraftsRequest({ request, env });
   }
   if (url.pathname === '/telegram/mini-app/api/question-vote' && request.method === 'POST') {
-    return handleQuestionVoteRequest({ request, env });
+    return handleQuestionVoteRequest({ request, env, ...(createdAt ? { createdAt } : {}) });
+  }
+  if (url.pathname === '/telegram/mini-app/api/agent-only/token-votes' && request.method === 'POST') {
+    return handleAgentOnlyHumanVoteRequest({ request, env, ...(createdAt ? { createdAt } : {}) });
+  }
+  if (url.pathname === '/telegram/mini-app/api/agent-only/confirm' && request.method === 'POST') {
+    return handleAgentOnlyConfirmRequest({ request, env, ...(createdAt ? { createdAt } : {}) });
   }
   if (url.pathname === '/telegram/mini-app/api/transcribe' && request.method === 'POST') {
     return handleTranscribeRequest({ request, env });
@@ -11084,6 +12512,7 @@ export async function handleTelegramMiniAppRequest({
 
 export const __test__telegramMiniApp = {
   AGENT_REQUEST_KV_PREFIX,
+  MINI_APP_DRAFT_DIVERGENCE_KV_PREFIX,
   MINI_APP_QUESTION_VOTE_KV_PREFIX,
   SUBMIT_REQUEST_KV_PREFIX,
   buildMiniAppState,

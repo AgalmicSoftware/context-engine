@@ -170,6 +170,44 @@ test('worker health endpoint marks private bridge and default broadcast-enabled 
   assert.equal(body.broadcastEnabled, true);
 });
 
+test('worker serves the short Session Wrapped skill route', async () => {
+  const response = await worker.fetch(new Request('https://bridge.example/session-wrapped'));
+
+  assert.equal(response.status, 302);
+  const location = response.headers.get('location') || '';
+  assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/main\/workers\/agentBridgeWorker\/skills\/ce-session-wrapped\/SKILL\.md/);
+  assert.match(location, /v=2026-07-04-session-wrapped-v1-/);
+});
+
+test('worker serves the short Session Wrapped skill route to HEAD probes', async () => {
+  const response = await worker.fetch(new Request('https://bridge.example/session-wrapped', { method: 'HEAD' }));
+
+  assert.equal(response.status, 302);
+  const location = response.headers.get('location') || '';
+  assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/main\/workers\/agentBridgeWorker\/skills\/ce-session-wrapped\/SKILL\.md/);
+  assert.match(location, /v=2026-07-04-session-wrapped-v1-/);
+});
+
+test('worker dispatches canonical agent API routes', async () => {
+  const response = await worker.fetch(new Request('https://bridge.example/api/agent/session-meta?sessionSlug=alpha'), {
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha',
+        telegramOnly: true,
+        telegramBridgeEnabled: true,
+      }],
+    }),
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(body.sessionSlug, 'alpha');
+  assert.equal(body.telegramOnly, true);
+});
+
 test('worker mock demo route returns end-to-end private Telegram flow without secrets', async () => {
   const response = await worker.fetch(new Request('https://bridge.example/mock/telegram/demo-flow', {
     method: 'POST',
@@ -1258,9 +1296,9 @@ test('worker Telegram webhook mocked live-bot smoke covers core commands with sa
   assert.match(byCommand['/attachments'].text, /Attachments for alpha:/);
   assert.match(byCommand['/docs'].text, /Attachments for alpha:/);
   assert.match(byCommand['/me'].text, /Account/);
-  assert.match(byCommand['/me'].text, /Address: <a href="https:\/\/optimism-sepolia\.blockscout\.com\/address\/0x[0-9a-f]{40}">0x[0-9a-f]{4}\.\.\.[0-9a-f]{4}<\/a>/i);
-  assert.match(byCommand['/me'].text, /Chain: OP Sepolia Testnet \(11155420\)/);
-  assert.equal(byCommand['/me'].parse_mode, 'HTML');
+  assert.match(byCommand['/me'].text, /Address: 0x[0-9a-f]{4}\.\.\.[0-9a-f]{4}/i);
+  assert.doesNotMatch(byCommand['/me'].text, /Chain:/);
+  assert.equal(byCommand['/me'].parse_mode, undefined);
 
   for (const command of ['/join alpha', '/sessions', '/questions', '/q 1', '/attachments', '/docs']) {
     assertGroupSafeText(byCommand[command].text);
@@ -1274,7 +1312,11 @@ test('worker Telegram webhook mocked live-bot smoke covers core commands with sa
   const questionButtons = flattenButtons(byCommand['/questions'].reply_markup);
 
   assert.match(joinStart.url, /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,48}$/);
-  assert.deepEqual(questionButtons.map((button) => button.text), ['Pose 1', 'Pose 2']);
+  assert.deepEqual(
+    questionButtons.filter((button) => button.text !== 'Back to Start').map((button) => button.text),
+    ['Pose 1', 'Pose 2']
+  );
+  assert.equal(questionButtons.some((button) => button.text === 'Back to Start'), true);
   assert.equal(questionButtons.some((button) => button.text === 'Open Mini App'), false);
   assert.equal(Array.from(kv.store.keys()).some((key) => key.startsWith('telegram:group-session:')), true);
   assert.equal(Array.from(kv.store.keys()).filter((key) => key.startsWith('telegram:action:')).length >= 12, true);

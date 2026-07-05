@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  canonicalAnswerKvKey,
+  canonicalAnswerSessionKvKey,
   buildQueuedSubmitRecord,
+  persistTelegramSubmitRecord,
   processTelegramSubmitQueueBatch,
   queueTelegramSubmitRecord,
   submitRequestSessionKvKey,
@@ -88,6 +91,21 @@ test('Telegram submit queue persists accepted responses before async processing'
   assert.equal(JSON.parse(await kv.get('telegram:submit-request:submit-one')).status, 'submit_queued');
   assert.equal(JSON.parse(await kv.get(submitRequestSessionKvKey(record))).status, 'submit_queued');
   assert.equal(JSON.parse(await kv.get(submitRequestUserKvKey(record))).status, 'submit_queued');
+  const canonical = JSON.parse(await kv.get(canonicalAnswerKvKey(record)));
+  const canonicalBySession = JSON.parse(await kv.get(canonicalAnswerSessionKvKey(record)));
+  assert.equal(canonical.type, 'telegram_canonical_answer');
+  assert.equal(canonical.status, 'submit_queued');
+  assert.equal(canonical.sessionSlug, 'alpha');
+  assert.equal(canonical.questionId, `0x${'12'.repeat(32)}`);
+  assert.deepEqual(canonicalBySession, canonical);
+  for (const key of [
+    canonicalAnswerKvKey(record),
+    canonicalAnswerSessionKvKey(record),
+  ]) {
+    const call = kv.putCalls.find((entry) => entry.key === key);
+    assert.ok(call, `expected canonical KV put for ${key}`);
+    assert.equal(call.options.expirationTtl, undefined);
+  }
   const expectedMetadata = {
     v: 1,
     t: 'submit_request',
@@ -105,6 +123,111 @@ test('Telegram submit queue persists accepted responses before async processing'
     assert.ok(call, `expected KV put for ${key}`);
     assert.deepEqual(call.options.metadata, expectedMetadata);
   }
+});
+
+test('Telegram canonical answer records are durable and last-write-wins', async () => {
+  const kv = new MemoryKv();
+  const record = buildQueuedSubmitRecord({
+    session: {
+      sessionSlug: 'alpha',
+      managedAccountSubmitAllowed: true,
+    },
+    canonicalBody: {
+      session: 'alpha',
+      questionId: 'q-durable',
+      answerRef: 'telegram_private_answer_ref',
+      idempotencyKey: 'idem-durable',
+    },
+    baseRecord: {
+      version: 1,
+      requestId: 'submit-durable',
+      idempotencyKey: 'idem-durable',
+      answerFingerprint: 'fp-durable',
+      lane: 'telegram_mini_app',
+      telegramUserId: '42',
+      sessionSlug: 'alpha',
+      questionId: 'q-durable',
+      questionIdShort: 'q-durable',
+      answer: { label: 'Unsure', value: 'unsure', controlType: 'agree_unsure_disagree' },
+      onChainAnswer: {
+        questionType: 'agree_unsure_disagree',
+        value: 'unsure',
+        label: 'Unsure',
+        comments: '',
+      },
+      createdAt: '2026-05-23T12:00:00.000Z',
+    },
+  });
+
+  const first = await persistTelegramSubmitRecord({
+    env: { AGENT_ACTION_KV: kv },
+    kvKey: 'telegram:submit-request:submit-durable',
+    record,
+  });
+  const updated = {
+    ...record,
+    status: 'direct_submitted',
+    answer: { ...record.answer, label: 'Agree', value: 'agree' },
+    onChainAnswer: { ...record.onChainAnswer, label: 'Agree', value: 'agree' },
+    processedAt: '2026-05-23T12:01:00.000Z',
+  };
+  const second = await persistTelegramSubmitRecord({
+    env: { AGENT_ACTION_KV: kv },
+    kvKey: 'telegram:submit-request:submit-durable',
+    record: updated,
+  });
+
+  assert.equal(first.ok, true);
+  assert.equal(second.ok, true);
+  const durable = JSON.parse(await kv.get(canonicalAnswerSessionKvKey(updated)));
+  assert.equal(durable.status, 'direct_submitted');
+  assert.equal(durable.answer.value, 'agree');
+  assert.equal(durable.updatedAt, '2026-05-23T12:01:00.000Z');
+  const canonicalCalls = kv.putCalls.filter((entry) => entry.key === canonicalAnswerSessionKvKey(updated));
+  assert.equal(canonicalCalls.length, 2);
+  assert.equal(canonicalCalls.every((entry) => entry.options.expirationTtl === undefined), true);
+});
+
+test('Telegram submit records get server timestamps when omitted', async () => {
+  const kv = new MemoryKv();
+  const record = {
+    version: 1,
+    requestId: 'submit-missing-created-at',
+    idempotencyKey: 'idem-missing-created-at',
+    answerFingerprint: 'fp-missing-created-at',
+    action: 'submit_response',
+    status: 'submit_request_created',
+    lane: 'telegram_mini_app',
+    telegramUserId: '42',
+    sessionSlug: 'alpha',
+    questionId: 'q-one',
+    questionIdShort: 'q-one',
+    answer: { label: 'Agree', value: 'agree', controlType: 'agree_unsure_disagree' },
+  };
+
+  const before = Date.now();
+  const persisted = await persistTelegramSubmitRecord({
+    env: { AGENT_ACTION_KV: kv },
+    kvKey: 'telegram:submit-request:submit-missing-created-at',
+    record,
+  });
+  const after = Date.now();
+
+  assert.equal(persisted.ok, true);
+  const stored = JSON.parse(await kv.get('telegram:submit-request:submit-missing-created-at'));
+  const indexed = JSON.parse(await kv.get(submitRequestSessionKvKey(stored)));
+  const canonical = JSON.parse(await kv.get(canonicalAnswerSessionKvKey(stored)));
+  const storedMs = Date.parse(stored.createdAt);
+
+  assert.equal(Number.isFinite(storedMs), true);
+  assert.ok(storedMs >= before && storedMs <= after);
+  assert.equal(indexed.createdAt, stored.createdAt);
+  assert.equal(canonical.createdAt, stored.createdAt);
+  assert.equal(
+    kv.putCalls.find((entry) => entry.key === 'telegram:submit-request:submit-missing-created-at')
+      ?.options.metadata.c,
+    stored.createdAt.slice(0, 32),
+  );
 });
 
 test('Telegram submit queue caps metadata fields within KV metadata limits', async () => {

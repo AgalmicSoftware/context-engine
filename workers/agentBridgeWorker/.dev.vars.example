@@ -34,6 +34,10 @@ AGENT_BRIDGE_AUTO_FAUCET_ON_JOIN=true
 # AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW=true
 # Optional Mini App overrides. Defaults to $AGENT_BRIDGE_PUBLIC_URL/telegram/mini-app.
 # AGENT_BRIDGE_MINI_APP_URL=https://ce-agent-bridge-worker.your-workers-subdomain.workers.dev/telegram/mini-app
+# Optional production web origins allowed to exchange Telegram client tokens.
+# AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS=https://contextengine.xyz,https://www.contextengine.xyz
+# Optional Mini App origins; these are also accepted for client-login exchanges.
+# AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS=https://ce-agent-bridge-worker.your-workers-subdomain.workers.dev
 # AGENT_BRIDGE_MINI_APP_AUTH_MAX_AGE_SECONDS=86400
 # AGENT_BRIDGE_QUESTION_SOURCE=fixture
 # AGENT_BRIDGE_QUESTION_LIVE_FALLBACK_TIMEOUT_MS=2500
@@ -51,6 +55,9 @@ AGENT_BRIDGE_AUTO_FAUCET_ON_JOIN=true
 # AGENT_BRIDGE_SESSION_POLICY_JSON={"defaultSessionSlug":"general","sessions":[{"sessionSlug":"general","sessionName":"General","telegramOnly":true,"sessionMode":"telegram_only","telegramBridgeEnabled":true,"questions":[{"questionId":"q-readiness","questionType":"freeform","prompt":"What should this group decide next?"}]}]}
 # AGENT_BRIDGE_DEMO_QUESTIONS_JSON=[{"questionId":"q-readiness","questionType":"freeform","prompt":"What should this group decide next?"}]
 # AGENT_BRIDGE_DEMO_DOCS_JSON=[{"docId":"doc-public","sessionSlug":"general","title":"Public notes","fileType":"md","visibility":"public","contentPreview":"Public summary only"}]
+# Optional: override the default 7-day token life for invite onboarding
+# requests using {"mode":"agent_only"}.
+# AGENT_BRIDGE_AGENT_ONLY_TOKEN_TTL_SECONDS=604800
 # AGENT_BRIDGE_TELEGRAM_API_TIMEOUT_MS=8000
 
 # Optional developer fallback only. Live apply derives the account from the

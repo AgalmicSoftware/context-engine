@@ -417,7 +417,13 @@ export function normalizeSessionPolicy(input = {}, {
     ) || null,
     chainId: safeString(session.chainId || input.chainId || input.defaultChainId) || null,
   })).filter((session) => SESSION_SLUG_RE.test(session.sessionSlug));
-  const baseDefaultSessionSlug = safeString(input.defaultSessionSlug || linkedSessions.find((session) => session.default)?.sessionSlug || linkedSessions[0]?.sessionSlug).toLowerCase();
+  const baseDefaultSessionSlug = safeString(
+    input.defaultSessionSlug ||
+    input.defaultSession ||
+    (typeof input.default === 'string' ? input.default : '') ||
+    linkedSessions.find((session) => session.default)?.sessionSlug ||
+    linkedSessions[0]?.sessionSlug
+  ).toLowerCase();
   const defaultSessionSchedule = normalizeDefaultSessionSchedule(input);
   return {
     type: 'agent_bridge_session_policy',
@@ -437,7 +443,9 @@ export function normalizeSessionPolicy(input = {}, {
 }
 
 export function resolveSessionInvocation(policyInput = {}, sessionNameOrSlug = '') {
-  const policy = normalizeSessionPolicy(policyInput);
+  const policy = policyInput?.type === 'agent_bridge_session_policy' && Array.isArray(policyInput.linkedSessions)
+    ? policyInput
+    : normalizeSessionPolicy(policyInput);
   const lookup = safeString(sessionNameOrSlug || policy.defaultSessionSlug).toLowerCase();
   const session = policy.linkedSessions.find((entry) => (
     entry.sessionSlug === lookup || entry.sessionName.toLowerCase() === lookup

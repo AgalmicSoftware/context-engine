@@ -6,6 +6,7 @@ import {
 } from './onChainResponses.mjs';
 import { normalizeTelegramPrincipal } from './telegramUpdates.mjs';
 import {
+  canonicalAnswerSessionKvPrefix,
   SUBMIT_REQUEST_KV_PREFIX,
   submitRequestSessionKvPrefix,
 } from './telegramSubmitQueue.mjs';
@@ -34,6 +35,16 @@ function safeJsonParse(value, fallback = null) {
 function normalizeAddress(value = '') {
   const address = lower(value);
   return /^0x[0-9a-f]{40}$/.test(address) ? address : '';
+}
+
+function hasOwn(value = {}, key = '') {
+  return Object.prototype.hasOwnProperty.call(value || {}, key);
+}
+
+function safeJsonScalar(value) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : safeString(value);
+  if (typeof value === 'boolean') return value;
+  return safeString(value);
 }
 
 function normalizeSessionSlug(value = '') {
@@ -325,16 +336,43 @@ function dedupeSubmitRecords(records = []) {
     const requestId = safeString(record.requestId || record.idempotencyKey || record.key);
     if (!requestId) return;
     const existing = byId.get(requestId);
-    if (!existing || safeString(existing.createdAt).localeCompare(safeString(record.createdAt)) <= 0) {
+    const existingPriority = safeString(existing?.type) === 'telegram_canonical_answer' ? 1 : 0;
+    const nextPriority = safeString(record?.type) === 'telegram_canonical_answer' ? 1 : 0;
+    const newerOrEqual = safeString(existing?.createdAt).localeCompare(safeString(record.createdAt)) <= 0;
+    if (!existing || nextPriority > existingPriority || (nextPriority === existingPriority && newerOrEqual)) {
       byId.set(requestId, record);
     }
   });
   return Array.from(byId.values());
 }
 
+function normalizeTelegramAnswer(answer = {}) {
+  const source = answer && typeof answer === 'object' && !Array.isArray(answer) ? answer : {};
+  const out = {};
+  [
+    'questionType',
+    'controlType',
+    'label',
+    'selectionMode',
+  ].forEach((key) => {
+    const value = safeString(source[key]);
+    if (value) out[key] = value;
+  });
+  if (hasOwn(source, 'value')) out.value = safeJsonScalar(source.value);
+  if (Array.isArray(source.values)) {
+    out.values = source.values.map(safeJsonScalar).filter((value) => safeString(value));
+  }
+  if (hasOwn(source, 'text')) out.text = safeString(source.text);
+  const comments = safeString(source.comments || source.additionalComments);
+  if (comments) out.comments = comments;
+  return out;
+}
+
 function normalizeTelegramSubmitRecord(record = {}) {
   return {
     key: safeString(record.key),
+    sourceRecordType: safeString(record.type) || 'telegram_submit_record',
+    sourceKey: safeString(record.sourceKey),
     requestId: safeString(record.requestId),
     idempotencyKey: safeString(record.idempotencyKey),
     action: safeString(record.action),
@@ -345,11 +383,7 @@ function normalizeTelegramSubmitRecord(record = {}) {
     sessionSlug: safeString(record.sessionSlug),
     questionId: safeString(record.questionId),
     questionIdShort: safeString(record.questionIdShort),
-    answer: {
-      label: safeString(record.answer?.label),
-      value: safeString(record.answer?.value),
-      controlType: safeString(record.answer?.controlType),
-    },
+    answer: normalizeTelegramAnswer(record.answer),
     onChain: record.onChain ? {
       ok: record.onChain.ok === true,
       status: safeString(record.onChain.status),
@@ -367,12 +401,16 @@ function normalizeTelegramSubmitRecord(record = {}) {
 
 async function listTelegramSubmitRecordsForSession(env = {}, sessionSlug = '') {
   const slug = lower(sessionSlug);
+  const canonicalPrefix = canonicalAnswerSessionKvPrefix(slug);
+  const canonicalRecords = canonicalPrefix
+    ? await listKvRecordsByPrefix(env, canonicalPrefix, { limit: Infinity })
+    : [];
   const indexedPrefix = submitRequestSessionKvPrefix(slug);
   const indexedRecords = indexedPrefix
     ? await listKvRecordsByPrefix(env, indexedPrefix, { limit: Infinity })
     : [];
   const legacyRecords = await listKvRecordsByPrefix(env, SUBMIT_REQUEST_KV_PREFIX, { limit: Infinity });
-  const records = dedupeSubmitRecords([...indexedRecords, ...legacyRecords]);
+  const records = dedupeSubmitRecords([...canonicalRecords, ...indexedRecords, ...legacyRecords]);
   return records
     .filter((record) => lower(record.sessionSlug) === slug)
     .map(normalizeTelegramSubmitRecord)
@@ -406,44 +444,101 @@ function storageIdFromItem(item = {}) {
   return safeString(item.storageRef?.id || item.id || item.storageId);
 }
 
-function responsePayloadsFromSubmitRecords(submitRecords = []) {
-  return (Array.isArray(submitRecords) ? submitRecords : []).map((record, index) => {
+function responsePayloadsFromSubmitRecords(env = {}, submitRecords = []) {
+  return Promise.all((Array.isArray(submitRecords) ? submitRecords : []).map(async (record, index) => {
     const storageRef = record.onChain?.storageRef || (
       record.onChain?.storageId
         ? { backend: 'cloudflare', id: record.onChain.storageId, resource: 'responses' }
         : { backend: 'telegram-submit-record', id: record.requestId || `submit-record-${index + 1}`, resource: 'responses' }
     );
+    const participant = await participantReferenceFromSubmitRecord(env, record);
     return {
       storageRef,
       metadata: {
-        source: 'telegram-submit-record',
+        source: record.sourceRecordType === 'telegram_canonical_answer'
+          ? 'telegram-canonical-answer'
+          : 'telegram-submit-record',
         status: record.status,
         action: record.action,
         createdAt: record.createdAt,
       },
       submitRecord: record,
       payload: {
-        type: 'telegram_response_record',
+        type: 'telegram_research_response',
         version: 1,
-        source: 'telegram-submit-record',
-        requestId: record.requestId,
-        idempotencyKey: record.idempotencyKey,
-        status: record.status,
-        action: record.action,
-        lane: record.lane,
-        telegramUserId: record.telegramUserId,
-        chatId: record.chatId,
-        sessionSlug: record.sessionSlug,
-        questionId: record.questionId,
-        questionIdShort: record.questionIdShort,
+        source: 'telegram-answer-record',
+        responseId: record.requestId || `response-${index + 1}`,
+        participant,
+        session: {
+          sessionSlug: record.sessionSlug,
+        },
+        question: {
+          questionId: record.questionId,
+          questionIdShort: record.questionIdShort,
+        },
         answer: record.answer,
-        onChain: record.onChain,
+        provenance: {
+          status: record.status,
+          action: record.action,
+          lane: record.lane,
+          sourceRecordType: record.sourceRecordType,
+        },
+        onChain: record.onChain ? {
+          ok: record.onChain.ok === true,
+          status: safeString(record.onChain.status),
+          accountAddress: normalizeAddress(record.onChain.accountAddress),
+          txHash: safeString(record.onChain.txHash),
+          blockNumber: record.onChain.blockNumber ?? null,
+          storageRef: record.onChain.storageRef || null,
+          storageId: safeString(record.onChain.storageId),
+          responseHash: safeString(record.onChain.responseHash),
+          chainId: record.onChain.chainId ?? null,
+        } : null,
         createdAt: record.createdAt,
       },
       contentType: 'application/json',
       synthesizedFromSubmitRecord: true,
     };
-  });
+  }));
+}
+
+async function participantReferenceFromSubmitRecord(env = {}, record = {}) {
+  const onChainAddress = normalizeAddress(record.onChain?.accountAddress);
+  const telegramUserId = safeString(record.telegramUserId);
+  let accountAddress = onChainAddress;
+  if (!accountAddress && telegramUserId) {
+    const account = await deriveManagedDemoAccount({
+      principal: { telegramUserId },
+      deploymentId: env.AGENT_BRIDGE_DEPLOYMENT_ID || 'agent-bridge-live-demo',
+      rootSecret: env.DEMO_SIGNER_ROOT_SECRET || '',
+      createdAt: record.createdAt || null,
+    });
+    accountAddress = normalizeAddress(account.accountAddress);
+  }
+  return {
+    stableRef: accountAddress ? `evm:${accountAddress}` : '',
+    accountAddress,
+    accountType: accountAddress ? 'managed_telegram_evm' : '',
+  };
+}
+
+function responseIndexEntry(entry = {}) {
+  const submitRecord = entry.submitRecord || null;
+  return {
+    storageRef: entry.storageRef || null,
+    metadata: entry.metadata || {},
+    submitRecordRef: submitRecord ? {
+      requestId: safeString(submitRecord.requestId),
+      status: safeString(submitRecord.status),
+      createdAt: safeString(submitRecord.createdAt),
+      participant: submitRecord.onChain?.accountAddress
+        ? { accountAddress: normalizeAddress(submitRecord.onChain.accountAddress) }
+        : undefined,
+    } : null,
+    payload: entry.payload,
+    contentType: safeString(entry.contentType),
+    synthesizedFromSubmitRecord: entry.synthesizedFromSubmitRecord === true,
+  };
 }
 
 function safeFilePart(value = '') {
@@ -509,7 +604,7 @@ export async function buildTelegramResponseExportArchive({
   }
 
   const submitRecords = await listTelegramSubmitRecordsForSession(env, session.sessionSlug);
-  const buildArchive = ({
+  const buildArchive = async ({
     storageItems = [],
     responsePayloads = [],
     readErrors = [],
@@ -518,7 +613,7 @@ export async function buildTelegramResponseExportArchive({
   } = {}) => {
     const synthesizedPayloads = responsePayloads.length
       ? []
-      : responsePayloadsFromSubmitRecords(submitRecords);
+      : await responsePayloadsFromSubmitRecords(env, submitRecords);
     const exportedPayloads = responsePayloads.length ? responsePayloads : synthesizedPayloads;
     const manifest = {
       type: 'telegram_response_export',
@@ -541,7 +636,7 @@ export async function buildTelegramResponseExportArchive({
       { path: 'telegram-submit-records.json', content: jsonText(submitRecords) },
       {
         path: 'responses.json',
-        content: jsonText(exportedPayloads.map(({ rawBytes, ...entry }) => entry)),
+        content: jsonText(exportedPayloads.map(responseIndexEntry)),
       },
     ];
     if (storageListError) {

@@ -603,6 +603,115 @@ test('listCachedSessionQuestionsForBridge serves first available questions while
   assert.deepEqual(logRanges, [[96, 100], [91, 95], [90, 90]]);
 });
 
+test('listCachedSessionQuestionsForBridge bounds foreground payload fetches for first question loads', async () => {
+  __test__sessionQuestions.questionMemoryCache.clear();
+  const newestQuestionId = `0x${'a1'.repeat(32)}`;
+  const olderQuestionId = `0x${'b2'.repeat(32)}`;
+  const newestPointer = `0x${'12'.repeat(32)}`;
+  const olderPointer = `0x${'13'.repeat(32)}`;
+  const txByPointer = {
+    [newestPointer]: __test__sessionQuestions.hexToBase64url(newestPointer),
+    [olderPointer]: __test__sessionQuestions.hexToBase64url(olderPointer),
+  };
+  const pointerByQuestion = {
+    [newestQuestionId]: newestPointer,
+    [olderQuestionId]: olderPointer,
+  };
+  const promptByQuestion = {
+    [newestQuestionId]: 'Newest question should render first',
+    [olderQuestionId]: 'Older same-chunk question should finish in background',
+  };
+  const env = baseEnv({
+    AGENT_BRIDGE_QUESTION_LOG_CHUNK_SIZE: '5',
+  });
+  const background = [];
+  const logRanges = [];
+  const payloadUrls = [];
+  const fetchImpl = async (url, init = {}) => {
+    if (String(url).startsWith('https://ar-io.dev/')) {
+      payloadUrls.push(String(url));
+      const txId = String(url).split('/').pop();
+      const questionId = Object.entries(txByPointer)
+        .find(([, pointerTx]) => pointerTx === txId)?.[0] === newestPointer
+        ? newestQuestionId
+        : olderQuestionId;
+      return new Response(JSON.stringify({
+        id: questionId,
+        sessionSlug: 'demo',
+        type: 'freeform',
+        prompt: promptByQuestion[questionId],
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    const body = JSON.parse(init.body || '{}');
+    const data = String(body.params?.[0]?.data || '');
+    if (body.method === 'eth_blockNumber') {
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: '0x64' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (body.method === 'eth_getLogs') {
+      const fromBlock = Number(BigInt(body.params?.[0]?.fromBlock || '0x0'));
+      const toBlock = Number(BigInt(body.params?.[0]?.toBlock || '0x0'));
+      logRanges.push([fromBlock, toBlock]);
+      const ids = fromBlock <= 100 && toBlock >= 96
+        ? [olderQuestionId, newestQuestionId]
+        : [];
+      return new Response(JSON.stringify({
+        jsonrpc: '2.0',
+        id: body.id,
+        result: ids.length ? [{
+          address: '0x1111111111111111111111111111111111111111',
+          topics: [__test__sessionQuestions.QUESTIONS_ADDED_TOPIC0],
+          data: encodeQuestionsAddedData(ids, []),
+        }] : [],
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (
+      body.method === 'eth_call' &&
+      data.startsWith(__test__sessionQuestions.SELECTORS.getQuestionHash)
+    ) {
+      const questionId = `0x${data.slice(__test__sessionQuestions.SELECTORS.getQuestionHash.length)}`.toLowerCase();
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: pointerByQuestion[questionId] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    throw new Error(`unexpected ${body.method}`);
+  };
+
+  const first = await listCachedSessionQuestionsForBridge({
+    env,
+    sessionSlug: 'demo',
+    fetchImpl,
+    waitUntil: (promise) => background.push(promise),
+    questionLimit: 1,
+  });
+
+  assert.equal(first.ok, true);
+  assert.equal(first.reason, 'live_questions_index_partial');
+  assert.equal(first.complete, false);
+  assert.equal(first.nextScanToBlock, 100);
+  assert.deepEqual(first.questions.map((question) => question.prompt), ['Newest question should render first']);
+  assert.deepEqual(payloadUrls, [`https://ar-io.dev/${txByPointer[newestPointer]}`]);
+  assert.equal(background.length, 1);
+
+  await Promise.all(background);
+  const cached = JSON.parse(env.AGENT_ACTION_KV.store.get('telegram:questions:v5:demo'));
+  assert.equal(cached.complete, true);
+  assert.deepEqual(cached.questions.map((question) => question.prompt), [
+    'Newest question should render first',
+    'Older same-chunk question should finish in background',
+  ]);
+  assert.deepEqual(logRanges, [[96, 100], [96, 100], [91, 95], [90, 90]]);
+});
+
 test('listCachedSessionQuestionsForBridge replies after bounded foreground indexing when no question is found yet', async () => {
   __test__sessionQuestions.questionMemoryCache.clear();
   const olderQuestionId = `0x${'cc'.repeat(32)}`;

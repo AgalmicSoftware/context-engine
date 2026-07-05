@@ -50,6 +50,20 @@ test('resolveAgentBridgeDeployConfig builds the default workers.dev public URL a
   assert.equal(JSON.stringify(config).includes('webhook-secret'), false);
   assert.equal(JSON.stringify(config).includes('demo-root'), false);
   assert.equal(JSON.stringify(config).includes('agent-api-token'), false);
+
+  const staging = resolveAgentBridgeDeployConfig({
+    flags: { 'worker-name': 'ce-agent-bridge-worker-staging' },
+    env: completeEnv({
+      AGENT_BRIDGE_AGENT_ONLY_TOKEN_TTL_SECONDS: '604800',
+      AGENT_BRIDGE_AGENT_WRAPPED_STORY_DEFAULT: 'true',
+      AGENT_BRIDGE_AGENT_WRAPPED_COMPASS_DEFAULT: 'true',
+    }),
+  });
+  assert.equal(staging.workerName, 'ce-agent-bridge-worker-staging');
+  assert.equal(staging.resources.actionKvTitle, 'ContextEngineAgentBridgeActions:ce-agent-bridge-worker-staging');
+  assert.equal(staging.vars.AGENT_BRIDGE_AGENT_ONLY_TOKEN_TTL_SECONDS, '604800');
+  assert.equal(staging.vars.AGENT_BRIDGE_AGENT_WRAPPED_STORY_DEFAULT, 'true');
+  assert.equal(staging.vars.AGENT_BRIDGE_AGENT_WRAPPED_COMPASS_DEFAULT, 'true');
 });
 
 test('validateAgentBridgeDeployConfig requires only live deploy credentials, not unit-test credentials', () => {
@@ -311,6 +325,8 @@ test('buildAgentBridgeWorkerUploadMetadata includes optional demo fixtures when 
       AGENT_BRIDGE_ALLOW_UNSCOPED_QUESTION_SCAN: '1',
       AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW: 'true',
       AGENT_BRIDGE_MINI_APP_URL: 'https://mini.example.test/telegram',
+      AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS: 'https://contextengine.example,https://www.contextengine.example',
+      AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS: 'https://mini.contextengine.example',
       AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH: '1',
       AGENT_BRIDGE_MINI_APP_REQUIRE_INIT_DATA: 'false',
       AGENT_BRIDGE_MINI_APP_AUTH_MAX_AGE_SECONDS: '3600',
@@ -321,6 +337,8 @@ test('buildAgentBridgeWorkerUploadMetadata includes optional demo fixtures when 
       AGENT_BRIDGE_QUESTION_SCAN_END_BLOCK: '200',
       AGENT_BRIDGE_QUESTION_PAYLOAD_CONCURRENCY: '6',
       AGENT_BRIDGE_QUESTION_FOREGROUND_CHUNKS: '2',
+      AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITE_TOKEN_HASHES: 'abc123',
+      AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON: '[{"tokenHash":"def456","sessionSlug":"alpha"}]',
     }),
   });
   const metadata = buildAgentBridgeWorkerUploadMetadata(config);
@@ -351,6 +369,14 @@ test('buildAgentBridgeWorkerUploadMetadata includes optional demo fixtures when 
   assert.equal(metadata.bindings.some((binding) => (
     binding.name === 'AGENT_BRIDGE_MINI_APP_URL' &&
     binding.text === 'https://mini.example.test/telegram'
+  )), true);
+  assert.equal(metadata.bindings.some((binding) => (
+    binding.name === 'AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS' &&
+    binding.text === 'https://contextengine.example,https://www.contextengine.example'
+  )), true);
+  assert.equal(metadata.bindings.some((binding) => (
+    binding.name === 'AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS' &&
+    binding.text === 'https://mini.contextengine.example'
   )), true);
   assert.equal(metadata.bindings.some((binding) => (
     binding.name === 'AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH'
@@ -389,6 +415,14 @@ test('buildAgentBridgeWorkerUploadMetadata includes optional demo fixtures when 
   assert.equal(metadata.bindings.some((binding) => (
     binding.name === 'AGENT_BRIDGE_QUESTION_FOREGROUND_CHUNKS' &&
     binding.text === '2'
+  )), true);
+  assert.equal(metadata.bindings.some((binding) => (
+    binding.name === 'AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITE_TOKEN_HASHES' &&
+    binding.text === 'abc123'
+  )), true);
+  assert.equal(metadata.bindings.some((binding) => (
+    binding.name === 'AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON' &&
+    binding.text === '[{"tokenHash":"def456","sessionSlug":"alpha"}]'
   )), true);
 });
 
