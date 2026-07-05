@@ -824,6 +824,14 @@ const handleCloudflareRead = async ({ request, env, config, slug, uploaderAddres
   );
   if (resolvedAccess.encryption === PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE) {
     try {
+      await writeStorageEnvelopeKeyReleaseAudit({
+        env,
+        slug,
+        payloadId: id,
+        principal: uploaderAddress,
+        conditionMatched: access.conditionMatched || 'gate_fallback',
+        deps,
+      });
       responseBody = await decryptPayloadWithStorageEnvelope({
         env,
         config,
@@ -831,14 +839,6 @@ const handleCloudflareRead = async ({ request, env, config, slug, uploaderAddres
         payloadId: id,
         ciphertextBytes: await toUint8Array(body),
         envelope: metadata?.envelope,
-        deps,
-      });
-      await writeStorageEnvelopeKeyReleaseAudit({
-        env,
-        slug,
-        payloadId: id,
-        principal: uploaderAddress,
-        conditionMatched: access.conditionMatched || 'gate_fallback',
         deps,
       });
     } catch (error) {

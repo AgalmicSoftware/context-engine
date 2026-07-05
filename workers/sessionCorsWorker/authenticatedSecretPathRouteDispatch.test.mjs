@@ -265,3 +265,39 @@ test('dispatchAuthenticatedSecretPathRoute routes authenticated storage requests
   assert.equal(result.response, downstreamResponse);
   assert.equal(secretsCalled, false);
 });
+
+test('dispatchAuthenticatedSecretPathRoute accepts explicit storage scope for storage routes', async () => {
+  const request = { headers: new Headers({ Origin: 'https://allowed.example' }) };
+  const config = { storageProfile: { backend: 'cloudflare' } };
+  const downstreamResponse = new Response('stored');
+
+  const result = await dispatchAuthenticatedSecretPathRoute({
+    path: '/storage/read',
+    method: 'GET',
+    request,
+    config,
+    slug: 'session-a',
+    address: '0xabc',
+    env: { CE_STORAGE_INDEX_KV: {} },
+    limit: 7,
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+    scopes: { arweave: false, storage: true },
+    deps: {
+      evaluateAuthenticatedRoutePreflight: async (value) => {
+        assert.equal(value.scope, 'storage');
+        assert.equal(value.route, 'storage');
+        return { ok: true, tokenHasScope: true };
+      },
+      storageRoute: async (value) => {
+        assert.equal(value.path, '/storage/read');
+        assert.deepEqual(value.authScopes, { arweave: false, storage: true });
+        return downstreamResponse;
+      },
+      checkRateLimit: async () => true,
+      json: () => null,
+    },
+  });
+
+  assert.equal(result.handled, true);
+  assert.equal(result.response, downstreamResponse);
+});

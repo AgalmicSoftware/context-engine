@@ -295,16 +295,25 @@ const readJson = (value) => {
 };
 
 const listEnvelopeMetadataRows = async ({ index, slug }) => {
-  const listed = await index.list({ prefix: buildIndexPrefix({ slug }) });
-  const keys = Array.isArray(listed?.keys) ? listed.keys : [];
   const rows = [];
-  for (const keyEntry of keys) {
-    const key = trim(keyEntry?.name || keyEntry);
-    if (!key) continue;
+  const prefix = buildIndexPrefix({ slug });
+  let cursor = '';
+  do {
     // eslint-disable-next-line no-await-in-loop
-    const metadata = readJson(await index.get(key));
-    if (metadata?.envelope?.encryption === 'worker_envelope') rows.push({ key, metadata });
-  }
+    const listed = await index.list({
+      prefix,
+      ...(cursor ? { cursor } : {}),
+    });
+    const keys = Array.isArray(listed?.keys) ? listed.keys : [];
+    for (const keyEntry of keys) {
+      const key = trim(keyEntry?.name || keyEntry);
+      if (!key) continue;
+      // eslint-disable-next-line no-await-in-loop
+      const metadata = readJson(await index.get(key));
+      if (metadata?.envelope?.encryption === 'worker_envelope') rows.push({ key, metadata });
+    }
+    cursor = listed?.list_complete === false ? trim(listed?.cursor) : '';
+  } while (cursor);
   return rows;
 };
 
