@@ -131,6 +131,7 @@ import {
 } from './sessionWizardPublishFlow';
 import {
   appendSessionWizardRegisterTxEntry,
+  isSessionWizardRegisterDuplicatePreflightError,
   resolveSessionWizardPublishCompletionRequest,
   resolveSessionWizardPublishFailureSettlementDescriptor,
   resolveSessionWizardRegisterFailureSettlementDescriptor,
@@ -3294,12 +3295,12 @@ const SessionWizard = ({
       sessionIdHexValue,
       registryChainIdValue,
     } = registerIdentityDescriptor;
+    const registerDuplicateCheckDescriptor = resolveSessionWizardRegisterDuplicateCheckDescriptor({
+      registryChainId: registryChainIdValue,
+      registrySlug,
+      sessionIdHexValue,
+    });
     try {
-      const registerDuplicateCheckDescriptor = resolveSessionWizardRegisterDuplicateCheckDescriptor({
-        registryChainId: registryChainIdValue,
-        registrySlug,
-        sessionIdHexValue,
-      });
       const registryRead = sessionRegistryPublishAdapter.getRegistryContract({
         chainId: registerDuplicateCheckDescriptor.chainId,
         providerLike: null,
@@ -3325,7 +3326,11 @@ const SessionWizard = ({
         }
       }
     } catch (err) {
-      if (getSessionWizardErrorMessage(err)) throw err;
+      const message = getSessionWizardErrorMessage(err);
+      if (isSessionWizardRegisterDuplicatePreflightError(message, registerDuplicateCheckDescriptor)) throw err;
+      if (message) {
+        console.warn('SessionWizard: duplicate preflight check unavailable; continuing to publish flow', err);
+      }
     }
     return registerIdentityDescriptor;
   };

@@ -388,6 +388,7 @@ interface CreateQuestionsAndSurveysQuestion {
   currentTagInputValue?: string;
   isGeneratingTags?: boolean;
   lockGateIds?: string[] | null;
+  lockGateIdsTouched?: boolean;
   [key: string]: unknown;
 }
 
@@ -1312,6 +1313,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
                       ? (q.lockGateIds === null ? null : normalizeGateIds(q.lockGateIds))
                       : null
                   ),
+              lockGateIdsTouched: !!q.lockGateIdsTouched,
             };
           });
         }
@@ -3162,10 +3164,10 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       if (normalized.length) return normalized;
       return defaultGateId ? [defaultGateId] : [];
     };
-    const applyStandaloneSelectedGateIds = (value: unknown) => {
+    const applyStandaloneSelectedGateIds = (value: unknown, touched: unknown) => {
       const normalized = normalizeSelectedGateIds(value);
       if (normalized.length) return normalized;
-      if (Array.isArray(value) && normalizeGateIds(value).length === 0) return [];
+      if (touched && Array.isArray(value) && normalizeGateIds(value).length === 0) return [];
       return defaultGateId ? [defaultGateId] : [];
     };
     const surveySelectedGateIds = !isStandaloneQuestion
@@ -3365,7 +3367,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
                       !isStandaloneQuestion &&
                       (!Object.prototype.hasOwnProperty.call(question || {}, 'lockGateIds') || question.lockGateIds === null);
                     const selectedGateIds = isStandaloneQuestion
-                      ? applyStandaloneSelectedGateIds(question.lockGateIds)
+                      ? applyStandaloneSelectedGateIds(question.lockGateIds, question.lockGateIdsTouched)
                       : (inheritsSurvey ? surveySelectedGateIds : applyDefaultSelectedGateIds(question.lockGateIds));
 
                     return hasSelectableGateOptions ? (
@@ -3404,6 +3406,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
                               const updated = Array.isArray(prev.questions) ? [...prev.questions] : [];
                               const nextQ = { ...(updated[qIndex] || {}) };
                               nextQ.lockGateIds = normalized;
+                              nextQ.lockGateIdsTouched = true;
                               updated[qIndex] = nextQ;
                               return {
                                 questions: updated,
@@ -3421,6 +3424,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
                                   const updated = Array.isArray(prev.questions) ? [...prev.questions] : [];
                                   const nextQ = { ...(updated[qIndex] || {}) };
                                   nextQ.lockGateIds = [defaultGateId];
+                                  nextQ.lockGateIdsTouched = true;
                                   updated[qIndex] = nextQ;
                                   return { questions: updated };
                                 }, this.saveToLocalStorage);

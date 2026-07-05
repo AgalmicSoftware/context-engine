@@ -36,7 +36,7 @@ import {
 } from './session/sessionWorkerClient.js';
 import { createLogger } from '../utilities/logging.js';
 
-type ChainLike = Record<string, any>;
+type ChainLike = Record<string, unknown>;
 
 type RestoreOptions = {
   requireSigner?: boolean;

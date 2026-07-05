@@ -32,6 +32,40 @@ import { notify } from '../ui/notify.js';
 
 // Default RPCs derive from chains.js; PATH defaults live in rpcDefaults.js (Pocket/POKT gateway).
 
+type SbtReadProviderRef = string | Record<string, unknown>;
+type SbtReadGroupKeyOrConfig = string | Record<string, unknown> | null | undefined;
+type SbtReadOptions = { allowInjectedReadFallback?: boolean; [key: string]: unknown };
+type SignGroupMintAuthorizationInput = {
+  password?: unknown;
+  sbtAddress?: string | null;
+  userAddress?: string | null;
+  walletScopeSbtAddress?: string | null;
+};
+type GenerateInvitePayloadsInput = {
+  password?: unknown;
+  sbtAddress?: string | null;
+  nonces?: Array<string | number>;
+  walletScopeSbtAddress?: string | null;
+};
+type InvitePayloadResult = {
+  nonce: string;
+  signature: string;
+  inviteCode: string;
+};
+type EncodedInvitePayload = {
+  n: string;
+  s: string;
+};
+type SbtMintBurnCountsByAddressResult = {
+  mintedCountByAddress: Record<string, number>;
+  burnedCountByAddress: Record<string, number>;
+  mintedEventCount?: number;
+  burnedEventCount?: number;
+  scannedToBlock?: number | null;
+  ok?: boolean;
+  [key: string]: unknown;
+};
+
 import SURVEYS from '../../contractsABI/SURVEYS_ABI.json';
 import SBT_FACTORY_ABI from '../../contractsABI/SBT_FACTORY_ABI.json';
 import CUSTOM_SBT_ABI from '../../contractsABI/CUSTOM_SBT_ABI.json';
@@ -240,7 +274,7 @@ function recordRateLimitError(code: any, message: any) {
         ts: Date.now(),
       };
     }
-  } catch (_: any) {
+  } catch {
     // best effort only
   }
 }
@@ -476,7 +510,7 @@ const scheduleWeb3ContextCacheClear = () => {
   };
   try {
     Promise.resolve().then(clearCache);
-  } catch (_: any) {
+  } catch {
     setTimeout(clearCache, 100);
   }
 };
@@ -502,10 +536,10 @@ const normalizeWeb3ContextCacheValue = (value: any, seen: any = new WeakSet()): 
 const serializeWeb3ContextCacheKey = (groupKeyOrCfg: any) => {
   try {
     return JSON.stringify(normalizeWeb3ContextCacheValue(groupKeyOrCfg));
-  } catch (_: any) {
+  } catch {
     try {
       return String(groupKeyOrCfg);
-    } catch (__: any){
+    } catch {
       return '__unserializable__';
     }
   }
@@ -855,8 +889,8 @@ const checkAccountSatisfiesSbtGate = async ({ account, chainId, gate, groupKeyOr
       _sbtGateAccessCache.set(cacheKey, { ts: Date.now(), value: has });
       _sbtGateAccessErrorCache.delete(cacheKey);
       return has;
-    } catch (_: any) {
-      contractsLog.debug('checkAccountSatisfiesSbtGate error:', _);
+    } catch (error: unknown) {
+      contractsLog.debug('checkAccountSatisfiesSbtGate error:', error);
       // Unknown (RPC/etc) - do not overwrite the last known value; just throttle retries briefly.
       _sbtGateAccessErrorCache.set(cacheKey, { ts: Date.now() });
       return null;
@@ -1077,7 +1111,7 @@ function recordRpcStat(fnName: any, meta: any) {
     stats.recent.push(entry);
     if (stats.recent.length > RPC_STATS_MAX) stats.recent.shift();
     window.__RPC_STATS__ = stats;
-  } catch (_: any) {
+  } catch {
     // best effort only
   }
 }
@@ -1224,7 +1258,7 @@ const cloneJsonSafe = (value: any) => {
   if (value == null) return value;
   try {
     return JSON.parse(JSON.stringify(value));
-  } catch (_: any) {
+  } catch {
     return value;
   }
 };
@@ -1420,7 +1454,7 @@ const recordInFlightStat = (kind: any = 'miss') => {
     inflight[kind] = Number(inflight[kind] || 0) + 1;
     stats.inflight = inflight;
     window.__RPC_STATS__ = stats;
-  } catch (_: any) {
+  } catch {
     // best effort only
   }
 };
@@ -1555,7 +1589,7 @@ async function resolveGroupPasswordWalletScopeSbtAddress({
         return resolved;
       }
     }
-  } catch (_: any) {
+  } catch {
     // Fall back to SBT-scoped signing below when the hash cannot be read.
   }
 
@@ -1761,8 +1795,8 @@ const contractScripts: any = {
   const ensureHash = (v: any) => {
     try {
       if (cryptoUtils && typeof cryptoUtils.hashIdentifier === 'function') return cryptoUtils.hashIdentifier(v);
-    } catch (_: any) {}
-    try { if (utils.isHexString(v, 32)) return String(v).toLowerCase(); } catch (_: any) {}
+    } catch {}
+    try { if (utils.isHexString(v, 32)) return String(v).toLowerCase(); } catch {}
     const s = (v === null || v === undefined) ? '' : String(v);
     return s.trim() === '' ? ethers.constants.HashZero : utils.id(s);
   };
@@ -1795,7 +1829,7 @@ const contractScripts: any = {
         try {
           const evIds = (event.args.questionIds || []).map((x: any) => String(x).toLowerCase());
           return evIds.includes(qIdB32.toLowerCase());
-        } catch (_: any) { return false; }
+        } catch { return false; }
       })
       .map(async (event: any) => {
         const responder = event.args.responder;
@@ -1847,8 +1881,8 @@ const contractScripts: any = {
   const ensureHash = (v: any) => {
     try {
       if (cryptoUtils && typeof cryptoUtils.hashIdentifier === 'function') return cryptoUtils.hashIdentifier(v);
-    } catch (_: any) {}
-    try { if (utils.isHexString(v, 32)) return String(v).toLowerCase(); } catch (_: any) {}
+    } catch {}
+    try { if (utils.isHexString(v, 32)) return String(v).toLowerCase(); } catch {}
     const s = (v === null || v === undefined) ? '' : String(v);
     return s.trim() === '' ? ethers.constants.HashZero : utils.id(s);
   };
@@ -1929,7 +1963,7 @@ const contractScripts: any = {
     if (chainId) {
       try {
         provider = getReadProviderForChain(chainId);
-      } catch (_: any) {
+      } catch {
         provider = null;
       }
     }
@@ -1978,8 +2012,6 @@ const contractScripts: any = {
 
 
   async getSurveyResponsesByAddress(providerName: any, userAddress: any, fromBlock: any = null, toBlock: any = null, groupKeyOrCfg: any = null) {
-  // Ensure user-profile scans do not inherit stale latest-block bounds.
-  (latestBlockCache as any)._map = {};
   const cfg    = resolveSession(groupKeyOrCfg || '');
   const gAddrs = getSessionAddresses(cfg);
   const addr   = (gAddrs.surveys?.address);
@@ -2044,10 +2076,13 @@ const contractScripts: any = {
   const events = rawLogs.map((log: any) => SURVEYS_INTERFACE.parseLog(log));
 
   const surveyResponses: any = {};
-  for (const event of events) {
+  const responseEntries = await Promise.all(events.map(async (event: any) => {
     const responder = event.args.responder.toLowerCase();
     const surveyId = event.args.surveyId.toLowerCase();
     const responseData = await this.getSurveyResponse(providerName, responder, surveyId, groupKeyOrCfg);
+    return { responder, responseData, surveyId };
+  }));
+  for (const { responder, responseData, surveyId } of responseEntries) {
     if (responseData) {
       if (!surveyResponses[surveyId]) {
         surveyResponses[surveyId] = {};
@@ -2361,8 +2396,6 @@ const contractScripts: any = {
 },
 
   async getQuestionResponsesByAddress(providerName: any, userAddress: any, fromBlock: any = null, toBlock: any = null, groupKeyOrCfg: any = null, opts: any = {}) {
-  // Ensure user-profile scans do not inherit stale latest-block bounds.
-  (latestBlockCache as any)._map = {};
   const cfg    = resolveSession(groupKeyOrCfg || '');
   const gAddrs = getSessionAddresses(cfg);
   const addr   = (gAddrs.surveys?.address);
@@ -2396,7 +2429,7 @@ const contractScripts: any = {
     let event;
     try {
       event = SURVEYS_INTERFACE.parseLog(log);
-    } catch (_: any) {
+    } catch {
       event = null;
     }
     if (!event) return;
@@ -2506,8 +2539,8 @@ const contractScripts: any = {
   const ensureHash = (v: any) => {
     try {
       if (cryptoUtils && typeof cryptoUtils.hashIdentifier === 'function') return cryptoUtils.hashIdentifier(v);
-    } catch (_: any) {}
-    try { if (utils.isHexString(v, 32)) return String(v).toLowerCase(); } catch (_: any) {}
+    } catch {}
+    try { if (utils.isHexString(v, 32)) return String(v).toLowerCase(); } catch {}
     const s = (v === null || v === undefined) ? '' : String(v);
     return s.trim() === '' ? ethers.constants.HashZero : utils.id(s);
   };
@@ -2566,7 +2599,7 @@ const contractScripts: any = {
       try {
         const blockData = await this.getBlockWithCaching(provider, blockNumber, providerName, String(chId));
         if (blockData) blockTimestamp = blockData.timestamp;
-      } catch (_: any) {}
+      } catch {}
       let surveyResponseData = null;
       try {
         surveyResponseData = await this.getSurveyResponse(
@@ -2744,10 +2777,10 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
     const ensureHash = (v: any) => {
       try {
         if (cryptoUtils && typeof cryptoUtils.hashIdentifier === 'function') return cryptoUtils.hashIdentifier(v);
-      } catch (_: any) {}
+      } catch {}
       try {
         if (utils.isHexString(v, 32)) return String(v).toLowerCase();
-      } catch (_: any) {}
+      } catch {}
       const s = v == null ? '' : String(v);
       return s.trim() === '' ? ethers.constants.HashZero : utils.id(s);
     };
@@ -2911,10 +2944,10 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
     const ensureHash = (v: any) => {
       try {
         if (cryptoUtils && typeof cryptoUtils.hashIdentifier === 'function') return cryptoUtils.hashIdentifier(v);
-      } catch (_: any) {}
+      } catch {}
       try {
         if (utils.isHexString(v, 32)) return String(v).toLowerCase();
-      } catch (_: any) {}
+      } catch {}
       const s = v == null ? '' : String(v);
       return s.trim() === '' ? ethers.constants.HashZero : utils.id(s);
     };
@@ -3042,8 +3075,8 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
       if (cryptoUtils && typeof cryptoUtils.hashIdentifier === 'function') {
         return cryptoUtils.hashIdentifier(v);
       }
-    } catch (_: any) {}
-    try { if (utils.isHexString(v, 32)) return String(v).toLowerCase(); } catch (_: any) {}
+    } catch {}
+    try { if (utils.isHexString(v, 32)) return String(v).toLowerCase(); } catch {}
     const s = (v === null || v === undefined) ? '' : String(v);
     return s.trim() === '' ? ethers.constants.HashZero : utils.id(s);
   };
@@ -3206,8 +3239,8 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
   const ensureHash = (v: any) => {
     try {
       if (cryptoUtils && typeof cryptoUtils.hashIdentifier === 'function') return cryptoUtils.hashIdentifier(v);
-    } catch (_: any) {}
-    try { if (utils.isHexString(v, 32)) return String(v).toLowerCase(); } catch (_: any) {}
+    } catch {}
+    try { if (utils.isHexString(v, 32)) return String(v).toLowerCase(); } catch {}
     const s = (v === null || v === undefined) ? '' : String(v);
     return s.trim() === '' ? ethers.constants.HashZero : utils.id(s);
   };
@@ -3271,8 +3304,8 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
   const ensureHash = (v: any) => {
     try {
       if (cryptoUtils && typeof cryptoUtils.hashIdentifier === 'function') return cryptoUtils.hashIdentifier(v);
-    } catch (_: any) {}
-    try { if (utils.isHexString(v, 32)) return String(v).toLowerCase(); } catch (_: any) {}
+    } catch {}
+    try { if (utils.isHexString(v, 32)) return String(v).toLowerCase(); } catch {}
     const s = (v === null || v === undefined) ? '' : String(v);
     return s.trim() === '' ? ethers.constants.HashZero : utils.id(s);
   };
@@ -3298,7 +3331,7 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
       if (globalHit && typeof globalHit === 'object') {
         return cloneJsonSafe(globalHit);
       }
-    } catch (_: any) {}
+    } catch {}
 
     try {
       const raw = window.sessionStorage?.getItem('ce:e2e:mockedViewedResponses:v1');
@@ -3308,7 +3341,7 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
       if (hit && typeof hit === 'object') {
         return cloneJsonSafe(hit);
       }
-    } catch (_: any) {}
+    } catch {}
 
     return null;
   };
@@ -3428,8 +3461,8 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
   const ensureHash = (v: any) => {
     try {
       if (cryptoUtils && typeof cryptoUtils.hashIdentifier === 'function') return cryptoUtils.hashIdentifier(v);
-    } catch (_: any) {}
-    try { if (utils.isHexString(v, 32)) return String(v).toLowerCase(); } catch (_: any) {}
+    } catch {}
+    try { if (utils.isHexString(v, 32)) return String(v).toLowerCase(); } catch {}
     const s = (v === null || v === undefined) ? '' : String(v);
     return s.trim() === '' ? ethers.constants.HashZero : utils.id(s);
   };
@@ -3509,8 +3542,8 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
   const ensureHash = (v: any) => {
     try {
       if (cryptoUtils && typeof cryptoUtils.hashIdentifier === 'function') return cryptoUtils.hashIdentifier(v);
-    } catch (_: any) {}
-    try { if (utils.isHexString(v, 32)) return String(v).toLowerCase(); } catch (_: any) {}
+    } catch {}
+    try { if (utils.isHexString(v, 32)) return String(v).toLowerCase(); } catch {}
     const s = (v === null || v === undefined) ? '' : String(v);
     return s.trim() === '' ? ethers.constants.HashZero : utils.id(s);
   };
@@ -3583,8 +3616,8 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
   const ensureHash = (v: any) => {
     try {
       if (cryptoUtils && typeof cryptoUtils.hashIdentifier === 'function') return cryptoUtils.hashIdentifier(v);
-    } catch (_: any) {}
-    try { if (utils.isHexString(v, 32)) return String(v).toLowerCase(); } catch (_: any) {}
+    } catch {}
+    try { if (utils.isHexString(v, 32)) return String(v).toLowerCase(); } catch {}
     const s = (v === null || v === undefined) ? '' : String(v);
     return s.trim() === '' ? ethers.constants.HashZero : utils.id(s);
   };
@@ -4031,7 +4064,7 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
       let parsed = null;
       try {
         parsed = SBT_FACTORY_INTERFACE.parseLog(log);
-      } catch (_: any) {
+      } catch {
         return null;
       }
       const sbtAddress = (parsed?.args?.sbtAddress) || parsed?.args?.[0] || parsed?.args?.['0'];
@@ -4059,7 +4092,7 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
     try {
       // IMPORTANT: pass through the SAME groupKeyOrCfg, not a transformed cfg
       meta = await this.getSbtMetadata(providerName, sbtAddress, groupKeyOrCfg);
-    } catch (_: any) {}
+    } catch {}
     return {
       sbtAddress,
       tokenURI: meta?.tokenURI || null,
@@ -4348,6 +4381,26 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
       : baseFrom;
 
     const sbts = await this.getSbtsCreated('none', fromBlockNum, 'latest', groupKeyOrCfg);
+    try {
+      const holdings = await this.getUserSbtNetHoldings(
+        'none',
+        userAddress,
+        { fromBlock: fromBlockNum },
+        groupKeyOrCfg
+      );
+      const heldSet = new Set(
+        (Array.isArray(holdings?.addresses) ? holdings.addresses : [])
+          .map((address: any) => normalizeAddress(address))
+          .filter(Boolean)
+      );
+      if (heldSet.size > 0) {
+        return sbts.filter((sbt: any) => heldSet.has(normalizeAddress(sbt?.sbtAddress || '')));
+      }
+      return [];
+    } catch (error: any) {
+      contractsLog.warn('[getSBTsByUserAddress] holdings lookup failed; falling back to per-SBT checks:', error?.message || error);
+    }
+
     let claimedSBTs: any[] = [];
     for (let sbt of sbts) {
       const userHasClaimed = await this.userHasSBT('none', sbt.sbtAddress, userAddress, fromBlockNum, 'latest', groupKeyOrCfg);
@@ -4413,13 +4466,39 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
           if (/\.(png|jpe?g|gif|webp|svg|bmp|avif|ico)$/i.test(parsed.pathname || '')) {
             return normalized;
           }
-        } catch (_: any) {
+        } catch {
           // ignore
         }
         return null;
       };
 
+      const extractSbtMetadataTokenURI = (metadata: unknown) => {
+        if (!metadata) return null;
+        const indexedTokenUri = Array.isArray(metadata) ? metadata[8] : null;
+        const namedTokenUri = typeof metadata === 'object'
+          ? ((metadata as { tokenURI_?: unknown; tokenURI?: unknown }).tokenURI_ ||
+            (metadata as { tokenURI_?: unknown; tokenURI?: unknown }).tokenURI ||
+            null)
+          : null;
+        return namedTokenUri || indexedTokenUri || null;
+      };
+
       const sbt = new ethers.Contract(sbtAddress, CUSTOM_SBT_ABI, provider as any);
+      const readCollectionTokenURI = async () => {
+        try {
+          const metadata = await callWithRetry(() => sbt.getSBTMetadata(), 'SBT.getSBTMetadata');
+          const metadataTokenURI = extractSbtMetadataTokenURI(metadata);
+          if (metadataTokenURI) return metadataTokenURI;
+        } catch {
+          // Legacy SBTs may not expose the aggregate metadata getter.
+        }
+
+        try { return await callWithRetry(() => sbt.tokenURI(), 'SBT.tokenURI()'); }
+        catch {
+          try { return await callWithRetry(() => sbt.tokenURI(0), 'SBT.tokenURI(0)'); }
+          catch { return null; }
+        }
+      };
 
       // OPTIMIZATION: Removed redundant provider.getNetwork() call.
       // We already know 'chId' from the config used to create the provider.
@@ -4428,18 +4507,12 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
         callWithRetry(() => sbt.symbol(), 'SBT.symbol').catch(() => null),
         (async () => {
           try { return await callWithRetry(() => sbt.admin(), 'SBT.admin'); }
-          catch(_: any) {
+          catch {
             try { return await callWithRetry(() => sbt.owner(), 'SBT.owner'); }
-            catch(__: any) { return ethers.constants.AddressZero; }
+            catch { return ethers.constants.AddressZero; }
           }
         })(),
-        (async () => {
-          try { return await callWithRetry(() => sbt.tokenURI(), 'SBT.tokenURI()'); }
-          catch(_: any) {
-            try { return await callWithRetry(() => sbt.tokenURI(0), 'SBT.tokenURI(0)'); }
-            catch(__: any) { return null; }
-          }
-        })()
+        readCollectionTokenURI()
       ]);
 
       const tokenURI = normalizeUri(tokenURI_raw);
@@ -4498,7 +4571,7 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
               if (!text) return null;
               try {
                 return JSON.parse(text);
-              } catch (_: any) {
+              } catch {
                 return null;
               }
             }
@@ -4667,7 +4740,7 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
           } else if (!tokenUriMetadataTimedOut) {
             out.tokenUriMetadataFetched = true;
           }
-        } catch (_: any) {}
+        } catch {}
       }
 
       // Always prefer on-chain mint flags over tokenURI hints when the reads succeed.
@@ -4838,7 +4911,7 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
         try {
           const expected = ethers.BigNumber.from(mintedTokens).add(1).toString();
           inviteLog.log('[INVITE_DEBUG v4] expected nonce:', expected);
-        } catch (_: any) {}
+        } catch {}
       }
 
       try {
@@ -4847,14 +4920,14 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
           inviteLog.log('[INVITE_DEBUG v4] signer groupPasswordHash:', signerHash);
           inviteLog.log('[INVITE_DEBUG v4] signature matches signer:', String(signerHash).toLowerCase() === recoveredHash.toLowerCase());
         }
-      } catch (_: any) {}
+      } catch {}
 
       try {
         const signerMinted = await CustomSBT.mintedTokens?.().catch(() => null);
         if (signerMinted != null) {
           inviteLog.log('[INVITE_DEBUG v4] signer mintedTokens:', ethers.BigNumber.from(signerMinted).toString());
         }
-      } catch (_: any) {}
+      } catch {}
 
       try {
         let readProvider = null;
@@ -4863,12 +4936,12 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
           const net = await ethersProvider.getNetwork();
           readChainId = net?.chainId;
           inviteLog.log('[INVITE_DEBUG v4] signer chainId:', readChainId);
-        } catch (_: any) {}
+        } catch {}
 
         if (readChainId) {
           try {
             readProvider = getReadProviderForChain(readChainId);
-          } catch (_: any) {
+          } catch {
             readProvider = null;
           }
         }
@@ -4885,10 +4958,10 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
           let balanceOf = null;
           try {
             code = signerAddress ? await readProvider.getCode(signerAddress) : null;
-          } catch (_: any) {}
+          } catch {}
           try {
             balanceOf = signerAddress ? await readContract.balanceOf?.(signerAddress).catch(() => null) : null;
-          } catch (_: any) {}
+          } catch {}
           const endSec = mintingEndTime != null ? Number(ethers.BigNumber.from(mintingEndTime).toString()) : null;
           const nowSec = Math.floor(Date.now() / 1000);
           inviteLog.log('[INVITE_DEBUG v4] mintingEndTime:', endSec, 'now:', nowSec);
@@ -5029,7 +5102,7 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
     sbtAddress,
     userAddress,
     walletScopeSbtAddress
-  }: any) {
+  }: SignGroupMintAuthorizationInput) {
     const resolvedWalletScopeSbtAddress = await resolveGroupPasswordWalletScopeSbtAddress({
       password,
       sbtAddress,
@@ -5077,8 +5150,8 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
         sbtAddress: resolvedWalletScopeSbtAddress
       });
       inviteLog.log('[INVITE_DEBUG v4] derived groupPasswordHash:', localHash);
-    } catch (_: any) {}
-    const out: any[] = [];
+    } catch {}
+    const out: InvitePayloadResult[] = [];
     for (const nonce of nonces) {
       const signature = await cryptoUtils.signInvite({
         password: normalizedPassword,
@@ -5086,7 +5159,7 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
         nonce,
         walletScopeSbtAddress: resolvedWalletScopeSbtAddress
       });
-      const payload: any = { n: String(nonce), s: signature };
+      const payload: EncodedInvitePayload = { n: String(nonce), s: signature };
       const inviteCode = cryptoUtils.encodeInvite(payload);
       out.push({ nonce: String(nonce), signature, inviteCode });
     }
@@ -5095,7 +5168,12 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
 
   // "Group" here refers to SBT token group/collection, not session group
   /** Read helper for on-chain groupPasswordHash */
-  async getGroupPasswordHash(providerName: any, SBTAddress: any, groupKeyOrCfg: any = null, options: any = {}) {
+  async getGroupPasswordHash(
+    providerName: SbtReadProviderRef,
+    SBTAddress: string,
+    groupKeyOrCfg: SbtReadGroupKeyOrConfig = null,
+    options: SbtReadOptions = {}
+  ) {
     try {
       const provider = getLocalAwareReadProviderForGroup(groupKeyOrCfg, SBT_READ_PROVIDER_OPTIONS);
       const CustomSBT = new ethers.Contract(SBTAddress, CUSTOM_SBT_ABI, provider as any);
@@ -5122,13 +5200,18 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
           const v = await CustomSBT.groupPasswordHash();
           return v;
         }
-      } catch (_: any) {}
+      } catch {}
       return null;
     }
   },
 
   /** Read helper for on-chain mintedTokens */
-  async getMintedTokens(providerName: any, SBTAddress: any, groupKeyOrCfg: any = null, options: any = {}) {
+  async getMintedTokens(
+    providerName: SbtReadProviderRef,
+    SBTAddress: string,
+    groupKeyOrCfg: SbtReadGroupKeyOrConfig = null,
+    options: SbtReadOptions = {}
+  ) {
     try {
       if (!SBTAddress || !ethers.utils.isAddress(SBTAddress)) return null;
       const provider = getLocalAwareReadProviderForGroup(groupKeyOrCfg, SBT_READ_PROVIDER_OPTIONS);
@@ -5154,12 +5237,16 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
           const v = await CustomSBT.mintedTokens();
           return v != null ? v.toString() : null;
         }
-      } catch (_: any) {}
+      } catch {}
       return null;
     }
   },
 
-  async getSbtHistorySummary(providerName: any, SBTAddress: any, groupKeyOrCfg: any = null) {
+  async getSbtHistorySummary(
+    providerName: SbtReadProviderRef,
+    SBTAddress: string,
+    groupKeyOrCfg: SbtReadGroupKeyOrConfig = null
+  ) {
     try {
       if (!SBTAddress || !ethers.utils.isAddress(SBTAddress)) return null;
       const provider = getLocalAwareReadProviderForGroup(groupKeyOrCfg, SBT_READ_PROVIDER_OPTIONS);
@@ -5172,7 +5259,7 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
       );
       const summary = await callWithRetry(() => CustomSBT.getHistorySummary(), 'CustomSBT.getHistorySummary');
       return normalizeSbtHistorySummary(summary);
-    } catch (_: any) {
+    } catch {
       try {
         if (typeof window !== 'undefined' && window.ethereum) {
           const provider = new ethers.providers.Web3Provider(window.ethereum as any, 'any');
@@ -5187,7 +5274,7 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
           const summary = await CustomSBT.getHistorySummary();
           return normalizeSbtHistorySummary(summary);
         }
-      } catch (_: any) {}
+      } catch {}
       return null;
     }
   },
@@ -5341,7 +5428,7 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
         );
         if (tokenId && typeof tokenId.gt === 'function' && tokenId.gt(0)) return true;
       }
-    } catch (_: any) {
+    } catch {
       // Fall back to balanceOf below if the helper is unavailable.
     }
 
@@ -5353,7 +5440,7 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
         );
         if (bal && typeof bal.gt === 'function' && bal.gt(0)) return true;
       }
-    } catch (_: any) {
+    } catch {
       // Fall through to false when neither direct ownership helper succeeds.
     }
 
@@ -5379,8 +5466,49 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
     return false;
   },
 
+  async getCachedSbtMintBurnCountsByAddress(providerName: any, SBTAddress: any, fromBlock: any = 0, toBlock: any = "latest", groupKeyOrCfg: any = null) {
+    const scanFn = this.getSbtMintBurnCountsByAddress;
+    if (typeof scanFn !== 'function') {
+      return {
+        mintedCountByAddress: {},
+        burnedCountByAddress: {},
+        mintedEventCount: 0,
+        burnedEventCount: 0,
+        scannedToBlock: null,
+        ok: false,
+      };
+    }
+    const self = scanFn as any;
+    const memo = (self._sharedAddressMemo ??= {});
+    const inflight = (self._sharedAddressInflight ??= {});
+    const cfg = memoizedResolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
+    const scopeTag = buildSbtScopeMemoTag(groupKeyOrCfg, cfg);
+    const memoKey = [
+      String(providerName || 'none'),
+      normalizeAddress(SBTAddress || ''),
+      String(fromBlock ?? ''),
+      String(toBlock ?? ''),
+      scopeTag,
+    ].join(':');
+    const TTL_MS = 45 * 1000;
+    const now = Date.now();
+    const hit = memo[memoKey];
+    if (hit && (now - hit.ts) < TTL_MS) return hit.value;
+    if (inflight[memoKey]) return inflight[memoKey];
+    const run = Promise.resolve(
+      scanFn.call(this, providerName, SBTAddress, fromBlock, toBlock, groupKeyOrCfg)
+    ).then((value: SbtMintBurnCountsByAddressResult) => {
+      memo[memoKey] = { ts: Date.now(), value };
+      return value;
+    }).finally(() => {
+      if (inflight[memoKey] === run) delete inflight[memoKey];
+    });
+    inflight[memoKey] = run;
+    return run;
+  },
+
   async getAddressesWhoMintedSBT(providerName: any, SBTAddress: any, fromBlock: any = 0, toBlock: any = "latest", groupKeyOrCfg: any = null) {
-    const counts = await this.getSbtMintBurnCountsByAddress(
+    const counts = await this.getCachedSbtMintBurnCountsByAddress(
       providerName,
       SBTAddress,
       fromBlock,
@@ -5391,7 +5519,7 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
   },
 
   async getAddressesWhoBurnedSBT(providerName: any, SBTAddress: any, fromBlock: any = 0, toBlock: any = "latest", groupKeyOrCfg: any = null) {
-    const counts = await this.getSbtMintBurnCountsByAddress(
+    const counts = await this.getCachedSbtMintBurnCountsByAddress(
       providerName,
       SBTAddress,
       fromBlock,
@@ -5467,5 +5595,10 @@ export const __test__contractScriptsSbtHistory: any = {
 export const __test__contractScriptsErrors: any = {
   isNonexistentTokenError,
   isRetryableSurveyResponseReadError,
+};
+export const __test__contractScriptsReadCaches: any = {
+  clearLatestBlockCache: () => {
+    (latestBlockCache as any)._map = {};
+  },
 };
 export default contractScripts;

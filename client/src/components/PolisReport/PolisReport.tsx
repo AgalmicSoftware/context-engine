@@ -1129,6 +1129,33 @@ export function buildRatingMatrixFromDemo(demoDataSource: unknown = DEFAULT_POLI
   };
 }
 
+export const resolvePrecomputedClusterDifference = (
+  differenceFromData: unknown,
+  clusterAgreeRate: unknown,
+  overallAgreeRate: unknown
+): number => {
+  const difference = Number(differenceFromData);
+  if (Number.isFinite(difference)) return difference;
+  const clusterRate = Number(clusterAgreeRate);
+  const overallRate = Number(overallAgreeRate);
+  if (!Number.isFinite(clusterRate) || !Number.isFinite(overallRate)) return 0;
+  return +(Math.abs(clusterRate - overallRate).toFixed(1));
+};
+
+export const resolveExploratoryClusterCount = ({
+  activeClusterCount = 0,
+  manualClusterCountValue = null,
+}: {
+  activeClusterCount?: unknown;
+  manualClusterCountValue?: unknown;
+} = {}): number => {
+  const count = Number(activeClusterCount || 0);
+  const safeCount = Number.isFinite(count) ? count : 0;
+  return manualClusterCountValue !== null
+    ? Math.max(safeCount, 2)
+    : safeCount;
+};
+
 export function buildPrecomputedDemoClusterState(demoDataSource: unknown = DEFAULT_POLIS_DEMO_DATA): PrecomputedDemoClusterState | null {
   const demoRecord = demoDataSource && typeof demoDataSource === 'object' ? demoDataSource as UnknownRecord : {};
   if (Number(demoRecord.clusterAnalysisVersion) !== POLIS_DEMO_CLUSTER_ANALYSIS_VERSION) {
@@ -1179,12 +1206,11 @@ export function buildPrecomputedDemoClusterState(demoDataSource: unknown = DEFAU
       .map((statement): PolisRepresentativeQuestion | null => {
         const questionIndex = Number(statement?.questionIndex);
         if (!Number.isInteger(questionIndex) || questionIndex < 0) return null;
-        const differenceFromData = Number(statement?.differenceScore);
-        const clusterAgreeRate = Number(asRecord(statement?.cluster).agreeRate);
-        const overallAgreeRate = Number(asRecord(statement?.overall).agreeRate);
-        const difference = Number.isFinite(differenceFromData)
-          ? differenceFromData
-          : +(Math.abs(clusterAgreeRate - overallAgreeRate).toFixed(1));
+        const difference = resolvePrecomputedClusterDifference(
+          statement?.differenceScore,
+          asRecord(statement?.cluster).agreeRate,
+          asRecord(statement?.overall).agreeRate
+        );
 
         return {
           label: String(statement?.label || `#${questionIndex + 1}`),
@@ -1394,9 +1420,14 @@ export default function PolisReport({
   const [clusterCount, setClusterCount] = useState<number>(0);
   const [clusterAssignments, setClusterAssignments] = useState<number[]>([]);
   const [embeddingChoice, setEmbeddingChoice] = useState<EmbeddingChoice>(() => defaultEmbeddingChoice as EmbeddingChoice);
+  const embeddingChoiceRef = useRef<EmbeddingChoice>(defaultEmbeddingChoice as EmbeddingChoice);
   const [manualClusterCount, setManualClusterCount] = useState<string>(() => defaultManualClusterCount);
   const [exploratoryClusterAssignments, setExploratoryClusterAssignments] = useState<number[]>([]);
   const [exploratoryRepQuestions, setExploratoryRepQuestions] = useState<PolisRepQuestionsMap>({});
+
+  useEffect(() => {
+    embeddingChoiceRef.current = embeddingChoice;
+  }, [embeddingChoice]);
 
   // Representative questions
   const [repQuestions, setRepQuestions] = useState<PolisRepQuestionsMap>({});
@@ -1959,12 +1990,12 @@ export default function PolisReport({
       );
     } catch (e: unknown) {
       surveyLog.error('UMAP error caught:', e);
-      if (embeddingChoice === 'UMAP') {
+      if (embeddingChoiceRef.current === 'UMAP') {
         setErrorMessage(`UMAP error: ${getErrorMessage(e)}`);
       }
       setUmapParticipantCoords([]);
     }
-  }, [DETERMINISTIC_SEED, embeddingChoice, ratingMatrix]);
+  }, [DETERMINISTIC_SEED, ratingMatrix]);
 
   useEffect(() => {
     if (!ratingMatrix || !ratingMatrix.length) {
@@ -1985,9 +2016,15 @@ export default function PolisReport({
       return;
     }
 
-    const nextClusterCount = manualClusterCountValue !== null
-      ? Math.max(activeClusterCount || 0, 2)
-      : (activeClusterCount || 0);
+    const nextClusterCount = resolveExploratoryClusterCount({
+      activeClusterCount,
+      manualClusterCountValue,
+    });
+    if (nextClusterCount < 1) {
+      setExploratoryClusterAssignments([]);
+      setExploratoryRepQuestions({});
+      return;
+    }
     if (pointsToUse.length < nextClusterCount) {
       const fallbackAssignments = new Array(pointsToUse.length).fill(0);
       setExploratoryClusterAssignments(fallbackAssignments);

@@ -89,6 +89,12 @@ const normalizeExpiryToIso = (raw: any) => {
   if (ts < now) throw new Error('Expiry must be in the future.');
   return new Date(ts).toISOString();
 };
+const normalizeRestoredExpiryDate = (raw: unknown) => {
+  const rawDate = raw instanceof Date ? raw : new Date(toStr(raw || '').trim());
+  const ts = rawDate.getTime();
+  if (!Number.isFinite(ts)) return null;
+  return ts >= Date.now() ? new Date(ts) : null;
+};
 const SPONSOR_PAGE_CACHE_KEY = 'ce:sponsorPageDraft:v1';
 const SPONSOR_PAGE_CACHE_VERSION = 1;
 const DEFAULT_REMEMBER_SPONSOR_DRAFT = process.env.NODE_ENV !== 'production';
@@ -134,12 +140,11 @@ const readSponsorPageCache = () => {
       : typeof parsed.persistBundleSecrets === 'boolean'
         ? parsed.persistBundleSecrets
         : fallback.persistBundleDraft;
-    const expiresAtRaw = toStr(parsed.expiresAt || '').trim();
-    const expiresAt = expiresAtRaw ? new Date(expiresAtRaw) : null;
+    const expiresAt = normalizeRestoredExpiryDate(parsed.expiresAt);
     return {
       persistBundleDraft,
       bundleForm: persistBundleDraft ? normalizeSponsorBundleDraftForm(parsed.bundleForm) : buildEmptyBundleForm(),
-      expiresAt: expiresAt instanceof Date && Number.isFinite(expiresAt.getTime()) ? expiresAt : null,
+      expiresAt,
     };
   } catch (_) {
     return fallback;

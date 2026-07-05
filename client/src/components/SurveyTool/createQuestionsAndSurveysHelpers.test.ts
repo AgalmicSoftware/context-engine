@@ -6,6 +6,7 @@ import {
   buildCreateSurveySubmitGatePlan,
   buildCreateSurveyStandaloneToggleState,
   formatAiPromptModelLabel,
+  getCreateSurveyValidationError,
   isMultichoiceQuestionType,
   normalizeAuthoringQuestionOptions,
   normalizePayloadQuestionOptions,
@@ -34,6 +35,19 @@ describe('createQuestionsAndSurveysHelpers question options', () => {
   it('filters blank options only for submit and JSON payloads', () => {
     expect(normalizePayloadQuestionOptions('multichoice', ['Alpha', '', '  ', 'Beta']))
       .toEqual(['Alpha', 'Beta']);
+  });
+
+  it('rejects duplicate multichoice option labels during authoring validation', () => {
+    expect(getCreateSurveyValidationError({
+      title: 'Survey',
+      questions: [
+        {
+          type: 'multichoice',
+          prompt: 'Pick one',
+          options: ['Alpha', 'Beta', ' alpha '],
+        },
+      ],
+    })).toBe('Question 1 has duplicate multichoice option "alpha". Option labels must be unique.');
   });
 
   it('omits payload options when a multichoice question has no option array', () => {
@@ -260,12 +274,15 @@ describe('createQuestionsAndSurveysHelpers question options', () => {
       surveyLockGateIds: ['default-gate'],
       questions: [
         { id: 'q1', lockGateIds: [] },
+        { id: 'q1-public', lockGateIds: [], lockGateIdsTouched: true },
         { id: 'q2', lockGateIds: ['question-gate'] },
       ],
     });
 
     expect(standalonePlan.resolvedSurveyLockGateIds).toEqual([]);
     expect(standalonePlan.resolveQuestionSubmitGateIds({ id: 'q1', lockGateIds: [] }))
+      .toEqual(['default-gate']);
+    expect(standalonePlan.resolveQuestionSubmitGateIds({ id: 'q1-public', lockGateIds: [], lockGateIdsTouched: true }))
       .toEqual([]);
     expect(standalonePlan.resolveQuestionSubmitGateIds({ id: 'q-missing-lock' }))
       .toEqual(['default-gate']);

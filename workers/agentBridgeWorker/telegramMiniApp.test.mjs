@@ -461,6 +461,8 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.equal(html.includes('Save Draft'), false);
   assert.equal(html.includes('saveDraftButton'), false);
   assert.match(html, /const DRAFT_AUTOSAVE_DELAY_MS = 700;/);
+  assert.match(html, /const SUBMITTED_RESPONSE_STATUSES = new Set\(\['submit_request_created', 'direct_submitted', 'submit_queued'\]\);/);
+  assert.match(html, /if \(SUBMITTED_RESPONSE_STATUSES\.has\(body\.status\)\) \{/);
   assert.match(html, /draftAutosaveTimers: new Map\(\)/);
   assert.match(html, /function selectValue\(question, value\)[\s\S]*scheduleDraftAutosave\(question\);/);
   assert.match(html, /function toggleChoice\(question, option, single\)[\s\S]*scheduleDraftAutosave\(question\);/);

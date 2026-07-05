@@ -18,6 +18,8 @@ import {
 import { deriveTelegramResponseExportAccount } from './telegramResponseExport.mjs';
 import { persistTelegramSubmitRecord } from './telegramSubmitQueue.mjs';
 
+const LONG_LIVED_TEST_TOKEN_TTL_SECONDS = 365 * 24 * 60 * 60;
+
 class MemoryKv {
   constructor() {
     this.store = new Map();
@@ -374,6 +376,7 @@ test('Telegram agent CE install preference respects decline cooldown and token o
     username: 'participant',
     sessionSlug: 'alpha',
     accountAddress: `0x${'12'.repeat(20)}`,
+    ttlSeconds: LONG_LIVED_TEST_TOKEN_TTL_SECONDS,
     createdAt: '2026-05-08T12:00:00.000Z',
   });
 
@@ -471,6 +474,7 @@ test('Telegram agent onboarding returns consent questions and persists first-run
     username: 'participant',
     sessionSlug: 'alpha',
     accountAddress: `0x${'12'.repeat(20)}`,
+    ttlSeconds: LONG_LIVED_TEST_TOKEN_TTL_SECONDS,
     createdAt: '2026-05-08T12:00:00.000Z',
   });
 
@@ -866,6 +870,7 @@ test('Telegram agent digest returns sponsored-first ranked questions and redacte
     username: 'participant',
     sessionSlug: 'alpha',
     accountAddress: `0x${'78'.repeat(20)}`,
+    ttlSeconds: LONG_LIVED_TEST_TOKEN_TTL_SECONDS,
     createdAt: '2026-05-08T12:00:00.000Z',
   });
   await saveTelegramAgentSettingsPatch({

@@ -57,6 +57,7 @@ type CreateSurveyValidationInput = {
 };
 type CreateSurveySubmitGatePlanQuestion = {
   lockGateIds?: unknown;
+  lockGateIdsTouched?: unknown;
   [key: string]: unknown;
 };
 type CreateSurveySubmitGatePlanArgs = {
@@ -115,6 +116,7 @@ type CreateSurveyQuestionPatchEntry = {
   currentTagInputValue?: string;
   isGeneratingTags?: boolean;
   lockGateIds?: string[] | null;
+  lockGateIdsTouched?: boolean;
   [key: string]: unknown;
 };
 type CreateSurveyUploadedQuestionPatchEntry = {
@@ -247,6 +249,19 @@ export const normalizePayloadQuestionOptions = (
     normalizedOptions.push(text);
   });
   return normalizedOptions;
+};
+
+export const findDuplicateQuestionOptionLabel = (options: unknown = []): string => {
+  if (!Array.isArray(options)) return '';
+  const seen = new Set<string>();
+  for (const option of options) {
+    const label = toOptionText(option).trim();
+    const key = label.toLowerCase();
+    if (!key) continue;
+    if (seen.has(key)) return label;
+    seen.add(key);
+  }
+  return '';
 };
 
 export const resolvePayloadSingleSelect = (
@@ -523,6 +538,20 @@ export const findFirstBlankQuestionPromptIndex = (questions: unknown = []): numb
   })
 );
 
+export const findFirstDuplicateMultichoiceOptionQuestion = (questions: unknown = []): {
+  index: number;
+  label: string;
+} => {
+  const list = Array.isArray(questions) ? questions : [];
+  for (let index = 0; index < list.length; index += 1) {
+    const question = list[index] as CreateSurveyQuestionPatchEntry | null | undefined;
+    if (!isMultichoiceQuestionType(question?.type)) continue;
+    const label = findDuplicateQuestionOptionLabel(question?.options);
+    if (label) return { index, label };
+  }
+  return { index: -1, label: '' };
+};
+
 export const getCreateSurveyValidationError = ({
   title = '',
   isStandaloneQuestion = false,
@@ -534,6 +563,10 @@ export const getCreateSurveyValidationError = ({
   const blankQuestionIndex = findFirstBlankQuestionPromptIndex(questions);
   if (blankQuestionIndex !== -1) {
     return `Question ${blankQuestionIndex + 1} prompt cannot be blank.`;
+  }
+  const duplicateOption = findFirstDuplicateMultichoiceOptionQuestion(questions);
+  if (duplicateOption.index !== -1) {
+    return `Question ${duplicateOption.index + 1} has duplicate multichoice option "${duplicateOption.label}". Option labels must be unique.`;
   }
   return '';
 };
@@ -866,10 +899,10 @@ export const buildCreateSurveySubmitGatePlan = ({
     const normalized = normalizeKnownGateIds(value);
     return normalized.length ? normalized : defaultSubmitGateIds;
   };
-  const applyStandaloneQuestionGateIds = (value: unknown): string[] => {
+  const applyStandaloneQuestionGateIds = (value: unknown, touched: unknown): string[] => {
     const normalized = normalizeKnownGateIds(value);
     if (normalized.length) return normalized;
-    if (Array.isArray(value) && normalizeGateIds(value).length === 0) return [];
+    if (touched && Array.isArray(value) && normalizeGateIds(value).length === 0) return [];
     return defaultSubmitGateIds;
   };
 
@@ -881,7 +914,10 @@ export const buildCreateSurveySubmitGatePlan = ({
     question?: CreateSurveySubmitGatePlanQuestion | null
   ): string[] => {
     if (!question) return [];
-    if (isStandaloneQuestion) return applyStandaloneQuestionGateIds(question.lockGateIds);
+    if (isStandaloneQuestion) return applyStandaloneQuestionGateIds(
+      question.lockGateIds,
+      question.lockGateIdsTouched
+    );
     const hasOwnLock = Object.prototype.hasOwnProperty.call(question || {}, 'lockGateIds');
     if (!hasOwnLock || question.lockGateIds === null) return resolvedSurveyLockGateIds;
     return applyDefaultSubmitGateIds(question.lockGateIds);

@@ -881,7 +881,7 @@ export const loadPreviousPersistedDraftSnapshot = (
     prevBaseline: {},
     prevDraftRaw: '',
     prevSemanticSignature: null,
-    nextDraftParseCache: canUseCachedPrevDraft ? draftParseCache : draftParseCache,
+    nextDraftParseCache: draftParseCache,
     shouldResetDraftTracking: false,
   };
 

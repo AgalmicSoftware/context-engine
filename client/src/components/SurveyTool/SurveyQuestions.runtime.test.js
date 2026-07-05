@@ -236,6 +236,66 @@ describe('SurveyQuestions runtime helpers', () => {
     view.unmount();
   });
 
+  it('keeps parent runtime drafts isolated by wallet account within the same question scope', async () => {
+    jest.useFakeTimers();
+    const baseProps = {
+      activeSessionSlug: 'edge',
+      isStandalone: true,
+      loginComplete: true,
+      network: { id: 84532 },
+      networkChainId: 84532,
+      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Question one' }],
+      sessionSlug: 'edge',
+    };
+
+    let firstRuntime = null;
+    const firstView = renderSurveyQuestions({
+      ...baseProps,
+      account: '0xabc',
+      runtimeStrategy: {
+        render: (engine) => {
+          firstRuntime = engine;
+          return null;
+        },
+      },
+    });
+
+    await waitFor(() => expect(firstRuntime).not.toBeNull());
+    const firstDraftKey = firstRuntime.getDraftKey();
+    await act(async () => {
+      firstRuntime.handleAnswer(0, 'q1', 'account scoped draft');
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(firstRuntime._persistTimer).toBeTruthy());
+    await act(async () => {
+      jest.runOnlyPendingTimers();
+      await Promise.resolve();
+    });
+    expect(JSON.parse(sessionStorage.getItem(firstDraftKey)).answers.q1.value)
+      .toBe('account scoped draft');
+    firstView.unmount();
+
+    let secondRuntime = null;
+    const secondView = renderSurveyQuestions({
+      ...baseProps,
+      account: '0xdef',
+      runtimeStrategy: {
+        render: (engine) => {
+          secondRuntime = engine;
+          return null;
+        },
+      },
+    });
+
+    await waitFor(() => expect(secondRuntime).not.toBeNull());
+    const secondDraftKey = secondRuntime.getDraftKey();
+    expect(secondDraftKey).not.toBe(firstDraftKey);
+    expect(sessionStorage.getItem(secondDraftKey)).toBeNull();
+    expect(secondRuntime.loadDraft()).toBeNull();
+
+    secondView.unmount();
+  });
+
   it('deduplicates and clears single-question bootstrap retry timers in the parent runtime', async () => {
     jest.useFakeTimers();
     let runtimeEngine = null;
@@ -367,6 +427,77 @@ describe('SurveyQuestions runtime helpers', () => {
     }));
   });
 
+  it('keeps primary submit pending until the transaction receipt resolves', async () => {
+    const receiptDeferred = createDeferred();
+    const events = [];
+    const submitResponsesSpy = jest
+      .spyOn(contractScripts, 'submitResponses')
+      .mockImplementation(async () => {
+        events.push({ type: 'contract' });
+        return {
+          wait: async () => {
+            events.push({ type: 'wait-start' });
+            return receiptDeferred.promise;
+          },
+        };
+      });
+    jest.spyOn(cryptoUtils, 'getProviderKind').mockReturnValue('browser');
+    jest.spyOn(cryptoUtils, 'hashIdentifier').mockImplementation((value) => `hashed:${String(value)}`);
+
+    let runtimeEngine = null;
+    renderSurveyQuestions({
+      account: '0xabc',
+      isStandalone: true,
+      loginComplete: true,
+      network: { id: 84532 },
+      networkChainId: 84532,
+      provider: { request: jest.fn() },
+      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Question one' }],
+      runtimeStrategy: {
+        render: (engine) => {
+          runtimeEngine = engine;
+          return null;
+        },
+      },
+      sessionSlug: 'edge',
+    });
+
+    await waitFor(() => expect(runtimeEngine).not.toBeNull());
+    await act(async () => {
+      runtimeEngine.handleAnswer(0, 'q1', 'pending receipt answer');
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(runtimeEngine.getPendingEditStats().total).toBe(1));
+
+    await act(async () => {
+      runtimeEngine.handlePrimarySubmitClick();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => expect(submitResponsesSpy).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(events.map((event) => event.type)).toEqual(['contract', 'wait-start']));
+    expect(runtimeEngine._submitGuard).toBe(true);
+    expect(runtimeEngine.state.isSubmitting).toBe(true);
+    expect(runtimeEngine.state.submissionComplete).toBe(false);
+    expect(runtimeEngine.state.currentStep).toBe(2);
+
+    await act(async () => {
+      receiptDeferred.resolve({
+        status: 1,
+        blockNumber: 43,
+        transactionHash: `0x${'8'.repeat(64)}`,
+        transactionIndex: 0,
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => expect(runtimeEngine.state.submissionComplete).toBe(true));
+    expect(runtimeEngine._submitGuard).toBe(false);
+    expect(runtimeEngine.state.isSubmitting).toBe(false);
+    expect(runtimeEngine.state.currentStep).toBe(3);
+  });
+
   it('runs mount-time survey draft hydration under the response hydration guard', () => {
     const setState = jest.fn((update, callback) => {
       const patch = typeof update === 'function'
@@ -409,6 +540,52 @@ describe('SurveyQuestions runtime helpers', () => {
     expect(updateJsonPreview).toHaveBeenCalledTimes(1);
     // port note: the private responseHydrationOwned depth counter is covered here by
     // the extracted draft hydration controller receiving and applying the owned update.
+  });
+
+  it('defers same-context hydration invalidation while an owned update is pending', async () => {
+    let runtimeEngine = null;
+    const view = renderSurveyQuestions({
+      account: '0xabc',
+      isStandalone: true,
+      loginComplete: true,
+      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Question one' }],
+      runtimeStrategy: {
+        componentDidMount: jest.fn(),
+        render: (engine) => {
+          runtimeEngine = engine;
+          return null;
+        },
+      },
+      sessionSlug: 'edge',
+    });
+
+    await waitFor(() => expect(runtimeEngine).not.toBeNull());
+    const prevProps = runtimeEngine.props;
+    const prevState = {
+      ...runtimeEngine.state,
+      userAnswers: { stale: true },
+    };
+    runtimeEngine._fetchSurveyResponseRunId = 4;
+    runtimeEngine._fetchSingleQuestionRunId = 5;
+    runtimeEngine._localCacheRehydrateRunId = 6;
+
+    runtimeEngine._responseHydrationStateUpdateDepth = 1;
+    await act(async () => {
+      await runtimeEngine.runDefaultComponentDidUpdate(prevProps, prevState);
+    });
+    expect(runtimeEngine._fetchSurveyResponseRunId).toBe(4);
+    expect(runtimeEngine._fetchSingleQuestionRunId).toBe(5);
+    expect(runtimeEngine._localCacheRehydrateRunId).toBe(6);
+
+    runtimeEngine._responseHydrationStateUpdateDepth = 0;
+    await act(async () => {
+      await runtimeEngine.runDefaultComponentDidUpdate(prevProps, prevState);
+    });
+    expect(runtimeEngine._fetchSurveyResponseRunId).toBe(5);
+    expect(runtimeEngine._fetchSingleQuestionRunId).toBe(6);
+    expect(runtimeEngine._localCacheRehydrateRunId).toBe(7);
+
+    view.unmount();
   });
 
   it('keeps single-question prefill from invalidating its active hydration run', () => {
@@ -649,6 +826,46 @@ describe('SurveyQuestions runtime helpers', () => {
       .toEqual({ 'q1:answer': true });
     // port note: the actual debounce timer is a class instance field; the durable seam is
     // the single scheduled pass plus attempted-key state builder.
+  });
+
+  it('coalesces parent runtime auto-decrypt sweep reasons into one microtask', async () => {
+    let runtimeEngine = null;
+    const view = renderSurveyQuestions({
+      account: '0xabc',
+      isStandalone: true,
+      loginComplete: true,
+      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Question one' }],
+      runtimeStrategy: {
+        render: (engine) => {
+          runtimeEngine = engine;
+          return null;
+        },
+      },
+      sessionSlug: 'edge',
+    });
+
+    await waitFor(() => expect(runtimeEngine?._isMounted).toBe(true));
+    expect(runtimeEngine._queuedAutoDecryptSweepReasons.size).toBe(0);
+
+    runtimeEngine.queueAutoDecryptVisibleSweep('cache-ready');
+    runtimeEngine.queueAutoDecryptVisibleSweep('comments-toggle');
+    runtimeEngine.queueAutoDecryptVisibleSweep('cache-ready');
+    expect(runtimeEngine._autoDecryptSweepMicrotaskScheduled).toBe(true);
+    expect(Array.from(runtimeEngine._queuedAutoDecryptSweepReasons).sort())
+      .toEqual(['cache-ready', 'comments-toggle']);
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(runtimeEngine._autoDecryptSweepMicrotaskScheduled).toBe(false);
+    expect(runtimeEngine._autoDecryptSweepFrameRequestId).toBeNull();
+    expect(runtimeEngine._queuedAutoDecryptSweepReasons.size).toBe(0);
+
+    view.unmount();
+    runtimeEngine.queueAutoDecryptVisibleSweep('after-unmount');
+    expect(runtimeEngine._queuedAutoDecryptSweepReasons.size).toBe(0);
   });
 
   it('deduplicates in-flight decrypt tasks keyed to the same field payload', async () => {

@@ -327,6 +327,7 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
         type: 'freeform',
         prompt: 'Question 1',
         lockGateIds: [],
+        lockGateIdsTouched: true,
         tags: [],
         currentTagInputValue: '',
         aiGeneratedTagsFromSource: [],
