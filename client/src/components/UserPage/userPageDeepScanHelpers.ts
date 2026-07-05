@@ -219,10 +219,10 @@ export const buildUserPageDeepScanTooltipInputSignature = ({
         .map((netKey) => {
           const entry = toAnalysisRecord(userNode?.[netKey]);
           const lastBlock = Number(entry?.lastBlockScanned);
+          const lastScanTs = Number(entry?.lastScanTimestamp);
           const blockToken = Number.isFinite(lastBlock) ? String(lastBlock) : '';
-          const lastScanTimestamp = Number(entry?.lastScanTimestamp);
-          const timestampToken = Number.isFinite(lastScanTimestamp) ? String(lastScanTimestamp) : '';
-          return `${netKey}:${blockToken}:${timestampToken}`;
+          const tsToken = Number.isFinite(lastScanTs) ? String(lastScanTs) : '';
+          return `${netKey}:${blockToken}:${tsToken}`;
         })
         .join(',');
       return `${slug}:${netParts}`;

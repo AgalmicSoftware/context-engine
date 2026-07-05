@@ -1656,11 +1656,15 @@ class CommunityTab extends Component<any, any> {
     });
   }
 
-  _countPlottableQuestionsFromBeeswarmPoints = (points: any = []) => {
+  _countPlottableQuestionsFromBeeswarmPoints = (points: unknown[] = []) => {
     if (!Array.isArray(points)) return 0;
     const ids = new Set();
-    points.forEach((point: any) => {
-      const questionId = String(point?.questionId || '').trim().toLowerCase();
+    points.forEach((point: unknown) => {
+      const questionId = String(
+        point && typeof point === 'object'
+          ? (point as { questionId?: unknown }).questionId || ''
+          : ''
+      ).trim().toLowerCase();
       if (questionId) ids.add(questionId);
     });
     return ids.size;

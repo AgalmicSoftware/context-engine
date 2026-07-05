@@ -9,7 +9,7 @@
 import { ethers } from 'ethers';
 import { extractChainId, extractChainIdOrUndefined } from './chainIdResolution.js';
 
-type GroupKeyOrCfg = any;
+type GroupKeyOrCfg = unknown;
 
 type ContractsLogger = {
   log: (...args: unknown[]) => void;
@@ -559,7 +559,7 @@ export function createContractProfileMethods(deps: ContractProfileDeps): Contrac
               scannedBlocks: 0,
               onProgress,
               onLogs: onDiscoveredAddresses
-                ? ({ logs = [], scanTo }: { logs?: any[]; scanTo?: number | null }): void => {
+                ? ({ logs = [], scanTo }: { logs?: ethers.providers.Log[]; scanTo?: number | null }): void => {
                   emitDiscoveredAddresses(
                     collectAddressesFromLogs(logs),
                     scanTo ?? null

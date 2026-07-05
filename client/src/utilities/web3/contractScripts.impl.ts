@@ -32,6 +32,40 @@ import { notify } from '../ui/notify.js';
 
 // Default RPCs derive from chains.js; PATH defaults live in rpcDefaults.js (Pocket/POKT gateway).
 
+type SbtReadProviderRef = string | Record<string, unknown>;
+type SbtReadGroupKeyOrConfig = string | Record<string, unknown> | null | undefined;
+type SbtReadOptions = { allowInjectedReadFallback?: boolean; [key: string]: unknown };
+type SignGroupMintAuthorizationInput = {
+  password?: unknown;
+  sbtAddress?: string | null;
+  userAddress?: string | null;
+  walletScopeSbtAddress?: string | null;
+};
+type GenerateInvitePayloadsInput = {
+  password?: unknown;
+  sbtAddress?: string | null;
+  nonces?: Array<string | number>;
+  walletScopeSbtAddress?: string | null;
+};
+type InvitePayloadResult = {
+  nonce: string;
+  signature: string;
+  inviteCode: string;
+};
+type EncodedInvitePayload = {
+  n: string;
+  s: string;
+};
+type SbtMintBurnCountsByAddressResult = {
+  mintedCountByAddress: Record<string, number>;
+  burnedCountByAddress: Record<string, number>;
+  mintedEventCount?: number;
+  burnedEventCount?: number;
+  scannedToBlock?: number | null;
+  ok?: boolean;
+  [key: string]: unknown;
+};
+
 import SURVEYS from '../../contractsABI/SURVEYS_ABI.json';
 import SBT_FACTORY_ABI from '../../contractsABI/SBT_FACTORY_ABI.json';
 import CUSTOM_SBT_ABI from '../../contractsABI/CUSTOM_SBT_ABI.json';
@@ -4438,11 +4472,13 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
         return null;
       };
 
-      const extractSbtMetadataTokenURI = (metadata: any) => {
+      const extractSbtMetadataTokenURI = (metadata: unknown) => {
         if (!metadata) return null;
         const indexedTokenUri = Array.isArray(metadata) ? metadata[8] : null;
         const namedTokenUri = typeof metadata === 'object'
-          ? (metadata.tokenURI_ || metadata.tokenURI || null)
+          ? ((metadata as { tokenURI_?: unknown; tokenURI?: unknown }).tokenURI_ ||
+            (metadata as { tokenURI_?: unknown; tokenURI?: unknown }).tokenURI ||
+            null)
           : null;
         return namedTokenUri || indexedTokenUri || null;
       };
@@ -5066,7 +5102,7 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
     sbtAddress,
     userAddress,
     walletScopeSbtAddress
-  }: any) {
+  }: SignGroupMintAuthorizationInput) {
     const resolvedWalletScopeSbtAddress = await resolveGroupPasswordWalletScopeSbtAddress({
       password,
       sbtAddress,
@@ -5115,7 +5151,7 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
       });
       inviteLog.log('[INVITE_DEBUG v4] derived groupPasswordHash:', localHash);
     } catch {}
-    const out: any[] = [];
+    const out: InvitePayloadResult[] = [];
     for (const nonce of nonces) {
       const signature = await cryptoUtils.signInvite({
         password: normalizedPassword,
@@ -5123,7 +5159,7 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
         nonce,
         walletScopeSbtAddress: resolvedWalletScopeSbtAddress
       });
-      const payload: any = { n: String(nonce), s: signature };
+      const payload: EncodedInvitePayload = { n: String(nonce), s: signature };
       const inviteCode = cryptoUtils.encodeInvite(payload);
       out.push({ nonce: String(nonce), signature, inviteCode });
     }
@@ -5132,7 +5168,12 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
 
   // "Group" here refers to SBT token group/collection, not session group
   /** Read helper for on-chain groupPasswordHash */
-  async getGroupPasswordHash(providerName: any, SBTAddress: any, groupKeyOrCfg: any = null, options: any = {}) {
+  async getGroupPasswordHash(
+    providerName: SbtReadProviderRef,
+    SBTAddress: string,
+    groupKeyOrCfg: SbtReadGroupKeyOrConfig = null,
+    options: SbtReadOptions = {}
+  ) {
     try {
       const provider = getLocalAwareReadProviderForGroup(groupKeyOrCfg, SBT_READ_PROVIDER_OPTIONS);
       const CustomSBT = new ethers.Contract(SBTAddress, CUSTOM_SBT_ABI, provider as any);
@@ -5165,7 +5206,12 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
   },
 
   /** Read helper for on-chain mintedTokens */
-  async getMintedTokens(providerName: any, SBTAddress: any, groupKeyOrCfg: any = null, options: any = {}) {
+  async getMintedTokens(
+    providerName: SbtReadProviderRef,
+    SBTAddress: string,
+    groupKeyOrCfg: SbtReadGroupKeyOrConfig = null,
+    options: SbtReadOptions = {}
+  ) {
     try {
       if (!SBTAddress || !ethers.utils.isAddress(SBTAddress)) return null;
       const provider = getLocalAwareReadProviderForGroup(groupKeyOrCfg, SBT_READ_PROVIDER_OPTIONS);
@@ -5196,7 +5242,11 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
     }
   },
 
-  async getSbtHistorySummary(providerName: any, SBTAddress: any, groupKeyOrCfg: any = null) {
+  async getSbtHistorySummary(
+    providerName: SbtReadProviderRef,
+    SBTAddress: string,
+    groupKeyOrCfg: SbtReadGroupKeyOrConfig = null
+  ) {
     try {
       if (!SBTAddress || !ethers.utils.isAddress(SBTAddress)) return null;
       const provider = getLocalAwareReadProviderForGroup(groupKeyOrCfg, SBT_READ_PROVIDER_OPTIONS);
@@ -5447,7 +5497,7 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
     if (inflight[memoKey]) return inflight[memoKey];
     const run = Promise.resolve(
       scanFn.call(this, providerName, SBTAddress, fromBlock, toBlock, groupKeyOrCfg)
-    ).then((value: any) => {
+    ).then((value: SbtMintBurnCountsByAddressResult) => {
       memo[memoKey] = { ts: Date.now(), value };
       return value;
     }).finally(() => {

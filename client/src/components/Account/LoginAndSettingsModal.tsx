@@ -194,6 +194,35 @@ interface LoginAndSettingsModalState {
   walletBalanceWei: ethers.BigNumber | null;
 }
 
+type SponsoredSessionEntry = Record<string, unknown> & {
+  slug: string;
+  label: string;
+  sponsoredKeys: Record<string, unknown>;
+  isActive?: boolean;
+  inRpcScope?: boolean;
+};
+
+type SettingsSessionDescriptor = Record<string, unknown> & {
+  label: string;
+};
+
+type SponsoredSessionSources = {
+  byResource: Record<string, SponsoredSessionEntry[]>;
+  rpcScope: SponsoredSessionEntry[];
+};
+
+type SettingsOverviewContext = {
+  activeSession: SettingsSessionDescriptor;
+  cryptoTerminology: boolean;
+  needsNetworkSwitch: boolean;
+  showWalletNetwork: boolean;
+  sponsorshipCards: ReturnType<typeof buildLoginSettingsSponsorshipCards>;
+  sponsorSessions: SponsoredSessionSources;
+  targetNetworkName: string;
+  targetNetwork: unknown;
+  walletNetworkName: string;
+};
+
 export { buildBookmarksRoutePath };
 const getErrorCode = (error: unknown) => (
   error && typeof error === 'object' ? (error as { code?: unknown }).code : undefined
@@ -314,8 +343,8 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   _testFundsRequestId: number = 0;
   _portoSessionRestoreReqId: number = 0;
   _portoSessionActionId: number = 0;
-  _sponsoredSessionSourcesMemo: { key: string; value: any } | null = null;
-  _settingsOverviewMemo: { key: string; value: any } | null = null;
+  _sponsoredSessionSourcesMemo: { key: string; value: SponsoredSessionSources } | null = null;
+  _settingsOverviewMemo: { key: string; value: SettingsOverviewContext } | null = null;
 
   getListModePrimarySessionSlug = (state: Partial<LoginAndSettingsModalState> = this.state) => {
     const scope = this.getSessionScanScopeValue(state);
@@ -1593,12 +1622,12 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     });
     const allSessionSlugs = getAllSessionSlugs({ includeEmpty: true }) || [];
     const sourceSlugs = uniqueList([
-      ...allSessionSlugs.map((slug: any) => normalizeSettingsSessionSlug(slug)),
+      ...allSessionSlugs.map((slug: unknown) => normalizeSettingsSessionSlug(slug)),
       active,
       '',
     ]);
-    const configBySlug: any = new Map();
-    const sponsoredSourceSignature = sourceSlugs.map((slug: any) => {
+    const configBySlug = new Map<string, Record<string, unknown>>();
+    const sponsoredSourceSignature = sourceSlugs.map((slug: string) => {
       const cfg = this.getDisplaySessionConfig(slug);
       configBySlug.set(slug, cfg);
       return {
