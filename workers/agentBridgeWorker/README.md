@@ -286,11 +286,12 @@ Agent` so the setup path is not buried under `/me`. The default user-scoped
 agent token lifespan is 28 days, and the raw token is only included in the
 private copy payload, never in message body text.
 
-The web client login path never places a raw `ceagt_` token in a URL or durable
-browser storage. For Telegram-first sessions, users paste the token or copied
-install info into the login modal; the client calls
-`POST /api/agent/client-login/exchange` once and stores only the returned
-short-lived browser envelope in tab-scoped `sessionStorage`. The
+The web client login path never places a raw `ceagt_` token in a URL, durable
+browser storage, Redux state, or logs. For Telegram-first sessions, users paste
+the token or copied install info into the login modal; the client calls
+`POST /api/agent/client-login/exchange` once, clears the pasted token from
+component state after exchange, and stores only the returned short-lived browser
+envelope in tab-scoped `sessionStorage`. The
 `GET /api/agent/session-meta?sessionSlug=<slug>` endpoint returns public
 session metadata, including `clientSubmitReady`, which tells the client whether
 direct answer submit is deploy-ready for that session.
@@ -497,7 +498,7 @@ Required values:
 | `TELEGRAM_WEBHOOK_SECRET` random high-entropy string | Paste into `.dev.vars`; `deploy:apply -- --apply` writes deployed Worker secret `TELEGRAM_WEBHOOK_SECRET`; Telegram sends it as `X-Telegram-Bot-Api-Secret-Token` |
 | `DEMO_SIGNER_ROOT_SECRET` random high-entropy string | Paste into `.dev.vars`; `deploy:apply -- --apply` writes deployed Worker secret `DEMO_SIGNER_ROOT_SECRET` |
 | `AGENT_BRIDGE_AGENT_API_TOKEN` random high-entropy string | Paste into `.dev.vars`; `deploy:apply -- --apply` writes deployed Worker secret `AGENT_BRIDGE_AGENT_API_TOKEN` for OpenClaw/agent handoff API authentication |
-| Production web client origins | Set `AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS=https://contextengine.xyz,https://www.contextengine.xyz` so hosted clients can exchange Telegram tokens and read result-view cache entries. Result-view cache writes require the worker service token. Add Mini App origins to `AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS`; those origins are also accepted for client-login exchanges |
+| Production web client origins | Set `AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS=https://contextengine.xyz,https://www.contextengine.xyz,https://contextengine.sh,https://www.contextengine.sh` so hosted clients can exchange Telegram tokens and read result-view cache entries during the current `.xyz` deployment and the planned `.sh` cutover. Result-view cache writes require the worker service token. Add Mini App origins to `AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS`; those origins are also accepted for client-login exchanges |
 | Optional trusted Geo/Hermes onboarding invite | Store a SHA-256 hash in `AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITE_TOKEN_HASHES`, or use `AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON` records with `tokenHash`, `sessionSlug`, `label`, and `source`. The Geo node/link carries the plaintext invite token; Hermes supplies the Telegram user id it observes and receives a normal user-scoped `ceagt_...` token from `POST /api/agent/invite/onboard` |
 | Optional OpenAI key for Telegram AI | Paste into untracked `.dev.vars` as `AGENT_BRIDGE_OPENAI_API_KEY` or `OPENAI_API_KEY`; `deploy:apply -- --apply` writes deployed Worker secret `AGENT_BRIDGE_OPENAI_API_KEY`. Telegram question generation, AI search, add-question formatting, group analysis, and transcription pass it as a request-local `apiKey` to the configured session worker when that session worker has no per-session `openaiKey` secret |
 | Public deployed `agentBridgeWorker` URL | Paste or derive the Workers.dev base URL as `AGENT_BRIDGE_PUBLIC_URL`, for example `https://ce-agent-bridge-worker.<workers-subdomain>.workers.dev`; live apply can derive it when the token can read the account workers.dev subdomain |

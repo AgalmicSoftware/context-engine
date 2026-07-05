@@ -159,6 +159,21 @@ The same wallet is used for:
 
 Open `/new`. The app canonicalizes that route to `/session/new`, but `/new` is the intended entry point.
 
+The first screen is the session-mode choice. Nothing is preselected, and
+Continue stays disabled until the creator chooses a preset:
+
+- `Fast & Cheap (Cloudflare)` compiles to a Cloudflare-backed,
+  worker-canonical session shape.
+- `Trustless & Public (Decentralized)` compiles to the public Arweave +
+  EVM-registry session shape.
+
+Advanced per-axis changes, such as enabling the Telegram surface or changing
+storage/authority/encryption independently, flip the profile to `custom`. New
+session publishes write the `sessionModeProfile` profile as the source of truth
+and compile it down to the existing storage profile / payload-access fields for
+runtime compatibility. Legacy `telegramOnly` fields are read only as a migration
+fallback and are not written by new sessions.
+
 The normal-mode wizard is effectively four stages:
 
 1. Session Details
