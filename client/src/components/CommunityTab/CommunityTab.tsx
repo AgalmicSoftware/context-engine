@@ -1828,6 +1828,9 @@ class CommunityTab extends Component<any, any> {
   }
 
   _getQuestionSwarmPoints = () => {
+    if (this._shouldUseDemoBeeswarmData()) {
+      return this._buildDemoBeeswarmPoints();
+    }
     if (Array.isArray(this._beeswarmPoints) && this._beeswarmPoints.length > 0) {
       return this._beeswarmPoints;
     }
