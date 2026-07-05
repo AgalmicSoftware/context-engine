@@ -13,6 +13,7 @@ export type TelegramSessionMeta = {
 export type ResolveSessionBackendKindArgs = {
   sessionConfig?: unknown;
   probeResult?: TelegramSessionMeta | null;
+  sessionSlug?: unknown;
 };
 
 const toUnknownRecord = (value: unknown): UnknownRecord => (
@@ -24,6 +25,11 @@ const toUnknownRecord = (value: unknown): UnknownRecord => (
 const normalizeModeValue = (value: unknown): string => (
   String(value || '').trim().toLowerCase()
 );
+
+const normalizeSessionSlug = (value: unknown): string => {
+  const slug = String(value || '').trim().toLowerCase();
+  return slug === 'general' ? '' : slug;
+};
 
 export const isTelegramFirstSessionConfig = (metadata: unknown): boolean => {
   const config = toUnknownRecord(metadata);
@@ -41,8 +47,15 @@ export const isTelegramFirstSessionConfig = (metadata: unknown): boolean => {
 export const resolveSessionBackendKind = ({
   sessionConfig = null,
   probeResult = null,
+  sessionSlug = '',
 }: ResolveSessionBackendKindArgs = {}): SessionBackendKind => (
-  isTelegramFirstSessionConfig(sessionConfig) || probeResult?.telegramOnly === true
+  isTelegramFirstSessionConfig(sessionConfig) || (
+    probeResult?.telegramOnly === true &&
+    (
+      !normalizeSessionSlug(sessionSlug) ||
+      normalizeSessionSlug(probeResult.sessionSlug) === normalizeSessionSlug(sessionSlug)
+    )
+  )
     ? 'telegram'
     : 'onchain'
 );

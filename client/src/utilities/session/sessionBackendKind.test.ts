@@ -23,6 +23,19 @@ describe('sessionBackendKind', () => {
     })).toBe('telegram');
   });
 
+  it('ignores stale session-meta probe results from a different session slug', () => {
+    expect(resolveSessionBackendKind({
+      sessionConfig: { slug: 'demo' },
+      sessionSlug: 'demo',
+      probeResult: {
+        ok: true,
+        sessionSlug: 'edge',
+        telegramOnly: true,
+        telegramBridgeEnabled: true,
+      },
+    })).toBe('onchain');
+  });
+
   it('defaults ordinary sessions to onchain', () => {
     expect(isTelegramFirstSessionConfig({ sessionMode: 'standard' })).toBe(false);
     expect(resolveSessionBackendKind({ sessionConfig: { sessionMode: 'standard' } })).toBe('onchain');
