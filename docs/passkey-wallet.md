@@ -344,5 +344,7 @@ for repeatable OP Sepolia testing. `npm run ai:wallet` prints the deterministic
 address and, with `SHOW_PRIVATE_KEY=1`, private local-only fixture material for
 automation. Do not use fixture keys for production funds.
 
-`scripts/seed-survey-question-types.js` now seeds an encrypted IndexedDB wallet
-record for browser automation instead of storing a plaintext session record.
+`scripts/seed-survey-question-types.js` now seeds passkey-derived wallet
+metadata in IndexedDB for browser automation instead of storing a plaintext
+session record. The mock PRF output stays in the E2E harness payload and is not
+written into the wallet record.
