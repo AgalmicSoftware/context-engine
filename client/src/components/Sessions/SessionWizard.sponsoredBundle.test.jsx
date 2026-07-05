@@ -158,6 +158,7 @@ import {
   getFieldInputByLabel,
   getToggleCheckbox,
   openWorkerPanel,
+  selectNormalModeCard,
   setCloudflareTokenValue,
 } from './SessionWizard.sponsoredBundleDom.testUtils.js';
 import {
@@ -386,7 +387,7 @@ describe('SessionWizard sponsored bundle flow', () => {
       target: { value: 'This publish should stop before sponsored worker deployment.' },
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /step 3: deploy session/i }));
+    selectNormalModeCard('Deploy Session');
     const publishButton = await screen.findByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
 
     await waitFor(() => {

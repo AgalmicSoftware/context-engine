@@ -130,6 +130,34 @@ describe('sessionWizardDraftState', () => {
     }));
   });
 
+  it('migrates cached Cloudflare Lit storage drafts into a session mode profile', () => {
+    const normalized = buildSessionWizardInitialDraftFromCache({
+      cachedWizard: {
+        draft: {
+          sessionName: 'Cached Lit Cloudflare Session',
+          storageProfile: {
+            backend: 'cloudflare',
+            payloadAccessControl: { mode: 'lit_encrypted' },
+          },
+        },
+      },
+    });
+
+    expect(normalized.sessionModeProfile).toEqual(expect.objectContaining({
+      preset: 'custom',
+      authority: { mode: 'worker_canonical' },
+      storage: { backend: 'cloudflare' },
+      encryption: { mode: 'lit' },
+    }));
+    expect(normalized.storageProfile).toEqual(expect.objectContaining({
+      backend: 'cloudflare',
+      payloadAccessControl: expect.objectContaining({ mode: 'lit_encrypted' }),
+      sbtGatedAccess: expect.objectContaining({
+        litRequired: 'required_for_cloudflare_payload_encryption',
+      }),
+    }));
+  });
+
   it('applies registry-chain contract defaults and worker RPC fallbacks without mutating the draft', () => {
     const draft = {
       networkChainId: 84532,
