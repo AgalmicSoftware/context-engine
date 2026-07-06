@@ -5,12 +5,12 @@ import {
   type SurveyResultsExportGenerationPlan,
   type SurveyResultsExportGeneratorKey,
 } from './surveyResultsExportPlans.js';
+import {
+  runSurveyResultsBrowserDownload,
+  type SurveyResultsBrowserDownloadRequest,
+} from './surveyResultsBrowserDownloadPort.js';
 
-export type SurveyResultsExportDownloadRequest = {
-  fileContent: string;
-  filename: string;
-  mimeType: string;
-};
+export type SurveyResultsExportDownloadRequest = SurveyResultsBrowserDownloadRequest;
 
 export type SurveyResultsExportDownloadPort = (
   request: SurveyResultsExportDownloadRequest
@@ -51,21 +51,7 @@ export type RunSurveyResultsExportControllerArgs = {
   downloadFile: SurveyResultsExportDownloadPort;
 };
 
-export const runSurveyResultsBrowserDownload = ({
-  fileContent,
-  filename,
-  mimeType,
-}: SurveyResultsExportDownloadRequest): void => {
-  const blob = new Blob([fileContent], { type: mimeType });
-  const url = window.URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.setAttribute('hidden', '');
-  anchor.setAttribute('href', url);
-  anchor.setAttribute('download', filename);
-  document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
-};
+export { runSurveyResultsBrowserDownload };
 
 export const runSurveyResultsExportController = ({
   baseFileName,
