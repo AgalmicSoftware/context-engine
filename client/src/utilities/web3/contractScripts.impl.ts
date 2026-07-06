@@ -107,8 +107,8 @@ import {
   buildArweaveReadModeTag,
   buildDecryptModeTag,
   buildFailureModeTag,
-  createContractScriptsMetadataResolutionHelpers,
-} from './contractScriptsMetadataResolution.js';
+  createChainMetadataResolutionHelpers,
+} from './chainMetadataResolution.js';
 import {
   getReadProviderForGroup,
   getReadProviderForSession,
@@ -434,7 +434,7 @@ const getSurveysReadProviderForSession = (groupKeyOrCfg: any, cfg: any, chainId:
   getReadProviderForChain(chainId)
 );
 
-let contractMetadataResolutionHelpers: ReturnType<typeof createContractScriptsMetadataResolutionHelpers>;
+let contractMetadataResolutionHelpers: ReturnType<typeof createChainMetadataResolutionHelpers>;
 
 function recordRpcStat(fnName: any, meta: any) {
   try {
@@ -4595,7 +4595,7 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
 
 // Convenience: expose named read-provider resolver on default export
 (contractScripts as any).getReadProviderForGroup = getReadProviderForGroup;
-contractMetadataResolutionHelpers = createContractScriptsMetadataResolutionHelpers({
+contractMetadataResolutionHelpers = createChainMetadataResolutionHelpers({
   userHasSBT: (...args: unknown[]) => contractScripts.userHasSBT(...args),
 });
 // Back-compat alias retained for older callers that still use the legacy name.
