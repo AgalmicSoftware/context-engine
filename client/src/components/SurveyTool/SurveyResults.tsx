@@ -244,6 +244,9 @@ import {
   buildSurveyResultsHtmlReportResponseCountsByQuestion,
 } from './surveyResultsHtmlReportDataModel';
 import {
+  buildSurveyResultsAnalysisResponsesForExport,
+} from './surveyResultsAnalysisDataModel';
+import {
   buildSurveyResultsHtmlReportModalProps,
 } from './surveyResultsHtmlReportModalProps';
 import {
@@ -313,7 +316,6 @@ import {
   SESSION_RESULTS_EXPORT_FORMAT_PDF,
   SESSION_RESULTS_EXPORT_FORMAT_VIEWER,
   shortenSessionResultsAddress,
-  type SessionResultsAnalysisResponseInput,
   type SessionResultsAnalysisSectionKey,
   type SessionResultsExportFormat,
   type SessionResultsGeneratedAnalysisArtifact,
@@ -2657,67 +2659,24 @@ const writeResult = await runSurveyResultsAnalysisArtifactWriteController({
 if (!writeResult.ok && writeResult.error) throw writeResult.error;
 };
 
-const getSessionResultsAnalysisTextField = (field: unknown): string => {
-if (field === null || field === undefined) return '';
-if (typeof field === 'string' || typeof field === 'number' || typeof field === 'boolean') {
-  return String(field).trim();
-}
-const record = toSurveyResultsRecord(field);
-const value = record.value ?? record.text ?? record.answer;
-if (value === null || value === undefined || value === '*') return '';
-if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-  return String(value).trim();
-}
-return '';
-};
-
-const getSessionResultsAnalysisResponsesForExport = (): SessionResultsAnalysisResponseInput[] => {
-const rows: SessionResultsAnalysisResponseInput[] = [];
-const networkQuestions = getNetworkQuestionsForCurrentContext() as Record<string, SurveyResultsRecord | undefined>;
-const pushRow = (
-  response: SurveyResultsResponseRecord | null | undefined,
-  responder: unknown,
-  questionIdFallback: unknown = ''
-): void => {
-  if (!response || typeof response !== 'object') return;
-  const questionId = getResponseQuestionId(response) || String(questionIdFallback || '').trim();
-  if (!questionId) return;
-  const questionData = networkQuestions[questionId.toLowerCase()] || networkQuestions[questionId] || {};
-  const answer = getSessionResultsAnalysisTextField(response.answer);
-  const additional = getSessionResultsAnalysisTextField(response.additional);
-  if (!answer && !additional) return;
-  rows.push({
-    additional,
-    answer,
-    participantAddress: responder,
-    questionId,
-    questionPrompt: getResponseQuestionPrompt(response, questionData),
-    questionType: getResponseQuestionType(response, questionData),
-  });
-};
-
-if (stateRef.current.viewMode === 'survey' && stateRef.current.surveyViewMode === 'individuals') {
-  const filteredResponses = Array.isArray(stateRef.current.sbtFilteredResponses)
-    ? stateRef.current.sbtFilteredResponses as SurveyResultsResponseListEntry[]
-    : [];
-  filteredResponses.forEach((responseRow) => {
-    const parsedResponse = parseResponse(responseRow.response) as SurveyResultsSurveyResponsePayload | null;
-    const responseRows = Array.isArray(parsedResponse?.responses) ? parsedResponse.responses : [];
-    responseRows.forEach((answer) => pushRow(answer, responseRow.responder));
-  });
-  return rows;
-}
-
-const aggregator = toSurveyResultsRecord(stateRef.current.sbtFilteredAggregatorQuestionResponses);
-Object.entries(aggregator).forEach(([questionId, responsesArray]) => {
-  if (!Array.isArray(responsesArray)) return;
-  responsesArray.forEach((responseRow) => {
-    const row = toSurveyResultsRecord(responseRow);
-    const parsed = parseResponse(row.response) as SurveyResultsResponseRecord | null;
-    pushRow(parsed, row.responder, questionId);
-  });
+const getSessionResultsAnalysisResponsesForExport = () => {
+return buildSurveyResultsAnalysisResponsesForExport({
+  aggregatorQuestionResponses: stateRef.current.sbtFilteredAggregatorQuestionResponses,
+  filteredResponses: stateRef.current.sbtFilteredResponses,
+  getResponseQuestionId: (response) => getResponseQuestionId(toSurveyResultsRecord(response) as SurveyResultsResponseRecord),
+  getResponseQuestionPrompt: (response, questionData) => getResponseQuestionPrompt(
+    toSurveyResultsRecord(response) as SurveyResultsResponseRecord,
+    toSurveyResultsRecord(questionData)
+  ),
+  getResponseQuestionType: (response, questionData) => getResponseQuestionType(
+    toSurveyResultsRecord(response) as SurveyResultsResponseRecord,
+    toSurveyResultsRecord(questionData)
+  ),
+  networkQuestions: getNetworkQuestionsForCurrentContext(),
+  parseResponse,
+  surveyViewMode: stateRef.current.surveyViewMode,
+  viewMode: stateRef.current.viewMode,
 });
-return rows;
 };
 
 const getSessionResultsAnalysisSafeLabel = (value: unknown): string => {
