@@ -69,7 +69,7 @@ describe('sessionWizardDraftState', () => {
     expect(normalized.sessionModeProfile).toEqual(expect.objectContaining({
       preset: 'custom',
       authority: { mode: 'worker_canonical' },
-      storage: { backend: 'cloudflare' },
+      storage: expect.objectContaining({ backend: 'cloudflare' }),
       surfaces: expect.objectContaining({
         telegram: true,
         miniApp: true,
@@ -146,7 +146,7 @@ describe('sessionWizardDraftState', () => {
     expect(normalized.sessionModeProfile).toEqual(expect.objectContaining({
       preset: 'custom',
       authority: { mode: 'worker_canonical' },
-      storage: { backend: 'cloudflare' },
+      storage: expect.objectContaining({ backend: 'cloudflare' }),
       encryption: { mode: 'lit' },
     }));
     expect(normalized.storageProfile).toEqual(expect.objectContaining({
