@@ -9,10 +9,9 @@ import BlockLimitsField from './BlockLimitsField';
 import SessionHeaderField, { type SessionHeaderFieldProps } from './SessionHeaderField';
 import FeaturedSbtField from './FeaturedSbtField';
 import CollapsibleFieldGroup from './CollapsibleFieldGroup';
-import ContractsSection from './ContractsSection';
-import EncryptionPanel from './EncryptionPanel';
-import WorkerPanel, { type WorkerPanelProps } from './WorkerPanel';
-import WorkerDeployHelperToggle from './WorkerDeployHelperToggle';
+import SessionWizardContractsField from './SessionWizardContractsField';
+import SessionWizardStorageProfileMetadataField from './SessionWizardStorageProfileMetadataField';
+import type { WorkerPanelProps } from './WorkerPanel';
 import WorkerResourceCard from './WorkerResourceCard';
 import WorkerResourceInputs from './WorkerResourceInputs';
 import { finalizeDeferredCreateSbtDraftUpload } from '../SBTs/CreateSBTGroup';
@@ -47,7 +46,6 @@ import {
   getSessionRegistryChains,
 } from '../../variables/chains.js';
 import type { SessionConfig, UnknownRecord } from '../../utilities/session/sessionTypes.js';
-import type { SessionModeProfile } from '../../utilities/session/sessionModeProfile';
 import { normalizeBlockLimitsForConfig } from '../../utilities/session/blockLimits.js';
 import { normalizeBaseUrl } from '../../utilities/urlUtils.js';
 import { t } from '../../utilities/ui/terminology.js';
@@ -113,7 +111,11 @@ import {
 import SessionWizardInfoTooltip, { type SessionWizardTooltipRenderOptions } from './SessionWizardInfoTooltip';
 import SessionWizardShell from './SessionWizardShell';
 import SessionWizardSessionIdBadge from './SessionWizardSessionIdBadge';
-import SessionModeProfileField from './SessionModeProfileField';
+import SessionWizardSessionModeProfileControl from './SessionWizardSessionModeProfileControl';
+import {
+  applySessionModeProfileSelectionToDraft,
+  applyStorageProfileChangeToModeDraft,
+} from './sessionWizardModeProfileDraftController';
 import {
   buildNormalModeCards,
   buildNormalModePublishSummary,
@@ -2746,42 +2748,14 @@ const SessionWizard = ({
         );
       };
       return (
-        <CollapsibleFieldGroup
+        <SessionWizardStorageProfileMetadataField
           key={keyString}
           title={displayLabel}
           isCollapsed={isCollapsed}
-          toggleAriaLabel={`${displayLabel} ${isCollapsed ? 'expand' : 'collapse'}`}
-          onToggleCollapsed={() =>
-            setMetadataObjectCollapsed((prev) => ({ ...prev, storageProfile: !prev.storageProfile }))
-          }
+          onToggleCollapsed={() => setMetadataObjectCollapsed((prev) => ({ ...prev, storageProfile: !prev.storageProfile }))}
           onStorageProfileChange={(nextProfile) => {
             setDraft((prev) => {
-              const next = deepClone(prev);
-              const normalizedProfile = normalizeSessionStorageProfileConfig(nextProfile);
-              next.storageProfile = normalizedProfile;
-              if (next.sessionModeProfile && typeof next.sessionModeProfile === 'object') {
-                const modeProfile = deepClone(next.sessionModeProfile) as UnknownRecord;
-                const backend = toStr(normalizedProfile.backend).trim();
-                modeProfile.preset = 'custom';
-                modeProfile.storage = {
-                  ...((modeProfile.storage && typeof modeProfile.storage === 'object') ? modeProfile.storage : {}),
-                  backend: backend === 'cloudflare' ? 'cloudflare' : 'arweave',
-                };
-                modeProfile.authority = {
-                  ...((modeProfile.authority && typeof modeProfile.authority === 'object') ? modeProfile.authority : {}),
-                  mode: backend === 'cloudflare' ? 'worker_canonical' : 'evm_registry_canonical',
-                };
-                modeProfile.encryption = {
-                  ...((modeProfile.encryption && typeof modeProfile.encryption === 'object') ? modeProfile.encryption : {}),
-                  mode: backend === 'lit-arweave' || normalizedProfile.payloadAccessControl?.mode === 'lit_encrypted'
-                    ? 'lit'
-                    : 'none',
-                };
-                if (modeProfile.surfaces && typeof modeProfile.surfaces === 'object') {
-                  (modeProfile.surfaces as UnknownRecord).web = true;
-                }
-                next.sessionModeProfile = modeProfile;
-              }
+              const next = applyStorageProfileChangeToModeDraft(prev, nextProfile);
               draftRef.current = next;
               return next;
             });
@@ -5023,26 +4997,12 @@ const SessionWizard = ({
     />
   ) : null;
   const sessionModeProfileControl = (
-    <SessionModeProfileField
+    <SessionWizardSessionModeProfileControl
       registryChainId={registryChainId}
       value={draft.sessionModeProfile}
-      onChange={(profile: SessionModeProfile, compiled) => {
+      onChange={(profile, compiled) => {
         setDraft((prev) => {
-          const next = deepClone(prev);
-          const profileRecord: UnknownRecord = { ...profile };
-          next.sessionModeProfile = profileRecord;
-          next.storageProfile = normalizeSessionStorageProfileConfig(compiled.storageProfile);
-          delete next.telegramOnly;
-          delete next.telegram_only;
-          delete next.telegramMode;
-          delete next.sessionMode;
-          delete next.telegramBridgeEnabled;
-          if (next.telegram && typeof next.telegram === 'object') {
-            const telegram = next.telegram as UnknownRecord;
-            delete telegram.only;
-            delete telegram.mode;
-            if (!Object.keys(telegram).length) delete next.telegram;
-          }
+          const next = applySessionModeProfileSelectionToDraft(prev, profile, compiled);
           draftRef.current = next;
           return next;
         });
@@ -5139,74 +5099,40 @@ const SessionWizard = ({
       onToggleJsonPreview={() => setShowJsonPreview((prev) => !prev)}
       onToggleMoreOptions={() => setMoreOptionsOpen((prev) => !prev)}
       onTogglePublishAdvanced={() => setPublishAdvancedOpen((prev) => !prev)}
-      pendingSbtDrafts={pendingSbtDrafts}
-      pendingSbtSelectorOptions={pendingSbtSelectorOptions}
-      persistWorkerSecrets={persistWorkerSecrets}
-      primaryDraftEntries={primaryDraftEntries}
-      provider={provider}
-      publishUiPlan={publishUiPlan}
-      publishedPendingSbtLinks={publishedPendingSbtLinks}
-      registerExplorerBaseUrl={registerExplorerBaseUrl}
-      registerTxs={registerTxs}
-      registryAddress={registryAddress}
-      registryChainId={registryChainId}
-      registryChainName={registryChainName}
-      registryChainOptions={registryChainOptions}
-      removeEncryptionGate={removeEncryptionGate}
-      removePendingSbtDraft={removePendingSbtDraft}
-      renderField={renderField}
-      renderResourceCard={renderResourceCard}
-      renderSessionWizardInfoTooltip={renderSessionWizardInfoTooltip}
-      resolvedActiveSessionSlug={resolvedActiveSessionSlug}
-      resolvedWorkerBaseUrl={resolvedWorkerBaseUrl}
-      sbtCacheRevision={sbtCacheRevision}
-      selectedWizardContract={selectedWizardContract}
-      selectedWizardContractHref={selectedWizardContractHref}
-      selectorSourceChainId={selectorSourceChainId}
-      selectorSourceSessionConfig={selectorSourceSessionConfig}
-      sessionHeaderPreviewModalOpen={sessionHeaderPreviewModalOpen}
-      sessionHeaderPreviewSrc={sessionHeaderPreviewSrc}
-      sessionMetadataHeaderAccessory={sessionMetadataHeaderAccessory}
-      sessionModeProfileControl={sessionModeProfileControl}
-      sessionUrl={sessionUrl}
-      setBundleFile={setBundleFile}
-      setBundleMode={setBundleMode}
-      setDeployForm={setDeployForm}
-      setDeployHelperUrl={setDeployHelperUrl}
-      setNormalModeBundleUrlOverride={setNormalModeBundleUrlOverride}
-      setPersistWorkerSecrets={setPersistWorkerSecrets}
-      setWorkerAllowOrigins={setWorkerAllowOrigins}
-      setWorkerMode={setWorkerMode}
-      setWorkerSecretsEnabled={setWorkerSecretsEnabled}
-      setWorkerUrlAutoFilled={setWorkerUrlAutoFilled}
-      shouldShowDeployHelperUrlInput={shouldShowDeployHelperUrlInput}
-      shouldUseSponsoredAutoDeployFlow={shouldUseSponsoredAutoDeployFlow}
-      showJsonPreview={showJsonPreview}
-      showNewSessionRequirementsBanner={showNewSessionRequirementsBanner}
-      showNormalModeManualBundleControls={showNormalModeManualBundleControls}
-      showNormalModeWorkerStep={showNormalModeWorkerStep}
-      showSharedWorkerChoice={showSharedWorkerChoice}
-      showSponsoredBundleFallbackInput={showSponsoredBundleFallbackInput}
-      showSponsoredDeployAccessNotice={showSponsoredDeployAccessNotice}
-      showWorkerUrlField={showWorkerUrlField}
-      signBootstrapAdminAction={signBootstrapAdminAction}
-      sponsoredBundleStatus={sponsoredBundleStatus}
-      sponsoredManualBundleRetryMessage={SPONSORED_MANUAL_BUNDLE_RETRY_MESSAGE}
-      sponsoredPublishBundleFileInputRef={sponsoredPublishBundleFileInputRef}
-      status={status}
-      t={t}
-      toggleLoginModal={toggleLoginModal}
-      toggleSection={toggleSection}
-      updateDraftValue={updateDraftValue}
-      updateEncryptionGate={updateEncryptionGate}
-      visibleWorkerResourceKeys={visibleWorkerResourceKeys}
-      workerAllowOrigins={workerAllowOrigins}
-      workerMode={workerMode}
-      workerSecretsEnabled={workerSecretsEnabled}
-      workerUrlAutoFilled={workerUrlAutoFilled}
-      workerUrlSource={workerUrlSource}
-      wizardDisplaySettingsOpen={wizardDisplaySettingsOpen}
-      wizardMode={wizardMode}
+      pendingSbtDrafts={pendingSbtDrafts} pendingSbtSelectorOptions={pendingSbtSelectorOptions}
+      persistWorkerSecrets={persistWorkerSecrets} primaryDraftEntries={primaryDraftEntries}
+      provider={provider} publishUiPlan={publishUiPlan}
+      publishedPendingSbtLinks={publishedPendingSbtLinks} registerExplorerBaseUrl={registerExplorerBaseUrl}
+      registerTxs={registerTxs} registryAddress={registryAddress}
+      registryChainId={registryChainId} registryChainName={registryChainName}
+      registryChainOptions={registryChainOptions} removeEncryptionGate={removeEncryptionGate}
+      removePendingSbtDraft={removePendingSbtDraft} renderField={renderField}
+      renderResourceCard={renderResourceCard} renderSessionWizardInfoTooltip={renderSessionWizardInfoTooltip}
+      resolvedActiveSessionSlug={resolvedActiveSessionSlug} resolvedWorkerBaseUrl={resolvedWorkerBaseUrl}
+      sbtCacheRevision={sbtCacheRevision} selectedWizardContract={selectedWizardContract}
+      selectedWizardContractHref={selectedWizardContractHref} selectorSourceChainId={selectorSourceChainId}
+      selectorSourceSessionConfig={selectorSourceSessionConfig} sessionHeaderPreviewModalOpen={sessionHeaderPreviewModalOpen}
+      sessionHeaderPreviewSrc={sessionHeaderPreviewSrc} sessionMetadataHeaderAccessory={sessionMetadataHeaderAccessory}
+      sessionModeProfileControl={sessionModeProfileControl} sessionUrl={sessionUrl}
+      setBundleFile={setBundleFile} setBundleMode={setBundleMode}
+      setDeployForm={setDeployForm} setDeployHelperUrl={setDeployHelperUrl}
+      setNormalModeBundleUrlOverride={setNormalModeBundleUrlOverride} setPersistWorkerSecrets={setPersistWorkerSecrets}
+      setWorkerAllowOrigins={setWorkerAllowOrigins} setWorkerMode={setWorkerMode}
+      setWorkerSecretsEnabled={setWorkerSecretsEnabled} setWorkerUrlAutoFilled={setWorkerUrlAutoFilled}
+      shouldShowDeployHelperUrlInput={shouldShowDeployHelperUrlInput} shouldUseSponsoredAutoDeployFlow={shouldUseSponsoredAutoDeployFlow}
+      showJsonPreview={showJsonPreview} showNewSessionRequirementsBanner={showNewSessionRequirementsBanner}
+      showNormalModeManualBundleControls={showNormalModeManualBundleControls} showNormalModeWorkerStep={showNormalModeWorkerStep}
+      showSharedWorkerChoice={showSharedWorkerChoice} showSponsoredBundleFallbackInput={showSponsoredBundleFallbackInput}
+      showSponsoredDeployAccessNotice={showSponsoredDeployAccessNotice} showWorkerUrlField={showWorkerUrlField}
+      signBootstrapAdminAction={signBootstrapAdminAction} sponsoredBundleStatus={sponsoredBundleStatus}
+      sponsoredManualBundleRetryMessage={SPONSORED_MANUAL_BUNDLE_RETRY_MESSAGE} sponsoredPublishBundleFileInputRef={sponsoredPublishBundleFileInputRef}
+      status={status} t={t}
+      toggleLoginModal={toggleLoginModal} toggleSection={toggleSection}
+      updateDraftValue={updateDraftValue} updateEncryptionGate={updateEncryptionGate}
+      visibleWorkerResourceKeys={visibleWorkerResourceKeys} workerAllowOrigins={workerAllowOrigins}
+      workerMode={workerMode} workerSecretsEnabled={workerSecretsEnabled}
+      workerUrlAutoFilled={workerUrlAutoFilled} workerUrlSource={workerUrlSource}
+      wizardDisplaySettingsOpen={wizardDisplaySettingsOpen} wizardMode={wizardMode}
       normalizeSbtSelection={normalizeSbtSelection}
     />
   );
