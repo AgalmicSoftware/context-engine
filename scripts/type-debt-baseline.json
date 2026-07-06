@@ -11,8 +11,8 @@
   ],
   "counts": {
     "tsNocheck": 0,
-    "colonAny": 2914,
-    "asAny": 242,
+    "colonAny": 2876,
+    "asAny": 241,
     "asUnknownAs": 100,
     "promiseAny": 7,
     "arrayAny": 0,

@@ -41,9 +41,22 @@ import { getPolisDemoDatasetForSlug } from '../PolisReport/PolisReport';
 
 const uiLog = createLogger('ui');
 const COMMUNITY_BEESWARM_DEMO_SLUG = 'demo';
-const contractScriptsUntyped = contractScripts as any;
+type CacheReadOptions = { clone?: boolean };
+type SessionSelectorOption = { value: string; label: string };
+type ScopeCacheEntry = {
+  slug: string;
+  netKey: string;
+  surveysCache: Record<string, unknown>;
+  questionsCache: Record<string, unknown>;
+  sbtCache: Record<string, unknown>;
+};
+type ContractScriptsWithBlockWindow = typeof contractScripts & {
+  getRelevantBlockWindowForFilter: (slug?: string) => Promise<{ toBlock?: unknown }>;
+};
 
-const getDisplaySessionLists = (slugIn: any = '') => {
+const contractScriptsWithBlockWindow = contractScripts as ContractScriptsWithBlockWindow;
+
+const getDisplaySessionLists = (slugIn = '') => {
   const strictLists = getSessionLists(slugIn) || {};
   const hasStrictLists = [
     strictLists.featured_SBTs_LIST,
@@ -52,7 +65,7 @@ const getDisplaySessionLists = (slugIn: any = '') => {
     strictLists.BLOCKED_QUESTION_IDS,
     strictLists.HIGHLIGHTED_SURVEY_IDS,
     strictLists.BLOCKED_SURVEY_IDS,
-  ].some((value: any) => Array.isArray(value) && value.length > 0);
+  ].some((value: unknown) => Array.isArray(value) && value.length > 0);
   if (hasStrictLists) return strictLists;
 
   const demoCfg = getDemoSessionConfigBySlug(slugIn, { allowDemoFallback: true }) || {};
@@ -66,7 +79,7 @@ const getDisplaySessionLists = (slugIn: any = '') => {
   };
 };
 
-const getDisplaySessionChainId = (slugIn: any = '') => {
+const getDisplaySessionChainId = (slugIn = '') => {
   const strictChainId = getSessionChainId(slugIn);
   if (strictChainId != null) return strictChainId;
 
@@ -182,10 +195,10 @@ class CommunityTab extends Component<any, any> {
     return this._resolveRouteSlug();
   }
 
-  _dedupeNormalizedSlugs = (slugs: any = []) => {
-    const seen: any = new Set();
-    const out: any[] = [];
-    slugs.forEach((slugIn: any) => {
+  _dedupeNormalizedSlugs = (slugs: unknown[] = []): string[] => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    slugs.forEach((slugIn: unknown) => {
       const slug = normalizeSessionSlug(slugIn || '');
       if (seen.has(slug)) return;
       seen.add(slug);
@@ -194,34 +207,34 @@ class CommunityTab extends Component<any, any> {
     return out;
   }
 
-  _buildSessionSlugSignature = (slugs: any = []) => (
+  _buildSessionSlugSignature = (slugs: unknown[] = []) => (
     this._dedupeNormalizedSlugs(slugs).join('|')
   );
 
-  _sortSlugsByKnownOrder = (slugs: any = [], orderedUniverse: any = []) => {
+  _sortSlugsByKnownOrder = (slugs: unknown[] = [], orderedUniverse: unknown[] = []): string[] => {
     const normalizedUniverse = this._dedupeNormalizedSlugs(orderedUniverse);
-    const order: any = new Map();
-    normalizedUniverse.forEach((slug: any, index: any) => {
+    const order = new Map<string, number>();
+    normalizedUniverse.forEach((slug: string, index: number) => {
       order.set(normalizeSessionSlug(slug || ''), index);
     });
-    return this._dedupeNormalizedSlugs(slugs).sort((aRaw: any, bRaw: any) => {
+    return this._dedupeNormalizedSlugs(slugs).sort((aRaw: string, bRaw: string) => {
       const a = normalizeSessionSlug(aRaw || '');
       const b = normalizeSessionSlug(bRaw || '');
-      const ai = order.has(a) ? order.get(a) : Number.MAX_SAFE_INTEGER;
-      const bi = order.has(b) ? order.get(b) : Number.MAX_SAFE_INTEGER;
+      const ai = order.get(a) ?? Number.MAX_SAFE_INTEGER;
+      const bi = order.get(b) ?? Number.MAX_SAFE_INTEGER;
       if (ai !== bi) return ai - bi;
       return String(a).localeCompare(String(b));
     });
   }
 
-  _labelForSessionSlug = (slugIn: any) => {
+  _labelForSessionSlug = (slugIn: unknown): string => {
     const slug = normalizeSessionSlug(slugIn || '');
     return slug || 'General';
   }
 
   _getDefaultSelectedSessionSlugs = () => {
-    const availableSlugs = this._getSessionSelectorOptions().map((option: any) => option.value);
-    const availableSet: any = new Set(availableSlugs);
+    const availableSlugs = this._getSessionSelectorOptions().map((option: SessionSelectorOption) => option.value);
+    const availableSet = new Set<string>(availableSlugs);
     const routeSlug = normalizeSessionSlug(this._resolveRouteSlug() || '');
     if (this._hasPinnedRouteSession() && availableSet.has(routeSlug)) {
       return [routeSlug];
@@ -239,7 +252,7 @@ class CommunityTab extends Component<any, any> {
         primarySessionSlug: fallbackPrimarySlug,
       });
     const filteredDefaults = this._dedupeNormalizedSlugs(scopedDefaults)
-      .filter((slug: any) => availableSet.has(slug));
+      .filter((slug: string) => availableSet.has(slug));
     if (filteredDefaults.length > 0) {
       return this._sortSlugsByKnownOrder(filteredDefaults, availableSlugs);
     }
@@ -248,20 +261,20 @@ class CommunityTab extends Component<any, any> {
     return availableSlugs.length > 0 ? [availableSlugs[0]] : [];
   }
 
-  _getSessionSelectorOptions = () => this._dedupeNormalizedSlugs([
+  _getSessionSelectorOptions = (): SessionSelectorOption[] => this._dedupeNormalizedSlugs([
     this._resolveRouteSlug(),
     '',
     ...this.listAllSlugs(),
-  ]).map((slug: any) => ({
+  ]).map((slug: string) => ({
     value: slug,
     label: this._labelForSessionSlug(slug),
   }));
 
   _getSelectedSessionSlugs = () => {
-    const availableSlugs = this._getSessionSelectorOptions().map((option: any) => option.value);
-    const availableSet: any = new Set(availableSlugs);
+    const availableSlugs = this._getSessionSelectorOptions().map((option: SessionSelectorOption) => option.value);
+    const availableSet = new Set<string>(availableSlugs);
     const defaultSelected = this._getDefaultSelectedSessionSlugs()
-      .filter((slug: any) => availableSet.has(slug));
+      .filter((slug: string) => availableSet.has(slug));
     if (defaultSelected.length > 0) {
       return this._sortSlugsByKnownOrder(defaultSelected, availableSlugs);
     }
@@ -287,7 +300,7 @@ class CommunityTab extends Component<any, any> {
     ]);
   }
 
-  _resolveNetKeyForSlug = (slug: any) => {
+  _resolveNetKeyForSlug = (slug: string) => {
     try {
       const id = getDisplaySessionChainId(slug);
       return id != null ? String(id) : '';
@@ -296,13 +309,13 @@ class CommunityTab extends Component<any, any> {
     }
   }
 
-  _readCache = (cacheName: any, slug: any, options: any = {}) => {
+  _readCache = (cacheName: string, slug: string, options: CacheReadOptions = {}): Record<string, unknown> => {
     const shouldClone = options?.clone === true;
     const obj = peekCacheSync(cacheName, slug, { clone: shouldClone }) || {};
-    return (obj && typeof obj === 'object') ? obj : {};
+    return (obj && typeof obj === 'object') ? obj as Record<string, unknown> : {};
   }
 
-  _getObjectRefId = (value: any) => {
+  _getObjectRefId = (value: unknown) => {
     if (!value || typeof value !== 'object') return 'na';
     let id = this._cacheRefIds.get(value);
     if (!id) {
@@ -313,17 +326,22 @@ class CommunityTab extends Component<any, any> {
     return id;
   }
 
-  _pickNet = (cacheObj: any, netKey: any) => {
+  _pickNet = (cacheObj: unknown, netKey: string): Record<string, unknown> => {
     if (!cacheObj || typeof cacheObj !== 'object') return {};
-    if (netKey && cacheObj[netKey]) return cacheObj[netKey] || {};
-    const ks = Object.keys(cacheObj || {});
-    if (ks.length === 1) return cacheObj[ks[0]] || {};
+    const parsedCache = cacheObj as Record<string, unknown>;
+    if (netKey && parsedCache[netKey] && typeof parsedCache[netKey] === 'object') {
+      return parsedCache[netKey] as Record<string, unknown>;
+    }
+    const ks = Object.keys(parsedCache || {});
+    if (ks.length === 1 && parsedCache[ks[0]] && typeof parsedCache[ks[0]] === 'object') {
+      return parsedCache[ks[0]] as Record<string, unknown>;
+    }
     return {};
   }
 
-  _buildScopeEntriesFromSlugs = (slugs: any = [], options: any = {}) => {
-    const out: any[] = [];
-    this._dedupeNormalizedSlugs(slugs).forEach((slug: any) => {
+  _buildScopeEntriesFromSlugs = (slugs: unknown[] = [], options: CacheReadOptions = {}): ScopeCacheEntry[] => {
+    const out: ScopeCacheEntry[] = [];
+    this._dedupeNormalizedSlugs(slugs).forEach((slug: string) => {
       const netKey = this._resolveNetKeyForSlug(slug);
       const surveysCacheAll = this._readCache('surveysCache', slug, options);
       const questionsCacheAll = this._readCache('questionsCache', slug, options);
@@ -339,11 +357,11 @@ class CommunityTab extends Component<any, any> {
     return out;
   }
 
-  _iterUniverse = (options: any = {}) => {
+  _iterUniverse = (options: CacheReadOptions = {}) => {
     return this._buildScopeEntriesFromSlugs(this.listAllSlugs(), options);
   }
 
-  _iterScopeCaches = (options: any = {}) => {
+  _iterScopeCaches = (options: CacheReadOptions = {}) => {
     if (this._isUniverseEnabled()) return this._iterUniverse(options);
     const selectedSlugs = this._getSelectedSessionSlugs();
     if (selectedSlugs.length > 0) {
@@ -363,7 +381,7 @@ class CommunityTab extends Component<any, any> {
       const CONC = 2;
       for (let i = 0; i < slugs.length; i += CONC) {
         const chunk = slugs.slice(i, i + CONC);
-        await Promise.all(chunk.map((slug: any) => this._hydrateSbtHoldersForSlug(slug)));
+        await Promise.all(chunk.map((slug: string) => this._hydrateSbtHoldersForSlug(slug)));
         if (this._holdersHydrationAbort) break;
       }
     })();
@@ -378,7 +396,7 @@ class CommunityTab extends Component<any, any> {
     await this._refreshCommunityStats({ force: true, markLoading: false });
   };
 
-  _hydrateSbtHoldersForSlug = async (slug: any) => {
+  _hydrateSbtHoldersForSlug = async (slug: string) => {
     const netKey = this._resolveNetKeyForSlug(slug);
     if (!netKey) return;
 
@@ -950,7 +968,7 @@ class CommunityTab extends Component<any, any> {
           // Determine latest block (group-aware)
           let latestBlockNumber = 0;
           try {
-            const { toBlock } = await contractScriptsUntyped.getRelevantBlockWindowForFilter(slug);
+            const { toBlock } = await contractScriptsWithBlockWindow.getRelevantBlockWindowForFilter(slug);
             latestBlockNumber = Number(toBlock || 0);
           } catch (_) {
             try {
@@ -994,19 +1012,22 @@ class CommunityTab extends Component<any, any> {
       return false;
     }
 
-    const surveyLastBlock = surveysCache.surveysLatestBlock || surveysCache.lastBlock || 0;
-    const questionLastBlock =
-      questionsCache.questionsLatestBlock ||
-      questionsCache.questionResponsesLatestBlock ||
-      questionsCache.lastBlock ||
+    const surveyLastBlock =
+      Number(surveysCache.surveysLatestBlock) ||
+      Number(surveysCache.lastBlock) ||
       0;
-    const sbtLastBlock = sbtCache.lastBlock || 0;
+    const questionLastBlock =
+      Number(questionsCache.questionsLatestBlock) ||
+      Number(questionsCache.questionResponsesLatestBlock) ||
+      Number(questionsCache.lastBlock) ||
+      0;
+    const sbtLastBlock = Number(sbtCache.lastBlock) || 0;
 
     // Get the latest block number from chain (group-aware)
-    let latestBlockNumber;
+    let latestBlockNumber = 0;
     const activeSlug = normalizeSessionSlug(scopeEntry.slug || this._currentSlug());
     try {
-      const { toBlock } = await contractScriptsUntyped.getRelevantBlockWindowForFilter(activeSlug);
+      const { toBlock } = await contractScriptsWithBlockWindow.getRelevantBlockWindowForFilter(activeSlug);
       latestBlockNumber = Number(toBlock || 0);
     } catch (err) {
       try {
