@@ -163,6 +163,7 @@ const createDeferred = <T = any>(): Deferred<T> => {
 describe('SponsorPage', () => {
   const originalFetch = global.fetch;
   const originalCrypto = global.crypto;
+  const originalGetRandomValues = originalCrypto?.getRandomValues;
   let sessionEntries: any[];
 
   beforeEach(() => {
@@ -212,16 +213,30 @@ describe('SponsorPage', () => {
       audience: 'http://localhost',
       expiration: 4102444800,
     });
-    if (!global.crypto) (global as any).crypto = {};
-    (global.crypto as any).getRandomValues = jest.fn((buffer: any) => {
+    const fixtureCrypto = Object.create(originalCrypto || null);
+    fixtureCrypto.getRandomValues = jest.fn((buffer: any) => {
       for (let i = 0; i < buffer.length; i += 1) buffer[i] = i + 1;
       return buffer;
+    });
+    Object.defineProperty(global, 'crypto', {
+      configurable: true,
+      value: fixtureCrypto,
     });
   });
 
   afterEach(() => {
     global.fetch = originalFetch;
     global.crypto = originalCrypto;
+  });
+
+  it('uses an isolated deterministic random source for fixtures', () => {
+    expect(global.crypto).not.toBe(originalCrypto);
+    if (originalCrypto?.getRandomValues) {
+      expect(originalCrypto.getRandomValues).toBe(originalGetRandomValues);
+    }
+    const bytes = new Uint8Array(3);
+    global.crypto.getRandomValues(bytes);
+    expect(Array.from(bytes)).toEqual([1, 2, 3]);
   });
 
   it('renders paste-first credential inputs and lets the admin unlock the worker URL for editing', async () => {
