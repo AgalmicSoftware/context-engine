@@ -277,6 +277,15 @@ export { buildBookmarksRoutePath };
 const getErrorCode = (error: unknown) => (
   error && typeof error === 'object' ? (error as { code?: unknown }).code : undefined
 );
+const getErrorMessage = (error: unknown): string => (
+  error instanceof Error
+    ? error.message
+    : (
+      error && typeof error === 'object'
+        ? toStr((error as { message?: unknown }).message)
+        : toStr(error)
+    )
+);
 const uniqueList = <T = unknown>(values: T[] = []) => (
   Array.from(
     new Set(
@@ -1652,12 +1661,12 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     });
     const allSessionSlugs = getAllSessionSlugs({ includeEmpty: true }) || [];
     const sourceSlugs = uniqueList([
-      ...allSessionSlugs.map((slug: any) => normalizeSettingsSessionSlug(slug)),
+      ...allSessionSlugs.map((slug: unknown) => normalizeSettingsSessionSlug(slug)),
       active,
       '',
     ]);
-    const configBySlug: any = new Map();
-    const sponsoredSourceSignature = sourceSlugs.map((slug: any) => {
+    const configBySlug = new Map<string, Record<string, unknown>>();
+    const sponsoredSourceSignature = sourceSlugs.map((slug: string) => {
       const cfg = this.getDisplaySessionConfig(slug);
       configBySlug.set(slug, cfg);
       return {

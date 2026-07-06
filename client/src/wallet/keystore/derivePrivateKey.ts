@@ -55,10 +55,10 @@ export const deriveEoaPrivateKeyFromPrf = async ({
       {
         name: 'HKDF',
         hash: 'SHA-256',
-        salt,
-        info: textEncoder.encode(
+        salt: bufferSourceToUint8Array(salt),
+        info: bufferSourceToUint8Array(textEncoder.encode(
           `context-engine:passkey-derived-eoa:v1:${config.rpId}:${namespace(config)}:${counter}`
-        ),
+        )),
       },
       baseKey,
       256

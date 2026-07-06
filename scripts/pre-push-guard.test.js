@@ -51,7 +51,7 @@ function runHook(rootDir, input, remoteName = 'origin') {
     [
       path.join(rootDir, '.githooks', 'pre-push'),
       remoteName,
-      'git@github.com-agalmic:AgalmicSoftware/context-engine.git',
+      '[redacted-email]-agalmic:AgalmicSoftware/context-engine.git',
     ],
     {
       cwd: rootDir,

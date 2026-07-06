@@ -86,6 +86,13 @@ function isSafePlaceholder(value) {
     || normalized.startsWith('your_');
 }
 
+function isAllowedPublicEmail(value) {
+  const normalized = String(value || '').toLowerCase();
+  return normalized === 'name@example.com'
+    || normalized === 'agalmicsoftware@protonmail.com'
+    || normalized.endsWith('@users.noreply.github.com');
+}
+
 function isRepeatedHex(hex) {
   return /^([a-f0-9])\1{63}$/i.test(hex);
 }
@@ -125,6 +132,7 @@ function scanTextFile(relativePath, text, findings, warnings) {
 
     emailRe.lastIndex = 0;
     while ((match = emailRe.exec(line)) !== null) {
+      if (isAllowedPublicEmail(match[0])) continue;
       addFinding(findings, 'email', relativePath, lineNumber, match[0]);
     }
 

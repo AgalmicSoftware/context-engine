@@ -12,7 +12,7 @@ If you discover a security vulnerability in Context Engine, **please do not open
 
 Report it privately through one of these channels:
 
-1. **Email:** `agalmicsoftware@protonmail.com`
+1. **Email:** `[redacted-email]`
 2. **GitHub private advisory:** [Report a vulnerability](https://github.com/AgalmicSoftware/context-engine/security/advisories/new)
 
 ### What to include

@@ -4,7 +4,7 @@ const { ethers } = require('ethers');
 const { nowHumanTag } = require('./lib/common');
 const { normalizeRequiredMetadataUri } = require('./lib/arweave-metadata');
 const { resolveChainDefaults } = require('./lib/network-defaults');
-const { derivePrivateKeyFromPasskeyRawId } = require('./lib/porto-wallet-derivation.js');
+const { buildPasskeyDerivedWallet } = require('./lib/passkey-derived-wallet');
 
 const DEFAULT_PASSKEY_RAW_ID_B64URL = 'AQIDBAUGBwgJCgsMDQ4PEA';
 const DEFAULT_GROUP_PASSWORD = 'browserUse';

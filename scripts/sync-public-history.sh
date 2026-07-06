@@ -5,7 +5,7 @@ export LC_ALL=C
 export LANG=C
 
 PUBLIC_GIT_NAME="Agalmic"
-PUBLIC_GIT_EMAIL="agalmicsoftware@protonmail.com"
+PUBLIC_GIT_EMAIL="[redacted-email]"
 DEFAULT_BRANCH_NAME="release-staging"
 
 usage() {

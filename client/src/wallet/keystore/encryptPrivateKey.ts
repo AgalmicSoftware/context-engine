@@ -1,5 +1,5 @@
 import type { EncryptedWalletRecord, HexString, PasskeyWalletConfig } from '../types.js';
-import { bufferToBase64URL } from '../passkey/encoding.js';
+import { bufferSourceToUint8Array, bufferToBase64URL } from '../passkey/encoding.js';
 
 const textEncoder = new TextEncoder();
 
@@ -22,9 +22,9 @@ export const encryptPrivateKey = async ({
 }): Promise<EncryptedWalletRecord> => {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const ciphertext = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv },
+    { name: 'AES-GCM', iv: bufferSourceToUint8Array(iv) },
     aesKey,
-    textEncoder.encode(privateKey)
+    bufferSourceToUint8Array(textEncoder.encode(privateKey))
   );
   const timestamp = now.toISOString();
   return {
