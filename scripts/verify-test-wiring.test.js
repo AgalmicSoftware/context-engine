@@ -154,6 +154,7 @@ test('public-release style copies without .git still pass wiring checks', () => 
       'scripts/deploy-helper-deploy.mjs',
       'scripts/run-node-tests.js',
       'scripts/run-node-tests.test.js',
+      'scripts/pre-push-guard.test.js',
       'scripts/check-client-boundaries.mjs',
       'scripts/check-client-boundaries.test.mjs',
       'scripts/client-boundaries-baseline.json',

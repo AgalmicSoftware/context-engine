@@ -82,6 +82,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFile('scripts/deploy-helper-deploy.mjs');
   expectFile('scripts/run-node-tests.js');
   expectFile('scripts/run-node-tests.test.js');
+  expectFile('scripts/pre-push-guard.test.js');
   expectFile('scripts/check-client-boundaries.mjs');
   expectFile('scripts/check-client-boundaries.test.mjs');
   expectFile('scripts/client-boundaries-baseline.json');

@@ -126,7 +126,7 @@ test('installed pre-push hook blocks publishing dev to origin', () => {
     });
 
     assert.notEqual(pushResult.status, 0);
-    assert.match(`${pushResult.stderr}${pushResult.stdout}`, /Blocked push of protected private branch ref to origin\./);
+    assert.match(`${pushResult.stderr}${pushResult.stdout}`, /Blocked push to public Context Engine remote origin\./);
     assert.doesNotMatch(`${pushResult.stderr}${pushResult.stdout}`, /CE_ALLOW_PRIVATE_BRANCH_PUSH/);
     assert.equal(git(sourceDir, ['ls-remote', '--heads', 'origin', 'dev']).trim(), '');
   });
@@ -147,7 +147,7 @@ test('installed pre-push hook does not honor the old private branch bypass env v
     });
 
     assert.notEqual(pushResult.status, 0);
-    assert.match(`${pushResult.stderr}${pushResult.stdout}`, /Blocked push of protected private branch ref to origin\./);
+    assert.match(`${pushResult.stderr}${pushResult.stdout}`, /Blocked push to public Context Engine remote origin\./);
     assert.equal(git(sourceDir, ['ls-remote', '--heads', 'origin', 'dev']).trim(), '');
   });
 });
@@ -164,7 +164,7 @@ test('installed pre-push hook blocks publishing codex agent branches to origin',
     });
 
     assert.notEqual(pushResult.status, 0);
-    assert.match(`${pushResult.stderr}${pushResult.stdout}`, /Blocked push of protected private branch ref to origin\./);
+    assert.match(`${pushResult.stderr}${pushResult.stdout}`, /Blocked push to public Context Engine remote origin\./);
     assert.equal(git(sourceDir, ['ls-remote', '--heads', 'origin', 'codex/private-agent-branch']).trim(), '');
   });
 });
@@ -181,7 +181,7 @@ test('installed pre-push hook blocks publishing edge branches to origin', () => 
     });
 
     assert.notEqual(pushResult.status, 0);
-    assert.match(`${pushResult.stderr}${pushResult.stdout}`, /Blocked push of protected private branch ref to origin\./);
+    assert.match(`${pushResult.stderr}${pushResult.stdout}`, /Blocked push to public Context Engine remote origin\./);
     assert.equal(git(sourceDir, ['ls-remote', '--heads', 'origin', 'edge-2026']).trim(), '');
   });
 });
@@ -198,7 +198,7 @@ test('installed pre-push hook blocks publishing dev to matching public remotes e
     });
 
     assert.notEqual(hookResult.status, 0);
-    assert.match(`${hookResult.stderr}${hookResult.stdout}`, /Blocked push of protected private branch ref to public\./);
+    assert.match(`${hookResult.stderr}${hookResult.stdout}`, /Blocked push to public Context Engine remote public\./);
   });
 });
 
