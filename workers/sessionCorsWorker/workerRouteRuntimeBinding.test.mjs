@@ -244,6 +244,7 @@ test('createWorkerRouteRuntimeWithWorkerDeps preserves route runtime assembly bu
           now,
           randomUUID: 'randomUUID',
           getSessionSecrets: 'getSessionSecrets',
+          putSessionConfig: 'putSessionConfig',
         });
         assert.deepEqual(value.constants, {
           openAiTranscribeUrl: 'https://api.openai.example/v1/audio/transcriptions',
