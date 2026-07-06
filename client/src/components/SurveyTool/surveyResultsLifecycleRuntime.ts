@@ -6,6 +6,7 @@ import {
   buildSurveyResultsQuestionScopeResetPatch,
   buildSurveyResultsSurveyIdPropChangePatch,
   buildSurveyResultsSurveyIdStateChangePatch,
+  buildSurveyResultsViewStatePatch,
   buildSurveyResultsViewModeResetPatch,
 } from './surveyResultsHelpers.js';
 import { isSurveyResultsStateSynced } from './surveyResultsSyncHelpers.js';
@@ -19,10 +20,17 @@ type SurveyResultsResponseParseMemo = {
 };
 
 export type SurveyResultsLifecycleInstance = {
+  _isMounted?: boolean;
   _lastNotifiedFilterStateSignature: string | null;
+  _nonceTickInFlight?: boolean;
+  _nonceTickQueued?: boolean;
+  _pollLatestBlockFetchInFlight?: boolean;
   _responseParseMemo?: SurveyResultsResponseParseMemo | null;
+  _scrollMutationObserver?: MutationObserver | null;
+  _scrollToQuestionRetryTimer?: ReturnType<typeof setTimeout> | null;
   _surveyModeSourceSignature: string;
   _syncLoadingStartedAt: number | null;
+  _unsubscribeCacheUpdates?: (() => void) | null;
 };
 
 export type SurveyResultsLifecyclePorts = {
@@ -48,6 +56,30 @@ export type SurveyResultsComponentDidUpdateArgs = {
   prevState: SurveyResultsState;
   props: SurveyResultsProps;
   state: SurveyResultsState;
+};
+
+export type SurveyResultsComponentMountPorts = {
+  appendSessionHintToSurveyPath: (path: string) => string;
+  applyStatePatch: (patch: SurveyResultsRecord, afterApply?: () => void) => void;
+  destroyFetchResponsesRuntime: () => void;
+  destroyLocalStoragePollingRuntime: () => void;
+  destroyQueuedResultsRefreshRuntime: () => void;
+  getProps: () => SurveyResultsProps;
+  getState: () => SurveyResultsState;
+  handleDocumentVisibilityChange: () => void;
+  handleManagedCacheUpdate: (update?: unknown) => void;
+  handleManualRefresh: () => unknown;
+  handleUrlBasedView: () => void;
+  handleUrlChange: () => void;
+  queueResultsRefresh: (reason: string) => unknown;
+  subscribeCacheUpdates: (listener: (update?: unknown) => void) => (() => void) | null | undefined;
+  updateLocalStoragePollingState: () => unknown;
+  updateParentWithCurrentFiltersForUrl: () => unknown;
+};
+
+export type SurveyResultsComponentMountArgs = {
+  instance: SurveyResultsLifecycleInstance;
+  ports: SurveyResultsComponentMountPorts;
 };
 
 const clearResponseParseMemo = (instance: SurveyResultsLifecycleInstance): void => {
@@ -77,6 +109,133 @@ const queueStatePatchValue = ({
 const pushResultsPath = (path: string): void => {
   if (typeof window === 'undefined') return;
   window.history.pushState({}, '', applyExistingGroupPrefix(path));
+};
+
+const ensureMountedResultsUrl = ({
+  ports,
+}: SurveyResultsComponentMountArgs): void => {
+  const props = ports.getProps();
+  const state = ports.getState();
+  if (props.preventUrlChange) return;
+  if (typeof window === 'undefined') return;
+  if (window.location.pathname.endsWith('/results')) return;
+  let path =
+    state.viewMode === 'questions'
+      ? '/questions/results'
+      : (state.surveyId ? `/survey/${state.surveyId}/results` : '/questions/results');
+
+  path = applyExistingGroupPrefix(path);
+
+  const search = window.location.search;
+  if (search) {
+    path += search;
+  } else {
+    path = ports.appendSessionHintToSurveyPath(path);
+  }
+
+  window.history.pushState({}, '', path);
+};
+
+export const runSurveyResultsComponentDidMount = ({
+  instance,
+  ports,
+}: SurveyResultsComponentMountArgs): (() => void) => {
+  instance._isMounted = true;
+  instance._unsubscribeCacheUpdates = ports.subscribeCacheUpdates(ports.handleManagedCacheUpdate) || null;
+  if (typeof window !== 'undefined') {
+    window.addEventListener('popstate', ports.handleUrlChange);
+  }
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', ports.handleDocumentVisibilityChange);
+  }
+
+  const props = ports.getProps();
+  let initialViewMode = props.viewMode || 'questions';
+  const initialSurveyId = props.surveyId || '';
+
+  if (initialSurveyId) {
+    initialViewMode = 'survey';
+  }
+
+  ports.applyStatePatch(buildSurveyResultsViewStatePatch(initialViewMode, initialSurveyId), () => {
+    ports.handleUrlBasedView();
+
+    const currentProps = ports.getProps();
+    const currentState = ports.getState();
+    if (currentProps.isOpen) {
+      if (currentState.viewMode === 'questions') {
+        if (currentProps.refreshQuestionMetadata && currentProps.refreshQuestionResponses) {
+          currentProps.refreshQuestionMetadata();
+          currentProps.refreshQuestionResponses();
+        }
+      } else if (currentState.viewMode === 'survey' && currentState.surveyId) {
+        if (currentProps.refreshSurveyResponsesByID) {
+          currentProps.refreshSurveyResponsesByID(currentState.surveyId.toLowerCase());
+        }
+      }
+
+      ports.updateLocalStoragePollingState();
+      ports.handleManualRefresh();
+      ports.queueResultsRefresh('mount-open');
+      ensureMountedResultsUrl({ instance, ports });
+      ports.updateParentWithCurrentFiltersForUrl();
+    }
+  });
+
+  return () => {
+    runSurveyResultsComponentWillUnmount({ instance, ports });
+  };
+};
+
+export const runSurveyResultsComponentWillUnmount = ({
+  instance,
+  ports,
+}: SurveyResultsComponentMountArgs): void => {
+  instance._isMounted = false;
+  ports.destroyFetchResponsesRuntime();
+  instance._nonceTickInFlight = false;
+  instance._nonceTickQueued = false;
+  instance._pollLatestBlockFetchInFlight = false;
+  ports.destroyQueuedResultsRefreshRuntime();
+  clearResponseParseMemo(instance);
+  if (typeof instance._unsubscribeCacheUpdates === 'function') {
+    instance._unsubscribeCacheUpdates();
+  }
+  instance._unsubscribeCacheUpdates = null;
+  if (instance._scrollToQuestionRetryTimer) {
+    clearTimeout(instance._scrollToQuestionRetryTimer);
+    instance._scrollToQuestionRetryTimer = null;
+  }
+  if (instance._scrollMutationObserver) {
+    instance._scrollMutationObserver.disconnect();
+    instance._scrollMutationObserver = null;
+  }
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('popstate', ports.handleUrlChange);
+  }
+  if (typeof document !== 'undefined') {
+    document.removeEventListener('visibilitychange', ports.handleDocumentVisibilityChange);
+  }
+  ports.destroyLocalStoragePollingRuntime();
+
+  const props = ports.getProps();
+  if (props.isOpen && !props.preventUrlChange && typeof window !== 'undefined') {
+    const currentPath = window.location.pathname;
+    if (currentPath.includes('/results')) {
+      const state = ports.getState();
+      let newPath = currentPath.replace('/results', '').replace(/\/+$/, '');
+      if (!newPath) {
+        newPath =
+          state.viewMode === 'questions'
+            ? '/questions'
+            : state.surveyId
+              ? `/survey/${state.surveyId}`
+              : '/questions';
+      }
+      newPath = ports.appendSessionHintToSurveyPath(newPath);
+      window.history.pushState({}, '', newPath);
+    }
+  }
 };
 
 export const runSurveyResultsComponentDidUpdate = ({

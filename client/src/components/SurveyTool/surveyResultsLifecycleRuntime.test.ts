@@ -3,6 +3,7 @@ import type {
   SurveyResultsState,
 } from './SurveyResults';
 import {
+  runSurveyResultsComponentDidMount,
   runSurveyResultsComponentDidUpdate,
   type SurveyResultsLifecycleInstance,
   type SurveyResultsLifecyclePorts,
@@ -255,5 +256,99 @@ describe('runSurveyResultsComponentDidUpdate', () => {
       harness.events.indexOf('queue:question-scope-change')
     );
     expect(harness.queuedRefreshes).toContain('question-scope-change');
+  });
+});
+
+describe('runSurveyResultsComponentDidMount', () => {
+  beforeEach(() => {
+    window.history.replaceState({}, '', '/questions');
+  });
+
+  it('initializes open question results and cleans up the results URL on unmount', () => {
+    const instance = {
+      ...createInstance(),
+      _isMounted: false,
+      _nonceTickInFlight: true,
+      _nonceTickQueued: true,
+      _pollLatestBlockFetchInFlight: true,
+      _scrollMutationObserver: { disconnect: jest.fn() } as unknown as MutationObserver,
+      _scrollToQuestionRetryTimer: setTimeout(() => {}, 1000),
+      _unsubscribeCacheUpdates: null,
+    };
+    const unsubscribe = jest.fn();
+    const refreshQuestionMetadata = jest.fn();
+    const refreshQuestionResponses = jest.fn();
+    const events: string[] = [];
+    const patchCalls: PatchCall[] = [];
+    const props = createProps({
+      isOpen: true,
+      refreshQuestionMetadata,
+      refreshQuestionResponses,
+      viewMode: 'questions',
+    });
+    const state = createState({
+      viewMode: 'questions',
+    });
+
+    const cleanup = runSurveyResultsComponentDidMount({
+      instance,
+      ports: {
+        appendSessionHintToSurveyPath: (path) => `${path}?session=edge`,
+        applyStatePatch: (patch, afterApply) => {
+          patchCalls.push({ patch, afterApply });
+          events.push('applyStatePatch');
+          if (afterApply) afterApply();
+        },
+        destroyFetchResponsesRuntime: () => events.push('destroyFetch'),
+        destroyLocalStoragePollingRuntime: () => events.push('destroyPolling'),
+        destroyQueuedResultsRefreshRuntime: () => events.push('destroyQueue'),
+        getProps: () => props,
+        getState: () => state,
+        handleDocumentVisibilityChange: () => events.push('visibility'),
+        handleManagedCacheUpdate: () => events.push('cacheUpdate'),
+        handleManualRefresh: () => events.push('manualRefresh'),
+        handleUrlBasedView: () => events.push('urlBasedView'),
+        handleUrlChange: () => events.push('urlChange'),
+        queueResultsRefresh: (reason) => events.push(`queue:${reason}`),
+        subscribeCacheUpdates: () => unsubscribe,
+        updateLocalStoragePollingState: () => events.push('updatePolling'),
+        updateParentWithCurrentFiltersForUrl: () => events.push('updateParentFilters'),
+      },
+    });
+
+    expect(instance._isMounted).toBe(true);
+    expect(patchCalls[0].patch).toMatchObject({
+      surveyId: '',
+      viewMode: 'questions',
+    });
+    expect(refreshQuestionMetadata).toHaveBeenCalledTimes(1);
+    expect(refreshQuestionResponses).toHaveBeenCalledTimes(1);
+    expect(events).toEqual(expect.arrayContaining([
+      'urlBasedView',
+      'updatePolling',
+      'manualRefresh',
+      'queue:mount-open',
+      'updateParentFilters',
+    ]));
+    expect(window.location.pathname).toBe('/questions/results');
+    expect(window.location.search).toBe('?session=edge');
+
+    cleanup();
+
+    expect(instance._isMounted).toBe(false);
+    expect(instance._nonceTickInFlight).toBe(false);
+    expect(instance._nonceTickQueued).toBe(false);
+    expect(instance._pollLatestBlockFetchInFlight).toBe(false);
+    expect(instance._responseParseMemo?.clear).toHaveBeenCalledTimes(1);
+    expect(unsubscribe).toHaveBeenCalledTimes(1);
+    expect(instance._scrollMutationObserver).toBeNull();
+    expect(instance._scrollToQuestionRetryTimer).toBeNull();
+    expect(events).toEqual(expect.arrayContaining([
+      'destroyFetch',
+      'destroyQueue',
+      'destroyPolling',
+    ]));
+    expect(window.location.pathname).toBe('/questions');
+    expect(window.location.search).toBe('?session=edge');
   });
 });
