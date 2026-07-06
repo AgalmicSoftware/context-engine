@@ -13,8 +13,8 @@ import { t } from '../../utilities/ui/terminology.js';
 
 const mockFetchImageFromURL = jest.fn();
 
-jest.mock('../../utilities/ui/imageScripts.js', () => {
-  const actual = jest.requireActual('../../utilities/ui/imageScripts.js');
+jest.mock('../../utilities/ui/imageFetchClient.js', () => {
+  const actual = jest.requireActual('../../utilities/ui/imageFetchClient.js');
   return {
     __esModule: true,
     ...actual,

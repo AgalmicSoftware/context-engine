@@ -28,7 +28,7 @@ jest.mock('../../../utilities/ai/aiScripts.js', () => ({
   analyzePhotoForQuestionGeneration: (...args) => mockAnalyzePhotoForQuestionGeneration(...args),
 }));
 
-jest.mock('../../../utilities/ui/imageScripts.js', () => ({
+jest.mock('../../../utilities/ui/imageFetchClient.js', () => ({
   fetchImageFromURL: (...args) => mockFetchImageFromURL(...args),
 }));
 
