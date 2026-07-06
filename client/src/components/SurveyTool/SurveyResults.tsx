@@ -226,6 +226,9 @@ import {
   runSurveyResultsManualRefreshStatusApplicationController,
 } from './surveyResultsManualRefreshStatusApplicationController';
 import {
+  surveyResultsHtmlReportDownloadPort,
+} from './surveyResultsHtmlReportDownloadPort';
+import {
   runSurveyResultsQueuedRefreshController,
 } from './surveyResultsQueuedRefreshController';
 import {
@@ -292,8 +295,6 @@ import {
   buildSessionResultsAnalysisInputSignature,
   buildSessionResultsAnalysisPrompt,
   buildRedactedSessionResultsSnapshot,
-  downloadSessionResultsHtmlReport,
-  downloadSessionResultsPdfReport,
   evaluateSessionResultsAnalysisEligibility,
   renderSessionResultsHtmlReport,
   SESSION_RESULTS_ANALYSIS_SECTION_KEYS,
@@ -3324,12 +3325,12 @@ try {
   const { downloadRequest } = downloadPlan;
   const html = renderSessionResultsHtmlReport(snapshot, downloadRequest.renderOptions);
   if (downloadRequest.kind === 'pdf') {
-    await downloadSessionResultsPdfReport({
+    await surveyResultsHtmlReportDownloadPort.downloadPdfReport({
       html,
       filename: downloadRequest.filename,
     });
   } else {
-    downloadSessionResultsHtmlReport(html, downloadRequest.filename);
+    surveyResultsHtmlReportDownloadPort.downloadHtmlReport(html, downloadRequest.filename);
   }
   setState(asSurveyResultsStatePatch(buildSurveyResultsHtmlReportDownloadSuccessPatch()));
 } catch (error) {
