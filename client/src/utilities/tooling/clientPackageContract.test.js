@@ -131,10 +131,10 @@ describe('client package modernization contract', () => {
 
     expect(jestConfig.coverageThreshold).toEqual({
       global: {
-        statements: 74.95,
-        branches: 60.33,
-        functions: 76.52,
-        lines: 78.36,
+        statements: 75.7,
+        branches: 61,
+        functions: 77,
+        lines: 79.1,
       },
     });
   });

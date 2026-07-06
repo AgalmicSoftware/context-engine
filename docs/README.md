@@ -6,6 +6,8 @@ Primary product and system specification:
 Canonical reference set:
 - root docs: `README.md`, `ARCHITECTURE.md`, `AGENTS.md`, `spec.md`
 - the `docs/` reference docs listed below
+- `docs/architecture-overview.md` is the first-read architecture and verification
+  map for new engineers and auditors
 
 Non-canonical / historical planning material:
 - private planning files under ignored local paths
@@ -59,7 +61,11 @@ Local development:
 
 Release:
 - `docs/dependency-audit-hotspots.md`: dependency audit remediations, accepted residuals, and package-specific audit commands.
+- `docs/release-runbook.md`: operator release checklist, gates, public strip policy, worker bundle publishing, and rollback notes.
 - `docs/releasing.md`: Public-history replay, stripped artifact export, and release hygiene checks.
+- `docs/security/audit-prep-2026-07-06.md`: built-in audit-prep snapshot covering npm audit disposition, secrets/config sweeps, and contracts/worker inventory.
+- `docs/testing-budget.md`: full client/test:node runtime budget, coverage snapshot, and slowest-suite report.
+- `docs/typescript-strictness-plan.md`: plan for moving from count ratchets toward directory-level compiler strictness.
 
 Wallets:
 - `docs/passkey-wallet.md`: passkey-unlocked EOA wallet wiring and deterministic test wallet workflow.
@@ -69,6 +75,7 @@ Wallets:
 
 E2E workflows:
 - `docs/e2e-setup.md`: End-to-end workflow scripts, chain runtime modes, and the current manual-fork workflow for repeated verification against live deployments.
+- `docs/e2e-cadence.md`: operator cadence for nightly, pre-release, and per-lane E2E runs plus the E2E-BLOCKED protocol.
 - `docs/e2e-testid-api.md`: Stable `data-testid` hooks used by Playwright runners (TestID API).
 
 Public discovery:
