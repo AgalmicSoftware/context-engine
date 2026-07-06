@@ -44,7 +44,6 @@ import {
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 import { buildResponseGatePolicy } from '../../utilities/crypto/litGatePolicy.js';
 import { resolveSbtDisplayLabel } from '../../utilities/sbt/sbtDisplayNames.js';
-import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
 import { isDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
@@ -272,6 +271,10 @@ import {
 import {
   surveyResultsAnalysisArtifactMergePort,
 } from '../../domains/surveys/surveyResultsAnalysisArtifactMergePort';
+import {
+  cryptoGatePort,
+  type CryptoGateDecryptOptions,
+} from '../../domains/crypto/cryptoGatePort';
 import {
   createSurveyResultsFetchResponsesRuntime,
   type SurveyResultsFetchResponsesRuntime,
@@ -4006,22 +4009,26 @@ const decryptFieldValue = async (
   const envelope = extractEnvelopeCandidate(field);
   if (!envelope) return { ok: false };
 
-  const litHooks = getDecryptLitHooks();
-  const litOpts = litHooks && typeof litHooks.getKey === 'function'
-    ? { getKey: litHooks.getKey }
-    : undefined;
-
+  const decryptOptions = getCryptoGateDecryptOptions();
   try {
-    const value = await cryptoUtils.decryptEnvelopeValue(envelope, {
-      account: propsRef.current.account,
-      chainId: propsRef.current.network?.id || propsRef.current.networkChainId || null,
-      providerLike: propsRef.current.provider,
-      ...(litOpts ? { litOpts } : {}),
-    });
+    const value = await cryptoGatePort.decryptEnvelopeValue(envelope, decryptOptions);
     return { ok: true, value };
   } catch (error) {
     return { ok: false, error };
   }
+};
+
+const getCryptoGateDecryptOptions = (): CryptoGateDecryptOptions => {
+  const litHooks = getDecryptLitHooks();
+  const litOpts = litHooks && typeof litHooks.getKey === 'function'
+    ? { getKey: litHooks.getKey }
+    : undefined;
+  return {
+    account: propsRef.current.account,
+    chainId: propsRef.current.network?.id || propsRef.current.networkChainId || null,
+    providerLike: propsRef.current.provider,
+    ...(litOpts ? { litOpts } : {}),
+  };
 };
 
 const handleDecryptLockedResponses = async (): Promise<void> => {
@@ -4069,13 +4076,10 @@ const handleDecryptLockedResponses = async (): Promise<void> => {
       !hasOwn(override, 'importance')
     ) {
       try {
-        const litHooks = getDecryptLitHooks();
-        const importance = await cryptoUtils.decryptEnvelopeValue(response.importanceEncrypted, {
-          account: propsRef.current.account,
-          chainId: propsRef.current.network?.id || propsRef.current.networkChainId || null,
-          providerLike: propsRef.current.provider,
-          ...(litHooks?.getKey ? { litOpts: { getKey: litHooks.getKey } } : {}),
-        });
+        const importance = await cryptoGatePort.decryptEnvelopeValue(
+          response.importanceEncrypted,
+          getCryptoGateDecryptOptions()
+        );
         override.importance = Number.isNaN(Number(importance)) ? importance : Number(importance);
         anyDecrypted = true;
       } catch (e) { surveyLog.warn('SurveyResults: fallback', e); }
@@ -4087,13 +4091,10 @@ const handleDecryptLockedResponses = async (): Promise<void> => {
       !hasOwn(override, 'conviction')
     ) {
       try {
-        const litHooks = getDecryptLitHooks();
-        const conviction = await cryptoUtils.decryptEnvelopeValue(response.convictionEncrypted, {
-          account: propsRef.current.account,
-          chainId: propsRef.current.network?.id || propsRef.current.networkChainId || null,
-          providerLike: propsRef.current.provider,
-          ...(litHooks?.getKey ? { litOpts: { getKey: litHooks.getKey } } : {}),
-        });
+        const conviction = await cryptoGatePort.decryptEnvelopeValue(
+          response.convictionEncrypted,
+          getCryptoGateDecryptOptions()
+        );
         override.conviction = Number.isNaN(Number(conviction)) ? conviction : Number(conviction);
         anyDecrypted = true;
       } catch (e) { surveyLog.warn('SurveyResults: fallback', e); }
