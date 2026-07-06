@@ -244,6 +244,9 @@ import {
   buildSurveyResultsHtmlReportResponseCountsByQuestion,
 } from './surveyResultsHtmlReportDataModel';
 import {
+  buildSurveyResultsHtmlReportSnapshot,
+} from './surveyResultsHtmlReportSnapshotDataModel';
+import {
   buildSurveyResultsAnalysisResponsesForExport,
   buildSurveyResultsAnalysisSegmentDimensionsForExport,
   readSurveyResultsAnalysisSafeLabel,
@@ -312,7 +315,6 @@ import {
   buildSessionResultsAnalysisAiPayload,
   buildSessionResultsAnalysisInputSignature,
   buildSessionResultsAnalysisPrompt,
-  buildRedactedSessionResultsSnapshot,
   evaluateSessionResultsAnalysisEligibility,
   SESSION_RESULTS_ANALYSIS_SECTION_KEYS,
   SESSION_RESULTS_EXPORT_FORMAT_PDF,
@@ -2734,85 +2736,29 @@ return {
 const buildSessionResultsHtmlReportSnapshot = (
 exportedAt: unknown = new Date().toISOString()
 ): SessionResultsHtmlSnapshot => {
-const questions = getHtmlReportQuestionsForExport();
-const countsByQuestion = getHtmlReportResponseCountsByQuestion();
-const analysisArtifact = getHtmlReportAnalysisArtifact();
-const responseCountFromRows = Array.from(countsByQuestion.values()).reduce((sum, count) => sum + count, 0);
-const responsesCount =
-  responseCountFromRows ||
-  Number(stateRef.current.filteredResponsesCount) ||
-  Number(stateRef.current.totalResponsesCount) ||
-  0;
-const questionsCount =
-  questions.length ||
-  Number(stateRef.current.filteredQuestionsCount) ||
-  Number(stateRef.current.totalQuestionsCount) ||
-  0;
 const sessionSlug = getEffectiveSlug() || '';
 const sessionName = String(propsRef.current.sessionName || stateRef.current.surveyTitle || sessionSlug || 'Session').trim();
-const hasReportContent = questions.length > 0 || responsesCount > 0;
-
-return buildRedactedSessionResultsSnapshot({
+return buildSurveyResultsHtmlReportSnapshot({
+  analysisArtifact: getHtmlReportAnalysisArtifact(),
+  chainId: getHtmlReportChainId(),
+  countsByQuestion: getHtmlReportResponseCountsByQuestion(),
   exportedAt,
-  session: {
-    slug: sessionSlug,
-    name: sessionName,
-    chainId: getHtmlReportChainId(),
-    networkLabel: getHtmlReportNetworkLabel(),
-    latestKnownBlock: stateRef.current.networkLatestBlock || null,
-  },
-  exportedBy: getHtmlReportExporterMetadata() || undefined,
-  counts: {
-    questions: questionsCount,
-    responses: responsesCount,
-    participants: getHtmlReportParticipantCount(),
-    atlasNodes: analysisArtifact?.sections.atlas.nodes.length || 0,
-    riskMatrixComments: analysisArtifact?.sections.riskMatrix.comments.length || 0,
-  },
-  filters: {
-    filterState: stateRef.current.filterState || {},
-    surveyId: stateRef.current.surveyId || null,
-    surveyViewMode: stateRef.current.surveyViewMode || null,
-    viewMode: stateRef.current.viewMode || null,
-  },
-  sections: {
-    report: {
-      available: hasReportContent,
-      summary: {
-        ...(analysisArtifact?.sections.breakdown.summary || {}),
-        filteredQuestions: questions.length,
-        generatedAnalysisAt: analysisArtifact?.generatedAt || null,
-        surveyId: stateRef.current.surveyId || null,
-        surveyTitle: stateRef.current.surveyTitle || '',
-        surveyViewMode: stateRef.current.surveyViewMode || '',
-        viewMode: stateRef.current.viewMode || '',
-      },
-      dimensions: analysisArtifact?.sections.breakdown.dimensions || [],
-      groups: analysisArtifact?.sections.breakdown.groups || [],
-      representativeQuestions: [],
-      questions,
-      reason: hasReportContent ? undefined : 'No filtered questions or responses are hydrated yet.',
-    },
-    argumentMap: {
-      available: !!analysisArtifact?.sections.argumentMap.available,
-      debates: analysisArtifact?.sections.argumentMap.debates || [],
-      reason: analysisArtifact?.sections.argumentMap.reason || 'Generate analysis views to derive an argument map from this session data.',
-    },
-    riskMatrix: {
-      available: !!analysisArtifact?.sections.riskMatrix.available,
-      categories: analysisArtifact?.sections.riskMatrix.categories || [],
-      comments: analysisArtifact?.sections.riskMatrix.comments || [],
-      heatmap: analysisArtifact?.sections.riskMatrix.heatmap || {},
-      scenarioLinks: analysisArtifact?.sections.riskMatrix.scenarioLinks || [],
-      reason: analysisArtifact?.sections.riskMatrix.reason || 'Generate analysis views to derive a custom risk matrix from this session data.',
-    },
-    atlas: {
-      available: !!analysisArtifact?.sections.atlas.available,
-      nodes: analysisArtifact?.sections.atlas.nodes || [],
-      edges: analysisArtifact?.sections.atlas.edges || [],
-      reason: analysisArtifact?.sections.atlas.reason || 'Generate analysis views to derive atlas nodes from this session data.',
-    },
-  },
+  exporterMetadata: getHtmlReportExporterMetadata(),
+  filterState: stateRef.current.filterState,
+  filteredQuestionsCount: stateRef.current.filteredQuestionsCount,
+  filteredResponsesCount: stateRef.current.filteredResponsesCount,
+  latestKnownBlock: stateRef.current.networkLatestBlock,
+  networkLabel: getHtmlReportNetworkLabel(),
+  participantCount: getHtmlReportParticipantCount(),
+  questions: getHtmlReportQuestionsForExport(),
+  sessionName,
+  sessionSlug,
+  surveyId: stateRef.current.surveyId,
+  surveyTitle: stateRef.current.surveyTitle,
+  surveyViewMode: stateRef.current.surveyViewMode,
+  totalQuestionsCount: stateRef.current.totalQuestionsCount,
+  totalResponsesCount: stateRef.current.totalResponsesCount,
+  viewMode: stateRef.current.viewMode,
 });
 };
 
