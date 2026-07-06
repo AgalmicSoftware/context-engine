@@ -15,7 +15,7 @@ describe('SessionModeProfileField', () => {
     expect(screen.getByTestId('ce-new-preset-continue')).toBeDisabled();
     expect(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare')).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByTestId('ce-new-preset-trustless_public_decentralized')).toHaveAttribute('aria-checked', 'false');
-    expect(screen.getByText(/Hosted on Cloudflare\. Private by default and session-scoped\./)).toBeInTheDocument();
+    expect(screen.getByText(/Hosted on Cloudflare\. Session-scoped by default\./)).toBeInTheDocument();
     expect(screen.getByText(/Published publicly and permanently unless you enable encryption\./)).toBeInTheDocument();
   });
 
@@ -92,5 +92,66 @@ describe('SessionModeProfileField', () => {
     expect(screen.getByText('Choose a registry chain before enabling Lit.')).toBeInTheDocument();
     expect(within(screen.getByRole('radiogroup', { name: /encryption/i })).getByRole('radio', { name: /lit/i }))
       .toBeDisabled();
+  });
+
+  it('selects worker envelope only under Cloudflare and emits condition defaults', () => {
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    const onChange = jest.fn();
+    const { rerender } = render(
+      <SessionModeProfileField registryChainId={11155420} value={profile} onChange={onChange} />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /advanced options/i }));
+    fireEvent.click(screen.getByTestId('ce-new-encryption-worker_envelope'));
+
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        preset: 'custom',
+        encryption: { mode: 'worker_envelope', keyProvider: 'worker_secret' },
+      }),
+      expect.objectContaining({
+        storageProfile: expect.objectContaining({
+          payloadAccessControl: { gate: 'sbt_gate', encryption: 'worker_envelope' },
+        }),
+      })
+    );
+
+    const selected = onChange.mock.calls.at(-1)?.[0];
+    rerender(<SessionModeProfileField registryChainId={11155420} value={selected} onChange={onChange} />);
+
+    expect(screen.getByText(/Encrypted at rest\. Keys are held by the session worker/)).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('ce-new-envelope-add-agent-scope'));
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        encryption: expect.objectContaining({
+          accessConditions: {
+            match: 'any',
+            conditions: [{ kind: 'agent_grant_scope', scope: 'storage' }],
+          },
+        }),
+      }),
+      expect.objectContaining({
+        storageProfile: expect.objectContaining({
+          payloadAccessControl: expect.objectContaining({
+            accessConditions: {
+              match: 'any',
+              conditions: [{ kind: 'agent_grant_scope', scope: 'storage' }],
+            },
+          }),
+        }),
+      })
+    );
+  });
+
+  it('keeps worker envelope disabled under Arweave with reason copy', () => {
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
+    const onChange = jest.fn();
+    render(<SessionModeProfileField registryChainId={11155420} value={profile} onChange={onChange} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /advanced options/i }));
+
+    expect(screen.getByText(/Worker envelope encryption is available only with Cloudflare storage/))
+      .toBeInTheDocument();
+    expect(screen.getByTestId('ce-new-encryption-worker_envelope')).toBeDisabled();
   });
 });

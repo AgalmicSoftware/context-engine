@@ -58,6 +58,29 @@ describe('sessionStorageConfig', () => {
     expect(requiresLitForSessionStorage(sessionConfig, { resource: 'questions' })).toBe(false);
     expect(usesWorkerSbtGateCloudflareStorage(sessionConfig)).toBe(false);
     expect(normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.mode).toBe(SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ);
+    expect(normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.gate).toBe(SESSION_STORAGE_PAYLOAD_ACCESS_GATES.NONE);
+  });
+
+  test('normalizes v2 worker_envelope access without requiring Lit', () => {
+    const accessConditions = {
+      match: 'any',
+      conditions: [{ kind: 'agent_grant_scope', scope: 'storage' }],
+    };
+    const sessionConfig = {
+      storageProfile: {
+        backend: 'cloudflare',
+        payloadAccessControl: { gate: 'sbt_gate', encryption: 'worker_envelope', accessConditions },
+      },
+    };
+    expect(resolveSessionStorageBackend(sessionConfig, { resource: 'responses' })).toBe(STORAGE_BACKENDS.CLOUDFLARE);
+    expect(requiresLitForSessionStorage(sessionConfig, { resource: 'responses' })).toBe(false);
+    expect(usesWorkerSbtGateCloudflareStorage(sessionConfig)).toBe(true);
+    expect(normalizeSessionStorageConfig(sessionConfig).payloadAccessControl).toEqual({
+      gate: SESSION_STORAGE_PAYLOAD_ACCESS_GATES.SBT_GATE,
+      encryption: SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE,
+      mode: SESSION_STORAGE_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE,
+      accessConditions,
+    });
   });
 
   test('keeps explicitly staged Cloudflare resources on legacy Arweave fallback', () => {

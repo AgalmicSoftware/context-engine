@@ -100,6 +100,27 @@ describe('sessionWizardStorageProfile', () => {
     expect(profile.cloudflare.payloadAccessMode).toBe(SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ);
   });
 
+  test('normalizes v2 worker_envelope payload access while keeping the legacy display mode', () => {
+    const accessConditions = {
+      match: 'any',
+      conditions: [{ kind: 'agent_grant_scope', scope: 'storage' }],
+    };
+    const profile = normalizeSessionStorageProfileConfig({
+      backend: 'cloudflare',
+      payloadAccessControl: { gate: 'sbt_gate', encryption: 'worker_envelope', accessConditions },
+    });
+
+    expect(profile.payloadAccessControl.gate).toBe('sbt_gate');
+    expect(profile.payloadAccessControl.encryption).toBe('worker_envelope');
+    expect(profile.payloadAccessControl.mode).toBe(SESSION_STORAGE_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE);
+    expect(profile.payloadAccessControl.enforcement).toBe('session_worker_envelope_conditions');
+    expect(profile.payloadAccessControl.label).toBe('Worker-envelope encrypted Cloudflare payloads');
+    expect(profile.payloadAccessControl.accessConditions).toEqual(accessConditions);
+    expect(profile.payloadAccessControl.litRequired).toBe(false);
+    expect(profile.sbtGatedAccess.litRequired).toBe('not_required_worker_enforced');
+    expect(profile.cloudflare.payloadAccessMode).toBe(SESSION_STORAGE_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE);
+  });
+
   test('describes backend display options and helper copy', () => {
     const litArweave = buildSessionStorageProfileDisplayDescriptor({ backend: 'lit-arweave' });
 

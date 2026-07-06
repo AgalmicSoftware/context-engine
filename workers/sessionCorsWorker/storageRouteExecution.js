@@ -112,6 +112,7 @@ const buildCloudflareStorageId = ({ randomBytes, randomUUID, getRandomValues: ge
 const buildObjectKey = ({ slug, id }) => `sessions/${safeSlugPart(slug)}/storage/${id}`;
 const buildIndexKey = ({ slug, resource, id }) => `ce-storage:${safeSlugPart(slug)}:${trim(resource) || 'docsContext'}:${id}`;
 const buildIndexPrefix = ({ slug, resource }) => `ce-storage:${safeSlugPart(slug)}:${trim(resource) || 'docsContext'}:`;
+const buildSessionIndexPrefix = ({ slug }) => `ce-storage:${safeSlugPart(slug)}:`;
 const buildPayloadKey = ({ slug, id }) => `ce-storage-payload:${safeSlugPart(slug)}:${id}`;
 const readKvPayloadEnvelope = async ({ index, slug, id }) => {
   if (!index || typeof index.get !== 'function') return null;
@@ -946,6 +947,185 @@ export const exportCloudflareEncryptedPayloadEnvelopes = async ({
   };
 };
 
+const listCloudflareMetadataRows = async ({ index, slug, resource = '' }) => {
+  const rows = [];
+  const prefix = trim(resource)
+    ? buildIndexPrefix({ slug, resource })
+    : buildSessionIndexPrefix({ slug });
+  let cursor = '';
+  do {
+    // eslint-disable-next-line no-await-in-loop
+    const listed = await index.list({
+      prefix,
+      ...(cursor ? { cursor } : {}),
+    });
+    const keys = Array.isArray(listed?.keys) ? listed.keys : [];
+    for (const keyEntry of keys) {
+      const key = trim(keyEntry?.name || keyEntry);
+      if (!key || typeof index.get !== 'function') continue;
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const raw = await index.get(key);
+        const metadata = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (isObj(metadata) && trim(metadata.id)) rows.push({ key, metadata });
+      } catch {
+        rows.push({ key, metadata: null, error: 'invalid_metadata' });
+      }
+    }
+    cursor = listed?.list_complete === false ? trim(listed?.cursor) : '';
+  } while (cursor);
+  return rows;
+};
+
+const readStoredCloudflarePayloadBytes = async ({ env, index, slug, metadata }) => {
+  const id = trim(metadata?.id);
+  if (!id) return null;
+  const r2 = getStorageR2Binding(env);
+  if (r2 && typeof r2.get === 'function') {
+    const object = await r2.get(buildObjectKey({ slug, id }));
+    if (object) return toUint8Array(object);
+  }
+  const envelope = await readKvPayloadEnvelope({ index, slug, id });
+  if (envelope?.payloadBase64url) return base64urlToBytes(envelope.payloadBase64url);
+  return null;
+};
+
+const resolveEnvelopeExportKeyProvider = ({ metadataAccess, metadata, config }) => {
+  const explicit = trim(metadata?.envelope?.keyProvider);
+  if (explicit) return explicit;
+  if (metadataAccess?.encryption === PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE) {
+    return trim(config?.storageEnvelope?.keyProvider || 'worker_secret');
+  }
+  if (metadataAccess?.encryption === PAYLOAD_ENCRYPTION_MODES.LIT) return 'lit';
+  return '';
+};
+
+const resolveEnvelopeExportManifestKeyProvider = ({ sessionEnvelope, payloads }) => {
+  const providers = new Set();
+  const sessionProvider = trim(sessionEnvelope?.keyProvider);
+  if (sessionProvider) providers.add(sessionProvider);
+  for (const payload of payloads || []) {
+    const provider = trim(payload?.keyProvider);
+    if (provider) providers.add(provider);
+  }
+  if (providers.size > 1) return 'mixed';
+  return [...providers][0] || 'worker_secret';
+};
+
+export const exportCloudflareEncryptedPayloadEnvelopes = async ({
+  env,
+  config,
+  slug,
+  resource = '',
+  includeSessionEnvelope = true,
+  deps = {},
+} = {}) => {
+  const configuredBackend = resolveConfiguredStorageBackend({ config });
+  if (configuredBackend !== STORAGE_BACKENDS.CLOUDFLARE) {
+    return {
+      ok: false,
+      status: 400,
+      error: 'Encrypted-envelope export is only available for Cloudflare storage.',
+    };
+  }
+  const index = getStorageIndexBinding(env);
+  if (!index || typeof index.list !== 'function' || typeof index.get !== 'function') {
+    return {
+      ok: false,
+      status: 501,
+      error: 'Cloudflare storage index binding not configured.',
+    };
+  }
+  const generatedAt = new Date((deps?.now?.() || Date.now())).toISOString();
+  let rows = [];
+  let storageListError = null;
+  try {
+    rows = await listCloudflareMetadataRows({ index, slug, resource });
+  } catch (error) {
+    storageListError = { reason: error?.message || 'storage_list_failed' };
+  }
+  const payloads = [];
+  const readErrors = [];
+  let encryptedPayloadCount = 0;
+  for (const row of rows) {
+    if (!row.metadata) {
+      readErrors.push({ key: row.key, error: row.error || 'invalid_metadata' });
+      continue;
+    }
+    const metadataAccess = normalizePayloadAccessControl(
+      row.metadata.payloadAccessControl ||
+      row.metadata.payloadAccessMode ||
+      resolvePayloadAccessControl(config)
+    );
+    if (metadataAccess.encryption === PAYLOAD_ENCRYPTION_MODES.NONE) continue;
+    encryptedPayloadCount += 1;
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const ciphertextBytes = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata: row.metadata });
+      if (!ciphertextBytes) {
+        readErrors.push({ id: trim(row.metadata.id), error: 'payload_bytes_missing' });
+        continue;
+      }
+      const keyProvider = resolveEnvelopeExportKeyProvider({ metadataAccess, metadata: row.metadata, config });
+      payloads.push({
+        storageRef: normalizeStorageRef(row.metadata),
+        metadata: {
+          id: trim(row.metadata.id),
+          resource: trim(row.metadata.resource),
+          contentType: trim(row.metadata.contentType) || 'application/octet-stream',
+          encrypted: row.metadata.encrypted === true,
+          createdAt: trim(row.metadata.createdAt),
+          size: Number(row.metadata.size || ciphertextBytes.length || 0) || 0,
+          payloadAccessControl: {
+            gate: metadataAccess.gate,
+            encryption: metadataAccess.encryption,
+          },
+          payloadAccessMode: deriveLegacyPayloadAccessMode(metadataAccess),
+          ...(row.metadata.accessConditions ? { accessConditions: row.metadata.accessConditions } : {}),
+        },
+        envelope: isObj(row.metadata.envelope) ? row.metadata.envelope : null,
+        ciphertextBase64url: bytesToBase64url(ciphertextBytes),
+        keyProvider,
+        wrappedKeysIncluded: !!trim(row.metadata.envelope?.dek?.wrappedKey),
+      });
+    } catch (error) {
+      readErrors.push({ id: trim(row.metadata.id), error: error?.message || 'payload_read_failed' });
+    }
+  }
+  const sessionEnvelope = includeSessionEnvelope && isObj(config?.storageEnvelope)
+    ? JSON.parse(JSON.stringify(config.storageEnvelope))
+    : null;
+  const keyProvider = resolveEnvelopeExportManifestKeyProvider({ sessionEnvelope, payloads });
+  const manifest = {
+    type: 'ce_storage_encrypted_envelopes_export',
+    version: 1,
+    exportScope: 'encrypted_envelopes_only',
+    storageBackend: STORAGE_BACKENDS.CLOUDFLARE,
+    sessionSlug: safeSlugPart(slug),
+    resource: trim(resource) || 'all',
+    exportedAt: generatedAt,
+    exportedPayloadCount: payloads.length,
+    encryptedPayloadCount,
+    partial: !!storageListError || readErrors.length > 0,
+    storageListError,
+    readErrors,
+    gatewayErrors: [],
+    errors: [
+      ...(storageListError ? [storageListError] : []),
+      ...readErrors,
+    ],
+    wrappedKeysIncluded: !!sessionEnvelope?.sessionKey?.wrappedKey || payloads.some((entry) => entry.wrappedKeysIncluded),
+    keyProvider,
+    rewrapRequiredForNewDeployment: true,
+  };
+  return {
+    ok: true,
+    manifest,
+    ...(sessionEnvelope ? { sessionEnvelope } : {}),
+    payloads,
+  };
+};
+
 export const storageRoute = async ({ path, method, request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps } = {}) => {
   if (path === '/storage/upload' && method === 'POST') {
     const maxUploadBytes = resolveMaxUploadBytes({ env, deps });
@@ -972,6 +1152,27 @@ export const storageRoute = async ({ path, method, request, env, config, slug, u
   }
   if (path === '/storage/list' && (method === 'GET' || method === 'POST')) {
     return handleCloudflareList({ request, env, config, slug, uploaderAddress, baseHeaders, deps });
+  }
+  if (path === '/storage/export-envelopes' && (method === 'GET' || method === 'POST')) {
+    const url = new URL(request.url);
+    let resource = trim(url.searchParams.get('resource'));
+    if (!resource && method === 'POST') {
+      try {
+        const body = await request.clone().json();
+        resource = trim(body?.resource);
+      } catch {
+        resource = '';
+      }
+    }
+    const result = await exportCloudflareEncryptedPayloadEnvelopes({
+      env,
+      config,
+      slug,
+      resource,
+      includeSessionEnvelope: false,
+      deps,
+    });
+    return responseJson(deps, result.ok ? result : { error: result.error }, result.ok ? 200 : (result.status || 500), baseHeaders);
   }
 
   return responseJson(deps, { error: 'Not found.' }, 404, baseHeaders);

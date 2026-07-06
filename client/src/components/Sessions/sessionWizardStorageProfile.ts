@@ -115,16 +115,22 @@ export const buildSessionStoragePayloadAccessControl = (
   const normalizedMode = normalizeSessionStoragePayloadAccessMode(mode);
   const litEncrypted = normalizedMode === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED;
   const publicRead = normalizedMode === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ;
+  const workerEnvelope = accessControl.encryption === SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE;
   return {
     mode: normalizedMode,
     enforcement: litEncrypted
       ? 'lit_access_control_conditions'
-      : (publicRead ? 'session_worker_public_read' : 'session_worker_sbt_gate'),
+      : (workerEnvelope
+        ? 'session_worker_envelope_conditions'
+        : (publicRead ? 'session_worker_public_read' : 'session_worker_sbt_gate')),
     litRequired: litEncrypted,
     label: litEncrypted
       ? 'Lit-encrypted Cloudflare payloads'
-      : (publicRead ? 'Public-read Cloudflare payloads' : 'Worker-enforced SBT access control'),
+      : (workerEnvelope
+        ? 'Worker-envelope encrypted Cloudflare payloads'
+        : (publicRead ? 'Public-read Cloudflare payloads' : 'Worker-enforced SBT access control')),
     resources: { ...SESSION_STORAGE_PAYLOAD_ACCESS_RESOURCE_GATES },
+    ...(accessControl.accessConditions ? { accessConditions: accessControl.accessConditions } : {}),
   };
 };
 

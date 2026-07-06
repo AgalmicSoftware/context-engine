@@ -57,6 +57,14 @@ export type SessionModeExportScope =
   | 'all_session'
   | 'selected_surfaces'
   | 'encrypted_envelopes_only';
+export type SessionModeAccessConditionDocument = {
+  match: 'any' | 'all';
+  conditions: Array<
+    | { kind: 'worker_role'; role: string }
+    | { kind: 'sbt_onchain'; chainId: number; contract: string; anyOrAll: 'any' | 'all' }
+    | { kind: 'agent_grant_scope'; scope: string }
+  >;
+};
 
 export type SessionModeProfile = {
   profileVersion: 1;
@@ -65,6 +73,12 @@ export type SessionModeProfile = {
   evm: { registryChainId: number | null };
   storage: {
     backend: SessionModeStorageBackend;
+    payloadAccessControl?: {
+      gate?: typeof SESSION_STORAGE_PAYLOAD_ACCESS_GATES[keyof typeof SESSION_STORAGE_PAYLOAD_ACCESS_GATES];
+      encryption?: typeof SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES[keyof typeof SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES];
+      mode?: string;
+      accessConditions?: SessionModeAccessConditionDocument;
+    };
     resources?: Partial<Record<SessionModeResourceKey, {
       stage: 'active' | 'staged';
       backendOverride?: string;
@@ -81,6 +95,7 @@ export type SessionModeProfile = {
   encryption: {
     mode: SessionModeEncryptionMode;
     keyProvider?: SessionModeKeyProvider;
+    accessConditions?: SessionModeAccessConditionDocument;
   };
   surfaces: Record<SessionModeSurface, boolean>;
   results: {
@@ -105,6 +120,11 @@ export type SessionModeProfileValidationIssue = {
 
 export type CompiledSessionModeProfile = {
   storageProfile: UnknownRecord;
+  payloadAccessControl: {
+    gate: typeof SESSION_STORAGE_PAYLOAD_ACCESS_GATES[keyof typeof SESSION_STORAGE_PAYLOAD_ACCESS_GATES];
+    encryption: typeof SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES[keyof typeof SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES];
+    accessConditions?: SessionModeAccessConditionDocument;
+  };
   payloadAccessMode: string;
   authorityMode: SessionModeAuthorityMode;
   telegramBridgeEnabled: boolean;
@@ -139,6 +159,46 @@ const trim = (value: unknown): string => String(value ?? '').trim();
 const lower = (value: unknown): string => trim(value).toLowerCase();
 
 const normalizeModeValue = (value: unknown): string => lower(value);
+
+const normalizeMatch = (value: unknown): 'any' | 'all' => (
+  normalizeModeValue(value) === 'all' ? 'all' : 'any'
+);
+
+const normalizeAnyOrAll = (value: unknown): 'any' | 'all' => (
+  normalizeModeValue(value) === 'all' ? 'all' : 'any'
+);
+
+export const normalizeSessionModeAccessConditions = (
+  value: unknown
+): SessionModeAccessConditionDocument | null => {
+  const raw = isRecord(value) ? value : {};
+  const conditions = Array.isArray(raw.conditions) ? raw.conditions : [];
+  const normalized = conditions
+    .filter(isRecord)
+    .map((condition) => {
+      const kind = normalizeModeValue(condition.kind);
+      if (kind === 'worker_role') {
+        return { kind, role: trim(condition.role || 'admin') || 'admin' };
+      }
+      if (kind === 'sbt_onchain') {
+        return {
+          kind,
+          chainId: normalizeRegistryChainId(condition.chainId || condition.networkChainId) || 0,
+          contract: trim(condition.contract || condition.address),
+          anyOrAll: normalizeAnyOrAll(condition.anyOrAll || condition.mode || condition.match),
+        };
+      }
+      if (kind === 'agent_grant_scope') {
+        return { kind, scope: trim(condition.scope || condition.value) };
+      }
+      return null;
+    })
+    .filter((condition): condition is SessionModeAccessConditionDocument['conditions'][number] => !!condition);
+  return {
+    match: normalizeMatch(raw.match),
+    conditions: normalized,
+  };
+};
 
 export const hasLegacyTelegramFirstSessionFlags = (metadata: unknown): boolean => {
   const config = isRecord(metadata) ? metadata : {};
@@ -195,6 +255,33 @@ const hasParticipantGate = (profile: SessionModeProfile): boolean => (
     mechanism === 'agent_grant'
   ))
 );
+
+const resolveProfilePayloadAccessControl = (profile: SessionModeProfile): CompiledSessionModeProfile['payloadAccessControl'] => {
+  const explicitStorageAccess = isRecord(profile.storage.payloadAccessControl)
+    ? normalizeSessionStoragePayloadAccessControl(profile.storage.payloadAccessControl)
+    : null;
+  const encryption = profile.encryption.mode === 'lit'
+    ? SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES.LIT
+    : (profile.encryption.mode === 'worker_envelope'
+      ? SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE
+      : SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES.NONE);
+  const gate = encryption === SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES.LIT
+    ? SESSION_STORAGE_PAYLOAD_ACCESS_GATES.NONE
+    : (explicitStorageAccess?.gate || (
+      hasParticipantGate(profile)
+        ? SESSION_STORAGE_PAYLOAD_ACCESS_GATES.SBT_GATE
+        : SESSION_STORAGE_PAYLOAD_ACCESS_GATES.NONE
+    ));
+  const accessConditions = normalizeSessionModeAccessConditions(
+    profile.encryption.accessConditions ||
+    profile.storage.payloadAccessControl?.accessConditions
+  );
+  return {
+    gate,
+    encryption,
+    ...(accessConditions?.conditions.length ? { accessConditions } : {}),
+  };
+};
 
 export const SESSION_MODE_PRESETS: Readonly<Record<Exclude<SessionModePresetId, 'custom'>, SessionModeProfile>> = Object.freeze({
   fast_cheap_cloudflare: {
@@ -257,8 +344,35 @@ export const cloneSessionModePreset = (
   preset: Exclude<SessionModePresetId, 'custom'>
 ): SessionModeProfile => deepClone(SESSION_MODE_PRESETS[preset]);
 
+export const mergeSessionModeProfileStorageAccess = (
+  profile: SessionModeProfile,
+  storageProfile: unknown
+): SessionModeProfile => {
+  const next = deepClone(profile);
+  const storage = isRecord(storageProfile) ? storageProfile : {};
+  const backend = normalizeStorageBackend(storage.backend);
+  if (backend === STORAGE_BACKENDS.CLOUDFLARE && isRecord(storage.payloadAccessControl)) {
+    const accessControl = normalizeSessionStoragePayloadAccessControl(storage.payloadAccessControl);
+    next.storage = {
+      ...next.storage,
+      payloadAccessControl: {
+        gate: accessControl.gate,
+        encryption: accessControl.encryption,
+        ...(isRecord(storage.payloadAccessControl) && isRecord(storage.payloadAccessControl.accessConditions)
+          ? { accessConditions: normalizeSessionModeAccessConditions(storage.payloadAccessControl.accessConditions) || undefined }
+          : {}),
+      },
+    };
+  } else if (next.storage?.payloadAccessControl) {
+    next.storage = { ...next.storage };
+    delete next.storage.payloadAccessControl;
+  }
+  return next;
+};
+
 export const validateSessionModeProfile = (
-  profile: SessionModeProfile
+  profile: SessionModeProfile,
+  _opts: { enableWorkerEnvelope?: boolean } = {}
 ): { valid: boolean; issues: SessionModeProfileValidationIssue[] } => {
   const issues: SessionModeProfileValidationIssue[] = [];
   const addIssue = (path: string, code: string, message: string) => {
@@ -271,14 +385,43 @@ export const validateSessionModeProfile = (
   if (profile.authority?.mode === 'org_private_chain') {
     addIssue('authority.mode', 'reserved', 'Private-chain authority is reserved for a later implementation.');
   }
-  if (profile.encryption?.mode === 'worker_envelope') {
-    addIssue('encryption.mode', 'reserved', 'Worker envelope encryption is reserved for a later implementation.');
+  if (profile.encryption?.mode === 'worker_envelope' && profile.storage?.backend !== 'cloudflare') {
+    addIssue('encryption.mode', 'worker_envelope_requires_cloudflare', 'Worker envelope encryption is available only with Cloudflare storage.');
+  }
+  if (
+    profile.encryption?.mode === 'worker_envelope' &&
+    profile.encryption?.keyProvider &&
+    profile.encryption.keyProvider !== 'worker_secret'
+  ) {
+    addIssue('encryption.keyProvider', 'reserved', 'Only the worker_secret key provider is implemented for worker envelope encryption.');
   }
   if (profile.encryption?.mode === 'lit' && profile.authority?.mode === 'org_private_chain') {
     addIssue('encryption.mode', 'lit_private_chain_invalid', 'Lit encryption cannot evaluate private-chain state.');
   }
   if (profile.encryption?.mode === 'lit' && profile.evm?.registryChainId == null) {
     addIssue('evm.registryChainId', 'lit_requires_registry_chain', 'Lit encryption requires a registry chain id.');
+  }
+  const accessConditions = normalizeSessionModeAccessConditions(profile.encryption?.accessConditions);
+  if (profile.encryption?.mode === 'worker_envelope' && accessConditions?.conditions.length) {
+    accessConditions.conditions.forEach((condition, index) => {
+      if (condition.kind === 'worker_role' && !trim(condition.role)) {
+        addIssue(`encryption.accessConditions.conditions.${index}.role`, 'worker_role_required', 'Worker role conditions require a role.');
+      }
+      if (condition.kind === 'agent_grant_scope' && !trim(condition.scope)) {
+        addIssue(`encryption.accessConditions.conditions.${index}.scope`, 'agent_grant_scope_required', 'Agent grant conditions require a scope.');
+      }
+      if (condition.kind === 'sbt_onchain') {
+        if (!profile.evm?.registryChainId) {
+          addIssue('evm.registryChainId', 'sbt_condition_requires_registry_chain', 'SBT envelope conditions require a registry chain id.');
+        }
+        if (!condition.chainId) {
+          addIssue(`encryption.accessConditions.conditions.${index}.chainId`, 'sbt_condition_chain_required', 'SBT envelope conditions require a chain id.');
+        }
+        if (!trim(condition.contract)) {
+          addIssue(`encryption.accessConditions.conditions.${index}.contract`, 'sbt_condition_contract_required', 'SBT envelope conditions require a contract address.');
+        }
+      }
+    });
   }
   if (profile.export?.scope === 'encrypted_envelopes_only' && profile.encryption?.mode === 'none') {
     addIssue('export.scope', 'encrypted_export_requires_encryption', 'Encrypted-envelope export requires encryption.');
@@ -325,7 +468,13 @@ export const compileSessionModeProfile = (
   };
 
   if (storageBackend === STORAGE_BACKENDS.CLOUDFLARE) {
-    storageProfile.payloadAccessControl = { mode: payloadAccessMode };
+    storageProfile.payloadAccessControl = {
+      gate: payloadAccessControl.gate,
+      encryption: payloadAccessControl.encryption,
+      ...(payloadAccessControl.accessConditions
+        ? { accessConditions: deepClone(payloadAccessControl.accessConditions) }
+        : {}),
+    };
     storageProfile.cloudflare = { payloadAccessMode };
   }
 
@@ -386,7 +535,18 @@ export const profileFromLegacyConfig = (sessionConfig: unknown): SessionModeProf
   } else if (normalizedBackend === STORAGE_BACKENDS.CLOUDFLARE) {
     profile.authority.mode = 'worker_canonical';
     profile.storage.backend = 'cloudflare';
-    profile.encryption.mode = 'none';
+    const access = normalizeSessionStoragePayloadAccessControl(storageProfile);
+    profile.storage.payloadAccessControl = {
+      gate: access.gate,
+      encryption: access.encryption,
+    };
+    profile.encryption.mode = access.encryption === SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE
+      ? 'worker_envelope'
+      : (access.encryption === SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES.LIT ? 'lit' : 'none');
+    if (isRecord(storageProfile.payloadAccessControl) && isRecord(storageProfile.payloadAccessControl.accessConditions)) {
+      const accessConditions = normalizeSessionModeAccessConditions(storageProfile.payloadAccessControl.accessConditions);
+      if (accessConditions?.conditions.length) profile.encryption.accessConditions = accessConditions;
+    }
   } else {
     profile.authority.mode = 'evm_registry_canonical';
     profile.storage.backend = 'arweave';

@@ -96,6 +96,11 @@ const importDeploymentKek = async ({ env = {}, previous = false, deps = {} } = {
   return importAesKey(keyBytes, ['encrypt', 'decrypt'], deps);
 };
 
+const importDeploymentKekFromSecret = async ({ secret, deps = {} } = {}) => {
+  const keyBytes = await deriveDeploymentKeyBytes(secret, deps);
+  return importAesKey(keyBytes, ['encrypt', 'decrypt'], deps);
+};
+
 const aesEncrypt = async ({ keyBytes, plaintextBytes, aad = '', deps = {} }) => {
   const iv = randomBytes(12, deps);
   const key = await importAesKey(keyBytes, ['encrypt'], deps);
@@ -317,6 +322,146 @@ export const decryptPayloadWithStorageEnvelope = async ({
   });
 };
 
+const readJson = (value) => {
+  if (!trim(value)) return null;
+  try { return typeof value === 'string' ? JSON.parse(value) : value; } catch { return null; }
+};
+
+const listEnvelopeMetadataRows = async ({ index, slug }) => {
+  const rows = [];
+  const prefix = buildIndexPrefix({ slug });
+  let cursor = '';
+  do {
+    // eslint-disable-next-line no-await-in-loop
+    const listed = await index.list({
+      prefix,
+      ...(cursor ? { cursor } : {}),
+    });
+    const keys = Array.isArray(listed?.keys) ? listed.keys : [];
+    for (const keyEntry of keys) {
+      const key = trim(keyEntry?.name || keyEntry);
+      if (!key) continue;
+      // eslint-disable-next-line no-await-in-loop
+      const metadata = readJson(await index.get(key));
+      if (metadata?.envelope?.encryption === 'worker_envelope') rows.push({ key, metadata });
+    }
+    cursor = listed?.list_complete === false ? trim(listed?.cursor) : '';
+  } while (cursor);
+  return rows;
+};
+
+export const rotateStorageEnvelopeKeys = async ({ env = {}, slug, config, deps = {} } = {}) => {
+  const index = env.CE_STORAGE_INDEX_KV || env.STORAGE_INDEX_KV || env.STORAGE_KV || null;
+  if (!index || typeof index.list !== 'function' || typeof index.get !== 'function' || typeof index.put !== 'function') {
+    throw new Error('Storage index KV is required for envelope key rotation.');
+  }
+  if (typeof deps.putSessionConfig !== 'function') {
+    throw new Error('Session config store is required for envelope key rotation.');
+  }
+  const oldSessionKeyBytes = await unwrapSessionKeyBytes({ env, config, slug, deps });
+  const oldSessionKey = await importAesKey(oldSessionKeyBytes, ['decrypt'], deps);
+  const newSessionKeyBytes = randomBytes(32, deps);
+  const newSessionKey = await importAesKey(newSessionKeyBytes, ['encrypt'], deps);
+  const deploymentKey = await importDeploymentKek({ env, deps });
+  const rotatedAt = nowIso(deps);
+  const sessionKeyRecord = {
+    version: ENVELOPE_VERSION,
+    keyProvider: 'worker_secret',
+    keyId: `session:${safeSlugPart(slug)}:${rotatedAt}`,
+    createdAt: rotatedAt,
+    ...await wrapBytesWithKey({
+      wrappingKey: deploymentKey,
+      plaintextBytes: newSessionKeyBytes,
+      aad: `ce-storage-envelope:session:${safeSlugPart(slug)}`,
+      deps,
+    }),
+  };
+  const rows = await listEnvelopeMetadataRows({ index, slug });
+  for (const row of rows) {
+    const payloadId = trim(row.metadata.id);
+    const aad = `ce-storage-envelope:payload:${safeSlugPart(slug)}:${payloadId}`;
+    // eslint-disable-next-line no-await-in-loop
+    const dekBytes = await unwrapBytesWithKey({
+      wrappingKey: oldSessionKey,
+      wrapped: row.metadata.envelope.dek,
+      aad: `${aad}:dek`,
+      deps,
+    });
+    // eslint-disable-next-line no-await-in-loop
+    const nextDek = await wrapBytesWithKey({
+      wrappingKey: newSessionKey,
+      plaintextBytes: dekBytes,
+      aad: `${aad}:dek`,
+      deps,
+    });
+    const nextMetadata = {
+      ...row.metadata,
+      envelope: {
+        ...row.metadata.envelope,
+        dek: {
+          ...row.metadata.envelope.dek,
+          ...nextDek,
+        },
+        rotatedAt,
+      },
+    };
+    // eslint-disable-next-line no-await-in-loop
+    await index.put(row.key, JSON.stringify(nextMetadata));
+    const payloadKey = buildPayloadKey({ slug, id: payloadId });
+    // eslint-disable-next-line no-await-in-loop
+    const payloadEnvelope = readJson(await index.get(payloadKey));
+    if (payloadEnvelope?.metadata) {
+      payloadEnvelope.metadata = nextMetadata;
+      // eslint-disable-next-line no-await-in-loop
+      await index.put(payloadKey, JSON.stringify(payloadEnvelope));
+    }
+  }
+  const nextConfig = buildSessionEnvelopeConfig({ config, sessionKeyRecord, rotatedAt });
+  await deps.putSessionConfig(env, slug, nextConfig);
+  return {
+    ok: true,
+    rotatedAt,
+    payloadsRewrapped: rows.length,
+    config: nextConfig,
+  };
+};
+
+export const rewrapStorageEnvelopeSessionKeyForDeployment = async ({
+  env = {},
+  slug,
+  config,
+  newDeploymentKek,
+  deps = {},
+} = {}) => {
+  if (typeof deps.putSessionConfig !== 'function') {
+    throw new Error('Session config store is required for envelope deployment re-wrap.');
+  }
+  const sessionKeyBytes = await unwrapSessionKeyBytes({ env, config, slug, deps });
+  const nextDeploymentKey = await importDeploymentKekFromSecret({ secret: newDeploymentKek, deps });
+  const rewrappedAt = nowIso(deps);
+  const sessionKeyRecord = {
+    version: ENVELOPE_VERSION,
+    keyProvider: 'worker_secret',
+    keyId: `session:${safeSlugPart(slug)}:${rewrappedAt}`,
+    createdAt: rewrappedAt,
+    ...await wrapBytesWithKey({
+      wrappingKey: nextDeploymentKey,
+      plaintextBytes: sessionKeyBytes,
+      aad: `ce-storage-envelope:session:${safeSlugPart(slug)}`,
+      deps,
+    }),
+  };
+  const nextConfig = buildSessionEnvelopeConfig({ config, sessionKeyRecord, rotatedAt: rewrappedAt });
+  await deps.putSessionConfig(env, slug, nextConfig);
+  return {
+    ok: true,
+    rewrappedAt,
+    config: nextConfig,
+    keyProvider: 'worker_secret',
+  };
+};
+
+const resolveAuditD1 = (env = {}) => env.CE_STORAGE_AUDIT_D1 || env.STORAGE_AUDIT_D1 || env.D1 || env.DB || null;
 const resolveAuditKv = (env = {}) => env.CE_STORAGE_AUDIT_KV || env.CE_STORAGE_INDEX_KV || env.STORAGE_INDEX_KV || env.STORAGE_KV || null;
 
 const auditSuffix = (deps = {}) => {
