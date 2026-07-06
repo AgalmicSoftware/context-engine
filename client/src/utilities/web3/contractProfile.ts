@@ -9,7 +9,16 @@
 import { ethers } from 'ethers';
 import { extractChainId, extractChainIdOrUndefined } from './chainIdResolution.js';
 
-type GroupKeyOrCfg = any;
+type GroupKeyOrCfg = unknown;
+type ContractProfileRecord = Record<string, unknown>;
+type ContractProviderName = unknown;
+type ContractIdentifier = string | number | ethers.BigNumber;
+type ContractReadProvider = ethers.providers.Provider;
+type ContractLog = ethers.providers.Log;
+type ContractLogProgress = {
+  logs?: ContractLog[];
+  scanTo?: number | null;
+};
 
 type ContractsLogger = {
   log: (...args: unknown[]) => void;
@@ -22,14 +31,14 @@ type SessionAddresses = {
   sbtFactory?: {
     address?: string | null;
     chainId?: number | string | null;
-    [key: string]: any;
+    [key: string]: unknown;
   };
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 type LatestBlockCache = {
-  _map?: Record<string, any>;
-  [key: string]: any;
+  _map?: Record<string, unknown>;
+  [key: string]: unknown;
 };
 
 type BlockWindow = {
@@ -48,22 +57,22 @@ type SbtDiscoveryOptions = {
   force?: boolean;
   fromBlock?: unknown;
   toBlock?: unknown;
-  onProgress?: ((payload: any) => void) | null;
+  onProgress?: ((payload: unknown) => void) | null;
   onDiscoveredAddresses?: ((payload: DiscoveredAddressesPayload) => void) | null;
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 type UserSbtLookupOptions = {
   fromBlock?: number | string | null;
   toBlock?: number | string | null;
   ignoreScope?: boolean;
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 type SbtLookupMetaOptions = {
   returnMeta?: boolean;
   ignoreScope?: boolean;
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 type UserActivityOptions = {
@@ -71,7 +80,7 @@ type UserActivityOptions = {
   ignoreScope?: boolean;
   includeSurveyActivity?: boolean;
   includeQuestionActivity?: boolean;
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 type UserSbtNetHoldings = {
@@ -80,28 +89,28 @@ type UserSbtNetHoldings = {
 
 type SbtListItem = {
   sbtAddress: string;
-  sbtInfo?: any;
+  sbtInfo?: unknown;
 };
 
 type SurveyActivityEntry = {
-  id: any;
-  data: any;
+  id: unknown;
+  data: unknown;
 };
 
 type QuestionActivityEntry = {
-  id: any;
-  data: any;
+  id: unknown;
+  data: unknown;
 };
 
 type SurveyResponseActivityEntry = {
-  surveyId: any;
-  response: any;
+  surveyId: unknown;
+  response: unknown;
   responder: string;
 };
 
 type QuestionResponseActivityEntry = {
   questionId: string;
-  response: any;
+  response: unknown;
   responder: string;
   blockNumber: number;
   transactionIndex: number;
@@ -136,14 +145,14 @@ type MemoizedFields<T> = {
 
 type GetAllSbtAddressesCachedMethod = ((
   this: ContractProfileMethods,
-  providerName: any,
+  providerName: ContractProviderName,
   groupKeyOrCfg?: GroupKeyOrCfg,
   options?: SbtDiscoveryOptions | null
 ) => Promise<string[]>) & MemoizedFields<string[]>;
 
 type GetUserSbtNetHoldingsMethod = ((
   this: ContractProfileMethods,
-  providerName: any,
+  providerName: ContractProviderName,
   userAddress: string,
   options?: UserSbtLookupOptions | null,
   groupKeyOrCfg?: GroupKeyOrCfg
@@ -151,7 +160,7 @@ type GetUserSbtNetHoldingsMethod = ((
 
 type GetUserSBTsMinimalMethod = ((
   this: ContractProfileMethods,
-  providerName: any,
+  providerName: ContractProviderName,
   userAddress: string,
   withMetadata?: boolean,
   groupKeyOrCfg?: GroupKeyOrCfg,
@@ -159,150 +168,170 @@ type GetUserSBTsMinimalMethod = ((
 ) => Promise<SbtListItem[]>) & MemoizedFields<SbtListItem[]>;
 
 type ContractProfileDeps = {
-  resolveSession: (groupKeyOrCfg: GroupKeyOrCfg) => any;
+  resolveSession: (groupKeyOrCfg: GroupKeyOrCfg) => unknown;
   getReadProviderForGroup: (
     groupKeyOrCfg: GroupKeyOrCfg,
     opts?: { contractKey?: string; skipGlobalPreferred?: boolean }
-  ) => any;
-  CUSTOM_SBT_ABI: any;
+  ) => ContractReadProvider;
+  CUSTOM_SBT_ABI: ethers.ContractInterface;
   callWithRetry: <T>(
     operation: () => Promise<T>,
     operationName: string,
-    context?: Record<string, unknown>
+    context?: ContractProfileRecord
   ) => Promise<T>;
   rpcLog: (...args: unknown[]) => void;
   isNonexistentTokenError: (error: unknown) => boolean;
   contractsLog: ContractsLogger;
-  getSessionAddresses: (cfg: any) => SessionAddresses;
-  buildSbtScopeMemoTag: (groupKeyOrCfg: GroupKeyOrCfg, cfg?: any) => string;
-  bumpSbtMemoRunVersion: (holder: MemoizedFields<any>, memoKey: string) => number;
-  isLatestSbtMemoRun: (holder: MemoizedFields<any>, memoKey: string, runVersion: number) => boolean;
-  SBT_FACTORY_ABI: any;
+  getSessionAddresses: (cfg: unknown) => SessionAddresses;
+  buildSbtScopeMemoTag: (groupKeyOrCfg: GroupKeyOrCfg, cfg?: unknown) => string;
+  bumpSbtMemoRunVersion: (holder: MemoizedFields<unknown>, memoKey: string) => number;
+  isLatestSbtMemoRun: (holder: MemoizedFields<unknown>, memoKey: string, runVersion: number) => boolean;
+  SBT_FACTORY_ABI: ethers.ContractInterface;
   shouldLog: (category: string, level?: string) => boolean;
   fetchLogsSmartWithProvider: (
-    provider: any,
-    filter: any,
+    provider: ContractReadProvider,
+    filter: ethers.EventFilter,
     fromBlock: number,
     toBlock: number,
     depth?: number,
     maxDepth?: number,
-    opts?: any
-  ) => Promise<any[]>;
-  resolveSessionNameValue: (value: any) => string | null | undefined;
+    opts?: unknown
+  ) => Promise<ContractLog[]>;
+  resolveSessionNameValue: (value: unknown) => string | null | undefined;
   normalizeSessionSlug: (slug: string) => string;
-  normalizeSbtSessionLinkFields: (info: any, fallbackSessionSlug: string) => any;
-  normalizeSessionNameFields: (info: any, fallbackSessionName: string) => any;
+  normalizeSbtSessionLinkFields: (info: ContractProfileRecord, fallbackSessionSlug: string) => unknown;
+  normalizeSessionNameFields: (info: ContractProfileRecord, fallbackSessionName: string) => unknown;
   latestBlockCache: LatestBlockCache;
 };
 
 type ContractProfileMethods = {
   getSBTTokenIdByOwner: (
-    providerName: any,
+    providerName: ContractProviderName,
     SBTAddress: string,
     ownerAddress: string,
     groupKeyOrCfg?: GroupKeyOrCfg
   ) => Promise<string | null>;
   getOwnerByTokenId: (
-    providerName: any,
+    providerName: ContractProviderName,
     SBTAddress: string,
-    tokenId: any,
+    tokenId: ContractIdentifier,
     groupKeyOrCfg?: GroupKeyOrCfg
-  ) => Promise<any | null>;
+  ) => Promise<unknown | null>;
   getAllSbtAddressesCached: GetAllSbtAddressesCachedMethod;
   getUserSbtNetHoldings: GetUserSbtNetHoldingsMethod;
   getUserSBTsMinimal: GetUserSBTsMinimalMethod;
   getSBTsForUser: (
     this: ContractProfileMethods,
     address: string,
-    slug: any,
+    slug: unknown,
     fromBlock?: number,
     opts?: SbtLookupMetaOptions | null
   ) => Promise<SbtListItem[] | MetaResult<SbtListItem[]>>;
   getUserActivity: (
     this: ContractProfileMethods,
     address: string,
-    slug: any,
+    slug: unknown,
     fromBlock?: number,
     opts?: UserActivityOptions | null
   ) => Promise<UserActivity | MetaResult<UserActivity>>;
   getRelevantBlockWindowForFilter?: (
     this: ContractProfileMethods,
     groupKeyOrCfg: GroupKeyOrCfg,
-    opts?: any
+    opts?: unknown
   ) => Promise<BlockWindow>;
   getSbtMetadata?: (
     this: ContractProfileMethods,
-    providerName: any,
+    providerName: ContractProviderName,
     sbtAddress: string,
     groupKeyOrCfg?: GroupKeyOrCfg
-  ) => Promise<any>;
+  ) => Promise<unknown>;
   getSurveysCreatedByAddress?: (
     this: ContractProfileMethods,
-    providerName: any,
+    providerName: ContractProviderName,
     address: string,
     fromBlock?: number,
-    toBlock?: any,
+    toBlock?: unknown,
     groupKeyOrCfg?: GroupKeyOrCfg
-  ) => Promise<any[]>;
+  ) => Promise<unknown[]>;
   getSurveyDataById?: (
     this: ContractProfileMethods,
-    providerName: any,
-    surveyId: any,
+    providerName: ContractProviderName,
+    surveyId: unknown,
     groupKeyOrCfg?: GroupKeyOrCfg,
-    opts?: any
-  ) => Promise<any>;
+    opts?: unknown
+  ) => Promise<unknown>;
   getSurveyResponsesByAddress?: (
     this: ContractProfileMethods,
-    providerName: any,
+    providerName: ContractProviderName,
     address: string,
     fromBlock?: number,
-    toBlock?: any,
+    toBlock?: unknown,
     groupKeyOrCfg?: GroupKeyOrCfg
-  ) => Promise<any[]>;
+  ) => Promise<unknown[]>;
   getSurveyResponse?: (
     this: ContractProfileMethods,
-    providerName: any,
+    providerName: ContractProviderName,
     address: string,
-    surveyId: any,
+    surveyId: unknown,
     groupKeyOrCfg?: GroupKeyOrCfg,
-    opts?: any
-  ) => Promise<any>;
+    opts?: unknown
+  ) => Promise<unknown>;
   getQuestionsCreatedByAddress?: (
     this: ContractProfileMethods,
-    providerName: any,
+    providerName: ContractProviderName,
     address: string,
     fromBlock?: number,
-    toBlock?: any,
+    toBlock?: unknown,
     groupKeyOrCfg?: GroupKeyOrCfg
-  ) => Promise<any[]>;
+  ) => Promise<unknown[]>;
   getQuestionData?: (
     this: ContractProfileMethods,
-    providerName: any,
-    questionId: any,
+    providerName: ContractProviderName,
+    questionId: unknown,
     groupKeyOrCfg?: GroupKeyOrCfg,
-    opts?: any
-  ) => Promise<any>;
+    opts?: unknown
+  ) => Promise<unknown>;
   getQuestionResponsesByAddress?: (
     this: ContractProfileMethods,
-    providerName: any,
+    providerName: ContractProviderName,
     address: string,
     fromBlock?: number,
-    toBlock?: any,
+    toBlock?: unknown,
     groupKeyOrCfg?: GroupKeyOrCfg,
-    opts?: any
-  ) => Promise<any[]>;
+    opts?: unknown
+  ) => Promise<unknown[]>;
   getResponse?: (
     this: ContractProfileMethods,
-    providerName: any,
+    providerName: ContractProviderName,
     address: string,
-    questionId: any,
+    questionId: unknown,
     groupKeyOrCfg?: GroupKeyOrCfg,
-    opts?: any
-  ) => Promise<any>;
-  [key: string]: any;
+    opts?: unknown
+  ) => Promise<unknown>;
+  [key: string]: unknown;
 };
 
-const requireContractProfileMethod = <T extends (...args: any[]) => any>(
+type ContractProfileCallable = (...args: never[]) => unknown;
+
+const isRecord = (value: unknown): value is ContractProfileRecord => (
+  !!value && typeof value === 'object' && !Array.isArray(value)
+);
+
+const getErrorMessage = (error: unknown): string => (
+  error instanceof Error && error.message
+    ? error.message
+    : isRecord(error) && error.message
+      ? String(error.message)
+      : String(error || '')
+);
+
+const getNestedErrorName = (error: unknown): string => {
+  if (!isRecord(error)) return '';
+  const nested = isRecord(error.error) ? error.error : {};
+  return String(error.errorName || nested.errorName || '');
+};
+
+const requireContractProfileMethod = <T extends ContractProfileCallable>(
   method: T | undefined,
   methodName: string
 ): T => {
@@ -343,7 +372,7 @@ export function createContractProfileMethods(deps: ContractProfileDeps): Contrac
 
   const methods: ContractProfileMethods = {
     async getSBTTokenIdByOwner(
-      providerName: any,
+      providerName: ContractProviderName,
       SBTAddress: string,
       ownerAddress: string,
       groupKeyOrCfg: GroupKeyOrCfg = null
@@ -356,23 +385,23 @@ export function createContractProfileMethods(deps: ContractProfileDeps): Contrac
           method: 'CustomSBT.getTokenIdByOwner',
           params: { ownerAddress },
         });
-        const tokenId: any = await callWithRetry(
+        const tokenId = await callWithRetry(
           () => CustomSBT.getTokenIdByOwner(ownerAddress),
           'CustomSBT.getTokenIdByOwner'
         );
         void providerName;
-        return tokenId.toString();
+        return String(tokenId);
       } catch {
         return null;
       }
     },
 
     async getOwnerByTokenId(
-      providerName: any,
+      providerName: ContractProviderName,
       SBTAddress: string,
-      tokenId: any,
+      tokenId: ContractIdentifier,
       groupKeyOrCfg: GroupKeyOrCfg = null
-    ): Promise<any | null> {
+    ): Promise<unknown | null> {
       const provider = getReadProviderForGroup(groupKeyOrCfg, SBT_READ_PROVIDER_OPTIONS);
       const CustomSBT = new ethers.Contract(SBTAddress, CUSTOM_SBT_ABI, provider);
       try {
@@ -383,8 +412,8 @@ export function createContractProfileMethods(deps: ContractProfileDeps): Contrac
         });
         void providerName;
         return await callWithRetry(() => CustomSBT.ownerOf(tokenId), 'CustomSBT.ownerOf');
-      } catch (error: any) {
-        const errorName = error?.errorName || error?.error?.errorName || '';
+      } catch (error: unknown) {
+        const errorName = getNestedErrorName(error);
         if (isNonexistentTokenError(error)) {
           contractsLog.debug('[getOwnerByTokenId] token not minted', { tokenId, SBTAddress, errorName });
         } else {
@@ -396,7 +425,7 @@ export function createContractProfileMethods(deps: ContractProfileDeps): Contrac
 
     async getAllSbtAddressesCached(
       this: ContractProfileMethods,
-      providerName: any,
+      providerName: ContractProviderName,
       groupKeyOrCfg: GroupKeyOrCfg = null,
       options: SbtDiscoveryOptions | null = {}
     ): Promise<string[]> {
@@ -425,11 +454,12 @@ export function createContractProfileMethods(deps: ContractProfileDeps): Contrac
         : null;
 
       const cfg = resolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
-      const slugOrEmpty = (cfg && typeof cfg.slug !== 'undefined') ? cfg.slug : '';
+      const cfgRecord = isRecord(cfg) ? cfg : {};
+      const slugOrEmpty = typeof cfgRecord.slug !== 'undefined' ? cfgRecord.slug : '';
       const gAddrs = getSessionAddresses(cfg);
       const addr = gAddrs.sbtFactory?.address;
       const chId =
-        gAddrs.sbtFactory?.chainId || extractChainIdOrUndefined(cfg, { contractKey: 'sbtFactory' } as any);
+        gAddrs.sbtFactory?.chainId || extractChainIdOrUndefined(cfg, { contractKey: 'sbtFactory' });
 
       if (!addr) {
         contractsLog.log('No SBT factory address in group config:', slugOrEmpty);
@@ -493,16 +523,16 @@ export function createContractProfileMethods(deps: ContractProfileDeps): Contrac
 
           const totalBlocks = Math.max(0, resolvedToBlock - resolvedFromBlock + 1);
           const parsedLogKeys = new Set<string>();
-          const getSbtCreatedLogKey = (log: any): string => [
+          const getSbtCreatedLogKey = (log: ContractLog): string => [
             log?.blockHash || log?.blockNumber || '',
             log?.transactionHash || '',
             log?.logIndex ?? log?.transactionIndex ?? '',
             Array.isArray(log?.topics) ? log.topics.join('|') : '',
             log?.data || '',
           ].join(':');
-          const collectAddressesFromLogs = (logs: any[] = []): string[] => {
+          const collectAddressesFromLogs = (logs: ContractLog[] = []): string[] => {
             const next: string[] = [];
-            (Array.isArray(logs) ? logs : []).forEach((log: any): void => {
+            (Array.isArray(logs) ? logs : []).forEach((log): void => {
               const logKey = getSbtCreatedLogKey(log);
               if (logKey && parsedLogKeys.has(logKey)) return;
               if (logKey) parsedLogKeys.add(logKey);
@@ -559,7 +589,7 @@ export function createContractProfileMethods(deps: ContractProfileDeps): Contrac
               scannedBlocks: 0,
               onProgress,
               onLogs: onDiscoveredAddresses
-                ? ({ logs = [], scanTo }: { logs?: any[]; scanTo?: number | null }): void => {
+                ? ({ logs = [], scanTo }: ContractLogProgress): void => {
                   emitDiscoveredAddresses(
                     collectAddressesFromLogs(logs),
                     scanTo ?? null
@@ -591,7 +621,7 @@ export function createContractProfileMethods(deps: ContractProfileDeps): Contrac
 
     async getUserSbtNetHoldings(
       this: ContractProfileMethods,
-      providerName: any,
+      providerName: ContractProviderName,
       userAddress: string,
       options: UserSbtLookupOptions | null = {},
       groupKeyOrCfg: GroupKeyOrCfg = null
@@ -605,7 +635,7 @@ export function createContractProfileMethods(deps: ContractProfileDeps): Contrac
       }
 
       const cfg = resolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
-      const chId = extractChainId(cfg, SBT_READ_PROVIDER_OPTIONS as any);
+      const chId = extractChainId(cfg, SBT_READ_PROVIDER_OPTIONS);
 
       if (shouldLog('rpc', 'log')) {
         rpcLog('RPC Call:', {
@@ -649,9 +679,9 @@ export function createContractProfileMethods(deps: ContractProfileDeps): Contrac
           const held: string[] = [];
           const BATCH_SIZE = 10;
           const balanceAbi = ['function balanceOf(address owner) view returns (uint256)'];
-          const balanceContracts = new Map<string, any>();
+          const balanceContracts = new Map<string, ethers.Contract>();
           const readProvider = getReadProviderForGroup(scopedGroupRef, SBT_READ_PROVIDER_OPTIONS);
-          const getBalanceContract = (addr: string): any | null => {
+          const getBalanceContract = (addr: string): ethers.Contract | null => {
             const key = String(addr || '').toLowerCase();
             if (!key) return null;
             if (balanceContracts.has(key)) return balanceContracts.get(key) || null;
@@ -694,10 +724,10 @@ export function createContractProfileMethods(deps: ContractProfileDeps): Contrac
                     const trimmed = tokenIdStr.toString();
                     if (trimmed === '0' || trimmed === '0x0') return null;
                     return addr;
-                  } catch (tokenError: any) {
+                  } catch (tokenError: unknown) {
                     contractsLog.warn(
                       `[getUserSbtNetHoldings] balance/token check failed for ${addr}:`,
-                      tokenError?.message || tokenError
+                      getErrorMessage(tokenError) || tokenError
                     );
                     return null;
                   }
@@ -732,7 +762,7 @@ export function createContractProfileMethods(deps: ContractProfileDeps): Contrac
 
     async getUserSBTsMinimal(
       this: ContractProfileMethods,
-      providerName: any,
+      providerName: ContractProviderName,
       userAddress: string,
       withMetadata: boolean = true,
       groupKeyOrCfg: GroupKeyOrCfg = null,
@@ -747,7 +777,8 @@ export function createContractProfileMethods(deps: ContractProfileDeps): Contrac
       }
 
       const cfg = resolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
-      const chId = extractChainId(cfg, SBT_READ_PROVIDER_OPTIONS as any);
+      const cfgRecord = isRecord(cfg) ? cfg : {};
+      const chId = extractChainId(cfg, SBT_READ_PROVIDER_OPTIONS);
 
       const fromBlock = options?.fromBlock || 0;
       const scopedGroupRef = (options && options.ignoreScope)
@@ -795,14 +826,14 @@ export function createContractProfileMethods(deps: ContractProfileDeps): Contrac
             return bare;
           }
 
-          const fallbackSessionSlug = normalizeSessionSlug(cfg?.slug || '');
+          const fallbackSessionSlug = normalizeSessionSlug(String(cfgRecord.slug || ''));
           const fallbackSessionName = (() : string => {
             const fromCfg = resolveSessionNameValue(cfg || {});
             if (fromCfg) return fromCfg;
             return fallbackSessionSlug || 'general';
           })();
-          const normalizeSbtInfoSessionNames = (rawInfo: any): any => {
-            const info = (rawInfo && typeof rawInfo === 'object') ? { ...rawInfo } : {};
+          const normalizeSbtInfoSessionNames = (rawInfo: unknown): unknown => {
+            const info = isRecord(rawInfo) ? { ...rawInfo } : {};
             normalizeSbtSessionLinkFields(info, fallbackSessionSlug);
             const hasSessionName = !!resolveSessionNameValue(info || {});
             if (!hasSessionName && !fallbackSessionName) return info;
@@ -845,7 +876,7 @@ export function createContractProfileMethods(deps: ContractProfileDeps): Contrac
     async getSBTsForUser(
       this: ContractProfileMethods,
       address: string,
-      slug: any,
+      slug: unknown,
       fromBlock: number = 0,
       opts: SbtLookupMetaOptions | null = {}
     ): Promise<SbtListItem[] | MetaResult<SbtListItem[]>> {
@@ -860,7 +891,7 @@ export function createContractProfileMethods(deps: ContractProfileDeps): Contrac
         if (!returnMeta) return normalized;
         const result: MetaResult<SbtListItem[]> = { data: normalized, hadError: !!hadError };
         if (hadError && error) {
-          result.error = String((error as any)?.message || error);
+          result.error = getErrorMessage(error) || String(error);
         }
         return result;
       };
@@ -880,8 +911,9 @@ export function createContractProfileMethods(deps: ContractProfileDeps): Contrac
           this.getUserSBTsMinimal,
           'getUserSBTsMinimal'
         );
+        const resolvedSession = resolveSession(slug || '');
         const sessionRef = ignoreScope
-          ? { ...(resolveSession(slug || '') || {}), __ignoreSessionScanScope: true }
+          ? { ...(isRecord(resolvedSession) ? resolvedSession : {}), __ignoreSessionScanScope: true }
           : slug;
         const sbts = await getUserSBTsMinimal.call(this, 'none', address, true, sessionRef, {
           fromBlock,
@@ -897,7 +929,7 @@ export function createContractProfileMethods(deps: ContractProfileDeps): Contrac
     async getUserActivity(
       this: ContractProfileMethods,
       address: string,
-      slug: any,
+      slug: unknown,
       fromBlock: number = 0,
       opts: UserActivityOptions | null = {}
     ): Promise<UserActivity | MetaResult<UserActivity>> {
@@ -913,8 +945,9 @@ export function createContractProfileMethods(deps: ContractProfileDeps): Contrac
         Object.prototype.hasOwnProperty.call(opts, 'includeQuestionActivity') &&
         opts.includeQuestionActivity === false
       );
+      const resolvedSession = resolveSession(slug || '');
       const sessionRef = ignoreScope
-        ? { ...(resolveSession(slug || '') || {}), __ignoreSessionScanScope: true }
+        ? { ...(isRecord(resolvedSession) ? resolvedSession : {}), __ignoreSessionScanScope: true }
         : slug;
       const activity: UserActivity = {
         sbts: [],
@@ -978,15 +1011,15 @@ export function createContractProfileMethods(deps: ContractProfileDeps): Contrac
             'getSurveyResponse'
           );
 
-          const surveyIDsRaw = await safeCall<any[]>(
+          const surveyIDsRaw = await safeCall<unknown[]>(
             'getSurveysCreatedByAddress',
             () => getSurveysCreatedByAddress.call(this, 'none', address, fromBlock, 'latest', sessionRef),
             []
           );
           const surveyIDs = Array.isArray(surveyIDsRaw) ? surveyIDsRaw : [];
           if (surveyIDs.length > 0) {
-            const surveys = await Promise.all(surveyIDs.map(async (id: any): Promise<SurveyActivityEntry | null> => {
-              const data = await safeCall<any | null>(
+            const surveys = await Promise.all(surveyIDs.map(async (id: unknown): Promise<SurveyActivityEntry | null> => {
+              const data = await safeCall<unknown | null>(
                 `getSurveyDataById:${String(id || '').toLowerCase()}`,
                 () => getSurveyDataById.call(this, 'none', id, sessionRef, { throwOnFailure: true }),
                 null
@@ -998,7 +1031,7 @@ export function createContractProfileMethods(deps: ContractProfileDeps): Contrac
             );
           }
 
-          const respondedSurveyIDsRaw = await safeCall<any[]>(
+          const respondedSurveyIDsRaw = await safeCall<unknown[]>(
             'getSurveyResponsesByAddress',
             () => getSurveyResponsesByAddress.call(this, 'none', address, fromBlock, 'latest', sessionRef),
             []
@@ -1006,8 +1039,8 @@ export function createContractProfileMethods(deps: ContractProfileDeps): Contrac
           const respondedSurveyIDs = Array.isArray(respondedSurveyIDsRaw) ? respondedSurveyIDsRaw : [];
           if (respondedSurveyIDs.length > 0) {
             const responses = await Promise.all(
-              respondedSurveyIDs.map(async (sid: any): Promise<SurveyResponseActivityEntry | null> => {
-                const data = await safeCall<any | null>(
+              respondedSurveyIDs.map(async (sid: unknown): Promise<SurveyResponseActivityEntry | null> => {
+                const data = await safeCall<unknown | null>(
                   `getSurveyResponse:${String(sid || '').toLowerCase()}`,
                   () => getSurveyResponse.call(this, 'none', address, sid, sessionRef, { throwOnError: true }),
                   null
@@ -1039,15 +1072,15 @@ export function createContractProfileMethods(deps: ContractProfileDeps): Contrac
             'getResponse'
           );
 
-          const questionIDsRaw = await safeCall<any[]>(
+          const questionIDsRaw = await safeCall<unknown[]>(
             'getQuestionsCreatedByAddress',
             () => getQuestionsCreatedByAddress.call(this, 'none', address, fromBlock, 'latest', sessionRef),
             []
           );
           const questionIDs = Array.isArray(questionIDsRaw) ? questionIDsRaw : [];
           if (questionIDs.length > 0) {
-            const questions = await Promise.all(questionIDs.map(async (id: any): Promise<QuestionActivityEntry | null> => {
-              const data = await safeCall<any | null>(
+            const questions = await Promise.all(questionIDs.map(async (id: unknown): Promise<QuestionActivityEntry | null> => {
+              const data = await safeCall<unknown | null>(
                 `getQuestionData:${String(id || '').toLowerCase()}`,
                 () => getQuestionData.call(this, 'none', id, sessionRef, { throwOnFailure: true }),
                 null
@@ -1059,7 +1092,7 @@ export function createContractProfileMethods(deps: ContractProfileDeps): Contrac
             );
           }
 
-          const respondedQuestionEntriesRaw = await safeCall<any[]>(
+          const respondedQuestionEntriesRaw = await safeCall<unknown[]>(
             'getQuestionResponsesByAddress',
             () => getQuestionResponsesByAddress.call(
               this,
@@ -1077,12 +1110,13 @@ export function createContractProfileMethods(deps: ContractProfileDeps): Contrac
             : [];
           if (respondedQuestionEntries.length > 0) {
             const responses = await Promise.all(
-              respondedQuestionEntries.map(async (entry: any): Promise<QuestionResponseActivityEntry | null> => {
-                const qid = (entry && typeof entry === 'object')
-                  ? String(entry.questionId || '').toLowerCase()
+              respondedQuestionEntries.map(async (entry: unknown): Promise<QuestionResponseActivityEntry | null> => {
+                const entryRecord = isRecord(entry) ? entry : null;
+                const qid = entryRecord
+                  ? String(entryRecord.questionId || '').toLowerCase()
                   : String(entry || '').toLowerCase();
                 if (!qid) return null;
-                const data = await safeCall<any | null>(
+                const data = await safeCall<unknown | null>(
                   `getResponse:${qid}`,
                   () => getResponse.call(this, 'none', address, qid, sessionRef, { throwOnError: true }),
                   null
@@ -1092,10 +1126,10 @@ export function createContractProfileMethods(deps: ContractProfileDeps): Contrac
                   questionId: qid,
                   response: data,
                   responder: address,
-                  blockNumber: Number(entry?.blockNumber || 0) || 0,
-                  transactionIndex: Number(entry?.transactionIndex || 0) || 0,
-                  logIndex: Number(entry?.logIndex || 0) || 0,
-                  timestamp: Number(entry?.timestamp || 0) || 0,
+                  blockNumber: Number(entryRecord?.blockNumber || 0) || 0,
+                  transactionIndex: Number(entryRecord?.transactionIndex || 0) || 0,
+                  logIndex: Number(entryRecord?.logIndex || 0) || 0,
+                  timestamp: Number(entryRecord?.timestamp || 0) || 0,
                 };
               })
             );
