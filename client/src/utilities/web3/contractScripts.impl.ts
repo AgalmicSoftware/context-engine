@@ -100,7 +100,7 @@ import { resolveSessionStorageBackend } from '../storage/sessionStorageConfig.js
 import store from '../../store';
 import { sessionRegistryStore, sessionRegistryUtils } from './sessionRegistry.js';
 import { createContractHelperMethods } from './contractHelpers.js';
-import { createContractEventListenerMethods } from './contractEventListeners.js';
+import { createContractEventListenerMethods } from './chainEventStreams.js';
 import { createContractProfileMethods } from './contractProfile.js';
 import { createContractScriptsEventScanMethods } from './contractScriptsEventScans.js';
 import {
