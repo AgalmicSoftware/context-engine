@@ -256,6 +256,9 @@ import {
   type SurveyResultsScopedQuestionNetworkMemo,
 } from './surveyResultsQuestionNetworkReadController';
 import {
+  normalizeSurveyResultsQuestionModeCache,
+} from './surveyResultsQuestionModeCacheNormalizationController';
+import {
   surveyResultsCachePort,
 } from '../../domains/surveys/surveyResultsCachePort';
 import {
@@ -2062,41 +2065,6 @@ const isDemoPolisFixtureResponse = (responseData: unknown): boolean => (
   (responseData as SurveyResultsRecord).source === 'demo-polis-data'
 );
 
-const filterLiveQuestionResponses = (
-  questionResponses: SurveyResultsQuestionResponsesByQuestion = {},
-  options: { sessionSlug?: unknown } = {}
-): SurveyResultsQuestionResponsesByQuestion => {
-  const out: SurveyResultsQuestionResponsesByQuestion = {};
-  const requiredSessionSlug = normalizeSessionSlug(options.sessionSlug || '');
-  Object.entries(questionResponses || {}).forEach(([qId, responderMap]) => {
-    const questionId = String(qId || '').trim().toLowerCase();
-    if (!questionId || !responderMap || typeof responderMap !== 'object') return;
-    const kept: SurveyResultsQuestionResponsesByResponder = {};
-    Object.entries(responderMap).forEach(([responder, responseData]) => {
-      const parsedResponse = parseResponse(responseData);
-      if (isDemoPolisFixtureResponse(parsedResponse)) return;
-      if (!isResponseAllowedForSessionSlug(parsedResponse, requiredSessionSlug)) return;
-      kept[responder] = responseData;
-    });
-    if (Object.keys(kept).length > 0) out[questionId] = kept;
-  });
-  return out;
-};
-
-const filterLiveQuestionMetadata = (
-  questions: Record<string, SurveyResultsQuestionRecord> = {},
-  liveQuestionIds: Set<string> = new Set()
-): Record<string, SurveyResultsQuestionRecord> => {
-  const out: Record<string, SurveyResultsQuestionRecord> = {};
-  Object.entries(questions || {}).forEach(([qId, question]) => {
-    const questionId = String(qId || question?.id || '').trim().toLowerCase();
-    if (!questionId) return;
-    if (question?.source === 'demo-polis-data' && !liveQuestionIds.has(questionId)) return;
-    out[questionId] = question;
-  });
-  return out;
-};
-
 const getNetworkQuestionsForCurrentContext = (
   _identity?: SurveyResultsQuestionMetadataReadIdentity
 ): Record<string, SurveyResultsQuestionRecord> => {
@@ -2283,12 +2251,18 @@ const netIdStr = String(propsRef.current.network?.id ?? propsRef.current.network
 if (!netIdStr) return;
 const questionNetCache = await getScopedQuestionNetworkData('questions') as SurveyResultsScopedQuestionNetworkData;
   const strictQuestionResponseSlug = isDemoSessionSlug(getEffectiveSlug()) ? getEffectiveSlug() : '';
-  const partialQR: SurveyResultsQuestionResponsesByQuestion = filterLiveQuestionResponses(
-    questionNetCache?.questionResponses || {},
-    { sessionSlug: strictQuestionResponseSlug }
-  );
-  const liveQuestionIds = new Set(Object.keys(partialQR).map((qid) => String(qid || '').trim().toLowerCase()));
-	const allQuestions = filterLiveQuestionMetadata(questionNetCache?.questions || {}, liveQuestionIds);
+  const normalizedQuestionModeCache = normalizeSurveyResultsQuestionModeCache({
+    ports: {
+      isDemoPolisFixtureResponse,
+      isResponseAllowedForSessionSlug,
+      parseResponse,
+    },
+    questionResponses: questionNetCache?.questionResponses || {},
+    questions: questionNetCache?.questions || {},
+    requiredSessionSlug: normalizeSessionSlug(strictQuestionResponseSlug),
+  });
+  const partialQR: SurveyResultsQuestionResponsesByQuestion = normalizedQuestionModeCache.questionResponses;
+	const allQuestions = normalizedQuestionModeCache.questions;
 	const aggregatorMap: Record<string, unknown> = {};
 
 	Object.keys(partialQR).forEach((qId) => {
