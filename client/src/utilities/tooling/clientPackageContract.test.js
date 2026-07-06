@@ -278,6 +278,7 @@ describe('client package modernization contract', () => {
       'src/components/DebateMap/DebateMap.tsx',
       'src/components/SurveyTool/CreateQuestionsAndSurveys.tsx',
       'src/components/ContractPage/contractSourceLoader.ts',
+      'src/utilities/web3/chainGateway.ts',
       'src/utilities/web3/contractScripts.ts',
     ].forEach((relativePath) => {
       expect(readClientFile(relativePath)).not.toMatch(/\brequire\(/);
