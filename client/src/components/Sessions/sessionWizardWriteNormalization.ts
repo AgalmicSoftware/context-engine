@@ -221,6 +221,38 @@ export const sanitizeSessionWizardMetadataPayload = (metadata: AnyRecord, {
   return orderMetadataFields(next, fieldOrder);
 };
 
+export const resolveSessionWizardWorkerStorageProfilePayload = ({
+  draft = {},
+  deployPayload = {},
+}: {
+  draft?: AnyRecord | null;
+  deployPayload?: AnyRecord | null;
+} = {}): {
+  storageProfile: AnyRecord;
+  sessionModeProfile: SessionModeProfile | null;
+} => {
+  const resolvedDraft = isObj(draft) ? draft : {};
+  const resolvedDeployPayload = isObj(deployPayload) ? deployPayload : {};
+  const rawStorageProfile = resolvedDraft.storageProfile || resolvedDeployPayload.storageProfile;
+  const sessionModeProfile = isObj(resolvedDraft.sessionModeProfile)
+    ? resolvedDraft.sessionModeProfile as SessionModeProfile
+    : (hasLegacyTelegramFirstSessionFlags(resolvedDraft)
+      ? profileFromLegacyConfig(resolvedDraft)
+      : null);
+  const effectiveSessionModeProfile = sessionModeProfile
+    ? mergeSessionModeProfileStorageAccess(sessionModeProfile, rawStorageProfile)
+    : null;
+  const compiledProfile = effectiveSessionModeProfile ? compileSessionModeProfile(effectiveSessionModeProfile) : null;
+  const storageProfile = normalizeSessionStorageProfileConfig(
+    compiledProfile?.storageProfile ||
+    rawStorageProfile
+  );
+  return {
+    storageProfile,
+    sessionModeProfile: effectiveSessionModeProfile,
+  };
+};
+
 export const buildSessionWizardWorkerConfigPayload = ({
   slug = '',
   draft = {},
@@ -274,20 +306,13 @@ export const buildSessionWizardWorkerConfigPayload = ({
     };
   });
 
-  const rawStorageProfile = resolvedDraft.storageProfile || resolvedDeployPayload.storageProfile;
-  const sessionModeProfile = isObj(resolvedDraft.sessionModeProfile)
-    ? resolvedDraft.sessionModeProfile as SessionModeProfile
-    : (hasLegacyTelegramFirstSessionFlags(resolvedDraft)
-      ? profileFromLegacyConfig(resolvedDraft)
-      : null);
-  const effectiveSessionModeProfile = sessionModeProfile
-    ? mergeSessionModeProfileStorageAccess(sessionModeProfile, rawStorageProfile)
-    : null;
-  const compiledProfile = effectiveSessionModeProfile ? compileSessionModeProfile(effectiveSessionModeProfile) : null;
-  const storageProfile = normalizeSessionStorageProfileConfig(
-    compiledProfile?.storageProfile ||
-    rawStorageProfile
-  );
+  const {
+    storageProfile,
+    sessionModeProfile: effectiveSessionModeProfile,
+  } = resolveSessionWizardWorkerStorageProfilePayload({
+    draft: resolvedDraft,
+    deployPayload: resolvedDeployPayload,
+  });
   const next: AnyRecord = {
     slug: trimString(slug),
     adminAddress: trimString(resolvedDeployPayload.adminAddress || account),
