@@ -107,6 +107,43 @@ test('worker group CRUD stores memberships separately and enforces caps', async 
   assert.equal(denied.reason, 'worker_group_membership_denied');
 });
 
+test('worker groups operate on storage index KV without a D1 binding', async () => {
+  const kv = createMockKv();
+  const env = { CE_STORAGE_INDEX_KV: kv };
+  const created = await createWorkerGroup({
+    env,
+    slug: 'session-a',
+    input: { groupId: 'fresh-worker', label: 'Fresh worker', joinMode: 'admin_add' },
+    actorPrincipal: actor,
+  });
+  assert.equal(created.ok, true);
+  assert.equal(created.store, 'kv');
+
+  const added = await addWorkerGroupMember({
+    env,
+    slug: 'session-a',
+    groupId: 'fresh-worker',
+    principal: member,
+    actorPrincipal: actor,
+  });
+  assert.equal(added.ok, true);
+  assert.equal(added.store, 'kv');
+
+  const membership = await isWorkerGroupMember({
+    env,
+    slug: 'session-a',
+    groupId: 'fresh-worker',
+    principal: member,
+  });
+  assert.equal(membership.ok, true);
+  assert.equal(membership.store, 'kv');
+
+  const memberships = await listWorkerGroupMemberships({ env, slug: 'session-a', principal: member });
+  assert.equal(memberships.ok, true);
+  assert.equal(memberships.store, 'kv');
+  assert.deepEqual(memberships.memberships.map((entry) => entry.group.groupId), ['fresh-worker']);
+});
+
 test('worker groups reject deferred join modes and malformed principals fail closed', async () => {
   const env = { CE_WORKER_GROUPS_KV: createMockKv() };
   const password = await createWorkerGroup({
