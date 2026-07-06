@@ -223,6 +223,9 @@ import {
   runSurveyResultsManualRefreshDispatchController,
 } from './surveyResultsManualRefreshController';
 import {
+  runSurveyResultsManualRefreshStatusApplicationController,
+} from './surveyResultsManualRefreshStatusApplicationController';
+import {
   runSurveyResultsQueuedRefreshController,
 } from './surveyResultsQueuedRefreshController';
 import {
@@ -4323,22 +4326,12 @@ setState(asSurveyResultsStateUpdater((prevState) => buildSurveyResultsBooleanTog
 const handleManualRefresh = async (): Promise<void> => {
 try {
   const slug = getEffectiveSlug();
-	  const latestOnChain = await chainScanReadsPort.getLatestBlockNumber(propsRef.current.provider as string | undefined, slug);
-  const refreshStatusSequencePlan = buildSurveyResultsRefreshStatusSequencePlan({
-    latestBlock: latestOnChain,
-    followUpEffects: [
-      'manualRefreshDispatch',
-      'resetLocalStoragePollingBackoff:manual-refresh',
-      'pollLocalStorageForUpdates',
-      'queueResultsRefresh:manual-refresh',
-    ],
-  });
-  if (!refreshStatusSequencePlan.shouldWrite || !refreshStatusSequencePlan.statePatch) return;
-
-  setState(
-    asSurveyResultsStatePatch(refreshStatusSequencePlan.statePatch),
-    async () => {
-      await runSurveyResultsManualRefreshDispatchController({
+  await runSurveyResultsManualRefreshStatusApplicationController({
+    ports: {
+      applyRefreshState: (statePatch, afterApply) => {
+        setState(asSurveyResultsStatePatch(statePatch), afterApply);
+      },
+      dispatchManualRefresh: () => runSurveyResultsManualRefreshDispatchController({
         ports: {
           onQuestionMetadataRefreshAvailable: () => surveyLog.log("refreshQuestionMetadata present"),
           refreshQuestionMetadata: propsRef.current.refreshQuestionMetadata,
@@ -4347,12 +4340,16 @@ try {
         },
         surveyId: stateRef.current.surveyId,
         viewMode: stateRef.current.viewMode,
-      });
-      resetLocalStoragePollingBackoff('manual-refresh');
-      pollLocalStorageForUpdates();
-      queueResultsRefresh('manual-refresh');
-    }
-  );
+      }),
+      pollLocalStorageForUpdates,
+      queueResultsRefresh,
+      readLatestBlock: () => chainScanReadsPort.getLatestBlockNumber(
+        propsRef.current.provider as string | undefined,
+        slug
+      ),
+      resetLocalStoragePollingBackoff,
+    },
+  });
 } catch (error) {
   surveyLog.error('handleManualRefresh error:', error);
 }
