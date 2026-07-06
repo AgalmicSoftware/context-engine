@@ -2,7 +2,6 @@ import type React from 'react';
 
 import { buildResponseGatePolicy } from '../../utilities/crypto/litGatePolicy.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
-import { resolveSbtDisplayLabel } from '../../utilities/sbt/sbtDisplayNames.js';
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
 import { t } from '../../utilities/ui/terminology.js';
 import {
@@ -146,6 +145,7 @@ export type SurveyResultsLockedResponsesRuntimePorts = {
   getProps: () => SurveyResultsProps;
   getState: () => SurveyResultsState;
   logWarn: (...args: unknown[]) => void;
+  resolveSbtDisplayLabel: SurveyResultsSbtDisplayLabelResolver;
   resolveSessionContext: (slug: string) => { sessionConfig?: unknown; sessionSlug?: string };
 };
 
@@ -156,10 +156,6 @@ export type SurveyResultsLockedResponsesRuntimeArgs = {
 
 const toSurveyResultsRecord = (value: unknown): SurveyResultsRecord => (
   value && typeof value === 'object' ? value as SurveyResultsRecord : {}
-);
-
-const resolveSbtDisplayLabelForSurveyResults: SurveyResultsSbtDisplayLabelResolver = (args) => (
-  (resolveSbtDisplayLabel as unknown as SurveyResultsSbtDisplayLabelResolver)(args)
 );
 
 export const createSurveyResultsLockedResponsesRuntime = ({
@@ -317,7 +313,7 @@ export const createSurveyResultsLockedResponsesRuntime = ({
       normalizeGateText,
       questionLookup,
       readSessionGateContext,
-      resolveSbtDisplayLabel: resolveSbtDisplayLabelForSurveyResults,
+      resolveSbtDisplayLabel: ports.resolveSbtDisplayLabel,
     }) as SurveyResultsLockedGateDetailsResult;
   };
 

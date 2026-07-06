@@ -184,4 +184,59 @@ describe('surveyResultsHydrationRuntime', () => {
     });
     expect(harness.reapplyQuestionFilters).toHaveBeenCalledTimes(1);
   });
+
+  it('uses the latest filter state after async question cache reads', async () => {
+    let currentState = createState({
+      isFilterActive: false,
+      viewMode: 'questions',
+    });
+    const activeState = createState({
+      filteredQuestionsCount: 1,
+      filteredResponsesCount: 1,
+      isFilterActive: true,
+      sbtFilteredAggregatorQuestionResponses: { q1: [{ responder: '0xFiltered' }] },
+      viewMode: 'questions',
+    });
+    const questionNetworkData = {
+      questions: {
+        Q1: { id: 'Q1', prompt: 'Question one' },
+      },
+      questionResponses: {
+        Q1: {
+          '0xResponder': JSON.stringify({
+            answer: { value: 'Yes' },
+            sessionSlug: 'session-one',
+            timeStamp: 9,
+          }),
+        },
+      },
+    };
+    const harness = createPorts({
+      state: currentState,
+      questionNetworkData,
+    });
+
+    await fetchSurveyResultsQuestionModeResponses({
+      instance: createInstance(),
+      ports: {
+        ...harness.ports,
+        getScopedQuestionNetworkData: async () => {
+          currentState = activeState;
+          return questionNetworkData as never;
+        },
+        getState: () => currentState,
+      },
+    });
+
+    expect(harness.patchCalls).toHaveLength(1);
+    expect(harness.patchCalls[0].patch).toMatchObject({
+      filteredQuestionsCount: 1,
+      filteredResponsesCount: 1,
+      questionResultsHydrated: true,
+      sbtFilteredAggregatorQuestionResponses: activeState.sbtFilteredAggregatorQuestionResponses,
+      totalQuestionsCount: 1,
+      totalResponsesCount: 1,
+    });
+    expect(harness.reapplyQuestionFilters).toHaveBeenCalledTimes(1);
+  });
 });
