@@ -59,6 +59,7 @@
     "test:local": "bash -c 'set -euo pipefail; anvil --silent --port 8545 --chain-id 31337 --mnemonic \"test test test test test test test test test test test junk\" > /tmp/anvil.log 2>&1 & ANVIL_PID=$!; trap \"kill $ANVIL_PID\" EXIT; for i in {1..20}; do if cast block-number --rpc-url http://127.0.0.1:8545 >/dev/null 2>&1; then break; fi; sleep 0.25; done; npm run chain:deploy; (cd client && npm test)'",
     "verify:release": "npm run lint && npm run typecheck:client && npm run test:release:client && npm run verify:public-release-surface && npm run worker:bundle && npm run verify:worker-bundle && npm --prefix client run build",
     "ai:node": "node -r ./scripts/lib/env-loader.js",
+    "ai:harness:doctor": "node scripts/ai-harness-doctor.js",
     "ai:playwright-server": "npm run -s ai:node -- scripts/start-playwright-server.js",
     "ai:wallet": "npm run -s ai:node -- scripts/ai-wallet.js",
     "ai:mint-test-sbt": "npm run -s ai:node -- scripts/mint-test-sbt.js",
@@ -87,7 +88,6 @@
     "client:bundle-budget:check": "node scripts/check-client-bundle-budget.mjs",
     "ci:gate": "node scripts/run-ci-gates.mjs --gate",
     "ci:gates:check-hosted": "node scripts/run-ci-gates.mjs --check-results hosted",
-    "ai:harness:doctor": "node scripts/ai-harness-doctor.js",
     "lint:workers": "node scripts/run-workers-lint.js"
   },
   "devDependencies": {
