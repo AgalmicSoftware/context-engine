@@ -2,15 +2,20 @@ export function isArrayBufferLike(value: unknown): value is ArrayBuffer {
   return value instanceof ArrayBuffer || Object.prototype.toString.call(value) === '[object ArrayBuffer]';
 }
 
-export function bufferToBase64URL(buffer: ArrayBuffer | ArrayBufferView): string {
-  let bytes: Uint8Array;
+export function bufferSourceToUint8Array(buffer: ArrayBuffer | ArrayBufferView): Uint8Array {
   if (isArrayBufferLike(buffer)) {
-    bytes = new Uint8Array(buffer);
-  } else if (ArrayBuffer.isView(buffer)) {
-    bytes = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
-  } else {
-    throw new Error('Expected an ArrayBuffer or ArrayBufferView.');
+    return new Uint8Array(buffer);
   }
+
+  if (ArrayBuffer.isView(buffer)) {
+    return new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+  }
+
+  throw new Error('Expected an ArrayBuffer or ArrayBufferView.');
+}
+
+export function bufferToBase64URL(buffer: ArrayBuffer | ArrayBufferView): string {
+  const bytes = bufferSourceToUint8Array(buffer);
   let value = '';
   for (let i = 0; i < bytes.byteLength; i += 1) {
     value += String.fromCharCode(bytes[i]);

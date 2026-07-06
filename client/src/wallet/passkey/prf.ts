@@ -1,4 +1,9 @@
-import { base64URLToBuffer, bufferToBase64URL, isArrayBufferLike } from './encoding.js';
+import {
+  base64URLToBuffer,
+  bufferSourceToUint8Array,
+  bufferToBase64URL,
+  isArrayBufferLike,
+} from './encoding.js';
 
 type PrfResults = {
   prf?: {
@@ -38,7 +43,13 @@ export const deriveAesGcmKeyFromPrf = async (
   saltBase64Url: string
 ): Promise<CryptoKey> => {
   if (!crypto.subtle) throw new Error('WebCrypto subtle API is not available.');
-  const baseKey = await crypto.subtle.importKey('raw', prfOutput, 'HKDF', false, ['deriveKey']);
+  const baseKey = await crypto.subtle.importKey(
+    'raw',
+    bufferSourceToUint8Array(prfOutput),
+    'HKDF',
+    false,
+    ['deriveKey']
+  );
   return crypto.subtle.deriveKey(
     {
       name: 'HKDF',
