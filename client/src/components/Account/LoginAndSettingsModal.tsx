@@ -207,6 +207,72 @@ interface LoginAndSettingsModalState {
   walletBalanceWei: ethers.BigNumber | null;
 }
 
+type SponsoredSessionEntry = Record<string, unknown> & {
+  slug: string;
+  label: string;
+  sponsoredKeys: Record<string, unknown>;
+  isActive?: boolean;
+  inRpcScope?: boolean;
+};
+
+type AiSettingsLike = Record<string, unknown> & {
+  mode?: unknown;
+  models?: Record<string, unknown>;
+  modelProviders?: Record<string, unknown>;
+  providers?: Record<string, unknown>;
+  preset?: unknown;
+  taskReasoningEffort?: Record<string, unknown>;
+  transcription?: Record<string, unknown>;
+};
+
+type AiPresetOption = {
+  key: string;
+  label: string;
+  badgeLabel: string;
+  provider?: unknown;
+  models?: Readonly<Record<string, unknown>>;
+};
+
+type AiPresetConfig = {
+  provider?: unknown;
+  models?: Readonly<Record<string, unknown>>;
+};
+
+type ChainIdLike = {
+  id?: unknown;
+  chainId?: unknown;
+} | null | undefined;
+
+type WagmiBalanceLike = {
+  data?: { value?: unknown };
+  value?: unknown;
+} | null | undefined;
+
+type TestFundsRequestOptions = {
+  source?: 'manual' | 'auto';
+};
+
+type SettingsSessionDescriptor = Record<string, unknown> & {
+  label: string;
+};
+
+type SponsoredSessionSources = {
+  byResource: Record<string, SponsoredSessionEntry[]>;
+  rpcScope: SponsoredSessionEntry[];
+};
+
+type SettingsOverviewContext = {
+  activeSession: SettingsSessionDescriptor;
+  cryptoTerminology: boolean;
+  needsNetworkSwitch: boolean;
+  showWalletNetwork: boolean;
+  sponsorshipCards: ReturnType<typeof buildLoginSettingsSponsorshipCards>;
+  sponsorSessions: SponsoredSessionSources;
+  targetNetworkName: string;
+  targetNetwork: unknown;
+  walletNetworkName: string;
+};
+
 export { buildBookmarksRoutePath };
 const getErrorCode = (error: unknown) => (
   error && typeof error === 'object' ? (error as { code?: unknown }).code : undefined
@@ -218,6 +284,16 @@ const uniqueList = <T = unknown>(values: T[] = []) => (
     )
   )
 );
+const readChainIdLike = (value: ChainIdLike): unknown => (
+  value && typeof value === 'object'
+    ? value.id ?? value.chainId ?? 0
+    : 0
+);
+const readWagmiBalanceValue = (value: WagmiBalanceLike): unknown => (
+  value && typeof value === 'object'
+    ? value.data?.value ?? value.value ?? null
+    : null
+);
 const AI_PRESET_LABELS: Record<string, { label: string; badgeLabel: string }> = Object.freeze({
   'gpt-5': { label: 'GPT-5 (default)', badgeLabel: 'GPT-5' },
   'gpt-4o': { label: 'GPT-4o', badgeLabel: 'GPT-4o' },
@@ -225,8 +301,8 @@ const AI_PRESET_LABELS: Record<string, { label: string; badgeLabel: string }> = 
   'claude-opus': { label: 'Claude Opus 4.6', badgeLabel: 'Claude Opus 4.6' },
 });
 
-const AI_PRESET_OPTIONS: readonly any[] = Object.freeze([
-  ...Object.entries(AI_PRESET_CONFIGS).map(([key, config]: any) => Object.freeze({
+const AI_PRESET_OPTIONS: readonly AiPresetOption[] = Object.freeze([
+  ...Object.entries(AI_PRESET_CONFIGS as Record<string, AiPresetConfig>).map(([key, config]) => Object.freeze({
     key,
     label: AI_PRESET_LABELS[key]?.label || key,
     badgeLabel: AI_PRESET_LABELS[key]?.badgeLabel || key,
@@ -240,18 +316,18 @@ const AI_PRESET_OPTIONS: readonly any[] = Object.freeze([
   }),
 ]);
 
-const deriveAiPresetKey = (settings: any = {}) => deriveAiPreset({
+const deriveAiPresetKey = (settings: AiSettingsLike = {}) => deriveAiPreset({
   mode: settings?.mode,
   models: settings?.models,
   modelProviders: settings?.modelProviders,
 });
 
-const getAiPresetMeta = (presetKey: any = ''): any => (
-  AI_PRESET_OPTIONS.find((entry: any) => entry.key === presetKey) ||
+const getAiPresetMeta = (presetKey: unknown = ''): AiPresetOption => (
+  AI_PRESET_OPTIONS.find((entry) => entry.key === presetKey) ||
   AI_PRESET_OPTIONS[AI_PRESET_OPTIONS.length - 1]
 );
 
-const formatAiPresetBadgeLabel = (settings: any = {}) => {
+const formatAiPresetBadgeLabel = (settings: AiSettingsLike = {}) => {
   const hasModelShape = !!(
     settings?.models?.fast ||
     settings?.models?.thinking ||
@@ -267,10 +343,10 @@ const formatAiPresetBadgeLabel = (settings: any = {}) => {
   return toStr(settings?.models?.thinking || settings?.models?.fast || settings?.mode || 'Custom model') || 'Custom model';
 };
 
-const settingsSupportReasoning = (settings: any = {}) => (
+const settingsSupportReasoning = (settings: AiSettingsLike = {}) => (
   [settings?.models?.fast, settings?.models?.thinking]
-    .map((model: any) => toModelLeaf(model))
-    .some((modelLeaf: any) => /^(gpt-5|o[13])/.test(modelLeaf))
+    .map((model) => toModelLeaf(model))
+    .some((modelLeaf) => /^(gpt-5|o[13])/.test(toStr(modelLeaf)))
 );
 
 export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps, LoginAndSettingsModalState> {
@@ -315,7 +391,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
         Array.isArray(initialSessionScanSlugs)
           ? initialSessionScanSlugs
           : []
-      ).map((slug: any) => (slug ? slug : 'general')).join(', '),
+      ).map((slug: string) => (slug ? slug : 'general')).join(', '),
       sessionScanStatus: '',
       preLoginSettingsOpen: false,
       preLoginConfigOpen: false,
@@ -501,16 +577,16 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   getWalletChainId = (props: LoginAndSettingsModalProps = this.props) => (
     Number(
       props.provider === 'wagmi'
-        ? ((props.wagmiNetwork as any)?.id ?? (props.wagmiNetwork as any)?.chainId ?? (props.network as any)?.id ?? (props.network as any)?.chainId ?? 0)
-        : ((props.network as any)?.id ?? (props.network as any)?.chainId ?? 0)
+        ? (readChainIdLike(props.wagmiNetwork) || readChainIdLike(props.network))
+        : readChainIdLike(props.network)
     ) || null
   );
 
   getWagmiBalanceInput = (props: LoginAndSettingsModalProps = this.props) => (
-    (props.wagmiBalance as any)?.data?.value ?? (props.wagmiBalance as any)?.value ?? null
+    readWagmiBalanceValue(props.wagmiBalance)
   );
 
-  areWalletBalanceInputsEqual = (leftBalance: any, rightBalance: any) => {
+  areWalletBalanceInputsEqual = (leftBalance: unknown, rightBalance: unknown) => {
     if (leftBalance === rightBalance) return true;
     if (leftBalance == null || rightBalance == null) return leftBalance == null && rightBalance == null;
     try {
@@ -564,7 +640,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     `${this.getWalletBalanceContextKey(props)}|${this.getActiveSessionSlug(props, state)}`
   );
 
-  normalizeWalletBalance = (rawBalance: any) => {
+  normalizeWalletBalance = (rawBalance: unknown) => {
     if (rawBalance == null) return null;
     if (ethers.BigNumber.isBigNumber(rawBalance)) return rawBalance;
     if (typeof rawBalance === 'bigint') return ethers.BigNumber.from(String(rawBalance));
@@ -604,7 +680,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
 
   syncWalletBalance = async (props: LoginAndSettingsModalProps = this.props) => {
     const balanceContextKey = this.getWalletBalanceContextKey(props);
-    let nextBalance: any = null;
+    let nextBalance: ethers.BigNumber | null = null;
 
     try {
       nextBalance = await this.readWalletBalance(props);
@@ -639,24 +715,25 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     }
   };
 
-  buildTestFundsSuccessMessage = (result: any = {}) => {
+  buildTestFundsSuccessMessage = (result: Record<string, unknown> = {}) => {
     const amountEth = toStr(result?.amountEth).trim();
     const networkName = this.getTargetNetwork()?.name || 'the session network';
     if (amountEth) return `Test gas sent: ${amountEth} ETH on ${networkName}.`;
     return `Test gas sent on ${networkName}.`;
   };
 
-  buildTestFundsErrorMessage = (error: any, { source = 'manual' }: any = {}) => {
+  buildTestFundsErrorMessage = (error: unknown, { source = 'manual' }: TestFundsRequestOptions = {}) => {
     const prefix = source === 'auto' ? 'Auto-funding failed' : 'Get test gas failed';
-    const baseMessage = toStr(error?.message).trim() || 'Failed to request test gas.';
-    const status = Number(error?.status || 0) || 0;
+    const errorRecord = error && typeof error === 'object' ? error as Record<string, unknown> : {};
+    const baseMessage = toStr(errorRecord.message).trim() || 'Failed to request test gas.';
+    const status = Number(errorRecord.status || 0) || 0;
     if (status && !baseMessage.includes(`(${status})`) && !baseMessage.includes(`HTTP ${status}`)) {
       return `${prefix}: ${baseMessage} (HTTP ${status}).`;
     }
     return `${prefix}: ${baseMessage}`;
   };
 
-  requestTestFunds = async ({ source = 'manual' }: any = {}) => {
+  requestTestFunds = async ({ source = 'manual' }: TestFundsRequestOptions = {}) => {
     if (this.state.sendingTestFunds) return null;
     const walletAccount = this.getWalletAccount();
     if (!walletAccount) return null;
@@ -749,7 +826,10 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     clearAllWorkerSessionTokens();
   };
 
-  componentDidUpdate(prevProps: any, prevState: any) {
+  componentDidUpdate(
+    prevProps: Readonly<LoginAndSettingsModalProps>,
+    prevState: Readonly<LoginAndSettingsModalState>,
+  ) {
     let needsBalanceCheck = false;
     const activeSessionChanged = (
       this.getActiveSessionSlug(this.props, this.state) !== this.getActiveSessionSlug(prevProps, prevState)
