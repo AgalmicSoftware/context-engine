@@ -8,7 +8,7 @@
   - `client/src/utilities/web3/contractHelpers.ts`
   - `client/src/utilities/web3/chainEventStreams.ts`
   - `client/src/utilities/web3/contractProfile.ts`
-  - `client/src/utilities/web3/contractScriptsEventScans.ts`
+  - `client/src/utilities/web3/chainEventScans.ts`
   - `client/src/utilities/web3/contractScriptsMetadataResolution.ts`
 - Current lengths:
   - `contractScripts.js`: **12 lines**
@@ -18,7 +18,8 @@
   - `chainEventStreams.ts`: **554 lines**
   - `contractEventListeners.ts`: **2-line compatibility alias**
   - `contractProfile.ts`: **1,151 lines**
-  - `contractScriptsEventScans.ts`: **511 lines**
+  - `chainEventScans.ts`: **511 lines**
+  - `contractScriptsEventScans.ts`: **5-line compatibility alias**
   - `contractScriptsMetadataResolution.ts`: **797 lines**
 - This map intentionally avoids exact line numbers. Phase 4 TypeScript extraction and helper splits move code frequently, so name-based navigation stays more accurate than stale ranges.
 - `sessionRegistry.ts` and `contractScripts.impl.ts` typecheck without `@ts-nocheck`. The typed web3-core milestone was verified on OP Sepolia with the gate and gated-decrypt E2E suites; Lit v3 remains chain-configured and is not tied to a single testnet.
@@ -30,7 +31,7 @@ contractScripts.js  [CJS compatibility barrel for jest.spyOn]
      -> createContractHelperMethods(...)        [provider / block-window / cache helpers]
      -> createContractEventListenerMethods(...) [SBT / survey chain event streams]
      -> createContractProfileMethods(...)       [SBT universe + user activity/profile scans]
-     -> contractScriptsEventScans.ts            [stateless event-scan helpers]
+     -> chainEventScans.ts                     [stateless event-scan helpers]
      -> contractScriptsMetadataResolution.ts    [metadata read / resolution helpers]
 ```
 
@@ -44,7 +45,7 @@ Route/page code now reaches selected `contractScripts` operations through purpos
 - Start in `contractHelpers.ts` for block windows, latest block/gas, read-provider behavior, or faucet helpers.
 - Start in `chainEventStreams.ts` for long-lived listener registration and cleanup.
 - Start in `contractProfile.ts` for user-profile scans, SBT universe discovery, and memoized holdings/activity views.
-- Start in `contractScriptsEventScans.ts` for stateless historical event-scan helpers delegated from the main export object.
+- Start in `chainEventScans.ts` for stateless historical event-scan helpers delegated from the main export object.
 - Start in `contractScriptsMetadataResolution.ts` for metadata URI resolution and stateless metadata read helpers delegated from the main export object.
 - Start in `contractScripts.impl.ts` for everything else: session lookup, decrypt policy, Arweave IO, tx submission, SBT creation/claim flows, and dependency wiring.
 - Start in `client/src/domains/sbts/`, `client/src/domains/chain/`, `client/src/domains/profiles/`, `client/src/domains/surveys/`, or `client/src/domains/worker/` when a page already uses a purpose port for a narrow read/write/listener/faucet operation.
@@ -82,8 +83,9 @@ Route/page code now reaches selected `contractScripts` operations through purpos
 ### `contractProfile.ts`
 - Owns token-owner lookups, SBT universe discovery, per-user holdings memoization, minimal SBT summaries, and cross-domain activity aggregation.
 
-### `contractScriptsEventScans.ts`
+### `chainEventScans.ts`
 - Owns stateless historical event-scan helpers split from the main implementation while preserving call-time delegation through the `contractScripts` object.
+- `contractScriptsEventScans.ts` remains as a naming-migration alias for existing imports while callers move to the canonical scan name.
 
 ### `contractScriptsMetadataResolution.ts`
 - Owns stateless metadata URI resolution, fetch, and normalization helpers split from the main implementation while preserving call-time delegation through the `contractScripts` object.
