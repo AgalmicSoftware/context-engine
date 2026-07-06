@@ -36,7 +36,7 @@ make release-clean           # delete the artifact
 Important behavior:
 
 - Public replay identity is always forced to `Agalmic <agalmicsoftware@protonmail.com>`
-- The first sync run installs a repo-local `pre-push` hook that blocks `dev -> origin`
+- The first sync run installs a repo-local `pre-push` hook that blocks private branch pushes (`dev`, `codex/*`, `claude/*`, and `edge-*`) to public remotes.
 - Commits that only touch stripped paths are skipped automatically
 - `--dry-run` lists which commits would replay vs skip without creating the replay branch
 - Before the replayed branch is imported or pushed, `scripts/verify-public-release-surface.js` scans public JavaScript/TypeScript imports, exports, dynamic imports, and `require(...)` calls and fails if any public file resolves into a stripped path such as `contextEngine-cc/`
@@ -52,6 +52,8 @@ Push safety:
 - `make install-private-branch-guard` (or any `sync-public-history.sh` run) installs `.githooks/pre-push` and unsets any `dev` upstream so plain public pushes stay pointed at replay branches, not your private branch
 - The replay branch is rebuilt from `origin/main`, not from `dev`
 - Only the replayed public-safe commits become reachable from the branch you push
+- The guard has no environment-variable bypass for private branch publication; leaked protected branches can still be deleted remotely.
+- CI intentionally does not trigger on `dev`; add public verification through replay branches or pull requests to `main`, not by pushing private branches to GitHub.
 - The same strip patterns as `prepare-public-release.sh` are applied before every replayed commit is created
 - The public-surface import verifier uses the same strip-pattern helper, so newly stripped paths automatically become invalid import targets from public files
 - The replayed public tree runs `npm run test:wiring`, `npm run type-debt:check`, and `npm run test:node` before push with the source checkout's `node_modules` linked into the temporary public checkout when available, so public-copy inventory, boundary/type-debt baselines, and stripped-path assumptions fail locally before PR CI

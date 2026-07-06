@@ -25,17 +25,13 @@ is_protected_branch_ref() {
   local ref_name="$1"
 
   case "$ref_name" in
-    refs/heads/dev)
+    refs/heads/dev|refs/heads/codex/*|refs/heads/claude/*|refs/heads/edge-*)
       return 0
       ;;
   esac
 
   return 1
 }
-
-if [ "${CE_ALLOW_PRIVATE_BRANCH_PUSH:-0}" = "1" ]; then
-  exit 0
-fi
 
 if ! should_protect_remote; then
   exit 0
@@ -49,9 +45,9 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   fi
 
   if is_protected_branch_ref "$local_ref" || is_protected_branch_ref "$remote_ref"; then
-    printf 'Blocked push of the private `dev` branch to %s.\n' "$REMOTE_NAME" >&2
-    printf 'Use `scripts/sync-public-history.sh` to publish `release-staging` instead.\n' >&2
-    printf 'If this push is truly intentional, rerun with `CE_ALLOW_PRIVATE_BRANCH_PUSH=1`.\n' >&2
+    printf 'Blocked push of protected private branch ref to %s.\n' "$REMOTE_NAME" >&2
+    printf 'Use `scripts/sync-public-history.sh` to publish a stripped public replay branch instead.\n' >&2
+    printf 'Remote deletion of leaked protected branches remains allowed.\n' >&2
     exit 1
   fi
 done

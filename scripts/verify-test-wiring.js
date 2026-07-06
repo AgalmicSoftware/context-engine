@@ -66,6 +66,11 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
       failures.push(`CI workflow must include ${description}`);
     }
   };
+  const expectWorkflowOmits = (unexpected, description = unexpected) => {
+    if (workflow.includes(unexpected)) {
+      failures.push(`CI workflow must not include ${description}`);
+    }
+  };
   const expectSyncPublicHistoryContains = (expected, description = expected) => {
     if (!syncPublicHistory.includes(expected)) {
       failures.push(`sync-public-history verification must include ${description}`);
@@ -179,6 +184,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectWorkflowContains('if: ${{ always() }}', 'always-running aggregate test job');
   expectWorkflowContains('WIRING_AND_RELEASE_RESULT:', 'aggregate wiring-and-release result check');
   expectWorkflowContains('CECC_AND_NODE_RESULT:', 'aggregate cecc-and-node result check');
+  expectWorkflowOmits('      - dev\n', 'private dev branch triggers');
   if (!publishWorkflow.includes('run: npm run worker:bundle')) {
     failures.push('publish-worker-bundles workflow must execute "npm run worker:bundle"');
   }
