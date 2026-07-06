@@ -18,6 +18,13 @@ files as `no-passthrough-facade` violations. Existing debt is tracked in
 resolved entries also fail until the baseline is pruned in the same commit. The
 current boundary baseline is zero.
 
+After the survey question runtime moved low-level reads/writes behind domain
+ports, the checker also treats explicit shared runtimes and any production
+component over 5,000 lines as `shared-runtime-no-new-low-level` guarded files.
+This prevents new low-level imports from re-entering large shared runtimes while
+smaller component-helper cleanup remains a separate, reviewable modernization
+lane.
+
 ## Decision
 
 Use this boundary shape for client runtime code:
@@ -42,6 +49,8 @@ late-binding behavior.
 
 - Do not add pass-through barrels or one-line delegation modules outside
   `client/src/domains/**` or `client/src/app/runtime/**`.
+- Do not add direct low-level imports to explicit shared runtime files or
+  production components over 5,000 lines.
 - Do not introduce `(...args: unknown[])` signatures or `as unknown as` casts in
   domain port code.
 - Prefer small purpose ports over broad adapters.

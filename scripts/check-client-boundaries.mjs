@@ -49,6 +49,11 @@ const ROUTE_RUNTIME_OWNER_PREFIXES = Object.freeze([
   'client/src/components/Sessions/SessionWizard',
 ]);
 
+const SHARED_RUNTIME_MIN_LINE_COUNT = 5000;
+const SHARED_RUNTIME_COMPONENT_FILES = Object.freeze([
+  'client/src/components/SurveyTool/SurveyQuestions.tsx',
+]);
+
 export const CLIENT_BOUNDARY_RULES = Object.freeze({
   domainsNoComponents: {
     id: 'domains-no-components',
@@ -57,6 +62,10 @@ export const CLIENT_BOUNDARY_RULES = Object.freeze({
   routePageNoLowLevel: {
     id: 'route-page-no-low-level',
     description: 'route/page code should not add direct imports of low-level web3/worker/storage modules',
+  },
+  sharedRuntimeNoNewLowLevel: {
+    id: 'shared-runtime-no-new-low-level',
+    description: 'large shared runtime components should not add direct imports of low-level web3/worker/storage modules',
   },
   noPassthroughFacade: {
     id: 'no-passthrough-facade',
@@ -207,6 +216,20 @@ const isRouteRuntimeOwnerImport = (resolvedImport) => ROUTE_RUNTIME_OWNER_PREFIX
 
 const isLowLevelRouteImport = (resolvedImport) => LOW_LEVEL_ROUTE_IMPORT_PREFIXES
   .some((prefix) => startsWithPath(resolvedImport, prefix));
+
+const countSourceLines = (sourceText) => (
+  sourceText.length === 0 ? 0 : sourceText.split(/\r\n|\r|\n/).length
+);
+
+function isSharedRuntimeComponent(source, sourceText) {
+  if (!isComponentsPath(source)) {
+    return false;
+  }
+  if (SHARED_RUNTIME_COMPONENT_FILES.includes(source)) {
+    return true;
+  }
+  return countSourceLines(sourceText) > SHARED_RUNTIME_MIN_LINE_COUNT;
+}
 
 const isPassthroughFacadeRuleScope = (filePath) => (
   (isUtilitiesPath(filePath) || isComponentsPath(filePath))
@@ -447,7 +470,7 @@ export function evaluatePassthroughFacade({ source, sourceText }) {
   )];
 }
 
-export function evaluateClientBoundaryImport({ source, specifier, resolved }) {
+export function evaluateClientBoundaryImport({ source, sourceText = '', specifier, resolved }) {
   const violations = [];
 
   if (isUtilitiesPath(source) && isComponentsPath(resolved)) {
@@ -480,6 +503,15 @@ export function evaluateClientBoundaryImport({ source, specifier, resolved }) {
   if (isRouteOrPageCode(source) && isLowLevelRouteImport(resolved)) {
     violations.push(buildViolation(
       CLIENT_BOUNDARY_RULES.routePageNoLowLevel,
+      source,
+      specifier,
+      resolved,
+    ));
+  }
+
+  if (isSharedRuntimeComponent(source, sourceText) && isLowLevelRouteImport(resolved)) {
+    violations.push(buildViolation(
+      CLIENT_BOUNDARY_RULES.sharedRuntimeNoNewLowLevel,
       source,
       specifier,
       resolved,
@@ -520,7 +552,12 @@ export function collectClientBoundaryViolations({
       if (!resolved) {
         continue;
       }
-      violations.push(...evaluateClientBoundaryImport({ source, specifier, resolved }));
+      violations.push(...evaluateClientBoundaryImport({
+        source,
+        sourceText,
+        specifier,
+        resolved,
+      }));
     }
   }
 
