@@ -26,10 +26,16 @@ const mockResolveCorsProxyUrl = jest.fn();
 const mockLoadSessionRegistryCache = jest.fn();
 const mockGetAllSessionEntries = jest.fn();
 const mockBuildSignedAdminActionAuth = jest.fn();
+const mockFetchWorkerWithAuth = jest.fn();
+const mockBuildSiweMessage = jest.fn(() => 'siwe-message');
 const mockSetSessionFieldsOnChain = jest.fn();
 const mockUploadSessionMetadata = jest.fn();
 const mockUpdateSessionMetadataOnChain = jest.fn();
 const mockUpsertSessionRegistryCache = jest.fn();
+const mockFetchSessionFromRegistry = jest.fn();
+const mockUploadDataToArweave = jest.fn();
+const mockBuildArweaveGatewayUrl = jest.fn();
+const mockNormalizeSessionMediaUrl = jest.fn((value) => String(value || '').trim());
 
 jest.mock('../../utilities/worker/corsProxy.js', () => ({
   corsProxyUtils: {
@@ -38,9 +44,9 @@ jest.mock('../../utilities/worker/corsProxy.js', () => ({
 }));
 
 jest.mock('../../utilities/worker/workerAuth.js', () => ({
-  buildSiweMessage: jest.fn(() => 'siwe-message'),
+  buildSiweMessage: (...args) => mockBuildSiweMessage(...args),
   buildSignedAdminActionAuth: (...args) => mockBuildSignedAdminActionAuth(...args),
-  fetchWorkerWithAuth: jest.fn(),
+  fetchWorkerWithAuth: (...args) => mockFetchWorkerWithAuth(...args),
 }));
 
 jest.mock('../../utilities/crypto/cryptography.js', () => ({
@@ -49,13 +55,19 @@ jest.mock('../../utilities/crypto/cryptography.js', () => ({
   },
 }));
 
-jest.mock('../../utilities/arweave/arweaveScripts.js', () => ({
-  arweaveScripts: {
-    uploadDataToArweave: jest.fn(),
+jest.mock('../../utilities/arweave/arweaveClient.js', () => {
+  const arweaveClient = {
+    uploadDataToArweave: (...args) => mockUploadDataToArweave(...args),
+    buildArweaveGatewayUrl: (...args) => mockBuildArweaveGatewayUrl(...args),
     downloadDataFromArweave: jest.fn(),
     readArweaveWalletBalance: jest.fn(),
     formatWinstonToAr: jest.fn(),
-  },
+  };
+  return { arweaveClient, arweaveScripts: arweaveClient };
+});
+
+jest.mock('../../domains/sessions/sessionMediaUrls.js', () => ({
+  normalizeSessionMediaUrl: (...args) => mockNormalizeSessionMediaUrl(...args),
 }));
 
 jest.mock('../../utilities/crypto/encryptedFields.js', () => ({
@@ -72,12 +84,16 @@ jest.mock('../../utilities/web3/sessionRegistry.js', () => ({
   },
   setSessionFieldsOnChain: (...args) => mockSetSessionFieldsOnChain(...args),
   setResourceGatesOnChain: jest.fn(),
-  fetchSessionFromRegistry: jest.fn(),
+  fetchSessionFromRegistry: (...args) => mockFetchSessionFromRegistry(...args),
   upsertSessionRegistryCache: (...args) => mockUpsertSessionRegistryCache(...args),
   uploadSessionMetadata: (...args) => mockUploadSessionMetadata(...args),
   updateSessionMetadataOnChain: (...args) => mockUpdateSessionMetadataOnChain(...args),
   sessionRegistryUtils: {
+    SESSION_REGISTRY_CACHE_UPDATED_EVENT,
+    fetchSessionFromRegistry: (...args) => mockFetchSessionFromRegistry(...args),
+    upsertSessionRegistryCache: (...args) => mockUpsertSessionRegistryCache(...args),
     normalizeSessionIdHex: jest.fn(() => ''),
+    toRegistrySlug: jest.fn((value) => String(value || '').trim().toLowerCase()),
   },
 }));
 
@@ -151,6 +167,16 @@ describe('AdminPage rendered interactions', () => {
       source: 'session-config',
       status: 'ok',
     });
+    mockFetchWorkerWithAuth.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ ok: true }),
+    });
+    mockBuildSiweMessage.mockReturnValue('siwe-message');
+    mockFetchSessionFromRegistry.mockResolvedValue(null);
+    mockUploadDataToArweave.mockResolvedValue('arweave_test_tx_1234567890');
+    mockBuildArweaveGatewayUrl.mockImplementation((txId) => `https://arweave.example.test/${txId}`);
+    mockNormalizeSessionMediaUrl.mockImplementation((value) => String(value || '').trim());
     mockUploadSessionMetadata.mockResolvedValue({
       txId: 'metadata_tx_id',
       metadataUri: 'ar://metadata_tx_id',
@@ -232,6 +258,214 @@ describe('AdminPage rendered interactions', () => {
     expect(screen.queryByText(/^Tests$/)).not.toBeInTheDocument();
   });
 
+  it('runs worker health, AI, and faucet probes through authenticated worker fetches', async () => {
+    global.fetch = jest.fn((url) => Promise.resolve(
+      String(url).endsWith('/health')
+        ? { ok: false, status: 401, json: async () => ({ error: 'auth required' }) }
+        : { ok: true, status: 200, json: async () => ({ ok: true }) }
+    ));
+    mockFetchWorkerWithAuth.mockImplementation(async (url) => ({
+      ok: true,
+      status: 200,
+      json: async () => {
+        if (String(url).endsWith('/health')) return { ts: '2026-01-02T03:04:05.000Z' };
+        if (String(url).endsWith('/ai')) return { completion: 'pong from worker' };
+        return { txHash: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef' };
+      },
+    }));
+
+    await renderAdminPage();
+    await waitForResolvedWorkerUrl();
+    await clickAndSettle(screen.getByRole('button', { name: 'Test' }));
+    const testsPanel = screen.getByText('Tests').closest('section');
+
+    await clickAndSettle(within(testsPanel).getByTitle('Click to test /health'));
+    await waitFor(() => {
+      expect(screen.getByText('OK (2026-01-02T03:04:05.000Z)')).toBeInTheDocument();
+    });
+
+    await clickAndSettle(within(testsPanel).getByTitle('Click to test AI'));
+    await waitFor(() => {
+      expect(screen.getByText('OK (pong from worker)')).toBeInTheDocument();
+    });
+
+    await clickAndSettle(within(testsPanel).getByTitle('Click to test faucet (0.0000001)'));
+    await waitFor(() => {
+      expect(screen.getByText('OK (tx 0x1234567890…)')).toBeInTheDocument();
+    });
+
+    expect(mockFetchWorkerWithAuth).toHaveBeenCalledWith(
+      'https://worker.example.test/health',
+      { method: 'GET' },
+      expect.objectContaining({
+        sessionSlug: 'edge',
+        workerUrl: 'https://worker.example.test',
+      })
+    );
+    expect(mockFetchWorkerWithAuth).toHaveBeenCalledWith(
+      'https://worker.example.test/ai',
+      expect.objectContaining({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: expect.stringContaining('"action":"ai"'),
+      }),
+      expect.objectContaining({
+        sessionSlug: 'edge',
+        workerUrl: 'https://worker.example.test',
+      })
+    );
+    expect(mockFetchWorkerWithAuth).toHaveBeenCalledWith(
+      'https://worker.example.test/',
+      expect.objectContaining({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: expect.stringContaining('"action":"request_test_eth"'),
+      }),
+      expect.objectContaining({
+        sessionSlug: 'edge',
+        workerUrl: 'https://worker.example.test',
+      })
+    );
+  });
+
+  it('keeps worker probe requests exclusive while a probe is in flight', async () => {
+    global.fetch = jest.fn((url) => Promise.resolve(
+      String(url).endsWith('/health')
+        ? { ok: false, status: 401, json: async () => ({ error: 'auth required' }) }
+        : { ok: true, status: 200, json: async () => ({ ok: true }) }
+    ));
+    let resolveHealth;
+    mockFetchWorkerWithAuth.mockImplementation((url) => {
+      if (String(url).endsWith('/health')) {
+        return new Promise((resolve) => {
+          resolveHealth = () => resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({ ts: '2026-01-02T03:04:05.000Z' }),
+          });
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ completion: 'should not run while health is busy' }),
+      });
+    });
+
+    await renderAdminPage();
+    await waitForResolvedWorkerUrl();
+    await clickAndSettle(screen.getByRole('button', { name: 'Test' }));
+    const testsPanel = screen.getByText('Tests').closest('section');
+
+    fireEvent.click(within(testsPanel).getByTitle('Click to test /health'));
+    await screen.findAllByText('Testing…');
+
+    fireEvent.click(within(testsPanel).getByTitle('Click to test AI'));
+
+    expect(mockFetchWorkerWithAuth).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveHealth();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('OK (2026-01-02T03:04:05.000Z)')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('OK (should not run while health is busy)')).not.toBeInTheDocument();
+  });
+
+  it('uploads the admin Arweave probe payload and displays the gateway link', async () => {
+    mockUploadDataToArweave.mockResolvedValue('arweave_probe_tx_1234567890');
+
+    await renderAdminPage();
+    await waitForResolvedWorkerUrl();
+    await clickAndSettle(screen.getByRole('button', { name: 'Test' }));
+    const testsPanel = screen.getByText('Tests').closest('section');
+
+    await clickAndSettle(within(testsPanel).getByTitle('Click to test Arweave upload'));
+
+    await waitFor(() => {
+      expect(mockUploadDataToArweave).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole('link', { name: 'OK (tx arweave_prob…)' })).toHaveAttribute(
+        'href',
+        'https://arweave.example.test/arweave_probe_tx_1234567890'
+      );
+    });
+    expect(mockUploadDataToArweave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'admin-test',
+        slug: 'edge',
+      }),
+      'json',
+      expect.objectContaining({
+        sessionSlug: 'edge',
+        workerUrl: 'https://worker.example.test',
+      })
+    );
+    expect(mockBuildArweaveGatewayUrl).toHaveBeenCalledWith('arweave_probe_tx_1234567890');
+  });
+
+  it('signs the prepared SIWE message and posts the denied-login body unchanged', async () => {
+    const signMessage = jest.fn().mockResolvedValue('0xrendered-siwe-signature');
+    web3ProviderSpy.mockImplementation(() => ({
+      getSigner: () => ({ signMessage }),
+    }));
+    mockBuildSiweMessage.mockReturnValue('rendered-byte-exact-siwe-message');
+    global.fetch = jest.fn((url) => {
+      if (String(url).endsWith('/auth/nonce')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ nonce: 'rendered-nonce' }),
+        });
+      }
+      if (String(url).endsWith('/auth/login')) {
+        return Promise.resolve({
+          ok: false,
+          status: 403,
+          json: async () => ({ error: 'expected-denied' }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true }),
+      });
+    });
+
+    await renderAdminPage();
+    await waitForResolvedWorkerUrl();
+    await clickAndSettle(screen.getByRole('button', { name: 'Test' }));
+    fireEvent.click(screen.getByTestId('ce-admin-denied-chip-login'));
+
+    await waitFor(() => {
+      expect(signMessage).toHaveBeenCalledWith('rendered-byte-exact-siwe-message');
+    });
+    const loginCall = global.fetch.mock.calls.find(([url]) => (
+      String(url).endsWith('/auth/login')
+    ));
+    expect(loginCall?.[1]).toMatchObject({
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    expect(JSON.parse(loginCall[1].body)).toEqual({
+      address: ADMIN_ADDRESS,
+      message: 'rendered-byte-exact-siwe-message',
+      signature: '0xrendered-siwe-signature',
+      sessionSlug: 'edge',
+    });
+    expect(mockBuildSiweMessage).toHaveBeenCalledWith({
+      address: ADMIN_ADDRESS,
+      nonce: 'rendered-nonce',
+      chainId: 84532,
+      statement: 'Sign in to Context Engine.',
+    });
+    await waitFor(() => {
+      expect(screen.getByText('OK (403 expected-denied)')).toBeInTheDocument();
+    });
+  });
+
   it('does not reserve hero media space when the session header image fails to load', async () => {
     const OriginalImage = global.Image;
     class BrokenImageMock {
@@ -258,6 +492,43 @@ describe('AdminPage rendered interactions', () => {
         expect(hero).toHaveClass(styles.heroNoMedia);
       });
       expect(screen.queryByAltText('edge header')).not.toBeInTheDocument();
+    } finally {
+      global.Image = OriginalImage;
+    }
+  });
+
+  it('normalizes the session header image through the session media domain helper', async () => {
+    const OriginalImage = global.Image;
+    class LoadedImageMock {
+      set src(_value) {
+        setTimeout(() => {
+          if (typeof this.onload === 'function') this.onload();
+        }, 0);
+      }
+    }
+    global.Image = LoadedImageMock;
+    mockNormalizeSessionMediaUrl.mockReturnValue('https://media.example.test/session-header.png');
+    sessionEntries = [[
+      'edge',
+      buildSessionConfig({
+        sessionHeaderImg: ' ar://session_header_tx ',
+      }),
+    ]];
+
+    try {
+      await renderAdminPage();
+      await waitForResolvedWorkerUrl();
+
+      await waitFor(() => {
+        expect(screen.getByAltText('edge header')).toHaveAttribute(
+          'src',
+          'https://media.example.test/session-header.png'
+        );
+      });
+      expect(mockNormalizeSessionMediaUrl).toHaveBeenCalledWith(
+        ' ar://session_header_tx ',
+        { contextLabel: 'session_header_image' }
+      );
     } finally {
       global.Image = OriginalImage;
     }
@@ -376,6 +647,64 @@ describe('AdminPage rendered interactions', () => {
 
     const sessionSelect = await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT);
     expect(sessionSelect).toHaveValue('edge');
+  });
+
+  it('round-trips requested registry refreshes through fetch, upsert, and store reads', async () => {
+    sessionEntries = [];
+    const requestedConfig = buildSessionConfig({
+      slug: 'requested-edge',
+      sessionName: 'Requested Edge Session',
+    });
+    mockFetchSessionFromRegistry.mockResolvedValue(requestedConfig);
+    mockUpsertSessionRegistryCache.mockImplementation(({ config }) => {
+      sessionEntries = [[config.slug, config]];
+    });
+
+    await renderAdminPage({
+      initialSessionId: 'requested-edge',
+      initialRegistryChainId: '84532',
+    });
+
+    await clickAndSettle(screen.getByRole('button', { name: 'Refresh sessions' }));
+
+    await waitFor(() => {
+      expect(mockFetchSessionFromRegistry).toHaveBeenCalledWith(expect.objectContaining({
+        chainId: 84532,
+        slug: 'requested-edge',
+        providerLike: null,
+        account: '',
+        lit: null,
+        bootstrapRpc: true,
+      }));
+      expect(mockUpsertSessionRegistryCache).toHaveBeenCalledWith({
+        config: requestedConfig,
+      });
+      expect(screen.getByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('requested-edge');
+    });
+    expect(mockGetAllSessionEntries).toHaveBeenCalled();
+  });
+
+  it('subscribes and unsubscribes the registry cache update listener with the same callback', async () => {
+    const addEventListenerSpy = jest.spyOn(window, 'addEventListener');
+    const removeEventListenerSpy = jest.spyOn(window, 'removeEventListener');
+    try {
+      const { unmount } = await renderAdminPage();
+
+      const addCall = addEventListenerSpy.mock.calls.find(([eventName]) => (
+        eventName === SESSION_REGISTRY_CACHE_UPDATED_EVENT
+      ));
+      expect(addCall).toBeTruthy();
+
+      unmount();
+
+      expect(removeEventListenerSpy).toHaveBeenCalledWith(
+        SESSION_REGISTRY_CACHE_UPDATED_EVENT,
+        addCall[1]
+      );
+    } finally {
+      addEventListenerSpy.mockRestore();
+      removeEventListenerSpy.mockRestore();
+    }
   });
 
   it('preserves decrypted encrypted fields across equivalent registry cache refreshes', async () => {

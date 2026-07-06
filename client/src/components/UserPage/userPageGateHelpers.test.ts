@@ -846,5 +846,32 @@ describe('userPageGateHelpers', () => {
       surveyId: hashZero,
       acceptedSurveyIds: [hashZero],
     });
+    expect(buildUserPageResponseDecryptSurveyBindings({
+      hashZero,
+      questionId: 'q1',
+      responseOverride: null,
+      detailedSurveyResponses: {
+        IncludedSurvey: [
+          {
+            questionData: { id: 'Q1', surveyID: 'QuestionSurvey' },
+            responseData: { surveyId: 'ResponseSurvey' },
+          },
+        ],
+        IgnoredSurvey: [
+          {
+            questionData: { id: 'Other', surveyID: 'IgnoredQuestion' },
+            responseData: { surveyId: 'IgnoredResponse' },
+          },
+        ],
+      },
+    })).toEqual({
+      surveyId: 'includedsurvey',
+      acceptedSurveyIds: [
+        'includedsurvey',
+        'questionsurvey',
+        'responsesurvey',
+        hashZero,
+      ],
+    });
   });
 });

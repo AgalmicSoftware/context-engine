@@ -6,7 +6,41 @@
 import { createLogger, shouldLog } from '../logging.js';
 import { toStr } from '../shared/primitives.js';
 
-type AnyRecord = Record<string, any>;
+type RpcRuntimeGlobals = Window & {
+  CE_RPC_VERBOSE_ERRORS?: unknown;
+};
+type RpcErrorNode = {
+  body?: unknown;
+  cause?: unknown;
+  code?: unknown;
+  data?: unknown;
+  error?: RpcErrorNode;
+  errors?: unknown[];
+  message?: unknown;
+  method?: unknown;
+  name?: unknown;
+  provider?: {
+    connection?: {
+      url?: unknown;
+    };
+  };
+  reason?: unknown;
+  requestBody?: unknown;
+  requestMethod?: unknown;
+  results?: unknown[];
+  stack?: unknown;
+  status?: unknown;
+  statusCode?: unknown;
+  url?: unknown;
+};
+type RpcErrorSummary = Record<string, unknown>;
+type StackLike = {
+  split: (separator: string) => string[];
+};
+
+const asRpcErrorNode = (value: unknown): RpcErrorNode => (
+  value && typeof value === 'object' ? value as RpcErrorNode : {}
+);
 
 const rpcLogger = createLogger('rpc', { prefix: '[RPC_DEBUG]' });
 const RPC_ERROR_TREE_MAX_DEPTH = 5;
@@ -17,7 +51,7 @@ const RPC_ERROR_TREE_MAX_STACK_LINES = 8;
 const isVerboseRpcErrorsEnabled = (): boolean => {
   try {
     if (typeof window === 'undefined') return false;
-    return (window as Window & AnyRecord).CE_RPC_VERBOSE_ERRORS === true;
+    return (window as RpcRuntimeGlobals).CE_RPC_VERBOSE_ERRORS === true;
   } catch (_) {
     return false;
   }
@@ -31,56 +65,59 @@ export function truncateRpcString(value: unknown, maxLen = RPC_ERROR_TREE_MAX_ST
 }
 
 export function summarizeRpcError(
-  err: any,
+  err: unknown,
   depth = RPC_ERROR_TREE_MAX_DEPTH,
-  seen: Set<any> = new Set()
+  seen: Set<unknown> = new Set()
 ): unknown {
   if (err == null) return err;
   if (typeof err !== 'object') return truncateRpcString(err);
   if (seen.has(err)) return { circular: true };
   seen.add(err);
+  const error = asRpcErrorNode(err);
+  const nestedError = asRpcErrorNode(error.error);
+  const providerConnection = asRpcErrorNode(error.provider?.connection);
 
   const url =
-    err?.url ||
-    err?.error?.url ||
-    err?.provider?.connection?.url;
+    error.url ||
+    nestedError.url ||
+    providerConnection.url;
 
-  const summary: AnyRecord = {
-    name: err?.name,
-    code: err?.code ?? err?.error?.code,
-    status: err?.status ?? err?.statusCode ?? err?.error?.status ?? err?.error?.statusCode,
-    message: truncateRpcString(err?.message || err?.error?.message || err?.reason || err?.error?.reason),
-    method: err?.method || err?.error?.method || err?.requestMethod,
-    requestMethod: err?.requestMethod,
+  const summary: RpcErrorSummary = {
+    name: error.name,
+    code: error.code ?? nestedError.code,
+    status: error.status ?? error.statusCode ?? nestedError.status ?? nestedError.statusCode,
+    message: truncateRpcString(error.message || nestedError.message || error.reason || nestedError.reason),
+    method: error.method || nestedError.method || error.requestMethod,
+    requestMethod: error.requestMethod,
     url: url || undefined,
   };
 
-  if (err?.stack) {
-    summary.stack = err.stack.split('\n').slice(0, RPC_ERROR_TREE_MAX_STACK_LINES).join('\n');
+  if (error.stack) {
+    summary.stack = (error.stack as StackLike).split('\n').slice(0, RPC_ERROR_TREE_MAX_STACK_LINES).join('\n');
   }
-  if (err?.body) summary.body = truncateRpcString(err.body);
-  if (err?.requestBody) summary.requestBody = truncateRpcString(err.requestBody);
+  if (error.body) summary.body = truncateRpcString(error.body);
+  if (error.requestBody) summary.requestBody = truncateRpcString(error.requestBody);
 
   if (depth <= 0) return summary;
 
-  if (err?.error) summary.error = summarizeRpcError(err.error, depth - 1, seen);
-  if (err?.cause) summary.cause = summarizeRpcError(err.cause, depth - 1, seen);
-  if (Array.isArray(err?.errors)) {
-    summary.errors = err.errors.slice(0, RPC_ERROR_TREE_MAX_ARRAY)
+  if (error.error) summary.error = summarizeRpcError(error.error, depth - 1, seen);
+  if (error.cause) summary.cause = summarizeRpcError(error.cause, depth - 1, seen);
+  if (Array.isArray(error.errors)) {
+    summary.errors = error.errors.slice(0, RPC_ERROR_TREE_MAX_ARRAY)
       .map((e: unknown) => summarizeRpcError(e, depth - 1, seen));
   }
-  if (Array.isArray(err?.results)) {
-    summary.results = err.results.slice(0, RPC_ERROR_TREE_MAX_ARRAY)
+  if (Array.isArray(error.results)) {
+    summary.results = error.results.slice(0, RPC_ERROR_TREE_MAX_ARRAY)
       .map((e: unknown) => summarizeRpcError(e, depth - 1, seen));
   }
-  if (err?.data && typeof err.data === 'object') {
-    summary.data = summarizeRpcError(err.data, depth - 1, seen);
+  if (error.data && typeof error.data === 'object') {
+    summary.data = summarizeRpcError(error.data, depth - 1, seen);
   }
 
   return summary;
 }
 
-export function logVerboseRpcError(label: unknown, err: unknown, meta: AnyRecord = {}): void {
+export function logVerboseRpcError(label: unknown, err: unknown, meta: Record<string, unknown> = {}): void {
   if (!isVerboseRpcErrorsEnabled()) return;
   if (!shouldLog('rpc', 'log')) return;
   const payload = { ...meta, error: summarizeRpcError(err) };

@@ -283,11 +283,15 @@ describe('error paths', () => {
     );
   });
 
-  it('keeps legacy unknown provider fallback isolated in getProviderLocation compatibility wrapper', () => {
+  it('keeps signer fallback explicit and rejects unknown named providers', () => {
     const injectedProvider = makeRpcProvider();
     window.ethereum = injectedProvider;
 
-    expect(contractScripts.getProviderLocation('legacy-extension')).toBe(injectedProvider);
+    expect(contractScripts.getProviderLocation('')).toBe(injectedProvider);
+    expect(contractScripts.getProviderLocation('injected')).toBe(injectedProvider);
+    expect(() => contractScripts.getProviderLocation('legacy-extension')).toThrow(
+      'Could not determine provider for "legacy-extension".'
+    );
   });
 
   it('does not fall back to injected wallet reads for minted token counts by default', async () => {

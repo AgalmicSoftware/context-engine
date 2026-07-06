@@ -83,8 +83,7 @@ const mergeTranscript = (prev, next) => {
   const a = String(prev || '');
   const b = String(next || '');
   if (!a.trim()) {
-    // squash trivial repeats in b only
-    return b.replace(/\b([A-Za-z]{1,16})\b(?:[.!?]?\s+\1\b){2,}/g, (m, w) => `${w.charAt(0).toUpperCase()}${w.slice(1)}.`).trim();
+    return b.trim();
   }
   if (!b.trim()) return a;
 
@@ -128,10 +127,7 @@ const mergeTranscript = (prev, next) => {
     bTrimmed = b.replace(re, '');
   }
 
-  const merged = `${a}${a && bTrimmed && !/\s$/.test(a) ? ' ' : ''}${bTrimmed}`.trim();
-
-  // Squash trivial EXACT repeats like "yes yes yes", "okay okay okay" (avoid numbers/enumerations)
-  return merged.replace(/\b([A-Za-z]{1,16})\b(?:[.!?]?\s+\1\b){2,}/g, (m, w) => `${w.charAt(0).toUpperCase()}${w.slice(1)}.`).trim();
+  return `${a}${a && bTrimmed && !/\s$/.test(a) ? ' ' : ''}${bTrimmed}`.trim();
 };
 
 const resolveAudioExtension = (blob) => {

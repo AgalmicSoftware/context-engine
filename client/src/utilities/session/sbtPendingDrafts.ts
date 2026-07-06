@@ -1,4 +1,5 @@
 import { toStr } from '../shared/primitives.js';
+import type { SessionConfigLike } from './sessionTypes.js';
 
 type PendingSbtContractEntry = {
   address?: string;
@@ -6,7 +7,6 @@ type PendingSbtContractEntry = {
 };
 
 type PendingSbtContractsMap = Record<string, PendingSbtContractEntry>;
-type SessionConfigLike = Record<string, unknown>;
 
 type BuildPendingSbtDeploySessionConfigOptions = {
   sessionConfig?: unknown;

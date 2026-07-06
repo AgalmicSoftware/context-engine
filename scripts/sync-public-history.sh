@@ -5,7 +5,7 @@ export LC_ALL=C
 export LANG=C
 
 PUBLIC_GIT_NAME="Agalmic"
-PUBLIC_GIT_EMAIL="agalmicsoftware@protonmail.com"
+PUBLIC_GIT_EMAIL="[redacted-email]"
 DEFAULT_BRANCH_NAME="release-staging"
 
 usage() {
@@ -19,6 +19,16 @@ Options:
   --push       Push the resulting branch to origin after replay completes
   --source-branch <name>
                Replay commits from this local branch (default: dev)
+  --source-base <rev>
+               Replay commits after this source revision instead of origin/main
+  --target-base <rev>
+               Start the public target branch from this revision instead of origin/main
+  --allow-diverged-source
+               Allow a source branch that does not contain origin/main by
+               replaying patch-new non-merge commits from git cherry
+  --sanitize-private-replay-messages
+               Rewrite known private tokens in replayed commit messages instead
+               of refusing otherwise-public commits
   --force-with-lease
                Replace an existing local target branch safely
   -h, --help   Show this help text
@@ -64,15 +74,23 @@ TMP_ROOT=""
 TEMP_CLONE=""
 TARGET_BRANCH="$DEFAULT_BRANCH_NAME"
 SOURCE_BRANCH="dev"
+SOURCE_BASE_REF=""
+TARGET_BASE_REF=""
 DRY_RUN=0
 AUTO_PUSH=0
 EXPLICIT_FORCE_WITH_LEASE=0
+ALLOW_DIVERGED_SOURCE=0
+SANITIZE_PRIVATE_REPLAY_MESSAGES=0
 REPLAYED_COUNT=0
 SKIPPED_COUNT=0
 REMOTE_BRANCH_EXISTS=0
 REMOTE_BRANCH_SHA=""
 
 cleanup() {
+  if [ "${SYNC_PUBLIC_HISTORY_KEEP_TMP:-0}" = "1" ]; then
+    return
+  fi
+
   if [ -n "$TMP_ROOT" ] && [ -d "$TMP_ROOT" ]; then
     rm -rf "$TMP_ROOT"
   fi
@@ -129,6 +147,35 @@ private_replay_message_token() {
   return 1
 }
 
+sanitize_private_replay_message() {
+  local message_file="$1"
+
+  node - "$message_file" <<'NODE'
+const fs = require('node:fs');
+
+const messagePath = process.argv[2];
+let message = fs.readFileSync(messagePath, 'utf8');
+
+const replacements = [
+  [/contextEngine-cc/gi, 'private companion tooling'],
+  [/docs\/agent-native/gi, 'private integration docs'],
+  [/agent-native/gi, 'private integration'],
+  [/OpenClaw/gi, 'external agent'],
+  [/Telegram bridge/gi, 'private messaging bridge'],
+  [/agent bridge/gi, 'private integration'],
+  [/private bridge/gi, 'private integration'],
+  [/private agent/gi, 'private integration'],
+  [/TODO\//gi, 'private planning/'],
+];
+
+for (const [pattern, replacement] of replacements) {
+  message = message.replace(pattern, replacement);
+}
+
+fs.writeFileSync(messagePath, message);
+NODE
+}
+
 ensure_public_replay_message() {
   local commit_sha="$1"
   local subject="$2"
@@ -136,6 +183,14 @@ ensure_public_replay_message() {
   local token
 
   if token=$(private_replay_message_token "$message_file"); then
+    if [ "$SANITIZE_PRIVATE_REPLAY_MESSAGES" -eq 1 ]; then
+      sanitize_private_replay_message "$message_file"
+      if ! token=$(private_replay_message_token "$message_file"); then
+        log_info "Sanitized private replay message tokens for $commit_sha | $subject"
+        return 0
+      fi
+    fi
+
     log_error "Refusing to replay $commit_sha | $subject"
     log_error "Commit message mentions private release token: $token"
     log_error "Split the private-only changes into a stripped commit or rewrite the replayed public commit message."
@@ -218,6 +273,12 @@ reset_clone_to_branch_head() {
   git -C "$TEMP_CLONE" clean -fdq
 }
 
+clone_has_no_pending_changes() {
+  git -C "$TEMP_CLONE" diff --quiet &&
+    git -C "$TEMP_CLONE" diff --cached --quiet &&
+    ! git -C "$TEMP_CLONE" diff --name-only --diff-filter=U | grep -q .
+}
+
 resolve_private_cherry_pick_conflicts() {
   local path
   local found_conflict=0
@@ -235,6 +296,31 @@ resolve_private_cherry_pick_conflicts() {
   fi
 
   strip_private_paths_from_clone
+
+  if git -C "$TEMP_CLONE" diff --name-only --diff-filter=U | grep -q .; then
+    return 1
+  fi
+
+  return 0
+}
+
+resolve_theirs_cherry_pick_conflicts() {
+  local path
+  local found_conflict=0
+
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    found_conflict=1
+    git -C "$TEMP_CLONE" checkout --theirs -- "$path" >/dev/null 2>&1 ||
+      git -C "$TEMP_CLONE" rm -f -- "$path" >/dev/null 2>&1 ||
+      return 1
+  done < <(git -C "$TEMP_CLONE" diff --name-only --diff-filter=U)
+
+  if [ "$found_conflict" -ne 1 ]; then
+    return 1
+  fi
+
+  git -C "$TEMP_CLONE" add -A
 
   if git -C "$TEMP_CLONE" diff --name-only --diff-filter=U | grep -q .; then
     return 1
@@ -289,28 +375,92 @@ verify_public_release_surface() {
   node "$verifier" "$TEMP_CLONE" >&2
 }
 
-verify_public_node_tests() {
+ensure_public_node_modules_link() {
   local node_path="$REPO_ROOT/node_modules"
   local temp_node_path="$TEMP_CLONE/node_modules"
-
-  if [ ! -f "$TEMP_CLONE/package.json" ]; then
-    fail "Cannot run public Node tests; package.json was not found in replay output." 1
-  fi
 
   if [ -d "$node_path" ] && [ ! -e "$temp_node_path" ]; then
     log_info "Linking source node_modules into public test checkout."
     ln -s "$node_path" "$temp_node_path"
   fi
+}
 
-  log_info "Running public release Node tests."
+run_public_npm_script() {
+  local script_name="$1"
+  local description="$2"
+  local node_path="$REPO_ROOT/node_modules"
+
+  if [ ! -f "$TEMP_CLONE/package.json" ]; then
+    fail "Cannot run public $description; package.json was not found in replay output." 1
+  fi
+
+  ensure_public_node_modules_link
+
+  log_info "Running public release $description."
   (
     cd "$TEMP_CLONE"
     if [ -d "$node_path" ]; then
-      NODE_PATH="$node_path${NODE_PATH:+:$NODE_PATH}" npm run test:node
+      NODE_PATH="$node_path${NODE_PATH:+:$NODE_PATH}" npm run "$script_name"
     else
-      npm run test:node
+      npm run "$script_name"
     fi
   )
+}
+
+verify_public_test_wiring() {
+  local verifier="$TEMP_CLONE/scripts/verify-test-wiring.js"
+  local node_path="$REPO_ROOT/node_modules"
+
+  if [ ! -f "$verifier" ]; then
+    log_info "Skipping public release test wiring checks; scripts/verify-test-wiring.js was not found in replay output."
+    return 0
+  fi
+
+  if [ ! -f "$TEMP_CLONE/package.json" ]; then
+    fail "Cannot run public test wiring checks; package.json was not found in replay output." 1
+  fi
+
+  ensure_public_node_modules_link
+
+  log_info "Running public release test wiring checks."
+  (
+    cd "$TEMP_CLONE"
+    if [ -d "$node_path" ]; then
+      NODE_PATH="$node_path${NODE_PATH:+:$NODE_PATH}" npm run test:wiring
+    else
+      npm run test:wiring
+    fi
+  )
+}
+
+verify_public_type_debt() {
+  local ratchet="$TEMP_CLONE/scripts/check-type-debt-ratchet.mjs"
+  local node_path="$REPO_ROOT/node_modules"
+
+  if [ ! -f "$ratchet" ]; then
+    log_info "Skipping public release type-debt ratchet; scripts/check-type-debt-ratchet.mjs was not found in replay output."
+    return 0
+  fi
+
+  if [ ! -f "$TEMP_CLONE/package.json" ]; then
+    fail "Cannot run public type-debt ratchet; package.json was not found in replay output." 1
+  fi
+
+  ensure_public_node_modules_link
+
+  log_info "Running public release type-debt ratchet."
+  (
+    cd "$TEMP_CLONE"
+    if [ -d "$node_path" ]; then
+      NODE_PATH="$node_path${NODE_PATH:+:$NODE_PATH}" npm run type-debt:check
+    else
+      npm run type-debt:check
+    fi
+  )
+}
+
+verify_public_node_tests() {
+  run_public_npm_script "test:node" "Node tests"
 }
 
 ensure_private_branch_guard() {
@@ -336,6 +486,26 @@ while [ $# -gt 0 ]; do
         fail "--source-branch requires a branch name." 1
       fi
       SOURCE_BRANCH="$1"
+      ;;
+    --source-base)
+      shift
+      if [ $# -eq 0 ]; then
+        fail "--source-base requires a revision." 1
+      fi
+      SOURCE_BASE_REF="$1"
+      ;;
+    --target-base)
+      shift
+      if [ $# -eq 0 ]; then
+        fail "--target-base requires a revision." 1
+      fi
+      TARGET_BASE_REF="$1"
+      ;;
+    --allow-diverged-source)
+      ALLOW_DIVERGED_SOURCE=1
+      ;;
+    --sanitize-private-replay-messages)
+      SANITIZE_PRIVATE_REPLAY_MESSAGES=1
       ;;
     --force-with-lease)
       EXPLICIT_FORCE_WITH_LEASE=1
@@ -386,21 +556,60 @@ fi
 
 git -C "$REPO_ROOT" fetch --quiet origin main
 
-if ! git -C "$REPO_ROOT" merge-base --is-ancestor origin/main "$SOURCE_BRANCH"; then
-  fail "origin/main is not an ancestor of $SOURCE_BRANCH. Rebase or merge $SOURCE_BRANCH before running sync-public-history.sh." 1
+SOURCE_BASE="${SOURCE_BASE_REF:-origin/main}"
+TARGET_BASE="${TARGET_BASE_REF:-origin/main}"
+
+if ! git -C "$REPO_ROOT" rev-parse --verify --quiet "$SOURCE_BASE^{commit}" >/dev/null; then
+  fail "Source base revision was not found: $SOURCE_BASE" 1
 fi
 
-MERGE_COUNT=$(git -C "$REPO_ROOT" rev-list --count --merges "origin/main..$SOURCE_BRANCH")
-if [ "$MERGE_COUNT" -ne 0 ]; then
-  fail "Merge commits were found in origin/main..$SOURCE_BRANCH. This script only supports a linear history." 1
+if ! git -C "$REPO_ROOT" rev-parse --verify --quiet "$TARGET_BASE^{commit}" >/dev/null; then
+  fail "Target base revision was not found: $TARGET_BASE" 1
+fi
+
+SOURCE_CONTAINS_ORIGIN_MAIN=0
+if git -C "$REPO_ROOT" merge-base --is-ancestor origin/main "$SOURCE_BRANCH"; then
+  SOURCE_CONTAINS_ORIGIN_MAIN=1
+fi
+
+if [ "$SOURCE_BASE_REF" != "" ]; then
+  if ! git -C "$REPO_ROOT" merge-base --is-ancestor "$SOURCE_BASE" "$SOURCE_BRANCH"; then
+    fail "$SOURCE_BASE is not an ancestor of $SOURCE_BRANCH." 1
+  fi
+  log_info "Using explicit source base $SOURCE_BASE for replay."
+elif [ "$SOURCE_CONTAINS_ORIGIN_MAIN" -ne 1 ] && [ "$ALLOW_DIVERGED_SOURCE" -ne 1 ]; then
+  fail "origin/main is not an ancestor of $SOURCE_BRANCH. Rebase or merge $SOURCE_BRANCH before running sync-public-history.sh, or pass --allow-diverged-source to replay patch-new non-merge commits." 1
+elif [ "$SOURCE_CONTAINS_ORIGIN_MAIN" -ne 1 ]; then
+  log_info "origin/main is not an ancestor of $SOURCE_BRANCH; using git cherry to replay patch-new non-merge commits."
+fi
+
+if [ "$TARGET_BASE_REF" != "" ]; then
+  log_info "Using explicit target base $TARGET_BASE for $TARGET_BRANCH."
+fi
+
+MERGE_COUNT=$(git -C "$REPO_ROOT" rev-list --count --merges "$SOURCE_BASE..$SOURCE_BRANCH")
+if [ "$MERGE_COUNT" -ne 0 ] && [ "$ALLOW_DIVERGED_SOURCE" -ne 1 ]; then
+  fail "Merge commits were found in $SOURCE_BASE..$SOURCE_BRANCH. This script only supports a linear history." 1
+elif [ "$MERGE_COUNT" -ne 0 ]; then
+  log_info "Merge commits were found in $SOURCE_BASE..$SOURCE_BRANCH; replaying non-merge patch commits only."
 fi
 
 COMMITS=()
-while IFS= read -r commit_sha; do
-  COMMITS+=("$commit_sha")
-done < <(git -C "$REPO_ROOT" rev-list --reverse "origin/main..$SOURCE_BRANCH")
+if [ "$SOURCE_BASE_REF" != "" ]; then
+  while IFS= read -r commit_sha; do
+    COMMITS+=("$commit_sha")
+  done < <(git -C "$REPO_ROOT" rev-list --reverse --no-merges "$SOURCE_BASE..$SOURCE_BRANCH")
+elif [ "$ALLOW_DIVERGED_SOURCE" -eq 1 ]; then
+  while IFS= read -r commit_sha; do
+    COMMITS+=("$commit_sha")
+  done < <(git -C "$REPO_ROOT" cherry -v origin/main "$SOURCE_BRANCH" | awk '$1 == "+" {print $2}')
+else
+  while IFS= read -r commit_sha; do
+    COMMITS+=("$commit_sha")
+  done < <(git -C "$REPO_ROOT" rev-list --reverse "$SOURCE_BASE..$SOURCE_BRANCH")
+fi
 if [ "${#COMMITS[@]}" -eq 0 ]; then
-  printf 'Nothing to replay from origin/main..%s.\n' "$SOURCE_BRANCH"
+  printf 'Nothing to replay from %s..%s.\n' "$SOURCE_BASE" "$SOURCE_BRANCH"
   exit 0
 fi
 
@@ -426,8 +635,8 @@ if git -C "$TEMP_CLONE" ls-remote --exit-code --heads origin "$TARGET_BRANCH" >/
   fi
 fi
 
-git -C "$TEMP_CLONE" checkout --quiet -B "$TARGET_BRANCH" origin/main
-log_info "Prepared temp branch $TARGET_BRANCH from origin/main."
+git -C "$TEMP_CLONE" checkout --quiet -B "$TARGET_BRANCH" "$TARGET_BASE"
+log_info "Prepared temp branch $TARGET_BRANCH from $TARGET_BASE."
 
 if [ "$DRY_RUN" -eq 1 ]; then
   for commit_sha in "${COMMITS[@]}"; do
@@ -448,6 +657,8 @@ if [ "$DRY_RUN" -eq 1 ]; then
   printf 'Would replay: %s\n' "$REPLAYED_COUNT"
   printf 'Would skip: %s\n' "$SKIPPED_COUNT"
   printf 'Source branch: %s\n' "$SOURCE_BRANCH"
+  printf 'Source base: %s\n' "$SOURCE_BASE"
+  printf 'Target base: %s\n' "$TARGET_BASE"
   printf 'Branch name: %s\n' "$TARGET_BRANCH"
   exit 0
 fi
@@ -460,9 +671,16 @@ for commit_sha in "${COMMITS[@]}"; do
   git -C "$REPO_ROOT" log -1 --format='%B' "$commit_sha" > "$message_file"
 
   log_info "Replaying $commit_sha | $subject"
-  if ! git -C "$TEMP_CLONE" cherry-pick --no-commit "$commit_sha" >/dev/null 2>&1; then
+  if ! git -C "$TEMP_CLONE" cherry-pick --no-commit -X theirs "$commit_sha" >/dev/null 2>&1; then
     if resolve_private_cherry_pick_conflicts; then
       log_info "Resolved stripped-path cherry-pick conflicts for $commit_sha | $subject"
+    elif resolve_theirs_cherry_pick_conflicts; then
+      log_info "Resolved remaining cherry-pick conflicts from source for $commit_sha | $subject"
+    elif clone_has_no_pending_changes; then
+      SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
+      log_info "Skipped $commit_sha because the public patch is already present."
+      reset_clone_to_branch_head
+      continue
     else
       log_error "Cherry-pick failed for $commit_sha | $subject"
       reset_clone_to_branch_head
@@ -511,7 +729,8 @@ else
   exit 2
 fi
 
-offending_identities=$(author_audit_output)
+offending_identities=$(git -C "$TEMP_CLONE" log --format='%H %an <%ae> | %cn <%ce>' "$TARGET_BASE..$TARGET_BRANCH" \
+  | grep -Fv "$PUBLIC_GIT_NAME <$PUBLIC_GIT_EMAIL> | $PUBLIC_GIT_NAME <$PUBLIC_GIT_EMAIL>" || true)
 if [ -n "$offending_identities" ]; then
   log_error "Identity audit failed; offending commits:"
   printf '%s\n' "$offending_identities" >&2
@@ -519,6 +738,14 @@ if [ -n "$offending_identities" ]; then
 fi
 
 if ! verify_public_release_surface; then
+  exit 2
+fi
+
+if ! verify_public_test_wiring; then
+  exit 2
+fi
+
+if ! verify_public_type_debt; then
   exit 2
 fi
 
@@ -532,6 +759,8 @@ push_branch_to_origin
 
 printf 'Replay complete.\n'
 printf 'Source branch: %s\n' "$SOURCE_BRANCH"
+printf 'Source base: %s\n' "$SOURCE_BASE"
+printf 'Target base: %s\n' "$TARGET_BASE"
 printf 'Branch name: %s\n' "$TARGET_BRANCH"
 printf 'Replayed commits: %s\n' "$REPLAYED_COUNT"
 printf 'Skipped commits: %s\n' "$SKIPPED_COUNT"

@@ -1,22 +1,22 @@
 // Pure decrypt-eligibility decisions extracted from SurveyQuestions.
-// getPortoReady is a THUNK so porto readiness is probed ONLY for the
-// 'porto' kind -- this preserves the original lazy evaluation exactly.
+// getPasskeyReady is a THUNK so passkey wallet readiness is probed ONLY for the
+// embedded-wallet kind -- this preserves the original lazy evaluation exactly.
 export type DecryptProviderKind = string | null | undefined;
 
 export function decideAutoDecryptBlocked(
   providerKind: DecryptProviderKind,
-  getPortoReady: () => boolean,
+  getPasskeyReady: () => boolean,
 ): boolean {
   if (providerKind === 'wagmi') return true;
-  if (providerKind === 'porto') return !getPortoReady();
+  if (providerKind === 'passkey-eoa') return !getPasskeyReady();
   return false;
 }
 
 export function decideAutomaticPromptDecryptByKind(
   providerKind: DecryptProviderKind,
-  getPortoReady: () => boolean,
+  getPasskeyReady: () => boolean,
 ): boolean {
   if (providerKind === 'web3auth') return true;
-  if (providerKind === 'porto') return getPortoReady();
+  if (providerKind === 'passkey-eoa') return getPasskeyReady();
   return false;
 }

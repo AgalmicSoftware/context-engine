@@ -23,11 +23,11 @@ import { createLogger } from '../logging.js';
 type LooseObject = { [key: string]: unknown };
 type RpcParams = unknown[];
 type RpcCacheMethod = 'eth_call' | 'eth_getLogs' | 'eth_blockNumber' | 'eth_chainId';
-type ProviderSend = (methodIn: string, paramsIn: unknown[]) => Promise<any>;
+type ProviderSend = (methodIn: string, paramsIn: unknown[]) => Promise<unknown>;
 
 interface RpcCacheEntry {
   expiresAt: number;
-  value: any;
+  value: unknown;
 }
 
 interface RpcCacheByMethod {
@@ -45,11 +45,17 @@ interface RpcRateLimitState {
   retryAfterMs: number;
 }
 
+interface RpcRateLimitProbe {
+  promise: Promise<void>;
+  startedAt: number;
+}
+
 interface RpcReadCacheState {
   v: number;
-  inflight: Map<string, Promise<any>>;
+  inflight: Map<string, Promise<unknown>>;
   cacheByMethod: RpcCacheByMethod;
   rateLimits: Map<string, RpcRateLimitState>;
+  rateLimitProbes: Map<string, RpcRateLimitProbe>;
 }
 
 interface ProviderDebugContext extends LooseObject {
@@ -96,7 +102,7 @@ type RpcCacheGlobals = typeof globalThis & {
   ENABLE_RPC_DEBUG_TRACE?: boolean;
 };
 
-const log: any = createLogger('rpcReadCache');
+const log = createLogger('rpcReadCache');
 let evictionIntervalStarted: boolean = false;
 let evictionIntervalId: ReturnType<typeof setInterval> | null = null;
 
@@ -109,9 +115,10 @@ const createCacheByMethod = (): RpcCacheByMethod => ({
 
 const createGlobalCacheState = (): RpcReadCacheState => ({
   v: 1,
-  inflight: new Map<string, Promise<any>>(),
+  inflight: new Map<string, Promise<unknown>>(),
   cacheByMethod: createCacheByMethod(),
   rateLimits: new Map<string, RpcRateLimitState>(),
+  rateLimitProbes: new Map<string, RpcRateLimitProbe>(),
 });
 
 const getGlobalObject = (): RpcCacheGlobals => (
@@ -129,8 +136,9 @@ const normalizeDebugMethod = (value: unknown): string => {
 };
 
 const nowMs = (): number => Date.now();
-const RPC_RATE_LIMIT_BASE_BACKOFF_MS = 2_000;
-const RPC_RATE_LIMIT_MAX_BACKOFF_MS = 60_000;
+const RPC_RATE_LIMIT_BASE_BACKOFF_MS = 60_000;
+const RPC_RATE_LIMIT_MAX_BACKOFF_MS = 5 * 60_000;
+const RPC_RATE_LIMIT_PROBE_WAIT_MS = 500;
 
 const isCacheDisabled = (): boolean => {
   try {
@@ -417,6 +425,9 @@ const getGlobalCache = (): RpcReadCacheState => {
   if (!(g.__CE_RPC_READ_CACHE__.rateLimits instanceof Map)) {
     g.__CE_RPC_READ_CACHE__.rateLimits = new Map<string, RpcRateLimitState>();
   }
+  if (!(g.__CE_RPC_READ_CACHE__.rateLimitProbes instanceof Map)) {
+    g.__CE_RPC_READ_CACHE__.rateLimitProbes = new Map<string, RpcRateLimitProbe>();
+  }
   return g.__CE_RPC_READ_CACHE__;
 };
 
@@ -475,7 +486,7 @@ const readHeaderValue = (headers: unknown, name: string): string => {
   if (!headers) return '';
   const lowerName = name.toLowerCase();
   try {
-    const getter = (headers as any)?.get;
+    const getter = isObj(headers) ? headers.get : null;
     if (typeof getter === 'function') {
       return toStr(getter.call(headers, name) || getter.call(headers, lowerName)).trim();
     }
@@ -539,6 +550,34 @@ const getRpcRateLimitBackoffError = (key: string, meta: ProviderSendMeta): (Erro
   if (!state) return null;
   if (Number(state.nextRetryAt || 0) <= nowMs()) return null;
   return buildRpcRateLimitBackoffError(meta, state);
+};
+
+const waitForActiveRateLimitProbe = async (key: string): Promise<void> => {
+  if (!key) return;
+  const probe = getGlobalCache().rateLimitProbes.get(key);
+  if (!probe?.promise) return;
+  const elapsed = nowMs() - Number(probe.startedAt || 0);
+  const remaining = Math.max(0, RPC_RATE_LIMIT_PROBE_WAIT_MS - elapsed);
+  if (remaining <= 0) return;
+  await Promise.race([
+    probe.promise,
+    new Promise<void>((resolve) => { setTimeout(resolve, remaining); }),
+  ]);
+};
+
+const trackRateLimitProbe = (key: string, run: Promise<unknown>): void => {
+  if (!key) return;
+  const cache = getGlobalCache();
+  const probe: RpcRateLimitProbe = {
+    promise: run.then(() => undefined, () => undefined),
+    startedAt: nowMs(),
+  };
+  cache.rateLimitProbes.set(key, probe);
+  probe.promise.then(() => {
+    if (cache.rateLimitProbes.get(key) === probe) {
+      cache.rateLimitProbes.delete(key);
+    }
+  });
 };
 
 const recordRpcRateLimitSuccess = (key: string): void => {
@@ -665,11 +704,12 @@ export const wrapEthersJsonRpcSend = <T extends WrappedProvider | null | undefin
 
   const readProviderRpcDebugContext = (method: string, params: RpcParams): RpcDebugTags => {
     try {
-      const mapped: any = rpcDebugReadProviderContext(provider);
+      const mapped = rpcDebugReadProviderContext(provider);
       if (mapped && typeof mapped === 'object' && matchesProviderDebugContext(mapped, method, params)) {
+        const mappedRecord = mapped as ProviderDebugContext;
         return {
-          fnTag: normalizeDebugTag(mapped.fnTag || mapped.fn || ''),
-          scopeTag: normalizeDebugTag(mapped.scopeTag || mapped.scope || ''),
+          fnTag: normalizeDebugTag(mappedRecord.fnTag || mappedRecord.fn || ''),
+          scopeTag: normalizeDebugTag(mappedRecord.scopeTag || mappedRecord.scope || ''),
         };
       }
       const raw = provider && typeof provider === 'object' ? provider.__CE_RPC_DEBUG_CONTEXT__ : null;
@@ -693,7 +733,7 @@ export const wrapEthersJsonRpcSend = <T extends WrappedProvider | null | undefin
     provider.__CE_RPC_SEND_WRAPPED__ = true;
   }
 
-  provider.send = async (methodIn: unknown, paramsIn: unknown): Promise<any> => {
+  provider.send = async (methodIn: unknown, paramsIn: unknown): Promise<unknown> => {
     const method = toStr(methodIn).trim() || 'unknown';
     const params: RpcParams = Array.isArray(paramsIn) ? paramsIn : [];
 
@@ -703,10 +743,17 @@ export const wrapEthersJsonRpcSend = <T extends WrappedProvider | null | undefin
 
     // Fast path: if this method is not a target for dedupe/TTL caching, do nothing.
     if (!wantsDedupe && !wantsTtl && !debugOnly) {
-      const backoffError = getRpcRateLimitBackoffError(rateLimitKey, sendMeta);
+      let backoffError = getRpcRateLimitBackoffError(rateLimitKey, sendMeta);
       if (backoffError) throw backoffError;
+      await waitForActiveRateLimitProbe(rateLimitKey);
+      backoffError = getRpcRateLimitBackoffError(rateLimitKey, sendMeta);
+      if (backoffError) throw backoffError;
+      const run: Promise<unknown> = (async (): Promise<unknown> => {
+        return await originalSend(method, params);
+      })();
+      trackRateLimitProbe(rateLimitKey, run);
       try {
-        const result = await originalSend(method, params);
+        const result = await run;
         recordRpcRateLimitSuccess(rateLimitKey);
         return result;
       } catch (err) {
@@ -759,7 +806,27 @@ export const wrapEthersJsonRpcSend = <T extends WrappedProvider | null | undefin
       }
     }
 
-    const backoffError = getRpcRateLimitBackoffError(rateLimitKey, sendMeta);
+    let backoffError = getRpcRateLimitBackoffError(rateLimitKey, sendMeta);
+    if (backoffError) {
+      if (isDebug) {
+        rpcDebugRecord({
+          chainId,
+          providerKey,
+          url,
+          method,
+          params,
+          fnTag: debugContext.fnTag,
+          scopeTag: debugContext.scopeTag,
+          outcome: 'error',
+          ms: nowMs() - t0,
+          stackSnippet,
+          keyHash,
+        });
+      }
+      throw backoffError;
+    }
+    await waitForActiveRateLimitProbe(rateLimitKey);
+    backoffError = getRpcRateLimitBackoffError(rateLimitKey, sendMeta);
     if (backoffError) {
       if (isDebug) {
         rpcDebugRecord({
@@ -802,9 +869,10 @@ export const wrapEthersJsonRpcSend = <T extends WrappedProvider | null | undefin
       }
     }
 
-    const run: Promise<any> = (async (): Promise<any> => {
+    const run: Promise<unknown> = (async (): Promise<unknown> => {
       return await originalSend(method, params);
     })();
+    trackRateLimitProbe(rateLimitKey, run);
 
     if (shouldDedupe) globalCache.inflight.set(keyHash, run);
 
@@ -875,9 +943,10 @@ export const __test__resetRpcReadCache = (): void => {
   const g = getGlobalObject();
   if (g.__CE_RPC_READ_CACHE__ && typeof g.__CE_RPC_READ_CACHE__ === 'object') {
     try {
-      g.__CE_RPC_READ_CACHE__.inflight = new Map<string, Promise<any>>();
+      g.__CE_RPC_READ_CACHE__.inflight = new Map<string, Promise<unknown>>();
       g.__CE_RPC_READ_CACHE__.cacheByMethod = createCacheByMethod();
       g.__CE_RPC_READ_CACHE__.rateLimits = new Map<string, RpcRateLimitState>();
+      g.__CE_RPC_READ_CACHE__.rateLimitProbes = new Map<string, RpcRateLimitProbe>();
     } catch (e) { log.warn('rpcReadCache: fallback', e); }
   }
   if (evictionIntervalId != null) {

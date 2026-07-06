@@ -182,13 +182,14 @@ import { getEffectiveAiConfig } from 'utilities/ai/aiSettings.js';
 
 import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
 import { createLogger } from 'utilities/logging.js';
+import { checkSponsoredAccess } from '../../domains/sessions/sponsoredAccess.js';
 import {
   getDemoSessionConfigBySlug,
   getSessionConfigBySlug,
   getSessionConfigBySlugOrDefault,
   getSessionSlugByName,
   normalizeSessionSlug,
-} from '../../utilities/web3/contractScripts.js';
+} from '../../domains/sessions/sessionConfig.js';
 import {
   getAllowedSessionSlugs,
   readSessionScanScope,
@@ -203,7 +204,6 @@ import {
   writeCache,
 } from '../../utilities/cache/cacheScripts.js';
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
-import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
 import { getGlobalLitHooks } from '../../utilities/crypto/litProtocol.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
@@ -266,7 +266,8 @@ type CacheSourceSnapshot = CacheSourcePresence & {
   membershipSignature: string;
 };
 
-type UserPageTimerHandle = ReturnType<typeof setTimeout>;
+type UserPageTimeoutHandle = ReturnType<typeof setTimeout>;
+type UserPageIntervalHandle = ReturnType<typeof setInterval>;
 
 type QueuedCacheRefreshOptions = {
   force?: unknown;
@@ -685,13 +686,13 @@ const resolveUserAnalysisAiContext = (
 
 class UserPage extends Component<any, any> {
   _isMounted: boolean = false;
-  analysisTimer: UserPageTimerHandle | null = null;
+  analysisTimer: UserPageIntervalHandle | null = null;
   _profileScanRequestSeq: number = 0;
-  _queuedCacheRefreshTimer: UserPageTimerHandle | null = null;
+  _queuedCacheRefreshTimer: UserPageTimeoutHandle | null = null;
   _queuedCacheRefreshForce: boolean = false;
   _queuedCacheRefreshLoading: boolean = false;
   _queuedCacheRefreshBypassSignature: boolean = false;
-  _responseGateRetryTimer: UserPageTimerHandle | null = null;
+  _responseGateRetryTimer: UserPageTimeoutHandle | null = null;
   _responseGateRetryDueAt: number = 0;
   _responseGateAccessStatusByKey: Map<string, GateAccessStatusEntry> = new Map();
   _responseGateAccessInFlightByKey: Map<string, ResponseGateAccessCheckPromise> = new Map();

@@ -7,7 +7,7 @@ import {
 import type {
   SurveyResultsHtmlReportSectionKey,
   SurveyResultsHtmlReportSectionRow,
-} from './surveyResultsExportDisplayHelpers';
+} from './surveyResultsHtmlReportReadiness';
 
 export type { SurveyResultsHtmlReportSectionRow };
 

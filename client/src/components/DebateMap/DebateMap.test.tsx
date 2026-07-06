@@ -9,7 +9,11 @@ import DebateMap, {
   buildHistoricalCompassPoints,
   getAtlasLinkStableKey,
   getCompactTreeNodeLabel,
+  getDebateNodeListStableKeys,
   getDebateNodeStableKey,
+  getDebateQuestionListStableKeys,
+  getDebateQuestionStableKey,
+  getDebateTagStableKeys,
   getPackedAtlasClickTarget,
   getPackedAtlasLabelFontSizePx,
   getPackedAtlasVerticalLiftPx,
@@ -85,7 +89,11 @@ const buildHistoricalCaseBriefAny = buildHistoricalCaseBrief as any;
 const buildHistoricalCompassPointsAny = buildHistoricalCompassPoints as any;
 const getAtlasLinkStableKeyAny = getAtlasLinkStableKey as any;
 const getCompactTreeNodeLabelAny = getCompactTreeNodeLabel as any;
+const getDebateNodeListStableKeysAny = getDebateNodeListStableKeys as any;
 const getDebateNodeStableKeyAny = getDebateNodeStableKey as any;
+const getDebateQuestionListStableKeysAny = getDebateQuestionListStableKeys as any;
+const getDebateQuestionStableKeyAny = getDebateQuestionStableKey as any;
+const getDebateTagStableKeysAny = getDebateTagStableKeys as any;
 const getPackedAtlasClickTargetAny = getPackedAtlasClickTarget as any;
 const getPackedAtlasLabelFontSizePxAny = getPackedAtlasLabelFontSizePx as any;
 const getPackedAtlasVerticalLiftPxAny = getPackedAtlasVerticalLiftPx as any;
@@ -334,8 +342,29 @@ describe('DebateMap', () => {
 
   it('builds stable keys for reorderable atlas and list items', () => {
     expect(getDebateNodeStableKeyAny({ id: 'node-id', name: 'Name' }, 'fallback')).toBe('node-id');
+    expect(getDebateNodeStableKeyAny({ name: 'Name', parentPath: [{ name: 'Parent' }] }, 'fallback')).toBe('Parent/Name');
     expect(getDebateNodeStableKeyAny({ name: 'Name' }, 'fallback')).toBe('Name');
     expect(getDebateNodeStableKeyAny({}, 'fallback')).toBe('fallback');
+    expect(getDebateNodeListStableKeysAny([{ name: 'Name' }, { name: 'Name' }], 'top-node')).toEqual([
+      'Name',
+      'Name:2',
+    ]);
+    expect(getDebateQuestionStableKeyAny({ id: 'q1', prompt: 'Prompt' }, 'fallback')).toBe('q1');
+    expect(getDebateQuestionStableKeyAny({ prompt: 'Prompt' }, 'fallback')).toBe('fallback:Prompt');
+    expect(getDebateQuestionListStableKeysAny([
+      { prompt: 'Same prompt' },
+      { prompt: 'Same prompt' },
+      { id: 'q3', prompt: 'Same prompt' },
+    ], 'question-card')).toEqual([
+      'question-card:Same prompt',
+      'question-card:Same prompt:2',
+      'q3',
+    ]);
+    expect(getDebateTagStableKeysAny(['tax', 'Tax', 'energy'])).toEqual([
+      'tag:tax',
+      'tag:Tax:2',
+      'tag:energy',
+    ]);
 
     expect(getAtlasLinkStableKeyAny({
       sourceId: 'source-id',

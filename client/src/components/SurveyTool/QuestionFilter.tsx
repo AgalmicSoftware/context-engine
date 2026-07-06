@@ -230,6 +230,7 @@ type QuestionFilterPipelineMemo = {
   aiAppliedTopN: number;
   aiCombineWithOtherFilters: boolean;
   aiRankedIdsSignature: string;
+  aiLastAppliedSignature: string;
   questionResponsesNonceKey: unknown;
   questionsCacheNonceKey: unknown;
   result: QuestionFilterPipelineResult;
@@ -711,9 +712,12 @@ class QuestionFilter extends React.Component<any, any> {
     return subset;
   };
 
-  getAiRankingCandidates = (): QuestionFilterQuestionRecord[] => (
-    Array.isArray(this.state.mergedQuestions) ? this.state.mergedQuestions as QuestionFilterQuestionRecord[] : []
-  );
+  getAiRankingCandidates = (): QuestionFilterQuestionRecord[] => {
+    if (this.state.aiCombineWithOtherFilters) {
+      return this.getQuestionsSubsetBeforeAi(true);
+    }
+    return Array.isArray(this.state.mergedQuestions) ? this.state.mergedQuestions as QuestionFilterQuestionRecord[] : [];
+  };
 
   buildAiApplySignature = ({
     stateIn = this.state,
@@ -758,6 +762,12 @@ class QuestionFilter extends React.Component<any, any> {
         source: reason,
       });
     }, 0);
+  };
+
+  queueCombinedAiRefreshIfNeeded = (reason: unknown): void => {
+    if (!this.state.aiCombineWithOtherFilters) return;
+    if (!String(this.state.aiSearchQuery || '').trim()) return;
+    this.queueAutoApplyAiFilter(reason);
   };
 
   async componentDidMount() {
@@ -878,7 +888,7 @@ class QuestionFilter extends React.Component<any, any> {
           newStateFromUrl.sortByImportance = false;
           newStateFromUrl.pendingSortByImportance = false;
           // Keep existing topQuestionsCount or component default if not specified by URL
-          if (urlFilterState.hasOwnProperty('topQuestions')) {
+          if (Object.prototype.hasOwnProperty.call(urlFilterState, 'topQuestions')) {
             // only reset count if topQuestions key exists and is null
             newStateFromUrl.topQuestionsCount = DEFAULT_TOP_QUESTIONS_COUNT; // default count
             newStateFromUrl.pendingTopQuestionsCount = DEFAULT_TOP_QUESTIONS_COUNT; // default count
@@ -1099,6 +1109,7 @@ class QuestionFilter extends React.Component<any, any> {
               this.saveFilterStateToLocalStorage();
             }
             this.handleApplyFilters(true);
+            this.queueCombinedAiRefreshIfNeeded('update:account-disconnect');
           }
         );
         return;
@@ -1894,6 +1905,7 @@ class QuestionFilter extends React.Component<any, any> {
     const aiCombineWithOtherFilters = !!this.state.aiCombineWithOtherFilters;
     const aiRankedQuestionIds = normalizeAiIdList(this.state.aiRankedQuestionIds || []);
     const aiRankedIdsSignature = stableSerializeSmallObject(aiRankedQuestionIds, 8192);
+    const aiLastAppliedSignature = String(this.state.aiLastAppliedSignature || '');
     const hasSbtFilter = sbtFilteredQuestions !== null;
     const hasTypeFilter = (selectedTypes || []).length > 0;
     const hasTagFilter = (selectedTags || []).length > 0;
@@ -1950,6 +1962,7 @@ class QuestionFilter extends React.Component<any, any> {
       memo.aiAppliedTopN === aiAppliedTopN &&
       memo.aiCombineWithOtherFilters === aiCombineWithOtherFilters &&
       memo.aiRankedIdsSignature === aiRankedIdsSignature &&
+      memo.aiLastAppliedSignature === aiLastAppliedSignature &&
       memo.questionResponsesNonceKey === questionResponsesNonceKey &&
       memo.questionsCacheNonceKey === questionsCacheNonceKey
     ) {
@@ -1979,6 +1992,7 @@ class QuestionFilter extends React.Component<any, any> {
         aiAppliedTopN,
         aiCombineWithOtherFilters,
         aiRankedIdsSignature,
+        aiLastAppliedSignature,
         questionResponsesNonceKey,
         questionsCacheNonceKey,
         result,
@@ -2005,7 +2019,16 @@ class QuestionFilter extends React.Component<any, any> {
       : this.getQuestionsSubsetBeforeAi(usePendingState);
     let finalQuestions: QuestionFilterQuestionRecord[] = baseQuestions;
 
-    if (hasAiFilter) {
+    let shouldApplyAiFilter = hasAiFilter;
+    if (hasAiFilter && aiCombineWithOtherFilters) {
+      const currentCombinedAiSignature = this.buildAiApplySignature({
+        queryOverride: aiSearchQuery,
+        candidateQuestions: baseQuestions,
+      });
+      shouldApplyAiFilter = !!currentCombinedAiSignature && aiLastAppliedSignature === currentCombinedAiSignature;
+    }
+
+    if (shouldApplyAiFilter) {
       finalQuestions = this.applyAISearchFilter(
         finalQuestions,
         aiSearchQuery,
@@ -2079,6 +2102,7 @@ class QuestionFilter extends React.Component<any, any> {
       aiAppliedTopN,
       aiCombineWithOtherFilters,
       aiRankedIdsSignature,
+      aiLastAppliedSignature,
       questionResponsesNonceKey,
       questionsCacheNonceKey,
       result,
@@ -2129,6 +2153,7 @@ class QuestionFilter extends React.Component<any, any> {
       },
       () => {
         this.handleApplyFilters(true);
+        this.queueCombinedAiRefreshIfNeeded('sbt-filter-change');
       }
     );
 
@@ -2212,6 +2237,7 @@ class QuestionFilter extends React.Component<any, any> {
     this.setState(buildQuestionFilterAiCombinePatch(checked), () => {
       if (this.state.aiFilterApplied && String(this.state.aiSearchQuery || '').trim()) {
         this.handleApplyFilters(true);
+        this.queueAutoApplyAiFilter('ai-combine-toggle');
       }
     });
   };
@@ -2512,6 +2538,7 @@ class QuestionFilter extends React.Component<any, any> {
     }
     this.setState(buildQuestionFilterPendingSelectedTypesPatch(newSelectedTypes), () => {
       this.handleApplyFilters(true);
+      this.queueCombinedAiRefreshIfNeeded('type-filter-change');
     });
   };
 
@@ -2529,6 +2556,7 @@ class QuestionFilter extends React.Component<any, any> {
     this.setState(buildQuestionFilterSelectedTagsPatch(updatedTags), () => {
       // Re-apply filters live so counts/lists update immediately
       this.handleApplyFilters(true);
+      this.queueCombinedAiRefreshIfNeeded('tag-filter-change');
     });
   };
 
@@ -2644,15 +2672,16 @@ class QuestionFilter extends React.Component<any, any> {
         throw new Error("Invalid filter string.");
       }
 
-      const newState: QuestionFilterMutableStatePatch = {};
+      const selectedTypes = normalizeFilterSelectionList(deserializedState.questionTypes);
+      const selectedTags = normalizeFilterSelectionList(deserializedState.selectedTags);
+      const sbtFilterLocalState = normalizeSbtFilterLocalState(deserializedState.sbtFilter);
+      const newState: QuestionFilterMutableStatePatch = {
+        selectedTypes,
+        pendingSelectedTypes: selectedTypes,
+        selectedTags,
+        sbtFilterLocalState,
+      };
       // Map deserialized state to component's state structure
-      if (deserializedState.questionTypes) {
-        newState.selectedTypes = deserializedState.questionTypes;
-        newState.pendingSelectedTypes = deserializedState.questionTypes;
-      }
-      if (deserializedState.selectedTags) {
-        newState.selectedTags = deserializedState.selectedTags;
-      }
       if (deserializedState.responseStatus) {
         const responseStatus = toUnknownRecord(deserializedState.responseStatus);
         const responseStatusState = normalizeResponseStatusFilterState({
@@ -2665,9 +2694,6 @@ class QuestionFilter extends React.Component<any, any> {
       } else {
         newState.filterByResponded = false;
         newState.filterByNotResponded = false;
-      }
-      if (deserializedState.sbtFilter) {
-        newState.sbtFilterLocalState = deserializedState.sbtFilter;
       }
       if (typeof deserializedState.aiFilter === 'string') {
         const aiQuery = deserializedState.aiFilter;
@@ -2690,13 +2716,15 @@ class QuestionFilter extends React.Component<any, any> {
         newState.aiRankedQuestionIds = [];
         newState.aiApplyError = '';
       }
-      if (deserializedState.topQuestions) {
+      if (deserializedState.topQuestions && typeof deserializedState.topQuestions === 'object') {
         const { count, by } = toUnknownRecord(deserializedState.topQuestions);
-        newState.topQuestionsCount = count || DEFAULT_TOP_QUESTIONS_COUNT;
-        newState.pendingTopQuestionsCount = count || DEFAULT_TOP_QUESTIONS_COUNT;
+        newState.topQuestionsCount = typeof count === 'number' ? count : DEFAULT_TOP_QUESTIONS_COUNT;
+        newState.pendingTopQuestionsCount = typeof count === 'number' ? count : DEFAULT_TOP_QUESTIONS_COUNT;
         if (by === 'importance') {
             newState.showTopQuestions = true;
             newState.pendingShowTopQuestions = true;
+            newState.sortByImportance = true;
+            newState.pendingSortByImportance = true;
             newState.showTopQuestionsByResponses = false;
             newState.pendingShowTopQuestionsByResponses = false;
         } else if (by === 'responses') {
@@ -2704,12 +2732,25 @@ class QuestionFilter extends React.Component<any, any> {
             newState.pendingShowTopQuestionsByResponses = true;
             newState.showTopQuestions = false;
             newState.pendingShowTopQuestions = false;
+            newState.sortByImportance = false;
+            newState.pendingSortByImportance = false;
         } else {
             newState.showTopQuestions = false;
             newState.pendingShowTopQuestions = false;
             newState.showTopQuestionsByResponses = false;
             newState.pendingShowTopQuestionsByResponses = false;
+            newState.sortByImportance = false;
+            newState.pendingSortByImportance = false;
         }
+      } else {
+        newState.topQuestionsCount = DEFAULT_TOP_QUESTIONS_COUNT;
+        newState.pendingTopQuestionsCount = DEFAULT_TOP_QUESTIONS_COUNT;
+        newState.showTopQuestions = false;
+        newState.pendingShowTopQuestions = false;
+        newState.showTopQuestionsByResponses = false;
+        newState.pendingShowTopQuestionsByResponses = false;
+        newState.sortByImportance = false;
+        newState.pendingSortByImportance = false;
       }
 
       this.setState(newState, () => {
@@ -2762,6 +2803,7 @@ class QuestionFilter extends React.Component<any, any> {
       buildQuestionFilterPendingSelectedTypesPatch(newPending),
       () => {
         this.handleApplyFilters(true);
+        this.queueCombinedAiRefreshIfNeeded('type-filter-remove');
       }
     );
   };
@@ -2772,6 +2814,7 @@ class QuestionFilter extends React.Component<any, any> {
       buildQuestionFilterSelectedTagsPatch(newTags),
       () => {
         this.handleApplyFilters(true);
+        this.queueCombinedAiRefreshIfNeeded('tag-filter-remove');
       }
     );
   };
@@ -3351,7 +3394,10 @@ class QuestionFilter extends React.Component<any, any> {
                   checked={this.state.filterByResponded}
                   onChange={() => this.setState(
                     (prev: { filterByResponded?: unknown }) => ({ filterByResponded: !prev.filterByResponded }),
-                    () => this.handleApplyFilters(true)
+                    () => {
+                      this.handleApplyFilters(true);
+                      this.queueCombinedAiRefreshIfNeeded('response-status-filter-change');
+                    }
                   )}
                   disabled={isOtherFiltersDisabled}
                 />
@@ -3363,7 +3409,10 @@ class QuestionFilter extends React.Component<any, any> {
                   checked={this.state.filterByNotResponded}
                   onChange={() => this.setState(
                     (prev: { filterByNotResponded?: unknown }) => ({ filterByNotResponded: !prev.filterByNotResponded }),
-                    () => this.handleApplyFilters(true)
+                    () => {
+                      this.handleApplyFilters(true);
+                      this.queueCombinedAiRefreshIfNeeded('response-status-filter-change');
+                    }
                   )}
                   disabled={isOtherFiltersDisabled}
                 />
@@ -3409,6 +3458,7 @@ class QuestionFilter extends React.Component<any, any> {
                 isSBTCacheReady={this.props.isSBTCacheReady}
                 sbtCacheRevision={this.props.sbtCacheRevision}
                 sessionSlug={sbtFilterSessionSlug}
+                activeSessionSlug={sbtFilterSessionSlug}
                 sessionConfig={sbtFilterSessionConfig}
                 ensureLightSbtUniverse={this.props.ensureLightSbtUniverse}
               />
@@ -3491,12 +3541,12 @@ class QuestionFilter extends React.Component<any, any> {
                     </div>
                     {this.state.aiFilterApplied && aiSearchQuery && !aiApplyError && (
                       <p className={styles.aiStatusText}>
-                        Active: "{aiSearchQuery}" • Top {normalizePositiveInt(this.state.aiAppliedTopN, DEFAULT_AI_TOP_N)} • {aiCombineWithOtherFilters ? 'Combined' : 'Override'}
+                        Active: &quot;{aiSearchQuery}&quot; • Top {normalizePositiveInt(this.state.aiAppliedTopN, DEFAULT_AI_TOP_N)} • {aiCombineWithOtherFilters ? 'Combined' : 'Override'}
                       </p>
                     )}
                     {this.state.aiFilterApplied && aiSearchQuery && !aiCombineWithOtherFilters && !aiApplyError && (
                       <p className={styles.aiHintText}>
-                        AI Top-N override mode is active. Enable "Combine with other filters" to intersect with type/tag/SBT filters.
+                        AI Top-N override mode is active. Enable &quot;Combine with other filters&quot; to intersect with type/tag/SBT filters.
                       </p>
                     )}
                     {!!aiApplyError && (

@@ -158,6 +158,7 @@ import {
   getFieldInputByLabel,
   getToggleCheckbox,
   openWorkerPanel,
+  selectNormalModeCard,
   setCloudflareTokenValue,
 } from './SessionWizard.sponsoredBundleDom.testUtils.js';
 import {
@@ -363,6 +364,51 @@ describe('SessionWizard sponsored bundle flow', () => {
       expect(screen.getByRole('button', { name: /step 3: deploy session/i })).toBeInTheDocument();
     });
     expect(rail).toHaveStyle('--session-wizard-card-count: 3');
+  }, 15000);
+
+  it('checks duplicate slugs before sponsored publish can auto-deploy a worker', async () => {
+    let publishClicked = false;
+    mockSessionExists.mockImplementation(async () => publishClicked);
+    mockDecryptWithPassword.mockResolvedValueOnce(buildDecryptedSponsoredBundle({
+      deployGrantToken: 'deploy-grant-token',
+    }));
+
+    renderLoggedInSessionWizard({
+      initialSponsoredBundleId: 'sponsor_tx_id',
+      initialSponsoredBundleKey: 'bundle-secret',
+    });
+
+    await expectSponsoredStatus('Sponsored resources applied.');
+
+    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
+      target: { value: 'Sponsored Duplicate Session' },
+    });
+    fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_INFO), {
+      target: { value: 'This publish should stop before sponsored worker deployment.' },
+    });
+
+    selectNormalModeCard('Deploy Session');
+    const publishButton = await screen.findByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
+
+    await waitFor(() => {
+      expect(publishButton).not.toBeDisabled();
+    });
+
+    publishClicked = true;
+    fireEvent.click(publishButton);
+
+    expect(
+      await screen.findByText('Session slug already exists on-chain: sponsored-duplicate-session')
+    ).toBeInTheDocument();
+    expect(mockSessionExists).toHaveBeenCalledWith('sponsored-duplicate-session');
+    expect(
+      global.fetch.mock.calls.some(([url]) => String(url).endsWith('/deploy'))
+    ).toBe(false);
+    expect(
+      global.fetch.mock.calls.some(([url]) => String(url).endsWith('/sponsored/redeem-deploy'))
+    ).toBe(false);
+    expect(mockUploadDataToArweave).not.toHaveBeenCalled();
+    expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
   }, 15000);
 
   it('keeps advanced-mode file upload controls available for sponsored worker testing', async () => {

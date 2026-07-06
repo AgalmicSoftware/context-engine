@@ -6,6 +6,7 @@ import type {
 } from './sbtCountHelpers.js';
 import type { SbtHistorySummary } from './sbtHistoryHelpers.js';
 import type { SbtRealtimeEventCursor } from './sbtRealtimeCursorHelpers.js';
+import type { SbtEventStreamsPort } from '../../domains/sbts/sbtPorts.js';
 
 type CacheRecord = Record<string, unknown>;
 type SetStateArg = CacheRecord | ((prev: CacheRecord) => CacheRecord | null) | null;
@@ -63,6 +64,7 @@ export interface SessionSbtCacheHost {
   getSessionChainId?: (slug: string) => string | number | null | undefined;
   getSessionScanScope?: () => string | null | undefined;
   getSessionScanScopeContext?: (scope?: string) => unknown;
+  eventStreamsPort?: SbtEventStreamsPort;
   initializeSurveyCacheForGroup?: (...args: unknown[]) => unknown;
   isMounted?: () => boolean;
   isSbtHistoryScanEnabled?: () => boolean;
@@ -79,6 +81,7 @@ export interface SessionSbtCacheHost {
   shouldAttachSbtDetailInstanceListener?: () => boolean;
   shouldAutoRunFullSbtScan?: (opts?: CacheRecord) => boolean;
   shouldSkipSessionScanForSlug?: (slug: string, op: string, scopeCtx?: unknown) => boolean;
+  sbtEventStreamsPort?: SbtEventStreamsPort;
   writeFlag?: (flag: string, slug: string, value: unknown) => void;
 }
 

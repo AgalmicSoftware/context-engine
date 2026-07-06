@@ -5,7 +5,7 @@
 
 import { ethers } from 'ethers';
 
-type AnyRecord = Record<string, any>;
+type SbtHistorySummaryRecord = Record<string, unknown>;
 type SbtHistorySummary = {
   totalMinted: string;
   totalBurned: string;
@@ -30,7 +30,7 @@ export const normalizeHistorySummaryCount = (value: unknown): string | null => {
 
 export const normalizeSbtHistorySummary = (value: unknown): SbtHistorySummary | null => {
   if (!value || typeof value !== 'object') return null;
-  const summary = value as AnyRecord;
+  const summary = value as SbtHistorySummaryRecord;
   const totalMinted = normalizeHistorySummaryCount(summary.totalMinted ?? summary[0]);
   const totalBurned = normalizeHistorySummaryCount(summary.totalBurned ?? summary[1]);
   const activeSupply = normalizeHistorySummaryCount(summary.activeSupply ?? summary[2]);

@@ -84,7 +84,7 @@ describe('accountActions', () => {
     const dispatch = createDispatch();
     const web3info = {
       account: '0xdef',
-      provider: 'porto_passkey',
+      provider: 'passkey_eoa',
       network: { chainId: 11155420, name: 'OP Sepolia' },
       userImageURL: null,
     };

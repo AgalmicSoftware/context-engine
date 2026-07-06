@@ -27,6 +27,7 @@ test('dispatchAdminRequestWithWorkerDeps preserves admin-request wiring and used
         assert.equal(value.deps.normalizeSignedWorkerRequest, 'normalizeSignedWorkerRequest');
         assert.equal(value.deps.resolveWorkerBodySlugContext, 'resolveWorkerBodySlugContext');
         assert.equal(value.deps.isAddress, 'isAddress');
+        assert.equal(value.deps.getAddress, 'getAddress');
         assert.equal(value.deps.resolveExistingSessionCors, 'resolveExistingSessionCors');
         assert.equal(value.deps.verifyMessage, 'verifyMessage');
         assert.equal(value.deps.validateRecoveredAddressMatchesRequest, 'validateRecoveredAddressMatchesRequest');
@@ -57,6 +58,7 @@ test('dispatchAdminRequestWithWorkerDeps preserves admin-request wiring and used
       normalizeSignedWorkerRequest: 'normalizeSignedWorkerRequest',
       resolveWorkerBodySlugContext: 'resolveWorkerBodySlugContext',
       isAddress: 'isAddress',
+      getAddress: 'getAddress',
       resolveExistingSessionCors: 'resolveExistingSessionCors',
       verifyMessage: 'verifyMessage',
       validateRecoveredAddressMatchesRequest: 'validateRecoveredAddressMatchesRequest',

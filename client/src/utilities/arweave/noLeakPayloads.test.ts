@@ -96,4 +96,14 @@ describe('no-leak Arweave payload guards', () => {
       title: 'Public survey title',
     })).toBe('Public survey title');
   });
+
+  it('does not copy non-string prompts or titles into response payloads', () => {
+    expect(sanitizeQuestionPromptForResponsePayload({
+      prompt: { nested: 'metadata' },
+    })).toBe('');
+
+    expect(sanitizeSurveyTitleForResponsePayload({
+      title: ['metadata'],
+    })).toBeNull();
+  });
 });

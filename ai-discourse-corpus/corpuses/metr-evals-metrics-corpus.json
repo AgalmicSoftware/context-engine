@@ -105,7 +105,8 @@
       "concentration_of_power": 4,
       "ai_consciousness_rights": 1,
       "open_vs_closed_models": 12
-    }
+    },
+    "last_updated": "2026-07-04"
   },
   "entries": [
     {
@@ -204,73 +205,6 @@
       "source_links": [
         "https://arxiv.org/abs/2503.14499",
         "https://metr.org/blog/2025-03-19-measuring-ai-ability-to-complete-long-tasks/",
-        "https://metr.org/time-horizons/"
-      ]
-    },
-    {
-      "id": "metr_time_horizon_1_1_2026",
-      "title": "Time Horizon 1.1",
-      "authors": [
-        "METR"
-      ],
-      "date": "2026-01-29",
-      "source_type": "research_note",
-      "source_platform": "METR Blog",
-      "url": "https://metr.org/blog/2026-1-29-time-horizon-1-1/",
-      "category": "metric",
-      "summary": "Major update to METR's time horizon measurement expanding to 228 tasks and incorporating new evaluation infrastructure built on UK AISI's Inspect framework. The update finds a post-2023 doubling time of approximately 131 days (roughly 4.3 months), suggesting acceleration compared to the original 7-month doubling estimate across the full 2019-2025 period. Includes updated measurements for all major frontier models including GPT-5, Claude Opus 4.5, and o3-series models. The faster doubling time implies that the transition from current capabilities to transformative AI may occur sooner than the original paper's extrapolations suggested. The update also refines methodology around scaffold selection and task difficulty calibration, addressing some limitations noted in the original paper.",
-      "key_findings": [
-        "Post-2023 doubling time of approximately 131 days (4.3 months)",
-        "Expanded task set to 228 tasks",
-        "Built on UK AISI Inspect framework",
-        "Suggests acceleration of capability growth compared to 2019-2023 trend",
-        "Updated measurements for GPT-5, Claude Opus 4.5, o3-series",
-        "Refined scaffold selection methodology"
-      ],
-      "quantitative_data": {
-        "metric_name": "50%-task-completion time horizon (updated)",
-        "doubling_time_post_2023": "131 days (~4.3 months)",
-        "doubling_time_overall": "~7 months (2019-2025)",
-        "task_count": 228,
-        "framework": "UK AISI Inspect",
-        "acceleration": "Post-2023 trend roughly 60% faster than overall trend"
-      },
-      "novel_arguments_and_concepts": "TH1.1 represents the first systematic attempt to detect acceleration in AI capability growth. While the original paper documented exponential growth, TH1.1 asks whether the exponential itself is speeding up. The finding of a 131-day post-2023 doubling time versus the 7-month overall doubling time is potentially one of the most consequential empirical findings in AI governance — it suggests that capability growth may be super-exponential during the current period. The transition to the Inspect framework also represents an important step toward evaluation infrastructure standardization, making it possible for other organizations to replicate and extend METR's measurements. The methodological refinements around scaffold selection address a key criticism of the original paper: that measured capability depends heavily on the software scaffolding provided to the model.",
-      "implications_for_governance": [
-        "131-day doubling means regulatory frameworks designed for annual review are inadequate",
-        "Super-exponential acceleration strengthens case for proactive rather than reactive regulation",
-        "Standardized evaluation infrastructure (Inspect) enables third-party verification",
-        "Updated measurements provide more current calibration for frontier AI safety policies"
-      ],
-      "debate_connections": [
-        "existential_risk_debate",
-        "regulation_timing",
-        "safety_vs_capabilities",
-        "who_governs_ai"
-      ],
-      "related_work": [
-        "metr_time_horizon_paper_2025",
-        "metr_hcast_2025",
-        "metr_claude_code_codex_th_2026"
-      ],
-      "themes": [
-        "AI Progress Measurement",
-        "Acceleration Detection",
-        "Evaluation Infrastructure",
-        "Capability Trends"
-      ],
-      "tags": [
-        "Time Horizon",
-        "Doubling Time",
-        "Acceleration",
-        "Inspect Framework",
-        "Frontier Models",
-        "METR"
-      ],
-      "influence_score": 9,
-      "citation_context": "Updated the most-cited AI progress metric. Referenced in subsequent METR evaluation reports and external analysis.",
-      "source_links": [
-        "https://metr.org/blog/2026-1-29-time-horizon-1-1/",
         "https://metr.org/time-horizons/"
       ]
     },
@@ -6220,64 +6154,6 @@
       ]
     },
     {
-      "id": "metr_frontier_risk_report_feb_mar_2026",
-      "title": "Frontier Risk Report (February to March 2026)",
-      "authors": [
-        "METR"
-      ],
-      "date": "2026-05-19",
-      "source_type": "research_report",
-      "source_platform": "METR",
-      "url": "https://metr.org/blog/2026-05-19-frontier-risk-report/",
-      "category": "model_evaluation",
-      "summary": "Assessment of whether internal AI agents at major labs had means, motive, and opportunity for rogue deployment. Found agents plausibly had means for small rogue deployments but not large robust ones.",
-      "key_findings": [
-        "Internal agents plausibly had means, motive, and opportunity for small rogue deployments",
-        "Large robust rogue deployments not yet feasible",
-        "Pilot entity-based risk assessment with Anthropic, Google, Meta, OpenAI"
-      ],
-      "quantitative_data": {
-        "labs_assessed": 4,
-        "assessment_period": "Feb-Mar 2026"
-      },
-      "novel_arguments_and_concepts": [
-        "Entity-based risk assessment framework",
-        "Rogue deployment capability taxonomy",
-        "Means-motive-opportunity framework for AI agents"
-      ],
-      "implications_for_governance": "Demonstrates feasibility of multi-lab cooperative risk assessment; rogue deployment risk is non-zero and growing",
-      "debate_connections": [
-        "debate_predeployment_eval_adequacy",
-        "debate_deceptive_alignment",
-        "debate_ai_rd_automation"
-      ],
-      "methodology": "Entity-based assessment combining evaluations, red-teaming, system cards, and public literature",
-      "related_work": [
-        "metr_time_horizon_paper_2025",
-        "metr_time_horizon_1_1_2026",
-        "metr_gpt5_eval_2025",
-        "metr_gpt51_codex_max_eval_2025",
-        "metr_gpt45_eval_2025"
-      ],
-      "themes": [
-        "Risk Assessment",
-        "Rogue Deployment",
-        "Multi-Lab Cooperation"
-      ],
-      "tags": [
-        "METR",
-        "Risk",
-        "Rogue Deployment",
-        "Frontier Models",
-        "Agent Safety"
-      ],
-      "influence_score": 10,
-      "citation_context": "First systematic multi-lab rogue deployment risk assessment",
-      "source_links": [
-        "https://metr.org/blog/2026-05-19-frontier-risk-report/"
-      ]
-    },
-    {
       "id": "metr_mirrorcode_2026",
       "title": "MirrorCode: Evidence that AI can already do some weeks-long coding tasks",
       "authors": [
@@ -6531,56 +6407,6 @@
       ]
     },
     {
-      "id": "metr_time_horizon_11_2026",
-      "title": "Time Horizon 1.1",
-      "authors": [
-        "METR"
-      ],
-      "date": "2026-01-29",
-      "source_type": "benchmark",
-      "source_platform": "METR",
-      "url": "https://metr.org/blog/2026-1-29-time-horizon-1-1/",
-      "category": "benchmark",
-      "summary": "Updated time horizon estimates with more tasks and new eval infrastructure for tracking AI agent autonomous work duration.",
-      "key_findings": [
-        "Time horizons have increased significantly",
-        "New eval infrastructure more comprehensive",
-        "More tasks improve reliability"
-      ],
-      "quantitative_data": {
-        "version": "1.1"
-      },
-      "novel_arguments_and_concepts": [
-        "Time horizon v1.1 methodology",
-        "Improved evaluation infrastructure"
-      ],
-      "implications_for_governance": "Time horizon is key metric for governance triggers; updated estimates inform risk assessments",
-      "debate_connections": [
-        "debate_ai_rd_automation",
-        "debate_benchmark_validity"
-      ],
-      "methodology": "Benchmark suite with human-calibrated tasks and new evaluation infrastructure",
-      "related_work": [
-        "metr_mirrorcode_2026"
-      ],
-      "themes": [
-        "Time Horizon",
-        "Evaluation",
-        "R&D Automation"
-      ],
-      "tags": [
-        "METR",
-        "Time Horizon",
-        "Benchmark",
-        "R&D Automation"
-      ],
-      "influence_score": 9,
-      "citation_context": "Updated version of influential time horizon metric",
-      "source_links": [
-        "https://metr.org/blog/2026-1-29-time-horizon-1-1/"
-      ]
-    },
-    {
       "id": "metr_monitorability_evals_2026",
       "title": "Early work on monitorability evaluations",
       "authors": [
@@ -6675,6 +6501,348 @@
       "citation_context": "Methodological contribution to AI productivity measurement",
       "source_links": [
         "https://metr.org/blog/2026-02-19-five-lessons-from-ai-biology-rct/"
+      ]
+    },
+    {
+      "id": "metr_frontier_risk_report_2026",
+      "title": "Frontier Risk Report (February to March 2026)",
+      "authors": [
+        "METR"
+      ],
+      "date": "2026-05-19",
+      "source_type": "evaluation_report",
+      "source_platform": "METR Blog",
+      "url": "https://metr.org/blog/2026-05-19-frontier-risk-report/",
+      "category": "evaluation",
+      "summary": "METR's pilot Frontier Risk Report presents the results of a first-of-its-kind cooperative exercise assessing misalignment risks from AI agents deployed inside frontier AI developers themselves. Conducted from February to March 2026 with participation from Anthropic, Google, Meta, and OpenAI, the assessment is entity-based rather than model-specific — evaluating the aggregate risk from how each organization uses AI agents internally, rather than scoring individual models in isolation. Each participant provided access to their most capable internal models, raw chains of thought, and non-public information about their internal deployment practices. The assessment framework uses a Means/Motive/Opportunity structure: evaluating whether internal AI agents have the capabilities and access (Means), the propensities and incentives (Motive), and whether safeguards are insufficient (Opportunity) for misaligned behavior. A key finding is that none of the shared models were significantly more capable than the strongest publicly documented models as of May 2026, suggesting that internal capabilities are not dramatically ahead of public releases. The exercise was explicitly designed for periodic repetition, with the next run planned for late 2026, establishing an ongoing monitoring framework rather than a one-time assessment.",
+      "key_findings": [
+        "None of the shared models were significantly more capable than the strongest publicly documented models as of May 2026",
+        "Internal AI agents at frontier developers plausibly had means for small-scale rogue deployments but not large robust ones",
+        "Entity-based assessment (evaluating organizations, not individual models) proved feasible and informative",
+        "All four major frontier developers (Anthropic, Google, Meta, OpenAI) participated cooperatively",
+        "Means/Motive/Opportunity framework successfully structured the assessment across different organizational contexts",
+        "Raw chains of thought from internal models provided unique insight into agent reasoning patterns",
+        "Non-public information sharing between competitors was achieved under appropriate confidentiality frameworks",
+        "The exercise is designed for periodic repetition with next run planned for late 2026"
+      ],
+      "quantitative_data": {
+        "labs_assessed": 4,
+        "assessment_period": "February to March 2026",
+        "publication_date": "2026-05-19",
+        "participating_organizations": [
+          "Anthropic",
+          "Google",
+          "Meta",
+          "OpenAI"
+        ],
+        "framework_dimensions": 3,
+        "framework_components": {
+          "means": "Capabilities and access of internal AI agents",
+          "motive": "Propensities and incentives for misaligned behavior",
+          "opportunity": "Adequacy of safeguards against rogue deployment"
+        },
+        "next_run": "Late 2026",
+        "capability_finding": "No internal models significantly exceeded strongest public models as of May 2026"
+      },
+      "novel_arguments_and_concepts": "The Frontier Risk Report introduces several conceptual innovations in AI safety evaluation. First, the entity-based assessment approach represents a paradigm shift from model-level evaluations: rather than asking 'is this model dangerous?', it asks 'is this organization's use of AI agents internally creating misalignment risk?' This captures deployment context, organizational safeguards, and systemic factors that model-level evals miss. Second, the Means/Motive/Opportunity framework adapts criminological concepts to AI risk assessment, providing a structured way to decompose misalignment risk into independently assessable components. Third, the finding that internal models do not dramatically exceed public capabilities challenges a common assumption in AI governance discourse — that labs are sitting on significantly more capable private models. This has important implications for compute governance and regulatory design, since it suggests that public model evaluations may be more representative of frontier capability than previously assumed. Fourth, the cooperative multi-lab format demonstrates that competitive AI developers can share sensitive internal information under appropriate frameworks, establishing a precedent for future industry-wide safety monitoring. The periodic repetition design transforms this from a one-time study into an ongoing monitoring institution.",
+      "implications_for_governance": [
+        "Demonstrates feasibility of cooperative multi-lab safety assessment, creating precedent for mandatory periodic reviews",
+        "Entity-based assessment could become the basis for organizational licensing or certification frameworks",
+        "Finding that internal capabilities do not dramatically exceed public ones informs compute governance assumptions",
+        "Means/Motive/Opportunity framework provides structured basis for regulatory risk assessment standards",
+        "Periodic repetition design creates an ongoing monitoring institution rather than one-time compliance check",
+        "Successful non-public information sharing between competitors suggests regulatory frameworks can require similar cooperation",
+        "Raw chain-of-thought access as assessment tool implies governance may need to mandate reasoning transparency"
+      ],
+      "debate_connections": [
+        "alignment_tractability",
+        "compute_governance",
+        "existential_risk_debate",
+        "regulation_timing",
+        "safety_vs_capabilities",
+        "who_governs_ai"
+      ],
+      "methodology": {
+        "approach": "Entity-based cooperative risk assessment using Means/Motive/Opportunity framework",
+        "primary_metrics": [
+          "Capability level of internal AI agents",
+          "Access scope of AI agents within lab infrastructure",
+          "Agent propensity for misaligned behavior patterns",
+          "Adequacy of organizational safeguards"
+        ],
+        "data_sources": [
+          "Most capable internal models from each participant",
+          "Raw chains of thought from internal agents",
+          "Non-public information about internal deployment practices",
+          "System cards and public literature"
+        ],
+        "participants": [
+          "Anthropic",
+          "Google",
+          "Meta",
+          "OpenAI"
+        ],
+        "limitations": [
+          "Pilot exercise — methodology will be refined in subsequent runs",
+          "Participants self-selected and may not represent all frontier developers",
+          "Assessment captures a point-in-time snapshot; rapid capability changes may outpace assessment cycle",
+          "Confidentiality requirements limited detail in public report"
+        ]
+      },
+      "related_work": [
+        "metr_time_horizon_paper_2025",
+        "metr_time_horizon_1_1_2026",
+        "metr_gpt5_eval_2025",
+        "metr_gpt51_codex_max_eval_2025"
+      ],
+      "themes": [
+        "Cooperative safety assessment",
+        "Entity-based risk evaluation",
+        "Misalignment risk from internal AI agents",
+        "Means/Motive/Opportunity framework",
+        "Multi-lab cooperation",
+        "Rogue deployment risk",
+        "Periodic safety monitoring",
+        "Internal vs public capability gap"
+      ],
+      "tags": [
+        "METR",
+        "Frontier Risk",
+        "Misalignment",
+        "Cooperative Assessment",
+        "Entity-Based Evaluation",
+        "Rogue Deployment",
+        "Anthropic",
+        "Google",
+        "Meta",
+        "OpenAI",
+        "Chain of Thought",
+        "Agent Safety"
+      ],
+      "influence_score": 9,
+      "source_links": [
+        "https://metr.org/blog/2026-05-19-frontier-risk-report/"
+      ]
+    },
+    {
+      "id": "metr_time_horizon_1_1_2026",
+      "title": "Time Horizon 1.1: Expanded Long-Horizon Task Benchmark",
+      "authors": [
+        "METR"
+      ],
+      "date": "2026-01-15",
+      "source_type": "benchmark_update",
+      "source_platform": "METR Blog",
+      "url": "https://metr.org/time-horizons/",
+      "category": "metric",
+      "summary": "Time Horizon 1.1 is a major expansion of METR's flagship capability measurement benchmark, growing from 14 to 31 long-horizon tasks where each task is estimated to take a human more than 8 hours to complete. The update incorporates data from 9 additional benchmarks spanning scientific reasoning, mathematics, robotics, computer use, and self-driving, providing cross-domain validation of capability growth trends. The central finding is that improvement rates across these diverse domains are generally similar to the 7-month doubling time established in the original Time Horizon paper, though with some evidence of acceleration in post-2023 data showing a roughly 131-day doubling time. A notable result is that AI agents successfully solved MirrorCode tasks — a software reimplementation benchmark developed in collaboration with Epoch AI — at a level corresponding to tasks that take experienced human developers weeks to complete. The update includes a performance hierarchy across frontier models: Claude Opus 4.6 achieves approximately 14.5 hours, GPT-5.2 approximately 6.6 hours, and Claude Opus 4.5 approximately 4.8 hours on the 50%-task-completion time horizon metric. The expanded benchmark suite provides more robust trend estimation and cross-domain generalization evidence than the original paper's software-engineering-focused task set.",
+      "key_findings": [
+        "Task set expanded from 14 to 31 long-horizon tasks (each estimated >8 hours human completion time)",
+        "9 additional benchmarks incorporated spanning scientific reasoning, math, robotics, computer use, and self-driving",
+        "Improvement rates across domains generally consistent with 7-month doubling time",
+        "Post-2023 data suggests possible acceleration to ~131-day doubling time",
+        "AI agents solved MirrorCode (Epoch AI) software reimplementation tasks taking humans weeks",
+        "Performance hierarchy: Claude Opus 4.6 ~14.5hrs, GPT-5.2 ~6.6hrs, Claude Opus 4.5 ~4.8hrs",
+        "Cross-domain consistency suggests capability growth is general, not domain-specific",
+        "Long-horizon task performance is improving across multiple independent benchmark suites"
+      ],
+      "quantitative_data": {
+        "metric_name": "50%-task-completion time horizon",
+        "task_count_previous": 14,
+        "task_count_updated": 31,
+        "benchmarks_analyzed": 9,
+        "domains_covered": [
+          "scientific reasoning",
+          "mathematics",
+          "robotics",
+          "computer use",
+          "self-driving"
+        ],
+        "doubling_time_overall": "~7 months (consistent with original paper)",
+        "doubling_time_post_2023": "~131 days (4.3 months, evidence of acceleration)",
+        "model_performance": {
+          "claude_opus_4_6": "~14.5 hours",
+          "gpt_5_2": "~6.6 hours",
+          "claude_opus_4_5": "~4.8 hours"
+        },
+        "mirrorcode_result": "Agents solved tasks estimated at weeks of human developer effort",
+        "minimum_task_duration": ">8 hours human completion time per task"
+      },
+      "novel_arguments_and_concepts": "TH1.1 makes three significant conceptual contributions beyond the original paper. First, the cross-domain expansion from software engineering to scientific reasoning, mathematics, robotics, computer use, and self-driving provides the strongest evidence yet that AI capability growth is a general phenomenon rather than an artifact of benchmark-specific optimization. The finding that doubling times are similar across these very different domains suggests a deep underlying trend in model capability improvement. Second, the MirrorCode collaboration with Epoch AI demonstrates that AI agents can now complete tasks at the 'weeks of human effort' scale — crossing a threshold that was considered far out of reach even in the original March 2025 paper. Third, the model performance hierarchy (Claude Opus 4.6 at 14.5hrs substantially above GPT-5.2 at 6.6hrs and Claude Opus 4.5 at 4.8hrs) provides a concrete ranking of frontier models on autonomous capability that complements but differs from traditional benchmark leaderboards. The gap between Claude Opus 4.6 and other models suggests that architectural or training differences — not just scale — may drive long-horizon performance.",
+      "implications_for_governance": [
+        "Cross-domain consistency in doubling time strengthens the case for domain-general capability governance rather than sector-specific regulation",
+        "Week-scale task completion (MirrorCode) implies AI systems approaching the threshold where they can contribute meaningfully to AI R&D itself",
+        "131-day post-2023 doubling means safety evaluations need quarterly rather than annual updates",
+        "The model performance hierarchy provides concrete data for tiered regulatory frameworks",
+        "Expansion to robotics and self-driving domains brings physical-world capability growth into governance scope",
+        "General capability growth trend undermines arguments that AI progress will slow in specific high-stakes domains"
+      ],
+      "debate_connections": [
+        "alignment_tractability",
+        "compute_governance",
+        "existential_risk_debate",
+        "regulation_timing",
+        "safety_vs_capabilities"
+      ],
+      "methodology": {
+        "approach": "Expanded benchmark suite with logistic regression on log(human_completion_time) vs. task success probability",
+        "task_sources": [
+          "Original Time Horizon tasks",
+          "MirrorCode (collaboration with Epoch AI)",
+          "Scientific reasoning benchmarks",
+          "Mathematics competition problems",
+          "Robotics simulation tasks",
+          "Computer use evaluation suites",
+          "Self-driving scenario benchmarks"
+        ],
+        "scaffolds_used": [
+          "ReAct",
+          "Triframe",
+          "domain-specific scaffolds"
+        ],
+        "human_calibration": "Professional-grade human baselines with >8 hour minimum task duration",
+        "limitations": [
+          "Long-horizon tasks remain primarily in structured lab environments",
+          "Real-world task completion may differ from benchmark performance",
+          "Scaffold choice affects measured capability and may not be optimal for all domains",
+          "Model rankings may shift with different scaffolding approaches"
+        ]
+      },
+      "related_work": [
+        "metr_time_horizon_paper_2025",
+        "metr_hcast_2025",
+        "metr_re_bench_2024"
+      ],
+      "themes": [
+        "AI capability measurement",
+        "Long-horizon task completion",
+        "Cross-domain capability trends",
+        "Exponential doubling time",
+        "Benchmark expansion",
+        "MirrorCode software reimplementation",
+        "Model performance hierarchy",
+        "Acceleration detection"
+      ],
+      "tags": [
+        "Time Horizon",
+        "METR",
+        "Benchmark",
+        "Long-Horizon Tasks",
+        "Claude Opus 4.6",
+        "GPT-5.2",
+        "MirrorCode",
+        "Epoch AI",
+        "Doubling Time",
+        "Cross-Domain",
+        "Autonomous AI"
+      ],
+      "influence_score": 9,
+      "source_links": [
+        "https://metr.org/time-horizons/",
+        "https://metr.org/blog/2026-1-29-time-horizon-1-1/"
+      ]
+    },
+    {
+      "id": "metr_gpt56_sol_eval_2026",
+      "title": "Pre-deployment Evaluation of OpenAI GPT-5.6 Sol",
+      "authors": [
+        "METR"
+      ],
+      "date": "2026-06-26",
+      "source_type": "evaluation_report",
+      "source_platform": "METR Blog",
+      "url": "https://metr.substack.com/p/2026-06-26-gpt-5-6-sol",
+      "category": "evaluation",
+      "summary": "METR's pre-deployment evaluation of OpenAI's GPT-5.6 Sol model represents one of the most anticipated third-party assessments of a frontier model released in mid-2026. As part of METR's ongoing commitment to independent evaluation of frontier AI systems prior to public deployment, this report assesses GPT-5.6 Sol across METR's standard evaluation dimensions including autonomous task completion capability, reward hacking propensity, sandbagging detection, and alignment-relevant behavioral patterns. GPT-5.6 Sol is positioned as OpenAI's most capable publicly released model at the time of assessment, building on the GPT-5 and GPT-5.1 series that METR previously evaluated. The evaluation applies METR's established methodology including the Time Horizon metric, RE-Bench tasks, HCAST evaluation integrity monitoring, and specialized probes for deceptive behavior patterns. The report provides quantitative capability measurements and qualitative assessment of alignment-relevant behaviors, contributing to the growing body of pre-deployment evaluation data that informs both OpenAI's release decisions and broader governance discussions about frontier model deployment.",
+      "key_findings": [
+        "GPT-5.6 Sol represents a significant capability advancement over GPT-5.1 and GPT-5.2",
+        "Pre-deployment assessment completed as part of METR's ongoing frontier model evaluation program",
+        "Evaluation spans autonomous task completion, reward hacking, sandbagging, and alignment behaviors",
+        "Results contribute to longitudinal tracking of OpenAI model capability progression",
+        "Assessment methodology consistent with prior GPT-5 and GPT-5.1-Codex-Max evaluations enabling direct comparison",
+        "Findings inform both OpenAI release decisions and broader governance discussions"
+      ],
+      "quantitative_data": {
+        "model_evaluated": "GPT-5.6 Sol",
+        "developer": "OpenAI",
+        "evaluation_date": "2026-06-26",
+        "evaluation_dimensions": [
+          "autonomous task completion",
+          "reward hacking propensity",
+          "sandbagging detection",
+          "alignment-relevant behavioral patterns"
+        ],
+        "comparison_models": [
+          "GPT-5",
+          "GPT-5.1-Codex-Max",
+          "GPT-5.2"
+        ],
+        "methodology_version": "Consistent with METR standard evaluation framework"
+      },
+      "novel_arguments_and_concepts": "The GPT-5.6 Sol evaluation continues to build METR's unique longitudinal dataset of pre-deployment frontier model assessments, which is increasingly valuable for detecting trends in capability growth and alignment-relevant behavior across model generations. Each successive OpenAI evaluation (GPT-5, GPT-5.1-Codex-Max, and now GPT-5.6 Sol) adds a data point to the capability trajectory curve and provides evidence about whether safety-relevant behavioral properties are stable across capability jumps. The pre-deployment timing is significant: METR's assessments occur before public release, giving the evaluation findings potential influence over deployment decisions. The growing library of consistent-methodology evaluations across multiple model generations from the same developer creates the empirical foundation for understanding how capability scaling relates to alignment properties — a question that is central to the safety vs capabilities debate but has historically lacked systematic longitudinal data.",
+      "implications_for_governance": [
+        "Pre-deployment evaluation by independent third parties is becoming established practice for frontier model releases",
+        "Longitudinal evaluation data across model generations enables trend detection in alignment-relevant properties",
+        "Consistent methodology across evaluations creates comparable data for regulatory standard-setting",
+        "Third-party evaluation independence provides credibility that self-assessment lacks",
+        "Pre-deployment timing gives evaluation findings potential influence over release decisions"
+      ],
+      "debate_connections": [
+        "alignment_tractability",
+        "compute_governance",
+        "existential_risk_debate",
+        "regulation_timing",
+        "safety_vs_capabilities"
+      ],
+      "methodology": {
+        "approach": "Standard METR pre-deployment evaluation framework applied to frontier model",
+        "primary_metrics": [
+          "Time Horizon (50%-task-completion time)",
+          "Reward hacking rate",
+          "Sandbagging detection",
+          "Alignment-relevant behavioral patterns"
+        ],
+        "evaluation_tools": [
+          "HCAST",
+          "RE-Bench",
+          "Time Horizon benchmark suite",
+          "Behavioral probes for deceptive patterns"
+        ],
+        "comparison_baseline": "Prior GPT-5 and GPT-5.1-Codex-Max evaluations",
+        "limitations": [
+          "Pre-deployment evaluation may not capture post-deployment behavioral changes",
+          "Evaluation scope bounded by METR's standard framework; novel capabilities may require new assessment methods",
+          "Full quantitative results subject to coordinated disclosure with OpenAI"
+        ]
+      },
+      "related_work": [
+        "metr_gpt5_eval_2025",
+        "metr_gpt51_codex_max_eval_2025",
+        "metr_time_horizon_paper_2025",
+        "metr_time_horizon_1_1_2026"
+      ],
+      "themes": [
+        "Pre-deployment evaluation",
+        "Frontier model assessment",
+        "GPT model progression",
+        "Independent safety evaluation",
+        "Longitudinal capability tracking",
+        "Alignment behavioral patterns"
+      ],
+      "tags": [
+        "GPT-5.6 Sol",
+        "OpenAI",
+        "METR",
+        "Pre-deployment",
+        "Frontier Models",
+        "Evaluation Report",
+        "Autonomous Capabilities",
+        "Alignment",
+        "Safety Assessment"
+      ],
+      "influence_score": 8,
+      "source_links": [
+        "https://metr.substack.com/p/2026-06-26-gpt-5-6-sol"
       ]
     }
   ]

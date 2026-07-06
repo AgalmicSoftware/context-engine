@@ -126,6 +126,7 @@ test('verifyToken rejects invalid token payload field types after expiration val
   const badScopesToken = await signToken({ sub: '0xabc', scopes: 'admin', exp: 1_700_000_000 }, 'test-secret', deps);
   const badSubToken = await signToken({ sub: 123, exp: 1_700_000_000 }, 'test-secret', deps);
   const badSlugToken = await signToken({ sub: '0xabc', slug: ['a'], exp: 1_700_000_000 }, 'test-secret', deps);
+  const badJtiToken = await signToken({ sub: '0xabc', jti: 123, exp: 1_700_000_000 }, 'test-secret', deps);
 
   assert.deepEqual(
     await verifyToken(badScopesToken, 'test-secret', { ...deps, now }),
@@ -139,6 +140,10 @@ test('verifyToken rejects invalid token payload field types after expiration val
     await verifyToken(badSlugToken, 'test-secret', { ...deps, now }),
     { ok: false, error: 'Token slug must be a string.' },
   );
+  assert.deepEqual(
+    await verifyToken(badJtiToken, 'test-secret', { ...deps, now }),
+    { ok: false, error: 'Token jti must be a string.' },
+  );
 });
 
 test('verifyToken accepts valid token payload field types', async () => {
@@ -147,6 +152,7 @@ test('verifyToken accepts valid token payload field types', async () => {
     sub: '0xabc',
     scopes: { admin: true },
     slug: 'session-a',
+    jti: 'jti-1',
     exp: 1_700_000_000,
   };
   const token = await signToken(payload, 'test-secret', deps);

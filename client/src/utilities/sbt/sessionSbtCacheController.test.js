@@ -39,7 +39,7 @@ jest.mock('../web3/contractScripts.js', () => {
   };
 });
 
-jest.mock('../../components/MainSite/mainSiteUtils', () => ({
+jest.mock('../session/mainSiteUtils', () => ({
   __esModule: true,
   emitMainSiteSbtDebug: jest.fn(),
   hasCoreSbtMetadata: jest.fn((info) => {
@@ -68,7 +68,7 @@ jest.mock('../../components/MainSite/mainSiteUtils', () => ({
   isForcedSbtSelectorDebugEnabled: jest.fn(() => false),
 }));
 
-jest.mock('../../components/MainSite/progressHelpers', () => ({
+jest.mock('../session/mainSiteProgressHelpers', () => ({
   __esModule: true,
   mapSbtWorkProgressToBlock: jest.fn(({
     baseFrom = 0,
@@ -102,11 +102,11 @@ const {
   emitMainSiteSbtDebug,
   hasCoreSbtMetadata,
   isForcedSbtSelectorDebugEnabled,
-} = require('../../components/MainSite/mainSiteUtils');
+} = require('../session/mainSiteUtils');
 const {
   mergeSbtLiveProgressEntry,
   shouldCommitThrottledProgress,
-} = require('../../components/MainSite/progressHelpers');
+} = require('../session/mainSiteProgressHelpers');
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
@@ -1283,6 +1283,35 @@ describe('createSessionSbtCacheController', () => {
       );
       expect(contractScripts.listenForSBTInstanceEvents).not.toHaveBeenCalled();
       expect(host.dgRead).not.toHaveBeenCalled();
+    });
+
+    it('uses an injected event stream port for SBT listener wiring', () => {
+      const sbtEventStreamsPort = {
+        listenForSBTEvents: jest.fn(),
+        removeSBTEventListener: jest.fn(),
+        listenForSurveyEvents: jest.fn(),
+        removeSurveyEventsListener: jest.fn(),
+        listenForSBTInstanceEvents: jest.fn(),
+        removeSBTInstanceEventsListener: jest.fn(),
+      };
+      const host = createMockHost({ chainId: '', sbtEventStreamsPort });
+      const controller = createSessionSbtCacheController(host);
+
+      controller.startSbtEventListenerForGroup('alpha');
+
+      expect(sbtEventStreamsPort.removeSBTEventListener).toHaveBeenCalledWith('none', 'alpha');
+      expect(sbtEventStreamsPort.removeSBTInstanceEventsListener)
+        .toHaveBeenCalledWith('none', [], 'alpha');
+      expect(sbtEventStreamsPort.listenForSBTEvents).toHaveBeenCalledWith(
+        'none',
+        expect.any(Function),
+        'alpha'
+      );
+      expect(sbtEventStreamsPort.listenForSBTInstanceEvents).not.toHaveBeenCalled();
+      expect(contractScripts.removeSBTEventListener).not.toHaveBeenCalled();
+      expect(contractScripts.removeSBTInstanceEventsListener).not.toHaveBeenCalled();
+      expect(contractScripts.listenForSBTEvents).not.toHaveBeenCalled();
+      expect(contractScripts.listenForSBTInstanceEvents).not.toHaveBeenCalled();
     });
 
     it('attaches a detail-page instance listener through the controller', () => {

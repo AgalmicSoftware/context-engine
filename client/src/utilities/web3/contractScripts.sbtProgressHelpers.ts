@@ -3,8 +3,8 @@
  * @description Helpers for tracking SBT event scan progress across holder refresh passes.
  */
 
-type AnyRecord = Record<string, any>;
-type SbtScanProgressEvent = AnyRecord & {
+type SbtScanProgressRecord = Record<string, unknown>;
+type SbtScanProgressEvent = SbtScanProgressRecord & {
   phase?: unknown;
   fromBlock?: unknown;
   toBlock?: unknown;
@@ -13,14 +13,14 @@ type SbtScanProgressEvent = AnyRecord & {
   remainingBlocks?: number;
   completionRatio?: number;
 };
-type SbtScanProgressState = AnyRecord & {
+type SbtScanProgressState = SbtScanProgressRecord & {
   phase: unknown;
   fromBlock: number;
   toBlock: number;
   totalBlocks: number;
   scannedBlocks: number;
   maxConcurrency: number | null;
-  onLogs: ((payload: AnyRecord) => Promise<unknown> | unknown) | null;
+  onLogs: ((payload: SbtScanProgressRecord) => Promise<unknown> | unknown) | null;
   onProgress: ((progress?: SbtScanProgressEvent) => void) | null;
 };
 
@@ -40,7 +40,7 @@ export const createSbtEventScanProgressState = ({
   maxConcurrency = null,
 }: {
   onProgress?: ((payload: SbtScanProgressEvent) => unknown) | null;
-  onLogs?: ((payload: AnyRecord) => Promise<unknown> | unknown) | null;
+  onLogs?: ((payload: SbtScanProgressRecord) => Promise<unknown> | unknown) | null;
   phase?: unknown;
   fromBlock?: unknown;
   toBlock?: unknown;

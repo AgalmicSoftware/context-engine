@@ -625,8 +625,9 @@ const SBTsList = ({
       try {
         await refreshSessionUniverseRegistryCache();
       } catch (e) { sbtLog.warn('SBTsList: fallback', e); } finally {
-        if (!isMounted.current) return;
-        syncSessionUniverseFromCache();
+        if (isMounted.current) {
+          syncSessionUniverseFromCache();
+        }
       }
     })();
   }, [
@@ -770,7 +771,11 @@ const SBTsList = ({
   ), [sectionSessionSlugs]);
 
   const resolvedListSlugForGroupLists = isSbtListSyntheticNoSessionSlug(listSlug) ? '' : listSlug;
-  const { featured_SBTs_LIST = [], ignored_SBTs_LIST = [] } = getSessionLists(resolvedListSlugForGroupLists);
+  const groupListRevision = Number(sbtCacheRevision || 0);
+  const { featured_SBTs_LIST = [], ignored_SBTs_LIST = [] } = useMemo(() => {
+    void groupListRevision;
+    return getSessionLists(resolvedListSlugForGroupLists);
+  }, [groupListRevision, resolvedListSlugForGroupLists]);
 
   const [sbtListBySlug, setSbtListBySlug] = useState<SbtListBySlug>({});
   const [sessionLoadStateBySlug, setSessionLoadStateBySlug] = useState<SbtListLoadStateBySlug>({});
@@ -1549,20 +1554,21 @@ const SBTsList = ({
 
     clearChipProgressVisibilityTimeout(slug);
     const previousMeta = chipProgressVisibilityMetaRef.current[slug] || {};
+    const shouldShow = Boolean(visible);
     chipProgressVisibilityMetaRef.current[slug] = {
       ...previousMeta,
-      visible: !!visible,
-      pendingVisible: !!visible,
+      visible: shouldShow,
+      pendingVisible: shouldShow,
       lastModeChangeAtMs: Math.max(0, Number(nowMs || Date.now()) || 0),
       timerId: null,
     };
     setChipProgressVisibilityBySlug((prev) => {
       const currentlyVisible = !!prev?.[slug];
-      if (currentlyVisible === !!visible) {
-        if (!!visible === false && !Object.prototype.hasOwnProperty.call(prev || {}, slug)) {
+      if (currentlyVisible === shouldShow) {
+        if (!shouldShow && !Object.prototype.hasOwnProperty.call(prev || {}, slug)) {
           return prev;
         }
-        if (!!visible) return prev;
+        if (shouldShow) return prev;
       }
       const next = { ...(prev || {}) };
       if (visible) next[slug] = true;

@@ -1,7 +1,9 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
-import SurveyResultsIndividualResponsesList from './SurveyResultsIndividualResponsesList';
+import SurveyResultsIndividualResponsesList, {
+  buildSurveyResultsResponseRowId,
+} from './SurveyResultsIndividualResponsesList';
 
 const styleMap = {
   biggerIcon: 'biggerIcon',
@@ -16,6 +18,14 @@ const styleMap = {
 };
 
 describe('SurveyResultsIndividualResponsesList', () => {
+  it('builds stable row ids from survey and responder identity', () => {
+    expect(buildSurveyResultsResponseRowId(
+      { responder: '0xABC123', surveyId: 'survey-1' },
+      'fallback-survey',
+      4
+    )).toBe('survey-1:0xabc123');
+  });
+
   it('renders the empty individual-results state', () => {
     render(
       <SurveyResultsIndividualResponsesList
@@ -35,7 +45,7 @@ describe('SurveyResultsIndividualResponsesList', () => {
     const renderResponseBody = jest.fn(() => <div data-testid="response-body">Response body</div>);
     render(
       <SurveyResultsIndividualResponsesList
-        activeToggles={{ 0: true }}
+        activeToggles={{ 'survey id/with spaces:0xabc123/def456': true }}
         currentSurveyId="survey id/with spaces"
         effectiveSlug="alpha"
         filterLoading={false}
@@ -63,7 +73,64 @@ describe('SurveyResultsIndividualResponsesList', () => {
     expect(onToggleResponse).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getAllByRole('link')[0].closest('.responseHeader') as HTMLElement);
-    expect(onToggleResponse).toHaveBeenCalledWith(0);
+    expect(onToggleResponse).toHaveBeenCalledWith('survey id/with spaces:0xabc123/def456');
+  });
+
+  it('keeps the expanded responder open when filtering changes response indexes', () => {
+    const renderResponseBody = jest.fn((response) => (
+      <div data-testid="response-body">{response.responder}</div>
+    ));
+    const { rerender } = render(
+      <SurveyResultsIndividualResponsesList
+        activeToggles={{ 'survey-1:0xbbb': true }}
+        currentSurveyId="survey-1"
+        filterLoading={false}
+        onToggleResponse={jest.fn()}
+        renderResponseBody={renderResponseBody}
+        responses={[
+          { responder: '0xAAA' },
+          { responder: '0xBBB' },
+        ]}
+        styleMap={styleMap}
+      />
+    );
+
+    expect(screen.getByTestId('response-body')).toHaveTextContent('0xBBB');
+    expect(renderResponseBody).toHaveBeenCalledWith({ responder: '0xBBB' }, 1);
+
+    renderResponseBody.mockClear();
+    rerender(
+      <SurveyResultsIndividualResponsesList
+        activeToggles={{ 'survey-1:0xbbb': true }}
+        currentSurveyId="survey-1"
+        filterLoading={false}
+        onToggleResponse={jest.fn()}
+        renderResponseBody={renderResponseBody}
+        responses={[{ responder: '0xBBB' }]}
+        styleMap={styleMap}
+      />
+    );
+
+    expect(screen.getByTestId('response-body')).toHaveTextContent('0xBBB');
+    expect(renderResponseBody).toHaveBeenCalledWith({ responder: '0xBBB' }, 0);
+  });
+
+  it('keeps collapsed response bodies unmounted', () => {
+    const renderResponseBody = jest.fn(() => <div data-testid="response-body">Response body</div>);
+    render(
+      <SurveyResultsIndividualResponsesList
+        activeToggles={{}}
+        currentSurveyId="survey-1"
+        filterLoading={false}
+        onToggleResponse={jest.fn()}
+        renderResponseBody={renderResponseBody}
+        responses={[{ responder: '0xabc123' }]}
+        styleMap={styleMap}
+      />
+    );
+
+    expect(screen.queryByTestId('response-body')).not.toBeInTheDocument();
+    expect(renderResponseBody).not.toHaveBeenCalled();
   });
 
   it('suppresses the empty copy while filters are loading', () => {
