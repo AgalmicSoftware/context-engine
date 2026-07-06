@@ -5,14 +5,14 @@ compiler enforcement. It does not change `tsconfig` settings.
 
 ## Current Ratchet
 
-`scripts/check-type-debt-ratchet.mjs --list` checked 862 production TS/TSX files
+`scripts/check-type-debt-ratchet.mjs --list` checked 887 production TS/TSX files
 under `client/src` and reported:
 
 | Debt kind | Current baseline |
 |---|---:|
 | `@ts-nocheck` | 0 |
-| `: any` | 2,630 |
-| `as any` | 209 |
+| `: any` | 1,226 |
+| `as any` | 93 |
 | `as unknown as` | 60 |
 | `Promise<any>` | 2 |
 | `Array<any>` | 0 |
@@ -22,13 +22,16 @@ Largest current clusters:
 
 | File | Debt |
 |---|---:|
-| `client/src/components/SurveyTool/SurveyQuestions.tsx` | `: any=1472`, `as any=116` |
-| `client/src/utilities/web3/contractScripts.impl.ts` | `: any=450`, `as any=66` |
 | `client/src/components/CommunityTab/CommunityTab.tsx` | `: any=148`, `Record<...any...>=4` |
 | `client/src/components/Account/LoginAndSettingsModal.tsx` | `: any=130`, `as any=6` |
 | `client/src/components/OnePageSession/OnePageSession.tsx` | `: any=111`, `as any=1`, `Record<...any...>=17` |
 | `client/src/components/Admin/AdminPage.tsx` | `: any=105`, `Record<...any...>=1` |
 | `client/src/components/SurveyTool/SurveyPileViewMode.tsx` | `: any=104`, `as any=1`, `as unknown as=2` |
+| `client/src/utilities/web3/contractScripts.sbtRegistryMethods.ts` | `: any=101`, `as any=11` |
+| `client/src/utilities/web3/contractScripts.surveyEventReadMethods.ts` | `: any=99`, `as any=6` |
+| `client/src/utilities/web3/contractScripts.impl.ts` | `: any=72`, `as any=7` |
+| `client/src/components/SurveyTool/surveyQuestionsRuntimeMethods.tsx` | `: any=65` |
+| `client/src/utilities/web3/contractScripts.sbtMintMethods.ts` | `: any=65`, `as any=29` |
 
 ## Migration Ladder
 
