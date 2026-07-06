@@ -228,6 +228,47 @@ test('route/page low-level imports through Vite bare aliases are violations', ()
   });
 });
 
+test('shared runtime components cannot add low-level imports', () => {
+  withTempRoot((rootDir) => {
+    writeFile(
+      rootDir,
+      'client/src/components/SurveyTool/SurveyQuestions.tsx',
+      "import contractScripts from '../../utilities/web3/contractScripts.js';\n"
+    );
+
+    const largeRuntimeSource = [
+      "import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';",
+      ...Array.from({ length: 5001 }, (_, index) => `const line${index} = ${index};`),
+    ].join('\n');
+    writeFile(
+      rootDir,
+      'client/src/components/SharedRuntime/LargeRuntime.tsx',
+      largeRuntimeSource
+    );
+    writeFile(
+      rootDir,
+      'client/src/components/SharedRuntime/SmallRuntime.tsx',
+      "import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';\n"
+    );
+
+    const violations = collectClientBoundaryViolations({ rootDir });
+    assert.deepEqual(violations, [
+      {
+        rule: 'shared-runtime-no-new-low-level',
+        source: 'client/src/components/SharedRuntime/LargeRuntime.tsx',
+        import: '../../utilities/arweave/arweaveUrls.js',
+        resolved: 'client/src/utilities/arweave/arweaveUrls',
+      },
+      {
+        rule: 'shared-runtime-no-new-low-level',
+        source: 'client/src/components/SurveyTool/SurveyQuestions.tsx',
+        import: '../../utilities/web3/contractScripts.js',
+        resolved: 'client/src/utilities/web3/contractScripts',
+      },
+    ]);
+  });
+});
+
 test('pure low-level re-export barrels are pass-through facade violations', () => {
   withTempRoot((rootDir) => {
     writeFile(
