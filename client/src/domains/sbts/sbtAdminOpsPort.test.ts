@@ -1,5 +1,5 @@
 import type { SbtAdminOpsPort, SbtProviderRef } from './sbtPorts.js';
-import { bindSbtAdminOpsPort } from './contractScriptsSbtAdminOpsPort.js';
+import { bindSbtAdminOpsPort } from './sbtAdminOpsPort.js';
 
 const executeSbtAdminOps = async (
   port: SbtAdminOpsPort,
@@ -44,30 +44,30 @@ describe('SbtAdminOpsPort', () => {
     expect(fakePort.startClaim).toHaveBeenCalledWith(providerRef, sbtAddress, '0xcommit');
   });
 
-  it('binds admin ops through a call-time contractScripts getter', async () => {
-    const firstContractScripts = {
+  it('binds admin ops through a call-time chainGateway getter', async () => {
+    const firstChainGateway = {
       addHashedPasswords: jest.fn(async () => ({ transactionHash: '0xfirstAdd' })),
       burnToken: jest.fn(async () => ({ transactionHash: '0xfirstBurn' })),
       claimWithPassword: jest.fn(async () => ({ transactionHash: '0xfirstPassword' })),
       isPasswordValid: jest.fn(async () => false),
       startClaim: jest.fn(async () => ({ transactionHash: '0xfirstStart' })),
     };
-    const secondContractScripts = {
+    const secondChainGateway = {
       addHashedPasswords: jest.fn(async () => ({ transactionHash: '0xsecondAdd' })),
       burnToken: jest.fn(async () => ({ transactionHash: '0xsecondBurn' })),
       claimWithPassword: jest.fn(async () => ({ transactionHash: '0xsecondPassword' })),
       isPasswordValid: jest.fn(async () => true),
       startClaim: jest.fn(async () => ({ transactionHash: '0xsecondStart' })),
     };
-    let currentContractScripts = firstContractScripts;
+    let currentChainGateway = firstChainGateway;
     const port = bindSbtAdminOpsPort({
-      contractScripts: () => currentContractScripts,
+      chainGateway: () => currentChainGateway,
     });
 
     await expect(port.addHashedPasswords('injected', '0x0000000000000000000000000000000000000001', ['0xfirst']))
       .resolves.toEqual({ transactionHash: '0xfirstAdd' });
 
-    currentContractScripts = secondContractScripts;
+    currentChainGateway = secondChainGateway;
 
     await expect(port.burnToken('injected', '0x0000000000000000000000000000000000000002', '5'))
       .resolves.toEqual({ transactionHash: '0xsecondBurn' });
@@ -78,28 +78,28 @@ describe('SbtAdminOpsPort', () => {
     await expect(port.startClaim('injected', '0x0000000000000000000000000000000000000002', '0xcommit'))
       .resolves.toEqual({ transactionHash: '0xsecondStart' });
 
-    expect(firstContractScripts.addHashedPasswords).toHaveBeenCalledWith(
+    expect(firstChainGateway.addHashedPasswords).toHaveBeenCalledWith(
       'injected',
       '0x0000000000000000000000000000000000000001',
       ['0xfirst'],
     );
-    expect(secondContractScripts.burnToken).toHaveBeenCalledWith(
+    expect(secondChainGateway.burnToken).toHaveBeenCalledWith(
       'injected',
       '0x0000000000000000000000000000000000000002',
       '5',
     );
-    expect(secondContractScripts.claimWithPassword).toHaveBeenCalledWith(
+    expect(secondChainGateway.claimWithPassword).toHaveBeenCalledWith(
       'injected',
       '0x0000000000000000000000000000000000000002',
       'pw',
     );
-    expect(secondContractScripts.isPasswordValid).toHaveBeenCalledWith(
+    expect(secondChainGateway.isPasswordValid).toHaveBeenCalledWith(
       'none',
       '0x0000000000000000000000000000000000000002',
       '0xhash',
       'beta',
     );
-    expect(secondContractScripts.startClaim).toHaveBeenCalledWith(
+    expect(secondChainGateway.startClaim).toHaveBeenCalledWith(
       'injected',
       '0x0000000000000000000000000000000000000002',
       '0xcommit',

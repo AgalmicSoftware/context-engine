@@ -219,7 +219,7 @@ import {
 } from './surveyResultsLifecycleRuntime';
 import {
   chainScanReadsPort,
-} from '../../domains/chain/contractScriptsChainScanReadsPort';
+} from '../../domains/chain/chainScanReadsPort';
 import {
   createSurveyResultsDataExportRuntime,
 } from './surveyResultsDataExportRuntime';

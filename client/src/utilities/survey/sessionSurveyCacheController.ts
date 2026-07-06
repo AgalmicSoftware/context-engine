@@ -13,7 +13,7 @@ import {
 } from './sessionSurveyResponseHelpers.js';
 import {
   sbtEventStreamsPort,
-} from '../../domains/sbts/contractScriptsSbtEventStreamsPort.js';
+} from '../../domains/sbts/sbtEventStreamsPort.js';
 import type { SbtEventStreamsPort } from '../../domains/sbts/sbtPorts.js';
 
 type StateRecord = Record<string, unknown>;

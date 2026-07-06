@@ -106,17 +106,17 @@ The characterization tests intentionally pin behavior as-is. The follow-up domai
 
 - `client/src/domains/sessions/registry/sessionRegistryReadPorts.ts`
   Typed session-registry read/cache port used by MainSite for cache load, store reads, session fetches, cache-update subscription, session config reads, and session ID formatting.
-- `client/src/domains/chain/contractScriptsChainScanReadsPort.ts`
+- `client/src/domains/chain/chainScanReadsPort.ts`
   Typed chain-scan read port for latest-block, relevant block-window, and session read-provider access.
-- `client/src/domains/profiles/contractScriptsProfileScanPort.ts`
+- `client/src/domains/profiles/profileScanPort.ts`
   Typed user profile scan port for `getSBTsForUser` and `getUserActivity`.
-- `client/src/domains/sbts/contractScriptsSbtEventStreamsPort.ts`
-  Typed SBT/survey listener removal port preserving call-time `contractScripts` lookup for spy compatibility.
-- `client/src/domains/sbts/contractScriptsSbtMetadataReadsPort.ts`
+- `client/src/domains/sbts/sbtEventStreamsPort.ts`
+  Typed SBT/survey listener removal port preserving call-time `chainGateway` lookup for spy compatibility.
+- `client/src/domains/sbts/sbtMetadataReadsPort.ts`
   Typed SBT metadata read port extended with SBT creation-block lookup.
-- `client/src/domains/surveys/contractScriptsSurveyReadsPort.ts`
+- `client/src/domains/surveys/surveyChainReadsPort.ts`
   Typed survey/question read port for survey hashes, survey/question data, and response reads.
-- `client/src/domains/worker/contractScriptsFaucetFundingPort.ts`
+- `client/src/domains/worker/faucetFundingPort.ts`
   Typed faucet funding port for the MainSite testnet-funding call.
 - `client/src/domains/surveys/questionArweaveCacheBranches.ts`
   Domain home for question Arweave cache branch preservation and merge helpers. The legacy utility module re-exports these helpers for remaining low-level consumers.

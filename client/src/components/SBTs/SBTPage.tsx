@@ -10,11 +10,11 @@ import {
   getSessionConfigBySlugOrDefault,
   normalizeSessionSlug,
 } from '../../domains/sessions/sessionConfig.js';
-import { sbtAdminOpsPort } from '../../domains/sbts/contractScriptsSbtAdminOpsPort.js';
-import { sbtGroupMintAuthorizationPort } from '../../domains/sbts/contractScriptsSbtGroupMintAuthorizationPort.js';
-import { sbtMetadataReadsPort } from '../../domains/sbts/contractScriptsSbtMetadataReadsPort.js';
-import { sbtMintExecutionPort } from '../../domains/sbts/contractScriptsSbtMintExecutionPort.js';
-import { sbtOwnershipReadsPort } from '../../domains/sbts/contractScriptsSbtOwnershipReadsPort.js';
+import { sbtAdminOpsPort } from '../../domains/sbts/sbtAdminOpsPort.js';
+import { sbtGroupMintAuthorizationPort } from '../../domains/sbts/sbtGroupMintAuthorizationPort.js';
+import { sbtMetadataReadsPort } from '../../domains/sbts/sbtMetadataReadsPort.js';
+import { sbtMintExecutionPort } from '../../domains/sbts/sbtMintExecutionPort.js';
+import { sbtOwnershipReadsPort } from '../../domains/sbts/sbtOwnershipReadsPort.js';
 import { getChainBlockTimeMs } from '../../variables/chains.js';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import styles from './SBTPage.module.scss';

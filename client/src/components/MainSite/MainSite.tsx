@@ -28,12 +28,12 @@ import {
   getSessionSlugByName,
   normalizeSessionSlug,
 } from '../../domains/sessions/sessionConfig.js';
-import { chainScanReadsPort } from '../../domains/chain/contractScriptsChainScanReadsPort.js';
-import { profileScanPort } from '../../domains/profiles/contractScriptsProfileScanPort.js';
-import { sbtEventStreamsPort } from '../../domains/sbts/contractScriptsSbtEventStreamsPort.js';
-import { sbtMetadataReadsPort } from '../../domains/sbts/contractScriptsSbtMetadataReadsPort.js';
-import { surveyReadsPort } from '../../domains/surveys/contractScriptsSurveyReadsPort.js';
-import { faucetFundingPort } from '../../domains/worker/contractScriptsFaucetFundingPort.js';
+import { chainScanReadsPort } from '../../domains/chain/chainScanReadsPort.js';
+import { profileScanPort } from '../../domains/profiles/profileScanPort.js';
+import { sbtEventStreamsPort } from '../../domains/sbts/sbtEventStreamsPort.js';
+import { sbtMetadataReadsPort } from '../../domains/sbts/sbtMetadataReadsPort.js';
+import { surveyReadsPort } from '../../domains/surveys/surveyChainReadsPort.js';
+import { faucetFundingPort } from '../../domains/worker/faucetFundingPort.js';
 import { deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import {

@@ -46,7 +46,7 @@ import { getSbtInstanceListenerPlan } from './sbtRealtimeListenerPlan.js';
 import { resolveSbtRealtimeEventBlockNumber } from './sbtRealtimeEventBlockResolver.js';
 import { getSbtRealtimeEventCursorGuard } from './sbtRealtimeEventCursorGuard.js';
 import { updateSbtRealtimeCursorForNetworkCache } from './sbtRealtimeCursorCache.js';
-import { sbtEventStreamsPort } from '../../domains/sbts/contractScriptsSbtEventStreamsPort.js';
+import { sbtEventStreamsPort } from '../../domains/sbts/sbtEventStreamsPort.js';
 
 const mainSiteLog = createLogger('mainSite');
 
