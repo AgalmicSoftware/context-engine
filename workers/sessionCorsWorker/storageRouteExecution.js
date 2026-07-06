@@ -20,6 +20,9 @@ import {
   toUint8Array,
   writeStorageEnvelopeKeyReleaseAudit,
 } from './storageEnvelopeEncryption.js';
+import {
+  isWorkerGroupMember,
+} from './workerGroups.js';
 
 const encoder = new TextEncoder();
 const toStr = (value) => (typeof value === 'string' ? value : value == null ? '' : String(value));
@@ -77,6 +80,15 @@ const buildIndexKey = ({ slug, resource, id }) => `ce-storage:${safeSlugPart(slu
 const buildIndexPrefix = ({ slug, resource }) => `ce-storage:${safeSlugPart(slug)}:${trim(resource) || 'docsContext'}:`;
 const buildSessionIndexPrefix = ({ slug }) => `ce-storage:${safeSlugPart(slug)}:`;
 const buildPayloadKey = ({ slug, id }) => `ce-storage-payload:${safeSlugPart(slug)}:${id}`;
+const safeGroupId = (value) => trim(value).toLowerCase().replace(/[^a-z0-9._:-]+/g, '-').replace(/^-+|-+$/g, '');
+const normalizeGroupIdList = (value) => {
+  let raw = value;
+  if (typeof raw === 'string' && raw.trim().startsWith('[')) {
+    try { raw = JSON.parse(raw); } catch { raw = value; }
+  }
+  const source = Array.isArray(raw) ? raw : [raw];
+  return Array.from(new Set(source.map(safeGroupId).filter(Boolean)));
+};
 const readKvPayloadEnvelope = async ({ index, slug, id }) => {
   if (!index || typeof index.get !== 'function') return null;
   try {
@@ -120,6 +132,29 @@ const normalizeAccessConditionDocument = (conditionsInput) => {
   return { match, conditions };
 };
 
+const normalizeUploadPolicy = (policyInput) => {
+  let raw = policyInput;
+  if (typeof raw === 'string' && raw.trim()) {
+    try { raw = JSON.parse(raw); } catch { raw = { mode: raw }; }
+  }
+  if (!isObj(raw)) return null;
+  const mode = trim(raw.mode || raw.kind || raw.type).toLowerCase();
+  if (!mode) return null;
+  return {
+    mode,
+    groupIds: normalizeGroupIdList(raw.groupIds || raw.groups || raw.groupId),
+    sbtAddresses: [
+      ...(Array.isArray(raw.sbtAddresses) ? raw.sbtAddresses : []),
+      ...(Array.isArray(raw.contracts) ? raw.contracts : []),
+      raw.sbtAddress,
+      raw.contract,
+      raw.address,
+    ].map(trim).filter(Boolean),
+    chainId: Number(raw.chainId || raw.networkChainId || 0) || null,
+    anyOrAll: normalizeGateMode(raw.anyOrAll || raw.match || raw.gateMode),
+  };
+};
+
 const readJsonPayload = async (request) => {
   let raw = null;
   try {
@@ -143,6 +178,8 @@ const readJsonPayload = async (request) => {
       gate: raw.gate || raw.gateResource || raw.resourceGate,
       tags: normalizeTagsForMetadata(raw.tags),
       accessConditions: normalizeAccessConditionDocument(raw.accessConditions || raw.conditions),
+      groupIds: normalizeGroupIdList(raw.groupIds || raw.groups || raw.groupId || raw.workerGroupId),
+      uploadPolicy: normalizeUploadPolicy(raw.uploadPolicy || raw.documentUploadPolicy || raw.policy),
       payloadEncrypted: raw.payloadEncrypted === true || raw.encrypted === true,
       requestId: trim(raw.requestId),
     },
@@ -171,6 +208,8 @@ const readMultipartPayload = async (request) => {
       gate: form.get('gate') || form.get('gateResource') || form.get('resourceGate'),
       tags: normalizeTagsForMetadata(form.get('tags')),
       accessConditions: normalizeAccessConditionDocument(form.get('accessConditions') || form.get('conditions')),
+      groupIds: normalizeGroupIdList(form.getAll?.('groupIds') || form.get('groupIds') || form.get('groupId') || form.get('workerGroupId')),
+      uploadPolicy: normalizeUploadPolicy(form.get('uploadPolicy') || form.get('documentUploadPolicy') || form.get('policy')),
       payloadEncrypted: trim(form.get('payloadEncrypted') || form.get('encrypted')).toLowerCase() === 'true',
       requestId: trim(form.get('requestId')),
     },
@@ -230,6 +269,7 @@ const resolvePayloadAccessControl = (config = {}) => {
     ...accessControl,
     mode: deriveLegacyPayloadAccessMode(accessControl),
     conditions,
+    groupIds: normalizeGroupIdList(payloadAccessControl.groupIds || payloadAccessControl.groups || payloadAccessControl.groupId),
     resources: { ...DEFAULT_RESOURCE_GATES, ...resourceGates },
   };
 };
@@ -412,13 +452,44 @@ const evaluateSbtOnchainCondition = async ({ condition, config, requesterAddress
   return { ok: false, reason: 'sbt_onchain_denied', condition: { kind: 'sbt_onchain', chainId, anyOrAll: mode } };
 };
 
-const evaluateAccessCondition = async ({ condition, config, requesterAddress, authScopes, deps }) => {
+const checkWorkerGroupMembership = async ({ env, slug, groupId, requesterAddress, authScopes, deps }) => {
+  const check = typeof deps?.isWorkerGroupMember === 'function' ? deps.isWorkerGroupMember : isWorkerGroupMember;
+  return check({ env, slug, groupId, requesterAddress, authScopes, deps });
+};
+
+const evaluateWorkerGroupCondition = async ({ condition, env, slug, requesterAddress, authScopes, deps }) => {
+  const groupIds = normalizeGroupIdList(condition.groupIds || condition.groups || condition.groupId);
+  if (!groupIds.length) return { ok: false, reason: 'missing_worker_group', condition: { kind: 'worker_group' } };
+  let firstFailure = null;
+  for (const groupId of groupIds) {
+    // eslint-disable-next-line no-await-in-loop
+    const result = await checkWorkerGroupMembership({ env, slug, groupId, requesterAddress, authScopes, deps });
+    if (result?.ok) {
+      return {
+        ok: true,
+        matchedCondition: {
+          kind: 'worker_group',
+          groupId,
+          principal: result.principal,
+        },
+      };
+    }
+    if (!firstFailure) firstFailure = result;
+  }
+  return {
+    ok: false,
+    reason: firstFailure?.reason || 'worker_group_membership_denied',
+    condition: { kind: 'worker_group', groupIds },
+  };
+};
+
+const evaluateAccessCondition = async ({ condition, env, slug, config, requesterAddress, authScopes, deps }) => {
   const kind = trim(condition?.kind).toLowerCase();
   if (kind === 'worker_role') return evaluateWorkerRoleCondition({ condition, config, requesterAddress });
   if (kind === 'agent_grant_scope') return evaluateAgentGrantScopeCondition({ condition, authScopes });
   if (kind === 'sbt_onchain') return evaluateSbtOnchainCondition({ condition, config, requesterAddress, deps });
   if (kind === 'worker_group') {
-    return { ok: false, reason: 'reserved_condition_kind', condition: { kind: 'worker_group' } };
+    return evaluateWorkerGroupCondition({ condition, env, slug, requesterAddress, authScopes, deps });
   }
   return { ok: false, reason: 'unknown_condition_kind', condition: { kind: kind || 'unknown' } };
 };
@@ -440,6 +511,8 @@ const resolvePayloadAccessConditions = ({ metadata, access }) => {
 const evaluateAccessConditionDocument = async ({
   document,
   source,
+  env,
+  slug,
   config,
   requesterAddress,
   authScopes,
@@ -454,6 +527,8 @@ const evaluateAccessConditionDocument = async ({
     // eslint-disable-next-line no-await-in-loop
     const result = await evaluateAccessCondition({
       condition,
+      env,
+      slug,
       config,
       requesterAddress,
       authScopes,
@@ -479,7 +554,50 @@ const evaluateAccessConditionDocument = async ({
   };
 };
 
+const resolveGroupGateIds = ({ metadata, access }) => normalizeGroupIdList([
+  ...normalizeGroupIdList(metadata?.groupIds),
+  ...normalizeGroupIdList(metadata?.groupId),
+  ...normalizeGroupIdList(metadata?.groupAllowlist),
+  ...normalizeGroupIdList(metadata?.payloadAccessControl?.groupIds),
+  ...normalizeGroupIdList(metadata?.payloadAccessControl?.groupId),
+  ...normalizeGroupIdList(access.groupIds),
+]);
+
+const authorizeWorkerGroupAccess = async ({ env, slug, groupIds, requesterAddress, authScopes, baseHeaders, deps }) => {
+  if (!groupIds.length) {
+    return {
+      ok: false,
+      response: responseJson(deps, { error: 'Access denied: missing worker group.' }, 403, baseHeaders),
+    };
+  }
+  let firstFailure = null;
+  for (const groupId of groupIds) {
+    // eslint-disable-next-line no-await-in-loop
+    const result = await checkWorkerGroupMembership({ env, slug, groupId, requesterAddress, authScopes, deps });
+    if (result?.ok) {
+      return {
+        ok: true,
+        conditionMatched: {
+          source: 'gate_fallback',
+          kind: 'worker_group',
+          groupId,
+          principal: result.principal,
+        },
+      };
+    }
+    if (!firstFailure) firstFailure = result;
+  }
+  return {
+    ok: false,
+    response: responseJson(deps, {
+      error: 'Access denied: worker group gate failed.',
+      reason: firstFailure?.reason || 'worker_group_membership_denied',
+    }, 403, baseHeaders),
+  };
+};
+
 const authorizeCloudflareStorageAccess = async ({
+  env,
   config,
   slug,
   resource,
@@ -495,6 +613,8 @@ const authorizeCloudflareStorageAccess = async ({
     const conditionResult = await evaluateAccessConditionDocument({
       document: payloadConditions.document,
       source: payloadConditions.source,
+      env,
+      slug,
       config,
       requesterAddress,
       authScopes,
@@ -521,6 +641,24 @@ const authorizeCloudflareStorageAccess = async ({
   }
   if (access.gate === PAYLOAD_ACCESS_GATES.NONE) {
     return { ok: true, mode: access.mode, payloadAccessControl: access };
+  }
+  if (access.gate === PAYLOAD_ACCESS_GATES.GROUP_GATE) {
+    const groupAccess = await authorizeWorkerGroupAccess({
+      env,
+      slug,
+      groupIds: resolveGroupGateIds({ metadata, access }),
+      requesterAddress,
+      authScopes,
+      baseHeaders,
+      deps,
+    });
+    if (!groupAccess.ok) return groupAccess;
+    return {
+      ok: true,
+      mode: access.mode,
+      payloadAccessControl: access,
+      conditionMatched: groupAccess.conditionMatched,
+    };
   }
   if (access.gate !== PAYLOAD_ACCESS_GATES.SBT_GATE) {
     return {
@@ -586,6 +724,69 @@ const authorizeCloudflareStorageAccess = async ({
   };
 };
 
+const enforceCloudflareUploadPolicy = async ({ env, config, slug, payload, requesterAddress, authScopes, baseHeaders, deps }) => {
+  const policy = payload?.uploadPolicy;
+  if (!policy?.mode) return { ok: true };
+  if (policy.mode === 'group_allowlist') {
+    const groupIds = normalizeGroupIdList([...policy.groupIds, ...normalizeGroupIdList(payload?.groupIds)]);
+    const groupAccess = await authorizeWorkerGroupAccess({
+      env,
+      slug,
+      groupIds,
+      requesterAddress,
+      authScopes,
+      baseHeaders,
+      deps,
+    });
+    if (!groupAccess.ok) return groupAccess;
+    return { ok: true, conditionMatched: groupAccess.conditionMatched, groupIds };
+  }
+  if (policy.mode === 'sbt_allowlist') {
+    const address = normalizeAddress(requesterAddress);
+    if (!address) {
+      return {
+        ok: false,
+        response: responseJson(deps, { error: 'Missing requester address for SBT upload policy.' }, 401, baseHeaders),
+      };
+    }
+    if (!policy.sbtAddresses.length) {
+      return {
+        ok: false,
+        response: responseJson(deps, { error: 'Invalid SBT upload policy.', reason: 'missing_sbt_upload_policy_contract' }, 400, baseHeaders),
+      };
+    }
+    const chainId = policy.chainId || null;
+    const rpcUrls = typeof deps?.resolveRpcUrlListForGate === 'function'
+      ? deps.resolveRpcUrlListForGate(config, chainId)
+      : [];
+    if (!rpcUrls.length || typeof deps?.checkSbtGate !== 'function') {
+      return {
+        ok: false,
+        response: responseJson(deps, { error: 'Missing RPC URL for SBT upload policy.', reason: 'missing_sbt_rpc' }, 403, baseHeaders),
+      };
+    }
+    for (const rpcUrl of rpcUrls) {
+      // eslint-disable-next-line no-await-in-loop
+      const ok = await deps.checkSbtGate({
+        sbtAddresses: policy.sbtAddresses,
+        address,
+        rpcUrl,
+        mode: policy.anyOrAll,
+        chainId,
+      });
+      if (ok) return { ok: true };
+    }
+    return {
+      ok: false,
+      response: responseJson(deps, { error: 'Access denied: SBT upload policy failed.', reason: 'sbt_upload_policy_denied' }, 403, baseHeaders),
+    };
+  }
+  return {
+    ok: false,
+    response: responseJson(deps, { error: 'Unsupported upload policy.', reason: 'unsupported_upload_policy' }, 400, baseHeaders),
+  };
+};
+
 const responseJson = (deps, body, status, headers) => deps?.json?.(body, status, headers) || new Response(JSON.stringify(body), { status, headers });
 
 const parseArweaveUploadResponse = async (response) => {
@@ -631,6 +832,7 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
     return responseJson(deps, { error: 'Cloudflare storage binding not configured.' }, 501, baseHeaders);
   }
   const access = await authorizeCloudflareStorageAccess({
+    env,
     config,
     slug,
     resource: payload.resource,
@@ -641,6 +843,17 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
     deps,
   });
   if (!access.ok) return access.response;
+  const uploadPolicy = await enforceCloudflareUploadPolicy({
+    env,
+    config,
+    slug,
+    payload,
+    requesterAddress: uploaderAddress,
+    authScopes,
+    baseHeaders,
+    deps,
+  });
+  if (!uploadPolicy.ok) return uploadPolicy.response;
   const payloadAccess = resolvePayloadAccessControl(config);
   if (payloadAccess.encryption === PAYLOAD_ENCRYPTION_MODES.LIT && payload.payloadEncrypted !== true) {
     return responseJson(deps, { error: 'Cloudflare lit_encrypted storage requires payloadEncrypted=true.' }, 400, baseHeaders);
@@ -697,12 +910,19 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
     encrypted: payload.payloadEncrypted === true || payloadAccess.encryption === PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE,
     gate: trim(payload.gate),
     tags: payload.tags,
+    groupIds: normalizeGroupIdList([
+      ...normalizeGroupIdList(payload.groupIds),
+      ...normalizeGroupIdList(uploadPolicy.groupIds),
+      ...normalizeGroupIdList(payloadAccess.groupIds),
+    ]),
+    uploadPolicy: payload.uploadPolicy?.mode ? payload.uploadPolicy : undefined,
     size: bytesToStore?.length || 0,
     createdAt,
     payloadAccessMode: payloadAccess.mode,
     payloadAccessControl: {
       gate: payloadAccess.gate,
       encryption: payloadAccess.encryption,
+      ...(payloadAccess.groupIds.length ? { groupIds: payloadAccess.groupIds } : {}),
     },
     ...(accessConditions?.conditions?.length ? { accessConditions } : {}),
     ...(envelope ? { envelope } : {}),
@@ -728,6 +948,7 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
         encrypted: metadata.encrypted ? 'true' : 'false',
         payloadAccessMode: payloadAccess.mode,
         payloadAccessControl: JSON.stringify(metadata.payloadAccessControl),
+        groupIds: metadata.groupIds?.length ? JSON.stringify(metadata.groupIds) : '',
       },
     });
   } else {
@@ -840,6 +1061,7 @@ const handleCloudflareRead = async ({ request, env, config, slug, uploaderAddres
   }
   const resource = trim(metadata?.resource) || 'docsContext';
   const access = await authorizeCloudflareStorageAccess({
+    env,
     config,
     slug,
     resource,
@@ -899,6 +1121,7 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
   if (!resolvedResource.ok) return responseJson(deps, { error: resolvedResource.error }, 400, baseHeaders);
   const resource = resolvedResource.resource;
   const access = await authorizeCloudflareStorageAccess({
+    env,
     config,
     slug,
     resource,

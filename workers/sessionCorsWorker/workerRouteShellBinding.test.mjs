@@ -465,6 +465,8 @@ test('createWorkerRouteShellWithWorkerDeps preserves authenticated fallback afte
           resolveAuthenticatedRouteSecrets: 'resolveAuthenticatedRouteSecrets',
           checkRateLimit: 'checkRateLimit',
           getSessionSecrets: 'getSessionSecrets',
+          isAddress: 'isAddress',
+          getAddress: 'getAddress',
           transcribe: 'transcribe',
           arweaveUpload: 'arweaveUpload',
           storageRoute: 'storageRoute',

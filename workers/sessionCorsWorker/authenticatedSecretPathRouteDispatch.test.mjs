@@ -342,3 +342,42 @@ test('dispatchAuthenticatedSecretPathRoute routes encrypted envelope exports as 
   assert.equal(result.response, downstreamResponse);
   assert.equal(secretsCalled, false);
 });
+
+test('dispatchAuthenticatedSecretPathRoute routes authenticated worker group requests', async () => {
+  const request = { headers: new Headers({ Origin: 'https://allowed.example' }) };
+  const downstreamResponse = new Response(JSON.stringify({ ok: true }));
+
+  const result = await dispatchAuthenticatedSecretPathRoute({
+    path: '/groups/my-memberships',
+    method: 'GET',
+    request,
+    config: { storageProfile: { backend: 'cloudflare' } },
+    slug: 'session-a',
+    address: '0x0000000000000000000000000000000000000def',
+    env: { CE_WORKER_GROUPS_KV: {} },
+    limit: 7,
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+    scopes: { arweave: false, groups: true },
+    deps: {
+      evaluateAuthenticatedRoutePreflight: async (value) => {
+        assert.equal(value.scope, 'groups');
+        assert.equal(value.route, 'groups');
+        return { ok: true, tokenHasScope: true };
+      },
+      workerGroupsRoute: async (value) => {
+        assert.equal(value.path, '/groups/my-memberships');
+        assert.equal(value.requesterAddress, '0x0000000000000000000000000000000000000def');
+        assert.deepEqual(value.authScopes, { arweave: false, groups: true });
+        return downstreamResponse;
+      },
+      resolveAuthenticatedRouteSecrets: async () => {
+        throw new Error('should not resolve secrets');
+      },
+      checkRateLimit: async () => true,
+      json: () => null,
+    },
+  });
+
+  assert.equal(result.handled, true);
+  assert.equal(result.response, downstreamResponse);
+});

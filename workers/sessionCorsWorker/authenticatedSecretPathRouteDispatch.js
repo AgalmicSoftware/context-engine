@@ -1,4 +1,5 @@
 import { readArweaveUploadRequestPayload } from './arweaveUploadRequestNormalization.js';
+import { workerGroupsRoute as workerGroupsRouteBoundary } from './workerGroups.js';
 
 export const dispatchAuthenticatedSecretPathRoute = async ({
   path,
@@ -21,16 +22,21 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
     (path === '/storage/list' && (method === 'GET' || method === 'POST')) ||
     (path === '/storage/export-envelopes' && (method === 'GET' || method === 'POST'))
   );
-  if (!isTranscribeRoute && !isArweaveUploadRoute && !isStorageRoute) {
+  const isWorkerGroupsRoute = (
+    (path === '/groups/my-memberships' && (method === 'GET' || method === 'POST')) ||
+    (path === '/groups/list' && (method === 'GET' || method === 'POST')) ||
+    (path === '/groups/join' && method === 'POST')
+  );
+  if (!isTranscribeRoute && !isArweaveUploadRoute && !isStorageRoute && !isWorkerGroupsRoute) {
     return { handled: false };
   }
 
   const route = isTranscribeRoute
     ? 'transcribe'
-    : (isStorageRoute ? 'storage' : 'arweave');
+    : (isStorageRoute ? 'storage' : (isWorkerGroupsRoute ? 'groups' : 'arweave'));
   const scope = isTranscribeRoute
     ? 'transcribe'
-    : (isStorageRoute && scopes?.storage === true ? 'storage' : 'arweave');
+    : ((isStorageRoute && scopes?.storage === true) || (isWorkerGroupsRoute && scopes?.groups === true) ? route : 'arweave');
   const preflight = await deps?.evaluateAuthenticatedRoutePreflight?.({
     scopes,
     scope,
@@ -65,6 +71,32 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
         uploaderAddress: address,
         authScopes: scopes,
         baseHeaders: headers,
+      }),
+    };
+  }
+
+  if (isWorkerGroupsRoute) {
+    const workerGroupsRoute = deps?.workerGroupsRoute || workerGroupsRouteBoundary;
+    return {
+      handled: true,
+      response: await workerGroupsRoute({
+        path,
+        method,
+        request,
+        env,
+        config,
+        slug,
+        requesterAddress: address,
+        authScopes: scopes,
+        baseHeaders: headers,
+        deps: {
+          json: deps?.json,
+          isAddress: deps?.isAddress,
+          getAddress: deps?.getAddress,
+          now: deps?.now,
+          randomUUID: deps?.randomUUID,
+          getRandomValues: deps?.getRandomValues,
+        },
       }),
     };
   }

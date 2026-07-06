@@ -24,6 +24,9 @@ import {
 import {
   exportCloudflareEncryptedPayloadEnvelopes,
 } from './storageRouteExecution.js';
+import {
+  dispatchAdminWorkerGroupRequest,
+} from './workerGroups.js';
 
 const ALLOWED_SECRET_KEYS = [
   'openaiKey',
@@ -138,6 +141,26 @@ export const dispatchAdminRequest = async ({
     headers,
     targetSlug,
   } = authorityResult;
+
+  if (action?.startsWith?.('groups/')) {
+    const response = await (deps?.dispatchAdminWorkerGroupRequest || dispatchAdminWorkerGroupRequest)({
+      action,
+      body,
+      env,
+      slug: targetSlug,
+      adminAddress: authorityResult.address || body?.address,
+      headers,
+      deps: {
+        json: deps?.json,
+        isAddress: deps?.isAddress,
+        getAddress: deps?.getAddress,
+        now: deps?.now,
+        randomUUID: deps?.randomUUID,
+        getRandomValues: deps?.getRandomValues,
+      },
+    });
+    if (response) return response;
+  }
 
   if (action === 'set-config') {
     const incoming = buildSetConfigIncomingConfig({

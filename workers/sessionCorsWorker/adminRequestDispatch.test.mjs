@@ -289,6 +289,78 @@ test('dispatchAdminRequest returns allowed-key secret presence without exposing 
   assert.doesNotMatch(JSON.stringify(result.body), /sk-existing|rpc\.example|do-not-report|RSA/);
 });
 
+test('dispatchAdminRequest routes signed worker group CRUD through admin auth', async () => {
+  let authorityCalled = false;
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({
+        group: {
+          groupId: 'reviewers',
+          label: 'Reviewers',
+          joinMode: 'admin_add',
+          memberVisibility: 'members',
+        },
+      }),
+    },
+    env: { CE_WORKER_GROUPS_KV: {
+      store: new Map(),
+      async put(key, value) { this.store.set(key, value); },
+      async get(key) { return this.store.get(key) || null; },
+      async list({ prefix = '' } = {}) {
+        return { keys: [...this.store.keys()].filter((name) => name.startsWith(prefix)).map((name) => ({ name })) };
+      },
+    } },
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: '',
+    action: 'groups/create',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => {
+        authorityCalled = true;
+        return {
+          ok: true,
+          address: '0x0000000000000000000000000000000000000abc',
+          existingConfig: { adminAddress: '0x0000000000000000000000000000000000000abc' },
+          headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+          targetSlug: 'session-a',
+        };
+      },
+      now: () => Date.parse('2026-02-03T04:05:06.000Z'),
+    }),
+  });
+
+  assert.equal(authorityCalled, true);
+  assert.equal(result.status, 200);
+  assert.equal(result.body.ok, true);
+  assert.equal(result.body.group.groupId, 'reviewers');
+  assert.equal(result.body.group.createdBy.kind, 'evm_address');
+});
+
+test('dispatchAdminRequest does not touch groups when admin auth fails', async () => {
+  const response = { body: { error: 'Admin denied.' }, status: 403, headers: {} };
+  let groupDispatchCalled = false;
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({
+        group: { groupId: 'blocked', label: 'Blocked', joinMode: 'admin_add' },
+      }),
+    },
+    env: {},
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: '',
+    action: 'groups/create',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({ ok: false, response }),
+      dispatchAdminWorkerGroupRequest: async () => {
+        groupDispatchCalled = true;
+        return null;
+      },
+    }),
+  });
+
+  assert.equal(result, response);
+  assert.equal(groupDispatchCalled, false);
+});
+
 test('dispatchAdminRequest reads Lit Chipotle status from worker config plus session secrets', async () => {
   const result = await dispatchAdminRequest({
     request: {
