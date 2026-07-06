@@ -47,7 +47,7 @@ type WalletChainRequestOptions = {
 };
 
 const getWindowLike = (): AnyRecord | null => (
-  typeof window !== 'undefined' ? (window as unknown as AnyRecord) : null
+  typeof window !== 'undefined' ? (window as AnyRecord) : null
 );
 
 const normalizeProviderName = (providerName: unknown): string => (

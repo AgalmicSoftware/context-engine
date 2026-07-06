@@ -328,27 +328,30 @@ type MainSiteProfileMetaResult<T> = {
 };
 const styles = stylesRaw as Record<string, string>;
 const WagmiHooksHOC = WagmiHooksHOCRaw;
-const Navbar = NavbarRaw as unknown as MainSiteRouteComponent;
-const MainAreaTabs = MainAreaTabsRaw as unknown as MainSiteRouteComponent;
-const RightSide = RightSideRaw as unknown as MainSiteRouteComponent;
-const OnboardingOverlay = OnboardingOverlayRaw as unknown as MainSiteRouteComponent;
-const Footer = FooterRaw as unknown as MainSiteRouteComponent;
-const LazyFallback = LazyFallbackRaw as unknown as MainSiteRouteComponent;
-const DevE2eNav = DevE2eNavRaw as unknown as MainSiteRouteComponent;
-const RouteErrorBoundary = RouteErrorBoundaryRaw as unknown as MainSiteRouteComponent;
-const ExperimentalStub = ExperimentalStubRaw as unknown as MainSiteRouteComponent;
-const NotFoundRoute = NotFoundRouteRaw as unknown as MainSiteRouteComponent;
-const SessionLoadingSkeleton = SessionLoadingSkeletonRaw as unknown as MainSiteRouteComponent;
-const AboutPage = AboutPageRaw as unknown as MainSiteRouteComponent;
-const AdminPage = AdminPageRaw as unknown as MainSiteRouteComponent;
-const AgentPage = AgentPageRaw as unknown as MainSiteRouteComponent;
-const DebateMap = DebateMapRaw as unknown as MainSiteRouteComponent;
-const BookmarksPage = BookmarksPageRaw as unknown as MainSiteRouteComponent;
-const CompareAddresses = CompareAddressesRaw as unknown as MainSiteRouteComponent;
-const ContractPage = ContractPageRaw as unknown as MainSiteRouteComponent;
-const DemosIndex = DemosIndexRaw as unknown as MainSiteRouteComponent;
-const OnePageSession = OnePageSessionRaw as unknown as MainSiteRouteComponent;
-const RiskMatrixDemo = RiskMatrixDemoRaw as unknown as MainSiteRouteComponent;
+const asMainSiteRouteComponent = (component: unknown): MainSiteRouteComponent => (
+  component as MainSiteRouteComponent
+);
+const Navbar = asMainSiteRouteComponent(NavbarRaw);
+const MainAreaTabs = asMainSiteRouteComponent(MainAreaTabsRaw);
+const RightSide = asMainSiteRouteComponent(RightSideRaw);
+const OnboardingOverlay = asMainSiteRouteComponent(OnboardingOverlayRaw);
+const Footer = asMainSiteRouteComponent(FooterRaw);
+const LazyFallback = asMainSiteRouteComponent(LazyFallbackRaw);
+const DevE2eNav = asMainSiteRouteComponent(DevE2eNavRaw);
+const RouteErrorBoundary = asMainSiteRouteComponent(RouteErrorBoundaryRaw);
+const ExperimentalStub = asMainSiteRouteComponent(ExperimentalStubRaw);
+const NotFoundRoute = asMainSiteRouteComponent(NotFoundRouteRaw);
+const SessionLoadingSkeleton = asMainSiteRouteComponent(SessionLoadingSkeletonRaw);
+const AboutPage = asMainSiteRouteComponent(AboutPageRaw);
+const AdminPage = asMainSiteRouteComponent(AdminPageRaw);
+const AgentPage = asMainSiteRouteComponent(AgentPageRaw);
+const DebateMap = asMainSiteRouteComponent(DebateMapRaw);
+const BookmarksPage = asMainSiteRouteComponent(BookmarksPageRaw);
+const CompareAddresses = asMainSiteRouteComponent(CompareAddressesRaw);
+const ContractPage = asMainSiteRouteComponent(ContractPageRaw);
+const DemosIndex = asMainSiteRouteComponent(DemosIndexRaw);
+const OnePageSession = asMainSiteRouteComponent(OnePageSessionRaw);
+const RiskMatrixDemo = asMainSiteRouteComponent(RiskMatrixDemoRaw);
 
 const isMainSiteProfileMetaResult = <T,>(value: unknown): value is MainSiteProfileMetaResult<T> => (
   !!value &&
@@ -358,16 +361,16 @@ const isMainSiteProfileMetaResult = <T,>(value: unknown): value is MainSiteProfi
     Object.prototype.hasOwnProperty.call(value, 'data')
   )
 );
-const SBTPage = SBTPageRaw as unknown as MainSiteRouteComponent;
-const SBTsPage = SBTsPageRaw as unknown as MainSiteRouteComponent;
-const SessionDocumentsPage = SessionDocumentsPageRaw as unknown as MainSiteRouteComponent;
-const SessionWizard = SessionWizardRaw as unknown as MainSiteRouteComponent;
-const SimulatedUserPage = SimulatedUserPageRaw as unknown as MainSiteRouteComponent;
-const SponsorPage = SponsorPageRaw as unknown as MainSiteRouteComponent;
-const SurveyPage = SurveyPageRaw as unknown as MainSiteRouteComponent;
-const SurveyTool = SurveyToolRaw as unknown as MainSiteRouteComponent;
-const TagPage = TagPageRaw as unknown as MainSiteRouteComponent;
-const UserPage = UserPageRaw as unknown as MainSiteRouteComponent;
+const SBTPage = asMainSiteRouteComponent(SBTPageRaw);
+const SBTsPage = asMainSiteRouteComponent(SBTsPageRaw);
+const SessionDocumentsPage = asMainSiteRouteComponent(SessionDocumentsPageRaw);
+const SessionWizard = asMainSiteRouteComponent(SessionWizardRaw);
+const SimulatedUserPage = asMainSiteRouteComponent(SimulatedUserPageRaw);
+const SponsorPage = asMainSiteRouteComponent(SponsorPageRaw);
+const SurveyPage = asMainSiteRouteComponent(SurveyPageRaw);
+const SurveyTool = asMainSiteRouteComponent(SurveyToolRaw);
+const TagPage = asMainSiteRouteComponent(TagPageRaw);
+const UserPage = asMainSiteRouteComponent(UserPageRaw);
 
 interface RouteRenderCtx {
   fullPath: string;
@@ -6682,4 +6685,4 @@ export const mainSiteDispatchActions = {
   changeActiveSessionSlug
 };
 
-export default connect(mapStateToProps, mainSiteDispatchActions)(MainSiteWithWagmiHooks) as unknown as React.ComponentType<Record<string, unknown>>;
+export default connect(mapStateToProps, mainSiteDispatchActions)(MainSiteWithWagmiHooks) as React.ComponentType<Record<string, unknown>>;
