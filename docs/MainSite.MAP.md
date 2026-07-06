@@ -6,6 +6,7 @@
 - Component type: typed React class component (`MainSite extends Component`)
 - Type definitions: `client/src/components/MainSite/MainSiteTypes.ts`
 - Route classifier: `client/src/components/MainSite/routeTable.ts`
+- Route view map: `client/src/components/MainSite/mainSiteRouteViewMap.ts`
 - Route classifier tests: `client/src/components/MainSite/routeTable.test.ts`
 - Runtime characterization tests: `client/src/components/MainSite/MainSite.routes.test.jsx`
 - Session media URL domain helper: `client/src/domains/sessions/sessionMediaUrls.ts`
@@ -16,7 +17,7 @@ This map intentionally avoids exact line numbers. MainSite is still changing dur
 
 ## Route Dispatch
 
-Route matching is now classified by the pure `resolveMainSiteRouteMatch` table in `routeTable.ts`. `MainSite.getMainView` remains the rendering caller and still owns URL side effects such as `/new` canonicalization and question/survey responder query normalization.
+Route matching is now classified by the pure `resolveMainSiteRouteMatch` table in `routeTable.ts`, while route-key-to-view assembly lives in `mainSiteRouteViewMap.ts`. `MainSite.getMainView` remains the rendering caller and still owns URL side effects such as `/new` canonicalization and question/survey responder query normalization.
 Degenerate double-slash SBT address URLs such as `//sbt/0x...` and `//group/0x...` intentionally resolve as SBT detail routes; this PRD 647 decision is pinned in `routeTable.test.ts`.
 
 Covered route keys:
@@ -92,6 +93,8 @@ The characterization tests intentionally pin behavior as-is. The follow-up domai
   List-scope fallback redirects and temporary root/about redirect guards.
 - `client/src/components/MainSite/sessionDisplayHelpers.ts`
   Session name/info/header display resolution.
+- `client/src/components/MainSite/mainSiteRouteViewMap.ts`
+  Pure route-key-to-view assembly used by `MainSite.getMainView`; route side effects and query normalization stay in the class component.
 - `client/src/domains/sessions/sessionMediaUrls.ts`
   Typed domain wrapper for session media URL normalization. MainSite uses this instead of importing `utilities/arweave/arweaveUrls` directly.
 - `client/src/utilities/session/sessionBackendKind.ts`
@@ -210,7 +213,7 @@ The client-boundary baseline is now 0/0.
 
 | Area | Controller-routed | Typed contract module present | Test-pinned | Parent-owned | Blocked reason | Next safe lane |
 |---|---|---|---|---|---|---|
-| Route classification | Yes | N/A | Yes | `MainSite.getMainView` renders | None | Route props can move only after route-table consumers stabilize |
+| Route classification and view-map assembly | Yes | N/A | Yes | `MainSite.getMainView` renders and owns URL/query side effects | None | Route props can move only after route-table and route-view consumers stabilize |
 | Session media URL normalization | Yes | Yes | Yes | MainSite supplies helper to `sessionDisplayHelpers` | None | Share with Admin/storage URL domain when Admin lane lands |
 | Listener lifecycle | Partial | Yes | Yes | MainSite lifecycle starts/removes listeners | Listener orchestration still crosses mount/update/unmount state | Extract listener orchestration after attach-side controller ports converge |
 | Registry bootstrap and route session lookup | Partial | Yes | Yes | MainSite + `sessionProfileScanController` bridge state | Bootstrap promise identity and route/session state stay parent-owned | Session bootstrap controller extraction |

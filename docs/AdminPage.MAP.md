@@ -3,7 +3,7 @@
 ## Quick Reference
 
 - Entry wrapper: `client/src/components/Admin/AdminPage.tsx`
-- Current shape: function component, 3544 lines, 45 `useState`, 20 `useEffect`, 17 `useCallback`, 20 `useMemo`, and 11 `useRef` calls.
+- Current shape: function component, 3561 lines, 45 `useState`, 20 `useEffect`, 17 `useCallback`, 18 `useMemo`, and 11 `useRef` calls.
 - Boundary debt: `AdminPage.tsx` owns 0 `route-page-no-low-level` baseline entries. The former `arweaveScripts.js`, `arweaveUrls.js`, `sessionRegistry.js`, `corsProxy.js`, `workerAuth.js`, and `workerCorsOrigins.js` seams now route through domain ports.
 - Existing test surface: 16 Admin files cover worker config payloads, signed admin actions, allowlist normalization, metadata writes, render gating and registry retry, resource balances, helper formatting, worker errors, and test-result rendering.
 - Port architecture: `AdminPage.tsx` remains the route/page shell and UI state owner while concrete worker, storage, and session-registry operations route through typed domain ports under `client/src/domains/**`.
