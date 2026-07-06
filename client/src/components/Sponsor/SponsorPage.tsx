@@ -130,8 +130,9 @@ type SponsoredFieldGroup = {
   fields: readonly SponsoredField[];
 };
 
-const isRecord = (value: unknown): value is UnknownRecord =>
-  !!value && typeof value === 'object' && !Array.isArray(value);
+const isRecord = (value: unknown): value is UnknownRecord => (
+  !!value && typeof value === 'object' && !Array.isArray(value)
+);
 
 const getErrorMessage = (error: unknown, fallback = 'Unknown error') => {
   if (error instanceof Error && error.message) return error.message;
@@ -164,7 +165,7 @@ const countSessionsForChain = (entries: unknown = [], chainId: number | null = n
     return cfgChainId === chainId;
   }).length;
 };
-const stableCreateContextValue = (value: any, seen = new WeakSet<object>()): any => {
+const stableCreateContextValue = (value: unknown, seen = new WeakSet<object>()): unknown => {
   if (value == null) return value;
   const valueType = typeof value;
   if (valueType === 'bigint') return value.toString();
@@ -176,8 +177,9 @@ const stableCreateContextValue = (value: any, seen = new WeakSet<object>()): any
     seen.delete(value);
     return result;
   }
-  const result = Object.keys(value).sort().reduce((acc: Record<string, any>, key) => {
-    const nextValue = value[key];
+  const record = value as UnknownRecord;
+  const result = Object.keys(record).sort().reduce<UnknownRecord>((acc, key) => {
+    const nextValue = record[key];
     if (typeof nextValue !== 'function' && typeof nextValue !== 'undefined') {
       acc[key] = stableCreateContextValue(nextValue, seen);
     }
@@ -186,14 +188,14 @@ const stableCreateContextValue = (value: any, seen = new WeakSet<object>()): any
   seen.delete(value);
   return result;
 };
-const buildCreateConfigSignature = (sessionConfig: any = null) => {
+const buildCreateConfigSignature = (sessionConfig: unknown = null) => {
   try {
     return JSON.stringify(stableCreateContextValue(sessionConfig || null));
   } catch (_) {
     return '';
   }
 };
-const shortAddress = (addr: any) => {
+const shortAddress = (addr: unknown) => {
   const value = toStr(addr).trim();
   if (!value) return '';
   return `${value.slice(0, 6)}…${value.slice(-4)}`;
@@ -222,7 +224,7 @@ const normalizeRestoredExpiryDate = (raw: unknown) => {
 const SPONSOR_PAGE_CACHE_KEY = 'ce:sponsorPageDraft:v1';
 const SPONSOR_PAGE_CACHE_VERSION = 1;
 const DEFAULT_REMEMBER_SPONSOR_DRAFT = process.env.NODE_ENV !== 'production';
-const buildEmptyBundleForm = () => ({
+const buildEmptyBundleForm = (): SponsorBundleForm => ({
   label: '',
   openaiKey: '',
   anthropicKey: '',
@@ -246,20 +248,23 @@ const normalizeSponsorBundleForm = (raw: unknown = {}): SponsorBundleForm => {
   });
   return next;
 };
-const normalizeSponsorBundleDraftForm = (raw: any = {}) => ({
-  ...buildEmptyBundleForm(),
-  label: toStr(raw?.label || '').trim(),
-});
-const readSponsorPageCache = () => {
-  const fallback = {
+const normalizeSponsorBundleDraftForm = (raw: unknown = {}): SponsorBundleForm => {
+  const source = isRecord(raw) ? raw : {};
+  return {
+    ...buildEmptyBundleForm(),
+    label: toStr(source.label || '').trim(),
+  };
+};
+const readSponsorPageCache = (): SponsorPageCache => {
+  const fallback: SponsorPageCache = {
     persistBundleDraft: DEFAULT_REMEMBER_SPONSOR_DRAFT,
     bundleForm: buildEmptyBundleForm(),
     expiresAt: null,
   };
   if (typeof window === 'undefined' || !window.localStorage) return fallback;
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(SPONSOR_PAGE_CACHE_KEY) || 'null');
-    if (!parsed || Number(parsed.v || 0) !== SPONSOR_PAGE_CACHE_VERSION) return fallback;
+    const parsed: unknown = JSON.parse(window.localStorage.getItem(SPONSOR_PAGE_CACHE_KEY) || 'null');
+    if (!isRecord(parsed) || Number(parsed.v || 0) !== SPONSOR_PAGE_CACHE_VERSION) return fallback;
     const persistBundleDraft = typeof parsed.persistBundleDraft === 'boolean'
       ? parsed.persistBundleDraft
       : typeof parsed.persistBundleSecrets === 'boolean'
@@ -276,11 +281,7 @@ const readSponsorPageCache = () => {
     return fallback;
   }
 };
-const writeSponsorPageCache = ({
-  persistBundleDraft = DEFAULT_REMEMBER_SPONSOR_DRAFT,
-  bundleForm = {},
-  expiresAt = null,
-}: any = {}) => {
+const writeSponsorPageCache = (cache: Partial<SponsorPageCache> = {}) => {
   if (typeof window === 'undefined' || !window.localStorage) return;
   const persistBundleDraft = cache.persistBundleDraft ?? DEFAULT_REMEMBER_SPONSOR_DRAFT;
   const bundleForm = cache.bundleForm ?? buildEmptyBundleForm();
@@ -297,8 +298,11 @@ const writeSponsorPageCache = ({
     }));
   } catch (_) {}
 };
-const getCurrentOrigin = () =>
-  typeof window !== 'undefined' && window.location ? toStr(window.location.origin).trim() : '';
+const getCurrentOrigin = () => (
+  typeof window !== 'undefined' && window.location
+    ? toStr(window.location.origin).trim()
+    : ''
+);
 const buildSponsorGrantCorsMessage = (workerBase: unknown, detail: unknown = '') => {
   const origin = getCurrentOrigin() || '<current-origin>';
   const worker = toStr(workerBase).trim() || 'sponsoring worker';
@@ -404,32 +408,32 @@ const SponsorPage = ({
     initialCacheRef.current = readSponsorPageCache();
   }
   const initialCache = initialCacheRef.current;
-  const [sessions, setSessions] = useState<any>([]);
-  const [selectedSlug, setSelectedSlug] = useState<any>('');
-  const [ignoreRequestedSession, setIgnoreRequestedSession] = useState<any>(false);
-  const [sessionLookupStatus, setSessionLookupStatus] = useState<any>('');
-  const [sessionsRefreshStatus, setSessionsRefreshStatus] = useState<any>('');
-  const [sessionsRefreshBusy, setSessionsRefreshBusy] = useState<any>(false);
-  const [workerUrl, setWorkerUrl] = useState<any>('');
-  const [workerUrlEditable, setWorkerUrlEditable] = useState<any>(false);
-  const [persistBundleDraft, setPersistBundleDraft] = useState<any>(initialCache.persistBundleDraft);
-  const [bundleForm, setBundleForm] = useState<any>(initialCache.bundleForm);
-  const [expiresAt, setExpiresAt] = useState<any>(initialCache.expiresAt);
-  const [createBusy, setCreateBusy] = useState<any>(false);
-  const [createStatus, setCreateStatus] = useState<any>('');
-  const [shareUrl, setShareUrl] = useState<any>('');
-  const [shareTxId, setShareTxId] = useState<any>('');
+  const [sessions, setSessions] = useState<SponsorSessionEntry[]>([]);
+  const [selectedSlug, setSelectedSlug] = useState('');
+  const [ignoreRequestedSession, setIgnoreRequestedSession] = useState(false);
+  const [sessionLookupStatus, setSessionLookupStatus] = useState('');
+  const [sessionsRefreshStatus, setSessionsRefreshStatus] = useState('');
+  const [sessionsRefreshBusy, setSessionsRefreshBusy] = useState(false);
+  const [workerUrl, setWorkerUrl] = useState('');
+  const [workerUrlEditable, setWorkerUrlEditable] = useState(false);
+  const [persistBundleDraft, setPersistBundleDraft] = useState(initialCache.persistBundleDraft);
+  const [bundleForm, setBundleForm] = useState<SponsorBundleForm>(initialCache.bundleForm);
+  const [expiresAt, setExpiresAt] = useState<Date | null>(initialCache.expiresAt);
+  const [createBusy, setCreateBusy] = useState(false);
+  const [createStatus, setCreateStatus] = useState('');
+  const [shareUrl, setShareUrl] = useState('');
+  const [shareTxId, setShareTxId] = useState('');
   const shareTxUrl = shareTxId
     ? (() => {
         const normalized = normalizeArweaveUrl(shareTxId);
         return normalized === shareTxId ? `https://ar-io.dev/${shareTxId}` : normalized;
       })()
     : '';
-  const [workerUrlOverrideDirty, setWorkerUrlOverrideDirty] = useState<any>(false);
-  const requestedFetchKeyRef = useRef<any>('');
-  const requestedAutoRefreshKeyRef = useRef<any>('');
-  const prevSelectedSlugRef = useRef<any>('');
-  const workerUrlOverrideDirtyRef = useRef<any>(false);
+  const [workerUrlOverrideDirty, setWorkerUrlOverrideDirty] = useState(false);
+  const requestedFetchKeyRef = useRef('');
+  const requestedAutoRefreshKeyRef = useRef('');
+  const prevSelectedSlugRef = useRef('');
+  const workerUrlOverrideDirtyRef = useRef(false);
   const createRequestSeqRef = useRef(0);
   const requestedSessionRaw = toStr(initialSessionId).trim();
   const requestedSessionIdHex = sessionRegistryReadsPort.normalizeSessionIdHex(requestedSessionRaw);
@@ -456,43 +460,43 @@ const SponsorPage = ({
     return nextSessions;
   }, []);
 
-  const loadSessions = useCallback(
-    async ({ forceOnChain, isCancelled }: LoadSessionsOptions = {}) => {
-      const cached = syncSessionsFromRegistryCache({ isCancelled });
+  const loadSessions = useCallback(async ({ forceOnChain, isCancelled }: LoadSessionsOptions = {}) => {
+    const cached = syncSessionsFromRegistryCache({ isCancelled });
 
-      const chainIds = requestedChainId ? [requestedChainId] : undefined;
-      const shouldForceRegistryRead = !USE_ONCHAIN_SESSION_REGISTRY || !!forceOnChain;
-      const runRegistryLoad = async (bootstrapRpc: boolean): Promise<UnknownRecord> => {
-        try {
-          const result = await sessionRegistryReadsPort.loadSessionRegistryCache({
-            ...(chainIds ? { chainIds } : {}),
-            force: shouldForceRegistryRead,
-            providerLike: null,
-            account: '',
-            lit: null,
-            bootstrapRpc,
-          });
-          return isRecord(result) ? result : {};
-        } catch (error) {
-          return { __error: error };
-        }
-      };
-
-      const primaryResult = await runRegistryLoad(true);
-      let refreshed = syncSessionsFromRegistryCache({ isCancelled });
-      if (typeof isCancelled === 'function' && isCancelled()) return refreshed;
-      const primaryCount = countSessionsForChain(refreshed, requestedChainId);
-      const loadMeta = isRecord(primaryResult.__loadMeta) ? primaryResult.__loadMeta : null;
-      const primaryLoadHadErrors = !!primaryResult?.__error || loadMeta?.hadLoadErrors === true;
-      const shouldRetryWithDefaultRpc = primaryCount <= 0 || primaryLoadHadErrors;
-      if (shouldRetryWithDefaultRpc) {
-        await runRegistryLoad(false);
-        refreshed = syncSessionsFromRegistryCache({ isCancelled });
+    const chainIds = requestedChainId ? [requestedChainId] : undefined;
+    const shouldForceRegistryRead = !USE_ONCHAIN_SESSION_REGISTRY || !!forceOnChain;
+    const runRegistryLoad = async (bootstrapRpc: boolean): Promise<UnknownRecord> => {
+      try {
+        const result = await sessionRegistryReadsPort.loadSessionRegistryCache({
+          ...(chainIds ? { chainIds } : {}),
+          force: shouldForceRegistryRead,
+          providerLike: null,
+          account: '',
+          lit: null,
+          bootstrapRpc,
+        });
+        return isRecord(result) ? result : {};
+      } catch (error) {
+        return { __error: error };
       }
-      return refreshed;
-    },
-    [requestedChainId, syncSessionsFromRegistryCache],
-  );
+    };
+
+    const primaryResult = await runRegistryLoad(true);
+    let refreshed = syncSessionsFromRegistryCache({ isCancelled });
+    if (typeof isCancelled === 'function' && isCancelled()) return refreshed;
+    const primaryCount = countSessionsForChain(refreshed, requestedChainId);
+    const loadMeta = isRecord(primaryResult.__loadMeta) ? primaryResult.__loadMeta : null;
+    const primaryLoadHadErrors = (
+      !!primaryResult?.__error ||
+      loadMeta?.hadLoadErrors === true
+    );
+    const shouldRetryWithDefaultRpc = primaryCount <= 0 || primaryLoadHadErrors;
+    if (shouldRetryWithDefaultRpc) {
+      await runRegistryLoad(false);
+      refreshed = syncSessionsFromRegistryCache({ isCancelled });
+    }
+    return refreshed;
+  }, [requestedChainId, syncSessionsFromRegistryCache]);
 
   const handleRefreshSessions = useCallback(async () => {
     setSessionsRefreshBusy(true);
@@ -559,12 +563,10 @@ const SponsorPage = ({
   const requestedSessionMatch = useMemo(() => {
     if (!requestedSessionRaw) return null;
     if (requestedSessionIdHex) {
-      return (
-        sessionsForChain.find(([, cfg]) => {
-          const cfgId = sessionRegistryReadsPort.normalizeSessionIdHex(cfg?.__registry?.sessionIdHex || cfg?.sessionId);
-          return cfgId && cfgId === requestedSessionIdHex;
-        }) || null
-      );
+      return sessionsForChain.find(([, cfg]) => {
+        const cfgId = sessionRegistryReadsPort.normalizeSessionIdHex(cfg?.__registry?.sessionIdHex || cfg?.sessionId);
+        return cfgId && cfgId === requestedSessionIdHex;
+      }) || null;
     }
     return sessionsForChain.find(([slug]) => slug === requestedSessionSlug) || null;
   }, [requestedSessionIdHex, requestedSessionRaw, requestedSessionSlug, sessionsForChain]);
@@ -807,82 +809,52 @@ const SponsorPage = ({
   const canAdmin =
     !!account && !!selectedConfig && !missingSupportedAdminConfig && isAdminForSelected && hasRegistryEntry;
 
-  const updateBundleField = useCallback((key: any, value: any) => {
-    setBundleForm((prev: any) => ({ ...prev, [key]: value }));
+  const updateBundleField = useCallback((key: SponsorBundleFieldKey, value: string) => {
+    setBundleForm((prev) => ({ ...prev, [key]: value }));
   }, []);
 
-  const buildBootstrapUploadAuth = useCallback(
-    async ({ workerUrl: overrideWorkerUrl }: WorkerUrlOverride = {}) => {
-      if (!account) {
-        if (toggleLoginModal) toggleLoginModal(true);
-        throw new Error('Connect a wallet to sign admin requests.');
-      }
-      const slug = normalizeSlug(selectedSlug);
-      const baseUrl = adminWorkerPorts.workerUrl.normalizeWorkerUrl(
-        overrideWorkerUrl || workerUrl || selectedConfigWorkerUrl,
-      );
-      if (!baseUrl) throw new Error('Worker URL is missing.');
-      const chainId =
-        Number(selectedConfig?.__registry?.chainId || selectedConfig?.networkChainId || network?.id || 1) || 1;
-      return adminWorkerPorts.adminAuth.buildSignedBootstrapAdminAuth({
-        slug,
-        workerUrl: baseUrl,
-        statement: 'Admin request: bootstrap arweave upload',
-        context: {
-          account,
-          chainId,
-          providerLike: typeof provider === 'string' ? provider : undefined,
-        },
-      });
-    },
-    [
-      account,
-      network?.id,
-      provider,
-      selectedConfig,
-      selectedConfigWorkerUrl,
-      selectedSlug,
-      toggleLoginModal,
-      workerUrl,
-    ],
-  );
+  const buildBootstrapUploadAuth = useCallback(async ({ workerUrl: overrideWorkerUrl }: WorkerUrlOverride = {}) => {
+    if (!account) {
+      if (toggleLoginModal) toggleLoginModal(true);
+      throw new Error('Connect a wallet to sign admin requests.');
+    }
+    const slug = normalizeSlug(selectedSlug);
+    const baseUrl = adminWorkerPorts.workerUrl.normalizeWorkerUrl(overrideWorkerUrl || workerUrl || selectedConfigWorkerUrl);
+    if (!baseUrl) throw new Error('Worker URL is missing.');
+    const chainId = Number(selectedConfig?.__registry?.chainId || selectedConfig?.networkChainId || network?.id || 1) || 1;
+    return adminWorkerPorts.adminAuth.buildSignedBootstrapAdminAuth({
+      slug,
+      workerUrl: baseUrl,
+      statement: 'Admin request: bootstrap arweave upload',
+      context: {
+        account,
+        chainId,
+        providerLike: typeof provider === 'string' ? provider : undefined,
+      },
+    });
+  }, [account, network?.id, provider, selectedConfig, selectedConfigWorkerUrl, selectedSlug, toggleLoginModal, workerUrl]);
 
-  const buildGrantIssueAuth = useCallback(
-    async ({ workerUrl: overrideWorkerUrl, body }: GrantIssueAuthArgs = {}) => {
-      if (!account) {
-        if (toggleLoginModal) toggleLoginModal(true);
-        throw new Error('Connect a wallet to sign admin requests.');
-      }
-      const slug = normalizeSlug(selectedSlug);
-      const baseUrl = adminWorkerPorts.workerUrl.normalizeWorkerUrl(
-        overrideWorkerUrl || workerUrl || selectedConfigWorkerUrl,
-      );
-      if (!baseUrl) throw new Error('Worker URL is missing.');
-      const chainId =
-        Number(selectedConfig?.__registry?.chainId || selectedConfig?.networkChainId || network?.id || 1) || 1;
-      return adminWorkerPorts.adminAuth.buildSignedAdminActionAuth({
-        action: 'issue-sponsored-grants',
-        slug,
-        body,
-        workerUrl: baseUrl,
-        context: {
-          account,
-          chainId,
-          providerLike: typeof provider === 'string' ? provider : undefined,
-        },
-      });
-    },
-    [
-      account,
-      network?.id,
-      provider,
-      selectedConfig,
-      selectedConfigWorkerUrl,
-      selectedSlug,
-      toggleLoginModal,
-      workerUrl,
-    ],
-  );
+  const buildGrantIssueAuth = useCallback(async ({ workerUrl: overrideWorkerUrl, body }: GrantIssueAuthArgs = {}) => {
+    if (!account) {
+      if (toggleLoginModal) toggleLoginModal(true);
+      throw new Error('Connect a wallet to sign admin requests.');
+    }
+    const slug = normalizeSlug(selectedSlug);
+    const baseUrl = adminWorkerPorts.workerUrl.normalizeWorkerUrl(overrideWorkerUrl || workerUrl || selectedConfigWorkerUrl);
+    if (!baseUrl) throw new Error('Worker URL is missing.');
+    const chainId = Number(selectedConfig?.__registry?.chainId || selectedConfig?.networkChainId || network?.id || 1) || 1;
+    return adminWorkerPorts.adminAuth.buildSignedAdminActionAuth({
+      action: 'issue-sponsored-grants',
+      slug,
+      body,
+      workerUrl: baseUrl,
+      context: {
+        account,
+        chainId,
+        providerLike: typeof provider === 'string' ? provider : undefined,
+      },
+    });
+  }, [account, network?.id, provider, selectedConfig, selectedConfigWorkerUrl, selectedSlug, toggleLoginModal, workerUrl]);
 
   const handleCreateSponsoredUrl = useCallback(async () => {
     const requestSeq = createRequestSeqRef.current + 1;
@@ -937,7 +909,7 @@ const SponsorPage = ({
       let resolvedGrantWorkerUrl = resolvedWorkerUrl;
       if (grantRequest.deploy || grantRequest.faucet) {
         setCreateStatusIfCurrent('Issuing sponsored bootstrap grants…');
-        const grantRequestBody = {
+        const grantRequestBody: UnknownRecord = {
           sessionSlug: selectedSlug,
           grantRequest,
         };
@@ -965,7 +937,7 @@ const SponsorPage = ({
           );
         }
         if (!isCurrentCreateRequest()) return;
-        const grantData = await grantResponse.json().catch(() => ({}));
+        const grantData: UnknownRecord = await grantResponse.json().catch(() => ({}));
         if (!isCurrentCreateRequest()) return;
         if (!grantResponse.ok) {
           throw new Error(
@@ -1180,7 +1152,7 @@ const SponsorPage = ({
                 <Input
                   type="checkbox"
                   checked={persistBundleDraft}
-                  onChange={(e: any) => setPersistBundleDraft(!!e.target.checked)}
+                  onChange={(e) => setPersistBundleDraft(!!e.target.checked)}
                 />
                 <span>Remember non-secret draft fields</span>
               </Label>
@@ -1299,15 +1271,11 @@ const SponsorPage = ({
                 className={styles.heroCardInput}
                 readOnly={!workerUrlEditable}
                 data-testid={E2E_TESTIDS.SPONSOR_WORKER_URL}
-                onChange={
-                  workerUrlEditable
-                    ? (e) => {
-                        workerUrlOverrideDirtyRef.current = true;
-                        setWorkerUrlOverrideDirty(true);
-                        setWorkerUrl(e.target.value);
-                      }
-                    : undefined
-                }
+                onChange={workerUrlEditable ? (e) => {
+                  workerUrlOverrideDirtyRef.current = true;
+                  setWorkerUrlOverrideDirty(true);
+                  setWorkerUrl(e.target.value);
+                } : undefined}
               />
               <div className={styles.heroCardInputActions}>
                 <button

@@ -171,16 +171,16 @@ type GetUserSBTsMinimalMethod = ((
   MemoizedFields<SbtListItem[]>;
 
 type ContractProfileDeps = {
-  resolveSession: (groupKeyOrCfg: GroupKeyOrCfg) => any;
+  resolveSession: (groupKeyOrCfg: GroupKeyOrCfg) => unknown;
   getReadProviderForGroup: (
     groupKeyOrCfg: GroupKeyOrCfg,
     opts?: { contractKey?: string; skipGlobalPreferred?: boolean }
-  ) => any;
-  CUSTOM_SBT_ABI: any;
+  ) => ContractReadProvider;
+  CUSTOM_SBT_ABI: ethers.ContractInterface;
   callWithRetry: <T>(
     operation: () => Promise<T>,
     operationName: string,
-    context?: Record<string, unknown>
+    context?: ContractProfileRecord
   ) => Promise<T>;
   rpcLog: (...args: unknown[]) => void;
   isNonexistentTokenError: (error: unknown) => boolean;
@@ -198,7 +198,7 @@ type ContractProfileDeps = {
     toBlock: number,
     depth?: number,
     maxDepth?: number,
-    opts?: unknown,
+    opts?: unknown
   ) => Promise<ContractLog[]>;
   resolveSessionNameValue: (value: unknown) => string | null | undefined;
   normalizeSessionSlug: (slug: string) => string;
@@ -218,7 +218,7 @@ type ContractProfileMethods = {
     providerName: ContractProviderName,
     SBTAddress: string,
     tokenId: ContractIdentifier,
-    groupKeyOrCfg?: GroupKeyOrCfg,
+    groupKeyOrCfg?: GroupKeyOrCfg
   ) => Promise<unknown | null>;
   getAllSbtAddressesCached: GetAllSbtAddressesCachedMethod;
   getUserSbtNetHoldings: GetUserSbtNetHoldingsMethod;
@@ -240,13 +240,13 @@ type ContractProfileMethods = {
   getRelevantBlockWindowForFilter?: (
     this: ContractProfileMethods,
     groupKeyOrCfg: GroupKeyOrCfg,
-    opts?: unknown,
+    opts?: unknown
   ) => Promise<BlockWindow>;
   getSbtMetadata?: (
     this: ContractProfileMethods,
     providerName: ContractProviderName,
     sbtAddress: string,
-    groupKeyOrCfg?: GroupKeyOrCfg,
+    groupKeyOrCfg?: GroupKeyOrCfg
   ) => Promise<unknown>;
   getSurveysCreatedByAddress?: (
     this: ContractProfileMethods,
@@ -254,14 +254,14 @@ type ContractProfileMethods = {
     address: string,
     fromBlock?: number,
     toBlock?: unknown,
-    groupKeyOrCfg?: GroupKeyOrCfg,
+    groupKeyOrCfg?: GroupKeyOrCfg
   ) => Promise<unknown[]>;
   getSurveyDataById?: (
     this: ContractProfileMethods,
     providerName: ContractProviderName,
     surveyId: unknown,
     groupKeyOrCfg?: GroupKeyOrCfg,
-    opts?: unknown,
+    opts?: unknown
   ) => Promise<unknown>;
   getSurveyResponsesByAddress?: (
     this: ContractProfileMethods,
@@ -269,7 +269,7 @@ type ContractProfileMethods = {
     address: string,
     fromBlock?: number,
     toBlock?: unknown,
-    groupKeyOrCfg?: GroupKeyOrCfg,
+    groupKeyOrCfg?: GroupKeyOrCfg
   ) => Promise<unknown[]>;
   getSurveyResponse?: (
     this: ContractProfileMethods,
@@ -277,7 +277,7 @@ type ContractProfileMethods = {
     address: string,
     surveyId: unknown,
     groupKeyOrCfg?: GroupKeyOrCfg,
-    opts?: unknown,
+    opts?: unknown
   ) => Promise<unknown>;
   getQuestionsCreatedByAddress?: (
     this: ContractProfileMethods,
@@ -285,14 +285,14 @@ type ContractProfileMethods = {
     address: string,
     fromBlock?: number,
     toBlock?: unknown,
-    groupKeyOrCfg?: GroupKeyOrCfg,
+    groupKeyOrCfg?: GroupKeyOrCfg
   ) => Promise<unknown[]>;
   getQuestionData?: (
     this: ContractProfileMethods,
     providerName: ContractProviderName,
     questionId: unknown,
     groupKeyOrCfg?: GroupKeyOrCfg,
-    opts?: unknown,
+    opts?: unknown
   ) => Promise<unknown>;
   getQuestionResponsesByAddress?: (
     this: ContractProfileMethods,
@@ -301,7 +301,7 @@ type ContractProfileMethods = {
     fromBlock?: number,
     toBlock?: unknown,
     groupKeyOrCfg?: GroupKeyOrCfg,
-    opts?: unknown,
+    opts?: unknown
   ) => Promise<unknown[]>;
   getResponse?: (
     this: ContractProfileMethods,
@@ -309,22 +309,24 @@ type ContractProfileMethods = {
     address: string,
     questionId: unknown,
     groupKeyOrCfg?: GroupKeyOrCfg,
-    opts?: unknown,
+    opts?: unknown
   ) => Promise<unknown>;
   [key: string]: unknown;
 };
 
 type ContractProfileCallable = (...args: never[]) => unknown;
 
-const isRecord = (value: unknown): value is ContractProfileRecord =>
-  !!value && typeof value === 'object' && !Array.isArray(value);
+const isRecord = (value: unknown): value is ContractProfileRecord => (
+  !!value && typeof value === 'object' && !Array.isArray(value)
+);
 
-const getErrorMessage = (error: unknown): string =>
+const getErrorMessage = (error: unknown): string => (
   error instanceof Error && error.message
     ? error.message
     : isRecord(error) && error.message
       ? String(error.message)
-      : String(error || '');
+      : String(error || '')
+);
 
 const getNestedErrorName = (error: unknown): string => {
   if (!isRecord(error)) return '';
@@ -401,7 +403,7 @@ export function createProfileChainReadMethods(deps: ContractProfileDeps): Contra
       providerName: ContractProviderName,
       SBTAddress: string,
       tokenId: ContractIdentifier,
-      groupKeyOrCfg: GroupKeyOrCfg = null,
+      groupKeyOrCfg: GroupKeyOrCfg = null
     ): Promise<unknown | null> {
       const provider = getReadProviderForGroup(groupKeyOrCfg, SBT_READ_PROVIDER_OPTIONS);
       const CustomSBT = new ethers.Contract(SBTAddress, CUSTOM_SBT_ABI, provider);
@@ -452,7 +454,8 @@ export function createProfileChainReadMethods(deps: ContractProfileDeps): Contra
       const slugOrEmpty = typeof cfgRecord.slug !== 'undefined' ? cfgRecord.slug : '';
       const gAddrs = getSessionAddresses(cfg);
       const addr = gAddrs.sbtFactory?.address;
-      const chId = gAddrs.sbtFactory?.chainId || extractChainIdOrUndefined(cfg, { contractKey: 'sbtFactory' });
+      const chId =
+        gAddrs.sbtFactory?.chainId || extractChainIdOrUndefined(cfg, { contractKey: 'sbtFactory' });
 
       if (!addr) {
         contractsLog.log('No SBT factory address in group config:', slugOrEmpty);
@@ -516,14 +519,13 @@ export function createProfileChainReadMethods(deps: ContractProfileDeps): Contra
 
           const totalBlocks = Math.max(0, resolvedToBlock - resolvedFromBlock + 1);
           const parsedLogKeys = new Set<string>();
-          const getSbtCreatedLogKey = (log: ContractLog): string =>
-            [
-              log?.blockHash || log?.blockNumber || '',
-              log?.transactionHash || '',
-              log?.logIndex ?? log?.transactionIndex ?? '',
-              Array.isArray(log?.topics) ? log.topics.join('|') : '',
-              log?.data || '',
-            ].join(':');
+          const getSbtCreatedLogKey = (log: ContractLog): string => [
+            log?.blockHash || log?.blockNumber || '',
+            log?.transactionHash || '',
+            log?.logIndex ?? log?.transactionIndex ?? '',
+            Array.isArray(log?.topics) ? log.topics.join('|') : '',
+            log?.data || '',
+          ].join(':');
           const collectAddressesFromLogs = (logs: ContractLog[] = []): string[] => {
             const next: string[] = [];
             (Array.isArray(logs) ? logs : []).forEach((log): void => {
@@ -575,19 +577,19 @@ export function createProfileChainReadMethods(deps: ContractProfileDeps): Contra
             resolvedToBlock,
             0,
             20,
-            onProgress || onDiscoveredAddresses
-              ? {
-                  phase: 'discover',
-                  fromBlock: resolvedFromBlock,
-                  toBlock: resolvedToBlock,
-                  totalBlocks,
-                  scannedBlocks: 0,
-                  onProgress,
-                  onLogs: onDiscoveredAddresses
-                    ? ({ logs = [], scanTo }: ContractLogProgress): void => {
-                        emitDiscoveredAddresses(collectAddressesFromLogs(logs), scanTo ?? null);
-                      }
-                    : null,
+            (onProgress || onDiscoveredAddresses) ? {
+              phase: 'discover',
+              fromBlock: resolvedFromBlock,
+              toBlock: resolvedToBlock,
+              totalBlocks,
+              scannedBlocks: 0,
+              onProgress,
+              onLogs: onDiscoveredAddresses
+                ? ({ logs = [], scanTo }: ContractLogProgress): void => {
+                  emitDiscoveredAddresses(
+                    collectAddressesFromLogs(logs),
+                    scanTo ?? null
+                  );
                 }
               : null,
           );
@@ -710,7 +712,7 @@ export function createProfileChainReadMethods(deps: ContractProfileDeps): Contra
                   } catch (tokenError: unknown) {
                     contractsLog.warn(
                       `[getUserSbtNetHoldings] balance/token check failed for ${addr}:`,
-                      getErrorMessage(tokenError) || tokenError,
+                      getErrorMessage(tokenError) || tokenError
                     );
                     return null;
                   }
@@ -811,7 +813,7 @@ export function createProfileChainReadMethods(deps: ContractProfileDeps): Contra
           }
 
           const fallbackSessionSlug = normalizeSessionSlug(String(cfgRecord.slug || ''));
-          const fallbackSessionName = ((): string => {
+          const fallbackSessionName = (() : string => {
             const fromCfg = resolveSessionNameValue(cfg || {});
             if (fromCfg) return fromCfg;
             return fallbackSessionSlug || 'general';
@@ -890,7 +892,10 @@ export function createProfileChainReadMethods(deps: ContractProfileDeps): Contra
           });
         }
 
-        const getUserSBTsMinimal = requireContractProfileMethod(this.getUserSBTsMinimal, 'getUserSBTsMinimal');
+        const getUserSBTsMinimal = requireContractProfileMethod(
+          this.getUserSBTsMinimal,
+          'getUserSBTsMinimal'
+        );
         const resolvedSession = resolveSession(slug || '');
         const sessionRef = ignoreScope
           ? { ...(isRecord(resolvedSession) ? resolvedSession : {}), __ignoreSessionScanScope: true }
@@ -989,16 +994,14 @@ export function createProfileChainReadMethods(deps: ContractProfileDeps): Contra
           );
           const surveyIDs = Array.isArray(surveyIDsRaw) ? surveyIDsRaw : [];
           if (surveyIDs.length > 0) {
-            const surveys = await Promise.all(
-              surveyIDs.map(async (id: unknown): Promise<SurveyActivityEntry | null> => {
-                const data = await safeCall<unknown | null>(
-                  `getSurveyDataById:${String(id || '').toLowerCase()}`,
-                  () => getSurveyDataById.call(this, 'none', id, sessionRef, { throwOnFailure: true }),
-                  null,
-                );
-                return data ? { id, data } : null;
-              }),
-            );
+            const surveys = await Promise.all(surveyIDs.map(async (id: unknown): Promise<SurveyActivityEntry | null> => {
+              const data = await safeCall<unknown | null>(
+                `getSurveyDataById:${String(id || '').toLowerCase()}`,
+                () => getSurveyDataById.call(this, 'none', id, sessionRef, { throwOnFailure: true }),
+                null
+              );
+              return data ? { id, data } : null;
+            }));
             activity.createdSurveys = surveys.filter(
               (survey: SurveyActivityEntry | null): survey is SurveyActivityEntry => !!(survey && survey.data),
             );
@@ -1047,16 +1050,14 @@ export function createProfileChainReadMethods(deps: ContractProfileDeps): Contra
           );
           const questionIDs = Array.isArray(questionIDsRaw) ? questionIDsRaw : [];
           if (questionIDs.length > 0) {
-            const questions = await Promise.all(
-              questionIDs.map(async (id: unknown): Promise<QuestionActivityEntry | null> => {
-                const data = await safeCall<unknown | null>(
-                  `getQuestionData:${String(id || '').toLowerCase()}`,
-                  () => getQuestionData.call(this, 'none', id, sessionRef, { throwOnFailure: true }),
-                  null,
-                );
-                return data ? { id, data } : null;
-              }),
-            );
+            const questions = await Promise.all(questionIDs.map(async (id: unknown): Promise<QuestionActivityEntry | null> => {
+              const data = await safeCall<unknown | null>(
+                `getQuestionData:${String(id || '').toLowerCase()}`,
+                () => getQuestionData.call(this, 'none', id, sessionRef, { throwOnFailure: true }),
+                null
+              );
+              return data ? { id, data } : null;
+            }));
             activity.createdQuestions = questions.filter(
               (question: QuestionActivityEntry | null): question is QuestionActivityEntry =>
                 !!(question && question.data),
