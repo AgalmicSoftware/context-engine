@@ -2,7 +2,7 @@
 
 Moved from root README.md for readability.
 
-The stripped `release-public` OSS copy intentionally omits the private repo-level E2E workflow entrypoints under `scripts/test-*.js`, `scripts/test-*.ui.js`, and `scripts/lib/e2e/`. Use the detailed workflow references below with the full dev repo or a restored private pack, not the stripped public release artifact.
+The stripped `release-public` OSS copy intentionally omits the private repo-level E2E workflow entrypoints under `scripts/test-*.js`, `scripts/test-*.ui.js`, `scripts/e2e/`, and `scripts/lib/e2e/`. Use the detailed workflow references below with the full dev repo or a restored private pack, not the stripped public release artifact.
 
 The maintained public smoke path is Vite-compatible and runs against an already running client:
 

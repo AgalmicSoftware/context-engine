@@ -1,6 +1,6 @@
 # E2E Workflow Tests (OP Sepolia + Local UI)
 
-The stripped `release-public` OSS copy intentionally omits the repo-level E2E workflow entrypoints under `scripts/test-*.js`, `scripts/test-*.ui.js`, and `scripts/lib/e2e/`. This runbook is for the full dev repo or a restored private pack, not the stripped public release artifact.
+The stripped `release-public` OSS copy intentionally omits the repo-level E2E workflow entrypoints under `scripts/test-*.js`, `scripts/test-*.ui.js`, `scripts/e2e/`, and `scripts/lib/e2e/`. This runbook is for the full dev repo or a restored private pack, not the stripped public release artifact.
 
 This repo now includes an expanded CE E2E runner set for:
 - Session setup

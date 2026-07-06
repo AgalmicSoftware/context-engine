@@ -44,6 +44,7 @@ docs/*prd*.md
 scripts/test-*.js
 scripts/test-*.ui.js
 scripts/seed-*.js
+scripts/e2e
 scripts/lib/e2e
 scripts/start-playwright-server.js
 scripts/run-e2e-*
@@ -122,6 +123,7 @@ local-private-version
 scripts/test-*.js
 scripts/test-*.ui.js
 scripts/seed-*.js
+scripts/e2e
 scripts/lib/e2e
 scripts/start-playwright-server.js
 scripts/run-agent-bridge-worker-tests.js

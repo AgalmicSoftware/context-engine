@@ -80,6 +80,33 @@ test('verifyPublicReleaseSurface ignores files inside stripped paths', () => {
   });
 });
 
+test('verifyPublicReleaseSurface ignores stripped source importing stripped target', () => {
+  withPublicFixture((rootDir) => {
+    const strippedImport = '../../lib/e2e/wallets';
+    writeFile(
+      rootDir,
+      path.join('scripts', 'lib', 'public-release-strip-patterns.sh'),
+      `#!/usr/bin/env bash
+ce_public_release_strip_patterns() {
+  cat <<'EOF'
+scripts/e2e
+scripts/lib/e2e
+EOF
+}
+`,
+    );
+    writeFile(
+      rootDir,
+      path.join('scripts', 'e2e', 'prd652', 'prd652-cloudflare.js'),
+      `const { DEFAULT_PASSKEY_A } = require('${strippedImport}');\n`,
+    );
+
+    const result = verifyPublicReleaseSurface(rootDir);
+
+    assert.deepEqual(result.findings, []);
+  });
+});
+
 test('verify-public-release-surface CLI exits nonzero for stripped imports', () => {
   withPublicFixture((rootDir) => {
     const strippedImport = '../../contextEngine-cc/lib/litChipotleActionCatalog.mjs';
