@@ -7,6 +7,8 @@
 - Type definitions: `client/src/components/MainSite/MainSiteTypes.ts`
 - Route classifier: `client/src/components/MainSite/routeTable.ts`
 - Route view map: `client/src/components/MainSite/mainSiteRouteViewMap.ts`
+- Route renderers: `client/src/components/MainSite/mainSiteRouteRenderers.tsx`
+- Profile scan runtime: `client/src/components/MainSite/mainSiteProfileScanRuntime.ts`
 - Route classifier tests: `client/src/components/MainSite/routeTable.test.ts`
 - Runtime characterization tests: `client/src/components/MainSite/MainSite.routes.test.jsx`
 - Session media URL domain helper: `client/src/domains/sessions/sessionMediaUrls.ts`
@@ -17,7 +19,7 @@ This map intentionally avoids exact line numbers. MainSite is still changing dur
 
 ## Route Dispatch
 
-Route matching is now classified by the pure `resolveMainSiteRouteMatch` table in `routeTable.ts`, while route-key-to-view assembly lives in `mainSiteRouteViewMap.ts`. `MainSite.getMainView` remains the rendering caller and still owns URL side effects such as `/new` canonicalization and question/survey responder query normalization.
+Route matching is now classified by the pure `resolveMainSiteRouteMatch` table in `routeTable.ts`, while route-key-to-view assembly lives in `mainSiteRouteViewMap.ts`. `mainSiteRouteRenderers.tsx` owns the route renderer bodies and the extracted `getMainView` dispatch wrapper; `MainSite` binds those host-aware functions so URL side effects such as `/new` canonicalization and question/survey responder query normalization keep the same runtime host state.
 Degenerate double-slash SBT address URLs such as `//sbt/0x...` and `//group/0x...` intentionally resolve as SBT detail routes; this PRD 647 decision is pinned in `routeTable.test.ts`.
 
 Covered route keys:
@@ -94,7 +96,9 @@ The characterization tests intentionally pin behavior as-is. The follow-up domai
 - `client/src/components/MainSite/sessionDisplayHelpers.ts`
   Session name/info/header display resolution.
 - `client/src/components/MainSite/mainSiteRouteViewMap.ts`
-  Pure route-key-to-view assembly used by `MainSite.getMainView`; route side effects and query normalization stay in the class component.
+  Pure route-key-to-view assembly used by the extracted `getMainView` dispatch wrapper.
+- `client/src/components/MainSite/mainSiteRouteRenderers.tsx`
+  Host-aware route renderer bodies and route dispatch wrapper. MainSite binds these functions but no longer carries the JSX route bodies directly.
 - `client/src/domains/sessions/sessionMediaUrls.ts`
   Typed domain wrapper for session media URL normalization. MainSite uses this instead of importing `utilities/arweave/arweaveUrls` directly.
 - `client/src/utilities/session/sessionBackendKind.ts`
@@ -129,6 +133,8 @@ The characterization tests intentionally pin behavior as-is. The follow-up domai
   Owns profile-scan scope helpers, registry hydration/dedup state, retry scheduling, and scan telemetry helpers.
 - `client/src/utilities/session/profileScanReportHelpers.js`
   Pure profile-scan fan-out plan and report-shape helpers.
+- `client/src/components/MainSite/mainSiteProfileScanRuntime.ts`
+  Host-aware profile scan runtime body for `scanSpecificUserProfile`. MainSite keeps the public method seam while the cache writes, fan-out execution, and telemetry body live here.
 
 ### Metadata and cache entry shaping
 
@@ -171,11 +177,9 @@ These remain inside `MainSite.tsx` by design for this lane:
 - `componentDidUpdate`
 - `handleNetworkChange`
 - `scanSpecificUserProfilePriority`
-- `scanSpecificUserProfile`
+- `scanSpecificUserProfile` public wrapper
 - `scanForSurveyGroup`
 - `onNewSurveyEventDetectedForGroup`
-- `_render*Route` methods
-- `getMainView`
 - `render`
 
 ## Runtime Flow
@@ -213,19 +217,19 @@ The client-boundary baseline is now 0/0.
 
 | Area | Controller-routed | Typed contract module present | Test-pinned | Parent-owned | Blocked reason | Next safe lane |
 |---|---|---|---|---|---|---|
-| Route classification and view-map assembly | Yes | N/A | Yes | `MainSite.getMainView` renders and owns URL/query side effects | None | Route props can move only after route-table and route-view consumers stabilize |
+| Route classification and view-map assembly | Yes | N/A | Yes | `mainSiteRouteRenderers.tsx` owns route bodies; MainSite binds the host-aware wrappers | None | Route props can move only after route-table and route-view consumers stabilize |
 | Session media URL normalization | Yes | Yes | Yes | MainSite supplies helper to `sessionDisplayHelpers` | None | Share with Admin/storage URL domain when Admin lane lands |
 | Listener lifecycle | Partial | Yes | Yes | MainSite lifecycle starts/removes listeners | Listener orchestration still crosses mount/update/unmount state | Extract listener orchestration after attach-side controller ports converge |
 | Registry bootstrap and route session lookup | Partial | Yes | Yes | MainSite + `sessionProfileScanController` bridge state | Bootstrap promise identity and route/session state stay parent-owned | Session bootstrap controller extraction |
-| User profile scan fan-out | Partial | Yes | Yes | MainSite owns scan body and cache writes | Scan body still writes multiple caches and UI flags | Profile scan reducer/controller extraction |
+| User profile scan fan-out | Partial | Yes | Yes | `mainSiteProfileScanRuntime.ts` owns the scan body through MainSite host methods | Scan body still writes multiple caches and UI flags | Profile scan reducer/controller extraction |
 | Survey event reconciliation | Partial | Yes | Yes | MainSite owns real-time cache reconciliation | Event reconciliation still owns cache writes and merge decisions | Survey/question event reconciliation controller |
 | Arweave retry branch merge | Yes | Yes | Yes | MainSite owns cache merge call sites | Cache merge call sites remain inside scan/hydration bodies | Question cache hydration/retry controller |
 
 ## Edit Heuristics
 
-- For URL matching or route order, start in `routeTable.ts` and then inspect `getMainView`.
+- For URL matching or route order, start in `routeTable.ts` and then inspect `mainSiteRouteRenderers.tsx`.
 - For route session slug/ID behavior, inspect `routeSessionResolution.ts` and `sessionPathResolverController.ts` before editing MainSite.
 - For session header/media display, inspect `sessionDisplayHelpers.ts` and `domains/sessions/sessionMediaUrls.ts`.
-- For profile scans, inspect `sessionProfileScanController.ts` and `profileScanReportHelpers.ts` before touching `scanSpecificUserProfile`.
+- For profile scans, inspect `sessionProfileScanController.ts`, `profileScanReportHelpers.ts`, and `mainSiteProfileScanRuntime.ts` before touching `scanSpecificUserProfile`.
 - For listener leaks or duplicate events, inspect `chainEventStreams.ts`, `sessionSbtCacheController.js`, `sessionSurveyCacheController.ts`, and the listener characterization tests before editing lifecycle code.
 - For cache readiness drift, inspect `sessionCacheReadinessController.ts` and `sessionCachePersistenceController.ts` before editing mount/update code.
