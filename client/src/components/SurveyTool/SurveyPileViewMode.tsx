@@ -54,6 +54,7 @@ import {
   buildPileSubmitTempTextPatch,
   resolveEarlyVisiblePileQuestions,
   shouldPreferPileGatedEmptyState,
+  type EarlyVisiblePileQuestion,
 } from './surveyPileViewState.js';
 import {
   renderPileActiveQuestionCard,
@@ -113,6 +114,7 @@ import {
   executePileInitializeResponseState,
   executePileQuestionSetHydration,
 } from './surveyPileResponseController';
+import type { PileResponseSlice } from './surveyPileResponseWindow';
 import {
   buildClearedTransientSubmitFeedbackState,
   buildTransientSubmitFeedbackState,
@@ -474,6 +476,8 @@ import {
   buildInitialSurveyQuestionsState,
   buildSurveyQuestionPoolLoadState,
   isSurveyQuestionsMaskedPromptText,
+  type SurveyQuestionsRuntimeEngine,
+  type SurveyQuestionsRuntimeStrategy,
   type SurveyQuestionsProps,
   type SurveyQuestionsState,
 } from './surveyQuestionsTypes.js';
@@ -488,7 +492,7 @@ import { SurveyQuestions } from './SurveyQuestions';
 export const LazyPileCreateQuestionsAndSurveys = React.lazy(() => import('./CreateQuestionsAndSurveys'));
 export const LazySessionListeningPanel = React.lazy(() => import('./SessionListeningPanel'));
 
-export const buildPileRuntimeInitialState = (engine: any) => {
+export const buildPileRuntimeInitialState = (engine: SurveyQuestionsRuntimeEngine) => {
   const props = engine.props || {};
   let initialFilterState = normalizeSurveyToolFilterState(props.filterState);
   if (Object.keys(initialFilterState).length === 0 && typeof window !== 'undefined') {
@@ -559,20 +563,20 @@ export const buildPileRuntimeInitialState = (engine: any) => {
   return nextState;
 };
 
-export const createPileViewRuntimeStrategy = () => ({
-  buildInitialState: (engine: any) => buildPileRuntimeInitialState(attachPileViewRuntimeEngine(engine)),
+export const createPileViewRuntimeStrategy = (): SurveyQuestionsRuntimeStrategy => ({
+  buildInitialState: (engine) => buildPileRuntimeInitialState(attachPileViewRuntimeEngine(engine)),
 
-  componentDidMount: (engine: any) => attachPileViewRuntimeEngine(engine).runPileComponentDidMount(),
+  componentDidMount: (engine) => attachPileViewRuntimeEngine(engine).runPileComponentDidMount(),
 
-  componentDidUpdate: (engine: any, prevProps: any, prevState: any) => (
+  componentDidUpdate: (engine, prevProps, prevState) => (
     attachPileViewRuntimeEngine(engine).runPileComponentDidUpdate(prevProps, prevState)
   ),
 
-  componentWillUnmount: (engine: any) => attachPileViewRuntimeEngine(engine).runPileComponentWillUnmount(),
+  componentWillUnmount: (engine) => attachPileViewRuntimeEngine(engine).runPileComponentWillUnmount(),
 
-  render: (engine: any) => attachPileViewRuntimeEngine(engine).renderPileViewMode(),
+  render: (engine) => attachPileViewRuntimeEngine(engine).renderPileViewMode(),
 
-  getCurrentRenderedQuestionIds: (engine: any) => {
+  getCurrentRenderedQuestionIds: (engine) => {
     engine = attachPileViewRuntimeEngine(engine);
     const pileQuestions = Array.isArray(engine.state?.pileQuestions) ? engine.state.pileQuestions : [];
     const activePileIndex = Number(engine.state?.activePileIndex || 0);
@@ -592,20 +596,21 @@ export const createPileViewRuntimeStrategy = () => ({
     return ids;
   },
 
-  toggleComments: (engine: any, questionId: any) => (
-    attachPileViewRuntimeEngine(engine).setState((prev: any) => ({
+  toggleComments: (engine, questionId) => {
+    const normalizedQuestionId = String(questionId ?? '');
+    return attachPileViewRuntimeEngine(engine).setState((prev: SurveyQuestionsState) => ({
       showComments: {
         ...prev.showComments,
-        [questionId]: !prev.showComments[questionId],
+        [normalizedQuestionId]: !prev.showComments[normalizedQuestionId],
       },
-    }))
-  ),
+    }));
+  },
 
-  getAnsweredQuestionsCount: (engine: any) => attachPileViewRuntimeEngine(engine).getSubmitCount(),
+  getAnsweredQuestionsCount: (engine) => attachPileViewRuntimeEngine(engine).getSubmitCount(),
 
-  getPendingEditStats: (engine: any) => attachPileViewRuntimeEngine(engine).computePendingEditStatsAtIndex(0),
+  getPendingEditStats: (engine) => attachPileViewRuntimeEngine(engine).computePendingEditStatsAtIndex(0),
 
-  showTransientSubmitFeedback: (engine: any, message: any = '', durationMs: any = 2000) => {
+  showTransientSubmitFeedback: (engine, message = '', durationMs = 2000) => {
     engine = attachPileViewRuntimeEngine(engine);
     if (engine._emptySubmitTimer) {
       clearTimeout(engine._emptySubmitTimer);
@@ -632,9 +637,27 @@ export const createPileViewRuntimeStrategy = () => ({
   },
 });
 
-type PileViewModeEngine = any;
-type PileQuestionRecord = Record<string, any>;
+type PileViewModeEngine = SurveyQuestionsRuntimeEngine;
+type PileQuestionRecord = {
+  id?: string;
+  creator?: unknown;
+  tags?: unknown;
+  type?: unknown;
+  prompt?: unknown;
+  promptDecrypted?: boolean;
+  arweaveTxId?: unknown;
+  singleSelect?: unknown;
+  singleChoice?: unknown;
+  options?: unknown;
+  [key: string]: unknown;
+};
 type PileQuestionResponsesMap = Record<string, Record<string, unknown>>;
+type PileControllerStateLike = Record<string, unknown> & {
+  pileQuestions?: unknown;
+  activePileIndex?: unknown;
+  surveysResponseState?: Array<Partial<PileResponseSlice> | null | undefined>;
+  editBaseline?: Partial<PileResponseSlice> | null;
+};
 
 const mergeQuestionResponsesForPile = mergeQuestionResponses as unknown as (
   target?: PileQuestionResponsesMap,
@@ -661,6 +684,15 @@ const createPileViewInstanceFields = () => ({
   _lastGatedEmptyRecoveryKey: '',
 });
 
+const bindPileEngineMethod = <Args extends unknown[], Result>(
+  engine: PileViewModeEngine,
+  method: (engine: PileViewModeEngine, ...args: Args) => Result
+) => (...args: Args): Result => method(engine, ...args);
+
+const bindPileMethod = <Args extends unknown[], Result>(
+  method: (...args: Args) => Result
+) => (...args: Args): Result => method(...args);
+
 const attachPileViewRuntimeEngine = (engine: PileViewModeEngine): PileViewModeEngine => {
   if (!engine || typeof engine !== 'object') return engine;
   if (!engine.__pileViewRuntimeFieldsInitialized) {
@@ -668,72 +700,72 @@ const attachPileViewRuntimeEngine = (engine: PileViewModeEngine): PileViewModeEn
     engine.__pileViewRuntimeFieldsInitialized = true;
   }
   Object.assign(engine, {
-        buildWarmPileSeedState: (...args: any[]) => (buildWarmPileSeedState as any)(engine, ...args),
-        getQuestionOptionsForInput: (...args: any[]) => (getQuestionOptionsForInput as any)(...args),
-        buildQuestionOptionsDigest: (...args: any[]) => (buildQuestionOptionsDigest as any)(engine, ...args),
-        getPileLoadingScanDisplay: (...args: any[]) => (getPileLoadingScanDisplay as any)(engine, ...args),
-        getQuestionObjectSignature: (...args: any[]) => (getQuestionObjectSignature as any)(engine, ...args),
-        mixQuestionListHash: (...args: any[]) => (mixQuestionListHash as any)(engine, ...args),
-        buildQuestionListSignature: (...args: any[]) => (buildQuestionListSignature as any)(engine, ...args),
-        getPileVisibleQuestionIds: (...args: any[]) => (getPileVisibleQuestionIds as any)(engine, ...args),
-        buildPileVisibleResponseSignature: (...args: any[]) => (buildPileVisibleResponseSignature as any)(engine, ...args),
-        syncCurrentPileQuestionsSignature: (...args: any[]) => (syncCurrentPileQuestionsSignature as any)(engine, ...args),
-        areQuestionListsEquivalent: (...args: any[]) => (areQuestionListsEquivalent as any)(engine, ...args),
-        isRecentRateLimit: (...args: any[]) => (isRecentRateLimit as any)(engine, ...args),
-        getEffectivePileSessionConfig: (...args: any[]) => (getEffectivePileSessionConfig as any)(engine, ...args),
-        hasRestrictedSessionQuestionGate: (...args: any[]) => (hasRestrictedSessionQuestionGate as any)(engine, ...args),
-        maybeRecoverUnhydratedGatedPile: (...args: any[]) => (maybeRecoverUnhydratedGatedPile as any)(engine, ...args),
-        isPileLoadingVisible: (...args: any[]) => (isPileLoadingVisible as any)(engine, ...args),
-        shouldPreferGatedEmptyState: (...args: any[]) => (shouldPreferGatedEmptyState as any)(engine, ...args),
-        syncLoadingElapsedTimer: (...args: any[]) => (syncLoadingElapsedTimer as any)(engine, ...args),
-        scheduleLoadAndSortQuestions: (...args: any[]) => (scheduleLoadAndSortQuestions as any)(engine, ...args),
-        runPileComponentDidMount: (...args: any[]) => (runPileComponentDidMount as any)(engine, ...args),
-        runPileComponentDidUpdate: (...args: any[]) => (runPileComponentDidUpdate as any)(engine, ...args),
-        runPileComponentWillUnmount: (...args: any[]) => (runPileComponentWillUnmount as any)(engine, ...args),
-        handleViewAllFromPile: (...args: any[]) => (handleViewAllFromPile as any)(engine, ...args),
-        triggerNavFade: (...args: any[]) => (triggerNavFade as any)(engine, ...args),
-        handleNext: (...args: any[]) => (handleNext as any)(engine, ...args),
-        handlePrev: (...args: any[]) => (handlePrev as any)(engine, ...args),
-        toggleCreate: (...args: any[]) => (toggleCreate as any)(engine, ...args),
-        syncListeningModeQuery: (...args: any[]) => (syncListeningModeQuery as any)(engine, ...args),
-        shouldUseMobileListeningScroll: (...args: any[]) => (shouldUseMobileListeningScroll as any)(engine, ...args),
-        scrollListeningPanelIntoViewIfNeeded: (...args: any[]) => (scrollListeningPanelIntoViewIfNeeded as any)(engine, ...args),
-        toggleListeningPanel: (...args: any[]) => (toggleListeningPanel as any)(engine, ...args),
-        closeListeningPanel: (...args: any[]) => (closeListeningPanel as any)(engine, ...args),
-        toggleHologramAssistant: (...args: any[]) => (toggleHologramAssistant as any)(engine, ...args),
-        toggleConviction: (...args: any[]) => (toggleConviction as any)(engine, ...args),
-        openConvictionSlider: (...args: any[]) => (openConvictionSlider as any)(engine, ...args),
-        checkCacheAgainstBaseline: (...args: any[]) => (checkCacheAgainstBaseline as any)(engine, ...args),
-        prefillUserAnswersFromCache: (...args: any[]) => (prefillUserAnswersFromCache as any)(engine, ...args),
-        loadAndSortQuestions: (...args: any[]) => (loadAndSortQuestions as any)(engine, ...args),
-        shouldAbortPileHydrationRequest: (...args: any[]) => (shouldAbortPileHydrationRequest as any)(engine, ...args),
-        resetPileAutoDecryptLedger: (...args: any[]) => (resetPileAutoDecryptLedger as any)(engine, ...args),
-        rehydrateVisiblePileWindow: (...args: any[]) => (rehydrateVisiblePileWindow as any)(engine, ...args),
-        runPileQuestionSetHydration: (...args: any[]) => (runPileQuestionSetHydration as any)(engine, ...args),
-        initializeResponseState: (...args: any[]) => (initializeResponseState as any)(engine, ...args),
-        ensureVisiblePileResponseState: (...args: any[]) => (ensureVisiblePileResponseState as any)(engine, ...args),
-        handleAnswerPile: (...args: any[]) => (handleAnswerPile as any)(engine, ...args),
-        handleAdditionalPile: (...args: any[]) => (handleAdditionalPile as any)(engine, ...args),
-        getSubmitCount: (...args: any[]) => (getSubmitCount as any)(engine, ...args),
-        showNoPendingPileSubmitFeedback: (...args: any[]) => (showNoPendingPileSubmitFeedback as any)(engine, ...args),
-        handlePileSubmitClick: (...args: any[]) => (handlePileSubmitClick as any)(engine, ...args),
-        getPileFilterQuestionResponses: (...args: any[]) => (getPileFilterQuestionResponses as any)(engine, ...args),
-        toggleFilterModal: (...args: any[]) => (toggleFilterModal as any)(engine, ...args),
-        handlePileFilterActivityChange: (...args: any[]) => (handlePileFilterActivityChange as any)(engine, ...args),
-        handleFilter: (...args: any[]) => (handleFilter as any)(engine, ...args),
-        getIsPileSubmitRailVisible: (...args: any[]) => (getIsPileSubmitRailVisible as any)(engine, ...args),
-        notifyPileSubmitRailVisibility: (...args: any[]) => (notifyPileSubmitRailVisibility as any)(engine, ...args),
-        renderPileResponseInput: (...args: any[]) => (renderPileResponseInput as any)(engine, ...args),
-        renderPileSliderSection: (...args: any[]) => (renderPileSliderSection as any)(engine, ...args),
-        renderPileAdditionalInput: (...args: any[]) => (renderPileAdditionalInput as any)(engine, ...args),
-        renderPileAdditionalEditorRow: (...args: any[]) => (renderPileAdditionalEditorRow as any)(engine, ...args),
-        renderPileCommentsSection: (...args: any[]) => (renderPileCommentsSection as any)(engine, ...args),
-        renderPileQuestionIcons: (...args: any[]) => (renderPileQuestionIcons as any)(engine, ...args),
-        renderPileFooterSection: (...args: any[]) => (renderPileFooterSection as any)(engine, ...args),
-        renderPileCardShell: (...args: any[]) => (renderPileCardShell as any)(engine, ...args),
-        renderPileGatedPromptCard: (...args: any[]) => (renderPileGatedPromptCard as any)(engine, ...args),
-        renderActiveQuestion: (...args: any[]) => (renderActiveQuestion as any)(engine, ...args),
-        renderPileViewMode: (...args: any[]) => (renderPileViewMode as any)(engine, ...args),
+        buildWarmPileSeedState: bindPileEngineMethod(engine, buildWarmPileSeedState),
+        getQuestionOptionsForInput: bindPileMethod(getQuestionOptionsForInput),
+        buildQuestionOptionsDigest: bindPileEngineMethod(engine, buildQuestionOptionsDigest),
+        getPileLoadingScanDisplay: bindPileEngineMethod(engine, getPileLoadingScanDisplay),
+        getQuestionObjectSignature: bindPileEngineMethod(engine, getQuestionObjectSignature),
+        mixQuestionListHash: bindPileEngineMethod(engine, mixQuestionListHash),
+        buildQuestionListSignature: bindPileEngineMethod(engine, buildQuestionListSignature),
+        getPileVisibleQuestionIds: bindPileEngineMethod(engine, getPileVisibleQuestionIds),
+        buildPileVisibleResponseSignature: bindPileEngineMethod(engine, buildPileVisibleResponseSignature),
+        syncCurrentPileQuestionsSignature: bindPileEngineMethod(engine, syncCurrentPileQuestionsSignature),
+        areQuestionListsEquivalent: bindPileEngineMethod(engine, areQuestionListsEquivalent),
+        isRecentRateLimit: bindPileEngineMethod(engine, isRecentRateLimit),
+        getEffectivePileSessionConfig: bindPileEngineMethod(engine, getEffectivePileSessionConfig),
+        hasRestrictedSessionQuestionGate: bindPileEngineMethod(engine, hasRestrictedSessionQuestionGate),
+        maybeRecoverUnhydratedGatedPile: bindPileEngineMethod(engine, maybeRecoverUnhydratedGatedPile),
+        isPileLoadingVisible: bindPileEngineMethod(engine, isPileLoadingVisible),
+        shouldPreferGatedEmptyState: bindPileEngineMethod(engine, shouldPreferGatedEmptyState),
+        syncLoadingElapsedTimer: bindPileEngineMethod(engine, syncLoadingElapsedTimer),
+        scheduleLoadAndSortQuestions: bindPileEngineMethod(engine, scheduleLoadAndSortQuestions),
+        runPileComponentDidMount: bindPileEngineMethod(engine, runPileComponentDidMount),
+        runPileComponentDidUpdate: bindPileEngineMethod(engine, runPileComponentDidUpdate),
+        runPileComponentWillUnmount: bindPileEngineMethod(engine, runPileComponentWillUnmount),
+        handleViewAllFromPile: bindPileEngineMethod(engine, handleViewAllFromPile),
+        triggerNavFade: bindPileEngineMethod(engine, triggerNavFade),
+        handleNext: bindPileEngineMethod(engine, handleNext),
+        handlePrev: bindPileEngineMethod(engine, handlePrev),
+        toggleCreate: bindPileEngineMethod(engine, toggleCreate),
+        syncListeningModeQuery: bindPileEngineMethod(engine, syncListeningModeQuery),
+        shouldUseMobileListeningScroll: bindPileEngineMethod(engine, shouldUseMobileListeningScroll),
+        scrollListeningPanelIntoViewIfNeeded: bindPileEngineMethod(engine, scrollListeningPanelIntoViewIfNeeded),
+        toggleListeningPanel: bindPileEngineMethod(engine, toggleListeningPanel),
+        closeListeningPanel: bindPileEngineMethod(engine, closeListeningPanel),
+        toggleHologramAssistant: bindPileEngineMethod(engine, toggleHologramAssistant),
+        toggleConviction: bindPileEngineMethod(engine, toggleConviction),
+        openConvictionSlider: bindPileEngineMethod(engine, openConvictionSlider),
+        checkCacheAgainstBaseline: bindPileEngineMethod(engine, checkCacheAgainstBaseline),
+        prefillUserAnswersFromCache: bindPileEngineMethod(engine, prefillUserAnswersFromCache),
+        loadAndSortQuestions: bindPileEngineMethod(engine, loadAndSortQuestions),
+        shouldAbortPileHydrationRequest: bindPileEngineMethod(engine, shouldAbortPileHydrationRequest),
+        resetPileAutoDecryptLedger: bindPileEngineMethod(engine, resetPileAutoDecryptLedger),
+        rehydrateVisiblePileWindow: bindPileEngineMethod(engine, rehydrateVisiblePileWindow),
+        runPileQuestionSetHydration: bindPileEngineMethod(engine, runPileQuestionSetHydration),
+        initializeResponseState: bindPileEngineMethod(engine, initializeResponseState),
+        ensureVisiblePileResponseState: bindPileEngineMethod(engine, ensureVisiblePileResponseState),
+        handleAnswerPile: bindPileEngineMethod(engine, handleAnswerPile),
+        handleAdditionalPile: bindPileEngineMethod(engine, handleAdditionalPile),
+        getSubmitCount: bindPileEngineMethod(engine, getSubmitCount),
+        showNoPendingPileSubmitFeedback: bindPileEngineMethod(engine, showNoPendingPileSubmitFeedback),
+        handlePileSubmitClick: bindPileEngineMethod(engine, handlePileSubmitClick),
+        getPileFilterQuestionResponses: bindPileEngineMethod(engine, getPileFilterQuestionResponses),
+        toggleFilterModal: bindPileEngineMethod(engine, toggleFilterModal),
+        handlePileFilterActivityChange: bindPileEngineMethod(engine, handlePileFilterActivityChange),
+        handleFilter: bindPileEngineMethod(engine, handleFilter),
+        getIsPileSubmitRailVisible: bindPileEngineMethod(engine, getIsPileSubmitRailVisible),
+        notifyPileSubmitRailVisibility: bindPileEngineMethod(engine, notifyPileSubmitRailVisibility),
+        renderPileResponseInput: bindPileEngineMethod(engine, renderPileResponseInput),
+        renderPileSliderSection: bindPileEngineMethod(engine, renderPileSliderSection),
+        renderPileAdditionalInput: bindPileEngineMethod(engine, renderPileAdditionalInput),
+        renderPileAdditionalEditorRow: bindPileEngineMethod(engine, renderPileAdditionalEditorRow),
+        renderPileCommentsSection: bindPileEngineMethod(engine, renderPileCommentsSection),
+        renderPileQuestionIcons: bindPileEngineMethod(engine, renderPileQuestionIcons),
+        renderPileFooterSection: bindPileEngineMethod(engine, renderPileFooterSection),
+        renderPileCardShell: bindPileEngineMethod(engine, renderPileCardShell),
+        renderPileGatedPromptCard: bindPileEngineMethod(engine, renderPileGatedPromptCard),
+        renderActiveQuestion: bindPileEngineMethod(engine, renderActiveQuestion),
+        renderPileViewMode: bindPileEngineMethod(engine, renderPileViewMode),
   });
   engine.__pileViewRuntimeMethodsAttached = true;
   return engine;
@@ -1731,11 +1763,19 @@ const prefillUserAnswersFromCache = (engine: PileViewModeEngine) => {
       pileQuestions: engine.state.pileQuestions,
       questionResponsesByQuestionId: qRespMap,
       account: acctLower,
-      currentSlice: engine.state.surveysResponseState?.[0],
+      currentSlice: engine.state.surveysResponseState?.[0] as Partial<PileResponseSlice> | null | undefined,
       editBaseline: engine.state.editBaseline,
       pendingTotal: pendingStats.total,
       cloneValue: engine.deepClone,
-      applyCachedResponseEntryToSlice: ({ targetSlice, questionId, response }: any) => (
+      applyCachedResponseEntryToSlice: ({
+        targetSlice,
+        questionId,
+        response,
+      }: {
+        targetSlice: PileResponseSlice;
+        questionId: string;
+        response: Record<string, unknown>;
+      }) => (
         engine._applyCachedResponseEntryToSlice({
           targetSlice,
           questionId,
@@ -2069,7 +2109,7 @@ const initializeResponseState = (engine: PileViewModeEngine, cb: any) => {
       activePileIndex: engine.state.activePileIndex,
       lastInitializeResponseSig: engine._lastInitializeResponseSig,
       buildEmptyResponseFieldState: engine.buildEmptyResponseFieldState,
-      setLastInitializeResponseSig: (nextInitializeResponseSig: any) => {
+      setLastInitializeResponseSig: (nextInitializeResponseSig: string) => {
         engine._lastInitializeResponseSig = nextInitializeResponseSig;
       },
       cloneValue: engine.deepClone,
@@ -2085,7 +2125,7 @@ const initializeResponseState = (engine: PileViewModeEngine, cb: any) => {
 
 const ensureVisiblePileResponseState = (engine: PileViewModeEngine) => {
     executeEnsureVisiblePileResponseState({
-      getState: () => engine.state,
+      getState: () => engine.state as PileControllerStateLike,
       buildEmptyResponseFieldState: engine.buildEmptyResponseFieldState,
       setState: engine.setState.bind(engine),
       onRehydrateVisibleWindow: () => {
@@ -2094,7 +2134,7 @@ const ensureVisiblePileResponseState = (engine: PileViewModeEngine) => {
           resetAutoDecryptLedger: false,
         });
       },
-      onError: (error: any) => {
+      onError: (error: unknown) => {
         surveyLog.error('ensureVisiblePileResponseState failed:', error);
       },
     });
@@ -2707,11 +2747,11 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
       showHologramAssistant,
       showListeningPanel,
     } = engine.state;
-    const fallbackQuestionPool = (
+    const fallbackQuestionPool: EarlyVisiblePileQuestion[] = (
       Array.isArray(engine.state.questionPool) && engine.state.questionPool.length > 0
     )
-      ? engine.state.questionPool
-      : (Array.isArray(engine.props.questionPool) ? engine.props.questionPool : []);
+      ? engine.state.questionPool as EarlyVisiblePileQuestion[]
+      : (Array.isArray(engine.props.questionPool) ? engine.props.questionPool as EarlyVisiblePileQuestion[] : []);
 
     const hiddenMaskSource = (
       Array.isArray(engine.state.allQuestionsForFilter) && engine.state.allQuestionsForFilter.length > 0
@@ -2738,7 +2778,9 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
       !!engine.state.isFilterActive ||
       isSurveyToolFilterStateActive(engine.state.filterState);
     const pileQuestions = resolveEarlyVisiblePileQuestions({
-      pileQuestions: statePileQuestions,
+      pileQuestions: Array.isArray(statePileQuestions)
+        ? statePileQuestions as EarlyVisiblePileQuestion[]
+        : [],
       questionPool: fallbackQuestionPool,
       isFilterActive,
     });
