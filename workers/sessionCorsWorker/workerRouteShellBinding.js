@@ -291,6 +291,8 @@ export const createWorkerRouteShellWithWorkerDeps = ({
           resolveAuthenticatedRouteSecrets: deps?.resolveAuthenticatedRouteSecrets,
           checkRateLimit: deps?.checkRateLimit,
           getSessionSecrets: deps?.getSessionSecrets,
+          isAddress: deps?.isAddress,
+          getAddress: deps?.getAddress,
           transcribe: deps?.transcribe,
           arweaveUpload: deps?.arweaveUpload,
           storageRoute: deps?.storageRoute,

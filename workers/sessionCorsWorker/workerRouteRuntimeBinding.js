@@ -263,6 +263,8 @@ export const createWorkerRouteRuntimeWithWorkerDeps = ({
       dispatchAuthenticatedSecretActionRoute: deps?.dispatchAuthenticatedSecretActionRoute,
       evaluateAuthenticatedRoutePreflight: deps?.evaluateAuthenticatedRoutePreflight,
       resolveAuthenticatedRouteSecrets: deps?.resolveAuthenticatedRouteSecrets,
+      isAddress: deps?.isAddress,
+      getAddress: deps?.getAddress,
       fetchImage: executionServices.fetchImage,
       fetchUrl: executionServices.fetchUrl,
       normalizeAiRequestPayload: deps?.normalizeAiRequestPayload,

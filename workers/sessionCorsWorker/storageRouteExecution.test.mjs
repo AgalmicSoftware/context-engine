@@ -9,6 +9,11 @@ import {
   rewrapStorageEnvelopeSessionKeyForDeployment,
   rotateStorageEnvelopeKeys,
 } from './storageEnvelopeEncryption.js';
+import {
+  addWorkerGroupMember,
+  createWorkerGroup,
+  deleteWorkerGroup,
+} from './workerGroups.js';
 
 const TX_ID = 'abc123abc123abc123abc123abc123abc123abc1230';
 const CF_ID = 'AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA';
@@ -1050,6 +1055,227 @@ test('storageRoute allows public_read Cloudflare reads and lists without request
   assert.equal(listed.items[0].metadata.payloadAccessMode, 'public_read');
 });
 
+test('storageRoute enforces worker group gates and group upload allowlists', async () => {
+  const kv = createMockKv();
+  const env = { CE_STORAGE_INDEX_KV: kv };
+  const adminPrincipal = { kind: 'evm_address', address: '0x0000000000000000000000000000000000000abc' };
+  const memberAddress = '0x0000000000000000000000000000000000000def';
+  const outsiderAddress = '0x0000000000000000000000000000000000000bad';
+  await createWorkerGroup({
+    env,
+    slug: 'session-a',
+    input: { groupId: 'reviewers', label: 'Reviewers', joinMode: 'admin_add' },
+    actorPrincipal: adminPrincipal,
+  });
+  await addWorkerGroupMember({
+    env,
+    slug: 'session-a',
+    groupId: 'reviewers',
+    principal: { kind: 'evm_address', address: memberAddress },
+    actorPrincipal: adminPrincipal,
+  });
+
+  const groupGateConfig = {
+    storageProfile: {
+      backend: 'cloudflare',
+      payloadAccessControl: { gate: 'group_gate', encryption: 'none', groupId: 'reviewers' },
+    },
+  };
+  const deniedUpload = await storageRoute({
+    path: '/storage/upload',
+    method: 'POST',
+    request: new Request('https://worker.example/storage/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: 'group payload', resource: 'docsContext' }),
+    }),
+    env,
+    config: groupGateConfig,
+    slug: 'session-a',
+    uploaderAddress: outsiderAddress,
+    authScopes: {},
+    baseHeaders: {},
+    deps: { json, randomBytes: fixedRandomBytes },
+  });
+  assert.equal(deniedUpload.status, 403);
+  assert.equal((await readJson(deniedUpload)).reason, 'worker_group_membership_denied');
+
+  const uploadResponse = await storageRoute({
+    path: '/storage/upload',
+    method: 'POST',
+    request: new Request('https://worker.example/storage/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: 'group payload', resource: 'docsContext' }),
+    }),
+    env,
+    config: groupGateConfig,
+    slug: 'session-a',
+    uploaderAddress: memberAddress,
+    authScopes: {},
+    baseHeaders: {},
+    deps: { json, randomBytes: fixedRandomBytes },
+  });
+  assert.equal(uploadResponse.status, 200);
+  const uploaded = await readJson(uploadResponse);
+  const metadata = await readStorageIndexMetadata(kv, 'session-a', 'docsContext', uploaded.storageRef.id);
+  assert.deepEqual(metadata.payloadAccessControl, {
+    gate: 'group_gate',
+    encryption: 'none',
+    groupIds: ['reviewers'],
+  });
+
+  const deniedRead = await storageRoute({
+    path: '/storage/read',
+    method: 'GET',
+    request: new Request(`https://worker.example/storage/read?id=${uploaded.storageRef.id}`),
+    env,
+    config: groupGateConfig,
+    slug: 'session-a',
+    uploaderAddress: outsiderAddress,
+    authScopes: {},
+    baseHeaders: {},
+    deps: { json },
+  });
+  assert.equal(deniedRead.status, 403);
+  const allowedRead = await storageRoute({
+    path: '/storage/read',
+    method: 'GET',
+    request: new Request(`https://worker.example/storage/read?id=${uploaded.storageRef.id}`),
+    env,
+    config: groupGateConfig,
+    slug: 'session-a',
+    uploaderAddress: memberAddress,
+    authScopes: {},
+    baseHeaders: {},
+    deps: { json },
+  });
+  assert.equal(allowedRead.status, 200);
+  assert.equal(await allowedRead.text(), 'group payload');
+
+  const publicConfig = {
+    storageProfile: {
+      backend: 'cloudflare',
+      payloadAccessControl: { gate: 'none', encryption: 'none' },
+    },
+  };
+  const deniedPolicyUpload = await storageRoute({
+    path: '/storage/upload',
+    method: 'POST',
+    request: new Request('https://worker.example/storage/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        data: 'policy payload',
+        uploadPolicy: { mode: 'group_allowlist', groupIds: ['reviewers'] },
+      }),
+    }),
+    env,
+    config: publicConfig,
+    slug: 'session-a',
+    uploaderAddress: outsiderAddress,
+    authScopes: {},
+    baseHeaders: {},
+    deps: { json, randomBytes: fixedRandomBytes },
+  });
+  assert.equal(deniedPolicyUpload.status, 403);
+  const allowedPolicyUpload = await storageRoute({
+    path: '/storage/upload',
+    method: 'POST',
+    request: new Request('https://worker.example/storage/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        data: 'policy payload',
+        uploadPolicy: { mode: 'group_allowlist', groupIds: ['reviewers'] },
+      }),
+    }),
+    env,
+    config: publicConfig,
+    slug: 'session-a',
+    uploaderAddress: memberAddress,
+    authScopes: {},
+    baseHeaders: {},
+    deps: { json, randomBytes: createSequenceRandomBytes(33) },
+  });
+  assert.equal(allowedPolicyUpload.status, 200);
+  const policyBody = await readJson(allowedPolicyUpload);
+  const policyMetadata = await readStorageIndexMetadata(kv, 'session-a', 'docsContext', policyBody.storageRef.id);
+  assert.deepEqual(policyMetadata.groupIds, ['reviewers']);
+  assert.equal(policyMetadata.uploadPolicy.mode, 'group_allowlist');
+
+  let sbtPolicyChecked = false;
+  const deniedSbtPolicyUpload = await storageRoute({
+    path: '/storage/upload',
+    method: 'POST',
+    request: new Request('https://worker.example/storage/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        data: 'sbt policy payload',
+        uploadPolicy: {
+          mode: 'sbt_allowlist',
+          contract: '0x00000000000000000000000000000000000000aa',
+          chainId: 11155420,
+          anyOrAll: 'any',
+        },
+      }),
+    }),
+    env,
+    config: publicConfig,
+    slug: 'session-a',
+    uploaderAddress: memberAddress,
+    authScopes: {},
+    baseHeaders: {},
+    deps: {
+      json,
+      randomBytes: createSequenceRandomBytes(65),
+      resolveRpcUrlListForGate: () => ['https://rpc.example'],
+      checkSbtGate: async ({ sbtAddresses, chainId, mode }) => {
+        sbtPolicyChecked = true;
+        assert.deepEqual(sbtAddresses, ['0x00000000000000000000000000000000000000aa']);
+        assert.equal(chainId, 11155420);
+        assert.equal(mode, 'any');
+        return false;
+      },
+    },
+  });
+  assert.equal(deniedSbtPolicyUpload.status, 403);
+  assert.equal((await readJson(deniedSbtPolicyUpload)).reason, 'sbt_upload_policy_denied');
+  assert.equal(sbtPolicyChecked, true);
+
+  const allowedSbtPolicyUpload = await storageRoute({
+    path: '/storage/upload',
+    method: 'POST',
+    request: new Request('https://worker.example/storage/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        data: 'sbt policy payload',
+        uploadPolicy: {
+          mode: 'sbt_allowlist',
+          contract: '0x00000000000000000000000000000000000000aa',
+          chainId: 11155420,
+          anyOrAll: 'any',
+        },
+      }),
+    }),
+    env,
+    config: publicConfig,
+    slug: 'session-a',
+    uploaderAddress: memberAddress,
+    authScopes: {},
+    baseHeaders: {},
+    deps: {
+      json,
+      randomBytes: createSequenceRandomBytes(97),
+      resolveRpcUrlListForGate: () => ['https://rpc.example'],
+      checkSbtGate: async () => true,
+    },
+  });
+  assert.equal(allowedSbtPolicyUpload.status, 200);
+});
+
 test('storageRoute scaffold rejects plaintext Cloudflare lit_encrypted uploads', async () => {
   const r2 = createMockR2();
   const env = { CE_STORAGE_R2: r2, CE_STORAGE_INDEX_KV: createMockKv() };
@@ -1407,10 +1633,37 @@ test('storageRoute worker_envelope evaluates any/all and supported condition kin
   assert.equal(sbtAllowedResponse.status, 200);
   assert.equal(sbtChecked, true);
 
-  await setConditions({ match: 'all', conditions: [{ kind: 'worker_group', groupId: 'reserved' }] });
-  const reservedResponse = await read();
-  assert.equal(reservedResponse.status, 403);
-  assert.equal((await readJson(reservedResponse)).reason, 'reserved_condition_kind');
+  await createWorkerGroup({
+    env,
+    slug: 'session-a',
+    input: { groupId: 'reviewers', label: 'Reviewers', joinMode: 'admin_add' },
+    actorPrincipal: { kind: 'evm_address', address: '0x0000000000000000000000000000000000000abc' },
+  });
+  await addWorkerGroupMember({
+    env,
+    slug: 'session-a',
+    groupId: 'reviewers',
+    principal: { kind: 'evm_address', address: '0x0000000000000000000000000000000000000bad' },
+    actorPrincipal: { kind: 'evm_address', address: '0x0000000000000000000000000000000000000abc' },
+  });
+  await setConditions({ match: 'all', conditions: [{ kind: 'worker_group', groupId: 'reviewers' }] });
+  const groupAllowedResponse = await read();
+  assert.equal(groupAllowedResponse.status, 200);
+  const groupDeniedResponse = await read({
+    requesterAddress: '0x0000000000000000000000000000000000000eee',
+  });
+  assert.equal(groupDeniedResponse.status, 403);
+  assert.equal((await readJson(groupDeniedResponse)).reason, 'worker_group_membership_denied');
+
+  await deleteWorkerGroup({
+    env,
+    slug: 'session-a',
+    groupId: 'reviewers',
+    actorPrincipal: { kind: 'evm_address', address: '0x0000000000000000000000000000000000000abc' },
+  });
+  const deletedGroupResponse = await read();
+  assert.equal(deletedGroupResponse.status, 403);
+  assert.equal((await readJson(deletedGroupResponse)).reason, 'worker_group_not_found');
 
   await setConditions({ match: 'all', conditions: [{ kind: 'future_kind' }] });
   const unknownResponse = await read();
