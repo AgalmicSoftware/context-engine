@@ -34,14 +34,9 @@ import {
   getAllSessionSlugs,
   getSessionConfigBySlug,
 } from '../../utilities/web3/contractScripts.js';
-import { getShortenedAddress, getShortenedSurveyID } from 'utilities/ui/displayHelpers.js';
 import { createLogger } from 'utilities/logging.js';
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
-import { buildResponseGatePolicy } from '../../utilities/crypto/litGatePolicy.js';
 import { resolveSbtDisplayLabel } from '../../utilities/sbt/sbtDisplayNames.js';
-import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
-import { t } from '../../utilities/ui/terminology.js';
-import { isDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
 import {
   resolveSurveyResultsExplicitSessionSlug,
   resolveSurveyResultsQuestionReadScope,
@@ -50,11 +45,8 @@ import {
 } from './surveyResultsSessionResolution.js';
 import {
   normalizeSurveyResultsBlockNumber,
-  readSurveyResultsLatestBlock,
-  type SurveyResultsLatestBlockMap,
 } from './surveyResultsBlockNumbers.js';
 import {
-  buildSurveyResultsAlertMessagePatch,
   buildSurveyResultsBookmarkedQuestionIdsPatch,
   buildSurveyResultsBookmarkedSurveyIdsPatch,
   buildSurveyResultsBooleanTogglePatch,
@@ -62,61 +54,36 @@ import {
   buildSurveyResultsDemoAtlasOpenPatch,
   buildSurveyResultsDemoAtlasNodePatch,
   buildSurveyResultsDemoViewSelectPatch,
-  buildSurveyResultsEmptySurveyModePatch,
   buildSurveyResultsExportTypePatch,
   buildSurveyResultsFilterActivePatch,
   buildSurveyResultsFilterLoadingStatePatch,
   buildSurveyResultsFilterLoadingUpdate,
-  buildSurveyResultsFilteredQuestionModeHydratedPatch,
   buildSurveyResultsFilteredQuestionsCountPatch,
   buildSurveyResultsFilteredResponsesPatchPlan,
   buildSurveyResultsIndividualResponseAggregator,
   buildSurveyResultsKeyedTogglePatch,
-  buildSurveyResultsLockedResponsesDecryptCompletePatch,
-  buildSurveyResultsLockedResponsesDecryptingPatch,
-  buildSurveyResultsLocalStoragePollPatch,
-  buildSurveyResultsNetworkLatestBlockPatch,
   buildSurveyResultsQuestionIdSortPatch,
   buildSurveyResultsQuestionFilterCountPatch,
   buildSurveyResultsQuestionFilterPatch,
   buildSurveyResultsQuestionFilterQuestions,
   buildSurveyResultsRefreshStatusSequencePlan,
-  buildSurveyResultsSurveyModeHydratedPatch,
   buildSurveyResultsSurveyViewModePatch,
-  buildSurveyResultsUnfilteredQuestionModeHydratedPatch,
   buildSurveyResultsViewStatePatch,
-  buildSurveyRespondersPayloadRefSignature,
-  buildSurveyRespondersSignature,
   countQuestionModeResponses,
-  getSurveyResponseAggregateTimestampMs,
-  getSurveyResponseQuestionId,
-  hasAnyCountableSurveyAnswer,
-  normalizeSurveyResponsePayloadByQuestionId,
   stringifySurveyResultsAggregatorResponses,
-  toggleSurveyResultsLockedResponseDetailsPatch,
   type SurveyResultsAggregateRow,
   type SurveyResultsFilterQuestionRecord,
   type SurveyResultsIndividualAggregator,
   type SurveyResultsStringifiedAggregator,
-  type SurveyResultsSurveyResponsePayload,
 } from './surveyResultsHelpers.js';
-import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
-import { isResponseAllowedForSessionSlug } from '../../utilities/session/responseSessionScope.js';
 import {
   readSessionScanScope,
   readSessionScanSlugs,
 } from '../../utilities/session/sessionScanScope.js';
 import {
-  SurveyResultsLockedResponsesBanner,
-  SurveyResultsLockedResponsesToggle,
-} from './SurveyResultsLockedResponsesPanel';
-import {
   buildSurveyResultsQuestionTableEntries,
   type SurveyResultsQuestionTableEntry,
 } from './surveyResultsSummaryModels';
-import {
-  renderSurveyResultsSyncStatusPanel,
-} from './SurveyResultsPanels';
 import {
   createInitialSurveyResultsState,
   preserveSurveyResultsFilterStateValue,
@@ -141,15 +108,6 @@ import {
 import type {
   SurveyResultsHtmlReportSectionKey,
 } from './surveyResultsHtmlReportReadiness.js';
-import {
-  buildSurveyResultsExportControlsDisplayDescriptor,
-} from './surveyResultsExportPlans.js';
-import {
-  buildSurveyResultsCacheReadinessDisplayPlan,
-} from './surveyResultsCacheReadinessDisplayPlan';
-import {
-  buildSurveyResultsCacheControllerSnapshot,
-} from './surveyResultsCacheControllerSnapshot';
 import {
   buildSurveyResultsSurveyQuestionBookmarkWritePlan,
 } from './surveyResultsCacheWriteEligibilityPlan';
@@ -187,21 +145,7 @@ import {
   buildSurveyResultsHtmlReportDownloadExecutionPlan,
 } from './surveyResultsHtmlReportDownloadRequest';
 import {
-  buildSurveyResultsLockedRows,
-} from './surveyResultsLockedResponsesModel';
-import {
-  buildSurveyResultsLockedGateDetails,
-} from './surveyResultsLockedGateDetailsModel';
-import {
-  buildLockedResponseSignature,
-  extractEnvelopeCandidate,
-  hasOwn,
-  isBannerEligibleLockedField,
-  isLockedEncryptedField,
   normalizeGateSbtEntries,
-  normalizeGateText,
-  type SurveyResultsEncryptedFieldRecord,
-  type SurveyResultsGateRecord,
   type SurveyResultsResponseRecord,
 } from './surveyResultsLockedFieldHelpers';
 import {
@@ -214,7 +158,6 @@ import {
   hasExplicitSessionQueryPinInPath,
   normalizeNonceKey,
   resolveNetBucketReadOnly,
-  unifyAggregatorWithAllQuestionIDs,
 } from './surveyResultsRuntimeHelpers';
 import {
   buildSurveyResultsHtmlReportModalProps,
@@ -239,13 +182,9 @@ import {
   type SurveyResultsQuestionBucketRecord,
   type SurveyResultsQuestionRecord,
   type SurveyResultsQuestionResponsesByQuestion,
-  type SurveyResultsQuestionResponsesByResponder,
   type SurveyResultsScopedQuestionNetworkData,
   type SurveyResultsScopedQuestionNetworkMemo,
 } from './surveyResultsQuestionNetworkReadController';
-import {
-  normalizeSurveyResultsQuestionModeCache,
-} from './surveyResultsQuestionModeCacheNormalizationController';
 import {
   applySurveyResultsBuiltInDemoQuestionMetadataFallbackToBucket,
   isSurveyResultsDemoQuestionResultsContext,
@@ -261,7 +200,6 @@ import {
 } from '../../domains/surveys/surveyResultsAnalysisArtifactMergePort';
 import {
   cryptoGatePort,
-  type CryptoGateDecryptOptions,
 } from '../../domains/crypto/cryptoGatePort';
 import {
   createSurveyResultsFetchResponsesRuntime,
@@ -272,18 +210,11 @@ import {
   type SurveyResultsLocalStoragePollingRuntime,
 } from '../../domains/surveys/surveyResultsLocalStoragePollingRuntime';
 import {
-  buildSurveyResultsLocalStoragePollCountPlan,
-  buildSurveyResultsLocalStoragePollPatchPlan,
-} from './surveyResultsLocalStoragePollDecision';
-import {
-  buildSurveyResultsDemoSurfaceProps,
-  createSurveyResultsDemoSurfaceParentProps,
-} from './surveyResultsDemoSurfaceProps';
-import {
   createSurveyResultsQueuedRefreshRuntime,
   type SurveyResultsQueuedRefreshRuntime,
 } from '../../domains/surveys/surveyResultsQueuedRefreshRuntime';
 import {
+  runSurveyResultsComponentDidMount,
   runSurveyResultsComponentDidUpdate,
 } from './surveyResultsLifecycleRuntime';
 import {
@@ -296,6 +227,21 @@ import {
   createSurveyResultsHtmlReportRuntime,
 } from './surveyResultsHtmlReportRuntime';
 import {
+  fetchSurveyResultsQuestionModeResponses,
+  fetchSurveyResultsSurveyModeResponses,
+} from './surveyResultsHydrationRuntime';
+import {
+  maybeRefreshSurveyResultsNetworkLatestBlockFromPolling,
+  pollSurveyResultsLocalStorageForUpdates,
+} from './surveyResultsLocalStoragePollRuntime';
+import {
+  createSurveyResultsLockedResponsesRuntime,
+  type SurveyResultsLockedResponsesRuntimeInstance,
+} from './surveyResultsLockedResponsesRuntime';
+import {
+  renderSurveyResultsRenderSurface,
+} from './surveyResultsRenderSurface';
+import {
   buildSessionResultsAnalysisPrompt,
   SESSION_RESULTS_ANALYSIS_SECTION_KEYS,
   SESSION_RESULTS_EXPORT_FORMAT_PDF,
@@ -305,13 +251,10 @@ import {
   type SessionResultsGeneratedAnalysisArtifact,
   type SessionResultsSectionSelection,
 } from '../../utilities/sessionResultsExport';
-import type { SurveyResultsDisplayPanelsArgs } from './SurveyResultsDisplayPanels';
-import { renderSurveyResultsFilterExportControls } from './SurveyResultsFilterExportControls';
 import type { QuestionFilterHandle } from './QuestionFilter';
 import {
   type SurveyResultsHtmlReportExportModalProps,
 } from './SurveyResultsHtmlReportExportModal';
-import SurveyResultsReportSurface from './SurveyResultsReportSurface';
 import SurveyResultsQuestionSummary from './SurveyResultsQuestionSummary';
 import SurveyResultsQuestionTable from './SurveyResultsQuestionTable';
 
@@ -416,23 +359,6 @@ type SurveyResultsQuestionEncryptionRecord = SurveyResultsRecord & {
 type SurveyResultsQuestionWithEncryption = SurveyResultsRecord & {
   encryption?: SurveyResultsQuestionEncryptionRecord | unknown;
 };
-type SurveyResultsSessionConfigRecord = SurveyResultsRecord & {
-  __registry?: SurveyResultsRecord & { chainId?: unknown };
-  networkChainId?: number | string | null;
-  sponsored?: SurveyResultsRecord & { gates?: unknown };
-};
-type SurveyResultsLockedResponseKeyArgs = {
-  questionId?: unknown;
-  responder?: unknown;
-  response?: SurveyResultsResponseRecord | null;
-  surveyId?: unknown;
-};
-type SurveyResultsSurveyBucketRecord = SurveyResultsRecord & {
-  surveyResponses?: Record<string, SurveyResultsRecord>;
-  surveyResponsesLatestBlock?: SurveyResultsLatestBlockMap;
-  surveys?: Record<string, SurveyResultsRecord & { documentURLs?: unknown; questionIDs?: unknown; title?: string }>;
-  surveysLatestBlock?: unknown;
-};
 type SurveyResultsManagedCacheUpdate = {
   namespace?: unknown;
 };
@@ -440,76 +366,19 @@ type SurveyResultsQuestionFilterCombinedPayload = SurveyResultsRecord & {
   filteredQuestions?: unknown;
   filteredResponsesByQuestion?: unknown;
 };
-type SurveyResultsPollingCountOptions = {
-  forceScan?: boolean;
-};
 type SurveyResultsResponseListEntry = SurveyResultsRecord & {
   response?: (SurveyResultsRecord & { responses?: SurveyResultsRecord[] }) | null;
   responder: string;
   surveyId?: unknown;
 };
-type SurveyResultsLockedGateDetail = {
-  address: string;
-  href: string;
-  label: React.ReactNode;
-};
-type SurveyResultsLockedRow = SurveyResultsRecord & {
-  key: string;
-  mergedResponse?: SurveyResultsResponseRecord | null;
-  questionId: string;
-  responder: string;
-  response?: SurveyResultsResponseRecord | null;
-  surveyId?: unknown;
-};
-type SurveyResultsLockedResponsesModel = SurveyResultsRecord & {
-  gateDetails?: SurveyResultsLockedGateDetail[];
-  hasGenericGateMessage?: boolean;
-  lockedCount?: number;
-  lockedRows?: SurveyResultsLockedRow[];
-};
-type SurveyResultsLockedGateContext = {
-  configuredGateMap: Record<string, SurveyResultsGateRecord>;
-  defaultPolicy: SurveyResultsRecord & { gates?: unknown };
-  fallbackChainId: number | null;
-  slug: string;
-};
-type SurveyResultsLockedGateDetailsResult = {
-  gateDetails: SurveyResultsLockedGateDetail[];
-  hasGenericGateMessage: boolean;
-};
-type SurveyResultsLockedResponsesModelMemo = {
-  aggregatorRef?: unknown;
-  overridesRef?: unknown;
-  questionLookupRef?: unknown;
-  responsesRef?: unknown;
-  result?: SurveyResultsLockedResponsesModel;
-  slug?: string;
-  surveyViewMode?: unknown;
-  viewMode?: unknown;
-};
-type SurveyResultsDecryptFieldResult =
-  | { ok: true; value: unknown }
-  | { ok: false; error?: unknown };
 type SurveyResultsLitHooks = SurveyResultsRecord & {
   getKey?: (...args: unknown[]) => unknown;
-};
-type SurveyResultsWindowWithLitHooks = Window & {
-  __litHooks?: SurveyResultsLitHooks | null;
-  litHooks?: SurveyResultsLitHooks | null;
 };
 type SurveyResultsDecryptedResponseOverride = SurveyResultsRecord & {
   additionalValue?: unknown;
   answerValue?: unknown;
   conviction?: unknown;
   importance?: unknown;
-};
-type SurveyResultsApplyDecryptedOverrideArgs = {
-  key?: unknown;
-  response?: SurveyResultsResponseRecord | null;
-};
-type SurveyResultsDemoViewOption = {
-  key: string;
-  label: string;
 };
 export type SurveyResultsProps = SurveyResultsRecord & {
   account?: string;
@@ -738,7 +607,7 @@ type SurveyResultsInstanceFields = {
   _isMounted: boolean;
   _questionFilterQuestionsMemo: SurveyResultsQuestionFilterQuestionsMemo;
   _questionTableEntriesMemo: SurveyResultsQuestionTableEntriesMemo;
-  _lockedResponsesModelMemo: SurveyResultsLockedResponsesModelMemo;
+  _lockedResponsesModelMemo: SurveyResultsLockedResponsesRuntimeInstance['_lockedResponsesModelMemo'];
   _lastLocalStoragePollCoarseSignature: string;
   _lastLocalStoragePollDetailedSignature: string;
   _lastPolledQuestionsRef: unknown;
@@ -1335,225 +1204,43 @@ function stopLocalStoragePolling(): void {
     localStoragePollingRuntime.stop();
   }
 
+const getLocalStoragePollRuntimeArgs = () => ({
+  config: {
+    forceRescanEvery: LOCAL_STORAGE_FORCE_RESCAN_EVERY,
+    latestBlockPollThrottleMs: LATEST_BLOCK_POLL_THROTTLE_MS,
+  },
+  instance: inst,
+  ports: {
+    applyStatePatch: (patch: unknown, afterApply?: () => void) => {
+      setState(asSurveyResultsStatePatch(patch), afterApply);
+    },
+    getEffectiveSlug,
+    getFetchRuntimeSnapshot: () => fetchResponsesRuntime.getSnapshot(),
+    getProps: () => propsRef.current,
+    getScopedQuestionNetworkDataSync,
+    getStableCycles: () => localStoragePollingRuntime.getStableCycles(),
+    getState: () => stateRef.current,
+    logWarn: (...args: unknown[]) => surveyLog.warn(...args),
+    queueResultsRefresh: (reason: string) => queueResultsRefresh(reason),
+    readLatestBlock: (provider: string | undefined, slug: string) => (
+      chainScanReadsPort.getLatestBlockNumber(provider, slug)
+    ),
+    readQuestionCacheSync: (slug: string) => (
+      surveyResultsCachePort.peekCacheSync('questionsCache', slug, { clone: false })
+    ),
+    readSurveyCacheSync: (slug: string) => (
+      surveyResultsCachePort.peekCacheSync('surveysCache', slug, { clone: false })
+    ),
+  },
+});
+
 const maybeRefreshNetworkLatestBlockFromPolling = (): void => {
-    if (normalizeSurveyResultsBlockNumber(stateRef.current.networkLatestBlock) > 0) return;
-    if (inst._pollLatestBlockFetchInFlight) return;
-    const now = Date.now();
-    if (
-      inst._pollLatestBlockLastAttemptAt > 0 &&
-      (now - inst._pollLatestBlockLastAttemptAt) < LATEST_BLOCK_POLL_THROTTLE_MS
-    ) {
-      return;
-    }
-    inst._pollLatestBlockLastAttemptAt = now;
-    inst._pollLatestBlockFetchInFlight = true;
-    const slug = getEffectiveSlug();
-    chainScanReadsPort
-      .getLatestBlockNumber(propsRef.current.provider as string | undefined, slug)
-      .then((blk: unknown) => {
-        if (!inst._isMounted) return;
-        const parsed = normalizeSurveyResultsBlockNumber(blk);
-        const currentLatestBlock = normalizeSurveyResultsBlockNumber(stateRef.current.networkLatestBlock);
-        if (parsed > 0 && parsed !== currentLatestBlock) {
-          setState(asSurveyResultsStatePatch(buildSurveyResultsNetworkLatestBlockPatch(parsed)));
-        }
-      })
-      .catch((e: unknown) => { surveyLog.warn('SurveyResults: fallback', e); })
-      .finally(() => {
-        inst._pollLatestBlockFetchInFlight = false;
-      });
-  };
-
-const getMemoizedQuestionsCountForPolling = (
-    questionsById: unknown,
-    options: SurveyResultsPollingCountOptions = {}
-  ): number => {
-    const ref: SurveyResultsRecord = questionsById && typeof questionsById === 'object'
-      ? questionsById as SurveyResultsRecord
-      : {};
-    const forceScan = options && options.forceScan === true;
-    const memo = inst._pollQuestionCountMemo;
-    if (!forceScan && memo.questionsRef === ref) return memo.count;
-    const nextCount = measureSync(
-      forceScan
-        ? 'ce.surveyResults.poll.questionsCountForcedScan'
-        : 'ce.surveyResults.poll.questionsCountScan',
-      () => Object.keys(ref).length
-    ) as number;
-    inst._pollQuestionCountMemo = {
-      questionsRef: ref,
-      count: nextCount,
-    };
-    return nextCount;
-  };
-
-const getMemoizedSurveyResponsesCountForPolling = (
-    surveyResponsesById: unknown,
-    surveyId: unknown,
-    options: SurveyResultsPollingCountOptions = {}
-  ): number => {
-    const sid = String(surveyId || '').toLowerCase();
-    if (!sid) {
-      inst._pollSurveyResponsesCountMemo = {
-        surveyId: '',
-        responsesRef: null,
-        count: 0,
-      };
-      return 0;
-    }
-
-    const byId: SurveyResultsRecord = surveyResponsesById && typeof surveyResponsesById === 'object'
-      ? surveyResponsesById as SurveyResultsRecord
-      : {};
-    const responsesRef = byId[sid] && typeof byId[sid] === 'object'
-      ? byId[sid] as SurveyResultsRecord
-      : null;
-    const memo = inst._pollSurveyResponsesCountMemo;
-    const forceScan = options && options.forceScan === true;
-    if (!forceScan && memo.surveyId === sid && memo.responsesRef === responsesRef) {
-      return memo.count;
-    }
-    const nextCount = measureSync(
-      forceScan
-        ? 'ce.surveyResults.poll.surveyResponsesCountForcedScan'
-        : 'ce.surveyResults.poll.surveyResponsesCountScan',
-      () => Object.keys(responsesRef || {}).length
-    ) as number;
-    inst._pollSurveyResponsesCountMemo = {
-      surveyId: sid,
-      responsesRef,
-      count: nextCount,
-    };
-    return nextCount;
-  };
+  maybeRefreshSurveyResultsNetworkLatestBlockFromPolling(getLocalStoragePollRuntimeArgs());
+};
 
 function pollLocalStorageForUpdates(): boolean {
-  return measureSync('ce.surveyResults.pollLocalStorageForUpdates', () => {
-    if (!hasEffectiveNetworkId()) return false;
-    const slug = getEffectiveSlug();
-    const netIdStr = String(propsRef.current.network?.id ?? propsRef.current.networkChainId ?? '');
-    if (!netIdStr) return false;
-    const currentSurveyId = stateRef.current.viewMode === 'survey'
-      ? String(stateRef.current.surveyId || '').toLowerCase()
-      : '';
-
-    const questionNetCache: SurveyResultsQuestionBucketRecord = (
-      stateRef.current.viewMode === 'questions'
-        ? getScopedQuestionNetworkDataSync('questions')
-        : resolveNetBucketReadOnly(
-            surveyResultsCachePort.peekCacheSync('questionsCache', slug, { clone: false }) || {},
-            netIdStr,
-            {
-              questionsLatestBlock: 0,
-              questions: {},
-              questionResponses: {},
-              questionResponsesLatestBlock: 0,
-            }
-          )
-    ) as SurveyResultsQuestionBucketRecord;
-
-    const questionsById = questionNetCache.questions || {};
-    let surveyNetCache: SurveyResultsSurveyBucketRecord | null = null;
-    let surveyResponsesById: unknown = {};
-    if (currentSurveyId) {
-      const surveysCache = surveyResultsCachePort.peekCacheSync('surveysCache', slug, { clone: false }) || {};
-      surveyNetCache = resolveNetBucketReadOnly(surveysCache, netIdStr, {
-        surveys: {},
-        surveyResponses: {},
-        surveyResponsesLatestBlock: {},
-        surveysLatestBlock: 0,
-      }) as SurveyResultsSurveyBucketRecord;
-      surveyResponsesById = surveyNetCache.surveyResponses || {};
-    }
-    if (inst._lastPolledQuestionsRef !== questionsById) {
-      inst._lastPolledQuestionsRef = questionsById;
-      inst._lastPolledQuestionRefVersion += 1;
-    }
-    if (inst._lastPolledSurveyResponsesRef !== surveyResponsesById) {
-      inst._lastPolledSurveyResponsesRef = surveyResponsesById;
-      inst._lastPolledSurveyResponsesRefVersion += 1;
-    }
-
-    // Keep retrying latest-block fetches even when local cache signatures are stable.
-    let netLatest = normalizeSurveyResultsBlockNumber(stateRef.current.networkLatestBlock);
-    if (!netLatest) {
-      maybeRefreshNetworkLatestBlockFromPolling();
-      netLatest = 0;
-    }
-
-    const localQBlock = normalizeSurveyResultsBlockNumber(questionNetCache.questionsLatestBlock);
-    const localRespBlock = normalizeSurveyResultsBlockNumber(questionNetCache.questionResponsesLatestBlock);
-    const localSBlock = currentSurveyId
-      ? readSurveyResultsLatestBlock(surveyNetCache?.surveyResponsesLatestBlock, currentSurveyId)
-      : 0;
-
-    const fetchRuntimeSnapshot = fetchResponsesRuntime.getSnapshot();
-    const countPlan = buildSurveyResultsLocalStoragePollCountPlan({
-      currentSurveyId,
-      fetchInFlight: fetchRuntimeSnapshot.inFlight,
-      forceRescanEvery: LOCAL_STORAGE_FORCE_RESCAN_EVERY,
-      localQBlock,
-      localRespBlock,
-      localSBlock,
-      netLatest,
-      previousCoarseSignature: inst._lastLocalStoragePollCoarseSignature,
-      questionLocalBlock: stateRef.current.questionLocalBlock,
-      questionRefVersion: inst._lastPolledQuestionRefVersion,
-      responseLocalBlock: stateRef.current.responseLocalBlock,
-      stableCycles: localStoragePollingRuntime.getStableCycles(),
-      surveyLocalBlock: stateRef.current.surveyLocalBlock,
-      surveyResponsesRefVersion: inst._lastPolledSurveyResponsesRefVersion,
-      viewMode: stateRef.current.viewMode,
-    });
-    if (countPlan.shouldReturnFalseForInFlight) {
-      return false;
-    }
-
-    const newQuestionsCount = countPlan.useCachedCounts
-      ? Number(stateRef.current.cachedQuestionsCount || 0)
-      : getMemoizedQuestionsCountForPolling(questionsById, {
-          forceScan: countPlan.shouldForceCountRescan,
-        });
-    const localSurveyResponsesCount = currentSurveyId
-      ? (
-          countPlan.useCachedCounts
-            ? Number(stateRef.current.cachedSurveyResponsesCount || 0)
-            : getMemoizedSurveyResponsesCountForPolling(surveyResponsesById, currentSurveyId, {
-                forceScan: countPlan.shouldForceCountRescan,
-              })
-        )
-      : 0;
-    const patchPlan = buildSurveyResultsLocalStoragePollPatchPlan({
-      blockOrRespChanged: countPlan.blockOrRespChanged,
-      cachedQuestionsCount: stateRef.current.cachedQuestionsCount,
-      cachedSurveyResponsesCount: stateRef.current.cachedSurveyResponsesCount,
-      coarseSignature: countPlan.coarseSignature,
-      localQBlock,
-      localRespBlock,
-      localSBlock,
-      localSurveyResponsesCount,
-      netLatest: countPlan.netLatest,
-      newQuestionsCount,
-      previousDetailedSignature: inst._lastLocalStoragePollDetailedSignature,
-    });
-    if (patchPlan.shouldReturnFalseForUnchangedSignature) {
-      return false;
-    }
-    inst._lastLocalStoragePollCoarseSignature = countPlan.coarseSignature;
-    inst._lastLocalStoragePollDetailedSignature = patchPlan.detailedSignature;
-
-    if (patchPlan.shouldApplyPatch && patchPlan.patch) {
-      setState(
-        asSurveyResultsStatePatch(buildSurveyResultsLocalStoragePollPatch(patchPlan.patch)),
-        () => {
-          queueResultsRefresh('poll-local-storage-change');
-        }
-      );
-      return true;
-    }
-
-    return false;
-  }) as boolean;
+  if (!hasEffectiveNetworkId()) return false;
+  return pollSurveyResultsLocalStorageForUpdates(getLocalStoragePollRuntimeArgs());
 }
 
 const parseResponse = <T,>(responseData: T): T | SurveyResultsRecord | null => {
@@ -1625,235 +1312,45 @@ if (stateRef.current.viewMode === 'survey') {
 };
 
 async function fetchSurveyModeResponses(): Promise<void> {
-    const currentSurveyID = stateRef.current.surveyId ? stateRef.current.surveyId.toLowerCase() : null;
-
-    // Use the robust slug resolver to ensure we read the correct cache
-    const slug = getEffectiveSlug();
-    const netIdStr = String(propsRef.current.network?.id ?? propsRef.current.networkChainId ?? '');
-
-    // Read the specific group's cache
-    let surveysCache = (surveyResultsCachePort.peekCacheSync('surveysCache', slug, { clone: false }) || {}) as SurveyResultsRecord;
-    if (!surveysCache || Object.keys(surveysCache).length === 0) {
-      surveysCache = ((await surveyResultsCachePort.readCache('surveysCache', slug)) || {}) as SurveyResultsRecord;
-    }
-    const hasSurveyNetCache = !!(
-      surveysCache &&
-      typeof surveysCache === 'object' &&
-      surveysCache[netIdStr] != null
-    );
-    const surveyNetCache = resolveNetBucketReadOnly(
-      surveysCache,
-      netIdStr,
-      null
-    ) as SurveyResultsSurveyBucketRecord | null;
-
-    // If cache missing for this network, abort
-    if (!hasSurveyNetCache || !surveyNetCache) {
-      return;
-    }
-
-    if (!currentSurveyID) {
-      const emptySignature = `${slug}|${netIdStr}|__none__`;
-      if (inst._surveyModeSourceSignature === emptySignature) {
-        return;
-      }
-      inst._surveyModeSourceSignature = emptySignature;
-      inst._surveyModeSourceCoarseSignature = emptySignature;
-      inst._surveyModeSourcePayloadRefSignature = '';
-      inst._surveyModeSourceCacheNonce = Number(inst._surveysCacheChangeNonce || 0);
-      setState(asSurveyResultsStatePatch(buildSurveyResultsEmptySurveyModePatch()));
-      return;
-    }
-
-    // In survey mode, show questions strictly belonging to this survey.
-    const srMap = surveyNetCache.surveyResponses?.[currentSurveyID] || {};
-    const allResponders = Object.keys(srMap);
-    const networkQuestions = getNetworkQuestionsForCurrentContext();
-    const questionIDsInSurvey: string[] = Array.isArray(surveyNetCache?.surveys?.[currentSurveyID]?.questionIDs)
-      ? surveyNetCache.surveys[currentSurveyID].questionIDs as string[]
-      : [];
-    const questionIdsSignature = questionIDsInSurvey
-      .map((qid) => String(qid || '').toLowerCase())
-      .join('|');
-    const surveyResponsesLatestBlock = readSurveyResultsLatestBlock(
-      surveyNetCache?.surveyResponsesLatestBlock,
-      currentSurveyID
-    );
-    const surveyDefinitionLatestBlock = normalizeSurveyResultsBlockNumber(surveyNetCache?.surveysLatestBlock);
-    const surveyCacheChangeNonce = Number(inst._surveysCacheChangeNonce || 0);
-    const questionCacheReadySignal = propsRef.current.isQuestionCacheReady ? 1 : 0;
-    const payloadRefSignature = buildSurveyRespondersPayloadRefSignature(srMap);
-    const coarseSourceSignature = [
-      slug,
-      netIdStr,
-      currentSurveyID,
-      questionCacheReadySignal,
-      surveyResponsesLatestBlock,
-      surveyDefinitionLatestBlock,
-      allResponders.length,
-      questionIdsSignature,
-    ].join('::');
-    const respondersSignature = buildSurveyRespondersSignature(srMap);
-    const sourceSignature = [
-      coarseSourceSignature,
-      respondersSignature,
-    ].join('::');
-    if (inst._surveyModeSourceSignature === sourceSignature) {
-      inst._surveyModeSourceCoarseSignature = coarseSourceSignature;
-      inst._surveyModeSourcePayloadRefSignature = payloadRefSignature;
-      inst._surveyModeSourceCacheNonce = surveyCacheChangeNonce;
-      return;
-    }
-    inst._surveyModeSourceCoarseSignature = coarseSourceSignature;
-    inst._surveyModeSourcePayloadRefSignature = payloadRefSignature;
-    inst._surveyModeSourceCacheNonce = surveyCacheChangeNonce;
-    inst._surveyModeSourceSignature = sourceSignature;
-
-    const aggregatorMap: Record<string, SurveyResultsAggregateRow[]> = {};
-    const rawResponses: SurveyResultsResponseListEntry[] = [];
-    allResponders.forEach((responder) => {
-      const responderLower = String(responder || '').toLowerCase();
-      const rawResp = normalizeSurveyResponsePayloadByQuestionId(
-        parseResponse(srMap[responder])
-      ) as SurveyResultsSurveyResponsePayload | null;
-      if (!hasAnyCountableSurveyAnswer(rawResp, networkQuestions)) return;
-      rawResponses.push({
-        responder: responderLower,
-        surveyId: currentSurveyID,
-        response: rawResp as SurveyResultsResponseListEntry['response'],
-      });
-      if (!rawResp || !Array.isArray(rawResp.responses)) return;
-      rawResp.responses.forEach((ans: SurveyResultsResponseRecord) => {
-        const qIdL = getSurveyResponseQuestionId(ans);
-        if (!qIdL) return;
-        if (!aggregatorMap[qIdL]) aggregatorMap[qIdL] = [];
-        aggregatorMap[qIdL].push({
-          responder: responderLower,
-          questionId: qIdL,
-          response: ans,
-          timestamp: getSurveyResponseAggregateTimestampMs(ans, rawResp),
-        });
-      });
-    });
-    const totalRespondersCount = rawResponses.length;
-
-    const finalAggregator = unifyAggregatorWithAllQuestionIDs(
-      aggregatorMap,
-      questionIDsInSurvey
-    );
-
-    const totalQCount = Object.keys(finalAggregator).length;
-
-    // Retrieve title from the correct group cache
-    let foundTitle = '';
-    let foundDocURLs: string[] = [];
-    if (surveyNetCache?.surveys?.[currentSurveyID]) {
-      foundTitle = surveyNetCache.surveys[currentSurveyID].title || '';
-      foundDocURLs = Array.isArray(surveyNetCache.surveys[currentSurveyID].documentURLs)
-        ? surveyNetCache.surveys[currentSurveyID].documentURLs as string[]
-        : [];
-    }
-
-    // Initialize master and filtered views so UI renders immediately
-    setState(asSurveyResultsStatePatch(buildSurveyResultsSurveyModeHydratedPatch({
-      aggregateQuestionResponses: finalAggregator,
-      filteredResponsesCount: rawResponses.length,
-      responses: rawResponses,
-      sbtFilteredAggregatorQuestionResponses: finalAggregator,
-      sbtFilteredResponses: rawResponses,
-      surveyDocumentURLs: foundDocURLs,
-      surveyTitle: foundTitle,
-      totalQuestionsCount: totalQCount,
-      totalResponsesCount: totalRespondersCount,
-    })));
+  await fetchSurveyResultsSurveyModeResponses({
+    instance: inst,
+    ports: {
+      applyStatePatch: (patch, afterApply) => setState(asSurveyResultsStatePatch(patch), afterApply),
+      getEffectiveSlug,
+      getNetworkQuestionsForCurrentContext,
+      getProps: () => propsRef.current,
+      getScopedQuestionNetworkData,
+      getState: () => stateRef.current,
+      logWarn: (...args) => surveyLog.warn(...args),
+      parseResponse,
+      readSurveyCache: (slug) => surveyResultsCachePort.readCache('surveysCache', slug),
+      readSurveyCacheSync: (slug) => surveyResultsCachePort.peekCacheSync('surveysCache', slug, { clone: false }),
+      reapplyQuestionFilters: () => {
+        if (questionFilterRef.current) questionFilterRef.current.handleApplyFilters(true);
+      },
+    },
+  });
   }
 
 async function fetchQuestionModeResponses(): Promise<void> {
-const netIdStr = String(propsRef.current.network?.id ?? propsRef.current.networkChainId ?? '');
-if (!netIdStr) return;
-const questionNetCache = await getScopedQuestionNetworkData('questions') as SurveyResultsScopedQuestionNetworkData;
-  const strictQuestionResponseSlug = isDemoSessionSlug(getEffectiveSlug()) ? getEffectiveSlug() : '';
-  const normalizedQuestionModeCache = normalizeSurveyResultsQuestionModeCache({
+  await fetchSurveyResultsQuestionModeResponses({
+    instance: inst,
     ports: {
-      isDemoPolisFixtureResponse,
-      isResponseAllowedForSessionSlug,
+      applyStatePatch: (patch, afterApply) => setState(asSurveyResultsStatePatch(patch), afterApply),
+      getEffectiveSlug,
+      getNetworkQuestionsForCurrentContext,
+      getProps: () => propsRef.current,
+      getScopedQuestionNetworkData,
+      getState: () => stateRef.current,
+      logWarn: (...args) => surveyLog.warn(...args),
       parseResponse,
+      readSurveyCache: (slug) => surveyResultsCachePort.readCache('surveysCache', slug),
+      readSurveyCacheSync: (slug) => surveyResultsCachePort.peekCacheSync('surveysCache', slug, { clone: false }),
+      reapplyQuestionFilters: () => {
+        if (questionFilterRef.current) questionFilterRef.current.handleApplyFilters(true);
+      },
     },
-    questionResponses: questionNetCache?.questionResponses || {},
-    questions: questionNetCache?.questions || {},
-    requiredSessionSlug: normalizeSessionSlug(strictQuestionResponseSlug),
   });
-  const partialQR: SurveyResultsQuestionResponsesByQuestion = normalizedQuestionModeCache.questionResponses;
-	const allQuestions = normalizedQuestionModeCache.questions;
-	const aggregatorMap: Record<string, unknown> = {};
-
-	Object.keys(partialQR).forEach((qId) => {
-	  const lowerQ = qId.toLowerCase();
-	  aggregatorMap[lowerQ] = aggregatorMap[lowerQ] || {};
-		  const respondersMap: SurveyResultsQuestionResponsesByResponder = partialQR[qId] || {};
-
-  Object.keys(respondersMap).forEach((rAddr) => {
-    const rData = respondersMap[rAddr];
-    const parsed = parseResponse(rData) as SurveyResultsRecord | null;
-    if (isDemoPolisFixtureResponse(parsed)) return;
-    if (parsed) {
-      // store as array downstream; collect as array here
-      if (!Array.isArray(aggregatorMap[lowerQ])) {
-        aggregatorMap[lowerQ] = [];
-      }
-      (aggregatorMap[lowerQ] as SurveyResultsAggregateRow[]).push({
-        responder: rAddr.toLowerCase(),
-        questionId: lowerQ,
-        response: parsed,
-        timestamp: parsed.timeStamp || 0
-      });
-    }
-	  });
-	});
-
-	const knownQIDs = Object.keys(allQuestions);
-	const finalAggregator = unifyAggregatorWithAllQuestionIDs(
-	  aggregatorMap as Record<string, unknown[]>,
-	  knownQIDs
-	);
-	const totalQ = Object.keys(finalAggregator).length;
-  const totalResponseCount = countQuestionModeResponses(finalAggregator, allQuestions);
-
-// Compute a baseline "filtered" count (used when no filters are active)
-const initialFilteredCount = totalResponseCount;
-
-// 🛡️ Preserve currently-applied filters across refresh if a filter is active
-if (stateRef.current.isFilterActive) {
-  setState(
-    asSurveyResultsStatePatch(buildSurveyResultsFilteredQuestionModeHydratedPatch({
-      aggregatorQuestionResponses: finalAggregator,
-      currentFilteredQuestionsCount: stateRef.current.filteredQuestionsCount,
-      currentFilteredResponsesCount: stateRef.current.filteredResponsesCount,
-      initialFilteredCount,
-      questionResponses: partialQR,
-      sbtFilteredAggregatorQuestionResponses: stateRef.current.sbtFilteredAggregatorQuestionResponses,
-      totalQuestionsCount: totalQ,
-      totalResponsesCount: totalResponseCount,
-    })),
-    () => {
-      // ask the QuestionFilter to re-apply its pipeline on the fresh data
-      if (questionFilterRef && questionFilterRef.current) {
-        try {
-          questionFilterRef.current.handleApplyFilters(true);
-        } catch (e) { surveyLog.warn('SurveyResults: fallback', e); }
-      }
-    }
-  );
-} else {
-  // no active filters – reset filtered view to the full aggregator
-  setState(asSurveyResultsStatePatch(buildSurveyResultsUnfilteredQuestionModeHydratedPatch({
-    aggregatorQuestionResponses: finalAggregator,
-    filteredResponsesCount: initialFilteredCount,
-    questionResponses: partialQR,
-    totalQuestionsCount: totalQ,
-    totalResponsesCount: totalResponseCount,
-  })));
-}
 }
 
 const dataExportRuntime = createSurveyResultsDataExportRuntime({
@@ -1873,6 +1370,34 @@ const {
   downloadCSV,
   getFilteredQuestionsForExport,
 } = dataExportRuntime;
+
+const lockedResponsesRuntime = createSurveyResultsLockedResponsesRuntime({
+  instance: inst,
+  ports: {
+    applyStatePatch: (patch, afterApply) => setState(patch as SurveyResultsStateUpdate, afterApply),
+    decryptEnvelopeValue: (envelope, options) => cryptoGatePort.decryptEnvelopeValue(envelope, options),
+    getEffectiveSessionContext,
+    getEffectiveSlug,
+    getNetworkQuestionsForCurrentContext: () => (
+      getNetworkQuestionsForCurrentContext() as Record<string, SurveyResultsQuestionWithEncryption>
+    ),
+    getProps: () => propsRef.current,
+    getState: () => stateRef.current,
+    logWarn: (...args) => surveyLog.warn(...args),
+    resolveSessionContext: (sessionSlug) => resolveSurveyResultsSessionContext({
+      sessionSlug,
+      resolveBySlug: getSessionConfigBySlug,
+    }),
+  },
+});
+const {
+  applyDecryptedOverrideToResponse,
+  getLockedResponseKey,
+  getMemoizedLockedResponsesModel,
+  getQuestionEncryptionGates,
+  handleDecryptLockedResponses,
+  toggleLockedResponseDetails,
+} = lockedResponsesRuntime;
 
 const applyHtmlReportAnalysisLifecycleStatePatch: SurveyResultsAnalysisLifecycleStatePatchPort = (patch) => {
 setState(asSurveyResultsStatePatch(patch));
@@ -2408,338 +1933,6 @@ const getSurveyResultsResponseCardProps = (): SurveyResultsResponseCardClassName
   aggregatorFreeformAnswerClassName: styles.surveyResultsFreeformAnswer,
 });
 
-const getDecryptLitHooks = (): SurveyResultsLitHooks | null => {
-  if (propsRef.current.lit && typeof propsRef.current.lit === 'object') {
-    return propsRef.current.lit as SurveyResultsLitHooks;
-  }
-  if (propsRef.current.litHooks && typeof propsRef.current.litHooks === 'object') {
-    return propsRef.current.litHooks as SurveyResultsLitHooks;
-  }
-  if (typeof window === 'undefined') return null;
-  const windowWithLitHooks = window as SurveyResultsWindowWithLitHooks;
-  return windowWithLitHooks.__litHooks || windowWithLitHooks.litHooks || null;
-};
-
-const getQuestionEncryptionGates = (question: SurveyResultsQuestionWithEncryption | null = null): SurveyResultsGateRecord[] => {
-  const encryption = question?.encryption as SurveyResultsQuestionEncryptionRecord | null | undefined;
-  if (!encryption || typeof encryption !== 'object' || encryption.enabled === false) return [];
-  const list = Array.isArray(encryption.gates)
-    ? encryption.gates
-    : (encryption.gate && typeof encryption.gate === 'object' ? [encryption.gate] : []);
-  return list.filter((gate): gate is SurveyResultsGateRecord => !!gate && typeof gate === 'object');
-};
-
-const getLockedResponseKey = ({
-  responder = '',
-  questionId = '',
-  surveyId = '',
-  response = null,
-}: SurveyResultsLockedResponseKeyArgs = {}): string => {
-  const responderLower = String(responder || '').trim().toLowerCase();
-  const qidLower = String(questionId || response?.questionID || response?.questionId || '').trim().toLowerCase();
-  const surveyKey = String(surveyId || '').trim().toLowerCase();
-  return [
-    surveyKey,
-    responderLower,
-    qidLower,
-    buildLockedResponseSignature(response || {}),
-  ].join('|');
-};
-
-const getDecryptedResponseOverride = (
-  key: unknown = ''
-): SurveyResultsDecryptedResponseOverride | null => {
-  if (!key) return null;
-  const overrides = toSurveyResultsRecord(stateRef.current.decryptedResponseOverrides);
-  const override = overrides[String(key)] || null;
-  return override && typeof override === 'object'
-    ? override as SurveyResultsDecryptedResponseOverride
-    : null;
-};
-
-const applyDecryptedOverrideToResponse = ({
-  response = null,
-  key = '',
-}: SurveyResultsApplyDecryptedOverrideArgs = {}): SurveyResultsResponseRecord | null => {
-  if (!response || typeof response !== 'object' || !key) return response;
-  const override = getDecryptedResponseOverride(key);
-  if (!override || typeof override !== 'object') return response;
-
-  let changed = false;
-  const next: SurveyResultsRecord = { ...response };
-
-  if (hasOwn(override, 'answerValue') && next.answer && typeof next.answer === 'object') {
-    next.answer = { ...toSurveyResultsRecord(next.answer), value: override.answerValue };
-    changed = true;
-  }
-  if (hasOwn(override, 'additionalValue') && next.additional && typeof next.additional === 'object') {
-    next.additional = { ...toSurveyResultsRecord(next.additional), value: override.additionalValue };
-    changed = true;
-  }
-  if (hasOwn(override, 'importance')) {
-    next.importance = override.importance;
-    changed = true;
-  }
-  if (hasOwn(override, 'conviction')) {
-    next.conviction = override.conviction;
-    changed = true;
-  }
-
-  return changed ? next : response;
-};
-
-const buildLockedGateDetails = (
-  lockedRows: unknown = [],
-  questionLookup: Record<string, SurveyResultsQuestionWithEncryption> = {}
-): SurveyResultsLockedGateDetailsResult => {
-  const rows = Array.isArray(lockedRows) ? lockedRows as SurveyResultsLockedRow[] : [];
-  if (rows.length === 0) {
-    return { gateDetails: [], hasGenericGateMessage: false };
-  }
-
-  const resolvedSession = getEffectiveSessionContext();
-  const baseSlug = resolvedSession.sessionSlug || '';
-  const baseSessionConfig = toSurveyResultsRecord(resolvedSession.sessionConfig) as SurveyResultsSessionConfigRecord;
-  const baseFallbackChainId = Number(
-    propsRef.current.network?.id ||
-    propsRef.current.networkChainId ||
-    baseSessionConfig?.networkChainId ||
-    baseSessionConfig?.__registry?.chainId ||
-    0
-  ) || null;
-  const sessionContextMemo = new Map<string, SurveyResultsLockedGateContext>();
-  const readSessionGateContext = (questionSlug: unknown = ''): SurveyResultsLockedGateContext => {
-    const requestedSlug = String(questionSlug || '').trim() || baseSlug;
-    if (sessionContextMemo.has(requestedSlug)) {
-      return sessionContextMemo.get(requestedSlug) as SurveyResultsLockedGateContext;
-    }
-    const nextResolvedSession = resolveSurveyResultsSessionContext({
-      sessionSlug: requestedSlug,
-      resolveBySlug: getSessionConfigBySlug,
-    });
-    const nextSlug = nextResolvedSession.sessionSlug || requestedSlug || baseSlug;
-    const nextSessionConfig = toSurveyResultsRecord(nextResolvedSession.sessionConfig) as SurveyResultsSessionConfigRecord;
-    const nextFallbackChainId = Number(
-      propsRef.current.network?.id ||
-      propsRef.current.networkChainId ||
-      nextSessionConfig?.networkChainId ||
-      nextSessionConfig?.__registry?.chainId ||
-      baseFallbackChainId ||
-      0
-    ) || null;
-    const sponsoredConfig = toSurveyResultsRecord(nextSessionConfig.sponsored);
-    const nextContext = {
-      slug: nextSlug,
-      fallbackChainId: nextFallbackChainId,
-      defaultPolicy: buildResponseGatePolicy({
-        cfg: nextSessionConfig,
-        isQuestionResponseFlow: stateRef.current.viewMode === 'questions',
-        fallbackChainId: nextFallbackChainId,
-      }) as SurveyResultsRecord & { gates?: unknown },
-      configuredGateMap: toSurveyResultsRecord(sponsoredConfig.gates) as Record<string, SurveyResultsGateRecord>,
-    };
-    sessionContextMemo.set(requestedSlug, nextContext);
-    return nextContext;
-  };
-
-  return buildSurveyResultsLockedGateDetails({
-    baseSlug,
-    buildSbtDetailPath,
-    getQuestionEncryptionGates: (question) => (
-      getQuestionEncryptionGates(toSurveyResultsRecord(question) as SurveyResultsQuestionWithEncryption | null)
-    ),
-    getShortenedAddress,
-    lockedRows: rows,
-    normalizeGateSbtEntries: (gate) => normalizeGateSbtEntries(toSurveyResultsRecord(gate) as SurveyResultsGateRecord),
-    normalizeGateText,
-    questionLookup,
-    readSessionGateContext,
-    resolveSbtDisplayLabel: resolveSbtDisplayLabelForSurveyResults,
-  }) as SurveyResultsLockedGateDetailsResult;
-};
-
-const getMemoizedLockedResponsesModel = (
-  questionLookup: Record<string, SurveyResultsQuestionWithEncryption> = {}
-): SurveyResultsLockedResponsesModel => {
-  const {
-    viewMode,
-    surveyViewMode,
-    sbtFilteredResponses,
-    sbtFilteredAggregatorQuestionResponses,
-    decryptedResponseOverrides,
-  } = stateRef.current;
-  const slug = getEffectiveSlug();
-  const memo = (inst._lockedResponsesModelMemo || {}) as SurveyResultsLockedResponsesModelMemo;
-  if (
-    memo.viewMode === viewMode &&
-    memo.surveyViewMode === surveyViewMode &&
-    memo.responsesRef === sbtFilteredResponses &&
-    memo.aggregatorRef === sbtFilteredAggregatorQuestionResponses &&
-    memo.questionLookupRef === questionLookup &&
-    memo.overridesRef === decryptedResponseOverrides &&
-    memo.slug === slug
-  ) {
-    return memo.result || {
-      lockedRows: [],
-      lockedCount: 0,
-      gateDetails: [],
-      hasGenericGateMessage: false,
-    };
-  }
-
-  const lockedRows = buildSurveyResultsLockedRows({
-    aggregatorQuestionResponses: sbtFilteredAggregatorQuestionResponses,
-    applyDecryptedOverrideToResponse: ({ response, key }) => applyDecryptedOverrideToResponse({
-      response: response as SurveyResultsResponseRecord | null,
-      key,
-    }),
-    getLockedResponseKey: (args) => getLockedResponseKey({
-      ...args,
-      response: args.response as SurveyResultsResponseRecord | null,
-    }),
-    isBannerEligibleLockedField: (field) => (
-      isBannerEligibleLockedField(field as SurveyResultsEncryptedFieldRecord | null | undefined)
-    ),
-    sbtFilteredResponses,
-    surveyId: stateRef.current.surveyId,
-    surveyViewMode,
-    viewMode,
-  }) as SurveyResultsLockedRow[];
-
-  const { gateDetails, hasGenericGateMessage } = buildLockedGateDetails(lockedRows, questionLookup);
-  const result = {
-    lockedRows,
-    lockedCount: lockedRows.length,
-    gateDetails,
-    hasGenericGateMessage,
-  };
-  inst._lockedResponsesModelMemo = {
-    viewMode,
-    surveyViewMode,
-    responsesRef: sbtFilteredResponses,
-    aggregatorRef: sbtFilteredAggregatorQuestionResponses,
-    questionLookupRef: questionLookup,
-    overridesRef: decryptedResponseOverrides,
-    slug,
-    result,
-  };
-  return result;
-};
-
-const decryptFieldValue = async (
-  field: SurveyResultsEncryptedFieldRecord | null = null
-): Promise<SurveyResultsDecryptFieldResult> => {
-  if (!field || typeof field !== 'object') return { ok: false };
-  const envelope = extractEnvelopeCandidate(field);
-  if (!envelope) return { ok: false };
-
-  const decryptOptions = getCryptoGateDecryptOptions();
-  try {
-    const value = await cryptoGatePort.decryptEnvelopeValue(envelope, decryptOptions);
-    return { ok: true, value };
-  } catch (error) {
-    return { ok: false, error };
-  }
-};
-
-const getCryptoGateDecryptOptions = (): CryptoGateDecryptOptions => {
-  const litHooks = getDecryptLitHooks();
-  const litOpts = litHooks && typeof litHooks.getKey === 'function'
-    ? { getKey: litHooks.getKey }
-    : undefined;
-  return {
-    account: propsRef.current.account,
-    chainId: propsRef.current.network?.id || propsRef.current.networkChainId || null,
-    providerLike: propsRef.current.provider,
-    ...(litOpts ? { litOpts } : {}),
-  };
-};
-
-const handleDecryptLockedResponses = async (): Promise<void> => {
-  if (stateRef.current.lockedResponsesDecrypting) return;
-  if (!propsRef.current.loginComplete || !propsRef.current.account) {
-    setState(asSurveyResultsStatePatch(buildSurveyResultsAlertMessagePatch('Login required to decrypt locked responses.')));
-    return;
-  }
-
-  const questionLookup = getNetworkQuestionsForCurrentContext();
-  const model = getMemoizedLockedResponsesModel(questionLookup);
-  const lockedRows = Array.isArray(model?.lockedRows) ? model.lockedRows : [];
-  if (lockedRows.length === 0) return;
-
-  setState(asSurveyResultsStatePatch(buildSurveyResultsLockedResponsesDecryptingPatch(true)));
-
-  let anyDecrypted = false;
-  const nextOverrides: Record<string, SurveyResultsDecryptedResponseOverride> = {
-    ...(toSurveyResultsRecord(stateRef.current.decryptedResponseOverrides) as Record<string, SurveyResultsDecryptedResponseOverride>),
-  };
-
-  for (const row of lockedRows) {
-    const response: SurveyResultsResponseRecord = row?.response || {};
-    const override: SurveyResultsDecryptedResponseOverride = { ...(nextOverrides[row.key] || {}) };
-
-    if (isLockedEncryptedField(row?.mergedResponse?.answer)) {
-      const answerResult = await decryptFieldValue(response.answer);
-      if (answerResult.ok) {
-        override.answerValue = answerResult.value;
-        anyDecrypted = true;
-      }
-    }
-
-    if (isLockedEncryptedField(row?.mergedResponse?.additional)) {
-      const additionalResult = await decryptFieldValue(response.additional);
-      if (additionalResult.ok) {
-        override.additionalValue = additionalResult.value;
-        anyDecrypted = true;
-      }
-    }
-
-    if (
-      typeof response?.importanceEncrypted === 'string' &&
-      response.importanceEncrypted.trim() &&
-      !hasOwn(override, 'importance')
-    ) {
-      try {
-        const importance = await cryptoGatePort.decryptEnvelopeValue(
-          response.importanceEncrypted,
-          getCryptoGateDecryptOptions()
-        );
-        override.importance = Number.isNaN(Number(importance)) ? importance : Number(importance);
-        anyDecrypted = true;
-      } catch (e) { surveyLog.warn('SurveyResults: fallback', e); }
-    }
-
-    if (
-      typeof response?.convictionEncrypted === 'string' &&
-      response.convictionEncrypted.trim() &&
-      !hasOwn(override, 'conviction')
-    ) {
-      try {
-        const conviction = await cryptoGatePort.decryptEnvelopeValue(
-          response.convictionEncrypted,
-          getCryptoGateDecryptOptions()
-        );
-        override.conviction = Number.isNaN(Number(conviction)) ? conviction : Number(conviction);
-        anyDecrypted = true;
-      } catch (e) { surveyLog.warn('SurveyResults: fallback', e); }
-    }
-
-    if (Object.keys(override).length > 0) {
-      nextOverrides[row.key] = override;
-    }
-  }
-
-  setState(asSurveyResultsStatePatch(buildSurveyResultsLockedResponsesDecryptCompletePatch({
-    anyDecrypted,
-    decryptedResponseOverrides: nextOverrides,
-    walletLowerLabel: t('walletLower'),
-  })));
-};
-
-const toggleLockedResponseDetails = (): void => {
-  setState(asSurveyResultsStateUpdater(toggleSurveyResultsLockedResponseDetailsPatch));
-};
-
 const renderQuestionSummary = (
   questionId: string,
   responses: unknown,
@@ -3048,358 +2241,107 @@ return buildSurveyResultsHtmlReportModalProps({
 
   // Class parity: componentDidMount / componentWillUnmount.
   useLayoutEffect(() => {
-    inst._isMounted = true;
-    inst._unsubscribeCacheUpdates = surveyResultsCachePort.subscribeCacheUpdates(handleManagedCacheUpdate);
-    window.addEventListener('popstate', handleUrlChange);
-    document.addEventListener('visibilitychange', handleDocumentVisibilityChange);
-
-    // Determine initial viewMode and surveyId for state
-    let initialViewMode = propsRef.current.viewMode || 'questions';
-    let initialSurveyId = propsRef.current.surveyId || '';
-
-    if (initialSurveyId) {
-      initialViewMode = 'survey';
-    }
-
-    setState(asSurveyResultsStatePatch(buildSurveyResultsViewStatePatch(initialViewMode, initialSurveyId)), () => {
-      handleUrlBasedView();
-
-      if (propsRef.current.isOpen) {
-        if (stateRef.current.viewMode === 'questions') {
-          if (propsRef.current.refreshQuestionMetadata && propsRef.current.refreshQuestionResponses) {
-            propsRef.current.refreshQuestionMetadata();
-            propsRef.current.refreshQuestionResponses();
-          }
-        } else if (stateRef.current.viewMode === 'survey' && stateRef.current.surveyId) {
-          if (propsRef.current.refreshSurveyResponsesByID) {
-            propsRef.current.refreshSurveyResponsesByID(stateRef.current.surveyId.toLowerCase());
-          }
-        }
-
-        const ensureResultsUrl = () => {
-          if (propsRef.current.preventUrlChange) return;
-          if (!window.location.pathname.endsWith('/results')) {
-            let path =
-              stateRef.current.viewMode === 'questions'
-                ? '/questions/results'
-                : (stateRef.current.surveyId ? `/survey/${stateRef.current.surveyId}/results` : '/questions/results');
-
-            // Apply prefix
-            path = applyExistingGroupPrefix(path);
-
-            // Preserve existing query params (specifically filter) if present
-            const search = window.location.search;
-            if (search) {
-              path += search;
-            } else {
-              path = appendSessionHintToSurveyPath(path);
-            }
-
-            window.history.pushState({}, '', path);
-          }
-        };
-
-        updateLocalStoragePollingState();
-        handleManualRefresh();
-        queueResultsRefresh('mount-open');
-        ensureResultsUrl();
-        updateParentWithCurrentFiltersForUrl();
-      }
+    return runSurveyResultsComponentDidMount({
+      instance: inst,
+      ports: {
+        appendSessionHintToSurveyPath,
+        applyStatePatch: (patch, afterApply) => {
+          setState(asSurveyResultsStatePatch(patch), afterApply);
+        },
+        destroyFetchResponsesRuntime: () => fetchResponsesRuntime.destroy(),
+        destroyLocalStoragePollingRuntime: () => localStoragePollingRuntime.destroy(),
+        destroyQueuedResultsRefreshRuntime: () => queuedResultsRefreshRuntime.destroy(),
+        getProps: () => propsRef.current,
+        getState: () => stateRef.current,
+        handleDocumentVisibilityChange,
+        handleManagedCacheUpdate: (update) => {
+          handleManagedCacheUpdate(
+            update && typeof update === 'object'
+              ? update as SurveyResultsManagedCacheUpdate
+              : {}
+          );
+        },
+        handleManualRefresh,
+        handleUrlBasedView,
+        handleUrlChange,
+        queueResultsRefresh,
+        subscribeCacheUpdates: (listener) => surveyResultsCachePort.subscribeCacheUpdates(listener),
+        updateLocalStoragePollingState,
+        updateParentWithCurrentFiltersForUrl,
+      },
     });
-
-    return () => {
-    inst._isMounted = false;
-    fetchResponsesRuntime.destroy();
-    inst._nonceTickInFlight = false;
-    inst._nonceTickQueued = false;
-    inst._pollLatestBlockFetchInFlight = false;
-    queuedResultsRefreshRuntime.destroy();
-    if (inst._responseParseMemo && typeof inst._responseParseMemo.clear === 'function') {
-      inst._responseParseMemo.clear();
-    }
-    if (typeof inst._unsubscribeCacheUpdates === 'function') {
-      inst._unsubscribeCacheUpdates();
-    }
-    inst._unsubscribeCacheUpdates = null;
-    if (inst._scrollToQuestionRetryTimer) {
-      clearTimeout(inst._scrollToQuestionRetryTimer);
-      inst._scrollToQuestionRetryTimer = null;
-    }
-    if (inst._scrollMutationObserver) {
-      inst._scrollMutationObserver.disconnect();
-      inst._scrollMutationObserver = null;
-    }
-    window.removeEventListener('popstate', handleUrlChange);
-    document.removeEventListener('visibilitychange', handleDocumentVisibilityChange);
-    localStoragePollingRuntime.destroy();
-
-    // If unmounting while still open, remove "/results" from the URL
-    if (propsRef.current.isOpen && !propsRef.current.preventUrlChange) {
-      const currentPath = window.location.pathname;
-      if (currentPath.includes('/results')) {
-        let newPath = currentPath.replace('/results', '').replace(/\/+$/, '');
-        // If that leaves nothing, fall back to whichever path logic you want:
-        if (!newPath) {
-          newPath =
-            stateRef.current.viewMode === 'questions'
-              ? '/questions'
-              : stateRef.current.surveyId // Use state.surveyId
-                ? `/survey/${stateRef.current.surveyId}`
-                : '/questions';
-        }
-        newPath = appendSessionHintToSurveyPath(newPath);
-        window.history.pushState({}, '', newPath);
-      }
-    }
-  };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-
-const isActuallyOpen = propsRef.current.isOpen;
-
-const {
-  responses,
-  sbtFilteredResponses,
-  exportType,
-  alertMessage,
-  filterLoading,
-  totalQuestionsCount,
-  totalResponsesCount,
-  filteredResponsesCount,
-  surveyViewMode,
-  exportAreaOpen,
-  aggregatorQuestionResponses,
-  sbtFilteredAggregatorQuestionResponses,
-  surveyTitle,
-  surveyDocumentURLs,
-  viewMode,
-  filteredQuestionsCount,
-  isFilterActive,
-} = stateRef.current;
-
-// Use stateRef.current.surveyId for consistency
-const currentSurveyId = stateRef.current.surveyId;
-// Preload scoped question metadata once per render so question-mode summaries stay in
-// sync with the same list-scope aggregation used by fetchQuestionModeResponses().
-const slug = getEffectiveSlug();
-const preQuestionNetworkData = getScopedQuestionNetworkDataSync(viewMode);
-const preNetworkQuestions = preQuestionNetworkData.questions || {};
-const questionFilterQuestions = getMemoizedQuestionFilterQuestions(preNetworkQuestions);
-const exportControlsDisplay = buildSurveyResultsExportControlsDisplayDescriptor({
-  exportAreaOpen,
-  exportType,
-});
-const aggregatorEntries = getMemoizedAggregatorEntries(sbtFilteredAggregatorQuestionResponses);
-const aggregatorEntriesCount = aggregatorEntries.length;
-const lockedResponsesModel = getMemoizedLockedResponsesModel(preNetworkQuestions);
-const surveyAggregateEntries =
-  (viewMode === 'survey' && surveyViewMode === 'aggregate') ? aggregatorEntries : [];
-const questionModeEntries = viewMode === 'questions' ? aggregatorEntries : [];
-
-const surveyIdAbbreviation = currentSurveyId
-  ? getShortenedSurveyID(currentSurveyId, false, null, false)
-  : null;
-const isDemoQuestionResults = getIsDemoQuestionResultsContext();
-const demoResultsViewMode = isDemoQuestionResults
-  ? stateRef.current.demoResultsViewMode || 'raw'
-  : 'raw';
-const isDemoAlternateResultsView = isDemoQuestionResults && demoResultsViewMode !== 'raw';
-const demoResultsViewOptions: SurveyResultsDemoViewOption[] = isDemoQuestionResults
-  ? [
-      { key: 'report', label: 'Report' },
-      { key: 'atlas', label: 'Atlas' },
-      { key: 'breakdown', label: 'Breakdown' },
-      { key: 'riskMatrix', label: 'Risk Matrix' },
-    ]
-  : [];
-const cacheControllerSnapshot = buildSurveyResultsCacheControllerSnapshot({
-  activeSessionSlug: slug,
-  aggregatorEntriesCount,
-  currentSurveyId,
-  currentSurveyIdForUrl: viewMode === 'survey' ? currentSurveyId : null,
-  currentViewModeForUrl: viewMode,
-  filteredQuestionsCount,
-  filteredResponsesCount,
-  filterLoading,
-  filterState: stateRef.current.filterState,
-  hasRefreshQuestionMetadata: typeof propsRef.current.refreshQuestionMetadata === 'function',
-  hasRefreshQuestionResponses: typeof propsRef.current.refreshQuestionResponses === 'function',
-  hasRefreshSurveyResponsesByID: typeof propsRef.current.refreshSurveyResponsesByID === 'function',
-  isQuestionCacheReady: propsRef.current.isQuestionCacheReady,
-  isSBTCacheReady: propsRef.current.isSBTCacheReady,
-  networkLatestBlock: stateRef.current.networkLatestBlock,
-  nowMs: Date.now(),
-  questionLocalBlock: stateRef.current.questionLocalBlock,
-  questionResponsesNonce: propsRef.current.questionResponsesNonce,
-  questionsCacheNonce: propsRef.current.questionsCacheNonce,
-  questionResultsHydrated: stateRef.current.questionResultsHydrated,
-  refreshTargetQuestionBlock: stateRef.current.refreshTargetQuestionBlock,
-  refreshTargetResponseBlock: stateRef.current.refreshTargetResponseBlock,
-  refreshTargetSurveyBlock: stateRef.current.refreshTargetSurveyBlock,
-  responseLocalBlock: stateRef.current.responseLocalBlock,
-  sbtCacheRevision: propsRef.current.sbtCacheRevision,
-  showQuestionFilter: stateRef.current.showQuestionFilter,
-  storageKeyPrefix: getQuestionFilterStorageKeyPrefix(viewMode),
-  surveyLocalBlock: stateRef.current.surveyLocalBlock,
-  surveyResultsHydrated: stateRef.current.surveyResultsHydrated,
-  surveyViewMode,
-  syncLoadingStartedAt: inst._syncLoadingStartedAt,
-  totalQuestionsCount,
-  totalResponsesCount,
-  viewMode,
-});
-const cacheReadinessDisplay = buildSurveyResultsCacheReadinessDisplayPlan(
-  cacheControllerSnapshot.cacheReadinessInput
-);
-const filterInput = cacheControllerSnapshot.filterInput;
-const syncStatusNode = renderSurveyResultsSyncStatusPanel({
-  syncStatusDisplay: cacheReadinessDisplay.syncStatusDisplay,
-  syncDetailsOpen: !!stateRef.current.syncDetailsOpen,
-  syncDetailsStyle: resolveSurveyResultsSyncDetailsStyle(stateRef.current.syncDetailsOpen),
+return renderSurveyResultsRenderSurface({
+  applyDecryptedOverrideToResponse,
+  closeModal,
+  displayStyles: {
+    documentLinkIconStyle: SURVEY_RESULTS_DOCUMENT_LINK_ICON_STYLE,
+    miniBarSpinnerStyle: SURVEY_RESULTS_MINI_BAR_SPINNER_STYLE,
+    miniProgressStyle: SURVEY_RESULTS_MINI_PROGRESS_STYLE,
+    remainingSpinnerStyle: SURVEY_RESULTS_SYNC_REMAINING_SPINNER_STYLE,
+    resolveSyncDetailsStyle: resolveSurveyResultsSyncDetailsStyle,
+    resolveToggleKnobStyle: resolveSurveyResultsToggleKnobStyle,
+    surveyBookmarkStyle: SURVEY_RESULTS_SURVEY_BOOKMARK_STYLE,
+    trailingLabelStyle: SURVEY_RESULTS_TRAILING_LABEL_STYLE,
+  },
+  downloadCSV,
+  getEffectiveSlug,
+  getFallbackQuestion: getStableFallbackQuestion,
+  getHtmlReportModalProps,
+  getIsDemoQuestionResultsContext,
+  getLockedResponseKey,
+  getMemoizedAggregatorEntries,
+  getMemoizedIndividualsAggregator,
+  getMemoizedLockedResponsesModel: (questions) => (
+    getMemoizedLockedResponsesModel(questions as Record<string, SurveyResultsQuestionWithEncryption>)
+  ),
+  getMemoizedPolisQuestionResponses,
+  getMemoizedQuestionFilterQuestions,
+  getQuestionFilterStorageKeyPrefix,
+  getResponseCardProps: getSurveyResultsResponseCardProps,
+  getScopedQuestionNetworkDataSync,
+  handleClearFiltersFromParent,
+  handleDecryptLockedResponses,
+  handleDemoAtlasModalClose,
+  handleDemoAtlasOpen,
+  handleDemoResultsViewSelect,
+  handleExportTypeChange,
+  handleFilterActivityChange,
+  handleFilteredResponses,
+  handleManualRefresh,
+  handleQuestionFilter,
+  handleQuestionFilterCountUpdate,
+  handleSurveyViewModeKeyDown,
+  handleSurveyViewModeToggle,
+  isOpen: propsRef.current.isOpen,
   onToggleSyncDetails: () =>
     setState(asSurveyResultsStateUpdater((prevState) => buildSurveyResultsBooleanTogglePatch({
       prevState,
       stateKey: 'syncDetailsOpen',
     }))),
-  onManualRefresh: () => handleManualRefresh(),
-  miniBarSpinnerStyle: SURVEY_RESULTS_MINI_BAR_SPINNER_STYLE,
-  miniProgressStyle: SURVEY_RESULTS_MINI_PROGRESS_STYLE,
-  remainingSpinnerStyle: SURVEY_RESULTS_SYNC_REMAINING_SPINNER_STYLE,
-});
-const filterControlsNode = renderSurveyResultsFilterExportControls({
-  activeSessionSlug: filterInput.activeSessionSlug,
-  aggregateQuestionResponses: stateRef.current.aggregateQuestionResponses,
-  currentSurveyIdForUrl: filterInput.currentSurveyIdForUrl,
-  currentViewModeForUrl: filterInput.currentViewModeForUrl,
-  defaultTags: propsRef.current.defaultTags,
-  ensureLightSbtUniverse: propsRef.current.ensureLightSbtUniverse,
-  exportControlsDisplay,
-  filterState: filterInput.filterState,
-  isFilterActive,
-  isQuestionCacheReady: filterInput.isQuestionCacheReady,
-  isSBTCacheReady: filterInput.isSBTCacheReady,
-  network: propsRef.current.network,
-  onClearFilters: handleClearFiltersFromParent,
-  onDownload: downloadCSV,
-  onExportHtmlReport: openHtmlReportExportModal,
-  onExportTypeChange: handleExportTypeChange,
-  onFilterActivityChange: handleFilterActivityChange,
-  onQuestionFilter: handleQuestionFilter,
-  onQuestionFilterCountUpdate: handleQuestionFilterCountUpdate,
-  onSbtFilter: handleFilteredResponses,
-  onSetFilterLoading: stableSetFilterLoadingRef.current,
-  onToggleExportArea: toggleExportArea,
-  onToggleQuestionFilter: toggleQuestionFilter,
-  provider: propsRef.current.provider,
-  questionFilterQuestions,
-  questionFilterRef: questionFilterRef,
-  questionResponses: stateRef.current.questionResponses,
-  questionResponsesNonce: filterInput.questionResponsesNonce,
-  questionsCacheNonce: filterInput.questionsCacheNonce,
-  responses: stateRef.current.responses,
-  sbtCacheRevision: filterInput.sbtCacheRevision,
-  sessionConfig: propsRef.current.sessionConfig,
-  sessionSlug: propsRef.current.sessionSlug,
-  showQuestionFilter: filterInput.showQuestionFilter,
-  storageKeyPrefix: filterInput.storageKeyPrefix,
-  styleMap: styles,
-  surveyViewMode,
-  viewMode,
-});
-const displayPanelsProps: SurveyResultsDisplayPanelsArgs = {
-  account: propsRef.current.account,
-  activeQuestionToggles: stateRef.current.activeQuestionToggles,
-  activeToggles: stateRef.current.activeToggles,
-  alertMessage,
-  applyDecryptedOverrideToResponse: applyDecryptedOverrideToResponse,
-  cacheReadinessDisplay,
-  currentSurveyId,
-  effectiveSlug: slug,
-  filterControlsNode,
-  filterLoading,
-  getFallbackQuestion: getStableFallbackQuestion,
-  getLockedResponseKey: getLockedResponseKey,
-  getResponseCardProps: getSurveyResultsResponseCardProps,
-  lockedResponsesBannerNode: SurveyResultsLockedResponsesBanner({
-    decrypting: !!stateRef.current.lockedResponsesDecrypting,
-    isOpen: !!stateRef.current.lockedResponseDetailsOpen,
-    lockedModel: lockedResponsesModel,
-    onDecrypt: handleDecryptLockedResponses,
-  }),
-  network: propsRef.current.network,
-  onSurveyViewModeKeyDown: handleSurveyViewModeKeyDown,
-  onSurveyViewModeToggle: handleSurveyViewModeToggle,
-  onToggleQuestionList: () => toggleQuestionSummary('__questionList__'),
-  onToggleResponse: toggleResponse,
-  preNetworkQuestions,
-  questionModeEntries,
-  questionResponsesNonce: propsRef.current.questionResponsesNonce,
-  questionsCacheNonce: propsRef.current.questionsCacheNonce,
-  renderQuestionSummary: (qId, arr) => renderQuestionSummary(qId, arr, preNetworkQuestions),
-  renderQuestionTable: () => renderQuestionIDsTable(
-    sbtFilteredAggregatorQuestionResponses,
-    preNetworkQuestions
+  openHtmlReportExportModal,
+  props: propsRef.current,
+  questionFilterRef,
+  questionIdTableRef,
+  renderQuestionSummary: (qId, arr, preNetworkQuestions) => (
+    renderQuestionSummary(qId, arr, preNetworkQuestions)
   ),
-  responses: sbtFilteredResponses,
-  sbtCacheRevision: propsRef.current.sbtCacheRevision,
-  styleMap: styles,
-  surveyAggregateEntries,
-  surveyViewMode,
-  tableWrapperRef: questionIdTableRef,
-  toggleKnobStyle: resolveSurveyResultsToggleKnobStyle(surveyViewMode === 'aggregate'),
-  trailingLabelStyle: SURVEY_RESULTS_TRAILING_LABEL_STYLE,
-  viewMode,
-};
-const demoSurfaceProps = buildSurveyResultsDemoSurfaceProps({
-  activeSlug: slug,
-  getIndividualsAggregator: getMemoizedIndividualsAggregator,
-  getPolisQuestionResponses: getMemoizedPolisQuestionResponses,
-  isDemoAlternateResultsView,
-  onAtlasModalClose: handleDemoAtlasModalClose,
-  onAtlasNodeOpen: handleDemoAtlasOpen,
-  parentProps: createSurveyResultsDemoSurfaceParentProps(propsRef.current),
+  renderQuestionTable: (questionMap, preNetworkQuestions) => (
+    renderQuestionIDsTable(questionMap, preNetworkQuestions)
+  ),
+  stableSetFilterLoading: stableSetFilterLoadingRef.current,
   state: stateRef.current,
-  viewKey: demoResultsViewMode,
+  styleMap: styles,
+  syncLoadingStartedAt: inst._syncLoadingStartedAt,
+  toggleExportArea,
+  toggleLockedResponseDetails,
+  toggleQuestionFilter,
+  toggleQuestionSummary,
+  toggleResponse,
+  toggleSurveyBookmark,
 });
-
-return (
-  <SurveyResultsReportSurface
-    demoSurfaceProps={demoSurfaceProps}
-    displayPanelsProps={displayPanelsProps}
-    htmlReportModalProps={getHtmlReportModalProps()}
-    isOpen={isActuallyOpen}
-    modalHeaderProps={{
-      bookmarkedSurveyIDs: stateRef.current.bookmarkedSurveyIDs,
-      currentSurveyId,
-      demoResultsViewMode,
-      demoResultsViewOptions,
-      documentLinkIconStyle: SURVEY_RESULTS_DOCUMENT_LINK_ICON_STYLE,
-      effectiveSlug: slug,
-      isDemoQuestionResults,
-      lockedResponsesToggleNode: SurveyResultsLockedResponsesToggle({
-        isOpen: !!stateRef.current.lockedResponseDetailsOpen,
-        lockedModel: lockedResponsesModel,
-        onToggleDetails: toggleLockedResponseDetails,
-      }),
-      onDemoResultsViewSelect: handleDemoResultsViewSelect,
-      onToggleSurveyBookmark: toggleSurveyBookmark,
-      styleMap: styles,
-      surveyBookmarkStyle: SURVEY_RESULTS_SURVEY_BOOKMARK_STYLE,
-      surveyDocumentURLs: Array.isArray(surveyDocumentURLs) ? surveyDocumentURLs : [],
-      surveyIdAbbreviation,
-      surveyTitle,
-      syncStatusNode,
-      viewMode,
-    }}
-    onCloseResultsModal={closeModal}
-    reportSurfaceDisplayPlan={{
-      demoResultsViewMode,
-      isDemoAlternateResultsView,
-    }}
-    styleMap={styles}
-  />
-);
 
 };
 
