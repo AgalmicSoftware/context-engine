@@ -50,6 +50,9 @@ counter updates. Option A from the design note, a Durable Object authority, is
 the future upgrade path if the project needs linearizable nonce and rate-limit
 state.
 
+ADR-0004 records the 2026-07-05 risk acceptance for the remaining nonce and
+rate-limit consistency limits.
+
 ## Tests
 
 Worker tests cover:
