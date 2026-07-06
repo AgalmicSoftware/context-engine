@@ -36,7 +36,7 @@ make release-clean           # delete the artifact
 Important behavior:
 
 - Public replay identity is always forced to `Agalmic <agalmicsoftware@protonmail.com>`
-- The first sync run installs a repo-local `pre-push` hook that blocks private branch pushes (`dev`, `codex/*`, `claude/*`, and `edge-*`) to public remotes.
+- The first sync run installs a repo-local `pre-push` hook that allows only `main`, `release-staging*`, and tags to be pushed to public remotes. Remote deletions are still allowed for cleanup.
 - Commits that only touch stripped paths are skipped automatically
 - `--dry-run` lists which commits would replay vs skip without creating the replay branch
 - Before the replayed branch is imported or pushed, `scripts/verify-public-release-surface.js` scans public JavaScript/TypeScript imports, exports, dynamic imports, and `require(...)` calls and fails if any public file resolves into a stripped path such as `contextEngine-cc/`
