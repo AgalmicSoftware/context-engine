@@ -1,7 +1,8 @@
-# contractScripts Map
+# chainGateway / contractScripts Map
 
 ## Quick Reference
-- Barrel file: `client/src/utilities/web3/contractScripts.js`
+- Canonical barrel file: `client/src/utilities/web3/chainGateway.ts`
+- Legacy compatibility shim: `client/src/utilities/web3/contractScripts.js`
 - Primary implementation: `client/src/utilities/web3/contractScripts.impl.ts`
 - Session registry helper: `client/src/utilities/web3/sessionRegistry.ts`
 - Split helper modules:
@@ -11,7 +12,9 @@
   - `client/src/utilities/web3/chainEventScans.ts`
   - `client/src/utilities/web3/chainMetadataResolution.ts`
 - Current lengths:
-  - `contractScripts.js`: **12 lines**
+  - `chainGateway.ts`: **86 lines**
+  - `contractScripts.js`: **13 lines**
+  - `contractScripts.ts`: **70-line compatibility alias**
   - `contractScripts.impl.ts`: **4,691 lines**
   - `sessionRegistry.ts`: **2,571 lines**
   - `contractHelpers.ts`: **1,040 lines**
@@ -27,7 +30,7 @@
 - `sessionRegistry.ts` and `contractScripts.impl.ts` typecheck without `@ts-nocheck`. The typed web3-core milestone was verified on OP Sepolia with the gate and gated-decrypt E2E suites; Lit v3 remains chain-configured and is not tied to a single testnet.
 
 ```text
-contractScripts.js  [CJS compatibility barrel for jest.spyOn]
+chainGateway.ts  [canonical CJS-compatible barrel for jest.spyOn]
   -> contractScripts.impl.ts  [main export object + shared helpers]
      -> sessionRegistry.ts                 [session registry reads / cache / config]
      -> createContractHelperMethods(...)        [provider / block-window / cache helpers]
@@ -37,12 +40,13 @@ contractScripts.js  [CJS compatibility barrel for jest.spyOn]
      -> chainMetadataResolution.ts             [metadata read / resolution helpers]
 ```
 
-`contractScripts` is still the main web3 integration layer between React and chain, Arweave, Lit, and registry state. The TypeScript split moved reusable helper families plus stateless event-scan and metadata-resolution helpers out of the monolith; `contractScripts.impl.ts` still owns session resolution, provider selection, decrypt policy, survey/question writes, SBT flows, and the final default export wiring.
+`chainGateway` is the main web3 integration layer between React and chain, Arweave, Lit, and registry state. The legacy `contractScripts.js` and `contractScripts.ts` names remain as compatibility aliases while callers migrate. The TypeScript split moved reusable helper families plus stateless event-scan and metadata-resolution helpers out of the monolith; `contractScripts.impl.ts` still owns session resolution, provider selection, decrypt policy, survey/question writes, SBT flows, and the final default export wiring.
 
-Route/page code now reaches selected `contractScripts` operations through purpose ports under `client/src/domains/**` when that boundary has been modernized. Those adapters deliberately use call-time property lookup against the shared barrel object so `jest.spyOn(contractScripts, ...)` remains a supported test seam.
+Route/page code now reaches selected chain gateway operations through purpose ports under `client/src/domains/**` when that boundary has been modernized. Those adapters deliberately use call-time property lookup against the shared barrel object so `jest.spyOn(contractScripts, ...)` and `jest.spyOn(chainGateway, ...)` remain supported test seams.
 
 ## Navigation Rules
-- Start in `contractScripts.js` only if you need barrel-export behavior or `jest.spyOn` compatibility.
+- Start in `chainGateway.ts` when adding or auditing barrel-export behavior.
+- Start in `contractScripts.js` or `contractScripts.ts` only when maintaining legacy import-path compatibility.
 - Start in `sessionRegistry.ts` for session registry lookups, registry cache behavior, session config normalization, or chain-aware session metadata.
 - Start in `contractHelpers.ts` for block windows, latest block/gas, read-provider behavior, or faucet helpers.
 - Start in `chainEventStreams.ts` for long-lived listener registration and cleanup.
@@ -54,10 +58,14 @@ Route/page code now reaches selected `contractScripts` operations through purpos
 
 ## File Index
 
-### `contractScripts.js`
-- Compatibility barrel.
+### `chainGateway.ts`
+- Canonical barrel.
 - Keeps CommonJS property assignment so `jest.spyOn()` can patch named exports.
 - Re-exports the default object plus high-value named helpers and `__test__` seams from `contractScripts.impl.ts`.
+
+### `contractScripts.js` / `contractScripts.ts`
+- Naming-migration aliases for legacy callers.
+- Preserve the same spyable default and named export surface while callers move to `chainGateway`.
 
 ### `contractScripts.impl.ts`
 - Declares shared constants, gas fallbacks, listener registries, and internal cache maps.
@@ -217,4 +225,4 @@ getAllSbtAddressesCached
 - If a bug is about masked metadata not decrypting, inspect `shouldAttemptGateDecrypt`, `maybeDecryptQuestionPayload`, `maybeDecryptSurveyPayload`, and the `get*Data` methods in `contractScripts.impl.ts`.
 - If a bug is about listeners double-firing or leaking, inspect `chainEventStreams.ts` before touching `MainSite`.
 - If a bug is about profile or SBT universe scans, inspect `profileChainReads.ts` before expanding `contractScripts.impl.ts`.
-- If a test needs to spy on named exports, remember the stable entry point is still `contractScripts.js`, not `contractScripts.impl.ts`.
+- If a test needs to spy on named exports, use `chainGateway.ts` for new tests and keep `contractScripts.js` coverage for legacy import-path compatibility.

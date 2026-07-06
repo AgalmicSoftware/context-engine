@@ -29,7 +29,7 @@ Code navigation maps:
 - `docs/MainSite.MAP.md`: app-shell route/runtime orchestration map.
 - `docs/SurveyTool.MAP.md`: survey/question runtime and encryption flow map.
 - `docs/SessionWizard.MAP.md`: session creation, worker deploy, and publish-flow map.
-- `docs/contractScripts.MAP.md`: web3 integration/navigation map for the `contractScripts` surface.
+- `docs/contractScripts.MAP.md`: web3 integration/navigation map for the `chainGateway` / legacy `contractScripts` surface.
 
 Session, gates, and the Worker:
 - `docs/session-creation-guide.md`: End-to-end setup guide for creating a session from `/new`, including the "what a new session needs" checklist, sponsored bundle handoff, worker deploy paths, on-chain registration, and `/admin` verification.
