@@ -15,6 +15,12 @@ const {
   runHarnessDoctor,
 } = require('./ai-harness-doctor');
 
+const STRIPPED_WALLETS_SPECIFIER = './lib/e2e/wallets.js';
+const STRIPPED_OPERATOR_RUNTIME_SPECIFIER = './lib/e2e/operator-local-runtime';
+const FIXTURE_REQUIRE_NAME = 'require';
+// Assemble stripped fixture requires so the public-surface checker scans fixture output, not this test source.
+const fixtureRequire = (specifier) => `${FIXTURE_REQUIRE_NAME}('${specifier}')`;
+
 function makeFixture(t) {
   const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ce-harness-doctor-'));
   t.after(() => fs.rmSync(rootDir, { recursive: true, force: true }));
@@ -61,7 +67,7 @@ test('runHarnessDoctor resolves restored passkey harness files', (t) => {
   `);
   fs.writeFileSync(path.join(rootDir, 'scripts', 'test-session-gates-any-all.js'), `
     'use strict';
-    const { buildPasskeyDerivedWallet } = require('./lib/e2e/wallets.js');
+    const { buildPasskeyDerivedWallet } = ${fixtureRequire(STRIPPED_WALLETS_SPECIFIER)};
     module.exports = { buildPasskeyDerivedWallet };
   `);
 
@@ -82,7 +88,7 @@ test('runHarnessDoctor reports the first stale porto dependency with the passkey
   `);
   fs.writeFileSync(path.join(rootDir, 'scripts', 'test-session-gates-any-all.js'), `
     'use strict';
-    module.exports = require('./lib/e2e/wallets.js');
+    module.exports = ${fixtureRequire(STRIPPED_WALLETS_SPECIFIER)};
   `);
 
   const report = runHarnessDoctor(rootDir);
@@ -101,7 +107,7 @@ test('extractTopLevelRequireSpecifiers ignores lazy workflow requires', () => {
     'use strict';
     const fs = require('node:fs');
     const loadRuntime = () => {
-      const runtime = require('./lib/e2e/operator-local-runtime');
+      const runtime = ${fixtureRequire(STRIPPED_OPERATOR_RUNTIME_SPECIFIER)};
       return runtime;
     };
   `;

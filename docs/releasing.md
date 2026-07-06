@@ -90,7 +90,7 @@ Both workflows remove these paths from the public result:
 | `.DS_Store`, `docs/codebase-*.md`, `docs/assets/codebase-*`, `docs/*PRD*.md`, `docs/*prd*.md` | Local macOS metadata, ignored codebase audit exports, and private planning docs |
 | `private-pack.manifest.json` (tracked repo copy) | Generated strip inventory should not ship from the dev tree |
 | `Demo Integration Package/` | Raw source data |
-| `scripts/test-*.js`, `scripts/seed-*.js`, `scripts/start-playwright-server.js`, `scripts/lib/e2e/`, `scripts/run-agent-bridge-worker-tests.js`, `scripts/vendor-cecc-ethers-bundle.js`, `tests/root/*.private.test.*` | E2E/private helper scripts and private root tests |
+| `scripts/test-*.js`, `scripts/seed-*.js`, `scripts/start-playwright-server.js`, `scripts/e2e/`, `scripts/lib/e2e/`, `scripts/run-agent-bridge-worker-tests.js`, `scripts/vendor-cecc-ethers-bundle.js`, `tests/root/*.private.test.*` | E2E/private helper scripts and private root tests |
 | `whitepaper/Slides.pdf`, `whitepaper/IdeasMap.md` | Internal whitepaper assets |
 
 For the artifact workflow, a fresh `private-pack.manifest.json` is generated in the output listing stripped files with SHA-256 checksums, so the strip can be verified or reversed. Private planning paths are deliberately omitted from that public manifest so roadmap filenames and planning IDs are not exposed. Any tracked repo-root copy is stripped before publish. Root npm script entries that point at stripped private test runners are also removed so public package scripts do not advertise missing private files.
