@@ -267,14 +267,69 @@ interface AtlasLink {
 }
 
 export const getDebateNodeStableKey = (
-  node: Pick<DebateNode, 'id' | 'name'> | null | undefined,
+  node: Pick<DebateNode, 'id' | 'name' | 'parentPath'> | null | undefined,
   fallback: string
 ): string => {
   const nodeId = String(node?.id || '').trim();
   if (nodeId) return nodeId;
   const nodeName = String(node?.name || '').trim();
+  const parentPath = Array.isArray(node?.parentPath)
+    ? node.parentPath
+        .map((entry) => String(entry?.id || entry?.name || '').trim())
+        .filter(Boolean)
+        .join('/')
+    : '';
+  if (nodeName && parentPath) return `${parentPath}/${nodeName}`;
   if (nodeName) return nodeName;
   return fallback;
+};
+
+export const getDebateNodeListStableKeys = (
+  nodes: Array<Pick<DebateNode, 'id' | 'name' | 'parentPath'> | null | undefined> = [],
+  fallback: string
+): string[] => {
+  const counts = new Map<string, number>();
+  return (Array.isArray(nodes) ? nodes : []).map((node) => {
+    const baseKey = getDebateNodeStableKey(node, fallback);
+    const occurrence = (counts.get(baseKey) || 0) + 1;
+    counts.set(baseKey, occurrence);
+    return occurrence === 1 ? baseKey : `${baseKey}:${occurrence}`;
+  });
+};
+
+export const getDebateQuestionStableKey = (
+  question: Pick<DebateQuestion, 'id' | 'question' | 'prompt'> | null | undefined,
+  fallback: string
+): string => {
+  const questionId = String(question?.id || '').trim();
+  if (questionId) return questionId;
+  const questionText = String(question?.question || question?.prompt || '').trim();
+  if (questionText) return `${fallback}:${questionText}`;
+  return fallback;
+};
+
+export const getDebateQuestionListStableKeys = (
+  questions: Array<Pick<DebateQuestion, 'id' | 'question' | 'prompt'> | null | undefined> = [],
+  fallback: string
+): string[] => {
+  const counts = new Map<string, number>();
+  return (Array.isArray(questions) ? questions : []).map((question) => {
+    const baseKey = getDebateQuestionStableKey(question, fallback);
+    const occurrence = (counts.get(baseKey) || 0) + 1;
+    counts.set(baseKey, occurrence);
+    return occurrence === 1 ? baseKey : `${baseKey}:${occurrence}`;
+  });
+};
+
+export const getDebateTagStableKeys = (tags: unknown[] = []): string[] => {
+  const counts = new Map<string, number>();
+  return (Array.isArray(tags) ? tags : []).map((tag) => {
+    const label = String(tag ?? '').trim() || 'tag';
+    const normalized = label.toLowerCase();
+    const occurrence = (counts.get(normalized) || 0) + 1;
+    counts.set(normalized, occurrence);
+    return occurrence === 1 ? `tag:${label}` : `tag:${label}:${occurrence}`;
+  });
 };
 
 const formatAtlasLinkCoordinate = (value: unknown): string => {
@@ -1479,9 +1534,9 @@ const AtlasChrome = ({
           <FontAwesomeIcon icon={faTimes} />
         </button>
       </h3>
-      {topNodes.map((node, index) => (
+      {topNodes.map((node, index, list) => (
         <button
-          key={`${node.id || node.name}-${index}`}
+          key={getDebateNodeListStableKeys(list, 'top-node')[index] || getDebateNodeStableKey(node, 'top-node')}
           type="button"
           className={styles.topNodeItem}
           onClick={(event) => {
@@ -2200,6 +2255,8 @@ const Modal = ({
   if (!isOpen || !content) return null;
 
   const questions = Array.isArray(content.questions) ? content.questions : [];
+  const questionSearchKeys = getDebateQuestionListStableKeys(questions, 'question-search');
+  const questionCardKeys = getDebateQuestionListStableKeys(questions, 'question-card');
   const argumentData = content?.arguments && typeof content.arguments === 'object'
     ? content.arguments
     : null;
@@ -2221,6 +2278,7 @@ const Modal = ({
   const depthClass = `depth${Math.min(depthIndex, 3)}`; // used for color mapping
 
   const tags = ["AI Safety", "Policy"];
+  const tagStableKeys = getDebateTagStableKeys(tags);
 
   // Calculate Counts from Content
   const upVotes = parseInt(String(content.votes?.up || 0), 10);
@@ -2667,7 +2725,7 @@ const Modal = ({
           {/* Generic Tags */}
           {tags.map((t, i) => (
              <button
-                key={i}
+                key={tagStableKeys[i] || `tag:${String(t)}`}
                 className={`${styles.tag} ${styles.clickable}`}
                 onClick={() => onTagClick && onTagClick(t)}
                 title={`Go to ${t}`}
@@ -2782,7 +2840,7 @@ const Modal = ({
             {!questionsOpen && (
               <div className={styles.collapseSearchText} aria-hidden="true">
                 {questions.map((q, i) => (
-                  <span key={`${q.id || 'question'}-search-${i}`}>
+                  <span key={questionSearchKeys[i] || getDebateQuestionStableKey(q, 'question-search')}>
                     {q.question || q.prompt || 'Untitled question'}
                   </span>
                 ))}
@@ -2797,7 +2855,7 @@ const Modal = ({
                   const authorAvatar = questionAuthor ? getUserAvatar(questionAuthor) : '';
 
                   return (
-                    <div key={`${q.id}-${i}`} className={styles.pileCard} data-type={questionType}>
+                    <div key={questionCardKeys[i] || getDebateQuestionStableKey(q, 'question-card')} className={styles.pileCard} data-type={questionType}>
                       <div className={styles.pileCardHeader}>
                         <div>
                           <div className={styles.questionText}>{questionText}</div>
@@ -2852,7 +2910,7 @@ const SuggestNodeModal = ({ isOpen, onClose, parentNode, parentPath = [], onSubm
         <div className={styles.lineageDisplay}>
             <span className={styles.lineageLabel}>Path:</span>
             {lineage.map((node, i) => (
-                <span key={i} className={styles.lineageItem}>
+                <span key={getDebateNodeStableKey(node, `lineage-${i}`)} className={styles.lineageItem}>
                     {node.name} {i < lineage.length - 1 && <FontAwesomeIcon icon={faChevronRight} className={styles.separator} />}
                 </span>
             ))}

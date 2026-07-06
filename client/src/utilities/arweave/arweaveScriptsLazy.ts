@@ -1,2 +1,2 @@
 /** @file arweaveScriptsLazy.ts */
-export { arweaveScripts } from './arweaveScripts.js';
+export { arweaveClient, arweaveScripts } from './arweaveClient.js';

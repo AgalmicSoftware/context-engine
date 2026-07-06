@@ -208,6 +208,10 @@ __pycache__/
 # Demo Integration Package (raw source data, not shipped in bundle)
 Demo Integration Package/
 
+# Grant applications (private)
+/grant-applications/
+/foresight-application-draft.md
+
 # AI discourse corpus — local untracked working files
 ai-discourse-corpus/bookmark-ingestion-procedure.md
 ai-discourse-corpus/corpuses/known-tweet-urls.txt

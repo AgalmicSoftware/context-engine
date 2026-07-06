@@ -98,10 +98,10 @@ const SessionWizardRequirementsBanner = ({
       <p className={styles.newSessionBannerCopy}>
         In the meantime, you can get a sponsored session URL by contacting{' '}
         <a
-          href="mailto:contextengine@protonmail.com"
+          href="mailto:[redacted-email]"
           className={styles.newSessionBannerLink}
         >
-          contextengine@protonmail.com
+          [redacted-email]
         </a>
         .
       </p>

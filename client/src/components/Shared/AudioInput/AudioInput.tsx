@@ -67,7 +67,7 @@ type UseWhisperOptions = {
   onTranscriptionUpdate?: (transcript: string) => void;
   onTranscriptionComplete?: (finalText: string) => void;
   onError?: (err: unknown) => void;
-  onRecordingStop?: () => void;
+  onRecordingStop?: (blob?: Blob | null, mimeType?: string) => void;
 };
 
 type UseWhisperHook = (options?: UseWhisperOptions) => UseWhisperResult;

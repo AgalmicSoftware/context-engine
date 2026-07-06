@@ -64,6 +64,8 @@ export function WagmiHooksHOC<P extends object>(Component: React.ComponentType<P
 
         const componentName = String(Component?.displayName || Component?.name || '');
         const needsBlockNumber = (
+          componentName === 'AppShell' ||
+          componentName === 'AppShellWithWagmiHooks' ||
           componentName === 'MainSite' ||
           componentName === 'MainSiteWithWagmiHooks' ||
           props.__ceRequireWagmiBlockNumber === true

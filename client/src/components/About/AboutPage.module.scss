@@ -552,40 +552,6 @@ $modal-muted: rgba(22, 48, 84, 0.82);
   line-height: 1.2;
 }
 
-.featureHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 8px;
-  flex-wrap: wrap;
-
-  .featureLabel {
-    margin: 0;
-  }
-}
-
-.featureStatusComplete {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  padding: 0.36rem 0.72rem;
-  border-radius: 999px;
-  border: 1px solid rgba(77, 255, 164, 0.34);
-  background: rgba(77, 255, 164, 0.12);
-  color: rgba(184, 255, 221, 0.98);
-  font-size: 0.76rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-
-  &::before {
-    content: '\2713';
-    font-size: 0.9em;
-    line-height: 1;
-  }
-}
-
 .featureText {
   display: block;
   color: rgba(244, 247, 255, 0.84);
@@ -594,29 +560,91 @@ $modal-muted: rgba(22, 48, 84, 0.82);
   line-height: 1.65;
 }
 
-.roadmapSubList {
+.roadmapSectionList {
   list-style: none;
-  margin: 0.9rem 0 0;
   padding: 0;
   display: grid;
-  gap: 0.7rem;
+  gap: 0;
+  margin: 0;
 }
 
-.roadmapSubItem {
-  position: relative;
-  padding-left: 1.2rem;
-  color: rgba(244, 247, 255, 0.78);
+.roadmapSectionItem {
+  padding: 15px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.085);
+
+  &:first-child {
+    padding-top: 0;
+  }
+
+  &:last-child {
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
+}
+
+.roadmapCategory {
+  margin: 0 0 8px;
+  color: rgba(244, 247, 255, 0.96);
   font-family: var(--ce-font-body);
   font-size: 0.98rem;
-  line-height: 1.55;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.roadmapChecklist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 7px;
+}
+
+.roadmapChecklistItem {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: flex-start;
+  gap: 10px;
+  color: rgba(244, 247, 255, 0.76);
+  font-family: var(--ce-font-body);
+  font-size: 0.98rem;
+  line-height: 1.5;
+}
+
+.roadmapChecklistItemComplete {
+  color: rgba(244, 247, 255, 0.82);
+}
+
+.roadmapChecklistItemPlanned {
+  color: rgba(244, 247, 255, 0.62);
+}
+
+.roadmapCheck {
+  display: inline-grid;
+  place-items: center;
+  width: 19px;
+  height: 19px;
+  margin-top: 0.12rem;
+  border: 1px solid rgba(77, 255, 164, 0.42);
+  border-radius: 999px;
+  background: rgba(77, 255, 164, 0.92);
+  color: rgba(8, 14, 19, 0.96);
+  font-size: 0.74rem;
+  font-weight: 900;
+  line-height: 1;
+  flex: 0 0 auto;
 
   &::before {
-    content: '•';
-    position: absolute;
-    left: 0;
-    top: 0;
-    color: $accent;
-    font-weight: 700;
+    content: '\2713';
+  }
+}
+
+.roadmapChecklistItemPlanned .roadmapCheck {
+  border-color: rgba(244, 247, 255, 0.28);
+  background: transparent;
+  color: transparent;
+
+  &::before {
+    content: '';
   }
 }
 
@@ -1226,22 +1254,39 @@ $modal-muted: rgba(22, 48, 84, 0.82);
 
   .toggleHeader {
     gap: 8px;
+    flex-wrap: wrap;
   }
 
   .toggleHeaderAside {
     gap: 6px;
     margin-left: auto;
+    display: contents;
+  }
+
+  .toggleHeaderAside .toggleIcon {
+    order: 2;
+    margin-left: auto;
   }
 
   .recognitionSummary {
-    display: none;
+    order: 3;
+    display: flex;
+    flex: 1 0 100%;
+    justify-content: flex-start;
+    gap: 0;
+    margin-top: 10px;
+    overflow: visible;
   }
 
   .recognitionSummaryLogo {
-    width: 24px;
-    height: 24px;
+    width: 28px;
+    height: 28px;
     border-radius: 8px;
     padding: 2px;
+  }
+
+  .recognitionSummaryLogo + .recognitionSummaryLogo {
+    margin-left: -6px;
   }
 
   .heroVideo {
@@ -1320,8 +1365,12 @@ $modal-muted: rgba(22, 48, 84, 0.82);
     font-size: 1.02rem;
   }
 
-  .featureStatusComplete {
-    font-size: 0.72rem;
+  .roadmapCategory {
+    font-size: 0.94rem;
+  }
+
+  .roadmapChecklistItem {
+    font-size: 0.94rem;
   }
 
   .featureText {

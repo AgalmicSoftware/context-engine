@@ -10,13 +10,17 @@ on:
       - master
       - main
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
 jobs:
-  test:
+  wiring-and-release:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 25
 
     steps:
       - name: Checkout
@@ -32,10 +36,126 @@ jobs:
             client/package-lock.json
             workers/sessionCorsWorker/package-lock.json
 
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install client dependencies
+        run: npm --prefix client ci
+
+      - name: Install sessionCorsWorker dependencies
+        run: npm --prefix workers/sessionCorsWorker ci
+
+      - name: Check test and release wiring
+        run: npm run test:wiring
+
+      - name: Check type debt ratchet
+        run: npm run type-debt:check
+
+      - name: Check baseline monotonicity
+        env:
+          BASELINE_MONOTONICITY_BASE: ${{ github.event.pull_request.base.sha || 'origin/main' }}
+          BASELINE_MONOTONICITY_ALLOW_TEXT: >-
+            ${{ github.event.pull_request.title }}
+            ${{ github.event.pull_request.body }}
+            ${{ github.event.head_commit.message }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin main || true
+          if [ "$BASELINE_MONOTONICITY_BASE" != "origin/main" ]; then
+            git fetch --no-tags --depth=1 origin "$BASELINE_MONOTONICITY_BASE" || true
+          fi
+          node scripts/check-baseline-monotonicity.mjs --base "$BASELINE_MONOTONICITY_BASE" --allow-text "$BASELINE_MONOTONICITY_ALLOW_TEXT"
+
+      - name: Lint client
+        run: npm run lint
+
+      - name: Typecheck client
+        run: npm run typecheck:client
+
+      - name: Verify public release surface
+        run: npm run verify:public-release-surface
+
+      - name: Build worker bundles
+        run: npm run worker:bundle
+
+      - name: Verify worker bundle sync
+        run: npm run verify:worker-bundle
+
+      - name: Build client
+        run: npm --prefix client run build
+
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
       - name: Setup Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
           version: stable
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Run contract tests
+        run: npm run test:contracts
+
+  client:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install client dependencies
+        run: npm --prefix client ci
+
+      - name: Run client coverage tests
+        run: npm run test:client
+
+      - name: Upload client coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: client-coverage
+          path: client/coverage/lcov.info
+          if-no-files-found: warn
+
+  root-jest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            client/package-lock.json
+            workers/sessionCorsWorker/package-lock.json
 
       - name: Install root dependencies
         run: npm ci
@@ -46,19 +166,99 @@ jobs:
       - name: Install sessionCorsWorker dependencies
         run: npm --prefix workers/sessionCorsWorker ci
 
-      - name: Build worker bundles
-        run: npm run worker:bundle
+      - name: Run root Jest tests
+        run: npm run test:root:jest
 
-      - name: Verify worker bundle sync
-        run: npm run verify:worker-bundle
+  workers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
 
-      - name: Run PR test gate
-        run: npm run test:ci
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Upload client coverage
-        if: always()
-        uses: actions/upload-artifact@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          name: client-coverage
-          path: client/coverage/lcov.info
-          if-no-files-found: warn
+          node-version: 20
+          cache: npm
+          cache-dependency-path: workers/sessionCorsWorker/package-lock.json
+
+      - name: Install sessionCorsWorker dependencies
+        run: npm --prefix workers/sessionCorsWorker ci
+
+      - name: Run sessionCorsWorker tests
+        run: npm run test:worker:session-cors
+
+  cecc-and-node:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            workers/sessionCorsWorker/package-lock.json
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install sessionCorsWorker dependencies
+        run: npm --prefix workers/sessionCorsWorker ci
+
+      - name: Run contextEngine-cc tests
+        run: npm run test:cc
+
+      - name: Run root Node tests
+        run: npm run test:node
+
+      - name: Run cache guard
+        run: npm run test:cache-guard
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs:
+      - wiring-and-release
+      - contracts
+      - client
+      - root-jest
+      - workers
+      - cecc-and-node
+    if: ${{ always() }}
+
+    steps:
+      - name: Check split CI job results
+        env:
+          WIRING_AND_RELEASE_RESULT: ${{ needs.wiring-and-release.result }}
+          CONTRACTS_RESULT: ${{ needs.contracts.result }}
+          CLIENT_RESULT: ${{ needs.client.result }}
+          ROOT_JEST_RESULT: ${{ needs.root-jest.result }}
+          WORKERS_RESULT: ${{ needs.workers.result }}
+          CECC_AND_NODE_RESULT: ${{ needs.cecc-and-node.result }}
+        run: |
+          set -euo pipefail
+          failed=0
+          for entry in \
+            "wiring-and-release:${WIRING_AND_RELEASE_RESULT}" \
+            "contracts:${CONTRACTS_RESULT}" \
+            "client:${CLIENT_RESULT}" \
+            "root-jest:${ROOT_JEST_RESULT}" \
+            "workers:${WORKERS_RESULT}" \
+            "cecc-and-node:${CECC_AND_NODE_RESULT}"
+          do
+            job="${entry%%:*}"
+            result="${entry#*:}"
+            printf '%s: %s\n' "$job" "$result"
+            if [ "$result" != "success" ]; then
+              failed=1
+            fi
+          done
+          exit "$failed"

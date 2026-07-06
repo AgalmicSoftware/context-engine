@@ -1,7 +1,7 @@
 /** @file uploads.js */
 
 import { Buffer } from 'buffer';
-import { arweaveScripts } from '../arweave/arweaveScripts.js';
+import { arweaveClient as arweaveScripts } from '../arweave/arweaveClient.js';
 import { uploadDataToSessionStorage } from '../storage/storageClient.js';
 import { STORAGE_BACKENDS, normalizeStorageRef } from '../storage/storageRefs.js';
 import { cryptoUtils } from '../crypto/cryptography.js';

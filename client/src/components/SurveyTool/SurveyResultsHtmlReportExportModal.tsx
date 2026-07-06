@@ -24,8 +24,10 @@ import SurveyResultsHtmlReportSectionTable, {
 } from './SurveyResultsHtmlReportSectionTable';
 import type {
   SurveyResultsHtmlReportAnalysisPayload,
+} from './surveyResultsHtmlReportModalDescriptor';
+import type {
   SurveyResultsHtmlReportSectionKey,
-} from './surveyResultsExportDisplayHelpers';
+} from './surveyResultsHtmlReportReadiness';
 
 export type SurveyResultsHtmlReportExportModalDisplayProps = {
   analysisGenerating?: boolean;

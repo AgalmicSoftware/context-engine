@@ -74,6 +74,233 @@
   line-height: 1.5;
 }
 
+.telegramShell {
+  width: min(1180px, 100%);
+  margin: 0 auto;
+  padding: 24px 0 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.telegramHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  color: #f8fafc;
+}
+
+.telegramHeaderText {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.telegramHeaderTitle {
+  margin: 0;
+  font-size: 1.7rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.telegramHeaderSubtitle {
+  color: rgba(255, 255, 255, 0.72);
+  margin: 0;
+  max-width: 720px;
+}
+
+.telegramAuthBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  border-radius: var(--ce-radius-8);
+  background: rgba(15, 23, 42, 0.72);
+  color: #e2e8f0;
+  padding: 10px 12px;
+}
+
+.telegramAuthIndicator {
+  font-size: 0.92rem;
+  color: #cbd5e1;
+}
+
+.telegramTabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.telegramTabButton,
+.telegramPrimaryButton,
+.telegramSecondaryButton,
+.telegramLogoutButton,
+.telegramIconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: var(--ce-radius-6);
+  min-height: 36px;
+  border: 1px solid rgba(148, 163, 184, 0.36);
+  background: rgba(15, 23, 42, 0.76);
+  color: #f8fafc;
+  padding: 7px 12px;
+  font-size: 0.92rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.telegramPrimaryButton {
+  background: #2563eb;
+  border-color: #2563eb;
+}
+
+.telegramSecondaryButton,
+.telegramLogoutButton {
+  background: rgba(30, 41, 59, 0.88);
+}
+
+.telegramTabButtonActive {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.telegramPrimaryButton:disabled,
+.telegramSecondaryButton:disabled,
+.telegramIconButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.telegramListPanel {
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: var(--ce-radius-8);
+  background: rgba(15, 23, 42, 0.66);
+  color: #f8fafc;
+  padding: 16px;
+}
+
+.telegramListHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  color: #e2e8f0;
+  font-weight: 700;
+}
+
+.telegramListEmpty,
+.telegramListError {
+  color: #cbd5e1;
+  font-size: 0.95rem;
+}
+
+.telegramListError {
+  color: #fecaca;
+  margin-top: 10px;
+}
+
+.telegramGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+
+.telegramPileNav {
+  display: flex;
+  gap: 8px;
+}
+
+.telegramIconButton {
+  width: 36px;
+  padding: 0;
+}
+
+.telegramPileFrame {
+  :global(.card) {
+    background: rgba(2, 6, 23, 0.72);
+    color: #f8fafc;
+    border-color: rgba(148, 163, 184, 0.28);
+  }
+}
+
+.telegramPileFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+.telegramSubmitDisabledReason {
+  color: #cbd5e1;
+  font-size: 0.88rem;
+}
+
+.telegramChipRow,
+.telegramTopicCounts {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.telegramChipDark {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  border-radius: var(--ce-radius-6);
+  background: rgba(30, 41, 59, 0.88);
+  color: #e2e8f0;
+  padding: 2px 8px;
+  font-size: 0.78rem;
+}
+
+.telegramBucketGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.telegramBucketSelect {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 12px 12px;
+  color: #172033;
+  font-size: 0.88rem;
+}
+
+.telegramBucketSelect select {
+  min-height: 34px;
+  border: 1px solid rgba(15, 23, 42, 0.22);
+  border-radius: var(--ce-radius-6);
+  padding: 4px 8px;
+}
+
+.telegramReportApprox {
+  margin: 0 0 12px;
+  color: #cbd5e1;
+  font-size: 0.9rem;
+}
+
+.telegramTopicPrompt {
+  white-space: pre-wrap;
+  overflow-x: auto;
+  border-radius: var(--ce-radius-6);
+  background: rgba(2, 6, 23, 0.82);
+  color: #e2e8f0;
+  padding: 12px;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
 .titleContainerWithPileSubmitRail {
   position: relative;
   z-index: 41;

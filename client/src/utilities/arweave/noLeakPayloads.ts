@@ -28,6 +28,14 @@ const hasEnvelope = (value: unknown): boolean => {
   return true;
 };
 
+const stringOrEmpty = (value: unknown): string => (
+  typeof value === 'string' ? value : ''
+);
+
+const stringOrNull = (value: unknown): string | null => (
+  typeof value === 'string' ? value : null
+);
+
 const isTargetEnabled = (targets: UnknownRecord, aliases: string[]): boolean => (
   aliases.some((alias) => targets?.[alias] === true)
 );
@@ -214,7 +222,7 @@ export const validateNoLockedPlaintextInPayload = (
 export const sanitizeQuestionPromptForResponsePayload = (
   question: unknown,
   { isLocked = false }: { isLocked?: boolean } = {}
-) => {
+): string => {
   const source = isObj(question) ? question : {};
   const locked =
     isLocked ||
@@ -222,13 +230,13 @@ export const sanitizeQuestionPromptForResponsePayload = (
     hasEnvelope(source.encryptedPrompt) ||
     isTargetEnabled(getTargets(source), ['questions', 'prompt']);
   if (locked) return LOCKED_FIELD_MASK;
-  return source.prompt ?? '';
+  return stringOrEmpty(source.prompt);
 };
 
 export const sanitizeSurveyTitleForResponsePayload = (
   survey: unknown,
   { isLocked = false }: { isLocked?: boolean } = {}
-) => {
+): string | null => {
   const source = isObj(survey) ? survey : {};
   const locked =
     isLocked ||
@@ -236,7 +244,7 @@ export const sanitizeSurveyTitleForResponsePayload = (
     hasEnvelope(source.encryptedTitle) ||
     isTargetEnabled(getTargets(source), ['survey', 'title']);
   if (locked) return LOCKED_FIELD_MASK;
-  return source.title ?? null;
+  return stringOrNull(source.title);
 };
 
 export { LOCKED_FIELD_MASK };

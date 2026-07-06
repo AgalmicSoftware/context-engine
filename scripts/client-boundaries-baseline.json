@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "mode": "fail-on-new-violation",
+  "note": "Existing legacy boundary violations are allowed only as a baseline; new violations fail the boundary check.",
+  "violations": []
+}

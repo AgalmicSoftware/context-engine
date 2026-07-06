@@ -1,3 +1,7 @@
+import {
+  validateAuthTokenRecord,
+} from './authTokenClaims.js';
+
 export const resolveAuthenticatedRequest = async ({
   request,
   env,
@@ -55,6 +59,19 @@ export const resolveAuthenticatedRequest = async ({
       ok: false,
       response: deps?.json?.({ error: 'Token does not match requested session slug.' }, 403, baseHeaders),
     };
+  }
+
+  if (Object.prototype.hasOwnProperty.call(payload, 'jti')) {
+    const validateRecord = typeof deps?.validateAuthTokenRecord === 'function'
+      ? deps.validateAuthTokenRecord
+      : validateAuthTokenRecord;
+    const tokenRecord = await validateRecord({ env, payload, slug });
+    if (!tokenRecord?.ok) {
+      return {
+        ok: false,
+        response: deps?.json?.({ error: tokenRecord?.error || 'Invalid token.' }, 401, baseHeaders),
+      };
+    }
   }
 
   return { ok: true, payload, slug };

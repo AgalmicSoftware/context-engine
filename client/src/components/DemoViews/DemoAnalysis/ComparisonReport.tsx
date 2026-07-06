@@ -192,7 +192,7 @@ const ResponseLine = ({ responseText, context = 'card' }: ResponseLineProps) => 
   const baseClassName = context === 'tooltip' ? styles.tooltipResponse : styles.responseText;
 
   if (!tone) {
-    return <Wrapper className={baseClassName}>Response: "{responseText}"</Wrapper>;
+    return <Wrapper className={baseClassName}>Response: &quot;{responseText}&quot;</Wrapper>;
   }
 
   return (

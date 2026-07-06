@@ -23,11 +23,6 @@ const POLYGON_PUBLIC_RPC_URLS = Object.freeze(getPublicRpcUrls(137));
 const BSC_PUBLIC_RPC_URLS = Object.freeze(getPublicRpcUrls(56));
 const CELO_PUBLIC_RPC_URLS = Object.freeze(getPublicRpcUrls(42220));
 const KATANA_PUBLIC_RPC_URLS = Object.freeze(getPublicRpcUrls(747474));
-const BASE_SEPOLIA_PORTO_RPC_URL = (
-  BASE_SEPOLIA_PUBLIC_RPC_URLS.find((url) => /\.drpc\.org$/i.test(String(url || '').trim()))
-  || BASE_SEPOLIA_PUBLIC_RPC_URLS[0]
-  || ''
-);
 const CONFIGURED_PAID_RPC_URL_HTTP_BY_CHAIN = Object.freeze({
   84532: readPublicEnv('REACT_APP_CE_BASE_SEPOLIA_PAID_RPC_URL_HTTP', ''),
   11155420: readPublicEnv('REACT_APP_CE_OP_SEPOLIA_PAID_RPC_URL_HTTP', ''),
@@ -218,11 +213,6 @@ export const baseSepolia = defineChain({
   },
   testnet: true,
   sourceId: SEPOLIA_SOURCE_ID,
-  porto: {
-    feeTokens: ['tETH', 'EXP1', 'EXP2'],
-    interopTokens: ['tETH', 'EXP1', 'EXP2'],
-    interopSupported: true,
-  },
 });
 
 /** @type {Chain} */
@@ -286,11 +276,6 @@ export const base = defineChain({
   },
   testnet: false,
   sourceId: OP_MAINNET_SOURCE_ID,
-  porto: {
-    feeTokens: ['ETH', 'USDC', 'USDT'],
-    interopTokens: ['ETH', 'USDC', 'USDT'],
-    interopSupported: true,
-  },
 });
 
 /** @type {Chain} */
@@ -350,11 +335,6 @@ export const optimism = defineChain({
   },
   testnet: false,
   sourceId: OP_MAINNET_SOURCE_ID,
-  porto: {
-    feeTokens: ['ETH', 'USDC', 'USDT'],
-    interopTokens: ['ETH', 'USDC', 'USDT'],
-    interopSupported: true,
-  },
 });
 
 /** @type {Chain} */
@@ -411,11 +391,6 @@ export const optimismSepolia = defineChain({
   },
   testnet: true,
   sourceId: SEPOLIA_SOURCE_ID,
-  porto: {
-    feeTokens: ['tETH', 'EXP1', 'EXP2'],
-    interopTokens: ['tETH', 'EXP1', 'EXP2'],
-    interopSupported: true,
-  },
 });
 
 /** @type {Chain} */
@@ -452,11 +427,6 @@ export const arbitrum = defineChain({
     },
   },
   testnet: false,
-  porto: {
-    feeTokens: ['ETH', 'USDC', 'USDT'],
-    interopTokens: ['ETH', 'USDC', 'USDT'],
-    interopSupported: true,
-  },
 });
 
 /** @type {Chain} */
@@ -493,11 +463,6 @@ export const arbitrumSepolia = defineChain({
     },
   },
   testnet: true,
-  porto: {
-    feeTokens: ['tETH'],
-    interopTokens: [],
-    interopSupported: false,
-  },
 });
 
 /** @type {Chain} */
@@ -538,11 +503,6 @@ export const mainnet = defineChain({
     },
   },
   testnet: false,
-  porto: {
-    feeTokens: ['ETH', 'USDC', 'USDT'],
-    interopTokens: ['ETH', 'USDC', 'USDT'],
-    interopSupported: true,
-  },
 });
 
 /** @type {Chain} */
@@ -575,11 +535,6 @@ export const polygon = defineChain({
     },
   },
   testnet: false,
-  porto: {
-    feeTokens: ['POL', 'USDC', 'USDT'],
-    interopTokens: ['USDC', 'USDT'],
-    interopSupported: true,
-  },
 });
 
 /** @type {Chain} */
@@ -616,11 +571,6 @@ export const bsc = defineChain({
     },
   },
   testnet: false,
-  porto: {
-    feeTokens: ['BNB', 'USDT'],
-    interopTokens: [],
-    interopSupported: false,
-  },
 });
 
 /** @type {Chain} */
@@ -657,11 +607,6 @@ export const celo = defineChain({
     },
   },
   testnet: false,
-  porto: {
-    feeTokens: ['CELO', 'USDC', 'USDT'],
-    interopTokens: ['USDC', 'USDT'],
-    interopSupported: true,
-  },
 });
 
 /** @type {Chain} */
@@ -691,11 +636,6 @@ export const katana = defineChain({
     },
   },
   testnet: false,
-  porto: {
-    feeTokens: ['ETH'],
-    interopTokens: [],
-    interopSupported: false,
-  },
 });
 
 /** @type {Chain} */
@@ -722,25 +662,6 @@ export const anvil = defineChain({
   },
   testnet: true,
 });
-
-export const portoChain = baseSepolia;
-const portoRelayUrlRegistry = {
-  // Porto relay uses explicit non-PATH RPCs. Pocket/PATH public endpoints have
-  // proven incompatible with Porto wallet send-tx flows; prefer DRPC here.
-  [baseSepolia.id]: readUseInfuraRpcFlag()
-    ? getConfiguredPaidRpcHttpUrl(baseSepolia.id)
-    : BASE_SEPOLIA_PORTO_RPC_URL,
-  [base.id]: BASE_PUBLIC_RPC_URLS[0] || '',
-  [optimism.id]: OPTIMISM_PUBLIC_RPC_URLS[0] || '',
-  [optimismSepolia.id]: OPTIMISM_SEPOLIA_PUBLIC_RPC_URLS[0] || '',
-  [arbitrum.id]: ARBITRUM_PUBLIC_RPC_URLS[0] || '',
-  [arbitrumSepolia.id]: ARBITRUM_SEPOLIA_PUBLIC_RPC_URLS[0] || '',
-  [mainnet.id]: ETHEREUM_PUBLIC_RPC_URLS[0] || '',
-  [polygon.id]: POLYGON_PUBLIC_RPC_URLS[0] || '',
-  [bsc.id]: BSC_PUBLIC_RPC_URLS[0] || '',
-  [celo.id]: CELO_PUBLIC_RPC_URLS[0] || '',
-  [katana.id]: KATANA_PUBLIC_RPC_URLS[0] || '',
-};
 
 export const chainRegistry = {
   1: mainnet,
@@ -945,22 +866,6 @@ export const chainHttpRpcNoPath = (ch) => {
     : candidates;
   return filtered[0] || '';
 };
-export function resolvePortoChain(chainOrId = portoChain) {
-  if (!chainOrId) return portoChain;
-  if (typeof chainOrId === 'number') return chainRegistry[chainOrId] || portoChain;
-  if (typeof chainOrId === 'object') {
-    const id = Number(chainOrId.id ?? chainOrId.chainId ?? 0);
-    if (id && chainRegistry[id]) return chainRegistry[id];
-    return chainOrId;
-  }
-  return portoChain;
-}
-
-export function getPortoRelayUrl(chainOrId = portoChain) {
-  const chain = resolvePortoChain(chainOrId);
-  if (!chain) return '';
-  return portoRelayUrlRegistry[chain.id] || chainHttpRpcNoPath(chain) || chainHttpRpc(chain) || '';
-}
 export const chainCurrency = (ch) =>
   ch?.nativeCurrency ?? { name: 'ETH', symbol: 'ETH', decimals: 18 }
 export const isTestnetChain = (ch) => {

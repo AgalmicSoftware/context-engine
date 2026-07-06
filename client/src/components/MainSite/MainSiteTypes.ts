@@ -1,4 +1,4 @@
-import type { QuestionScanProgressLike } from './progressHelpers.ts';
+import type { QuestionScanProgressLike } from '../../utilities/session/mainSiteProgressHelpers.ts';
 
 export type MainSiteRecord = Record<string, unknown>;
 export type MainSiteCallback = (...args: unknown[]) => void;

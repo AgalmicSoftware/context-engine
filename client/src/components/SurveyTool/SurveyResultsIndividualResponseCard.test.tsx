@@ -27,6 +27,7 @@ describe('SurveyResultsIndividualResponseCard', () => {
         onToggleResponse={jest.fn()}
         renderResponseBody={renderResponseBody}
         response={{ responder: '0xabc123/def456' }}
+        responseId="survey id/with spaces:0xabc123/def456"
         styleMap={styleMap}
       />
     );
@@ -53,6 +54,7 @@ describe('SurveyResultsIndividualResponseCard', () => {
         onToggleResponse={onToggleResponse}
         renderResponseBody={jest.fn(() => <div>Response body</div>)}
         response={{ responder: '0xabc123/def456' }}
+        responseId="survey-1:0xabc123/def456"
         styleMap={styleMap}
       />
     );
@@ -61,6 +63,6 @@ describe('SurveyResultsIndividualResponseCard', () => {
     expect(onToggleResponse).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getAllByRole('link')[0].closest('.responseHeader') as HTMLElement);
-    expect(onToggleResponse).toHaveBeenCalledWith(4);
+    expect(onToggleResponse).toHaveBeenCalledWith('survey-1:0xabc123/def456');
   });
 });

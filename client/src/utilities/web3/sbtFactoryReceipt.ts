@@ -1,19 +1,21 @@
 import { ethers } from 'ethers';
 import SBT_FACTORY_ABI from '../../contractsABI/SBT_FACTORY_ABI.json';
 
-type AnyRecord = Record<string, any>;
+type ReceiptRecord = Record<string, unknown>;
 
 const SBT_FACTORY_INTERFACE = new ethers.utils.Interface(SBT_FACTORY_ABI);
 
 const toText = (value: unknown): string => (value == null ? '' : String(value).trim());
 const isSbtCreatedEventName = (value: unknown): boolean => toText(value).startsWith('SBTCreated');
+const isReceiptRecord = (value: unknown): value is ReceiptRecord => (
+  !!value && typeof value === 'object'
+);
 
 const readSbtAddressFromArgs = (args: unknown): string => {
-  const source = (args && typeof args === 'object') ? args as AnyRecord : {};
+  const source = isReceiptRecord(args) ? args : {};
   const candidates = [
     source.sbtAddress,
     source.address,
-    source[0],
     source['0'],
   ];
 
@@ -26,19 +28,23 @@ const readSbtAddressFromArgs = (args: unknown): string => {
   return '';
 };
 
-const getReceiptLogs = (receipt: unknown): AnyRecord[] => {
-  const source = (receipt && typeof receipt === 'object') ? receipt as AnyRecord : {};
+const getReceiptLogs = (receipt: unknown): unknown[] => {
+  const source = isReceiptRecord(receipt) ? receipt : {};
   if (Array.isArray(source.logs)) return source.logs;
-  if (Array.isArray(source.receipt?.logs)) return source.receipt.logs;
+  const nestedReceipt = source.receipt;
+  if (isReceiptRecord(nestedReceipt) && Array.isArray(nestedReceipt.logs)) {
+    return nestedReceipt.logs;
+  }
   return [];
 };
 
 export const resolveSbtAddressFromFactoryReceipt = (receipt: unknown): string => {
-  const source = (receipt && typeof receipt === 'object') ? receipt as AnyRecord : {};
+  const source = isReceiptRecord(receipt) ? receipt : {};
   const decodedEvents = Array.isArray(source.events) ? source.events : [];
   for (const entry of decodedEvents) {
-    if (!isSbtCreatedEventName(entry?.event || entry?.name)) continue;
-    const address = readSbtAddressFromArgs(entry?.args);
+    const eventEntry = isReceiptRecord(entry) ? entry : {};
+    if (!isSbtCreatedEventName(eventEntry.event || eventEntry.name)) continue;
+    const address = readSbtAddressFromArgs(eventEntry.args);
     if (address) return address;
   }
 

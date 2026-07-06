@@ -62,8 +62,8 @@ describe('GreetingModal', () => {
 
     expect(screen.getByText(/Get updates/i)).toBeInTheDocument();
     expect(screen.getByText(/Feature updates/i)).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('name@example.com')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('[redacted-email]')).toBeInTheDocument();
     expect(screen.queryByText(/How to own a % of site/i)).not.toBeInTheDocument();
-    expect(screen.queryByPlaceholderText('lol@memewa.rs')).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('[redacted-email]')).not.toBeInTheDocument();
   });
 });

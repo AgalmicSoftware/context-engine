@@ -1,6 +1,10 @@
 import {
   resolveAuthLoginRequestAuthority,
 } from './authLoginRequestAuthority.js';
+import {
+  buildAuthTokenJti,
+  persistAuthTokenRecord,
+} from './authTokenClaims.js';
 
 export const dispatchAuthLoginRequest = async ({
   request,
@@ -56,11 +60,21 @@ export const dispatchAuthLoginRequest = async ({
   } = authorityResult;
 
   const exp = Math.floor((deps?.now?.() ?? Date.now()) / 1000) + deps?.TOKEN_TTL_SECONDS;
+  const sub = deps?.getAddress?.(address);
+  const buildJti = typeof deps?.buildAuthTokenJti === 'function'
+    ? deps.buildAuthTokenJti
+    : buildAuthTokenJti;
+  const jti = buildJti({
+    randomUUID: deps?.randomUUID,
+    getRandomValues: deps?.getRandomValues,
+    base64UrlEncode: deps?.base64UrlEncode,
+  });
   const payload = {
-    sub: deps?.getAddress?.(address),
+    sub,
     slug: targetSlug,
     scopes,
     exp,
+    jti,
   };
 
   let token;
@@ -68,6 +82,21 @@ export const dispatchAuthLoginRequest = async ({
     token = await deps?.signToken?.(payload, env?.TOKEN_HMAC_SECRET);
   } catch (err) {
     return deps?.json?.({ error: err?.message || 'Token signing failed.' }, 500, headers);
+  }
+
+  const persistTokenRecord = typeof deps?.persistAuthTokenRecord === 'function'
+    ? deps.persistAuthTokenRecord
+    : persistAuthTokenRecord;
+  try {
+    await persistTokenRecord({
+      env,
+      slug: targetSlug,
+      sub,
+      jti,
+      ttlSeconds: deps?.TOKEN_TTL_SECONDS,
+    });
+  } catch (err) {
+    return deps?.json?.({ error: err?.message || 'Token persistence failed.' }, 500, headers);
   }
 
   return deps?.json?.({ token, exp }, 200, headers);

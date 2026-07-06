@@ -162,7 +162,7 @@ class GreetingModal extends Component<GreetingModalProps, GreetingModalState> {
 
           <FormGroup className={styles.enterEmail}>
 
-          <Input type="email" name="emailInput" onChange={this.emailInputChange} className={styles.emailInput} placeholder="name@example.com" />
+          <Input type="email" name="emailInput" onChange={this.emailInputChange} className={styles.emailInput} placeholder="[redacted-email]" />
           </FormGroup>
 
 

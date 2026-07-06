@@ -1477,7 +1477,7 @@ export const buildDraftHydrationRenderedQuestionIds = ({
   const rendered = new Set(buildNormalizedRenderedQuestionIds({
     renderedIds: hydrationQuestionIds,
   }));
-  if (!!forceOverwrite) {
+  if (forceOverwrite) {
     (Array.isArray(pileQuestions) ? pileQuestions : []).forEach((question) => {
       const questionId = normalizeQuestionIdKey(
         isRecord(question) ? question.id : null
@@ -2387,7 +2387,7 @@ export const resolveQuestionSlugMapLookup = ({
 
   const fallbackSurveyId = surveyId !== undefined
     ? surveyId
-    : (!!singleQuestionMode ? null : (propsSurveyId || null));
+    : (singleQuestionMode ? null : (propsSurveyId || null));
 
   return buildQuestionSlugMapForIds({
     questionIds,

@@ -2,7 +2,7 @@
 
 Moved from root README.md for readability.
 
-The stripped `release-public` OSS copy intentionally omits the private repo-level E2E workflow entrypoints under `scripts/test-*.js`, `scripts/test-*.ui.js`, and `scripts/lib/e2e/`. Use the detailed workflow references below with the full dev repo or a restored private pack, not the stripped public release artifact.
+The stripped `release-public` OSS copy intentionally omits the private repo-level E2E workflow entrypoints under `scripts/test-*.js`, `scripts/test-*.ui.js`, `scripts/e2e/`, and `scripts/lib/e2e/`. Use the detailed workflow references below with the full dev repo or a restored private pack, not the stripped public release artifact.
 
 The maintained public smoke path is Vite-compatible and runs against an already running client:
 
@@ -15,7 +15,7 @@ The maintained public smoke path is Vite-compatible and runs against an already 
 ## AI Wallet Test Workflow (OP Sepolia)
 
 Use these scripts for repeatable blockchain testing from the same deterministic
-Porto-style test wallet.
+passkey EOA-style test wallet.
 
 - Show the derived wallet address (and optional balance/hash info):
   - `npm run ai:wallet`
@@ -51,6 +51,19 @@ Porto-style test wallet.
     - `artifacts/session-workflows/gated-decrypt-all-types-<run-tag>.json`
     - `artifacts/screenshots/gated-decrypt-all-types-<run-tag>.png`
 - Expanded CE E2E backlog coverage runners:
+  - Telegram/session close-out smokes:
+    - `BASE_URL=http://127.0.0.1:3000 npm run ai:test-telegram:client-login`
+    - `BASE_URL=http://127.0.0.1:3000 npm run ai:test-session:new-mode-presets`
+    - `BASE_URL=http://127.0.0.1:3000 npm run ai:test-session:demo-smoke`
+    - `BASE_URL=http://127.0.0.1:3000 npm run ai:test-session:closeout-smoke`
+  - Cloudflare storage, envelope encryption, and worker groups:
+    - `npm run ai:test-cf-envelope:worker`
+    - `npm run ai:test-cf-envelope:groups`
+    - `npm run ai:test-cf-envelope:group-gates`
+    - `npm run ai:test-cf-envelope:key-lifecycle`
+    - `npm run ai:test-cf-envelope:all`
+    - These live suites deploy a dedicated session worker through the same deploy helper used by `/new`, pass a Cloudflare `storageProfile`, register a non-identifying test session on the configured SessionRegistry, and then exercise worker routes against the fresh worker.
+    - Assertions cover `/new` worker-envelope selectability, `worker_envelope` ciphertext-only storage/export, admin envelope export, worker group CRUD and visibility, `group_gate`, `group_allowlist`, `worker_group` conditions, removal/deletion revocation, envelope rotation, deployment-KEK rewrap, and no plaintext marker leakage in denied/export responses.
   - Session setup:
     - `npm run ai:test-session-setup:default-worker`
     - `npm run ai:test-session-setup:custom-worker-secrets`
@@ -113,8 +126,8 @@ Environment variables supported by `ai:mint-test-sbt`:
 - `GROUP_PASSWORD` (default: `browserUse`)
 - `SBT_METADATA_URI` (required tokenURI metadata location; accepts `ar://<txId>`, Arweave gateway URL, or raw txId and normalizes to `ar://`)
 - `E2E_SBT_METADATA_URI` (optional alias used by profile-driven E2E scripts; `ai:mint-test-sbt` still prefers `SBT_METADATA_URI`)
-- `AI_TEST_PRIVATE_KEY` (optional override; otherwise derived from passkey test rawId)
-- `PASSKEY_RAW_ID_B64URL` (optional deterministic rawId source, default fixture value)
+- `AI_TEST_PRIVATE_KEY` (optional override; otherwise derived through the passkey-derived mock PRF/HKDF path)
+- `PASSKEY_RAW_ID_B64URL` (optional deterministic fixture credential ID used to mock passkey PRF output)
 - `DRY_RUN=1` (enabled via `ai:mint-test-sbt:dry`)
 
 Environment variables supported by `ai:test-gates:any-all`:
@@ -124,7 +137,7 @@ Environment variables supported by `ai:test-gates:any-all`:
 - `CHAIN_ID` (default: `11155420`)
 - `SESSION_REGISTRY` (default: OP Sepolia SessionRegistry)
 - `SBT_FACTORY` (default: OP Sepolia SBTFactory)
-- `PASSKEY_A` and `PASSKEY_B` (deterministic wallet rawIds; defaults are fixture values)
+- `PASSKEY_A` and `PASSKEY_B` (deterministic fixture credential IDs used to mock passkey PRF output)
 - `SESSION_SLUG` (optional explicit slug; default is `e2e-gates-<timestamp>`)
 - `FUND_WALLET_B` (ETH amount transferred from walletA to walletB if walletB is empty)
 - `METADATA_URI` (string stored in `createSession`; gates do not depend on it)
@@ -138,7 +151,7 @@ Environment variables supported by `ai:seed-survey:question-types`:
 - `RPC_URL` (optional browser rewrite target / preferred RPC override for the resolved chain)
 - `RPC_REWRITE_FROM` (optional advanced comma-separated override for rewrite sources; otherwise derived from the resolved chain's public, PATH, and faucet fallback RPC defaults)
 - `AI_RUN_TAG` / `RUN_TAG` (optional explicit run tag; default is timestamp)
-- `PASSKEY_RAW_ID_B64URL` (optional deterministic rawId source, default fixture value)
+- `PASSKEY_RAW_ID_B64URL` (optional deterministic fixture credential ID used to mock passkey PRF output)
 - `PLAYWRIGHT_CORE_PATH` (optional override for resolving the Playwright module)
 - `PLAYWRIGHT_EXECUTABLE_PATH` (optional override for Chromium; defaults to Playwright-managed Chromium)
 - `PLAYWRIGHT_HOST_PLATFORM_OVERRIDE` (optional; e.g. `mac-arm64` to force arm64 browser resolution)
@@ -152,7 +165,7 @@ Environment variables supported by `ai:seed-polis:binary-multi-wallet`:
 - `SESSION_SLUG` (required; existing session slug)
 - `AI_RUN_TAG` / `RUN_TAG` (optional explicit run tag; default is timestamp)
 - `BINARY_QUESTION_COUNT` (default: `4`; range `1..12`)
-- `PASSKEY_A`, `PASSKEY_B`, `PASSKEY_C`, `PASSKEY_D`, `PASSKEY_E` (wallet rawIds; defaults are fixture values)
+- `PASSKEY_A`, `PASSKEY_B`, `PASSKEY_C`, `PASSKEY_D`, `PASSKEY_E` (deterministic fixture credential IDs used to mock passkey PRF output)
 - `FUND_AMOUNT_ETH` (default `0.001`; walletA -> walletB/C/D/E top-up amount when recipients are under threshold)
 - `MIN_BALANCE_ETH` (default `0.0002`; recipient balance threshold for top-up checks)
 
@@ -161,7 +174,7 @@ Environment variables supported by `ai:test-gated-decrypt:all-types`:
 - `BASE_URL` (default: `http://127.0.0.1:3000`)
 - `SESSION_SLUG` (optional explicit slug; when unset, the runner generates a fresh timestamped slug)
 - `RPC_URL`, `CHAIN_ID`, `SESSION_REGISTRY`, `SBT_FACTORY` (OP Sepolia defaults)
-- `PASSKEY_A` and `PASSKEY_B` (wallet rawIds; defaults are fixture values)
+- `PASSKEY_A` and `PASSKEY_B` (deterministic fixture credential IDs used to mock passkey PRF output)
 - `SESSION_WORKER_URL` (optional override; legacy `WORKER_URL` is accepted only for sessionCorsWorker URLs; by default read from on-chain `corsWorkerUrl`)
 - `FUND_WALLET_B` (ETH amount transferred from walletA to walletB if walletB is empty)
 - `PLAYWRIGHT_CORE_PATH` and `PLAYWRIGHT_EXECUTABLE_PATH` (optional UI phase overrides)
@@ -220,5 +233,5 @@ Full-session worker handoff:
 
 Useful env vars for `ai:wallet`:
 
-- `SHOW_PRIVATE_KEY=1` to include the deterministic private key and a legacy
-  `porto_session_v1` record payload for automation seeding.
+- `SHOW_PRIVATE_KEY=1` to include the deterministic private key and local-only
+  passkey EOA fixture material for automation seeding.

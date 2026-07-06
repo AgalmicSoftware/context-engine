@@ -12,7 +12,7 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   readCache: jest.fn(),
 }), { virtual: true });
 
-jest.mock('../../components/MainSite/cacheConstants', () => ({
+jest.mock('./sessionCacheConstants', () => ({
   __esModule: true,
   DG_PRIMARY_ROUTE_CACHE_NAMES: ['surveysCache', 'questionsCache', 'sbtCache'],
 }));

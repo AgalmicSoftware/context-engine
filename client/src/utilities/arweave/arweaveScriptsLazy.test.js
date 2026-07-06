@@ -2,7 +2,8 @@ const mockArweaveScripts = {
   marker: 'lazy-export-shape',
 };
 
-jest.mock('./arweaveScripts.js', () => ({
+jest.mock('./arweaveClient.js', () => ({
+  arweaveClient: mockArweaveScripts,
   arweaveScripts: mockArweaveScripts,
 }));
 

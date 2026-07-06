@@ -1,6 +1,6 @@
 # E2E Workflow Tests (OP Sepolia + Local UI)
 
-The stripped `release-public` OSS copy intentionally omits the repo-level E2E workflow entrypoints under `scripts/test-*.js`, `scripts/test-*.ui.js`, and `scripts/lib/e2e/`. This runbook is for the full dev repo or a restored private pack, not the stripped public release artifact.
+The stripped `release-public` OSS copy intentionally omits the repo-level E2E workflow entrypoints under `scripts/test-*.js`, `scripts/test-*.ui.js`, `scripts/e2e/`, and `scripts/lib/e2e/`. This runbook is for the full dev repo or a restored private pack, not the stripped public release artifact.
 
 This repo now includes an expanded CE E2E runner set for:
 - Session setup
@@ -41,11 +41,14 @@ Arweave is public and permanent. Use non-identifying payloads only.
      - `E2E_OPENAI_KEY` when running real deploy verification with `E2E_AI_MOCK=0`
    - For fresh full private runs, set `CLOUDFLARE_API_TOKEN` and let session setup create the worker-backed session target.
    - For reuse-only runs, set both `SESSION_SLUG` and `SESSION_WORKER_URL` from an already established E2E session target.
-   - Ensure the deterministic wallet you use (derived from `PASSKEY_RAW_ID_B64URL`) is funded on the target chain.
+   - Ensure the deterministic wallet you use (derived from the fixture credential ID through the passkey mock PRF/HKDF path) is funded on the target chain.
+   - Before private harness runs, `npm run -s ai:harness:doctor` checks that restored operator-local E2E entrypoints resolve. Replace stale `porto-wallet-derivation` imports with `scripts/lib/passkey-derived-wallet.js`.
    - For multi-wallet Polis seeding, keep walletA funded; walletB/C/D/E are auto-topped-up by the runner when below threshold.
 3. Run `npm run -s test:e2e` for the public navigation smoke, or any private
    `ai:*` workflow command; the scripts auto-load `.env.e2e.local`, then
    `.env.e2e`.
+
+For the Cloudflare envelope and groups suites, also verify `CLOUDFLARE_API_TOKEN` can create Workers, KV namespaces, and worker secrets. Each run creates a dedicated session worker, a KV namespace, a `CE_STORAGE_ENVELOPE_KEK` worker secret when `worker_envelope` is selected, and a non-identifying SessionRegistry slug on the configured test chain. The key-lifecycle suite rotates/re-wraps envelope keys and, when the token permits worker secret updates, replaces only the test worker's `CE_STORAGE_ENVELOPE_KEK` to prove recovery under the new deployment key. The generated deployment key is process-local and must not be copied into docs, artifacts, or logs.
 
 Committed E2E scripts do not read fallback secrets from `.e2e-secrets/*`; use env, `.env.e2e.local`, `.env.e2e`, or `E2E_ENV_FILE`.
 

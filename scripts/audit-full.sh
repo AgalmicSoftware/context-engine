@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Full codebase security audit via Codex
-# Usage: bash scripts/audit-full.sh [--domain <worker|crypto|client|cecc|rpc|arweave|userpage|sbts|porto|contracts|ai|survey|all>]
+# Usage: bash scripts/audit-full.sh [--domain <worker|crypto|client|cecc|rpc|arweave|userpage|sbts|wallet|contracts|ai|survey|all>]
 set -euo pipefail
 
 CODEX="${CODEX_PATH:-codex}"
@@ -8,7 +8,7 @@ DOMAIN="all"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --domain) DOMAIN="$2"; shift 2 ;;
-    worker|crypto|client|cecc|rpc|arweave|userpage|sbts|porto|contracts|ai|survey|all) DOMAIN="$1"; shift ;;
+    worker|crypto|client|cecc|rpc|arweave|userpage|sbts|wallet|contracts|ai|survey|all) DOMAIN="$1"; shift ;;
     *) echo "Unknown arg: $1"; exit 1 ;;
   esac
 done
@@ -26,17 +26,17 @@ DOMAINS[rpc]="client/src/utilities/web3/rpcReadCache.ts client/src/utilities/web
 DOMAINS[arweave]="client/src/utilities/arweave/"
 DOMAINS[userpage]="client/src/components/UserPage/ client/src/utilities/cache/"
 DOMAINS[sbts]="client/src/components/SBTs/ client/src/utilities/sbt/"
-DOMAINS[porto]="client/src/utilities/web3/portoFunctions.ts client/src/utilities/web3/sponsoredAccess.ts"
+DOMAINS[wallet]="client/src/wallet/ client/src/utilities/web3/sponsoredAccess.ts"
 DOMAINS[contracts]="contracts/CustomSBT.sol contracts/SessionRegistry.sol contracts/Surveys.sol contracts/SBTFactory.sol"
 DOMAINS[ai]="client/src/utilities/ai/ client/src/components/Shared/AudioInput/AudioInput.tsx"
 DOMAINS[survey]="client/src/components/SurveyTool/ client/src/utilities/survey/"
 
 if [ "$DOMAIN" = "all" ]; then
-  TARGETS="${DOMAINS[worker]} ${DOMAINS[crypto]} ${DOMAINS[client]} ${DOMAINS[cecc]} ${DOMAINS[rpc]} ${DOMAINS[arweave]} ${DOMAINS[userpage]} ${DOMAINS[sbts]} ${DOMAINS[porto]} ${DOMAINS[contracts]} ${DOMAINS[ai]} ${DOMAINS[survey]}"
+  TARGETS="${DOMAINS[worker]} ${DOMAINS[crypto]} ${DOMAINS[client]} ${DOMAINS[cecc]} ${DOMAINS[rpc]} ${DOMAINS[arweave]} ${DOMAINS[userpage]} ${DOMAINS[sbts]} ${DOMAINS[wallet]} ${DOMAINS[contracts]} ${DOMAINS[ai]} ${DOMAINS[survey]}"
 elif [ -n "${DOMAINS[$DOMAIN]+x}" ]; then
   TARGETS="${DOMAINS[$DOMAIN]}"
 else
-  echo "Unknown domain: $DOMAIN (use: worker, crypto, client, cecc, rpc, arweave, userpage, sbts, porto, contracts, ai, survey, all)"
+  echo "Unknown domain: $DOMAIN (use: worker, crypto, client, cecc, rpc, arweave, userpage, sbts, wallet, contracts, ai, survey, all)"
   exit 1
 fi
 
@@ -79,11 +79,11 @@ case "$DOMAIN" in
   arweave) FOCUS="Focus: payload integrity, metadata parsing, gateway trust, malformed content handling, upload/download failure modes" ;;
   userpage) FOCUS="Focus: cache scoping, stale user/session data, privacy leaks, XSS in rendered profile content, persistence correctness" ;;
   sbts) FOCUS="Focus: mint/claim authorization, gate evaluation, wallet ownership assumptions, race conditions, sensitive metadata exposure" ;;
-  porto) FOCUS="Focus: sponsored access authorization, signer trust boundaries, replay protection, chain mismatch handling, fallback safety" ;;
+  wallet) FOCUS="Focus: passkey RP-ID validation, encrypted EOA keystore, signer trust boundaries, replay protection, chain mismatch handling, fallback safety" ;;
   contracts) FOCUS="Focus: access control, reentrancy, signature validation, upgrade/migration assumptions, event/state consistency" ;;
   ai) FOCUS="Focus: prompt/data leakage, unsafe model input handling, audio upload abuse, output sanitization, quota/performance abuse" ;;
   survey) FOCUS="Focus: response isolation, async lifecycle safety, stale hydration, encryption/gating correctness, submission integrity" ;;
-  all) FOCUS="Focus areas (priority order): 1) Worker auth & egress 2) Crypto & encryption 3) Client state 4) contextEngine-cc 5) RPC/read consistency 6) Arweave integrity 7) UserPage/cache safety 8) SBT flows 9) Porto sponsored access 10) Contracts 11) AI/audio paths 12) Survey state & submissions" ;;
+  all) FOCUS="Focus areas (priority order): 1) Worker auth & egress 2) Crypto & encryption 3) Client state 4) contextEngine-cc 5) RPC/read consistency 6) Arweave integrity 7) UserPage/cache safety 8) SBT flows 9) Passkey wallet 10) Contracts 11) AI/audio paths 12) Survey state & submissions" ;;
 esac
 
 REPORT_FILE="$REPORT_DIR/audit-full-${DOMAIN}-${TIMESTAMP}.txt"

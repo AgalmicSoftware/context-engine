@@ -155,10 +155,107 @@ const packageJsonPath = process.argv[2];
 const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
 
 if (packageJson.scripts && typeof packageJson.scripts === 'object') {
-  delete packageJson.scripts['test:worker:agent-bridge'];
+  const scripts = packageJson.scripts;
+  const removed = new Set();
+  const strippedRunnerPatterns = [
+    /\bscripts\/test-[^\s'"]+\.js\b/,
+    /\bscripts\/test-[^\s'"]+\.ui\.js\b/,
+    /\bscripts\/seed-[^\s'"]+\.js\b/,
+    /\bscripts\/e2e(?:\/|\b)/,
+    /\bscripts\/lib\/e2e(?:\/|\b)/,
+    /\bscripts\/run-e2e-[^\s'"]+\.js\b/,
+    /\bscripts\/run-ux-[^\s'"]+\.js\b/,
+    /\bscripts\/capture-ux-[^\s'"]+\.js\b/,
+    /\bscripts\/run-agent-bridge-worker-tests\.js\b/,
+    /\bscripts\/vendor-cecc-ethers-bundle\.js\b/,
+  ];
+
+  for (const [name, command] of Object.entries(scripts)) {
+    if (strippedRunnerPatterns.some((pattern) => pattern.test(String(command)))) {
+      removed.add(name);
+    }
+  }
+
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const [name, command] of Object.entries(scripts)) {
+      if (removed.has(name)) continue;
+      for (const removedName of removed) {
+        const escapedName = removedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        if (new RegExp(`\\bnpm\\s+run(?:\\s+-s)?\\s+${escapedName}\\b`).test(String(command))) {
+          removed.add(name);
+          changed = true;
+          break;
+        }
+      }
+    }
+  }
+
+  for (const name of removed) {
+    delete scripts[name];
+  }
 }
 
 fs.writeFileSync(packageJsonPath, `${JSON.stringify(packageJson, null, 2)}\n`);
+NODE
+}
+
+scrub_public_pii_text() {
+  if ! command -v node >/dev/null 2>&1; then
+    printf 'node is required to scrub public PII text.\n' >&2
+    return 1
+  fi
+
+  node - "$STAGING_ROOT" <<'NODE'
+const fs = require('node:fs');
+const path = require('node:path');
+
+const rootDir = path.resolve(process.argv[2]);
+const skipDirs = new Set(['.git', 'node_modules', 'build', 'dist', 'coverage']);
+const emailRe = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/ig;
+const homePathRe = /(?:^|[\s"'(=:{])((?:\/Users|\/home)\/[A-Za-z0-9._-]+(?:\/[^\s"'`<>\\)]*)?)/g;
+
+function isProbablyBinary(buffer) {
+  if (buffer.includes(0)) return true;
+  const sampleLength = Math.min(buffer.length, 4096);
+  if (sampleLength === 0) return false;
+
+  let controlBytes = 0;
+  for (let index = 0; index < sampleLength; index += 1) {
+    const byte = buffer[index];
+    if ((byte < 8) || (byte > 13 && byte < 32)) controlBytes += 1;
+  }
+  return controlBytes > Math.max(8, sampleLength * 0.02);
+}
+
+function scrubFile(absolutePath) {
+  const buffer = fs.readFileSync(absolutePath);
+  if (isProbablyBinary(buffer)) return;
+
+  const original = buffer.toString('utf8');
+  const scrubbed = original
+    .replace(emailRe, '[redacted-email]')
+    .replace(homePathRe, (match, homePath) => match.replace(homePath, '/redacted-home'));
+
+  if (scrubbed !== original) {
+    fs.writeFileSync(absolutePath, scrubbed);
+  }
+}
+
+function walk(absoluteDir) {
+  for (const entry of fs.readdirSync(absoluteDir, { withFileTypes: true })) {
+    const absolutePath = path.join(absoluteDir, entry.name);
+    if (entry.isDirectory()) {
+      if (skipDirs.has(entry.name)) continue;
+      walk(absolutePath);
+      continue;
+    }
+    if (entry.isFile()) scrubFile(absolutePath);
+  }
+}
+
+walk(rootDir);
 NODE
 }
 
@@ -333,6 +430,7 @@ while IFS= read -r path; do
 done < "$MATCHED_PATHS_FILE"
 
 scrub_public_package_json
+scrub_public_pii_text
 
 (
   cd "$STAGING_ROOT"

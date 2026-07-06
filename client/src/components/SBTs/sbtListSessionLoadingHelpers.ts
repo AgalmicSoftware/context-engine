@@ -432,7 +432,7 @@ export const resolveSbtListReadinessDisplayPlan = ({
   sectionSessionSearchFlag = false,
   sessionUniverseRegistryPending = false,
 }: ResolveSbtListReadinessDisplayPlanArgs = {}): SbtListReadinessDisplayPlan => {
-  const initialLoadingActive = !!allSessionsMode
+  const initialLoadingActive = allSessionsMode
     ? !initialLoadCompleted
     : (!initialLoadCompleted && !isSBTCacheReady);
   const sectionHeaderSpinnerVisible = !!emptySectionSpinnerActive;

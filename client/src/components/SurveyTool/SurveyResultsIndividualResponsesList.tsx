@@ -5,14 +5,27 @@ import SurveyResultsIndividualResponseCard, {
 } from './SurveyResultsIndividualResponseCard';
 
 type SurveyResultsIndividualResponsesListProps = {
-  activeToggles?: Record<number, unknown>;
+  activeToggles?: Record<string, unknown>;
   currentSurveyId?: string;
   effectiveSlug?: string;
   filterLoading?: boolean;
-  onToggleResponse: (index: number) => void;
+  onToggleResponse: (responseId: string) => void;
   renderResponseBody: (response: SurveyResultsResponseListEntry, index: number) => React.ReactNode;
   responses?: SurveyResultsResponseListEntry[];
   styleMap: Record<string, string>;
+};
+
+export const buildSurveyResultsResponseRowId = (
+  response: SurveyResultsResponseListEntry,
+  fallbackSurveyId = '',
+  index = 0
+): string => {
+  const responder = String(response?.responder || '').trim().toLowerCase();
+  const surveyId = String(response?.surveyId || fallbackSurveyId || '').trim();
+  if (responder || surveyId) {
+    return `${surveyId || 'unknown-survey'}:${responder || 'unknown-responder'}`;
+  }
+  return `response-row:${index}`;
 };
 
 const SurveyResultsIndividualResponsesList = ({
@@ -29,19 +42,23 @@ const SurveyResultsIndividualResponsesList = ({
     {responses.length === 0 && !filterLoading ? (
       <p>No results yet.</p>
     ) : (
-      responses.map((response: SurveyResultsResponseListEntry, index: number) => (
-        <SurveyResultsIndividualResponseCard
-          key={index}
-          currentSurveyId={currentSurveyId}
-          effectiveSlug={effectiveSlug}
-          index={index}
-          isOpen={!!activeToggles[index]}
-          onToggleResponse={onToggleResponse}
-          renderResponseBody={renderResponseBody}
-          response={response}
-          styleMap={styleMap}
-        />
-      ))
+      responses.map((response: SurveyResultsResponseListEntry, index: number) => {
+        const responseId = buildSurveyResultsResponseRowId(response, currentSurveyId, index);
+        return (
+          <SurveyResultsIndividualResponseCard
+            key={responseId}
+            currentSurveyId={currentSurveyId}
+            effectiveSlug={effectiveSlug}
+            index={index}
+            isOpen={!!activeToggles[responseId]}
+            onToggleResponse={onToggleResponse}
+            renderResponseBody={renderResponseBody}
+            response={response}
+            responseId={responseId}
+            styleMap={styleMap}
+          />
+        );
+      })
     )}
   </div>
 );

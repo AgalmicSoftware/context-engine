@@ -56,6 +56,18 @@ const PAYLOAD_ACCESS_MODES = Object.freeze({
   WORKER_SBT_GATE: 'worker_sbt_gate',
   LIT_ENCRYPTED: 'lit_encrypted',
 });
+const PAYLOAD_ACCESS_GATES = Object.freeze({
+  NONE: 'none',
+  SBT_GATE: 'sbt_gate',
+  GROUP_GATE: 'group_gate',
+  ROLE_GATE: 'role_gate',
+});
+const PAYLOAD_ENCRYPTION_MODES = Object.freeze({
+  NONE: 'none',
+  WORKER_ENVELOPE: 'worker_envelope',
+  LIT: 'lit',
+});
+const STORAGE_ENVELOPE_KEK_SECRET_NAME = 'CE_STORAGE_ENVELOPE_KEK';
 const R2_BUCKET_NAME_RE = /^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/;
 
 export const toStr = (val) => (typeof val === 'string' ? val : val == null ? '' : String(val));
@@ -320,6 +332,93 @@ const normalizePayloadAccessMode = (value) => {
   return PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE;
 };
 
+const normalizePayloadAccessGate = (value, fallback = PAYLOAD_ACCESS_GATES.SBT_GATE) => {
+  const normalized = toStr(value).trim().toLowerCase().replace(/-/g, '_');
+  if (!normalized) return fallback;
+  if (normalized === 'none' || normalized === 'public' || normalized === PAYLOAD_ACCESS_MODES.PUBLIC_READ) {
+    return PAYLOAD_ACCESS_GATES.NONE;
+  }
+  if (
+    normalized === 'sbt' ||
+    normalized === 'sbt_gate' ||
+    normalized === 'worker_sbt' ||
+    normalized === PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE
+  ) {
+    return PAYLOAD_ACCESS_GATES.SBT_GATE;
+  }
+  if (normalized === 'group' || normalized === 'group_gate' || normalized === 'worker_group') {
+    return PAYLOAD_ACCESS_GATES.GROUP_GATE;
+  }
+  if (normalized === 'role' || normalized === 'role_gate' || normalized === 'worker_role') {
+    return PAYLOAD_ACCESS_GATES.ROLE_GATE;
+  }
+  return fallback;
+};
+
+const normalizePayloadEncryptionMode = (value, fallback = PAYLOAD_ENCRYPTION_MODES.NONE) => {
+  const raw = isObj(value) ? value.mode : value;
+  const normalized = toStr(raw).trim().toLowerCase().replace(/-/g, '_');
+  if (!normalized) return fallback;
+  if (normalized === 'none' || normalized === 'plain' || normalized === 'plaintext') {
+    return PAYLOAD_ENCRYPTION_MODES.NONE;
+  }
+  if (normalized === 'worker_envelope' || normalized === 'cloudflare_envelope') {
+    return PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE;
+  }
+  if (normalized === 'lit' || normalized === PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED) {
+    return PAYLOAD_ENCRYPTION_MODES.LIT;
+  }
+  return fallback;
+};
+
+const deriveLegacyPayloadAccessMode = ({ gate, encryption }) => {
+  if (encryption === PAYLOAD_ENCRYPTION_MODES.LIT) return PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED;
+  if (gate === PAYLOAD_ACCESS_GATES.NONE) return PAYLOAD_ACCESS_MODES.PUBLIC_READ;
+  return PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE;
+};
+
+const cloneAccessConditions = (source) => {
+  const conditions = isObj(source?.accessConditions)
+    ? source.accessConditions
+    : (isObj(source?.conditions) ? source.conditions : null);
+  return conditions ? JSON.parse(JSON.stringify(conditions)) : null;
+};
+
+const normalizePayloadAccessControl = (raw) => {
+  const rawRecord = isObj(raw) ? raw : {};
+  const rawAccess = isObj(rawRecord.payloadAccessControl) ? rawRecord.payloadAccessControl : {};
+  const rawCloudflare = isObj(rawRecord.cloudflare) ? rawRecord.cloudflare : {};
+  const legacyMode = normalizePayloadAccessMode(
+    rawAccess.mode ||
+    rawCloudflare.payloadAccessMode ||
+    rawRecord.payloadAccessMode ||
+    rawRecord.accessControlMode
+  );
+  const fallbackGate = (
+    legacyMode === PAYLOAD_ACCESS_MODES.PUBLIC_READ ||
+    legacyMode === PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED
+  )
+    ? PAYLOAD_ACCESS_GATES.NONE
+    : PAYLOAD_ACCESS_GATES.SBT_GATE;
+  const fallbackEncryption = legacyMode === PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED
+    ? PAYLOAD_ENCRYPTION_MODES.LIT
+    : PAYLOAD_ENCRYPTION_MODES.NONE;
+  const directV2 = (
+    Object.prototype.hasOwnProperty.call(rawRecord, 'gate') ||
+    Object.prototype.hasOwnProperty.call(rawRecord, 'encryption')
+  );
+  const source = directV2 ? rawRecord : rawAccess;
+  const gate = normalizePayloadAccessGate(isObj(source) ? source.gate : undefined, fallbackGate);
+  const encryption = normalizePayloadEncryptionMode(isObj(source) ? source.encryption : undefined, fallbackEncryption);
+  const accessConditions = cloneAccessConditions(source);
+  return {
+    gate,
+    encryption,
+    mode: deriveLegacyPayloadAccessMode({ gate, encryption }),
+    ...(accessConditions ? { accessConditions } : {}),
+  };
+};
+
 const normalizeStorageProfileInput = (incoming) => {
   if (incoming == null) return null;
   if (isObj(incoming)) return incoming;
@@ -366,29 +465,31 @@ export const normalizeDeployStorageProfile = (incoming) => {
   };
   if (backend !== STORAGE_BACKENDS.CLOUDFLARE) return profile;
 
-  const rawCloudflare = isObj(raw.cloudflare) ? raw.cloudflare : {};
-  const rawAccess = isObj(raw.payloadAccessControl) ? raw.payloadAccessControl : {};
-  const accessMode = normalizePayloadAccessMode(
-    rawAccess.mode ||
-    rawCloudflare.payloadAccessMode ||
-    raw.payloadAccessMode ||
-    raw.accessControlMode
-  );
+  const accessControl = normalizePayloadAccessControl(raw);
+  const accessMode = accessControl.mode;
   const litEncrypted = accessMode === PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED;
+  const workerEnvelope = accessControl.encryption === PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE;
   const publicRead = accessMode === PAYLOAD_ACCESS_MODES.PUBLIC_READ;
   profile.payloadAccessControl = {
+    gate: accessControl.gate,
+    encryption: accessControl.encryption,
     mode: accessMode,
     enforcement: litEncrypted
       ? 'lit_access_control_conditions'
-      : (publicRead ? 'session_worker_public_read' : 'session_worker_sbt_gate'),
+      : (workerEnvelope
+        ? 'session_worker_envelope_conditions'
+        : (publicRead ? 'session_worker_public_read' : 'session_worker_sbt_gate')),
     litRequired: litEncrypted,
     label: litEncrypted
       ? 'Lit-encrypted Cloudflare payloads'
-      : (publicRead ? 'Public-read Cloudflare payloads' : 'Worker-enforced SBT access control'),
+      : (workerEnvelope
+        ? 'Worker-envelope encrypted Cloudflare payloads'
+        : (publicRead ? 'Public-read Cloudflare payloads' : 'Worker-enforced SBT access control')),
     resources: {
       ...DEFAULT_PAYLOAD_ACCESS_RESOURCES,
-      ...(isObj(rawAccess.resources) ? rawAccess.resources : {}),
+      ...(isObj(raw.payloadAccessControl?.resources) ? raw.payloadAccessControl.resources : {}),
     },
+    ...(accessControl.accessConditions ? { accessConditions: accessControl.accessConditions } : {}),
   };
   profile.sbtGatedAccess = {
     ...profile.sbtGatedAccess,
@@ -408,6 +509,11 @@ export const normalizeDeployStorageProfile = (incoming) => {
   };
   return profile;
 };
+
+const deployStorageRequiresEnvelopeKek = (storageProfile) => (
+  storageProfile?.backend === STORAGE_BACKENDS.CLOUDFLARE &&
+  storageProfile?.payloadAccessControl?.encryption === PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE
+);
 
 const firstTrimmed = (...values) => {
   for (const value of values) {
@@ -812,6 +918,29 @@ export const executeDeployHelperRequest = async ({
     });
   }
 
+  const envelopeKekSecretRequired = deployStorageRequiresEnvelopeKek(storageProfile);
+  let envelopeKekSecretSet = false;
+  if (envelopeKekSecretRequired) {
+    const envelopeKekResp = await cfFetch(apiToken, `/accounts/${accountId}/workers/scripts/${workerName}/secrets`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: STORAGE_ENVELOPE_KEK_SECRET_NAME,
+        type: 'secret_text',
+        text: randomSecret(),
+      }),
+    }, { fetchImpl });
+    if (!envelopeKekResp.ok) {
+      return buildFailure(502, {
+        error: envelopeKekResp.error,
+        detail: envelopeKekResp.detail,
+      }, {
+        fallbackEligible: shouldAllowFallbackForCloudflareFailure(envelopeKekResp),
+      });
+    }
+    envelopeKekSecretSet = true;
+  }
+
   const config = {
     registryAddress,
     registryChainId,
@@ -893,6 +1022,7 @@ export const executeDeployHelperRequest = async ({
     writesSessionConfig: true,
     writesSessionSecrets: true,
     tokenSecretSet: true,
+    envelopeKekSecretSet,
     subdomain,
     subdomainStatus,
     subdomainEnabled,

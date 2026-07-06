@@ -513,7 +513,7 @@ test('proxyCustomRPC rejects custom RPC URLs with userinfo before fetch', async 
   const result = await proxyCustomRPC({
     payload: {
       apiKey: 'sk-request',
-      rpcUrl: 'https://user:pass@rpc.example.test',
+      rpcUrl: 'https://user:[redacted-email]',
       prompt: 'ping',
     },
     secrets: {},

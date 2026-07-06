@@ -266,6 +266,9 @@ const baseProps = (): SessionWizardShellProps => ({
   sessionHeaderPreviewModalOpen: false,
   sessionHeaderPreviewSrc: '',
   sessionMetadataHeaderAccessory: <span data-testid="shell-session-id">session-id</span>,
+  sessionModeProfileControl: <section data-testid="shell-mode-profile">mode profile</section>,
+  showSessionModeProfileControlInSetup: false,
+  sessionModeProfileStepComplete: true,
   sessionUrl: '/session/demo-session',
   setBundleFile: jest.fn(),
   setBundleMode: jest.fn(),
@@ -327,6 +330,7 @@ describe('SessionWizardShell', () => {
     const publish = screen.getByTestId('shell-publish');
     const modals = screen.getByTestId('shell-modals');
 
+    expect(screen.queryByTestId('shell-mode-profile')).not.toBeInTheDocument();
     expect(header.compareDocumentPosition(requirements) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(requirements.compareDocumentPosition(sponsoredStatus) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(sponsoredStatus.compareDocumentPosition(rail) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -392,6 +396,24 @@ describe('SessionWizardShell', () => {
     expect(props.closeCreateSbtModal).toHaveBeenCalledTimes(1);
     expect(props.closeContractViewerModal).toHaveBeenCalledTimes(1);
     expect(props.onCloseSessionHeaderPreviewModal).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps setup status visible while the mode profile gates setup sections', () => {
+    const props = baseProps();
+    props.sessionModeProfileStepComplete = false;
+
+    render(<SessionWizardShell {...props} />);
+
+    expect(screen.getByTestId('shell-header')).toBeInTheDocument();
+    expect(screen.getByTestId('shell-requirements')).toBeInTheDocument();
+    expect(screen.getByTestId('shell-sponsored-status')).toBeInTheDocument();
+    expect(screen.getByTestId('shell-mode-profile')).toBeInTheDocument();
+    expect(screen.queryByTestId('shell-normal-rail')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('shell-encryption')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('shell-metadata')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('shell-worker')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('shell-publish')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('shell-modals')).not.toBeInTheDocument();
   });
 
   it('preserves section visibility and publish disabled state', () => {
