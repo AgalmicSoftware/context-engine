@@ -45,7 +45,6 @@ import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 import { buildResponseGatePolicy } from '../../utilities/crypto/litGatePolicy.js';
 import { resolveSbtDisplayLabel } from '../../utilities/sbt/sbtDisplayNames.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
-import { callAI } from '../../utilities/ai/aiScripts.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
 import { isDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
@@ -228,6 +227,9 @@ import {
 import {
   surveyResultsHtmlReportExporterPort,
 } from './surveyResultsHtmlReportExporterPort';
+import {
+  surveyResultsAnalysisGenerationPort,
+} from './surveyResultsAnalysisGenerationPort';
 import {
   runSurveyResultsQueuedRefreshController,
 } from './surveyResultsQueuedRefreshController';
@@ -3249,12 +3251,10 @@ try {
       `Generating ${label} (${index + 1}/${missingSections.length})`
     ));
     const prompt = buildSessionResultsAnalysisPrompt(aiPayload, section);
-    const rawOutput = await callAI(prompt, {
+    const rawOutput = await surveyResultsAnalysisGenerationPort.generateSection({
       maxTokens: HTML_REPORT_ANALYSIS_SECTION_MAX_TOKENS[section],
-      response_format: { type: 'json_object' },
+      prompt,
       sessionSlug: getEffectiveSlug() || '',
-      taskType: 'analysis',
-      thinking: true,
     });
     const sectionArtifact = surveyResultsAnalysisArtifactMergePort.normalizeGeneratedArtifact({
       generatedAt: new Date().toISOString(),
