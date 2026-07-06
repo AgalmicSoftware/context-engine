@@ -245,6 +245,8 @@ import {
 } from './surveyResultsHtmlReportDataModel';
 import {
   buildSurveyResultsAnalysisResponsesForExport,
+  buildSurveyResultsAnalysisSegmentDimensionsForExport,
+  readSurveyResultsAnalysisSafeLabel,
 } from './surveyResultsAnalysisDataModel';
 import {
   buildSurveyResultsHtmlReportModalProps,
@@ -2679,16 +2681,9 @@ return buildSurveyResultsAnalysisResponsesForExport({
 });
 };
 
-const getSessionResultsAnalysisSafeLabel = (value: unknown): string => {
-const text = String(value || '').replace(/\s+/g, ' ').trim();
-if (!text) return '';
-if (/^0x/i.test(text) || /0x[a-fA-F0-9]{6,}/.test(text)) return '';
-return text;
-};
-
 const getSessionResultsAnalysisSbtEntryLabel = (entry: unknown): string => {
 const record = toSurveyResultsRecord(entry);
-const direct = getSessionResultsAnalysisSafeLabel(
+const direct = readSurveyResultsAnalysisSafeLabel(
   record.label || record.name || record.title || record.sessionName || record.group || record.slug
 );
 if (direct) return direct;
@@ -2700,113 +2695,21 @@ const resolved = resolveSbtDisplayLabelForSurveyResults({
   fallback: 'short',
   preferredSlug: getEffectiveSlug() || '',
 });
-return getSessionResultsAnalysisSafeLabel(resolved);
+return readSurveyResultsAnalysisSafeLabel(resolved);
 };
 
 const getSessionResultsAnalysisSegmentDimensionsForExport = (): unknown[] => {
-const dimensions: unknown[] = [];
-const questions = getHtmlReportQuestionsForExport();
-
-const buildValues = (
-  counts: Map<string, { count: number; label: string; source?: string }>
-) => Array.from(counts.values())
-  .filter((value) => value.label)
-  .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label))
-  .map((value) => ({
-    count: value.count,
-    id: value.label,
-    label: value.label,
-    ...(value.source ? { source: value.source } : {}),
-  }));
-
-const tagCounts = new Map<string, { count: number; label: string; source?: string }>();
-questions.forEach((question) => {
-  const responseCount = Math.max(1, Number(question.responseCount || 0));
-  (Array.isArray(question.tags) ? question.tags : []).forEach((tag) => {
-    const label = getSessionResultsAnalysisSafeLabel(tag);
-    if (!label) return;
-    const key = label.toLowerCase();
-    const prev = tagCounts.get(key) || { count: 0, label, source: 'questionTags' };
-    prev.count += responseCount;
-    tagCounts.set(key, prev);
-  });
+return buildSurveyResultsAnalysisSegmentDimensionsForExport({
+  filterState: stateRef.current.filterState,
+  getQuestionEncryptionGates: (question) => (
+    getQuestionEncryptionGates(toSurveyResultsRecord(question) as SurveyResultsQuestionWithEncryption)
+  ),
+  getSbtEntryLabel: getSessionResultsAnalysisSbtEntryLabel,
+  networkQuestions: getNetworkQuestionsForCurrentContext(),
+  normalizeGateSbtEntries: (gate) => normalizeGateSbtEntries(toSurveyResultsRecord(gate) as SurveyResultsGateRecord),
+  participantCount: getHtmlReportParticipantCount(),
+  questions: getHtmlReportQuestionsForExport(),
 });
-const tagValues = buildValues(tagCounts);
-if (tagValues.length > 0) {
-  dimensions.push({
-    id: 'question_tags',
-    label: 'Question Tags',
-    source: 'questionTags',
-    values: tagValues,
-  });
-}
-
-const sbtFilter = toSurveyResultsRecord(toSurveyResultsRecord(stateRef.current.filterState).sbtFilter);
-const sbtCounts = new Map<string, { count: number; label: string; source?: string }>();
-const addSbtFilterEntries = (entries: unknown, prefix: string): void => {
-  if (!Array.isArray(entries)) return;
-  entries.forEach((entry) => {
-    const label = getSessionResultsAnalysisSbtEntryLabel(entry);
-    if (!label) return;
-    const fullLabel = `${prefix}: ${label}`;
-    const key = fullLabel.toLowerCase();
-    const prev = sbtCounts.get(key) || { count: 0, label: fullLabel, source: 'sbtFilter' };
-    prev.count += 1;
-    sbtCounts.set(key, prev);
-  });
-};
-addSbtFilterEntries(sbtFilter.selectedSBTGroups, 'Include');
-addSbtFilterEntries(sbtFilter.selectedSBTGroupsResponder, 'Responder include');
-addSbtFilterEntries(sbtFilter.selectedSBTGroupsCreator, 'Creator include');
-addSbtFilterEntries(sbtFilter.excludedSBTGroups, 'Exclude');
-addSbtFilterEntries(sbtFilter.excludedSBTGroupsResponder, 'Responder exclude');
-addSbtFilterEntries(sbtFilter.excludedSBTGroupsCreator, 'Creator exclude');
-if (sbtFilter.onlyVerifiedHumans) {
-  sbtCounts.set('verified_humans', {
-    count: getHtmlReportParticipantCount() || 1,
-    label: 'Verified humans',
-    source: 'sbtFilter',
-  });
-}
-const sbtValues = buildValues(sbtCounts);
-if (sbtValues.length > 0) {
-  dimensions.push({
-    id: 'active_sbt_filters',
-    label: 'Active SBT Filters',
-    source: 'sbtFilter',
-    values: sbtValues,
-  });
-}
-
-const gateCounts = new Map<string, { count: number; label: string; source?: string }>();
-const networkQuestions = getNetworkQuestionsForCurrentContext() as Record<string, SurveyResultsQuestionWithEncryption | undefined>;
-questions.forEach((question) => {
-  const questionId = String(question.id || '').trim();
-  const questionRecord = networkQuestions[questionId.toLowerCase()] || networkQuestions[questionId] || null;
-  const gates = getQuestionEncryptionGates(questionRecord);
-  gates.forEach((gate) => {
-    normalizeGateSbtEntries(gate).forEach((entry) => {
-      const label = getSessionResultsAnalysisSafeLabel(entry.label)
-        || getSessionResultsAnalysisSbtEntryLabel({ address: entry.address });
-      if (!label) return;
-      const key = label.toLowerCase();
-      const prev = gateCounts.get(key) || { count: 0, label, source: 'responseGates' };
-      prev.count += Math.max(1, Number(question.responseCount || 0));
-      gateCounts.set(key, prev);
-    });
-  });
-});
-const gateValues = buildValues(gateCounts);
-if (gateValues.length > 0) {
-  dimensions.push({
-    id: 'response_gates',
-    label: 'Response Gates',
-    source: 'responseGates',
-    values: gateValues,
-  });
-}
-
-return dimensions;
 };
 
 const buildSessionResultsAnalysisPayloadForAi = (): SurveyResultsAnalysisPayloadForAi => {

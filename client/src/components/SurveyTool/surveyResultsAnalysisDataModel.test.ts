@@ -1,5 +1,7 @@
 import {
   buildSurveyResultsAnalysisResponsesForExport,
+  buildSurveyResultsAnalysisSegmentDimensionsForExport,
+  readSurveyResultsAnalysisSafeLabel,
   readSurveyResultsAnalysisTextField,
 } from './surveyResultsAnalysisDataModel';
 
@@ -11,6 +13,12 @@ describe('surveyResultsAnalysisDataModel', () => {
     expect(readSurveyResultsAnalysisTextField({ answer: ' Delta ' })).toBe('Delta');
     expect(readSurveyResultsAnalysisTextField({ value: '*' })).toBe('');
     expect(readSurveyResultsAnalysisTextField({ value: { nested: true } })).toBe('');
+  });
+
+  it('normalizes safe analysis labels while rejecting addresses', () => {
+    expect(readSurveyResultsAnalysisSafeLabel(' Alpha   Beta ')).toBe('Alpha Beta');
+    expect(readSurveyResultsAnalysisSafeLabel('0x1234567890abcdef')).toBe('');
+    expect(readSurveyResultsAnalysisSafeLabel('group 0x1234567890abcdef')).toBe('');
   });
 
   it('builds survey-individual response rows from parsed response payloads', () => {
@@ -130,6 +138,83 @@ describe('surveyResultsAnalysisDataModel', () => {
         questionId: 'custom-id',
         questionPrompt: 'Custom prompt',
         questionType: 'custom-type',
+      },
+    ]);
+  });
+
+  it('builds segment dimensions from question tags and active SBT filters', () => {
+    const dimensions = buildSurveyResultsAnalysisSegmentDimensionsForExport({
+      filterState: {
+        sbtFilter: {
+          excludedSBTGroupsResponder: ['excluded-group'],
+          onlyVerifiedHumans: true,
+          selectedSBTGroups: ['alpha-group', 'alpha-group'],
+        },
+      },
+      getSbtEntryLabel: (entry) => String(entry).replace('-group', ' group'),
+      participantCount: 4,
+      questions: [
+        { id: 'q1', responseCount: 3, tags: ['Research', 'Ops'] },
+        { id: 'q2', responseCount: 0, tags: ['research', '0x1234567890abcdef'] },
+      ],
+    });
+
+    expect(dimensions).toEqual([
+      {
+        id: 'question_tags',
+        label: 'Question Tags',
+        source: 'questionTags',
+        values: [
+          { count: 4, id: 'Research', label: 'Research', source: 'questionTags' },
+          { count: 3, id: 'Ops', label: 'Ops', source: 'questionTags' },
+        ],
+      },
+      {
+        id: 'active_sbt_filters',
+        label: 'Active SBT Filters',
+        source: 'sbtFilter',
+        values: [
+          { count: 4, id: 'Verified humans', label: 'Verified humans', source: 'sbtFilter' },
+          { count: 2, id: 'Include: alpha group', label: 'Include: alpha group', source: 'sbtFilter' },
+          { count: 1, id: 'Responder exclude: excluded group', label: 'Responder exclude: excluded group', source: 'sbtFilter' },
+        ],
+      },
+    ]);
+  });
+
+  it('builds gate segment dimensions through injected gate ports', () => {
+    const dimensions = buildSurveyResultsAnalysisSegmentDimensionsForExport({
+      getQuestionEncryptionGates: (question) => Array.isArray((question as { gates?: unknown[] } | null)?.gates)
+        ? (question as { gates: unknown[] }).gates
+        : [],
+      getSbtEntryLabel: (entry) => {
+        const address = String((entry as { address?: unknown }).address || '');
+        return address === '0xabc' ? 'Fallback gate' : '';
+      },
+      networkQuestions: {
+        q1: { gates: ['gate-a'] },
+        q2: { gates: ['gate-b'] },
+      },
+      normalizeGateSbtEntries: (gate) => (
+        gate === 'gate-a'
+          ? [{ label: 'Direct gate' }, { address: '0xabc' }]
+          : [{ address: '0xmissing' }]
+      ),
+      questions: [
+        { id: 'Q1', responseCount: 2 },
+        { id: 'q2', responseCount: 5 },
+      ],
+    });
+
+    expect(dimensions).toEqual([
+      {
+        id: 'response_gates',
+        label: 'Response Gates',
+        source: 'responseGates',
+        values: [
+          { count: 2, id: 'Direct gate', label: 'Direct gate', source: 'responseGates' },
+          { count: 2, id: 'Fallback gate', label: 'Fallback gate', source: 'responseGates' },
+        ],
       },
     ]);
   });
