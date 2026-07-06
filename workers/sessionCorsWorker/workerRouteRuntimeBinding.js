@@ -179,6 +179,7 @@ export const createWorkerRouteRuntimeWithWorkerDeps = ({
       now: deps?.now,
       randomUUID: deps?.randomUUID,
       getSessionSecrets: deps?.getSessionSecrets,
+      putSessionConfig: deps?.putSessionConfig,
     },
     constants: {
       openAiTranscribeUrl: constants?.openAiTranscribeUrl,
