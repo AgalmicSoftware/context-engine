@@ -36,7 +36,7 @@ const LARGE_CLIENT_FILE_BASELINE = Object.freeze({
   'client/src/components/SBTs/SBTSelector.tsx': 2267,
   'client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.tsx': 2114,
   'client/src/utilities/survey/sessionQuestionCacheController.ts': 2200,
-  'client/src/utilities/ai/aiScripts.js': 2091,
+  'client/src/utilities/ai/aiClient.js': 2091,
   'client/src/components/CommunityTab/CommunityTab.tsx': 2127,
   'client/src/components/SurveyTool/SurveySelector.tsx': 2103,
   'client/src/utilities/sbt/sessionSbtCacheController.js': 2191,
