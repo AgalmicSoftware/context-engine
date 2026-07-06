@@ -173,6 +173,10 @@ describe('deploy-helper worker', () => {
       expect(uploadMetadata.bindings.some((binding) => binding.name === 'CE_STORAGE_INDEX_KV')).toBe(false);
       expect(uploadForm.get('worker.mjs')).toBeTruthy();
       expect(uploadForm.get('worker.js')).toBeNull();
+      const workerSecretWrites = fetchMock.calls
+        .filter(([url]) => String(url).endsWith('/workers/scripts/test-worker/secrets'))
+        .map(([, init]) => JSON.parse(init.body));
+      expect(workerSecretWrites.map((secret) => secret.name)).toEqual(['TOKEN_HMAC_SECRET']);
 
       const configWrite = fetchMock.calls[4];
       expect(JSON.parse(configWrite[1].body).allowOrigins).toEqual([
@@ -202,6 +206,67 @@ describe('deploy-helper worker', () => {
         'https://test-worker.tenant-subdomain.workers.dev/' // intentional: real URL — tests worker URL construction
       );
     } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('provisions an envelope KEK for worker-envelope storage without leaking it', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const fetchMock = makeFetchSequence([
+      new Response('export default { fetch() {} };', { status: 200 }),
+      cfSuccess({ id: 'kv-123' }),
+      cfSuccess({ id: 'worker-uploaded' }),
+      cfSuccess({}),
+      cfSuccess({}),
+      cfSuccess({}),
+      cfSuccess({}),
+      cfSuccess({ subdomain: 'tenant-subdomain', status: 'active' }),
+      cfSuccess({ enabled: true }),
+      cfSuccess({}),
+    ]);
+    global.fetch = fetchMock;
+
+    try {
+      const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        apiToken: 'cf-token',
+        accountId: 'acc-123',
+        workerName: 'test-worker',
+        sessionSlug: 'alpha-session',
+        bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
+        storageProfile: {
+          backend: 'cloudflare',
+          payloadAccessControl: { gate: 'sbt_gate', encryption: 'worker_envelope' },
+        },
+      }), {}, {});
+      const payload = await response.json();
+
+      expect(response.status).toBe(200);
+      const uploadMetadata = await readScriptUploadMetadata(fetchMock.calls[2]);
+      expect(uploadMetadata.bindings).toEqual(expect.arrayContaining([
+        { name: 'CE_STORAGE_INDEX_KV', type: 'kv_namespace', namespace_id: 'kv-123' },
+      ]));
+
+      const workerSecretWrites = fetchMock.calls
+        .filter(([url]) => String(url).endsWith('/workers/scripts/test-worker/secrets'))
+        .map(([, init]) => JSON.parse(init.body));
+      expect(workerSecretWrites.map((secret) => secret.name)).toEqual([
+        'TOKEN_HMAC_SECRET',
+        'CE_STORAGE_ENVELOPE_KEK',
+      ]);
+      const tokenSecret = workerSecretWrites[0].text;
+      const envelopeKek = workerSecretWrites[1].text;
+      expect(envelopeKek).toMatch(/^[0-9a-f]{64}$/);
+      expect(envelopeKek).not.toBe(tokenSecret);
+
+      const configWrite = JSON.parse(fetchMock.calls[5][1].body);
+      expect(configWrite.storageProfile.payloadAccessControl.encryption).toBe('worker_envelope');
+      expect(JSON.stringify(payload)).not.toContain(envelopeKek);
+      expect(JSON.stringify(configWrite)).not.toContain(envelopeKek);
+      expect(JSON.stringify(consoleLogSpy.mock.calls)).not.toContain(envelopeKek);
+      expect(JSON.stringify(consoleErrorSpy.mock.calls)).not.toContain(envelopeKek);
+    } finally {
+      consoleErrorSpy.mockRestore();
       consoleLogSpy.mockRestore();
     }
   });
