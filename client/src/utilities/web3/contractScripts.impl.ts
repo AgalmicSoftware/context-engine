@@ -101,7 +101,7 @@ import store from '../../store';
 import { sessionRegistryStore, sessionRegistryUtils } from './sessionRegistry.js';
 import { createContractHelperMethods } from './contractHelpers.js';
 import { createContractEventListenerMethods } from './chainEventStreams.js';
-import { createContractProfileMethods } from './contractProfile.js';
+import { createProfileChainReadMethods } from './profileChainReads.js';
 import { createChainEventScanMethods } from './chainEventScans.js';
 import {
   buildArweaveReadModeTag,
@@ -4563,7 +4563,7 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
     return Object.keys(counts?.burnedCountByAddress || {});
   },
 
-  ...createContractProfileMethods(contractProfileDeps),
+  ...createProfileChainReadMethods(contractProfileDeps),
 
 
   // SBT Functionality Ends -----------------------------

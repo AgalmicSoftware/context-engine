@@ -7,7 +7,7 @@
 - Split helper modules:
   - `client/src/utilities/web3/contractHelpers.ts`
   - `client/src/utilities/web3/chainEventStreams.ts`
-  - `client/src/utilities/web3/contractProfile.ts`
+  - `client/src/utilities/web3/profileChainReads.ts`
   - `client/src/utilities/web3/chainEventScans.ts`
   - `client/src/utilities/web3/chainMetadataResolution.ts`
 - Current lengths:
@@ -17,7 +17,8 @@
   - `contractHelpers.ts`: **1,040 lines**
   - `chainEventStreams.ts`: **554 lines**
   - `contractEventListeners.ts`: **2-line compatibility alias**
-  - `contractProfile.ts`: **1,151 lines**
+  - `profileChainReads.ts`: **1,151 lines**
+  - `contractProfile.ts`: **5-line compatibility alias**
   - `chainEventScans.ts`: **511 lines**
   - `contractScriptsEventScans.ts`: **5-line compatibility alias**
   - `chainMetadataResolution.ts`: **797 lines**
@@ -31,7 +32,7 @@ contractScripts.js  [CJS compatibility barrel for jest.spyOn]
      -> sessionRegistry.ts                 [session registry reads / cache / config]
      -> createContractHelperMethods(...)        [provider / block-window / cache helpers]
      -> createContractEventListenerMethods(...) [SBT / survey chain event streams]
-     -> createContractProfileMethods(...)       [SBT universe + user activity/profile scans]
+     -> createProfileChainReadMethods(...)     [SBT universe + user activity/profile scans]
      -> chainEventScans.ts                     [stateless event-scan helpers]
      -> chainMetadataResolution.ts             [metadata read / resolution helpers]
 ```
@@ -45,7 +46,7 @@ Route/page code now reaches selected `contractScripts` operations through purpos
 - Start in `sessionRegistry.ts` for session registry lookups, registry cache behavior, session config normalization, or chain-aware session metadata.
 - Start in `contractHelpers.ts` for block windows, latest block/gas, read-provider behavior, or faucet helpers.
 - Start in `chainEventStreams.ts` for long-lived listener registration and cleanup.
-- Start in `contractProfile.ts` for user-profile scans, SBT universe discovery, and memoized holdings/activity views.
+- Start in `profileChainReads.ts` for user-profile scans, SBT universe discovery, and memoized holdings/activity views.
 - Start in `chainEventScans.ts` for stateless historical event-scan helpers delegated from the main export object.
 - Start in `chainMetadataResolution.ts` for metadata URI resolution and stateless metadata read helpers delegated from the main export object.
 - Start in `contractScripts.impl.ts` for everything else: session lookup, decrypt policy, Arweave IO, tx submission, SBT creation/claim flows, and dependency wiring.
@@ -81,8 +82,9 @@ Route/page code now reaches selected `contractScripts` operations through purpos
 - Central place for attach/remove logic and listener dedupe behavior.
 - `contractEventListeners.ts` remains as a naming-migration alias for existing imports while callers move to the canonical stream name.
 
-### `contractProfile.ts`
+### `profileChainReads.ts`
 - Owns token-owner lookups, SBT universe discovery, per-user holdings memoization, minimal SBT summaries, and cross-domain activity aggregation.
+- `contractProfile.ts` remains as a naming-migration alias for existing imports while callers move to the canonical profile-read name.
 
 ### `chainEventScans.ts`
 - Owns stateless historical event-scan helpers split from the main implementation while preserving call-time delegation through the `contractScripts` object.
@@ -214,5 +216,5 @@ getAllSbtAddressesCached
 - If a bug is about missing results because of session scoping, inspect `getRelevantBlockWindowForFilter` in `contractHelpers.ts` plus the scope helpers in `contractScripts.impl.ts`.
 - If a bug is about masked metadata not decrypting, inspect `shouldAttemptGateDecrypt`, `maybeDecryptQuestionPayload`, `maybeDecryptSurveyPayload`, and the `get*Data` methods in `contractScripts.impl.ts`.
 - If a bug is about listeners double-firing or leaking, inspect `chainEventStreams.ts` before touching `MainSite`.
-- If a bug is about profile or SBT universe scans, inspect `contractProfile.ts` before expanding `contractScripts.impl.ts`.
+- If a bug is about profile or SBT universe scans, inspect `profileChainReads.ts` before expanding `contractScripts.impl.ts`.
 - If a test needs to spy on named exports, remember the stable entry point is still `contractScripts.js`, not `contractScripts.impl.ts`.

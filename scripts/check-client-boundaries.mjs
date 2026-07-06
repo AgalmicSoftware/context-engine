@@ -214,6 +214,10 @@ const isPassthroughFacadeRuleScope = (filePath) => (
   && !hasPathPrefix(filePath, 'client/src/app/runtime/')
 );
 
+const isNamingMigrationAlias = (sourceText) => (
+  /^\s*\/\*\*\s*naming-migration alias, remove per PRD 653\/654\.\s*\*\/\s*/.test(sourceText)
+);
+
 const isComponentRuntimeFacadeCandidate = (filePath) => (
   isComponentsPath(filePath)
   && /Runtime\.(?:js|jsx|ts|tsx)$/.test(path.posix.basename(filePath))
@@ -412,6 +416,9 @@ function collectPassthroughFacadeExportStats(sourceFile, sourceText) {
 
 export function evaluatePassthroughFacade({ source, sourceText }) {
   if (!isPassthroughFacadeRuleScope(source)) {
+    return [];
+  }
+  if (isNamingMigrationAlias(sourceText)) {
     return [];
   }
 

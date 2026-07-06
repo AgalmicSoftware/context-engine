@@ -63,7 +63,7 @@ const LARGE_CLIENT_FILE_BASELINE = Object.freeze({
   'client/src/components/Shared/AudioInput/AudioInput.tsx': 1194,
   'client/src/components/Sponsor/SponsorPage.tsx': 1300,
   'client/src/components/SBTs/createSbtGroupHelpers.ts': 1109,
-  'client/src/utilities/web3/contractProfile.ts': 1152,
+  'client/src/utilities/web3/profileChainReads.ts': 1152,
   'client/src/components/UserPage/userPageGateHelpers.ts': 1074,
   'client/src/utilities/web3/rpcProviders.ts': 1094,
   'client/src/components/SurveyTool/surveyResultsHelpers.ts': 1063,
