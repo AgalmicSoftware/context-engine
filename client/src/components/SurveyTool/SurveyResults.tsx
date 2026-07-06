@@ -247,6 +247,9 @@ import {
   buildSurveyResultsHtmlReportSnapshot,
 } from './surveyResultsHtmlReportSnapshotDataModel';
 import {
+  buildSurveyResultsLockedRows,
+} from './surveyResultsLockedResponsesModel';
+import {
   buildSurveyResultsAnalysisResponsesForExport,
   buildSurveyResultsAnalysisSegmentDimensionsForExport,
   readSurveyResultsAnalysisSafeLabel,
@@ -495,10 +498,6 @@ type SurveyResultsResponseListEntry = SurveyResultsRecord & {
   response?: (SurveyResultsRecord & { responses?: SurveyResultsRecord[] }) | null;
   responder: string;
   surveyId?: unknown;
-};
-type SurveyResultsAggregatorLockedResponseRow = SurveyResultsRecord & {
-  responder?: unknown;
-  response?: SurveyResultsResponseRecord | null;
 };
 type SurveyResultsLockedGateDetail = {
   address: string;
@@ -3524,79 +3523,24 @@ const getMemoizedLockedResponsesModel = (
     };
   }
 
-  const lockedRows: SurveyResultsLockedRow[] = [];
-
-  if (viewMode === 'survey' && surveyViewMode === 'individuals') {
-    const surveyResponses = Array.isArray(sbtFilteredResponses)
-      ? sbtFilteredResponses as SurveyResultsResponseListEntry[]
-      : [];
-    surveyResponses.forEach((surveyResponse) => {
-      const responder = String(surveyResponse?.responder || '').trim().toLowerCase();
-      const surveyId = String(surveyResponse?.surveyId || stateRef.current.surveyId || '').trim().toLowerCase();
-      const answers = Array.isArray(surveyResponse?.response?.responses)
-        ? surveyResponse.response.responses as SurveyResultsResponseRecord[]
-        : [];
-      answers.forEach((answerItem) => {
-        const questionId = String(answerItem?.questionID || answerItem?.questionId || '').trim().toLowerCase();
-        if (!questionId) return;
-        const key = getLockedResponseKey({
-          responder,
-          questionId,
-          surveyId,
-          response: answerItem,
-        });
-        const mergedResponse = applyDecryptedOverrideToResponse({
-          response: answerItem,
-          key,
-        });
-        if (
-          !isBannerEligibleLockedField(mergedResponse?.answer) &&
-          !isBannerEligibleLockedField(mergedResponse?.additional)
-        ) {
-          return;
-        }
-        lockedRows.push({
-          key,
-          responder,
-          surveyId,
-          questionId,
-          response: answerItem,
-          mergedResponse,
-        });
-      });
-    });
-  } else {
-    Object.entries(toSurveyResultsRecord(sbtFilteredAggregatorQuestionResponses)).forEach(([questionId, rows]) => {
-      const responseRows = Array.isArray(rows) ? rows as SurveyResultsAggregatorLockedResponseRow[] : [];
-      responseRows.forEach((row) => {
-        const responder = String(row?.responder || '').trim().toLowerCase();
-        const key = getLockedResponseKey({
-          responder,
-          questionId,
-          surveyId: stateRef.current.surveyId,
-          response: row?.response,
-        });
-        const mergedResponse = applyDecryptedOverrideToResponse({
-          response: row?.response,
-          key,
-        });
-        if (
-          !isBannerEligibleLockedField(mergedResponse?.answer) &&
-          !isBannerEligibleLockedField(mergedResponse?.additional)
-        ) {
-          return;
-        }
-        lockedRows.push({
-          key,
-          responder,
-          surveyId: stateRef.current.surveyId,
-          questionId: String(questionId || '').trim().toLowerCase(),
-          response: row?.response,
-          mergedResponse,
-        });
-      });
-    });
-  }
+  const lockedRows = buildSurveyResultsLockedRows({
+    aggregatorQuestionResponses: sbtFilteredAggregatorQuestionResponses,
+    applyDecryptedOverrideToResponse: ({ response, key }) => applyDecryptedOverrideToResponse({
+      response: response as SurveyResultsResponseRecord | null,
+      key,
+    }),
+    getLockedResponseKey: (args) => getLockedResponseKey({
+      ...args,
+      response: args.response as SurveyResultsResponseRecord | null,
+    }),
+    isBannerEligibleLockedField: (field) => (
+      isBannerEligibleLockedField(field as SurveyResultsEncryptedFieldRecord | null | undefined)
+    ),
+    sbtFilteredResponses,
+    surveyId: stateRef.current.surveyId,
+    surveyViewMode,
+    viewMode,
+  }) as SurveyResultsLockedRow[];
 
   const { gateDetails, hasGenericGateMessage } = buildLockedGateDetails(lockedRows, questionLookup);
   const result = {
