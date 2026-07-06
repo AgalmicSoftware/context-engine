@@ -106,12 +106,14 @@ import {
 } from './surveyToolDecryptFlow.js';
 
 // Crypto and contract utilities
-import contractScripts, {
+import {
   getAllSessionSlugs,
   getSessionConfigBySlug as getStrictSessionConfigBySlug,
-  getSessionSlugByName
-} from '../../utilities/web3/contractScripts.js';
-import { sessionRegistryStore } from '../../utilities/web3/sessionRegistry.js';
+  getSessionSlugByName,
+} from '../../domains/sessions/sessionConfig.js';
+import { surveyQuestionReadsPort } from '../../domains/surveys/surveyQuestionReadsPort.js';
+import { surveyResponseSubmitPort } from '../../domains/surveys/surveyResponseSubmitPort.js';
+import { sessionRegistryReadsPort } from '../../domains/sessions/registry/sessionRegistryReadPorts.js';
 import * as passkeyWallet from '../../wallet/passkeyWallet.js';
 import { ethers, utils } from 'ethers';
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
@@ -123,7 +125,7 @@ import { notify } from '../../utilities/ui/notify.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
 import { buildResponseGatePolicy } from '../../utilities/crypto/litGatePolicy.js';
-import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
+import { checkSponsoredAccess } from '../../domains/sessions/sponsoredAccess.js';
 import { getTemporaryDemoSessionQuestionFixtures } from '../../utilities/session/demoSessionQuestionFixtures.js';
 import { buildQuestionDecryptContextForSession } from '../../utilities/session/sessionQuestionDecryption.js';
 import {
@@ -136,10 +138,7 @@ import {
   shouldRetryMaskedQuestionRefresh,
 } from '../../utilities/survey/questionRouting.js';
 
-import {
-  sanitizeQuestionPromptForResponsePayload,
-  sanitizeSurveyTitleForResponsePayload,
-} from '../../utilities/arweave/noLeakPayloads.js';
+import { surveyResponseStoragePort } from '../../domains/storage/surveyResponseStoragePort.js';
 import {
   normalizeSessionSlug,
   resolveSessionAliases,
@@ -208,9 +207,6 @@ import {
   resolveSbtDisplayLabel,
   warmSbtDisplayNamesTargeted,
 } from '../../utilities/sbt/sbtDisplayNames.js';
-import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
-import { getLegacyArweaveTxId } from '../../utilities/storage/storageRefs.js';
-
 import {
   EMPTY_QUESTION_POOL,
   DEBUG_PREFILL,
@@ -1426,7 +1422,7 @@ const resolveLatestSurveyDecryptResponse = async (
   ) => (resolveLatestSurveyDecryptResponseHelper as any)(
     options,
     {
-      getLatestQuestionResponse: (contractScripts as any).getResponse,
+      getLatestQuestionResponse: surveyQuestionReadsPort.getResponse,
       getLatestSurveyResponse: getSurveyResponse,
     },
   );
@@ -1559,7 +1555,7 @@ const scheduleJsonPreviewUpdate = (delayMs: any = 120, force: any = false) => {
 const resolveResponseGateConfigBySlug = (slugIn: any) => {
     const slug: any = String(slugIn || '').trim().toLowerCase();
     return (
-      sessionRegistryStore.getSessionConfig(slug) ||
+      sessionRegistryReadsPort.getSessionConfig(slug) ||
       getStrictSessionConfigBySlug(slug)
     );
   };
@@ -2572,7 +2568,7 @@ const fetchQuestionPayloadWithDeterministicContext = async (questionId: any, opt
       const decryptContext: any = buildQuestionDecryptContext(candidateSlug);
       const litReady: any = !!(decryptContext?.litHooks && typeof decryptContext.litHooks.getKey === 'function');
       try {
-        const fetched: any = await (contractScripts as any).getQuestionData(
+        const fetched: any = await surveyQuestionReadsPort.getQuestionData(
           propsRef.current.provider,
           qid,
           candidateSlug,
@@ -3211,15 +3207,14 @@ const renderFullQuestionCardIcons = ({
     showResponseLookupSpinner,
     isQuestionBookmarked,
   }: any) => {
-    const arweaveTxId: any = getLegacyArweaveTxId(question);
     return (
       <QuestionCardLinks
         showResponseLookupSpinner={showResponseLookupSpinner}
         isQuestionBookmarked={isQuestionBookmarked}
         onBookmarkToggle={() => handleBookmarkToggle(question.id)}
-        arweaveHref={arweaveTxId
-          ? normalizeArweaveUrl(arweaveTxId, { contextLabel: 'survey_tool_question_link' })
-          : ''}
+        arweaveHref={surveyResponseStoragePort.buildQuestionArweaveHref(question, {
+          contextLabel: 'survey_tool_question_link',
+        })}
         questionHref={question.id
           ? buildQuestionRoutePath(question.id, { sessionSlug: inst._getEffectiveDraftSlug() })
           : ''}
@@ -4396,7 +4391,7 @@ const getLatestQuestionResponse = async (responder: any, questionId: any, networ
 
     let latest: any = null;
     try {
-      latest = await (contractScripts as any).getResponse(propsRef.current.provider, responder, questionId, slug);
+      latest = await surveyQuestionReadsPort.getResponse(propsRef.current.provider, responder, questionId, slug);
       if (latest) {
         const addrLower: any = String(responder || '').toLowerCase();
 
@@ -4737,7 +4732,11 @@ async function fetchQuestionPool() {
 
     if (!surveyData || !Array.isArray(surveyData.questionIDs) || surveyData.questionIDs.length === 0) {
       try {
-        surveyData = await (contractScripts as any).getSurveyDataById(propsRef.current.provider, surveyIdLower, effectiveSlug);
+        surveyData = await surveyQuestionReadsPort.getSurveyDataById(
+          propsRef.current.provider,
+          surveyIdLower,
+          effectiveSlug
+        );
         if (surveyData) {
           if (!Array.isArray(surveyData.questionIDs))
             surveyData.questionIDs = [];
@@ -5240,7 +5239,7 @@ async function fetchSingleQuestionData(opts: any = {}) {
       isMaskedQuestionPayload,
       fetchSingleQuestionMetadataCandidates: (args: any) => fetchSingleQuestionMetadataCandidates({
         ...args,
-        getQuestionData: (candidateSlug: any) => (contractScripts as any).getQuestionData(
+        getQuestionData: (candidateSlug: any) => surveyQuestionReadsPort.getQuestionData(
           propsRef.current.provider,
           questionId,
           candidateSlug,
@@ -5384,7 +5383,7 @@ async function fetchSingleQuestionData(opts: any = {}) {
               questionId: nextQuestionId,
               effectiveSingleSlug: nextSingleSlug,
               forceArweaveFetch = false,
-            }: any) => (contractScripts as any).getResponse(
+            }: any) => surveyQuestionReadsPort.getResponse(
               provider,
               nextResponderAddress,
               nextQuestionId,
@@ -5396,7 +5395,7 @@ async function fetchSingleQuestionData(opts: any = {}) {
               responderAddress: nextResponderAddress,
               questionId: nextQuestionId,
               effectiveSingleSlug: nextSingleSlug,
-            }: any) => (contractScripts as any).getResponseHash(
+            }: any) => surveyQuestionReadsPort.getResponseHash(
               provider,
               nextResponderAddress,
               nextQuestionId,
@@ -5427,7 +5426,7 @@ async function fetchSingleQuestionData(opts: any = {}) {
               responderAddress: nextResponderAddress,
               questionId: nextQuestionId,
               effectiveSingleSlug: nextSingleSlug,
-            }: any) => (contractScripts as any).getResponse(
+            }: any) => surveyQuestionReadsPort.getResponse(
               provider,
               nextResponderAddress,
               nextQuestionId,
@@ -6016,7 +6015,7 @@ const getSurveyResponse = async (responderAddress: any, surveyID: any) => {
       props: propsRef.current,
       network: propsRef.current.network,
     });
-    const surveyAnswers: any = await (contractScripts as any).getSurveyResponse(
+    const surveyAnswers: any = await surveyQuestionReadsPort.getSurveyResponse(
       propsRef.current.provider,
       responderAddress,
       surveyID,
@@ -6051,7 +6050,7 @@ const getSurveyMetadataForJson = (surveyHash: any) => {
       let sessionName: any = '';
       const netBucket: any = netIdStr ? (surveysCache?.[netIdStr] || null) : null;
       const s: any = netBucket?.surveys?.[surveyIdLower];
-      if (s?.title) surveyTitle = sanitizeSurveyTitleForResponsePayload(s);
+      if (s?.title) surveyTitle = surveyResponseStoragePort.sanitizeSurveyTitleForResponsePayload(s);
       if (s?.sessionName) sessionName = s.sessionName;
       else if (context.sessionConfig?.sessionName) sessionName = context.sessionConfig.sessionName;
 
@@ -6086,7 +6085,7 @@ const prepareJsonAndHash = (surveyIndex: any, responderAddress?: any, overrideSt
       },
       getConvictionFromSlice,
       getImportanceFromSlice,
-      sanitizeQuestionPromptForResponsePayload: sanitizeQuestionPromptForResponsePayload as any,
+      sanitizeQuestionPromptForResponsePayload: surveyResponseStoragePort.sanitizeQuestionPromptForResponsePayload,
     });
   };
 
@@ -7965,7 +7964,7 @@ const submitSurveyResponse = async (overrideState: any = null, overrideChangedQi
     const hashedSurveyId: any = ensureIdentifierHash(surveyId, hashDeps);
 
     // Submit tx (must actually send or we throw)
-    const tx: any = await (contractScripts as any).submitResponses(
+    const tx: any = await surveyResponseSubmitPort.submitResponses(
       context.provider,
       hashedQuestionIds,
       questionResponses,
