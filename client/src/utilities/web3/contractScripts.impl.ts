@@ -134,20 +134,9 @@ import { resolveSessionStorageBackend } from '../storage/sessionStorageConfig.js
 import store from '../../store';
 import { sessionRegistryStore, sessionRegistryUtils } from './sessionRegistry.js';
 import { createContractHelperMethods } from './contractHelpers.js';
-import { createContractEventListenerMethods } from './chainEventStreams.js';
-import { createProfileChainReadMethods } from './profileChainReads.js';
-import { createChainEventScanMethods } from './chainEventScans.js';
-import {
-  buildArweaveReadModeTag,
-  buildDecryptModeTag,
-  buildFailureModeTag,
-  createChainMetadataResolutionHelpers,
-} from './chainMetadataResolution.js';
-import { createContractScriptsSurveyEventReadMethods } from './contractScripts.surveyEventReadMethods.js';
-import { createContractScriptsSurveyPayloadReadMethods } from './contractScripts.surveyPayloadReadMethods.js';
-import { createContractScriptsSurveyWriteMethods } from './contractScripts.surveyWriteMethods.js';
-import { createContractScriptsSbtRegistryMethods } from './contractScripts.sbtRegistryMethods.js';
-import { createContractScriptsSbtMintMethods } from './contractScripts.sbtMintMethods.js';
+import { createContractEventListenerMethods } from './contractEventListeners.js';
+import { createContractProfileMethods } from './contractProfile.js';
+import { createContractScriptsEventScanMethods } from './contractScriptsEventScans.js';
 import {
   getReadProviderForGroup,
   getReadProviderForSession,
@@ -990,7 +979,7 @@ const profileChainReadDeps: any = {
   latestBlockCache,
 };
 
-const contractEventScanMethods = createChainEventScanMethods({
+const contractEventScanMethods = createContractScriptsEventScanMethods({
   ethers,
   SURVEYS,
   SURVEYS_INTERFACE,
@@ -1002,108 +991,6 @@ const contractEventScanMethods = createChainEventScanMethods({
   rpcLog,
   contractsLog,
 });
-
-const contractScriptsRuntimeDeps = {
-  ARWEAVE_ACTIVE,
-  CUSTOM_SBT_ABI,
-  CUSTOM_SBT_INTERFACE,
-  GAS_FALLBACKS,
-  HASH_MISS_SENTINEL,
-  HASH_READ_MAX_ENTRIES,
-  HASH_READ_TTL_MS,
-  READ_INFLIGHT,
-  READ_MEMO,
-  SBT_FACTORY_ABI,
-  SBT_FACTORY_INTERFACE,
-  SBT_READ_PROVIDER_OPTIONS,
-  SBT_TOKENURI_METADATA_GATEWAYS,
-  SBT_TOKENURI_METADATA_TIMEOUT_MS,
-  STORAGE_BACKENDS,
-  STORAGE_RESOURCE_KEYS,
-  SURVEYS,
-  SURVEYS_INTERFACE,
-  arweaveClient,
-  attachStorageRefCompatibilityFields,
-  attachPayloadPointerFields,
-  buildArweaveDebugContext,
-  buildArweaveReadModeTag,
-  buildDecryptModeTag,
-  buildFailureModeTag,
-  buildHashReadInflightKey,
-  buildHashReadMemoKey,
-  buildHashUnavailableMetadataError,
-  buildSbtScopeMemoTag,
-  callWithRetry,
-  clearReadCachesForGroup,
-  cloneJsonSafe,
-  contractEventScanMethods,
-  contractsLog,
-  createSbtEventScanProgressState,
-  cryptoUtils,
-  deriveSbtHistorySummaryFromCounts,
-  downloadArweaveTextForGroup,
-  ethers,
-  extractChainId,
-  fetchLogsSmartWithProvider,
-  getLocalAwareReadProviderForGroup,
-  getReadProviderForChain,
-  getSessionAddresses,
-  getSurveysReadProviderForSession,
-  getTimedMemoValue,
-  hasNonZeroHashValue,
-  hasPasswordMintForSbtMintMode,
-  inviteLog,
-  isCallExceptionError,
-  isCloudflareStorageResource,
-  isNonexistentTokenError,
-  isObj,
-  isRetryableSurveyResponseReadError,
-  latestBlockCache,
-  logArweaveMetadataFetchFailure,
-  markHashRevertLoggedOnce,
-  maybeWrapUnsupportedConfiguredDeterministicFactoryError,
-  memoizedResolveSession,
-  normalizeAddress,
-  normalizeArweaveUrl,
-  normalizeConvictionImportance,
-  normalizeCreate2Salt,
-  normalizeHistorySummaryCount,
-  normalizeQuestionFlags,
-  normalizeSbtHistorySummary,
-  normalizeSbtSessionLinkFields,
-  normalizeSessionNameFields,
-  normalizeSessionSlug,
-  normalizeStorageRef,
-  notify,
-  notifyUserFacingTransactionError,
-  parseArweaveTxId,
-  questionHashRevertLogged,
-  readPayloadPointerTextForGroup,
-  recordTerminalArweaveInvalidFailure,
-  resolveGroupPasswordWalletScopeSbtAddress,
-  resolveReadContext,
-  resolveReadProvider,
-  resolveArweaveUploadOpts,
-  refreshSessionRegistryFieldsCache: sessionRegistryUtils.refreshSessionRegistryFieldsCache,
-  resolveSession,
-  resolveSessionByName,
-  resolveSessionNameValue,
-  resolveStorageSessionSlug,
-  resolveTxGasOverrides,
-  rpcLog,
-  runInFlightCoalesced,
-  runWithSoftTimeout,
-  sendContractWriteViaProvider,
-  setTimedMemoValue,
-  shouldLog,
-  surveyHashRevertLogged,
-  uploadJsonPayloadForContractPointer,
-  utils,
-  validateNoLockedPlaintextInPayload,
-  get contractMetadataResolutionHelpers() {
-    return contractMetadataResolutionHelpers;
-  },
-};
 
 async function resolveGroupPasswordWalletScopeSbtAddress({
   password,
@@ -1150,49 +1037,8 @@ const contractScripts: any = {
   ...createContractHelperMethods(contractHelperDeps),
   ...createContractEventListenerMethods(contractEventListenerDeps),
 
-  async fetchAllQuestionIDs(providerName, fromBlock = null, toBlock = null, groupKeyOrCfg = null) {
-  const cfg    = resolveSession(groupKeyOrCfg || '');
-  const gAddrs = getSessionAddresses(cfg);
-  const addr   = (gAddrs.surveys?.address);
-  const chId   = (gAddrs.surveys?.chainId) || (cfg?.networkChainId) || undefined;
-
-  const provider =
-    getReadProviderForGroup(groupKeyOrCfg, { contractKey: 'surveys' }) ||
-    getReadProviderForChain(chId);
-  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider);
-  const questionsAddedEventFilter = SurveyContract.filters.QuestionsAdded(null, null, null);
-
-  // Per-group base window + clamp caller overrides
-  const { fromBlock: baseFrom, toBlock: baseTo } =
-    await this.getRelevantBlockWindowForFilter(groupKeyOrCfg);
-
-  const fromBlockNum = Number.isFinite(Number(fromBlock))
-    ? Math.max(Number(fromBlock), baseFrom)
-    : baseFrom;
-
-  const toBlockNum = (toBlock === 'latest' || typeof toBlock !== 'number')
-    ? baseTo
-    : Math.min(Number(toBlock), baseTo);
-
-  if (fromBlockNum > toBlockNum) return [];
-
-  rpcLog('fetchAllQuestionIDs: Fetching logs with fetchLogsSmartWithProvider:', {
-    address: SurveyContract.address, fromBlock: fromBlockNum, toBlock: toBlockNum
-  });
-
-  const rawLogs = await fetchLogsSmartWithProvider(provider, questionsAddedEventFilter, fromBlockNum, toBlockNum);
-  const events = rawLogs.map(log => SURVEYS_INTERFACE.parseLog(log));
-
-  const questionIDSet = new Set();
-  events.forEach(event => {
-    const questionIds = event.args.questionIds;
-    questionIds.forEach(id => {
-      if (id && id !== ethers.constants.HashZero) {
-        questionIDSet.add(id.toLowerCase());
-      }
-    });
-  });
-  return Array.from(questionIDSet);
+  async fetchAllQuestionIDs(providerName: any, fromBlock: any = null, toBlock: any = null, groupKeyOrCfg: any = null) {
+    return contractEventScanMethods.fetchAllQuestionIDs(this, providerName, fromBlock, toBlock, groupKeyOrCfg);
   },
 
   // === CHANGED: +groupKeyOrCfg (optional). Uses group provider/addr and clamps
@@ -1205,120 +1051,16 @@ const contractScripts: any = {
     groupKeyOrCfg,
     scanOptions = null
   ) {
-    const cfg    = resolveSession(groupKeyOrCfg || '');
-    const gAddrs = getSessionAddresses(cfg);
-    const addr   = (gAddrs.surveys?.address);
-    const chId   = (gAddrs.surveys?.chainId) || (cfg?.networkChainId) || undefined;
-    if (!addr) {
-      contractsLog.warn('[getAllQuestionIDsChunkedWithCallback] Missing surveys address; skipping scan.', {
-        group: cfg?.slug || '',
-      });
-      if (onPartialData) onPartialData([], Number(fromBlock) || 0);
-      return [];
-    }
-
-    const provider = getReadProviderForChain(chId);
-    const contract = new ethers.Contract(addr, SURVEYS, provider);
-    const questionsAddedEventFilter = contract.filters.QuestionsAdded();
-    const rpcDebugContext = normalizeRpcDebugContext(scanOptions?.rpcDebugContext) || null;
-
-    // Per-group base window + clamp caller overrides
-    const { fromBlock: baseFrom, toBlock: baseTo } =
-      await this.getRelevantBlockWindowForFilter(groupKeyOrCfg);
-
-    const resolvedFromBlock = Number.isFinite(Number(fromBlock))
-      ? Math.max(Number(fromBlock), baseFrom)
-      : baseFrom;
-
-    const resolvedToBlockNum = (toBlock === 'latest' || typeof toBlock !== 'number')
-      ? baseTo
-      : Math.min(Number(toBlock), baseTo);
-
-    if (resolvedFromBlock > resolvedToBlockNum) {
-      if (onPartialData) onPartialData([], resolvedFromBlock);
-      return [];
-    }
-
-    try {
-      rpcLog('getAllQuestionIDsChunkedWithCallback: Fetching logs:', {
-        contractAddress: contract.address, fromBlock: resolvedFromBlock, toBlock: resolvedToBlockNum
-      });
-      const totalRangeBlocks = Math.max(0, resolvedToBlockNum - resolvedFromBlock + 1);
-      const progressState = onChunkProgress ? {
-        phase: 'scan',
-        fromBlock: resolvedFromBlock,
-        toBlock: resolvedToBlockNum,
-        totalBlocks: totalRangeBlocks,
-        scannedBlocks: 0,
-        onProgress: (p) => {
-          const totalBlocks = Math.max(0, Number(p?.totalBlocks || totalRangeBlocks));
-          const doneSoFarBlocks = Math.max(0, Math.min(totalBlocks, Number(p?.scannedBlocks || 0)));
-          const remainingBlocks = Math.max(0, Number(p?.remainingBlocks ?? (totalBlocks - doneSoFarBlocks)));
-          onChunkProgress({
-            phase: 'scan',
-            fromBlock: resolvedFromBlock,
-            toBlock: resolvedToBlockNum,
-            chunkFrom: Number(p?.scanFrom ?? p?.lastScannedBlock ?? resolvedFromBlock),
-            chunkTo: Number(p?.scanTo ?? p?.lastScannedBlock ?? resolvedFromBlock),
-            doneSoFarBlocks,
-            totalRangeBlocks: totalBlocks,
-            remainingBlocks,
-            chunkEventCount: 0,
-            overallEventCount: 0,
-          });
-        },
-      } : null;
-
-      const rawLogs = await fetchLogsSmartWithProvider(
-        provider,
-        questionsAddedEventFilter,
-        resolvedFromBlock,
-        resolvedToBlockNum,
-        0,
-        20,
-        progressState,
-        rpcDebugContext
-      );
-      const allEvents = rawLogs.map(log => SURVEYS_INTERFACE.parseLog(log));
-
-      const questionIDSet = new Set();
-      allEvents.forEach((ev) => {
-        const qArr = ev.args.questionIds;
-        if (qArr && Array.isArray(qArr)) {
-          qArr.forEach((qId) => {
-            if (qId && qId !== ethers.constants.HashZero) {
-              questionIDSet.add(qId.toLowerCase());
-            }
-          });
-        }
-      });
-
-      const finalQIDs = Array.from(questionIDSet);
-
-      if (onChunkProgress) {
-        onChunkProgress({
-          phase: 'scan',
-          fromBlock: resolvedFromBlock,
-          toBlock: resolvedToBlockNum,
-          chunkFrom: resolvedFromBlock,
-          chunkTo: resolvedToBlockNum,
-          doneSoFarBlocks: totalRangeBlocks,
-          totalRangeBlocks: totalRangeBlocks,
-          remainingBlocks: 0,
-          chunkEventCount: allEvents.length,
-          overallEventCount: finalQIDs.length
-        });
-      }
-
-      if (onPartialData) {
-        onPartialData(finalQIDs, resolvedToBlockNum);
-      }
-
-      return finalQIDs;
-    } catch(error) {
-      contractsLog.error("getAllQuestionIDsChunkedWithCallback failed:", error);
-      throw error;
-    }
+    return contractEventScanMethods.getAllQuestionIDsChunkedWithCallback(
+      this,
+      providerName,
+      fromBlock,
+      toBlock,
+      onChunkProgress,
+      onPartialData,
+      groupKeyOrCfg,
+      scanOptions
+    );
   },
 
   async getResponsesByQuestionID(providerName, questionId, fromBlock = null, toBlock = null, groupKeyOrCfg = null) {
@@ -1549,40 +1291,15 @@ const contractScripts: any = {
   },
 
 
-  async getSurveyResponsesByAddress(providerName, userAddress, fromBlock = null, toBlock = null, groupKeyOrCfg = null) {
-  // Ensure user-profile scans do not inherit stale latest-block bounds.
-  latestBlockCache._map = {};
-  const cfg    = resolveSession(groupKeyOrCfg || '');
-  const gAddrs = getSessionAddresses(cfg);
-  const addr   = (gAddrs.surveys?.address);
-  const chId   = (gAddrs.surveys?.chainId) || (cfg?.networkChainId) || undefined;
-
-  const provider = getReadProviderForChain(chId);
-  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider);
-  const responseSubmittedEventTopic = SurveyContract.filters.ResponsesSubmitted(userAddress, null, null);
-
-  // Per-group base window + clamp caller overrides
-  const { fromBlock: baseFrom, toBlock: baseTo } =
-    await this.getRelevantBlockWindowForFilter(groupKeyOrCfg);
-
-  const fromBlockNum = Number.isFinite(Number(fromBlock))
-    ? Math.max(Number(fromBlock), baseFrom)
-    : baseFrom;
-
-  const toBlockNum = (toBlock === 'latest' || typeof toBlock !== 'number')
-    ? baseTo
-    : Math.min(Number(toBlock), baseTo);
-
-  if (fromBlockNum > toBlockNum) return [];
-
-  rpcLog('getSurveyResponsesByAddress: Fetching logs with fetchLogsSmartWithProvider:', {
-    address: SurveyContract.address, fromBlock: fromBlockNum, toBlock: toBlockNum
-  });
-  const rawLogs = await fetchLogsSmartWithProvider(provider, responseSubmittedEventTopic, fromBlockNum, toBlockNum);
-  const surveyResponseEvents = rawLogs.map(log => SURVEYS_INTERFACE.parseLog(log));
-
-  var surveyIDs = surveyResponseEvents.map(event => event.args.surveyId);
-  return surveyIDs;
+  async getSurveyResponsesByAddress(providerName: any, userAddress: any, fromBlock: any = null, toBlock: any = null, groupKeyOrCfg: any = null) {
+  return contractEventScanMethods.getSurveyResponsesByAddress(
+    this,
+    providerName,
+    userAddress,
+    fromBlock,
+    toBlock,
+    groupKeyOrCfg
+  );
 },
 
   async getSurveyResponses(providerName, fromCustomBlock = 0, toCustomBlock = 'latest', groupKeyOrCfg = null) {
@@ -1630,38 +1347,15 @@ const contractScripts: any = {
   return surveyResponses;
 },
 
-  async getSurveysCreatedByAddress(providerName, userAddress, fromBlock = null, toBlock = null, groupKeyOrCfg = null) {
-  const cfg    = resolveSession(groupKeyOrCfg || '');
-  const gAddrs = getSessionAddresses(cfg);
-  const addr   = (gAddrs.surveys?.address);
-  const chId   = (gAddrs.surveys?.chainId) || (cfg?.networkChainId) || undefined;
-
-  const provider = getReadProviderForChain(chId);
-  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider);
-  const surveyCreatedEventTopic = SurveyContract.filters.SurveyAdded(userAddress, null);
-
-  // Per-group base window + clamp caller overrides
-  const { fromBlock: baseFrom, toBlock: baseTo } =
-    await this.getRelevantBlockWindowForFilter(groupKeyOrCfg);
-
-  const fromBlockNum = Number.isFinite(Number(fromBlock))
-    ? Math.max(Number(fromBlock), baseFrom)
-    : baseFrom;
-
-  const toBlockNum = (toBlock === 'latest' || typeof toBlock !== 'number')
-    ? baseTo
-    : Math.min(Number(toBlock), baseTo);
-
-  if (fromBlockNum > toBlockNum) return [];
-
-  rpcLog('getSurveysCreatedByAddress: Fetching logs with fetchLogsSmartWithProvider:', {
-    address: SurveyContract.address, fromBlock: fromBlockNum, toBlock: toBlockNum
-  });
-  const rawLogs = await fetchLogsSmartWithProvider(provider, surveyCreatedEventTopic, fromBlockNum, toBlockNum);
-  const events = rawLogs.map(log => SURVEYS_INTERFACE.parseLog(log));
-
-  var surveyIDs = events.map(event => event.args.surveyId);
-  return surveyIDs;
+  async getSurveysCreatedByAddress(providerName: any, userAddress: any, fromBlock: any = null, toBlock: any = null, groupKeyOrCfg: any = null) {
+  return contractEventScanMethods.getSurveysCreatedByAddress(
+    this,
+    providerName,
+    userAddress,
+    fromBlock,
+    toBlock,
+    groupKeyOrCfg
+  );
 },
 
   async getQuestionResponses(
@@ -1888,121 +1582,27 @@ const contractScripts: any = {
   }
 },
 
-  async getQuestionsCreatedByAddress(providerName, userAddress, fromBlock = null, toBlock = null, groupKeyOrCfg = null) {
-  const cfg    = resolveSession(groupKeyOrCfg || '');
-  const gAddrs = getSessionAddresses(cfg);
-  const addr   = (gAddrs.surveys?.address);
-  const chId   = (gAddrs.surveys?.chainId) || (cfg?.networkChainId) || undefined;
-
-  const provider = getReadProviderForChain(chId);
-  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider);
-  const questionsAddedEventFilter = SurveyContract.filters.QuestionsAdded(userAddress, null, null);
-
-  // Per-group base window + clamp caller overrides
-  const { fromBlock: baseFrom, toBlock: baseTo } =
-    await this.getRelevantBlockWindowForFilter(groupKeyOrCfg);
-
-  const fromBlockNum = Number.isFinite(Number(fromBlock))
-    ? Math.max(Number(fromBlock), baseFrom)
-    : baseFrom;
-
-  const toBlockNum = (toBlock === 'latest' || typeof toBlock !== 'number')
-    ? baseTo
-    : Math.min(Number(toBlock), baseTo);
-
-  if (fromBlockNum > toBlockNum) return [];
-
-  rpcLog('getQuestionsCreatedByAddress: Fetching logs with fetchLogsSmartWithProvider:', {
-    address: SurveyContract.address, fromBlock: fromBlockNum, toBlock: toBlockNum
-  });
-  const rawLogs = await fetchLogsSmartWithProvider(provider, questionsAddedEventFilter, fromBlockNum, toBlockNum);
-  const events = rawLogs.map(log => SURVEYS_INTERFACE.parseLog(log));
-
-  const questionIDs = [];
-  events.forEach(event => {
-    const questionIds = event.args.questionIds;
-    questionIds.forEach(id => {
-      if (id && id !== ethers.constants.HashZero) {
-        questionIDs.push(id.toLowerCase());
-      }
-    });
-  });
-  return questionIDs;
+  async getQuestionsCreatedByAddress(providerName: any, userAddress: any, fromBlock: any = null, toBlock: any = null, groupKeyOrCfg: any = null) {
+  return contractEventScanMethods.getQuestionsCreatedByAddress(
+    this,
+    providerName,
+    userAddress,
+    fromBlock,
+    toBlock,
+    groupKeyOrCfg
+  );
 },
 
-  async getQuestionResponsesByAddress(providerName, userAddress, fromBlock = null, toBlock = null, groupKeyOrCfg = null, opts = {}) {
-  // Ensure user-profile scans do not inherit stale latest-block bounds.
-  latestBlockCache._map = {};
-  const cfg    = resolveSession(groupKeyOrCfg || '');
-  const gAddrs = getSessionAddresses(cfg);
-  const addr   = (gAddrs.surveys?.address);
-  const chId   = (gAddrs.surveys?.chainId) || (cfg?.networkChainId) || undefined;
-
-  const provider = getReadProviderForChain(chId);
-  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider);
-  const responsesSubmittedEventFilter = SurveyContract.filters.ResponsesSubmitted(userAddress, null);
-
-  // Per-group base window + clamp caller overrides
-  const { fromBlock: baseFrom, toBlock: baseTo } =
-    await this.getRelevantBlockWindowForFilter(groupKeyOrCfg);
-
-  const fromBlockNum = Number.isFinite(Number(fromBlock))
-    ? Math.max(Number(fromBlock), baseFrom)
-    : baseFrom;
-
-  const toBlockNum = (toBlock === 'latest' || typeof toBlock !== 'number')
-    ? baseTo
-    : Math.min(Number(toBlock), baseTo);
-
-  if (fromBlockNum > toBlockNum) return [];
-
-  rpcLog('getQuestionResponsesByAddress: Fetching logs with fetchLogsSmartWithProvider:', {
-    address: SurveyContract.address, fromBlock: fromBlockNum, toBlock: toBlockNum
-  });
-  const withMeta = !!(opts && opts.withMeta === true);
-  const rawLogs = await fetchLogsSmartWithProvider(provider, responsesSubmittedEventFilter, fromBlockNum, toBlockNum);
-  const latestByQuestion = new Map();
-  rawLogs.forEach((log) => {
-    let event;
-    try {
-      event = SURVEYS_INTERFACE.parseLog(log);
-    } catch (_) {
-      event = null;
-    }
-    if (!event) return;
-    const questionIds = Array.isArray(event?.args?.questionIds) ? event.args.questionIds : [];
-    const blockNumber = Number(log?.blockNumber || 0);
-    const transactionIndex = Number(log?.transactionIndex || 0);
-    const logIndex = Number(log?.logIndex || 0);
-    questionIds.forEach((id) => {
-      if (!id || id === ethers.constants.HashZero) return;
-      const qid = String(id || '').toLowerCase();
-      if (!qid) return;
-      const prev = latestByQuestion.get(qid);
-      const isNewer =
-        !prev ||
-        blockNumber > Number(prev.blockNumber || 0) ||
-        (
-          blockNumber === Number(prev.blockNumber || 0) &&
-          (
-            transactionIndex > Number(prev.transactionIndex || 0) ||
-            (
-              transactionIndex === Number(prev.transactionIndex || 0) &&
-              logIndex > Number(prev.logIndex || 0)
-            )
-          )
-        );
-      if (!isNewer) return;
-      latestByQuestion.set(qid, {
-        questionId: qid,
-        blockNumber,
-        transactionIndex,
-        logIndex,
-      });
-    });
-  });
-  const entries = Array.from(latestByQuestion.values());
-  return withMeta ? entries : entries.map((entry) => entry.questionId);
+  async getQuestionResponsesByAddress(providerName: any, userAddress: any, fromBlock: any = null, toBlock: any = null, groupKeyOrCfg: any = null, opts: any = {}) {
+  return contractEventScanMethods.getQuestionResponsesByAddress(
+    this,
+    providerName,
+    userAddress,
+    fromBlock,
+    toBlock,
+    groupKeyOrCfg,
+    opts
+  );
 },
 
   async fetchUserSubmittedSurveyIDs(providerName, fromBlock = null, toBlock = null, groupKeyOrCfg) {
