@@ -336,6 +336,7 @@ test('createWorkerRouteShellWithWorkerDeps preserves admin and anonymous branch 
             normalizeSignedWorkerRequest: 'normalizeSignedWorkerRequest',
             resolveWorkerBodySlugContext: 'resolveWorkerBodySlugContext',
             isAddress: 'isAddress',
+            getAddress: 'getAddress',
             resolveExistingSessionCors: 'resolveExistingSessionCors',
             verifyMessage: 'verifyMessage',
             validateRecoveredAddressMatchesRequest: 'validateRecoveredAddressMatchesRequest',

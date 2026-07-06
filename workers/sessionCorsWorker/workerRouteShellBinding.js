@@ -211,6 +211,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
           normalizeSignedWorkerRequest: deps?.normalizeSignedWorkerRequest,
           resolveWorkerBodySlugContext: deps?.resolveWorkerBodySlugContext,
           isAddress: deps?.isAddress,
+          getAddress: deps?.getAddress,
           resolveExistingSessionCors: deps?.resolveExistingSessionCors,
           verifyMessage: deps?.verifyMessage,
           validateRecoveredAddressMatchesRequest: deps?.validateRecoveredAddressMatchesRequest,
