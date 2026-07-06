@@ -25,6 +25,7 @@ bash scripts/sync-public-history.sh --push --force-with-lease release-staging
 
 # Stripped release artifact
 make release                 # output in ./release-public/
+npm run verify:public-release-pii -- release-public
 make release RELEASE_DIR=./out   # custom output path
 make release-clean           # delete the artifact
 ```
@@ -99,28 +100,13 @@ For the artifact workflow, a fresh `private-pack.manifest.json` is generated in 
 
 ## PII scan
 
-After building the artifact, run a PII and secrets scan before publishing:
+After building the artifact, run the public PII and secrets scanner before publishing:
 
 ```bash
-cd release-public
-
-# Email addresses
-rg -n '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' --type-not binary
-
-# Wallet addresses
-rg -n '0x[0-9a-fA-F]{40}' --type-not binary
-
-# Home directory paths
-rg -n '/Users/|/home/' --type-not binary
-
-# Secrets
-rg -n -i '(api[_-]?key|secret|password|token|credential)\s*[:=]' --type-not binary
-
-# Internal hostnames
-rg -n '(\.internal|\.local|\.corp|\.private)' --type-not binary
+npm run verify:public-release-pii -- release-public
 ```
 
-Review each match. Published contract addresses, `localhost`, and `example.com` are typically safe.
+The scanner fails on email addresses, local home-directory paths, concrete secret assignments, PEM private-key blocks, and private-key-shaped 64-hex values. It warns on bare `0x` values because published contract addresses, transaction hashes, and demo IDs are often legitimate public data.
 
 ## Workflow
 
@@ -132,4 +118,4 @@ Review each match. Published contract addresses, `localhost`, and `example.com` 
    - The command fails before push if any public source file still imports a stripped private path, if test wiring or type-debt checks fail, or if public Node tests fail
 4. Open or update the PR from `release-staging` into `main`
 5. Choose the merge method intentionally: `Merge pull request` preserves the replayed `release-staging` commit SHAs on `main`, while `Rebase and merge` keeps `main` linear but assigns new SHAs
-6. For the artifact workflow, run `make release` and then run the PII scan against the stripped output before publishing it
+6. For the artifact workflow, run `make release` and then `npm run verify:public-release-pii -- release-public` against the stripped output before publishing it

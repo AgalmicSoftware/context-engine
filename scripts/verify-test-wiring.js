@@ -98,6 +98,8 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFile('scripts/verify-worker-bundle-sync.test.js');
   expectFile('scripts/verify-public-release-surface.js');
   expectFile('scripts/verify-public-release-surface.test.js');
+  expectFile('scripts/verify-public-release-pii.sh');
+  expectFile('scripts/verify-public-release-pii.test.js');
   expectFile('scripts/sync-public-history.sh');
   expectFile('workers/sessionCorsWorker/package.json');
   expectFile(publishWorkflowPath);
@@ -143,6 +145,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('deploy-helper:deploy', 'scripts/deploy-helper-deploy.mjs');
   expectScriptContains('verify:worker-bundle', 'scripts/verify-worker-bundle-sync.mjs');
   expectScriptContains('verify:public-release-surface', 'scripts/verify-public-release-surface.js');
+  expectScriptContains('verify:public-release-pii', 'scripts/verify-public-release-pii.sh');
   expectScriptContains('verify:release', 'npm run lint');
   expectScriptContains('verify:release', 'npm run typecheck:client');
   expectScriptContains('verify:release', 'npm run test:release:client');

@@ -61,6 +61,7 @@ test('public-release style copies without .git still pass wiring checks', () => 
           'deploy-helper:deploy': 'node scripts/deploy-helper-deploy.mjs',
           'verify:worker-bundle': 'node scripts/verify-worker-bundle-sync.mjs',
           'verify:public-release-surface': 'node scripts/verify-public-release-surface.js',
+          'verify:public-release-pii': 'bash scripts/verify-public-release-pii.sh',
           'verify:release':
             'npm run lint && npm run typecheck:client && npm run test:release:client && npm run verify:public-release-surface && npm run worker:bundle && npm run verify:worker-bundle && npm --prefix client run build',
         },
@@ -170,6 +171,8 @@ test('public-release style copies without .git still pass wiring checks', () => 
       'scripts/verify-worker-bundle-sync.test.js',
       'scripts/verify-public-release-surface.js',
       'scripts/verify-public-release-surface.test.js',
+      'scripts/verify-public-release-pii.sh',
+      'scripts/verify-public-release-pii.test.js',
       'workers/sessionCorsWorker/package.json',
       'workers/deploy-helper/wrangler.example.toml',
       'workers/deploy-helper/.dev.vars.example',
