@@ -195,6 +195,72 @@ interface LoginAndSettingsModalState {
   walletBalanceWei: ethers.BigNumber | null;
 }
 
+type SponsoredSessionEntry = Record<string, unknown> & {
+  slug: string;
+  label: string;
+  sponsoredKeys: Record<string, unknown>;
+  isActive?: boolean;
+  inRpcScope?: boolean;
+};
+
+type AiSettingsLike = Record<string, unknown> & {
+  mode?: unknown;
+  models?: Record<string, unknown>;
+  modelProviders?: Record<string, unknown>;
+  providers?: Record<string, unknown>;
+  preset?: unknown;
+  taskReasoningEffort?: Record<string, unknown>;
+  transcription?: Record<string, unknown>;
+};
+
+type AiPresetOption = {
+  key: string;
+  label: string;
+  badgeLabel: string;
+  provider?: unknown;
+  models?: Readonly<Record<string, unknown>>;
+};
+
+type AiPresetConfig = {
+  provider?: unknown;
+  models?: Readonly<Record<string, unknown>>;
+};
+
+type ChainIdLike = {
+  id?: unknown;
+  chainId?: unknown;
+} | null | undefined;
+
+type WagmiBalanceLike = {
+  data?: { value?: unknown };
+  value?: unknown;
+} | null | undefined;
+
+type TestFundsRequestOptions = {
+  source?: 'manual' | 'auto';
+};
+
+type SettingsSessionDescriptor = Record<string, unknown> & {
+  label: string;
+};
+
+type SponsoredSessionSources = {
+  byResource: Record<string, SponsoredSessionEntry[]>;
+  rpcScope: SponsoredSessionEntry[];
+};
+
+type SettingsOverviewContext = {
+  activeSession: SettingsSessionDescriptor;
+  cryptoTerminology: boolean;
+  needsNetworkSwitch: boolean;
+  showWalletNetwork: boolean;
+  sponsorshipCards: ReturnType<typeof buildLoginSettingsSponsorshipCards>;
+  sponsorSessions: SponsoredSessionSources;
+  targetNetworkName: string;
+  targetNetwork: unknown;
+  walletNetworkName: string;
+};
+
 export { buildBookmarksRoutePath };
 const getErrorCode = (error: unknown) => (
   error && typeof error === 'object' ? (error as { code?: unknown }).code : undefined
@@ -206,6 +272,16 @@ const uniqueList = <T = unknown>(values: T[] = []) => (
     )
   )
 );
+const readChainIdLike = (value: ChainIdLike): unknown => (
+  value && typeof value === 'object'
+    ? value.id ?? value.chainId ?? 0
+    : 0
+);
+const readWagmiBalanceValue = (value: WagmiBalanceLike): unknown => (
+  value && typeof value === 'object'
+    ? value.data?.value ?? value.value ?? null
+    : null
+);
 const AI_PRESET_LABELS: Record<string, { label: string; badgeLabel: string }> = Object.freeze({
   'gpt-5': { label: 'GPT-5 (default)', badgeLabel: 'GPT-5' },
   'gpt-4o': { label: 'GPT-4o', badgeLabel: 'GPT-4o' },
@@ -214,15 +290,13 @@ const AI_PRESET_LABELS: Record<string, { label: string; badgeLabel: string }> = 
 });
 
 const AI_PRESET_OPTIONS: readonly AiPresetOption[] = Object.freeze([
-  ...Object.entries(AI_PRESET_CONFIGS as Record<string, AiPresetConfig>).map(([key, config]) =>
-    Object.freeze({
-      key,
-      label: AI_PRESET_LABELS[key]?.label || key,
-      badgeLabel: AI_PRESET_LABELS[key]?.badgeLabel || key,
-      provider: config.provider,
-      models: config.models,
-    }),
-  ),
+  ...Object.entries(AI_PRESET_CONFIGS as Record<string, AiPresetConfig>).map(([key, config]) => Object.freeze({
+    key,
+    label: AI_PRESET_LABELS[key]?.label || key,
+    badgeLabel: AI_PRESET_LABELS[key]?.badgeLabel || key,
+    provider: config.provider,
+    models: config.models,
+  })),
   Object.freeze({
     key: 'custom',
     label: 'Custom...',
@@ -230,18 +304,18 @@ const AI_PRESET_OPTIONS: readonly AiPresetOption[] = Object.freeze([
   }),
 ]);
 
-const deriveAiPresetKey = (settings: any = {}) => deriveAiPreset({
+const deriveAiPresetKey = (settings: AiSettingsLike = {}) => deriveAiPreset({
   mode: settings?.mode,
   models: settings?.models,
   modelProviders: settings?.modelProviders,
 });
 
-const getAiPresetMeta = (presetKey: any = ''): any => (
-  AI_PRESET_OPTIONS.find((entry: any) => entry.key === presetKey) ||
+const getAiPresetMeta = (presetKey: unknown = ''): AiPresetOption => (
+  AI_PRESET_OPTIONS.find((entry) => entry.key === presetKey) ||
   AI_PRESET_OPTIONS[AI_PRESET_OPTIONS.length - 1]
 );
 
-const formatAiPresetBadgeLabel = (settings: any = {}) => {
+const formatAiPresetBadgeLabel = (settings: AiSettingsLike = {}) => {
   const hasModelShape = !!(
     settings?.models?.fast ||
     settings?.models?.thinking ||
@@ -259,10 +333,11 @@ const formatAiPresetBadgeLabel = (settings: any = {}) => {
   );
 };
 
-const settingsSupportReasoning = (settings: AiSettingsLike = {}) =>
+const settingsSupportReasoning = (settings: AiSettingsLike = {}) => (
   [settings?.models?.fast, settings?.models?.thinking]
     .map((model) => toModelLeaf(model))
-    .some((modelLeaf) => /^(gpt-5|o[13])/.test(toStr(modelLeaf)));
+    .some((modelLeaf) => /^(gpt-5|o[13])/.test(toStr(modelLeaf)))
+);
 
 export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps, LoginAndSettingsModalState> {
   state: LoginAndSettingsModalState = (() => {
@@ -301,9 +376,11 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       workerResourcePresence: null,
       sessionScanScope: normalizeSessionScanScope(this.props.selectedSessionScope || readSessionScanScope()),
       sessionScanSlugs: Array.isArray(initialSessionScanSlugs) ? initialSessionScanSlugs : [],
-      sessionScanSlugsInput: (Array.isArray(initialSessionScanSlugs) ? initialSessionScanSlugs : [])
-        .map((slug: string) => (slug ? slug : 'general'))
-        .join(', '),
+      sessionScanSlugsInput: (
+        Array.isArray(initialSessionScanSlugs)
+          ? initialSessionScanSlugs
+          : []
+      ).map((slug: string) => (slug ? slug : 'general')).join(', '),
       sessionScanStatus: '',
       preLoginSettingsOpen: false,
       preLoginConfigOpen: false,
@@ -502,11 +579,14 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   getWalletChainId = (props: LoginAndSettingsModalProps = this.props) =>
     Number(
       props.provider === 'wagmi'
-        ? readChainIdLike(props.wagmiNetwork) || readChainIdLike(props.network)
-        : readChainIdLike(props.network),
-    ) || null;
+        ? (readChainIdLike(props.wagmiNetwork) || readChainIdLike(props.network))
+        : readChainIdLike(props.network)
+    ) || null
+  );
 
-  getWagmiBalanceInput = (props: LoginAndSettingsModalProps = this.props) => readWagmiBalanceValue(props.wagmiBalance);
+  getWagmiBalanceInput = (props: LoginAndSettingsModalProps = this.props) => (
+    readWagmiBalanceValue(props.wagmiBalance)
+  );
 
   areWalletBalanceInputsEqual = (leftBalance: unknown, rightBalance: unknown) => {
     if (leftBalance === rightBalance) return true;
@@ -640,7 +720,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
 
   buildTestFundsErrorMessage = (error: unknown, { source = 'manual' }: TestFundsRequestOptions = {}) => {
     const prefix = source === 'auto' ? 'Auto-funding failed' : 'Get test gas failed';
-    const errorRecord = error && typeof error === 'object' ? (error as Record<string, unknown>) : {};
+    const errorRecord = error && typeof error === 'object' ? error as Record<string, unknown> : {};
     const baseMessage = toStr(errorRecord.message).trim() || 'Failed to request test gas.';
     const status = Number(errorRecord.status || 0) || 0;
     if (status && !baseMessage.includes(`(${status})`) && !baseMessage.includes(`HTTP ${status}`)) {
@@ -737,7 +817,10 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     clearAllWorkerSessionTokens();
   };
 
-  componentDidUpdate(prevProps: Readonly<LoginAndSettingsModalProps>, prevState: Readonly<LoginAndSettingsModalState>) {
+  componentDidUpdate(
+    prevProps: Readonly<LoginAndSettingsModalProps>,
+    prevState: Readonly<LoginAndSettingsModalState>,
+  ) {
     let needsBalanceCheck = false;
     const activeSessionChanged =
       this.getActiveSessionSlug(this.props, this.state) !== this.getActiveSessionSlug(prevProps, prevState);
