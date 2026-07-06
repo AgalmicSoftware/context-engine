@@ -12,7 +12,8 @@ const LARGE_FILE_GROWTH_TOLERANCE = 25;
 const LARGE_FILE_SHRINK_TOLERANCE = 100;
 
 const LARGE_CLIENT_FILE_BASELINE = Object.freeze({
-  'client/src/components/SurveyTool/SurveyQuestions.tsx': 8761,
+  'client/src/components/SurveyTool/SurveyQuestions.tsx': 2226,
+  'client/src/components/SurveyTool/surveyQuestionsRuntimeMethods.tsx': 8112,
   'client/src/components/MainSite/AppShell.tsx': 4104,
   'client/src/components/SurveyTool/SurveyResults.tsx': 2358,
   'client/src/components/MainSite/mainSiteProfileScanRuntime.ts': 1411,
