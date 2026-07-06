@@ -1,7 +1,14 @@
+import {
+  formatTsForCsv,
+  pickTimestampMs,
+} from './surveyResultsHelpers.js';
+
 export type SurveyResultsExportOption = {
   label: string;
   value: string;
 };
+
+type SurveyResultsRecord = Record<string, unknown>;
 
 type SurveyResultsJsonExportCounts = {
   filteredQuestions?: unknown;
@@ -33,6 +40,22 @@ export type SurveyResultsQuestionCsvExportRecord = {
   prompt?: unknown;
   tags?: unknown;
   type?: unknown;
+};
+
+export type SurveyResultsResponseCsvParsePort = (response: unknown) => unknown;
+
+export type SurveyResultsResponsesCsvExportArgs = {
+  aggregatorQuestionResponses?: unknown;
+  filteredResponses?: unknown;
+  networkQuestions?: unknown;
+  parseResponse?: SurveyResultsResponseCsvParsePort | null;
+  surveyViewMode?: unknown;
+  viewMode?: unknown;
+};
+
+type SurveyResultsCsvLatestEntry = {
+  ms: number;
+  row: string;
 };
 
 export const SURVEY_RESULTS_EXPORT_TYPES = Object.freeze({
@@ -292,6 +315,87 @@ const quoteCsvCell = (value: unknown): string => (
   `"${String(value !== undefined && value !== null ? value : '').replace(/"/g, '""')}"`
 );
 
+const quoteResponseCsvCell = (value: unknown): string => {
+  const cellValue = Array.isArray(value) ? value.join(', ') : value;
+  return quoteCsvCell(cellValue);
+};
+
+const isSurveyResultsRecord = (value: unknown): value is SurveyResultsRecord => (
+  !!value && typeof value === 'object' && !Array.isArray(value)
+);
+
+const toSurveyResultsRecord = (value: unknown): SurveyResultsRecord => (
+  isSurveyResultsRecord(value) ? value : {}
+);
+
+const defaultParseResponseForCsv = (response: unknown): unknown => {
+  if (isSurveyResultsRecord(response)) return response;
+  if (typeof response !== 'string') return null;
+  const trimmed = response.trim();
+  if (!trimmed) return null;
+  try {
+    const parsed: unknown = JSON.parse(trimmed);
+    return isSurveyResultsRecord(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+const getResponseQuestionIdForCsv = (response: SurveyResultsRecord): string => (
+  String(response.questionID || response.questionId || '').trim()
+);
+
+const getResponseQuestionPromptForCsv = (
+  response: SurveyResultsRecord,
+  questionData: SurveyResultsRecord
+): unknown => (
+  response.prompt || questionData.prompt || ''
+);
+
+const getResponseQuestionTypeForCsv = (
+  response: SurveyResultsRecord,
+  questionData: SurveyResultsRecord
+): unknown => (
+  response.type || questionData.type || ''
+);
+
+const getConvictionValueForCsv = (response: SurveyResultsRecord): unknown => {
+  if (response.conviction !== undefined && response.conviction !== null) return response.conviction;
+  if (response.importance !== undefined && response.importance !== null) return response.importance;
+  return '';
+};
+
+const getResponseFieldValueForCsv = (
+  response: SurveyResultsRecord,
+  fieldName: 'additional' | 'answer',
+  key: 'encrypted' | 'hash' | 'value'
+): unknown => (
+  toSurveyResultsRecord(response[fieldName])[key]
+);
+
+const readResponderAddressForCsv = (value: unknown): unknown => {
+  if (typeof value === 'string') return value;
+  const record = toSurveyResultsRecord(value);
+  if (typeof record.address === 'string') return record.address;
+  return value || '';
+};
+
+const readQuestionDataForCsv = (
+  networkQuestions: unknown,
+  questionId: string
+): SurveyResultsRecord => {
+  const questionLookup = toSurveyResultsRecord(networkQuestions);
+  return toSurveyResultsRecord(
+    questionLookup[questionId.toLowerCase()] ?? questionLookup[questionId]
+  );
+};
+
+const readQuestionOptionsForCsv = (questionData: SurveyResultsRecord): string => (
+  questionData.type === 'multichoice' && Array.isArray(questionData.options)
+    ? questionData.options.join(';')
+    : ''
+);
+
 export const buildSurveyResultsQuestionsCsvExport = (
   filteredQuestions: readonly SurveyResultsQuestionCsvExportRecord[] = []
 ): string => {
@@ -308,6 +412,119 @@ export const buildSurveyResultsQuestionsCsvExport = (
     ].join(',');
   });
 
+  return header + csvRows.join('\n');
+};
+
+export const buildSurveyResultsResponsesCsvExport = ({
+  aggregatorQuestionResponses = {},
+  filteredResponses = [],
+  networkQuestions = {},
+  parseResponse = defaultParseResponseForCsv,
+  surveyViewMode = '',
+  viewMode = '',
+}: SurveyResultsResponsesCsvExportArgs = {}): string => {
+  const parsePort = typeof parseResponse === 'function'
+    ? parseResponse
+    : defaultParseResponseForCsv;
+  const csvRows: string[] = [];
+
+  if (viewMode === 'survey' && surveyViewMode === 'individuals') {
+    const header = 'responderAddress,questionID,questionPrompt,type,options,importance,answer,answerHash,additionalComments,answerEncrypted,additionalEncrypted,additionalHash,timestamp\n';
+    const latest = new Map<string, SurveyResultsCsvLatestEntry>();
+    const passthroughRows: string[] = [];
+    const rows = Array.isArray(filteredResponses) ? filteredResponses : [];
+
+    rows.forEach((responseRow) => {
+      const responseRecord = toSurveyResultsRecord(responseRow);
+      const parsedValue = parsePort(responseRecord.response);
+      if (!isSurveyResultsRecord(parsedValue) || !Array.isArray(parsedValue.responses)) return;
+
+      parsedValue.responses.forEach((answerValue) => {
+        const answer = toSurveyResultsRecord(answerValue);
+        const qid = getResponseQuestionIdForCsv(answer);
+        const responderAddress = readResponderAddressForCsv(responseRecord.responder);
+        const questionData = readQuestionDataForCsv(networkQuestions, qid);
+        const optionsString = readQuestionOptionsForCsv(questionData);
+        const ms = pickTimestampMs(answer, parsedValue, responseRecord);
+        const row = [
+          responderAddress,
+          qid,
+          getResponseQuestionPromptForCsv(answer, questionData),
+          getResponseQuestionTypeForCsv(answer, questionData),
+          optionsString,
+          getConvictionValueForCsv(answer),
+          getResponseFieldValueForCsv(answer, 'answer', 'value'),
+          getResponseFieldValueForCsv(answer, 'answer', 'hash'),
+          getResponseFieldValueForCsv(answer, 'additional', 'value'),
+          getResponseFieldValueForCsv(answer, 'answer', 'encrypted'),
+          getResponseFieldValueForCsv(answer, 'additional', 'encrypted'),
+          getResponseFieldValueForCsv(answer, 'additional', 'hash'),
+          formatTsForCsv(ms),
+        ].map(quoteResponseCsvCell).join(',');
+
+        if (!responderAddress || !qid) {
+          passthroughRows.push(row);
+          return;
+        }
+
+        const key = `${String(responderAddress).toLowerCase()}|${qid.toLowerCase()}`;
+        const prev = latest.get(key);
+        if (!prev || ms > prev.ms) {
+          latest.set(key, { ms, row });
+        }
+      });
+    });
+
+    csvRows.push(...passthroughRows, ...Array.from(latest.values()).map((entry) => entry.row));
+    return header + csvRows.join('\n');
+  }
+
+  const header = 'questionID,questionPrompt,type,options,responderAddress,importance,answer,answerHash,additionalComments,answerEncrypted,additionalEncrypted,additionalHash,timestamp\n';
+  const latest = new Map<string, SurveyResultsCsvLatestEntry>();
+  const passthroughRows: string[] = [];
+
+  Object.entries(toSurveyResultsRecord(aggregatorQuestionResponses)).forEach(([questionIdFromBucket, responsesArray]) => {
+    const rows = Array.isArray(responsesArray) ? responsesArray : [];
+    rows.forEach((responseRow) => {
+      const responseRecord = toSurveyResultsRecord(responseRow);
+      const parsedValue = parsePort(responseRecord.response);
+      if (!isSurveyResultsRecord(parsedValue)) return;
+
+      const responderAddress = readResponderAddressForCsv(responseRecord.responder);
+      const qid = getResponseQuestionIdForCsv(parsedValue) || String(questionIdFromBucket || '');
+      const questionData = readQuestionDataForCsv(networkQuestions, qid);
+      const optionsString = readQuestionOptionsForCsv(questionData);
+      const ms = pickTimestampMs(parsedValue, null, responseRecord);
+      const row = [
+        qid,
+        getResponseQuestionPromptForCsv(parsedValue, questionData),
+        getResponseQuestionTypeForCsv(parsedValue, questionData),
+        optionsString,
+        responderAddress,
+        getConvictionValueForCsv(parsedValue),
+        getResponseFieldValueForCsv(parsedValue, 'answer', 'value'),
+        getResponseFieldValueForCsv(parsedValue, 'answer', 'hash'),
+        getResponseFieldValueForCsv(parsedValue, 'additional', 'value'),
+        getResponseFieldValueForCsv(parsedValue, 'answer', 'encrypted'),
+        getResponseFieldValueForCsv(parsedValue, 'additional', 'encrypted'),
+        getResponseFieldValueForCsv(parsedValue, 'additional', 'hash'),
+        formatTsForCsv(ms),
+      ].map(quoteResponseCsvCell).join(',');
+
+      if (!responderAddress || !qid) {
+        passthroughRows.push(row);
+        return;
+      }
+
+      const key = `${String(responderAddress).toLowerCase()}|${String(qid).toLowerCase()}`;
+      const prev = latest.get(key);
+      if (!prev || ms > prev.ms) {
+        latest.set(key, { ms, row });
+      }
+    });
+  });
+
+  csvRows.push(...passthroughRows, ...Array.from(latest.values()).map((entry) => entry.row));
   return header + csvRows.join('\n');
 };
 
