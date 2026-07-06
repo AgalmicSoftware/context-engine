@@ -1254,22 +1254,39 @@ $modal-muted: rgba(22, 48, 84, 0.82);
 
   .toggleHeader {
     gap: 8px;
+    flex-wrap: wrap;
   }
 
   .toggleHeaderAside {
     gap: 6px;
     margin-left: auto;
+    display: contents;
+  }
+
+  .toggleHeaderAside .toggleIcon {
+    order: 2;
+    margin-left: auto;
   }
 
   .recognitionSummary {
-    display: none;
+    order: 3;
+    display: flex;
+    flex: 1 0 100%;
+    justify-content: flex-start;
+    gap: 0;
+    margin-top: 10px;
+    overflow: visible;
   }
 
   .recognitionSummaryLogo {
-    width: 24px;
-    height: 24px;
+    width: 28px;
+    height: 28px;
     border-radius: 8px;
     padding: 2px;
+  }
+
+  .recognitionSummaryLogo + .recognitionSummaryLogo {
+    margin-left: -6px;
   }
 
   .heroVideo {
