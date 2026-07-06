@@ -179,11 +179,12 @@ export const sanitizeSessionWizardMetadataPayload = (metadata: AnyRecord, {
   }
 
   if (isObj(next.sessionModeProfile)) {
-    next.sessionModeProfile = mergeSessionModeProfileStorageAccess(
+    const sessionModeProfile = mergeSessionModeProfileStorageAccess(
       next.sessionModeProfile as SessionModeProfile,
       next.storageProfile
-    ) as unknown as AnyRecord;
-    const compiled = compileSessionModeProfile(next.sessionModeProfile as unknown as SessionModeProfile);
+    );
+    next.sessionModeProfile = sessionModeProfile;
+    const compiled = compileSessionModeProfile(sessionModeProfile);
     next.storageProfile = normalizeSessionStorageProfileConfig(compiled.storageProfile);
   } else if (Object.prototype.hasOwnProperty.call(next, 'storageProfile')) {
     next.storageProfile = normalizeSessionStorageProfileConfig(next.storageProfile);

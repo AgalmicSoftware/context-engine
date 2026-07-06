@@ -44,6 +44,16 @@ const mergeSessionWizardDraftDeep = (target: AnyRecord, source: AnyRecord): AnyR
   });
   return out;
 };
+const hasCachedStorageProfile = (draft: AnyRecord | null): boolean => (
+  !!(
+    draft &&
+    (
+      (draft.storageProfile && typeof draft.storageProfile === 'object') ||
+      (draft.sessionStorageProfile && typeof draft.sessionStorageProfile === 'object') ||
+      (draft.storage && typeof draft.storage === 'object')
+    )
+  )
+);
 const getCachedStorageProfilePayloadAccessMode = (draft: AnyRecord): string => {
   const storageProfile = (
     draft.storageProfile &&
@@ -283,10 +293,17 @@ export const buildSessionWizardInitialDraftFromCache = ({
     base.embeddedDeployHelperEnabled = sourceEmbeddedDeployHelperDefault;
   }
   const merged = cachedDraft ? mergeSessionWizardDraftDeep(base, cachedDraft) : base;
-  if (cachedDraft && !merged.sessionModeProfile) {
-    merged.sessionModeProfile = buildCachedDraftSessionModeProfile(merged);
-  }
+  const shouldBuildCachedStorageModeProfile = (
+    cachedDraft &&
+    !merged.sessionModeProfile &&
+    hasCachedStorageProfile(cachedDraft)
+  );
   const normalized = normalizeSessionWizardDraftShape(merged);
+  if (shouldBuildCachedStorageModeProfile && !normalized.sessionModeProfile) {
+    normalized.sessionModeProfile = buildCachedDraftSessionModeProfile(normalized);
+    const compiled = compileSessionModeProfile(normalized.sessionModeProfile as SessionModeProfile);
+    normalized.storageProfile = normalizeSessionStorageProfileConfig(compiled.storageProfile);
+  }
   if (normalModeSharedHostedWorkerEnabled === false && !cachedWizard?.deployComplete) {
     normalized.corsWorkerUrl = '';
   }
