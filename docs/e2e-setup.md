@@ -48,7 +48,7 @@ Arweave is public and permanent. Use non-identifying payloads only.
    `ai:*` workflow command; the scripts auto-load `.env.e2e.local`, then
    `.env.e2e`.
 
-For the PRD 649/650 Cloudflare envelope and groups suites, also verify `CLOUDFLARE_API_TOKEN` can create Workers, KV namespaces, and worker secrets. Each run creates a dedicated session worker, a KV namespace, a `CE_STORAGE_ENVELOPE_KEK` worker secret when `worker_envelope` is selected, and a non-identifying SessionRegistry slug on the configured test chain. The key-lifecycle suite rotates/re-wraps envelope keys and, when the token permits worker secret updates, replaces only the test worker's `CE_STORAGE_ENVELOPE_KEK` to prove recovery under the new deployment key. The generated deployment key is process-local and must not be copied into docs, artifacts, or logs.
+For the Cloudflare envelope and groups suites, also verify `CLOUDFLARE_API_TOKEN` can create Workers, KV namespaces, and worker secrets. Each run creates a dedicated session worker, a KV namespace, a `CE_STORAGE_ENVELOPE_KEK` worker secret when `worker_envelope` is selected, and a non-identifying SessionRegistry slug on the configured test chain. The key-lifecycle suite rotates/re-wraps envelope keys and, when the token permits worker secret updates, replaces only the test worker's `CE_STORAGE_ENVELOPE_KEK` to prove recovery under the new deployment key. The generated deployment key is process-local and must not be copied into docs, artifacts, or logs.
 
 Committed E2E scripts do not read fallback secrets from `.e2e-secrets/*`; use env, `.env.e2e.local`, `.env.e2e`, or `E2E_ENV_FILE`.
 
