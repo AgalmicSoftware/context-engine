@@ -28,7 +28,7 @@ const LARGE_CLIENT_FILE_BASELINE = Object.freeze({
   'client/src/components/DebateMap/DebateMap.tsx': 3533,
   'client/src/components/Account/LoginAndSettingsModal.tsx': 3030,
   'client/src/components/UserPage/CompareAddresses.tsx': 2900,
-  'client/src/components/OnePageSession/OnePageSession.tsx': 2900,
+  'client/src/components/OnePageSession/OnePageSession.tsx': 2897,
   'client/src/components/SurveyTool/surveyToolHydrationFlow.ts': 2840,
   'client/src/components/SurveyTool/SurveyPileViewMode.tsx': 2993,
   'client/src/utilities/arweave/arweaveScripts.js': 2703,
