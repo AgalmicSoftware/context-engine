@@ -3,8 +3,8 @@
     "description": "Comprehensive corpus of AI legislation, regulations, and policy documents from global jurisdictions. Tracks enacted, proposed, and framework-level AI governance developments with detailed analysis of novel regulatory ideas, public debate, and policy arguments.",
     "version": "2.0",
     "date_created": "2026-02-15",
-    "last_updated": "2026-02-15",
-    "total_entries": 223,
+    "last_updated": "2026-07-04",
+    "total_entries": 227,
     "usage_notes": "This corpus documents how AI governance is being implemented and discussed globally. Each entry includes not just the law's provisions but the regulatory ideas and arguments surrounding it. The novel_arguments_and_perspectives and public_comments_and_debate fields contain the substantive analysis. Tags align with the expanded AI discourse taxonomy in expanded_tag_list.json.",
     "note_on_dates": "Dates reflect enactment or significant legislative status as of February 2026. Some entries reflect proposals whose timelines may have shifted.",
     "schema_version": "2.0",
@@ -126,7 +126,8 @@
       "voluntary",
       "under_review",
       "vetoed",
-      "revoked"
+      "revoked",
+      "discussion_draft"
     ]
   },
   "entries": [
@@ -8896,7 +8897,7 @@
       "source_url": "https://www.twobirds.com/en/insights/2026/ai-in-the-kings-speech-2026-regulating-for-growth-bill-announced"
     },
     {
-      "id": "international_ai_safety_report_2026",
+      "id": "intl_ai_safety_report_2026_policy",
       "title": "International AI Safety Report 2026",
       "jurisdiction": "International",
       "jurisdiction_level": "international",
@@ -9457,6 +9458,188 @@
       ],
       "verification_status": "verified",
       "verification_notes": "Added from LBNL/BIES publication page and DOI metadata."
+    },
+    {
+      "id": "us_eo_ai_innovation_security_2026",
+      "title": "Executive Order — Promoting Advanced Artificial Intelligence Innovation and Security",
+      "jurisdiction": "United States",
+      "jurisdiction_level": "federal",
+      "date_enacted": "2026-06-02",
+      "date_proposed": null,
+      "status": "enacted",
+      "summary": "Presidential executive order establishing a voluntary framework for frontier AI model developers to provide the federal government with pre-release access for cybersecurity and national security assessments. The order directs developers to grant trusted government partners access to frontier models up to 30 days before public release, creates an AI cybersecurity clearinghouse jointly operated by Treasury, NSA, and CISA (due July 2, 2026), and mandates a classified benchmarking process (due August 1, 2026) to designate 'covered frontier models' subject to the framework. It prioritizes criminal enforcement against AI-enabled cyberattacks and directs agencies to strengthen cyber defense of National Security Systems. Critically, Section 3(c) expressly disclaims any intent to impose mandatory licensing, preclearance, or permitting requirements on AI developers, maintaining the administration's pro-innovation posture while seeking to address national security risks through voluntary cooperation.",
+      "key_provisions": [
+        "Voluntary pre-release access framework allowing government to assess frontier models up to 30 days before public release",
+        "Creation of AI cybersecurity clearinghouse jointly operated by Treasury, NSA, and CISA (due July 2, 2026)",
+        "Classified benchmarking process to designate 'covered frontier models' (due August 1, 2026)",
+        "Directive to strengthen cyber defense of National Security Systems using AI capabilities",
+        "Prioritization of criminal enforcement against AI-enabled cyberattacks and cyber fraud",
+        "Section 3(c) express disclaimer of any mandatory licensing, preclearance, or permitting regime",
+        "Engagement framework for frontier model developers as trusted partners rather than regulated entities"
+      ],
+      "novel_arguments_and_perspectives": "This executive order represents a distinctive approach to frontier AI governance by framing the government as a security partner rather than a regulator. The voluntary pre-release access model is novel in that it asks developers to share access without mandating it, relying on the implicit incentive that cooperating firms will face less regulatory scrutiny and enjoy a closer relationship with national security agencies. The express disclaimer in Section 3(c) against mandatory licensing is notable as a direct repudiation of the licensing-regime approach advocated by some AI safety proponents and embodied in vetoed legislation like California's SB 1047. The classified benchmarking process for designating covered frontier models introduces a new concept where the criteria for what constitutes a frontier model are themselves classified, raising questions about transparency and due process for developers who may not know whether their models qualify. The order also signals a shift toward treating AI-enabled cyberattacks as a primary threat vector, elevating cybersecurity over the broader societal harms focus of the prior administration's EO 14110.",
+      "public_comments_and_debate": "The executive order received broadly positive reception from the AI industry, with major frontier labs expressing willingness to participate in the voluntary framework. Critics from the AI safety community argued that voluntary pre-release access without enforcement teeth is insufficient to address catastrophic risks from frontier models, noting that developers could simply decline to participate or limit the scope of access. Civil liberties organizations raised concerns about the classified benchmarking process, arguing that secret criteria for designating covered models undermine accountability and could be used selectively. Some congressional Democrats characterized the order as a weak substitute for comprehensive legislation, contrasting it with the binding obligations proposed in the Great American AI Act discussion draft released two days later. National security hawks praised the cybersecurity focus but questioned whether 30-day pre-release windows provide sufficient time for meaningful assessment of complex frontier systems.",
+      "risk_approach": "hybrid",
+      "enforcement_mechanism": "Voluntary framework with no direct enforcement mechanism for pre-release access; relies on criminal enforcement for AI-enabled cyberattacks under existing federal law; classified benchmarking process administered by national security agencies",
+      "tags": [
+        "Executive Order",
+        "National Security",
+        "Cybersecurity",
+        "Frontier Models",
+        "Voluntary",
+        "US federal",
+        "AI Safety Institute",
+        "Innovation Focus",
+        "Deregulation"
+      ],
+      "relevance_to_ai_discourse": "This order is a significant data point in the ongoing debate between voluntary and mandatory approaches to frontier AI governance. By explicitly disclaiming licensing or permitting authority while seeking cooperative access to frontier models, it stakes out a clear position that government should serve as a security partner rather than a gatekeeper. The classified benchmarking process for frontier model designation introduces a new and potentially contentious mechanism that will shape how 'frontier' is defined in US policy. The order's cybersecurity-first framing represents a narrowing of the AI governance aperture compared to the Biden-era EO 14110, prioritizing concrete national security threats over broader concerns about bias, discrimination, and societal impact.",
+      "related_legislation": [
+        "eo_14110_biden_ai",
+        "eo_14179_trump_ai"
+      ],
+      "source_links": [
+        "https://www.whitehouse.gov/presidential-actions/2026/06/promoting-advanced-artificial-intelligence-innovation-and-security/",
+        "https://www.whitehouse.gov/fact-sheets/2026/06/fact-sheet-president-donald-j-trump-promotes-advanced-artificial-intelligence-innovation-and-security/"
+      ],
+      "source_url": "https://www.whitehouse.gov/presidential-actions/2026/06/promoting-advanced-artificial-intelligence-innovation-and-security/"
+    },
+    {
+      "id": "us_great_american_ai_act_2026",
+      "title": "Great American Artificial Intelligence Act of 2026 (Discussion Draft)",
+      "jurisdiction": "United States",
+      "jurisdiction_level": "federal",
+      "date_enacted": null,
+      "date_proposed": "2026-06-04",
+      "status": "discussion_draft",
+      "summary": "A 269-page bipartisan discussion draft introduced by Representatives Jay Obernolte (R-CA) and Lori Trahan (D-MA) representing the most comprehensive federal AI legislation proposed to date. The bill is organized into four titles: Frontier AI Governance, Workforce Development, Cybersecurity, and Research/Development/International Cooperation. It creates binding federal obligations for 'large frontier developers' defined as firms with $500 million or more in annual revenue, including mandatory disclosure requirements, third-party audits conducted by Independent Verification Organizations (IVOs), and whistleblower protections. A centerpiece provision establishes a 3-year preemption of state laws regulating AI model development (but not use or deployment), intended to prevent a patchwork of conflicting state-level development regulations. The draft authorizes a Center for AI Standards and Innovation (CAISI) at the Department of Commerce with $100 million per year funding for FY2027-2029, creates penalties for AI impersonation of government officials, and requires critical safety incident reporting to the government.",
+      "key_provisions": [
+        "Binding federal development obligations for 'large frontier developers' ($500M+ annual revenue)",
+        "Mandatory disclosure requirements and third-party audits via Independent Verification Organizations (IVOs)",
+        "Whistleblower protections for employees reporting AI safety concerns",
+        "3-year preemption of state laws regulating AI model development (not use or deployment)",
+        "Establishment of Center for AI Standards and Innovation (CAISI) at Commerce, $100M/yr FY2027-2029",
+        "Criminal penalties for AI impersonation of government officials",
+        "Mandatory critical safety incident reporting to federal government",
+        "Four-title structure: Frontier AI Governance, Workforce, Cybersecurity, R&D/International Cooperation"
+      ],
+      "novel_arguments_and_perspectives": "The Great American AI Act introduces several novel regulatory concepts. The development-vs-deployment preemption distinction is a creative attempt to resolve the tension between federal uniformity and state experimentation: states remain free to regulate how AI is used and deployed within their borders, but cannot impose conflicting requirements on the model development process itself. This directly addresses industry complaints about compliance fragmentation while preserving states' ability to protect their residents from harmful AI applications. The Independent Verification Organization (IVO) concept creates a new category of third-party auditor specifically designed for frontier AI, analogous to financial auditing firms but with AI-specific technical competencies. The $500 million revenue threshold for 'large frontier developer' obligations is notable for being a business-size metric rather than a compute or capability threshold, which avoids the definitional challenges of compute-based thresholds but may under-include well-funded startups below the revenue line. The whistleblower protection provisions represent a legislative response to high-profile cases of AI safety researchers facing retaliation, codifying protections that had previously existed only as voluntary corporate commitments.",
+      "public_comments_and_debate": "The discussion draft generated intense debate across the AI policy landscape. Industry groups generally welcomed the preemption provision as providing regulatory clarity, though some argued the 3-year sunset was too short to provide meaningful planning certainty. State attorneys general, particularly from California and Colorado, expressed concern that development preemption could create a federal floor without a ceiling, potentially weakening state-level protections. AI safety organizations praised the mandatory incident reporting and whistleblower protections as long-overdue requirements but criticized the $500 million revenue threshold as too high to capture potentially dangerous models developed by smaller entities. The bipartisan sponsorship was noted as significant in the polarized AI governance landscape, though some observers questioned whether the discussion draft could survive committee markup without being stripped of its most consequential provisions. Tech policy analysts highlighted the tension between this legislative approach and the concurrent executive order's voluntary framework, noting that the two initiatives embody fundamentally different theories of AI governance.",
+      "risk_approach": "hybrid",
+      "enforcement_mechanism": "Federal enforcement through Commerce Department (CAISI); third-party audits via Independent Verification Organizations; criminal penalties for AI impersonation; mandatory incident reporting with penalties for non-compliance; whistleblower protections with anti-retaliation provisions",
+      "tags": [
+        "Federal AI Governance",
+        "Proposed Legislation",
+        "Bipartisan",
+        "Preemption",
+        "Frontier Models",
+        "Disclosure",
+        "Auditing",
+        "Whistleblower",
+        "Workforce Development",
+        "Cybersecurity",
+        "Innovation",
+        "Standards"
+      ],
+      "relevance_to_ai_discourse": "This draft represents the most ambitious attempt at comprehensive federal AI legislation in the United States and will likely serve as the baseline for congressional debate through 2026-2027. Its development-vs-deployment preemption framework proposes a novel solution to the federalism challenges that have plagued AI governance, and the IVO concept could reshape how third-party AI auditing is structured. The bill's interaction with the concurrent executive order on AI innovation and security highlights the evolving relationship between executive and legislative approaches to AI governance, with the former favoring voluntary cooperation and the latter imposing binding obligations. Whether the discussion draft advances through committee will be a bellwether for the political viability of comprehensive federal AI regulation.",
+      "related_legislation": [
+        "us_eo_ai_innovation_security_2026",
+        "california_sb_1047"
+      ],
+      "source_links": [
+        "https://obernolte.house.gov/media/press-releases/obernolte-trahan-release-discussion-draft-great-american-ai-act",
+        "https://www.techpolicy.press/unpacking-the-great-american-artificial-intelligence-act-of-2026/",
+        "https://rollcall.com/2026/06/04/bipartisan-ai-draft-proposes-three-year-preemption-of-state-laws/"
+      ],
+      "source_url": "https://obernolte.house.gov/media/press-releases/obernolte-trahan-release-discussion-draft-great-american-ai-act"
+    },
+    {
+      "id": "us_state_ai_bills_april_2026",
+      "title": "US Multi-State AI Legislative Wave — April 2026 (19 Bills Enacted)",
+      "jurisdiction": "Multiple Jurisdictions",
+      "jurisdiction_level": "state",
+      "date_enacted": "2026-04-15",
+      "date_proposed": null,
+      "status": "enacted",
+      "summary": "A landmark legislative wave in April 2026 saw 19 new AI-related bills signed into law across multiple US states, representing a dramatic acceleration from the 6 bills enacted through mid-March 2026 to 25 total by mid-April. The legislation spans employment, education, consumer protection, and deepfake regulation, reflecting the diversity of state-level AI governance approaches. Utah was particularly active, passing 9 AI-related bills including measures mandating AI literacy education in schools, establishing guardrails for AI use in classrooms, and creating frameworks for AI in government services. Other states addressed AI in hiring, insurance underwriting, healthcare decision support, and synthetic media disclosure. The April wave underscores the rapid growth of state-level AI governance activity and the increasing pressure for federal preemption to prevent regulatory fragmentation.",
+      "key_provisions": [
+        "19 AI bills signed into law across multiple states in a single month",
+        "Utah leads with 9 bills covering AI literacy education, classroom guardrails, and government AI use",
+        "Employment-focused measures regulating AI in hiring and workplace monitoring",
+        "Education measures including AI literacy curriculum requirements and classroom use policies",
+        "Consumer protection laws addressing AI-generated content disclosure and deepfakes",
+        "Insurance and healthcare AI governance provisions in multiple states",
+        "Cumulative total of 25+ state AI laws enacted in 2026 by mid-April"
+      ],
+      "novel_arguments_and_perspectives": "The April 2026 legislative wave is remarkable for its sheer volume and breadth, demonstrating that state legislatures have moved decisively past the deliberation phase into active AI regulation. Utah's cluster of 9 bills represents one of the most comprehensive state-level AI governance efforts, with its AI literacy education mandate reflecting a distinctive argument that effective AI governance begins with an educated citizenry rather than purely regulatory controls. The diversity of approaches across states — from Utah's education-first strategy to other states' employment and consumer protection focus — creates a natural experiment in AI governance that federalism proponents argue is valuable for identifying best practices. However, the rapid proliferation also validates industry concerns about regulatory fragmentation, providing ammunition for the federal preemption provisions in proposals like the Great American AI Act. The fact that 19 bills passed in a single month, tripling the year's previous total, suggests that state AI legislation has reached a tipping point where the pace of enactment may outstrip the capacity for careful deliberation.",
+      "public_comments_and_debate": "The April legislative wave generated significant commentary about the appropriate level of government for AI regulation. Industry groups cited the rapid proliferation as evidence that federal preemption is urgently needed, arguing that compliance with dozens of potentially conflicting state requirements is impractical and will drive AI development offshore. State legislators and advocacy groups countered that state-level experimentation is essential given the absence of comprehensive federal AI legislation, and that states should not be forced to wait for Congress to act. Education policy groups praised Utah's AI literacy measures as forward-thinking, while teachers' unions raised implementation concerns about the pace of mandated AI integration in curricula. Consumer advocates highlighted the bills as evidence of broad public demand for AI accountability, noting that AI regulation has become a bipartisan priority at the state level even as it remains contested in Congress.",
+      "risk_approach": "principles_based",
+      "enforcement_mechanism": "Varies by state; generally enforced through existing state regulatory agencies including state AGs, education departments, insurance commissions, and labor boards; some laws include private rights of action",
+      "tags": [
+        "State AI Law",
+        "Education",
+        "AI Literacy",
+        "Employment AI",
+        "Consumer Protection",
+        "Deepfakes",
+        "Preemption",
+        "state regulation",
+        "utah",
+        "enacted"
+      ],
+      "relevance_to_ai_discourse": "This legislative wave is a critical inflection point in the US AI governance landscape, demonstrating that state-level regulation is accelerating faster than federal efforts. The volume and diversity of these laws provide concrete evidence for both sides of the federal preemption debate: proponents of preemption can point to the fragmentation risk, while opponents can argue that states are filling a vacuum left by federal inaction. The education-focused measures in Utah represent an emerging strand of AI governance that emphasizes capacity-building and literacy alongside or instead of regulatory controls. The April wave also establishes a baseline against which the impact of any future federal preemption can be measured.",
+      "related_legislation": [
+        "colorado_sb_26_189_2026",
+        "colorado_sb_24_205"
+      ],
+      "source_links": [
+        "https://pluralpolicy.com/blog/the-ai-governance-watch-april-2026-nineteen-new-ai-bills-passed-into-law/"
+      ],
+      "source_url": "https://pluralpolicy.com/blog/the-ai-governance-watch-april-2026-nineteen-new-ai-bills-passed-into-law/"
+    },
+    {
+      "id": "us_ca_sb53_frontier_ai_transparency",
+      "title": "California Transparency in Frontier Artificial Intelligence Models Act (SB 53)",
+      "jurisdiction": "California, United States",
+      "jurisdiction_level": "state",
+      "date_enacted": "2026-01-15",
+      "date_proposed": "2025-12-01",
+      "status": "enacted",
+      "summary": "California SB 53, the Transparency in Frontier Artificial Intelligence Models Act, establishes transparency and safety obligations for developers of frontier AI models, defined as models trained with computational resources exceeding 10^26 floating point operations (FLOPS). The law requires frontier model developers to publish comprehensive risk assessment frameworks detailing potential catastrophic risks, report critical safety incidents to the California Attorney General and designated federal authorities, and implement whistleblower protections for employees who report safety concerns. Enhanced obligations apply to 'large frontier developers' with more than $500 million in annual revenue, including mandatory third-party safety assessments and penalties of up to $1 million per violation. The law emerged from the legislative aftermath of Governor Newsom's veto of SB 1047 in 2024, incorporating many of the transparency and reporting provisions from that bill while dropping the more controversial pre-deployment safety testing mandates and kill-switch requirements.",
+      "key_provisions": [
+        "Applies to frontier AI models trained with >10^26 FLOPS of computational resources",
+        "Mandatory publication of risk assessment frameworks covering catastrophic risk scenarios",
+        "Critical safety incident reporting to California AG and designated federal agencies",
+        "Whistleblower protections for employees reporting AI safety concerns internally or externally",
+        "Enhanced obligations for large frontier developers ($500M+ annual revenue)",
+        "Penalties up to $1 million per violation for large frontier developers",
+        "Mandatory third-party safety assessments for large frontier developers",
+        "Transparency requirements for training data provenance and compute usage"
+      ],
+      "novel_arguments_and_perspectives": "SB 53 represents a carefully calibrated legislative response to the politically fraught SB 1047 veto, preserving the transparency and reporting core of frontier AI governance while stripping out the pre-deployment mandates that drew the most intense industry opposition. The 10^26 FLOPS threshold is a technical line-drawing exercise that aims to capture only the most capable frontier systems while exempting smaller models and fine-tunes, though critics note that FLOPS thresholds become obsolete as training efficiency improves. The whistleblower protection provisions are particularly significant as they emerged directly from high-profile cases of AI safety researchers facing retaliation at major labs, making California the first state to codify protections specifically for AI safety whistleblowers. The tiered obligation structure, with enhanced requirements for firms above $500 million in revenue, mirrors an approach later adopted in the federal Great American AI Act discussion draft, suggesting California's influence on the national legislative conversation. The penalty cap of $1 million per violation is modest relative to the revenue of companies building frontier models, leading some to question whether it provides sufficient deterrence.",
+      "public_comments_and_debate": "SB 53 was widely characterized as a compromise measure — more palatable to industry than SB 1047 but still substantive enough to satisfy AI safety advocates who demanded legislative action after the veto. Major frontier labs including OpenAI, Anthropic, and Google DeepMind engaged constructively with the legislative process, with some offering conditional support for the transparency framework while seeking modifications to the FLOPS threshold and penalty provisions. Governor Newsom signaled early support for the bill's approach, describing it as 'right-sized' transparency regulation that avoids the overreach he identified in SB 1047. AI safety organizations including the Center for AI Safety and the Future of Life Institute praised the whistleblower protections and incident reporting requirements but argued that transparency without enforcement-backed safety mandates is insufficient to prevent catastrophic risks. Open-source AI advocates raised concerns that the FLOPS threshold could chill open-source frontier model development, though proponents noted that the threshold is set high enough to exempt most community-developed models. The bill's passage was seen as establishing California's continued role as the de facto standard-setter for AI regulation in the absence of comprehensive federal legislation.",
+      "risk_approach": "risk_based",
+      "enforcement_mechanism": "California Attorney General enforcement; penalties up to $1 million per violation for large frontier developers; mandatory incident reporting with AG investigation authority; no private right of action; third-party safety assessments required for large frontier developers",
+      "tags": [
+        "State AI Law",
+        "Frontier Models",
+        "Transparency",
+        "Safety",
+        "california",
+        "Whistleblower",
+        "Disclosure",
+        "Risk-Based Approach",
+        "enacted",
+        "Consumer Protection"
+      ],
+      "relevance_to_ai_discourse": "SB 53 is a pivotal development in the post-SB 1047 landscape, demonstrating that California can enact meaningful frontier AI governance without the provisions that provoked industry opposition and a gubernatorial veto. The bill's transparency-first approach has influenced federal legislative proposals, with the Great American AI Act's IVO and disclosure frameworks bearing clear resemblance to SB 53's structure. The FLOPS-based threshold for frontier model designation will be closely watched as a potential model for other jurisdictions, though its long-term viability depends on whether computational efficiency gains render absolute FLOPS counts obsolete as a proxy for model capability. SB 53's whistleblower protections address a gap in AI governance that has become increasingly salient as AI safety researchers at major labs have publicly described retaliation for raising concerns.",
+      "related_legislation": [
+        "california_sb_1047",
+        "us_great_american_ai_act_2026"
+      ],
+      "source_links": [
+        "https://leginfo.legislature.ca.gov/faces/billNavClient.xhtml?bill_id=202520260SB53"
+      ],
+      "source_url": "https://leginfo.legislature.ca.gov/faces/billNavClient.xhtml?bill_id=202520260SB53"
     }
   ]
 }
