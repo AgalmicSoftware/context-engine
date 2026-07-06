@@ -87,10 +87,7 @@ import {
   resolveTelegramAgentBridgeUrl as resolveTelegramAgentBridgeUrlForSession,
   type OnePageSessionPropsLike,
 } from './onePageSessionTelegramController';
-import {
-  buildInitialTelegramState,
-  createOnePageSessionTelegramActions,
-} from './onePageSessionTelegramActions';
+import { buildInitialTelegramState, createOnePageSessionTelegramActions, type OnePageSessionTelegramState } from './onePageSessionTelegramActions';
 
 const SurveyPage = React.lazy(() => import('../SurveyTool/SurveyPage'));
 const MemoSurveyPage = React.memo((props: any) => <SurveyPage {...props} />);
@@ -503,7 +500,7 @@ class OnePageSession extends Component<any, any> {
     this.handleViewAllQuestionsClick = this.handleViewAllQuestionsClick.bind(this);
 
     const telegramActions = createOnePageSessionTelegramActions({
-      getState: () => this.state,
+      getState: () => this.state as OnePageSessionTelegramState,
       isTelegramBackendMode: (sessionConfig) => this.isTelegramBackendMode(sessionConfig),
       ports: {
         clearStoredEnvelope: clearAgentClientLoginEnvelope,

@@ -355,12 +355,12 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     getActiveSessionSlug: () => this.getActiveSessionSlug(), getAgentTokenInput: () => this.state.agentTokenInput, getDemoSessionConfigBySlug,
     getPropSessionConfig: () => this.props.sessionConfig, getSessionConfigBySlugOrDefault,
     getTargetNetwork: () => this.getTargetNetwork(), isTelegramFirstSessionConfig, normalizeSettingsSessionSlug,
-    setState: (patch) => this.setState(patch), setStateIfMounted: (patch) => this.setStateIfMounted(patch),
-    updateLoginInfo: (payload) => this.props.updateLoginInfo(payload),
-    windowTarget: typeof window !== 'undefined' ? window : null,
+    setState: (patch) => { if (typeof patch === 'function') {
+      this.setState((prev) => patch(prev) as Pick<LoginAndSettingsModalState, 'agentTokenError' | 'agentTokenInput' | 'agentTokenStatus' | 'agentTokenLoginOpen'>); return; }
+      this.setState(patch as Pick<LoginAndSettingsModalState, 'agentTokenError' | 'agentTokenInput' | 'agentTokenStatus'>); }, setStateIfMounted: (patch) => this.setStateIfMounted(patch),
+    updateLoginInfo: (payload) => this.props.updateLoginInfo(payload), windowTarget: typeof window !== 'undefined' ? window : null,
   });
-  getDisplaySessionConfig = this._agentTokenActions.getDisplaySessionConfig;
-  getAgentTokenLoginSessionContext = this._agentTokenActions.getAgentTokenLoginSessionContext;
+  getDisplaySessionConfig = this._agentTokenActions.getDisplaySessionConfig; getAgentTokenLoginSessionContext = this._agentTokenActions.getAgentTokenLoginSessionContext;
   shouldShowAgentTokenLogin = this._agentTokenActions.shouldShowAgentTokenLogin; toggleAgentTokenLogin = this._agentTokenActions.toggleAgentTokenLogin;
   handleAgentTokenLoginSubmit = this._agentTokenActions.handleAgentTokenLoginSubmit;
 
