@@ -26,7 +26,13 @@ describe('SessionWizard worker resource rendering', () => {
 
   const selectPreset = async (presetId) => {
     const testId = `ce-new-preset-${presetId}`;
-    fireEvent.click(screen.getByTestId(testId));
+    const originalConfirm = window.confirm;
+    window.confirm = jest.fn(() => true);
+    try {
+      fireEvent.click(screen.getByTestId(testId));
+    } finally {
+      window.confirm = originalConfirm;
+    }
     await waitFor(() => {
       expect(screen.getByTestId(testId)).toHaveAttribute('aria-checked', 'true');
     });

@@ -7,6 +7,10 @@ import { Provider } from 'react-redux';
 import { createStore } from 'redux';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
+  SESSION_MODE_PRESET_IDS,
+  cloneSessionModePreset,
+} from '../../utilities/session/sessionModeProfile';
+import {
   getContractViewerCardTestId,
   getContractViewerSourceTestId,
   getSessionWizardContractModalTriggerTestId,
@@ -326,7 +330,13 @@ const selectNormalModeCard = (label) => {
   fireEvent.click(screen.getByRole('button', { name: new RegExp(label, 'i') }));
 };
 const selectCloudflarePreset = () => {
-  fireEvent.click(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare'));
+  const preset = screen.queryByTestId('ce-new-preset-fast_cheap_cloudflare');
+  if (!preset) return;
+  fireEvent.click(preset);
+  const continueButton = screen.queryByTestId('ce-new-preset-continue');
+  if (continueButton && !continueButton.disabled) {
+    fireEvent.click(continueButton);
+  }
 };
 const getMockSelectorById = (selectorId) => (
   screen.queryAllByTestId('mock-wizard-sbt-selector')
@@ -838,15 +848,37 @@ describe('SessionWizard rendered validation', () => {
     expect(await screen.findByText(REQUIRED_SESSION_SLUG_ERROR)).toBeInTheDocument();
   });
 
-  it('gates the first screen until a session mode preset is chosen', () => {
+  it('shows only session mode on /session/new until Continue reveals the prefilled setup', async () => {
+    localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
+      draft: {
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        storageProfile: { backend: 'cloudflare' },
+      },
+    }));
+    window.history.replaceState({}, '', '/session/new');
     renderSessionWizard();
 
     expect(screen.getByTestId('ce-new-preset-continue')).toBeDisabled();
     expect(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare')).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByTestId('ce-new-preset-trustless_public_decentralized')).toHaveAttribute('aria-checked', 'false');
-
+    expect(screen.queryByText('Custom')).not.toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).not.toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_PUBLISH)).not.toBeInTheDocument();
     expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByTestId('ce-new-preset-trustless_public_decentralized'));
+    expect(screen.getByTestId('ce-new-preset-continue')).not.toBeDisabled();
+    expect(screen.getByTestId('ce-new-preset-trustless_public_decentralized')).toHaveAttribute('aria-checked', 'true');
+    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('ce-new-preset-continue'));
+    expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).toBeInTheDocument();
+    expect(screen.queryByTestId('ce-new-preset-continue')).not.toBeInTheDocument();
+
+    enableAdvancedMode();
+    fireEvent.click(screen.getByRole('button', { name: 'Session Storage expand' }));
+    expect(screen.getByRole('radio', { name: 'Arweave' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: 'Cloudflare' })).toHaveAttribute('aria-checked', 'false');
   });
 
   it('checks session slug collisions before publish upload or register side effects', async () => {

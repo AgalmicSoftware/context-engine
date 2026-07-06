@@ -6,17 +6,20 @@ export type SessionWizardSessionModeProfileControlProps = {
   registryChainId?: number | null;
   value?: unknown;
   onChange: (profile: SessionModeProfile, compiled: { storageProfile: UnknownRecord }) => void;
+  onContinue?: () => void;
 };
 
 const SessionWizardSessionModeProfileControl = ({
   registryChainId,
   value,
   onChange,
+  onContinue,
 }: SessionWizardSessionModeProfileControlProps) => (
   <SessionModeProfileField
     registryChainId={registryChainId}
     value={value}
     onChange={onChange}
+    onContinue={onContinue}
   />
 );
 

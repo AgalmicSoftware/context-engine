@@ -300,7 +300,11 @@ import SessionWizard, {
   resolveSessionWizardWorkerBaseUrl,
 } from './SessionWizard';
 
-const renderSessionWizard = (props = {}) => render(<SessionWizard network={{ id: 84532 }} {...props} />);
+const renderSessionWizard = (props = {}) => {
+  const view = render(<SessionWizard network={{ id: 84532 }} {...props} />);
+  commitSessionModeProfileGateIfPresent();
+  return view;
+};
 const createTooltipStore = (tooltipsEnabled = true) => createStore(
   (state = { sessionState: { tooltipsEnabled } }, action) => {
     if (action.type === 'SET_TOOLTIPS') {
@@ -336,13 +340,7 @@ const enableAdvancedMode = () => {
   act(() => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
   });
-  if (hasCommittedSessionModeProfile()) return;
-  const preset = screen.queryByTestId(resolveSessionModePresetTestId());
-  if (preset) {
-    act(() => {
-      fireEvent.click(preset);
-    });
-  }
+  ensureSessionModeProfileReady();
 };
 const readCachedSessionWizardDraft = () => {
   try {
@@ -361,19 +359,56 @@ const resolveSessionModePresetTestId = () => {
     ? 'ce-new-preset-fast_cheap_cloudflare'
     : 'ce-new-preset-trustless_public_decentralized';
 };
-const hasCommittedSessionModeProfile = () => {
-  const continueButton = screen.queryByTestId('ce-new-preset-continue');
-  return !!continueButton && !continueButton.disabled;
-};
-const ensureSessionModeProfileSelected = () => {
-  if (hasCommittedSessionModeProfile()) return;
-  const presetTestId = resolveSessionModePresetTestId();
-  if (screen.queryByTestId(presetTestId)) {
+const clickSessionModePresetForTest = (testId) => {
+  const preset = screen.queryByTestId(testId);
+  if (!preset) return false;
+  const originalConfirm = window.confirm;
+  window.confirm = jest.fn(() => true);
+  try {
     act(() => {
-      fireEvent.click(screen.getByTestId(presetTestId));
+      fireEvent.click(preset);
     });
-    return;
+  } finally {
+    window.confirm = originalConfirm;
   }
+  return true;
+};
+const hasSelectedSessionModeProfile = () => {
+  const continueButton = screen.queryByTestId('ce-new-preset-continue');
+  return !continueButton || !continueButton.disabled;
+};
+function ensureSessionModeProfileReady() {
+  let continueButton = screen.queryByTestId('ce-new-preset-continue');
+  if (!continueButton) return false;
+  if (continueButton.disabled) {
+    const candidatePresets = [
+      resolveSessionModePresetTestId(),
+      'ce-new-preset-fast_cheap_cloudflare',
+      'ce-new-preset-trustless_public_decentralized',
+    ];
+    for (const presetTestId of [...new Set(candidatePresets)]) {
+      if (!clickSessionModePresetForTest(presetTestId)) continue;
+      continueButton = screen.queryByTestId('ce-new-preset-continue');
+      if (continueButton && !continueButton.disabled) break;
+    }
+  }
+  return !!continueButton && !continueButton.disabled;
+}
+function commitSessionModeProfileGateIfPresent() {
+  const setupVisible = !!screen.queryByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+  if (!ensureSessionModeProfileReady() || setupVisible) return;
+  const continueButton = screen.queryByTestId('ce-new-preset-continue');
+  if (continueButton && !continueButton.disabled) {
+    act(() => {
+      fireEvent.click(continueButton);
+    });
+  }
+}
+const ensureSessionModeProfileSelected = () => {
+  if (hasSelectedSessionModeProfile()) return;
+  commitSessionModeProfileGateIfPresent();
+  if (hasSelectedSessionModeProfile()) return;
+  const presetTestId = resolveSessionModePresetTestId();
   const normalModeButton = screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_NORMAL);
   const advancedModeButton = screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED);
   if (!normalModeButton || !advancedModeButton) return;
@@ -381,12 +416,7 @@ const ensureSessionModeProfileSelected = () => {
   act(() => {
     fireEvent.click(advancedModeButton);
   });
-  const preset = screen.queryByTestId(presetTestId);
-  if (preset) {
-    act(() => {
-      fireEvent.click(preset);
-    });
-  }
+  clickSessionModePresetForTest(presetTestId);
   if (wasNormalMode) {
     act(() => {
       fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_NORMAL));

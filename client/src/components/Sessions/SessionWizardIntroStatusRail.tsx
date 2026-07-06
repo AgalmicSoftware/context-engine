@@ -17,6 +17,7 @@ type SessionWizardIntroStatusRailProps = {
   onFocusNormalModeSection: (key: string) => void;
   onRetrySponsoredBundle: () => void;
   showNewSessionRequirementsBanner: boolean;
+  showNormalModeRail?: boolean;
   sponsoredBundleStatus?: React.ComponentProps<typeof SessionWizardSponsoredStatus>['status'];
 };
 
@@ -32,6 +33,7 @@ const SessionWizardIntroStatusRail = ({
   onFocusNormalModeSection,
   onRetrySponsoredBundle,
   showNewSessionRequirementsBanner,
+  showNormalModeRail = true,
   sponsoredBundleStatus = null,
 }: SessionWizardIntroStatusRailProps): React.ReactElement => (
   <>
@@ -49,7 +51,7 @@ const SessionWizardIntroStatusRail = ({
       status={sponsoredBundleStatus}
     />
 
-    {isNormalMode ? (
+    {isNormalMode && showNormalModeRail ? (
       <SessionWizardNormalModeRail
         activeNormalModeIndex={activeNormalModeIndex}
         collapsedSections={collapsedSections}

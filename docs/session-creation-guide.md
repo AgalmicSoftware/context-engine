@@ -160,12 +160,18 @@ The same wallet is used for:
 Open `/new`. The app canonicalizes that route to `/session/new`, but `/new` is the intended entry point.
 
 The first screen is the session-mode choice. Nothing is preselected, and
-Continue stays disabled until the creator chooses a preset:
+Continue stays disabled until the creator chooses a preset. The four-stage
+setup stays hidden until Continue, then opens with fields prefilled from the
+chosen mode:
 
 - `Fast & Cheap (Cloudflare)` compiles to a Cloudflare-backed,
-  worker-canonical session shape.
+  worker-canonical session shape. Its card lists the Cloudflare API token,
+  AI provider key, Arweave JWK, RPC URL/key, and optional Lit key needed
+  for Lit encryption.
 - `Trustless & Public (Decentralized)` compiles to the public Arweave +
-  EVM-registry session shape.
+  EVM-registry session shape. Its card lists the Arweave wallet/JWK, RPC
+  URL/key, AI provider key, and optional Lit key needed when encryption is
+  enabled.
 
 Advanced per-axis changes, such as enabling the Telegram surface or changing
 storage/authority/encryption independently, flip the profile to `custom`. New
