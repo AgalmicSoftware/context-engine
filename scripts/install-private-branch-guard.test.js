@@ -49,7 +49,7 @@ function setupSourceRepo() {
     git(tempRoot, ['init', '--bare', '--initial-branch=main', remoteDir], { stdio: 'ignore' });
     git(tempRoot, ['clone', remoteDir, sourceDir], { stdio: 'ignore' });
     git(sourceDir, ['config', 'user.name', 'Private Dev'], { stdio: 'ignore' });
-    git(sourceDir, ['config', 'user.email', 'private@example.com'], { stdio: 'ignore' });
+    git(sourceDir, ['config', 'user.email', '[redacted-email]'], { stdio: 'ignore' });
 
     installFixture(sourceDir);
 
@@ -191,7 +191,7 @@ test('installed pre-push hook blocks publishing dev to matching public remotes e
     const installResult = runInstaller(sourceDir);
     assert.equal(installResult.status, 0);
 
-    const hookResult = spawnSync('bash', [path.join(sourceDir, '.githooks', 'pre-push'), 'public', 'git@github.com-agalmic:AgalmicSoftware/context-engine.git'], {
+    const hookResult = spawnSync('bash', [path.join(sourceDir, '.githooks', 'pre-push'), 'public', '[redacted-email]-agalmic:AgalmicSoftware/context-engine.git'], {
       cwd: sourceDir,
       encoding: 'utf8',
       input: 'refs/heads/dev 1111111111111111111111111111111111111111 refs/heads/dev 0000000000000000000000000000000000000000\n',

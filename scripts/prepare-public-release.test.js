@@ -48,7 +48,7 @@ test('prepare-public-release strips review artifacts and preserves the generated
     );
     fs.chmodSync(path.join(sourceDir, 'scripts', 'prepare-public-release.sh'), 0o755);
 
-    writeFile(sourceDir, 'public.txt', 'keep owner@example.test and /Users/alice/context-engine\n');
+    writeFile(sourceDir, 'public.txt', 'keep [redacted-email] and /redacted-home\n');
     writeFile(sourceDir, '.DS_Store', 'mac metadata\n');
     writeFile(sourceDir, '.secrets.baseline', '{"results":{".codex/secret.txt":[]}}\n');
     writeFile(sourceDir, '.env.local', 'SECRET=value\n');

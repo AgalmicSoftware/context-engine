@@ -308,105 +308,6 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
     }
   }
 
-  if (!isCanonicalCellId(cellId)) return null;
-
-  const [activeCategoryX, activeSubcategoryX, activeCategoryY, activeSubcategoryY] = cellId.split('.');
-  return {
-    activeCategoryX,
-    activeCategoryY,
-    activeSubcategoryX,
-    activeSubcategoryY,
-  };
-};
-
-const getCommentsForCellRecords = (
-  cellId: string,
-  comments: RiskCommentRecord[] = []
-): RiskCommentRecord[] => {
-  if (typeof cellId !== 'string' || !cellId) return [];
-
-  if (isAggregateCellId(cellId)) {
-    const [catX, catY] = cellId.split('_vs_');
-    if (!catX || !catY) return [];
-
-    return comments.filter(
-      (entry) => isCanonicalCellId(entry.cell)
-        && entry.cell.startsWith(`${catX}.`)
-        && entry.cell.includes(`.${catY}.`)
-    );
-  }
-
-  return comments.filter((entry) => entry.cell === cellId);
-};
-
-const hasRestoreState = (restoreState: RiskMatrixRestoreState | null | undefined) => (
-  Boolean(restoreState && typeof restoreState === 'object' && Object.keys(restoreState).length > 0)
-);
-
-const buildInitialRiskMatrixState = (
-  restoreState: RiskMatrixRestoreState | null | undefined
-): RiskMatrixState => {
-  const nextComments = Array.isArray(restoreState?.comments)
-    ? restoreState.comments.filter(isValidCommentRecord).map(normalizeCommentRecord).map(enrichRiskMatrixCommentRecord)
-    : INITIAL_COMMENTS;
-  const rawSelectedCellId = String(restoreState?.selectedCellId || '').trim();
-  const selectedCellId = (isAggregateCellId(rawSelectedCellId) || isCanonicalCellId(rawSelectedCellId))
-    ? rawSelectedCellId
-    : '';
-  const derivedSelectionState = parseSelectionStateFromCell(selectedCellId);
-  const nextValence = VALID_VALENCES.has(String(restoreState?.valence || ''))
-    ? (restoreState?.valence as RiskValence)
-    : DEFAULT_VALENCE;
-  const parsedIntensity = Number(restoreState?.intensity);
-  const nextIntensity = Number.isFinite(parsedIntensity) && parsedIntensity > 0
-    ? parsedIntensity
-    : DEFAULT_INTENSITY;
-  const modal = Boolean(restoreState?.modal && selectedCellId);
-
-  return {
-    comments: nextComments,
-    modal,
-    selectedCellId: modal ? selectedCellId : '',
-    existingComments: modal ? getCommentsForCellRecords(selectedCellId, nextComments) : [],
-    comment: typeof restoreState?.comment === 'string' ? restoreState.comment : '',
-    valence: nextValence,
-    intensity: nextIntensity,
-    heatmap: buildHeatmapFromComments(nextComments),
-    activeCategoryX: restoreState?.activeCategoryX ?? derivedSelectionState?.activeCategoryX ?? null,
-    activeCategoryY: restoreState?.activeCategoryY ?? derivedSelectionState?.activeCategoryY ?? null,
-    activeSubcategoryX: restoreState?.activeSubcategoryX ?? derivedSelectionState?.activeSubcategoryX ?? null,
-    activeSubcategoryY: restoreState?.activeSubcategoryY ?? derivedSelectionState?.activeSubcategoryY ?? null,
-    hoveredRowIndex: null,
-    hoveredColIndex: null,
-    hoveredSubRowIndex: null,
-    hoveredSubColIndex: null,
-    openCommentGroups: {
-      opportunity: true,
-      risk: true,
-    },
-  };
-};
-
-const resolveAtlasAssetPath = (value = '') => {
-  const normalizedValue = String(value || '').trim();
-  if (!normalizedValue) return '';
-  return normalizedValue.startsWith('/') ? buildPublicUrlPath(normalizedValue) : normalizedValue;
-};
-
-class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
-  constructor(props: RiskMatrixProps) {
-    super(props);
-
-    this.state = buildInitialRiskMatrixState(props.restoreState);
-  }
-
-  componentDidMount() {
-    const { onRestoreApplied = null, restoreState = null } = this.props;
-    if (typeof onRestoreApplied === 'function' && hasRestoreState(restoreState)) {
-      onRestoreApplied();
-    }
-  }
-
   closeModal = () => {
     this.setState({
       modal: false,
@@ -426,26 +327,6 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
       },
     }));
   };
-
-  getCellValue = (catY: string, catX: string) => this.state.heatmap[`${catY}_${catX}`] || 0;
-
-  getCommentsForCell = (
-    cellId: string,
-    comments: RiskCommentRecord[] = this.state.comments
-  ): RiskCommentRecord[] => getCommentsForCellRecords(cellId, comments);
-
-  getRestoreState = (): RiskMatrixRestoreState => ({
-    comments: this.state.comments,
-    modal: this.state.modal,
-    selectedCellId: this.state.selectedCellId,
-    comment: this.state.comment,
-    valence: this.state.valence,
-    intensity: this.state.intensity,
-    activeCategoryX: this.state.activeCategoryX,
-    activeCategoryY: this.state.activeCategoryY,
-    activeSubcategoryX: this.state.activeSubcategoryX,
-    activeSubcategoryY: this.state.activeSubcategoryY,
-  });
 
   getCellValue = (catY: string, catX: string) => this.state.heatmap[`${catY}_${catX}`] || 0;
 

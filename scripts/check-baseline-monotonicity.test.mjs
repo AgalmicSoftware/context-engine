@@ -50,7 +50,7 @@ function withTempRepo(run) {
   try {
     git(repoDir, ['init', '--initial-branch=main']);
     git(repoDir, ['config', 'user.name', 'Baseline Tester']);
-    git(repoDir, ['config', 'user.email', 'baseline@example.invalid']);
+    git(repoDir, ['config', 'user.email', '[redacted-email]']);
     return run(repoDir);
   } finally {
     fs.rmSync(repoDir, { recursive: true, force: true });

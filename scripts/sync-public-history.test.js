@@ -90,7 +90,7 @@ function setupSourceRepo() {
     git(tempRoot, ['init', '--bare', '--initial-branch=main', remoteDir], { stdio: 'ignore' });
     git(tempRoot, ['clone', remoteDir, sourceDir], { stdio: 'ignore' });
     git(sourceDir, ['config', 'user.name', 'Private Dev'], { stdio: 'ignore' });
-    git(sourceDir, ['config', 'user.email', 'private@example.com'], { stdio: 'ignore' });
+    git(sourceDir, ['config', 'user.email', '[redacted-email]'], { stdio: 'ignore' });
 
     installSyncScriptFixture(sourceDir);
 
@@ -299,8 +299,8 @@ test('sync-public-history replays public commits, skips private-only commits, an
     ]).trim().split('\n');
 
     assert.deepEqual(historyLines, [
-      'Public commit title|2025-01-02T03:04:05Z|2025-01-02T03:04:05Z|Agalmic <agalmicsoftware@protonmail.com>|Agalmic <agalmicsoftware@protonmail.com>',
-      'Mixed commit|2025-01-04T05:06:07Z|2025-01-04T05:06:07Z|Agalmic <agalmicsoftware@protonmail.com>|Agalmic <agalmicsoftware@protonmail.com>',
+      'Public commit title|2025-01-02T03:04:05Z|2025-01-02T03:04:05Z|Agalmic <[redacted-email]>|Agalmic <[redacted-email]>',
+      'Mixed commit|2025-01-04T05:06:07Z|2025-01-04T05:06:07Z|Agalmic <[redacted-email]>|Agalmic <[redacted-email]>',
     ]);
 
     const replayedShas = git(sourceDir, [

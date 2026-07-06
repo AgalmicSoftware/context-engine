@@ -739,11 +739,11 @@ describe('SurveyResults sync status display', () => {
 });
 
 describe('SurveyResults demo results views', () => {
-  it('shows the demo results switcher only for configured demo question results', () => {
-    const nonDemoSubject = createSubject({
-      isOpen: true,
-      viewMode: 'questions',
-      sessionSlug: 'edge',
+  it('shows the demo results switcher only for configured demo question results', async () => {
+    seedCacheEnvironment();
+    const view = renderQuestionResults({ sessionSlug: 'edge', activeSessionSlug: 'edge' });
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Question Results' })).toBeInTheDocument();
     });
     expect(screen.queryByTestId('ce-surveyresults-demo-view-nav')).toBeNull();
 
@@ -752,42 +752,22 @@ describe('SurveyResults demo results views', () => {
       await Promise.resolve();
     });
 
-    const demoTree = demoSubject.render();
-    const demoHeader = findElement(
-      demoTree,
-      (element) => element?.type === SurveyResultsModalHeader
-    );
-    const demoMarkup = renderToStaticMarkup(demoHeader);
-    const syncIndex = demoMarkup.indexOf('syncStatusContainer');
-    const demoNavIndex = demoMarkup.indexOf('ce-surveyresults-demo-view-nav');
+    const demoNav = await screen.findByTestId('ce-surveyresults-demo-view-nav');
+    expect(within(demoNav).getByText('Report')).toBeInTheDocument();
+    expect(within(demoNav).getByText('Breakdown')).toBeInTheDocument();
+    expect(within(demoNav).getByText('Atlas')).toBeInTheDocument();
+    expect(within(demoNav).getByText('Risk Matrix')).toBeInTheDocument();
+    const syncNode = document.querySelector('[class*="syncStatusContainer"]') as HTMLElement;
+    expect(syncNode.compareDocumentPosition(demoNav) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
-    expect(demoNavIndex).toBeGreaterThanOrEqual(0);
-    expect(demoMarkup).toContain('Report');
-    expect(demoMarkup).toContain('Breakdown');
-    expect(demoMarkup).toContain('Atlas');
-    expect(demoMarkup).toContain('Risk Matrix');
-    expect(syncIndex).toBeGreaterThanOrEqual(0);
-    expect(demoNavIndex).toBeGreaterThan(syncIndex);
-
-    const demoThreeSubject = createSubject({
-      isOpen: true,
-      viewMode: 'questions',
-      sessionSlug: 'demo-1',
+    await act(async () => {
+      view.rerenderSurveyResults({ sessionSlug: 'demo-1', activeSessionSlug: 'demo-1' });
+      await Promise.resolve();
     });
-    demoThreeSubject.state = {
-      ...demoThreeSubject.state,
-      viewMode: 'questions',
-    };
 
-    const demoThreeTree = demoThreeSubject.render();
-    const demoThreeHeader = findElement(
-      demoThreeTree,
-      (element) => element?.type === SurveyResultsModalHeader
-    );
-    const demoThreeMarkup = renderToStaticMarkup(demoThreeHeader);
-
-    expect(demoThreeMarkup).toContain('ce-surveyresults-demo-view-nav');
-    expect(demoThreeMarkup).toContain('Breakdown');
+    const demoOneNav = await screen.findByTestId('ce-surveyresults-demo-view-nav');
+    expect(within(demoOneNav).getByText('Report')).toBeInTheDocument();
+    expect(within(demoOneNav).getByText('Breakdown')).toBeInTheDocument();
   });
 
   it('switches the demo modal surface from the top bar buttons and maps report to Polis', async () => {

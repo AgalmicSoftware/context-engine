@@ -202,7 +202,7 @@ const normalizeExpiryToIso = (raw: unknown) => {
   if (ts < now) throw new Error('Expiry must be in the future.');
   return new Date(ts).toISOString();
 };
-const normalizeRestoredExpiryDate = (raw: any) => {
+const normalizeRestoredExpiryDate = (raw: unknown) => {
   const rawDate = raw instanceof Date ? raw : new Date(toStr(raw || '').trim());
   const ts = rawDate.getTime();
   if (!Number.isFinite(ts)) return null;

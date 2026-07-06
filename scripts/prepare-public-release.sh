@@ -215,6 +215,18 @@ const rootDir = path.resolve(process.argv[2]);
 const skipDirs = new Set(['.git', 'node_modules', 'build', 'dist', 'coverage']);
 const emailRe = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/ig;
 const homePathRe = /(?:^|[\s"'(=:{])((?:\/Users|\/home)\/[A-Za-z0-9._-]+(?:\/[^\s"'`<>\\)]*)?)/g;
+const publicEmailAllowlist = new Set([
+  'name@example.com',
+  'agalmicsoftware@protonmail.com',
+]);
+
+function scrubEmail(email) {
+  const normalized = String(email || '').toLowerCase();
+  if (publicEmailAllowlist.has(normalized) || normalized.endsWith('@users.noreply.github.com')) {
+    return email;
+  }
+  return '[redacted-email]';
+}
 
 function isProbablyBinary(buffer) {
   if (buffer.includes(0)) return true;
@@ -235,7 +247,7 @@ function scrubFile(absolutePath) {
 
   const original = buffer.toString('utf8');
   const scrubbed = original
-    .replace(emailRe, '[redacted-email]')
+    .replace(emailRe, scrubEmail)
     .replace(homePathRe, (match, homePath) => match.replace(homePath, '/redacted-home'));
 
   if (scrubbed !== original) {

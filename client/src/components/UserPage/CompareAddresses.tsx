@@ -284,24 +284,7 @@ interface OpinionCompassProps {
   precomputed?: CompareCompassData | null;
 }
 
-interface CompareBookmark {
-  address?: string;
-  addressLower?: string;
-  nickname?: string;
-  label?: string;
-  [key: string]: unknown;
-}
 
-interface CompareSbt {
-  name?: string;
-  image?: string | null;
-  imageUrl?: string | null;
-  sbtInfo?: {
-    image?: string | null;
-    [key: string]: unknown;
-  };
-  [key: string]: unknown;
-}
 
 
 const isUnknownRecord = (value: unknown): value is UnknownRecord =>

@@ -1275,10 +1275,15 @@ const mergeSessionFieldsIntoCachedConfig = ({
   session,
   fieldsByKey,
   registryChainId,
+}: {
+  baseConfig?: AnyRecord | null;
+  session?: AnyRecord | null;
+  fieldsByKey?: AnyRecord | null;
+  registryChainId?: number | string | null;
 }) => {
   const base = normalizeSessionNaming(
     baseConfig && typeof baseConfig === 'object' ? { ...baseConfig } : {}
-  );
+  ) as AnyRecord;
   const registryMeta = base.__registry && typeof base.__registry === 'object'
     ? base.__registry
     : {};
@@ -1339,7 +1344,7 @@ const mergeSessionFieldsIntoCachedConfig = ({
   return normalizeSessionNaming(config);
 };
 
-const addSessionConfigToCache = (cache, config, opts = {}) => {
+const addSessionConfigToCache = (cache: RegistryCache | null, config: AnyRecord | null, opts: AnyRecord = {}) => {
   if (!cache || !config || typeof config !== 'object') return;
   const slug = normalizeSlug(config.slug);
 

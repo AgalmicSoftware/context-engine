@@ -876,6 +876,49 @@ describe('AppShell route render smoke', () => {
     subject.componentWillUnmount();
   });
 
+  it('redirects a first-visit root load to the about page', async () => {
+    const subject = createSubject({
+      path: '/',
+      firstVisit: true,
+    });
+    const replaceStateSpy = jest.spyOn(window.history, 'replaceState');
+    subject.applySessionFallbackRedirect = jest.fn(() => null);
+    subject.syncSessionFallbackRedirectConsumption = jest.fn();
+    subject.manageAutoHashPersistence = jest.fn();
+    subject.getDisplaySessionChainId = jest.fn(() => DEFAULT_NETWORK.id);
+    subject.getDisplaySessionNetwork = jest.fn(() => DEFAULT_NETWORK);
+    subject.resolveSessionPathSlug = jest.fn();
+    subject.syncLitHooks = jest.fn();
+    subject.refreshSessionInfo = jest.fn();
+    subject.refreshSessionMetaFields = jest.fn();
+    subject.refreshGroupCredentials = jest.fn();
+    subject.hasPersistedManagedCacheData = jest.fn(async () => false);
+    subject.syncCacheHasLoadedFlagFromPersistent = jest.fn(async () => undefined);
+    subject.syncCacheHasLoadedFlagOnTransition = jest.fn(async () => undefined);
+    subject.getSessionNetwork = jest.fn(() => null);
+    subject.setReadinessStateIfChanged = jest.fn((patch) => {
+      subject.state = { ...subject.state, ...(patch || {}) };
+    });
+    subject.checkAllCachesReady = jest.fn();
+    subject.handleDeepLinkScan = jest.fn();
+
+    await act(async () => {
+      await subject.componentDidMount();
+    });
+
+    expect(replaceStateSpy).toHaveBeenCalledWith({}, '', '/about');
+    expect(window.location.pathname).toBe('/about');
+
+    render(
+      <MemoryRouter initialEntries={['/about']}>
+        {subject.render()}
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_ABOUT_ROOT)).toBeInTheDocument();
+    subject.componentWillUnmount();
+  });
+
   it('does not restore the mount session after navigating during cache initialization', async () => {
     const deferredCacheInit = createDeferred();
     initCacheManager.mockReturnValueOnce(deferredCacheInit.promise);

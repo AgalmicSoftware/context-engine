@@ -75,16 +75,6 @@ const mockSbtLabels = () => (
   ))
 );
 
-const treeHasLinkHref = (node, href) => {
-  if (node == null) return false;
-  const expandedNode = expandInspectableNode(node);
-  if (expandedNode !== node) return treeHasLinkHref(expandedNode, href);
-  if (Array.isArray(node)) return node.some((child) => treeHasLinkHref(child, href));
-  if (typeof node !== 'object') return false;
-  if (node?.type === 'a' && node?.props?.href === href) return true;
-  return treeHasLinkHref(node?.props?.children, href);
-};
-
 describe('SurveyPileViewMode gated empty states', () => {
   afterEach(() => {
     jest.clearAllMocks();
@@ -192,9 +182,12 @@ describe('SurveyPileViewMode gated empty states', () => {
 
     expect(await screen.findByTestId(E2E_TESTIDS.SURVEY_LOCKED_BANNER)).toBeInTheDocument();
     expect(screen.getByText(`This session's questions are ${t('gatedLower')}`)).toBeInTheDocument();
-    expect(screen.getByText(
-      `${t('sbt')} required: VIP SBT. Connect an eligible ${t('walletLower')} that satisfies the ${t('gateLower')} requirements below, then decrypt to view the questions.`
-    )).toBeInTheDocument();
+    const expectedRequirementText = `${t('sbt')} required: VIP SBT. Connect an eligible ${t('walletLower')} that satisfies the ${t('gateLower')} requirements below, then decrypt to view the questions.`;
+    expect(screen.getByText((_, element) => (
+      typeof element?.className === 'string' &&
+      element.className.includes('lockedQuestionsSubtext') &&
+      element.textContent?.replace(/\s+/g, ' ').trim() === expectedRequirementText
+    ))).toBeInTheDocument();
     expect(screen.queryByText('VIP Gate')).toBeNull();
     expect(screen.getByText(/VIP SBT/)).toBeInTheDocument();
     expect(screen.queryByText('Retry decrypt')).toBeNull();
@@ -202,27 +195,11 @@ describe('SurveyPileViewMode gated empty states', () => {
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SURVEY_LOCKED_BANNER_CARET));
 
-    const tree = subject.render();
+    expect(screen.getByText('VIP Gate')).toBeInTheDocument();
+    expect(screen.getAllByText(/VIP SBT/).length).toBeGreaterThan(0);
     const expectedSbtHref = buildSbtDetailPath(gateSbt, 'edge');
-    expect(treeHasDataTestId(tree, E2E_TESTIDS.SURVEY_LOCKED_BANNER)).toBe(true);
-    expect(treeHasText(tree, `This session's questions are ${t('gatedLower')}`)).toBe(true);
-    expect(treeHasText(tree, t('sbt'))).toBe(true);
-    expect(treeHasText(tree, 'required:')).toBe(true);
-    expect(treeHasText(tree, `Connect an eligible ${t('walletLower')} that satisfies the ${t('gateLower')} requirements below, then decrypt to view the questions.`)).toBe(true);
-    expect(treeHasLinkHref(tree, expectedSbtHref)).toBe(true);
-    expect(treeHasText(tree, 'VIP Gate')).toBe(false);
-    expect(treeHasText(tree, 'VIP SBT')).toBe(true);
-    expect(treeHasText(tree, 'Retry decrypt')).toBe(false);
-    expect(treeHasText(tree, 'Decrypt')).toBe(true);
-    expect(treeHasDataTestId(tree, E2E_TESTIDS.SURVEY_LOCKED_BANNER_CARET)).toBe(true);
-
-    subject.state = {
-      ...subject.state,
-      lockedGateDetailsExpanded: true,
-    };
-
-    const expandedTree = subject.render();
-    expect(treeHasText(expandedTree, 'VIP Gate')).toBe(true);
-    expect(treeHasText(expandedTree, 'VIP SBT')).toBe(true);
+    screen.getAllByRole('link', { name: /VIP SBT/i }).forEach((link) => {
+      expect(link).toHaveAttribute('href', expectedSbtHref);
+    });
   });
 });

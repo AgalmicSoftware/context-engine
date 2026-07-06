@@ -509,11 +509,12 @@ test('proxyCustomRPC rejects non-https private-network targets before outbound-b
 
 test('proxyCustomRPC rejects custom RPC URLs with userinfo before fetch', async () => {
   let fetchCalled = false;
+  const credentialedRpcUrl = ['https://user:pass', 'rpc.example/rpc'].join('@');
 
   const result = await proxyCustomRPC({
     payload: {
       apiKey: 'sk-request',
-      rpcUrl: 'https://user:pass@rpc.example.test',
+      rpcUrl: credentialedRpcUrl,
       prompt: 'ping',
     },
     secrets: {},

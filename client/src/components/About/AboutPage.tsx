@@ -499,7 +499,7 @@ const AboutPage = () => {
                   {link.text}
                 </a>
               ))}
-              <a href="mailto:contextengine@protonmail.com" className={styles.tertiaryLink}>
+              <a href="mailto:[redacted-email]" className={styles.tertiaryLink}>
                 Email
               </a>
             </div>

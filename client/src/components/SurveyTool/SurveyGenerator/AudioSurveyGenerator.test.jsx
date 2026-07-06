@@ -83,7 +83,7 @@ describe('AudioSurveyGenerator input and question generation', () => {
     expect(container.querySelector('[data-testid="transcript-mode-toggle"]')).not.toBeNull();
   });
 
-  it('shows transcript mode when a URL source is typed', () => {
+  it('hides the generate questions button until the full-size database tool has content', () => {
     act(() => {
       root.render(
         <AudioSurveyGenerator
