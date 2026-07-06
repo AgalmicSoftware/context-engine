@@ -18,7 +18,8 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
   const isStorageRoute = (
     (path === '/storage/upload' && method === 'POST') ||
     (path === '/storage/read' && (method === 'GET' || method === 'POST')) ||
-    (path === '/storage/list' && (method === 'GET' || method === 'POST'))
+    (path === '/storage/list' && (method === 'GET' || method === 'POST')) ||
+    (path === '/storage/export-envelopes' && (method === 'GET' || method === 'POST'))
   );
   if (!isTranscribeRoute && !isArweaveUploadRoute && !isStorageRoute) {
     return { handled: false };

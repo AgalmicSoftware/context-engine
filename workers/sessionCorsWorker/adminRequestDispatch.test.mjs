@@ -681,6 +681,124 @@ test('dispatchAdminRequest merges limits and persists the result for set-limits'
   });
 });
 
+test('dispatchAdminRequest exports encrypted storage envelopes through the admin gate', async () => {
+  const calls = [];
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({ resource: 'responses' }),
+    },
+    env: { CE_STORAGE_INDEX_KV: {} },
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: 'session-a',
+    action: 'export-storage-envelopes',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({
+        ok: true,
+        existingConfig: { storageProfile: { backend: 'cloudflare' } },
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+        targetSlug: 'session-a',
+      }),
+      exportCloudflareEncryptedPayloadEnvelopes: async (value) => {
+        calls.push(value);
+        return {
+          ok: true,
+          manifest: {
+            exportScope: 'encrypted_envelopes_only',
+            encryptedPayloadCount: 1,
+          },
+          payloads: [{ storageRef: { id: 'payload-1' } }],
+        };
+      },
+    }),
+  });
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].slug, 'session-a');
+  assert.equal(calls[0].resource, 'responses');
+  assert.equal(calls[0].includeSessionEnvelope, true);
+  assert.deepEqual(result, {
+    body: {
+      ok: true,
+      manifest: {
+        exportScope: 'encrypted_envelopes_only',
+        encryptedPayloadCount: 1,
+      },
+      payloads: [{ storageRef: { id: 'payload-1' } }],
+    },
+    status: 200,
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+  });
+});
+
+test('dispatchAdminRequest does not export envelopes when admin authority fails', async () => {
+  let exportCalled = false;
+  const response = { body: { error: 'Admin authorization failed.' }, status: 403, headers: {} };
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({ resource: 'responses' }),
+    },
+    env: { CE_STORAGE_INDEX_KV: {} },
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: 'session-a',
+    action: 'export-storage-envelopes',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({ ok: false, response }),
+      exportCloudflareEncryptedPayloadEnvelopes: async () => {
+        exportCalled = true;
+        return { ok: true };
+      },
+    }),
+  });
+
+  assert.equal(result, response);
+  assert.equal(exportCalled, false);
+});
+
+test('dispatchAdminRequest rewraps deployment KEK without returning secret material', async () => {
+  const calls = [];
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({
+        newDeploymentKek: 'new deployment envelope kek',
+      }),
+    },
+    env: { CE_STORAGE_INDEX_KV: {} },
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: 'session-a',
+    action: 'rewrap-envelope-deployment-key',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({
+        ok: true,
+        existingConfig: { storageEnvelope: { keyProvider: 'worker_secret' } },
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+        targetSlug: 'session-a',
+      }),
+      rewrapStorageEnvelopeSessionKeyForDeployment: async (value) => {
+        calls.push(value);
+        return {
+          ok: true,
+          rewrappedAt: '2026-01-04T03:04:05.000Z',
+          keyProvider: 'worker_secret',
+        };
+      },
+    }),
+  });
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].slug, 'session-a');
+  assert.equal(calls[0].newDeploymentKek, 'new deployment envelope kek');
+  assert.deepEqual(result, {
+    body: {
+      ok: true,
+      rewrappedAt: '2026-01-04T03:04:05.000Z',
+      keyProvider: 'worker_secret',
+    },
+    status: 200,
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+  });
+  assert.doesNotMatch(JSON.stringify(result), /new deployment envelope kek/);
+});
+
 test('dispatchAdminRequest returns explicit unknown-action failures after admin verification', async () => {
   let putCalled = false;
 

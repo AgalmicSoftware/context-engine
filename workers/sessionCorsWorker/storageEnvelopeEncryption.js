@@ -97,6 +97,11 @@ const importDeploymentKek = async ({ env = {}, previous = false, deps = {} } = {
   return importAesKey(keyBytes, ['encrypt', 'decrypt'], deps);
 };
 
+const importDeploymentKekFromSecret = async ({ secret, deps = {} } = {}) => {
+  const keyBytes = await deriveDeploymentKeyBytes(secret, deps);
+  return importAesKey(keyBytes, ['encrypt', 'decrypt'], deps);
+};
+
 const aesEncrypt = async ({ keyBytes, plaintextBytes, aad = '', deps = {} }) => {
   const iv = randomBytes(12, deps);
   const key = await importAesKey(keyBytes, ['encrypt'], deps);
@@ -390,6 +395,41 @@ export const rotateStorageEnvelopeKeys = async ({ env = {}, slug, config, deps =
     rotatedAt,
     payloadsRewrapped: rows.length,
     config: nextConfig,
+  };
+};
+
+export const rewrapStorageEnvelopeSessionKeyForDeployment = async ({
+  env = {},
+  slug,
+  config,
+  newDeploymentKek,
+  deps = {},
+} = {}) => {
+  if (typeof deps.putSessionConfig !== 'function') {
+    throw new Error('Session config store is required for envelope deployment re-wrap.');
+  }
+  const sessionKeyBytes = await unwrapSessionKeyBytes({ env, config, slug, deps });
+  const nextDeploymentKey = await importDeploymentKekFromSecret({ secret: newDeploymentKek, deps });
+  const rewrappedAt = nowIso(deps);
+  const sessionKeyRecord = {
+    version: ENVELOPE_VERSION,
+    keyProvider: 'worker_secret',
+    keyId: `session:${safeSlugPart(slug)}:${rewrappedAt}`,
+    createdAt: rewrappedAt,
+    ...await wrapBytesWithKey({
+      wrappingKey: nextDeploymentKey,
+      plaintextBytes: sessionKeyBytes,
+      aad: `ce-storage-envelope:session:${safeSlugPart(slug)}`,
+      deps,
+    }),
+  };
+  const nextConfig = buildSessionEnvelopeConfig({ config, sessionKeyRecord, rotatedAt: rewrappedAt });
+  await deps.putSessionConfig(env, slug, nextConfig);
+  return {
+    ok: true,
+    rewrappedAt,
+    config: nextConfig,
+    keyProvider: 'worker_secret',
   };
 };
 
