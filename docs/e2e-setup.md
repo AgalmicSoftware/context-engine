@@ -42,6 +42,7 @@ Arweave is public and permanent. Use non-identifying payloads only.
    - For fresh full private runs, set `CLOUDFLARE_API_TOKEN` and let session setup create the worker-backed session target.
    - For reuse-only runs, set both `SESSION_SLUG` and `SESSION_WORKER_URL` from an already established E2E session target.
    - Ensure the deterministic wallet you use (derived from the fixture credential ID through the passkey mock PRF/HKDF path) is funded on the target chain.
+   - Before private harness runs, `npm run -s ai:harness:doctor` checks that restored operator-local E2E entrypoints resolve. Replace stale `porto-wallet-derivation` imports with `scripts/lib/passkey-derived-wallet.js`.
    - For multi-wallet Polis seeding, keep walletA funded; walletB/C/D/E are auto-topped-up by the runner when below threshold.
 3. Run `npm run -s test:e2e` for the public navigation smoke, or any private
    `ai:*` workflow command; the scripts auto-load `.env.e2e.local`, then
