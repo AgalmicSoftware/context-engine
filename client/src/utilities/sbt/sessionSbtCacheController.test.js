@@ -1285,6 +1285,35 @@ describe('createSessionSbtCacheController', () => {
       expect(host.dgRead).not.toHaveBeenCalled();
     });
 
+    it('uses an injected event stream port for SBT listener wiring', () => {
+      const sbtEventStreamsPort = {
+        listenForSBTEvents: jest.fn(),
+        removeSBTEventListener: jest.fn(),
+        listenForSurveyEvents: jest.fn(),
+        removeSurveyEventsListener: jest.fn(),
+        listenForSBTInstanceEvents: jest.fn(),
+        removeSBTInstanceEventsListener: jest.fn(),
+      };
+      const host = createMockHost({ chainId: '', sbtEventStreamsPort });
+      const controller = createSessionSbtCacheController(host);
+
+      controller.startSbtEventListenerForGroup('alpha');
+
+      expect(sbtEventStreamsPort.removeSBTEventListener).toHaveBeenCalledWith('none', 'alpha');
+      expect(sbtEventStreamsPort.removeSBTInstanceEventsListener)
+        .toHaveBeenCalledWith('none', [], 'alpha');
+      expect(sbtEventStreamsPort.listenForSBTEvents).toHaveBeenCalledWith(
+        'none',
+        expect.any(Function),
+        'alpha'
+      );
+      expect(sbtEventStreamsPort.listenForSBTInstanceEvents).not.toHaveBeenCalled();
+      expect(contractScripts.removeSBTEventListener).not.toHaveBeenCalled();
+      expect(contractScripts.removeSBTInstanceEventsListener).not.toHaveBeenCalled();
+      expect(contractScripts.listenForSBTEvents).not.toHaveBeenCalled();
+      expect(contractScripts.listenForSBTInstanceEvents).not.toHaveBeenCalled();
+    });
+
     it('attaches a detail-page instance listener through the controller', () => {
       const host = createMockHost();
       const controller = createSessionSbtCacheController(host);

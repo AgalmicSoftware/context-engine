@@ -196,6 +196,33 @@ describe('createSessionSurveyCacheController', () => {
       expect(host.onSurveyEventDetectedForGroup).toHaveBeenCalledWith('alpha', event);
     });
 
+    it('uses an injected event stream port for survey listeners', () => {
+      const surveyEventStreamsPort = {
+        removeSurveyEventsListener: jest.fn(),
+        listenForSurveyEvents: jest.fn(),
+      };
+      const host = createMockHost({ surveyEventStreamsPort });
+      const controller = createSessionSurveyCacheController(host);
+
+      expect(controller.startSurveyAndQuestionEventListenerForGroup('alpha')).toBe(true);
+
+      expect(surveyEventStreamsPort.removeSurveyEventsListener)
+        .toHaveBeenCalledWith('none', 'alpha');
+      expect(surveyEventStreamsPort.listenForSurveyEvents).toHaveBeenCalledWith(
+        'none',
+        expect.any(Function),
+        'alpha'
+      );
+      expect(contractScripts.removeSurveyEventsListener).not.toHaveBeenCalled();
+      expect(contractScripts.listenForSurveyEvents).not.toHaveBeenCalled();
+
+      const handler = surveyEventStreamsPort.listenForSurveyEvents.mock.calls[0][1];
+      const event = { type: 'SurveyAdded', surveyId: '0xinjected' };
+      handler(event);
+
+      expect(host.onSurveyEventDetectedForGroup).toHaveBeenCalledWith('alpha', event);
+    });
+
     it('uses the active session slug for the unscoped listener entrypoint', () => {
       const host = createMockHost({ activeSlug: 'active-slug' });
       const controller = createSessionSurveyCacheController(host);

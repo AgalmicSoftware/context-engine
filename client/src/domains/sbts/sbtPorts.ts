@@ -74,12 +74,28 @@ export type SbtMetadataReadsPort = {
 };
 
 export type SbtEventStreamsPort = {
+  listenForSBTEvents: (
+    providerName: SbtProviderRef,
+    handler: (event: unknown) => unknown,
+    sessionSlug: string
+  ) => unknown;
   removeSBTEventListener: (
     providerName: SbtProviderRef,
     sessionSlug: string
   ) => unknown;
+  listenForSurveyEvents: (
+    providerName: SbtProviderRef,
+    handler: (event: unknown) => unknown,
+    sessionSlug: string
+  ) => unknown;
   removeSurveyEventsListener: (
     providerName: SbtProviderRef,
+    sessionSlug: string
+  ) => unknown;
+  listenForSBTInstanceEvents: (
+    providerName: SbtProviderRef,
+    addresses: unknown[],
+    handler: (event: unknown) => unknown,
     sessionSlug: string
   ) => unknown;
   removeSBTInstanceEventsListener: (
