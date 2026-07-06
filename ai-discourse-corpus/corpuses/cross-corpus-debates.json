@@ -5831,14 +5831,14 @@
           "relevance_score": 7
         },
         {
-          "entry_url_or_id": "dwarkesh_elon_musk_feb_2026",
+          "entry_url_or_id": "musk_elon_dwarkesh_2026_ai_in_space",
           "corpus": "dwarkesh-lab-insiders",
           "side": "b",
           "stance_summary": "Musk's orbital-data-center discussion is retained only as speculative industry-response evidence, not as a policy-grade mitigation claim.",
           "relevance_score": 3
         },
         {
-          "entry_url_or_id": "international_ai_safety_report_2026",
+          "entry_url_or_id": "intl_ai_safety_report_2026_policy",
           "corpus": "ai-laws-policy",
           "side": "a",
           "stance_summary": "International safety framing increasingly includes environmental sustainability as one dimension of AI governance capacity.",
