@@ -8,7 +8,7 @@ import { normalizeSessionStorageProfileConfig } from './sessionWizardStorageProf
 
 type SessionWizardModeDraft = UnknownRecord & {
   sessionMode?: unknown;
-  sessionModeProfile?: UnknownRecord;
+  sessionModeProfile?: unknown;
   storageProfile?: unknown;
   telegram?: UnknownRecord;
   telegramBridgeEnabled?: unknown;
@@ -60,7 +60,7 @@ export const applySessionModeProfileSelectionToDraft = <Draft extends SessionWiz
   compiled: { storageProfile: UnknownRecord },
 ): Draft => {
   const next = deepClone(prev) as Draft;
-  next.sessionModeProfile = { ...profile };
+  next.sessionModeProfile = deepClone(profile);
   next.storageProfile = normalizeSessionStorageProfileConfig(compiled.storageProfile);
   delete next.telegramOnly;
   delete next.telegram_only;
