@@ -66,12 +66,19 @@ function readPackageScripts(packageJsonPath = path.join(ROOT, 'package.json')) {
 }
 
 function buildDeepE2eSteps(packageScripts = readPackageScripts()) {
-  const steps = [
-    ['worker scope matrix', ['run', '-s', 'ai:test-worker-scopes:matrix']],
-    ['gated decrypt all types', ['run', '-s', 'ai:test-gated-decrypt:all-types']],
-    ['survey response encryption matrix', ['run', '-s', 'ai:test-survey-response:encryption-matrix']],
-    ['doc library session filetypes', ['run', '-s', 'ai:test-doc-library:session:filetypes']],
+  const steps = [];
+  const optionalSteps = [
+    ['worker scope matrix', 'ai:test-worker-scopes:matrix'],
+    ['gated decrypt all types', 'ai:test-gated-decrypt:all-types'],
+    ['survey response encryption matrix', 'ai:test-survey-response:encryption-matrix'],
+    ['doc library session filetypes', 'ai:test-doc-library:session:filetypes'],
   ];
+
+  for (const [label, scriptName] of optionalSteps) {
+    if (Object.prototype.hasOwnProperty.call(packageScripts, scriptName)) {
+      steps.push([label, ['run', '-s', scriptName]]);
+    }
+  }
 
   if (Object.prototype.hasOwnProperty.call(packageScripts, 'test:worker:agent-bridge')) {
     steps.push(['agent bridge worker', ['run', '-s', 'test:worker:agent-bridge']]);

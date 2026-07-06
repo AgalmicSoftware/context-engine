@@ -112,6 +112,10 @@ test('prepare-public-release strips private surfaces without publishing an inven
           scripts: {
             test: 'node scripts/run-node-tests.js',
             'test:worker:agent-bridge': 'node scripts/run-agent-bridge-worker-tests.js',
+            'ai:test-cf-envelope:worker': 'npm run -s ai:node -- scripts/e2e/cloudflare-worker-envelope.js',
+            'ai:test-cf-envelope:all': 'npm run -s ai:test-cf-envelope:worker',
+            'ai:test-session:demo-smoke': 'npm run -s ai:node -- scripts/test-session-demo.ui.js',
+            'ai:test-session:closeout-smoke': 'npm run -s ai:test-session:demo-smoke',
           },
         },
         null,

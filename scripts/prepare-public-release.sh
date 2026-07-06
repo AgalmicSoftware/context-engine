@@ -141,7 +141,46 @@ const packageJsonPath = process.argv[2];
 const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
 
 if (packageJson.scripts && typeof packageJson.scripts === 'object') {
-  delete packageJson.scripts['test:worker:agent-bridge'];
+  const scripts = packageJson.scripts;
+  const removed = new Set();
+  const strippedRunnerPatterns = [
+    /\bscripts\/test-[^\s'"]+\.js\b/,
+    /\bscripts\/test-[^\s'"]+\.ui\.js\b/,
+    /\bscripts\/seed-[^\s'"]+\.js\b/,
+    /\bscripts\/e2e(?:\/|\b)/,
+    /\bscripts\/lib\/e2e(?:\/|\b)/,
+    /\bscripts\/run-e2e-[^\s'"]+\.js\b/,
+    /\bscripts\/run-ux-[^\s'"]+\.js\b/,
+    /\bscripts\/capture-ux-[^\s'"]+\.js\b/,
+    /\bscripts\/run-agent-bridge-worker-tests\.js\b/,
+    /\bscripts\/vendor-cecc-ethers-bundle\.js\b/,
+  ];
+
+  for (const [name, command] of Object.entries(scripts)) {
+    if (strippedRunnerPatterns.some((pattern) => pattern.test(String(command)))) {
+      removed.add(name);
+    }
+  }
+
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const [name, command] of Object.entries(scripts)) {
+      if (removed.has(name)) continue;
+      for (const removedName of removed) {
+        const escapedName = removedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        if (new RegExp(`\\bnpm\\s+run(?:\\s+-s)?\\s+${escapedName}\\b`).test(String(command))) {
+          removed.add(name);
+          changed = true;
+          break;
+        }
+      }
+    }
+  }
+
+  for (const name of removed) {
+    delete scripts[name];
+  }
 }
 
 fs.writeFileSync(packageJsonPath, `${JSON.stringify(packageJson, null, 2)}\n`);
