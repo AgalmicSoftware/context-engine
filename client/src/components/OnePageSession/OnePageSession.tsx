@@ -90,7 +90,7 @@ import {
 import { buildInitialTelegramState, createOnePageSessionTelegramActions, type OnePageSessionTelegramState } from './onePageSessionTelegramActions';
 
 const SurveyPage = React.lazy(() => import('../SurveyTool/SurveyPage'));
-const MemoSurveyPage = React.memo((props: any) => <SurveyPage {...props} />);
+const MemoSurveyPage = React.memo((props: Record<string, unknown>) => <SurveyPage {...props} />);
 const SBTsPage = React.lazy(() => import('../SBTs/SBTsPage'));
 const PolisReport = React.lazy(() => import('../PolisReport/PolisReport'));
 const DebateMap = React.lazy(() => import('../DebateMap/DebateMap'));
@@ -110,16 +110,22 @@ const DEFAULT_CORPUS_VIEWER_LOAD_STATE = Object.freeze({
   disableLoadButton: false,
   error: '',
 });
-const globalState: any = globalThis as any;
-const DebateMapAny: any = DebateMap;
+type OnePageGlobalState = typeof globalThis & {
+  ENABLE_CE_UI_PERF_STATS?: boolean;
+  ENABLE_CE_DEBUG_COUNTERS?: boolean;
+  __CE_DEBUG_COUNTERS__?: boolean;
+  __CE_PERF_COUNTERS__?: Record<string, Record<string, number>>;
+};
+const globalState = globalThis as OnePageGlobalState;
+const DebateMapAny = DebateMap as React.ComponentType<Record<string, unknown>>;
 
-const getErrorMessage = (error: any, fallback = 'Unknown error') => (
-  error && typeof error === 'object' && typeof error.message === 'string'
-    ? error.message
+const getErrorMessage = (error: unknown, fallback = 'Unknown error') => (
+  error && typeof error === 'object' && typeof (error as { message?: unknown }).message === 'string'
+    ? (error as { message: string }).message
     : fallback
 );
 
-const resolveAutoFeatureBySessionSlug = (metadata: any) => (
+const resolveAutoFeatureBySessionSlug = (metadata: Record<string, unknown> | null | undefined) => (
   metadata?.autoFeatureSBTsBySessionSlug !== undefined
     ? metadata.autoFeatureSBTsBySessionSlug
     : metadata?.autoFeatureSBTsWithFeaturedSbtTags
@@ -137,7 +143,7 @@ const isPerfCountersEnabled = () => {
   }
 };
 
-const bumpPerfCounter = (key: any, inc: any = 1) => {
+const bumpPerfCounter = (key: string, inc: number = 1) => {
   if (!isPerfCountersEnabled()) return;
   try {
     if (!globalState.__CE_PERF_COUNTERS__ || typeof globalState.__CE_PERF_COUNTERS__ !== 'object') {
@@ -164,7 +170,7 @@ const buildOnePageSessionEmptyFilterState = () => ({
   selectedTags: [],
 });
 
-const normalizeOnePageSessionFilterState = (value: any = {}) => {
+const normalizeOnePageSessionFilterState = (value: unknown = {}) => {
   const normalized = normalizeSurveyToolFilterState(
     (value && typeof value === 'object')
       ? value
@@ -175,25 +181,29 @@ const normalizeOnePageSessionFilterState = (value: any = {}) => {
     : buildOnePageSessionEmptyFilterState();
 };
 
-const serializeOnePageSessionFilterState = (value: any = {}) => (
+const serializeOnePageSessionFilterState = (value: unknown = {}) => (
   serializeFilterState(normalizeOnePageSessionFilterState(value))
 );
 
-const hasOwn = (value: any, key: string) => (
+const hasOwn = (value: unknown, key: string) => (
   !!value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, key)
 );
 
-const resolveOnePageSessionSurveySlug = (props: any = '') => {
-  if (hasOwn(props, 'questionSessionSlug')) {
-    return normalizeOnePageSessionSlug(props.questionSessionSlug);
+const resolveOnePageSessionSurveySlug = (props: Record<string, unknown> | string = '') => {
+  const propsRecord = props && typeof props === 'object' ? props : {};
+  const sessionConfig = propsRecord.sessionConfig && typeof propsRecord.sessionConfig === 'object'
+    ? propsRecord.sessionConfig as Record<string, unknown>
+    : {};
+  if (hasOwn(propsRecord, 'questionSessionSlug')) {
+    return normalizeOnePageSessionSlug(propsRecord.questionSessionSlug);
   }
-  if (hasOwn(props.sessionConfig, 'slug')) {
-    return normalizeOnePageSessionSlug(props.sessionConfig.slug);
+  if (hasOwn(sessionConfig, 'slug')) {
+    return normalizeOnePageSessionSlug(sessionConfig.slug);
   }
-  return normalizeOnePageSessionSlug(props.slug || '');
+  return normalizeOnePageSessionSlug(propsRecord.slug || '');
 };
 
-const getUniqueAggregatorCandidateSlugs = (...slugs: any[]) => {
+const getUniqueAggregatorCandidateSlugs = (...slugs: unknown[]) => {
   const seen = new Set<string>();
   return slugs
     .map((value) => normalizeOnePageSessionSlug(value))
@@ -205,7 +215,7 @@ const getUniqueAggregatorCandidateSlugs = (...slugs: any[]) => {
     });
 };
 
-const shouldUseBuiltInDemoAggregatorFallback = (displaySlug: any = '', questionSourceSlug: any = '') => {
+const shouldUseBuiltInDemoAggregatorFallback = (displaySlug: unknown = '', questionSourceSlug: unknown = '') => {
   const normalizedDisplaySlug = normalizeOnePageSessionSlug(displaySlug);
   const normalizedQuestionSourceSlug = normalizeOnePageSessionSlug(questionSourceSlug);
   return normalizedDisplaySlug === 'demo' && (
@@ -214,10 +224,10 @@ const shouldUseBuiltInDemoAggregatorFallback = (displaySlug: any = '', questionS
   );
 };
 
-const buildAggregatorFallbackQuestions = (questionPool: any[] = [], sessionSlug: any = '') => {
-  const out: Record<string, any> = {};
+const buildAggregatorFallbackQuestions = (questionPool: Array<Record<string, unknown>> = [], sessionSlug: unknown = '') => {
+  const out: Record<string, Record<string, unknown>> = {};
   const normalizedSessionSlug = normalizeOnePageSessionSlug(sessionSlug);
-  (Array.isArray(questionPool) ? questionPool : []).forEach((entry: any) => {
+  (Array.isArray(questionPool) ? questionPool : []).forEach((entry) => {
     const questionId = String(entry?.id || '').trim();
     if (!questionId) return;
     out[questionId.toLowerCase()] = {

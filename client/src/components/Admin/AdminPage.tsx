@@ -152,6 +152,19 @@ type AdminSessionConfigLike = {
   __registry?: Record<string, unknown>;
   [key: string]: unknown;
 };
+type AdminPageProps = {
+  account?: string;
+  provider?: string;
+  network?: {
+    id?: unknown;
+    chainId?: unknown;
+  } | null;
+  toggleLoginModal?: (payload?: unknown) => unknown;
+  loginComplete?: boolean;
+  ensureLightSbtUniverse?: () => unknown;
+  initialSessionId?: unknown;
+  initialRegistryChainId?: unknown;
+};
 
 export const __adminPageTestUtils = {
   applyAdminMetadataDraft,
@@ -184,7 +197,7 @@ const AdminPage = ({
   ensureLightSbtUniverse,
   initialSessionId,
   initialRegistryChainId,
-}: any) => {
+}: AdminPageProps) => {
   const [sessions, setSessions] = useState<AdminSessionRegistryEntry[]>([]);
   const [selectedSlug, setSelectedSlug] = useState('');
   const [ignoreRequestedSession, setIgnoreRequestedSession] = useState(false);
@@ -225,8 +238,8 @@ const AdminPage = ({
   const [transcribeText, setTranscribeText] = useState('');
   const [openSection, setOpenSection] = useState('');
   const [showTestsPanel, setShowTestsPanel] = useState(false);
-  const [encryptedFields, setEncryptedFields] = useState<any>({});
-  const [decryptedFields, setDecryptedFields] = useState<any>({});
+  const [encryptedFields, setEncryptedFields] = useState<Record<string, unknown>>({});
+  const [decryptedFields, setDecryptedFields] = useState<AdminDecryptedFieldMap>({});
   const [sessionLookupStatus, setSessionLookupStatus] = useState('');
   const [sessionsRefreshStatus, setSessionsRefreshStatus] = useState('');
   const [sessionsRefreshBusy, setSessionsRefreshBusy] = useState(false);
@@ -278,14 +291,14 @@ const AdminPage = ({
   const litResourceRequestRef = useRef(0);
   const secretPresenceRequestRef = useRef(0);
   const secretPresenceTargetKeyRef = useRef('');
-  const rawMetadataCopyResetRef = useRef<any>(null);
+  const rawMetadataCopyResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevSelectedSlugForDraftRef = useRef(selectedSlug);
   const prevSelectedSlugForAllowOriginsDraftRef = useRef(selectedSlug);
   const encryptedFieldsSessionKeyRef = useRef('');
   const metadataDraftTouchedRef = useRef(metadataDraftTouched);
   metadataDraftTouchedRef.current = metadataDraftTouched;
 
-  const handleSecretChange = useCallback((key: any, value: any) => {
+  const handleSecretChange = useCallback((key: string, value: string) => {
     setSecrets((prev) => ({ ...prev, [key]: value }));
     setWorkerSecretsDirty(true);
     setClearedSecretKeys((prev) => {
@@ -296,7 +309,7 @@ const AdminPage = ({
     });
   }, []);
 
-  const handleClearSecret = useCallback((key: any) => {
+  const handleClearSecret = useCallback((key: string) => {
     setSecrets((prev) => ({ ...prev, [key]: '' }));
     setWorkerSecretsDirty(true);
     setClearedSecretKeys((prev) => {
@@ -306,7 +319,7 @@ const AdminPage = ({
     });
   }, []);
 
-  const updateMetadataConfigDraft = useCallback((key: any, value: any) => {
+  const updateMetadataConfigDraft = useCallback((key: string, value: unknown) => {
     setMetadataDraftTouched(true);
     if (key === 'contractSurveysAddress' || key === 'contractSbtFactoryAddress' || key === 'contractSessionRegistryAddress') {
       setMetadataContractDraftTouched(true);
