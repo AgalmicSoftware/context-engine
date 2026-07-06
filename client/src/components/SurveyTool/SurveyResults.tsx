@@ -1384,6 +1384,7 @@ const lockedResponsesRuntime = createSurveyResultsLockedResponsesRuntime({
     getProps: () => propsRef.current,
     getState: () => stateRef.current,
     logWarn: (...args) => surveyLog.warn(...args),
+    resolveSbtDisplayLabel: resolveSbtDisplayLabelForSurveyResults,
     resolveSessionContext: (sessionSlug) => resolveSurveyResultsSessionContext({
       sessionSlug,
       resolveBySlug: getSessionConfigBySlug,

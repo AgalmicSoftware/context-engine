@@ -137,7 +137,8 @@ export const fetchSurveyResultsSurveyModeResponses = async ({
   );
   const surveyDefinitionLatestBlock = normalizeSurveyResultsBlockNumber(surveyNetCache?.surveysLatestBlock);
   const surveyCacheChangeNonce = Number(instance._surveysCacheChangeNonce || 0);
-  const questionCacheReadySignal = props.isQuestionCacheReady ? 1 : 0;
+  const latestProps = ports.getProps();
+  const questionCacheReadySignal = latestProps.isQuestionCacheReady ? 1 : 0;
   const payloadRefSignature = buildSurveyRespondersPayloadRefSignature(srMap);
   const coarseSourceSignature = [
     slug,
@@ -224,7 +225,6 @@ export const fetchSurveyResultsQuestionModeResponses = async ({
   ports,
 }: SurveyResultsHydrationRuntimeArgs): Promise<void> => {
   const props = ports.getProps();
-  const state = ports.getState();
   const netIdStr = String(props.network?.id ?? props.networkChainId ?? '');
   if (!netIdStr) return;
   const questionNetCache = await ports.getScopedQuestionNetworkData('questions');
@@ -279,6 +279,7 @@ export const fetchSurveyResultsQuestionModeResponses = async ({
   const totalQ = Object.keys(finalAggregator).length;
   const totalResponseCount = countQuestionModeResponses(finalAggregator, allQuestions);
   const initialFilteredCount = totalResponseCount;
+  const state = ports.getState();
 
   if (state.isFilterActive) {
     ports.applyStatePatch(
