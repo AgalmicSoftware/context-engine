@@ -11,11 +11,21 @@
   - `client/src/utilities/web3/profileChainReads.ts`
   - `client/src/utilities/web3/chainEventScans.ts`
   - `client/src/utilities/web3/chainMetadataResolution.ts`
+  - `client/src/utilities/web3/contractScripts.surveyEventReadMethods.ts`
+  - `client/src/utilities/web3/contractScripts.surveyPayloadReadMethods.ts`
+  - `client/src/utilities/web3/contractScripts.surveyWriteMethods.ts`
+  - `client/src/utilities/web3/contractScripts.sbtRegistryMethods.ts`
+  - `client/src/utilities/web3/contractScripts.sbtMintMethods.ts`
 - Current lengths:
   - `chainGateway.ts`: **86 lines**
   - `contractScripts.js`: **13 lines**
   - `contractScripts.ts`: **70-line compatibility alias**
-  - `contractScripts.impl.ts`: **4,691 lines**
+  - `contractScripts.impl.ts`: **1,166 lines**
+  - `contractScripts.surveyEventReadMethods.ts`: **756 lines**
+  - `contractScripts.surveyPayloadReadMethods.ts`: **822 lines**
+  - `contractScripts.surveyWriteMethods.ts`: **665 lines**
+  - `contractScripts.sbtRegistryMethods.ts`: **1,224 lines**
+  - `contractScripts.sbtMintMethods.ts`: **859 lines**
   - `sessionRegistry.ts`: **2,571 lines**
   - `contractHelpers.ts`: **1,040 lines**
   - `chainEventStreams.ts`: **554 lines**
@@ -38,9 +48,12 @@ chainGateway.ts  [canonical CJS-compatible barrel for jest.spyOn]
      -> createProfileChainReadMethods(...)     [SBT universe + user activity/profile scans]
      -> chainEventScans.ts                     [stateless event-scan helpers]
      -> chainMetadataResolution.ts             [metadata read / resolution helpers]
+     -> contractScripts.survey*Methods.ts      [survey/question read-write method maps]
+     -> contractScripts.sbt*Methods.ts         [SBT registry/mint method maps]
 ```
 
 `chainGateway` is the main web3 integration layer between React and chain, Arweave, Lit, and registry state. The legacy `contractScripts.js` and `contractScripts.ts` names remain as compatibility aliases while callers migrate. The TypeScript split moved reusable helper families plus stateless event-scan and metadata-resolution helpers out of the monolith; `contractScripts.impl.ts` still owns session resolution, provider selection, decrypt policy, survey/question writes, SBT flows, and the final default export wiring.
+The remaining stateful survey/SBT methods live in factory modules that receive the same runtime dependency bundle and are spread back onto the default export, preserving call-time `this` lookup and `jest.spyOn()` seams.
 
 Route/page code now reaches selected chain gateway operations through purpose ports under `client/src/domains/**` when that boundary has been modernized. Those adapters deliberately use call-time property lookup against the shared barrel object so `jest.spyOn(contractScripts, ...)` and `jest.spyOn(chainGateway, ...)` remain supported test seams.
 
@@ -72,9 +85,23 @@ Route/page code now reaches selected chain gateway operations through purpose po
 - Owns retry helpers, decrypt context creation, SBT-gate checks, and gate-aware decrypt suppression.
 - Resolves sessions, chains, addresses, PATH RPC policy, and provider selection.
 - Wires Arweave/hash/inflight caches plus the dependency bundles passed into the split helper modules.
-- Exposes the main survey/question read and write flows, including Arweave metadata fetch, upload, submit, and response decoding.
-- Exposes SBT factory, claim, password, invite, signature, metadata, burn, and history workflows.
+- Spreads stateful survey/question and SBT method maps back onto the default export.
 - Builds the final `contractScripts` export object and exposes `__test__contractScripts*` fixtures for targeted tests.
+
+### `contractScripts.surveyEventReadMethods.ts`
+- Owns survey/question event discovery and response-event scan methods that still depend on the default export's block-window and payload-read methods.
+
+### `contractScripts.surveyPayloadReadMethods.ts`
+- Owns survey/question/response hash reads, payload-pointer reads, metadata payload decoding, and decrypt-in-place helpers.
+
+### `contractScripts.surveyWriteMethods.ts`
+- Owns survey/question creation, question addition, response submission, payload upload, and post-write cache invalidation methods.
+
+### `contractScripts.sbtRegistryMethods.ts`
+- Owns SBT factory prediction/creation, factory event reads, mint/burn activity scan state, user SBT discovery, and SBT metadata hydration.
+
+### `contractScripts.sbtMintMethods.ts`
+- Owns SBT claim, password, invite, signature, burn, ownership, and cached mint/burn-address helper methods.
 
 ### `sessionRegistry.ts`
 - Owns session registry reads, cache hydration, and typed normalization of registry-derived session metadata.
