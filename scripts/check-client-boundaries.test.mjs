@@ -257,6 +257,25 @@ test('pure low-level re-export barrels are pass-through facade violations', () =
   });
 });
 
+test('naming-migration aliases may re-export canonical low-level modules', () => {
+  withTempRoot((rootDir) => {
+    writeFile(
+      rootDir,
+      'client/src/utilities/web3/legacyChainReads.ts',
+      `
+        /** naming-migration alias, remove per PRD 653/654. */
+        export {
+          createChainReads,
+          createChainReads as createLegacyChainReads,
+        } from './chainReads.js';
+        export type { ChainReadOptions } from './chainReads.js';
+      `
+    );
+
+    assert.deepEqual(collectClientBoundaryViolations({ rootDir }), []);
+  });
+});
+
 test('component-local runtime micro-facades over low-level modules are violations', () => {
   withTempRoot((rootDir) => {
     writeFile(
