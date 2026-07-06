@@ -8,13 +8,17 @@
   - `client/src/utilities/web3/contractHelpers.ts`
   - `client/src/utilities/web3/contractEventListeners.ts`
   - `client/src/utilities/web3/contractProfile.ts`
+  - `client/src/utilities/web3/contractScriptsEventScans.ts`
+  - `client/src/utilities/web3/contractScriptsMetadataResolution.ts`
 - Current lengths:
   - `contractScripts.js`: **12 lines**
-  - `contractScripts.impl.ts`: **5,470 lines**
-  - `sessionRegistry.ts`: **2,525 lines**
+  - `contractScripts.impl.ts`: **4,691 lines**
+  - `sessionRegistry.ts`: **2,571 lines**
   - `contractHelpers.ts`: **1,040 lines**
   - `contractEventListeners.ts`: **554 lines**
-  - `contractProfile.ts`: **1,109 lines**
+  - `contractProfile.ts`: **1,151 lines**
+  - `contractScriptsEventScans.ts`: **511 lines**
+  - `contractScriptsMetadataResolution.ts`: **797 lines**
 - This map intentionally avoids exact line numbers. Phase 4 TypeScript extraction and helper splits move code frequently, so name-based navigation stays more accurate than stale ranges.
 - `sessionRegistry.ts` and `contractScripts.impl.ts` typecheck without `@ts-nocheck`. The typed web3-core milestone was verified on OP Sepolia with the gate and gated-decrypt E2E suites; Lit v3 remains chain-configured and is not tied to a single testnet.
 
@@ -25,9 +29,11 @@ contractScripts.js  [CJS compatibility barrel for jest.spyOn]
      -> createContractHelperMethods(...)        [provider / block-window / cache helpers]
      -> createContractEventListenerMethods(...) [SBT / survey listener wiring]
      -> createContractProfileMethods(...)       [SBT universe + user activity/profile scans]
+     -> contractScriptsEventScans.ts            [stateless event-scan helpers]
+     -> contractScriptsMetadataResolution.ts    [metadata read / resolution helpers]
 ```
 
-`contractScripts` is still the main web3 integration layer between React and chain, Arweave, Lit, and registry state. The TypeScript split only moved reusable helper families out of the monolith; `contractScripts.impl.ts` still owns session resolution, provider selection, decrypt policy, survey/question reads and writes, SBT flows, and the final default export wiring.
+`contractScripts` is still the main web3 integration layer between React and chain, Arweave, Lit, and registry state. The TypeScript split moved reusable helper families plus stateless event-scan and metadata-resolution helpers out of the monolith; `contractScripts.impl.ts` still owns session resolution, provider selection, decrypt policy, survey/question writes, SBT flows, and the final default export wiring.
 
 Route/page code now reaches selected `contractScripts` operations through purpose ports under `client/src/domains/**` when that boundary has been modernized. Those adapters deliberately use call-time property lookup against the shared barrel object so `jest.spyOn(contractScripts, ...)` remains a supported test seam.
 
@@ -37,6 +43,8 @@ Route/page code now reaches selected `contractScripts` operations through purpos
 - Start in `contractHelpers.ts` for block windows, latest block/gas, read-provider behavior, or faucet helpers.
 - Start in `contractEventListeners.ts` for long-lived listener registration and cleanup.
 - Start in `contractProfile.ts` for user-profile scans, SBT universe discovery, and memoized holdings/activity views.
+- Start in `contractScriptsEventScans.ts` for stateless historical event-scan helpers delegated from the main export object.
+- Start in `contractScriptsMetadataResolution.ts` for metadata URI resolution and stateless metadata read helpers delegated from the main export object.
 - Start in `contractScripts.impl.ts` for everything else: session lookup, decrypt policy, Arweave IO, tx submission, SBT creation/claim flows, and dependency wiring.
 - Start in `client/src/domains/sbts/`, `client/src/domains/chain/`, `client/src/domains/profiles/`, `client/src/domains/surveys/`, or `client/src/domains/worker/` when a page already uses a purpose port for a narrow read/write/listener/faucet operation.
 
@@ -71,6 +79,12 @@ Route/page code now reaches selected `contractScripts` operations through purpos
 
 ### `contractProfile.ts`
 - Owns token-owner lookups, SBT universe discovery, per-user holdings memoization, minimal SBT summaries, and cross-domain activity aggregation.
+
+### `contractScriptsEventScans.ts`
+- Owns stateless historical event-scan helpers split from the main implementation while preserving call-time delegation through the `contractScripts` object.
+
+### `contractScriptsMetadataResolution.ts`
+- Owns stateless metadata URI resolution, fetch, and normalization helpers split from the main implementation while preserving call-time delegation through the `contractScripts` object.
 
 ## Method Guide
 
