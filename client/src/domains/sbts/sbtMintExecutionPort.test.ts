@@ -1,5 +1,5 @@
 import type { SbtMintExecutionPort, SbtProviderRef } from './sbtPorts.js';
-import { bindSbtMintExecutionPort } from './contractScriptsSbtMintExecutionPort.js';
+import { bindSbtMintExecutionPort } from './sbtMintExecutionPort.js';
 
 const executeSbtMintFlows = async (
   port: SbtMintExecutionPort,
@@ -61,26 +61,26 @@ describe('SbtMintExecutionPort', () => {
     );
   });
 
-  it('binds mint execution through a call-time contractScripts getter', async () => {
-    const firstContractScripts = {
+  it('binds mint execution through a call-time chainGateway getter', async () => {
+    const firstChainGateway = {
       claim: jest.fn(async () => ({ transactionHash: '0xfirstClaim' })),
       claimWithInvite: jest.fn(async () => ({ transactionHash: '0xfirstInvite' })),
       mintWithGroupSignature: jest.fn(async () => ({ transactionHash: '0xfirstGroup' })),
     };
-    const secondContractScripts = {
+    const secondChainGateway = {
       claim: jest.fn(async () => ({ transactionHash: '0xsecondClaim' })),
       claimWithInvite: jest.fn(async () => ({ transactionHash: '0xsecondInvite' })),
       mintWithGroupSignature: jest.fn(async () => ({ transactionHash: '0xsecondGroup' })),
     };
-    let currentContractScripts = firstContractScripts;
+    let currentChainGateway = firstChainGateway;
     const port = bindSbtMintExecutionPort({
-      contractScripts: () => currentContractScripts,
+      chainGateway: () => currentChainGateway,
     });
 
     await expect(port.claim('injected', '0x0000000000000000000000000000000000000001'))
       .resolves.toEqual({ transactionHash: '0xfirstClaim' });
 
-    currentContractScripts = secondContractScripts;
+    currentChainGateway = secondChainGateway;
 
     await expect(
       port.claimWithInvite(
@@ -98,17 +98,17 @@ describe('SbtMintExecutionPort', () => {
       )
     ).resolves.toEqual({ transactionHash: '0xsecondGroup' });
 
-    expect(firstContractScripts.claim).toHaveBeenCalledWith(
+    expect(firstChainGateway.claim).toHaveBeenCalledWith(
       'injected',
       '0x0000000000000000000000000000000000000001',
     );
-    expect(secondContractScripts.claimWithInvite).toHaveBeenCalledWith(
+    expect(secondChainGateway.claimWithInvite).toHaveBeenCalledWith(
       'injected',
       '0x0000000000000000000000000000000000000002',
       '8',
       '0xinviteSignature',
     );
-    expect(secondContractScripts.mintWithGroupSignature).toHaveBeenCalledWith(
+    expect(secondChainGateway.mintWithGroupSignature).toHaveBeenCalledWith(
       'injected',
       '0x0000000000000000000000000000000000000002',
       '0xgroupSignature',

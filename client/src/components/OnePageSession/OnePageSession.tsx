@@ -31,9 +31,9 @@ import {
   type SessionBalance,
 } from '../../domains/sessions/sessionBalanceReaders.js';
 import { getAllSessionSlugs } from '../../domains/sessions/sessionConfig.js';
-import { sbtGroupMintAuthorizationPort } from '../../domains/sbts/contractScriptsSbtGroupMintAuthorizationPort.js';
-import { sbtMetadataReadsPort } from '../../domains/sbts/contractScriptsSbtMetadataReadsPort.js';
-import { sbtMintExecutionPort } from '../../domains/sbts/contractScriptsSbtMintExecutionPort.js';
+import { sbtGroupMintAuthorizationPort } from '../../domains/sbts/sbtGroupMintAuthorizationPort.js';
+import { sbtMetadataReadsPort } from '../../domains/sbts/sbtMetadataReadsPort.js';
+import { sbtMintExecutionPort } from '../../domains/sbts/sbtMintExecutionPort.js';
 
 import { resolveEffectiveSlug, normalizeSurveyToolFilterState } from '../SurveyTool/surveyToolUtils.js';
 import { resolvePolisDemoQuestionPool } from '../SurveyTool/surveyPolisDemoQuestionPool.js';

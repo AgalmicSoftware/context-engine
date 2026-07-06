@@ -1,7 +1,7 @@
 import type { SbtGroupMintAuthorizationPort } from './sbtPorts.js';
 import {
   bindSbtGroupMintAuthorizationPort,
-} from './contractScriptsSbtGroupMintAuthorizationPort.js';
+} from './sbtGroupMintAuthorizationPort.js';
 
 const buildGroupMintArtifacts = async (
   port: SbtGroupMintAuthorizationPort,
@@ -82,24 +82,24 @@ describe('SbtGroupMintAuthorizationPort', () => {
     });
   });
 
-  it('binds group mint authorization through a call-time contractScripts getter', async () => {
-    const firstContractScripts = {
+  it('binds group mint authorization through a call-time chainGateway getter', async () => {
+    const firstChainGateway = {
       computeGroupPasswordHash: jest.fn(() => '0xfirstHash'),
       signGroupMintAuthorization: jest.fn(async () => '0xfirstSignature'),
       generateInvitePayloads: jest.fn(async () => [
         { nonce: '1', signature: '0xfirstInvite', inviteCode: 'first' },
       ]),
     };
-    const secondContractScripts = {
+    const secondChainGateway = {
       computeGroupPasswordHash: jest.fn(() => '0xsecondHash'),
       signGroupMintAuthorization: jest.fn(async () => '0xsecondSignature'),
       generateInvitePayloads: jest.fn(async () => [
         { nonce: '2', signature: '0xsecondInvite', inviteCode: 'second' },
       ]),
     };
-    let currentContractScripts = firstContractScripts;
+    let currentChainGateway = firstChainGateway;
     const port = bindSbtGroupMintAuthorizationPort({
-      contractScripts: () => currentContractScripts,
+      chainGateway: () => currentChainGateway,
     });
     const firstInput = {
       password: 'first password',
@@ -108,7 +108,7 @@ describe('SbtGroupMintAuthorizationPort', () => {
 
     expect(port.computeGroupPasswordHash(firstInput)).toBe('0xfirstHash');
 
-    currentContractScripts = secondContractScripts;
+    currentChainGateway = secondChainGateway;
 
     const signInput = {
       password: 'second password',
@@ -130,8 +130,8 @@ describe('SbtGroupMintAuthorizationPort', () => {
         { nonce: '2', signature: '0xsecondInvite', inviteCode: 'second' },
       ]);
 
-    expect(firstContractScripts.computeGroupPasswordHash).toHaveBeenCalledWith(firstInput);
-    expect(secondContractScripts.signGroupMintAuthorization).toHaveBeenCalledWith(signInput);
-    expect(secondContractScripts.generateInvitePayloads).toHaveBeenCalledWith(inviteInput);
+    expect(firstChainGateway.computeGroupPasswordHash).toHaveBeenCalledWith(firstInput);
+    expect(secondChainGateway.signGroupMintAuthorization).toHaveBeenCalledWith(signInput);
+    expect(secondChainGateway.generateInvitePayloads).toHaveBeenCalledWith(inviteInput);
   });
 });

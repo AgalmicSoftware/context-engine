@@ -1,4 +1,4 @@
-import contractScripts from '../../utilities/web3/contractScripts.js';
+import chainGateway from '../../utilities/web3/contractScripts.js';
 
 export type SurveyResponseSubmitGateway = {
   submitResponses: (
@@ -40,5 +40,5 @@ export const bindSurveyResponseSubmitPort = ({
 });
 
 export const surveyResponseSubmitPort = bindSurveyResponseSubmitPort({
-  chainGateway: () => contractScripts as SurveyResponseSubmitGateway,
+  chainGateway: () => chainGateway as SurveyResponseSubmitGateway,
 });

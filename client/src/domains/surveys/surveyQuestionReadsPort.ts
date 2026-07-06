@@ -1,4 +1,4 @@
-import contractScripts from '../../utilities/web3/contractScripts.js';
+import chainGateway from '../../utilities/web3/contractScripts.js';
 
 export type SurveyQuestionReadRecord = Record<string, unknown>;
 export type SurveyQuestionReadOptions = Record<string, unknown>;
@@ -73,5 +73,5 @@ export const bindSurveyQuestionReadsPort = ({
 });
 
 export const surveyQuestionReadsPort = bindSurveyQuestionReadsPort({
-  chainGateway: () => contractScripts as SurveyQuestionReadsGateway,
+  chainGateway: () => chainGateway as SurveyQuestionReadsGateway,
 });

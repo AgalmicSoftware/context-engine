@@ -4,7 +4,7 @@ import * as defaultSponsoredBundles from '../../../utilities/arweave/sponsoredBu
 import * as defaultSessionRegistry from '../../../utilities/web3/sessionRegistry.js';
 import * as defaultSbtFactoryReceipt from '../../../utilities/web3/sbtFactoryReceipt.js';
 import * as defaultWorkerAuth from '../../../utilities/worker/workerAuth.js';
-import { sbtMetadataReadsPort as defaultSbtMetadataReadsPort } from '../../sbts/contractScriptsSbtMetadataReadsPort.js';
+import { sbtMetadataReadsPort as defaultSbtMetadataReadsPort } from '../../sbts/sbtMetadataReadsPort.js';
 import type { ethers } from 'ethers';
 import type { SbtMetadataReadsPort, SbtProviderRef } from '../../sbts/sbtPorts.js';
 
