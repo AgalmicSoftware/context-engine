@@ -49,6 +49,14 @@ type RecognitionIndividual = {
   url?: string;
 };
 
+type RoadmapSection = {
+  category: string;
+  items: {
+    status: 'complete' | 'planned';
+    text: string;
+  }[];
+};
+
 const HEADER_LINKS = [
   { url: PUBLIC_WHITEPAPER_URL, text: 'Whitepaper', testId: 'ce-about-link-whitepaper' },
 ];
@@ -120,6 +128,119 @@ const RECOGNITION_GROUPS: RecognitionGroup[] = [
 ];
 
 const RECOGNIZED_INDIVIDUALS: RecognitionIndividual[] = [];
+
+const ROADMAP_SECTIONS: RoadmapSection[] = [
+  {
+    category: 'Current Foundations',
+    items: [
+      {
+        status: 'complete',
+        text: 'Create sessions with questions, responses, documents, access gates, and configuration from the web app.',
+      },
+      {
+        status: 'complete',
+        text: 'Run binary, rating, multiple-choice, and freeform questions with conviction weighting and comments.',
+      },
+      {
+        status: 'complete',
+        text: 'Use SBT groups for gated participation, encrypted fields, and sponsored RPC, AI, gas, Arweave, and Lit resources.',
+      },
+      {
+        status: 'complete',
+        text: 'Persist responses and documents on Arweave with report views, exports, and address-based comparison tools.',
+      },
+      {
+        status: 'complete',
+        text: 'Generate questions, transcribe input, summarize clusters, analyze results, and compare positions across wallets.',
+      },
+      {
+        status: 'complete',
+        text: 'Explore shipped demo sessions and reusable AI discourse corpus data from the app and repository.',
+      },
+    ],
+  },
+  {
+    category: 'Privacy, Credentials, and Safety',
+    items: [
+      {
+        status: 'planned',
+        text: 'Stronger privacy with unlinkable per-response and per-SBT accounts, ZK/FHE aggregation, and proofs on encrypted responses.',
+      },
+      {
+        status: 'planned',
+        text: 'zkTLS group formation for privacy-preserving groups based on verifiable attributes.',
+      },
+      {
+        status: 'planned',
+        text: 'AI whistleblowing toolkit with affiliation proofs, encrypted claims, and conditional timelocks.',
+      },
+      {
+        status: 'planned',
+        text: 'Post-quantum cryptography as relevant libraries and standards mature.',
+      },
+    ],
+  },
+  {
+    category: 'Deployment and Resilience',
+    items: [
+      {
+        status: 'planned',
+        text: 'Walkaway resilience through ENS-hosted frontends and stronger decentralized service options.',
+      },
+      {
+        status: 'planned',
+        text: 'More storage options, including IPFS for larger or ephemeral files and configurable centralized storage.',
+      },
+      {
+        status: 'planned',
+        text: 'Turnkey deployment bundles for Arweave, Lit, EVM gas, and AI API access.',
+      },
+    ],
+  },
+  {
+    category: 'Interfaces and Inputs',
+    items: [
+      {
+        status: 'planned',
+        text: 'Agent-first UX so people can point an assistant at a session and interact through natural language.',
+      },
+      {
+        status: 'planned',
+        text: 'Voice-only mode for multilingual interaction through spoken commands.',
+      },
+      {
+        status: 'planned',
+        text: 'Better document and context integration with knowledge maps and richer debate-tree flows.',
+      },
+    ],
+  },
+  {
+    category: 'Preference Data and Models',
+    items: [
+      {
+        status: 'planned',
+        text: 'Group-representative AI models that can represent preferences, earn from approved invocations, and sell revocable future access.',
+      },
+      {
+        status: 'planned',
+        text: 'Preference weighting for questions, priorities, and representative figures in automated debate.',
+      },
+    ],
+  },
+  {
+    category: 'Deliberation and Negotiation',
+    items: [
+      {
+        status: 'planned',
+        text: 'Group prompting and backcasting from result clusters into scenarios to aim for or avoid.',
+      },
+      {
+        status: 'planned',
+        text: 'Agent-to-agent negotiation tooling for multi-step processes involving private information.',
+      },
+    ],
+  },
+];
 
 const USE_CASES = [
   {
@@ -554,53 +675,32 @@ const AboutPage = () => {
           </div>
           {showRoadmap && (
             <div className={styles.collapsibleContent}>
-              <ul className={styles.featureList}>
-                <li className={styles.featureItem}>
-                  <div className={styles.featureHeader}>
-                    <span className={styles.featureLabel}>Stage 1:</span>
-                    <span className={styles.featureStatusComplete}>Complete</span>
-                  </div>
-                  <span className={styles.featureText}>
-                    Current platform: an upgraded decentralized Pol.is with more question types, optional privacy, AI-native inputs, permanent public storage, and a passkey Ethereum wallet model.
-                  </span>
-                </li>
-                <li className={styles.featureItem}>
-                  <span className={styles.featureLabel}>Stage 2:</span>
-                  <span className={styles.featureText}>
-                    Deployment and interface upgrades.
-                  </span>
-                  <ul className={styles.roadmapSubList}>
-                    <li className={styles.roadmapSubItem}>Ease of deployment through turnkey bundles for Arweave, Lit, gas, and AI credits</li>
-                    <li className={styles.roadmapSubItem}>Agent-first UX so an agent can interface with a session in natural language</li>
-                    <li className={styles.roadmapSubItem}>Voice-only mode across languages</li>
-                    <li className={styles.roadmapSubItem}>Better document and context integration with knowledge maps and richer debate-tree style flows</li>
-                  </ul>
-                </li>
-                <li className={styles.featureItem}>
-                  <span className={styles.featureLabel}>Stage 3:</span>
-                  <span className={styles.featureText}>
-                    Stronger privacy and resilience.
-                  </span>
-                  <ul className={styles.roadmapSubList}>
-                    <li className={styles.roadmapSubItem}>Unlinkable per-response and per-SBT accounts, zero-knowledge and FHE aggregation, and proofs on encrypted response properties</li>
-                    <li className={styles.roadmapSubItem}>Increased censorship-resistance and walkaway resilience via ENS-hosted frontends and stronger decentralized services</li>
-                    <li className={styles.roadmapSubItem}>More storage options, including IPFS and configurable centralized storage</li>
-                    <li className={styles.roadmapSubItem}>zkTLS group formation and post-quantum cryptography</li>
-                  </ul>
-                </li>
-                <li className={styles.featureItem}>
-                  <span className={styles.featureLabel}>Stage 4+:</span>
-                  <span className={styles.featureText}>
-                    Collective intelligence, representation, and negotiation.
-                  </span>
-                  <ul className={styles.roadmapSubList}>
-                    <li className={styles.roadmapSubItem}>Quadratic voting for questions, priorities, and representative figures in automated debate</li>
-                    <li className={styles.roadmapSubItem}>AI models that represent group preferences and earn from invocations</li>
-                    <li className={styles.roadmapSubItem}>Group prompting, multimedia worldbuilding, and backcasting from clusters to scenarios</li>
-                    <li className={styles.roadmapSubItem}>Agent-to-agent negotiation tooling for multi-step private processes</li>
-                    <li className={styles.roadmapSubItem}>AI whistleblowing flows using zero-knowledge proofs and conditional timelocks</li>
-                  </ul>
-                </li>
+              <ul className={styles.roadmapSectionList}>
+                {ROADMAP_SECTIONS.map((section) => (
+                  <li className={styles.roadmapSectionItem} key={section.category}>
+                    <h3 className={styles.roadmapCategory}>{section.category}</h3>
+                    <ul className={styles.roadmapChecklist}>
+                      {section.items.map((item) => (
+                        <li
+                          className={`${styles.roadmapChecklistItem} ${
+                            item.status === 'complete'
+                              ? styles.roadmapChecklistItemComplete
+                              : styles.roadmapChecklistItemPlanned
+                          }`}
+                          key={item.text}
+                        >
+                          <span className={styles.roadmapCheck} aria-hidden="true" />
+                          <span>
+                            <span className={styles.srOnly}>
+                              {item.status === 'complete' ? 'Complete: ' : 'Planned: '}
+                            </span>
+                            {item.text}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </li>
+                ))}
               </ul>
             </div>
           )}

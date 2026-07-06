@@ -234,7 +234,7 @@ describe('AboutPage', () => {
     }
   });
 
-  it('renames functionality and merges milestones plus future items into one roadmap toggle', () => {
+  it('keeps functionality separate and renders checked foundations plus planned roadmap items', () => {
     renderAboutPage();
 
     const currentToggle = screen.getByRole('button', { name: /functionality/i });
@@ -246,6 +246,7 @@ describe('AboutPage', () => {
     expect(
       screen.queryByText(/zero-knowledge proofs for encrypted predictions and retroactive evaluation/i)
     ).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Stage 1:$/i)).not.toBeInTheDocument();
 
     fireEvent.click(currentToggle);
 
@@ -264,29 +265,47 @@ describe('AboutPage', () => {
 
     fireEvent.click(roadmapToggle);
 
-    expect(screen.getByText(/^Stage 1:$/i)).toBeInTheDocument();
-    expect(screen.getByText(/^Complete$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^Current Foundations$/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/current platform: an upgraded decentralized pol\.is with more question types, optional privacy, ai-native inputs/i)
-    ).toBeInTheDocument();
-    expect(screen.getByText(/^Stage 2:$/i)).toBeInTheDocument();
-    expect(screen.getByText(/deployment and interface upgrades/i)).toBeInTheDocument();
-    expect(
-      screen.getByText(/agent-first ux so an agent can interface with a session in natural language/i)
-    ).toBeInTheDocument();
-    expect(screen.getByText(/^Stage 3:$/i)).toBeInTheDocument();
-    expect(screen.getByText(/stronger privacy and resilience/i)).toBeInTheDocument();
-    expect(
-      screen.getByText(/unlinkable per-response and per-sbt accounts, zero-knowledge and fhe aggregation/i)
-    ).toBeInTheDocument();
-    expect(screen.getByText(/zktls group formation and post-quantum cryptography/i)).toBeInTheDocument();
-    expect(screen.getByText(/^Stage 4\+:$/i)).toBeInTheDocument();
-    expect(
-      screen.getByText(/group prompting, multimedia worldbuilding, and backcasting from clusters to scenarios/i)
+      screen.getByText(/create sessions with questions, responses, documents, access gates, and configuration from the web app/i)
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/agent-to-agent negotiation tooling for multi-step private processes/i)
+      screen.getByText(/run binary, rating, multiple-choice, and freeform questions with conviction weighting and comments/i)
     ).toBeInTheDocument();
+    expect(
+      screen.getByText(/use sbt groups for gated participation, encrypted fields, and sponsored rpc, ai, gas, arweave, and lit resources/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/persist responses and documents on arweave with report views, exports, and address-based comparison tools/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/generate questions, transcribe input, summarize clusters, analyze results, and compare positions across wallets/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/explore shipped demo sessions and reusable ai discourse corpus data from the app and repository/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText(/^Privacy, Credentials, and Safety$/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/stronger privacy with unlinkable per-response and per-sbt accounts, zk\/fhe aggregation/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText(/zktls group formation for privacy-preserving groups/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/ai whistleblowing toolkit with affiliation proofs, encrypted claims, and conditional timelocks/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText(/^Deployment and Resilience$/i)).toBeInTheDocument();
+    expect(screen.getByText(/walkaway resilience through ens-hosted frontends/i)).toBeInTheDocument();
+    expect(screen.getByText(/^Interfaces and Inputs$/i)).toBeInTheDocument();
+    expect(screen.getByText(/agent-first ux so people can point an assistant at a session/i)).toBeInTheDocument();
+    expect(screen.getByText(/^Preference Data and Models$/i)).toBeInTheDocument();
+    expect(screen.getByText(/group-representative ai models/i)).toBeInTheDocument();
+    expect(screen.getByText(/^Deliberation and Negotiation$/i)).toBeInTheDocument();
+    expect(screen.getByText(/agent-to-agent negotiation tooling/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/^Complete:/i)).toHaveLength(6);
+    expect(screen.getAllByText(/^Planned:/i)).toHaveLength(14);
+    expect(screen.queryByText(/^Stage 1:$/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Stage 2:$/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Stage 3:$/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Stage 4\+:$/i)).not.toBeInTheDocument();
   });
 
   it('keeps the recognition section visible without rendering empty individuals content', () => {
@@ -394,7 +413,10 @@ describe('AboutPage', () => {
     expect(scss).toMatch(/\.useCaseLabel\s*{[\s\S]*?font-family:\s*var\(--ce-font-body\);[\s\S]*?color:\s*rgba\(14,\s*20,\s*39,\s*0\.5\);/);
     expect(scss).toMatch(/\.featureLabel\s*{[\s\S]*?font-size:\s*clamp\(1\.08rem,\s*1\.6vw,\s*1\.22rem\);[\s\S]*?font-weight:\s*700;/);
     expect(scss).toMatch(/\.featureItem\s*{[\s\S]*?border-radius:\s*16px;[\s\S]*?background:\s*rgba\(255,\s*255,\s*255,\s*0\.05\);/);
-    expect(scss).toMatch(/\.featureStatusComplete\s*{[\s\S]*?text-transform:\s*uppercase;/);
+    expect(scss).toMatch(/\.roadmapChecklistItem\s*{[\s\S]*?grid-template-columns:\s*auto minmax\(0,\s*1fr\);[\s\S]*?font-size:\s*0\.98rem;/);
+    expect(scss).toMatch(/\.roadmapCheck\s*{[\s\S]*?border-radius:\s*999px;[\s\S]*?content:\s*'\\2713';/);
+    expect(scss).toMatch(/\.roadmapChecklistItemPlanned\s*{[\s\S]*?color:\s*rgba\(244,\s*247,\s*255,\s*0\.62\);/);
+    expect(scss).toMatch(/\.roadmapChecklistItemPlanned\s+\.roadmapCheck\s*{[\s\S]*?background:\s*transparent;/);
     expect(scss).toMatch(/\.heroPrimaryButton\s*{[\s\S]*?font-size:\s*1\.14rem;[\s\S]*?font-weight:\s*700;/);
   });
 
