@@ -222,6 +222,7 @@ import {
   VALID_SURVEY_ID_RE,
 } from './routeConfig.js';
 import { resolveMainSiteRouteMatch } from './routeTable.js';
+import { renderMainSiteRouteView } from './mainSiteRouteViewMap.js';
 import {
   buildPublicRoute,
   buildPublicUrl,
@@ -6520,71 +6521,34 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
       isResultsRoute,
     };
 
-    if (routeMatch.key === 'surveyId') {
-      return this._renderSurveyIdRoute(ctx);
-    }
-
-    if (routeMatch.key === 'home') {
-      return this._renderHomeRoute(ctx);
-    }
-    if (routeMatch.key === 'debate') {
-      return this._renderDebateRoute(fullPath);
-    }
-    if (routeMatch.key === 'atlas') {
-      return this._renderAtlasRoute(ctx);
-    }
-    if (routeMatch.key === 'tag') {
-      return this._renderTagRoute(ctx);
-    }
-    if (routeMatch.key === 'bookmarks') {
-      return this._renderBookmarksRoute();
-    }
-    if (routeMatch.key === 'compare') {
-      return this._renderCompareRoute(ctx);
-    }
-    if (routeMatch.key === 'surveysOrQuestionsList') {
-      return this._renderSurveysOrQuestionsListRoute(ctx);
-    }
-    if (routeMatch.key === 'questionDetail') {
-      return this._renderQuestionDetailRoute(ctx);
-    }
-    if (routeMatch.key === 'sbtsList') {
-      return this._renderSbtsListRoute(ctx);
-    }
-    if (routeMatch.key === 'sbtDetail') {
-      return this._renderSbtDetailRoute(ctx);
-    }
-    if (routeMatch.key === 'simUser') {
-      return this._renderSimUserRoute(fullPath, defaultSessionNetwork);
-    }
-    if (routeMatch.key === 'userProfile') {
-      return this._renderUserProfileRoute(ctx);
-    }
-    if (routeMatch.key === 'about') {
-      return this._renderAboutRoute();
-    }
-    if (routeMatch.key === 'demos') {
-      return this._renderDemosRoute();
-    }
-    if (routeMatch.key === 'matrix') {
-      return this._renderMatrixRoute();
-    }
-    if (routeMatch.key === 'contracts') {
-      return this._renderContractsRoute(ctx);
-    }
-    if (routeMatch.key === 'admin') {
-      return this._renderAdminRoute(ctx);
-    }
-    if (routeMatch.key === 'sponsor') {
-      return this._renderSponsorRoute(ctx);
-    }
-    if (routeMatch.key === 'agent') {
-      return this._renderAgentRoute();
-    }
-    if (routeMatch.key === 'session') {
-      return this._renderSessionRoute(ctx);
-    }
-    return <NotFoundRoute path={fullPath} />;
+    return renderMainSiteRouteView({
+      routeKey: routeMatch.key,
+      fullPath,
+      renderers: {
+        surveyId: () => this._renderSurveyIdRoute(ctx),
+        home: () => this._renderHomeRoute(ctx),
+        debate: () => this._renderDebateRoute(fullPath),
+        atlas: () => this._renderAtlasRoute(ctx),
+        tag: () => this._renderTagRoute(ctx),
+        bookmarks: () => this._renderBookmarksRoute(),
+        compare: () => this._renderCompareRoute(ctx),
+        surveysOrQuestionsList: () => this._renderSurveysOrQuestionsListRoute(ctx),
+        questionDetail: () => this._renderQuestionDetailRoute(ctx),
+        sbtsList: () => this._renderSbtsListRoute(ctx),
+        sbtDetail: () => this._renderSbtDetailRoute(ctx),
+        simUser: () => this._renderSimUserRoute(fullPath, defaultSessionNetwork),
+        userProfile: () => this._renderUserProfileRoute(ctx),
+        about: () => this._renderAboutRoute(),
+        demos: () => this._renderDemosRoute(),
+        matrix: () => this._renderMatrixRoute(),
+        contracts: () => this._renderContractsRoute(ctx),
+        admin: () => this._renderAdminRoute(ctx),
+        sponsor: () => this._renderSponsorRoute(ctx),
+        agent: () => this._renderAgentRoute(),
+        session: () => this._renderSessionRoute(ctx),
+      },
+      renderNotFound: (path) => <NotFoundRoute path={path} />,
+    });
   };
 
 
