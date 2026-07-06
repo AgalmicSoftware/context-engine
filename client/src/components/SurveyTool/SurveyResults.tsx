@@ -250,6 +250,9 @@ import {
   buildSurveyResultsLockedRows,
 } from './surveyResultsLockedResponsesModel';
 import {
+  buildSurveyResultsLockedGateDetails,
+} from './surveyResultsLockedGateDetailsModel';
+import {
   buildSurveyResultsAnalysisResponsesForExport,
   buildSurveyResultsAnalysisSegmentDimensionsForExport,
   readSurveyResultsAnalysisSafeLabel,
@@ -3431,67 +3434,20 @@ const buildLockedGateDetails = (
     return nextContext;
   };
 
-  const detailsByAddress = new Map<string, SurveyResultsLockedGateDetail>();
-  let hasGenericGateMessage = false;
-
-  const addGate = (
-    gate: SurveyResultsGateRecord = {},
-    gateContext: SurveyResultsLockedGateContext = readSessionGateContext()
-  ): void => {
-    const configuredGate = gateContext.configuredGateMap[
-      normalizeGateText(gate?.gateId || gate?.id)
-    ] || null;
-    const gateEntries = [
-      ...normalizeGateSbtEntries(configuredGate),
-      ...normalizeGateSbtEntries(gate),
-    ];
-    if (!gateEntries.length) {
-      hasGenericGateMessage = true;
-      return;
-    }
-    gateEntries.forEach(({ address, label }) => {
-      const key = String(address || '').toLowerCase();
-      if (!key) return;
-      if (detailsByAddress.has(key)) return;
-      const displayLabel = resolveSbtDisplayLabelForSurveyResults({
-        address,
-        preferredSlug: gateContext.slug,
-        chainId: gateContext.fallbackChainId,
-        fallback: 'short',
-      });
-      detailsByAddress.set(key, {
-        address,
-        label: displayLabel || label || getShortenedAddress(address, true),
-        href: buildSbtDetailPath(address, gateContext.slug),
-      });
-    });
-  };
-
-  rows.forEach((row) => {
-    const qid = String(row?.questionId || '').trim().toLowerCase();
-    const question = questionLookup?.[qid] || null;
-    const gateContext = readSessionGateContext(question?.sessionSlug || baseSlug);
-    const questionGates = getQuestionEncryptionGates(question);
-    if (questionGates.length > 0) {
-      const beforeSize = detailsByAddress.size;
-      questionGates.forEach((gate) => addGate(gate, gateContext));
-      if (detailsByAddress.size > beforeSize) return;
-    }
-    const defaultGates = Array.isArray(gateContext.defaultPolicy?.gates)
-      ? gateContext.defaultPolicy.gates as SurveyResultsGateRecord[]
-      : [];
-    if (defaultGates.length > 0) {
-      const beforeSize = detailsByAddress.size;
-      defaultGates.forEach((gate) => addGate(gate, gateContext));
-      if (detailsByAddress.size > beforeSize) return;
-    }
-    hasGenericGateMessage = true;
-  });
-
-  return {
-    gateDetails: Array.from(detailsByAddress.values()),
-    hasGenericGateMessage,
-  };
+  return buildSurveyResultsLockedGateDetails({
+    baseSlug,
+    buildSbtDetailPath,
+    getQuestionEncryptionGates: (question) => (
+      getQuestionEncryptionGates(toSurveyResultsRecord(question) as SurveyResultsQuestionWithEncryption | null)
+    ),
+    getShortenedAddress,
+    lockedRows: rows,
+    normalizeGateSbtEntries: (gate) => normalizeGateSbtEntries(toSurveyResultsRecord(gate) as SurveyResultsGateRecord),
+    normalizeGateText,
+    questionLookup,
+    readSessionGateContext,
+    resolveSbtDisplayLabel: resolveSbtDisplayLabelForSurveyResults,
+  }) as SurveyResultsLockedGateDetailsResult;
 };
 
 const getMemoizedLockedResponsesModel = (
