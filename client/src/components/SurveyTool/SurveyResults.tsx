@@ -60,7 +60,6 @@ import {
   buildSurveyResultsBookmarkedSurveyIdsPatch,
   buildSurveyResultsBooleanTogglePatch,
   buildSurveyResultsCommittedFilterStatePatch,
-  buildSurveyResultsCsvFileNamePatch,
   buildSurveyResultsDemoAtlasOpenPatch,
   buildSurveyResultsDemoAtlasNodePatch,
   buildSurveyResultsDemoViewSelectPatch,
@@ -157,18 +156,8 @@ import {
   buildSurveyResultsDemoAnalysisArtifact,
 } from './surveyResultsDemoAnalysisArtifact.js';
 import {
-  buildSurveyResultsQuestionsCsvExport,
-  buildSurveyResultsQuestionsJsonExport,
-  buildSurveyResultsExportBaseFileName,
   buildSurveyResultsExportControlsDisplayDescriptor,
-  buildSurveyResultsResponsesCsvExport,
-  buildSurveyResultsResponsesJsonExport,
 } from './surveyResultsExportPlans.js';
-import {
-  buildSurveyResultsFilteredQuestionIdsForExport,
-  buildSurveyResultsFilteredQuestionsForExport,
-  type SurveyResultsQuestionExportRecord,
-} from './surveyResultsExportRows.js';
 import {
   buildSurveyResultsCacheReadinessDisplayPlan,
 } from './surveyResultsCacheReadinessDisplayPlan';
@@ -346,9 +335,8 @@ import {
   chainScanReadsPort,
 } from '../../domains/chain/contractScriptsChainScanReadsPort';
 import {
-  runSurveyResultsBrowserDownload,
-  runSurveyResultsExportController,
-} from './surveyResultsExportController.js';
+  createSurveyResultsDataExportRuntime,
+} from './surveyResultsDataExportRuntime';
 import {
   buildSessionResultsAnalysisAiPayload,
   buildSessionResultsAnalysisInputSignature,
@@ -1939,164 +1927,23 @@ if (stateRef.current.isFilterActive) {
 }
 }
 
-const generateResponsesCSV = (): string => {
-const { viewMode, surveyViewMode, sbtFilteredResponses, sbtFilteredAggregatorQuestionResponses } = stateRef.current;
-
-if (!hasEffectiveNetworkId()) {
-  setState(asSurveyResultsStatePatch(buildSurveyResultsAlertMessagePatch('Network not available for fetching question data.')));
-  return '';
-}
-const networkQuestions = getNetworkQuestionsForCurrentContext();
-
-const formatCell = (value: unknown): string => {
-  const cellValue = Array.isArray(value) ? value.join(', ') : value;
-  const stringValue = String(cellValue !== undefined && cellValue !== null ? cellValue : '');
-  return `"${stringValue.replace(/"/g, '""')}"`;
-};
-
-// -------- filename (prefix by mode) --------
-const tsName = new Date().toISOString().replace(/[:.]/g, '_');
-try {
-  const isSurveyIndividuals = (viewMode === 'survey' && surveyViewMode === 'individuals');
-  const prefix = isSurveyIndividuals ? 'contextEngine_surveyResponses' : 'contextEngine_questionResponses';
-
-  let cleanSession = '';
-  const sessionName = propsRef.current.sessionName;
-  try {
-    if (typeof sessionName === 'string' && sessionName.trim().length > 0) {
-      cleanSession = sessionName.replace(/[^A-Za-z0-9_-]+/g, '');
-    } else if (sessionName !== undefined) {
-      surveyLog.error('[SurveyResults.generateResponsesCSV] sessionName provided but not a non-empty string:', sessionName);
-    }
-  } catch (orgErr) {
-    surveyLog.error('[SurveyResults.generateResponsesCSV] Failed to sanitize sessionName:', orgErr);
-  }
-
-  const suggested = `${prefix}_${tsName}${cleanSession ? '_' + cleanSession : ''}.csv`;
-  inst.csvFileName = suggested;
-  if (typeof setState === 'function') {
-    setState(asSurveyResultsStatePatch(buildSurveyResultsCsvFileNamePatch(suggested)));
-  }
-} catch (err) {
-  surveyLog.error('[SurveyResults.generateResponsesCSV] Failed to set CSV filename:', err);
-  const fallback = `contextEngine_questionResponses_${tsName}.csv`;
-  inst.csvFileName = fallback;
-  try {
-    if (typeof setState === 'function') {
-      setState(asSurveyResultsStatePatch(buildSurveyResultsCsvFileNamePatch(fallback)));
-    }
-  } catch (innerErr) {
-    surveyLog.error('[SurveyResults.generateResponsesCSV] Failed to set fallback CSV filename:', innerErr);
-  }
-}
-
-return buildSurveyResultsResponsesCsvExport({
-  aggregatorQuestionResponses: sbtFilteredAggregatorQuestionResponses,
-  filteredResponses: sbtFilteredResponses,
-  networkQuestions,
-  parseResponse,
-  surveyViewMode,
-  viewMode,
-});
-};
-
-const generateResultsJSON = (): string => {
-const {
-  viewMode,
-  surveyViewMode,
-  surveyId,
-  surveyTitle,
-  totalQuestionsCount,
-  totalResponsesCount,
-  filteredQuestionsCount,
-  filteredResponsesCount,
-  filterState,
-  sbtFilteredResponses,
-  sbtFilteredAggregatorQuestionResponses,
-} = stateRef.current;
-
-return buildSurveyResultsResponsesJsonExport({
-    counts: {
-      totalQuestions: totalQuestionsCount,
-      filteredQuestions: filteredQuestionsCount,
-      totalResponses: totalResponsesCount,
-      filteredResponses: filteredResponsesCount,
-    },
-    exportedAt: new Date().toISOString(),
-    filteredQuestionResponses: sbtFilteredAggregatorQuestionResponses || {},
-    filteredQuestions: getFilteredQuestionsForExport(),
-    filteredResponses: sbtFilteredResponses || [],
-    filterState: filterState || {},
-    sessionSlug: getEffectiveSlug() || '',
-    surveyId: surveyId || null,
-    surveyTitle: surveyTitle || '',
-    surveyViewMode,
-    viewMode,
-  });
-};
-
-const getFilteredQuestionIdsForExport = (): string[] => {
-return buildSurveyResultsFilteredQuestionIdsForExport({
-  aggregatorQuestionResponses: stateRef.current.sbtFilteredAggregatorQuestionResponses,
-  filteredResponses: stateRef.current.sbtFilteredResponses as SurveyResultsSummaryResponseRow[],
-  getResponseQuestionId: (answer) => getResponseQuestionId(answer as SurveyResultsResponseRecord),
+const dataExportRuntime = createSurveyResultsDataExportRuntime({
+  applyStatePatch: (patch) => setState(asSurveyResultsStatePatch(patch)),
+  getEffectiveSlug,
+  getNetworkQuestionsForCurrentContext,
+  getProps: () => propsRef.current,
+  getResponseQuestionId,
+  getState: () => stateRef.current,
+  hasEffectiveNetworkId,
   parseResponse: (response) => parseResponse(response) as SurveyResultsResponseRecord | null,
+  writeCsvFileName: (filename) => {
+    inst.csvFileName = filename;
+  },
 });
-};
-
-const getFilteredQuestionsForExport = (): SurveyResultsQuestionExportRecord[] => {
-const networkQuestions = getNetworkQuestionsForCurrentContext() as Record<string, SurveyResultsRecord | undefined>;
-return buildSurveyResultsFilteredQuestionsForExport({
-  networkQuestions,
-  questionIds: getFilteredQuestionIdsForExport(),
-});
-};
-
-const generateQuestionsJSON = (): string => {
 const {
-  viewMode,
-  surveyViewMode,
-  surveyId,
-  surveyTitle,
-  totalQuestionsCount,
-  totalResponsesCount,
-  filteredQuestionsCount,
-  filteredResponsesCount,
-  filterState,
-} = stateRef.current;
-
-return buildSurveyResultsQuestionsJsonExport({
-    counts: {
-      totalQuestions: totalQuestionsCount,
-      filteredQuestions: filteredQuestionsCount,
-      totalResponses: totalResponsesCount,
-      filteredResponses: filteredResponsesCount,
-    },
-    exportedAt: new Date().toISOString(),
-    filteredQuestions: getFilteredQuestionsForExport(),
-    filterState: filterState || {},
-    sessionSlug: getEffectiveSlug() || '',
-    surveyId: surveyId || null,
-    surveyTitle: surveyTitle || '',
-    surveyViewMode,
-    viewMode,
-  });
-};
-
-const generateQuestionsCSV = (): string => {
-if (!hasEffectiveNetworkId()) {
-  setState(asSurveyResultsStatePatch(buildSurveyResultsAlertMessagePatch('Network not available for fetching question data.')));
-  return '';
-}
-
-const filteredQuestions = getFilteredQuestionsForExport();
-if (!filteredQuestions.length) {
-  setState(asSurveyResultsStatePatch(buildSurveyResultsAlertMessagePatch('No filtered questions to export.')));
-  return '';
-}
-
-return buildSurveyResultsQuestionsCsvExport(filteredQuestions);
-};
+  downloadCSV,
+  getFilteredQuestionsForExport,
+} = dataExportRuntime;
 
 const getHtmlReportChainId = (): number | null => {
 const network = toSurveyResultsRecord(propsRef.current.network);
@@ -2549,40 +2396,6 @@ try {
   surveyLog.error('[SurveyResults.downloadHtmlReport] Failed to export HTML report:', error);
   setState(asSurveyResultsStatePatch(buildSurveyResultsHtmlReportDownloadFailurePatch()));
 }
-};
-
-const getExportBaseFileName = (exportType: unknown = stateRef.current.exportType): string => {
-const { viewMode, surveyId } = stateRef.current;
-const surveyIdShort = surveyId
-  ? getShortenedSurveyID(surveyId, false, null, true)
-  : 'all';
-return buildSurveyResultsExportBaseFileName({
-  exportType,
-  surveyIdShort,
-  viewMode,
-});
-};
-
-const downloadCSV = (): void => {
-const { exportType } = stateRef.current;
-const timestamp = new Date().toISOString().replace(/[:.-]/g, '_');
-const baseFileName = getExportBaseFileName(exportType);
-runSurveyResultsExportController({
-  baseFileName,
-  downloadFile: runSurveyResultsBrowserDownload,
-  exportType,
-  generators: {
-    'questions-csv': generateQuestionsCSV,
-    'questions-json': generateQuestionsJSON,
-    'questions-responses-csv': generateResponsesCSV,
-    'questions-responses-json': generateResultsJSON,
-  },
-  getCurrentAlertMessage: () => stateRef.current.alertMessage,
-  onAlertMessage: (message) => {
-    setState(asSurveyResultsStatePatch(buildSurveyResultsAlertMessagePatch(message)));
-  },
-  timestamp,
-});
 };
 
 const handleExportTypeChange = (type: unknown): void => {
