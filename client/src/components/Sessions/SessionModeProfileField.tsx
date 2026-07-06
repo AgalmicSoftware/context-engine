@@ -22,6 +22,7 @@ type SessionModeProfileFieldProps = {
   registryChainId?: number | null;
   value?: unknown;
   onChange: (profile: SessionModeProfile, compiled: { storageProfile: AnyRecord }) => void;
+  onContinue?: () => void;
 };
 
 const PRESET_CARDS = [
@@ -30,12 +31,25 @@ const PRESET_CARDS = [
     title: 'Fast & Cheap (Cloudflare)',
     badge: 'Recommended',
     copy: 'Hosted on Cloudflare. Session-scoped by default. Not permanent. Can be publicly anchored later.',
+    keys: [
+      'Cloudflare API token',
+      'AI provider key',
+      'Arweave JWK',
+      'RPC URL/key',
+      'Lit key only for Lit encryption',
+    ],
   },
   {
     id: SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED,
     title: 'Trustless & Public (Decentralized)',
     badge: '',
     copy: 'Published publicly and permanently unless you enable encryption. Slower and more expensive to set up.',
+    keys: [
+      'Arweave wallet/JWK',
+      'RPC URL/key',
+      'AI provider key',
+      'Lit API key if encryption is enabled',
+    ],
   },
 ] as const;
 
@@ -118,6 +132,7 @@ const SessionModeProfileField = ({
   registryChainId = null,
   value = null,
   onChange,
+  onContinue,
 }: SessionModeProfileFieldProps): React.ReactElement => {
   const profile = isProfile(value) ? value : null;
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -177,6 +192,7 @@ const SessionModeProfileField = ({
           color="primary"
           disabled={!profile}
           data-testid="ce-new-preset-continue"
+          onClick={onContinue}
         >
           Continue
         </Button>
@@ -201,6 +217,16 @@ const SessionModeProfileField = ({
                 {selected ? <FontAwesomeIcon icon={faCheck} className={styles.modePresetCheck} /> : null}
               </span>
               <span className={styles.modePresetCopy}>{preset.copy}</span>
+              <span className={styles.modePresetKeys}>
+                <span className={styles.modePresetKeysLabel}>Keys needed</span>
+                <span className={styles.modePresetKeyList}>
+                  {preset.keys.map((key) => (
+                    <span key={key} className={styles.modePresetKey}>
+                      {key}
+                    </span>
+                  ))}
+                </span>
+              </span>
             </button>
           );
         })}

@@ -17,6 +17,13 @@ describe('SessionModeProfileField', () => {
     expect(screen.getByTestId('ce-new-preset-trustless_public_decentralized')).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByText(/Hosted on Cloudflare\. Session-scoped by default\./)).toBeInTheDocument();
     expect(screen.getByText(/Published publicly and permanently unless you enable encryption\./)).toBeInTheDocument();
+    expect(screen.getByText('Cloudflare API token')).toBeInTheDocument();
+    expect(screen.getAllByText('AI provider key')).toHaveLength(2);
+    expect(screen.getByText('Arweave JWK')).toBeInTheDocument();
+    expect(screen.getByText('Arweave wallet/JWK')).toBeInTheDocument();
+    expect(screen.getAllByText('RPC URL/key')).toHaveLength(2);
+    expect(screen.getByText('Lit key only for Lit encryption')).toBeInTheDocument();
+    expect(screen.getByText('Lit API key if encryption is enabled')).toBeInTheDocument();
   });
 
   it('selects a preset and emits the compiled storage profile', () => {
@@ -35,6 +42,29 @@ describe('SessionModeProfileField', () => {
         storageProfile: expect.objectContaining({ backend: 'arweave' }),
       })
     );
+  });
+
+  it('continues only after a mode profile exists', () => {
+    const onChange = jest.fn();
+    const onContinue = jest.fn();
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    const { rerender } = render(
+      <SessionModeProfileField registryChainId={11155420} onChange={onChange} onContinue={onContinue} />
+    );
+
+    fireEvent.click(screen.getByTestId('ce-new-preset-continue'));
+    expect(onContinue).not.toHaveBeenCalled();
+
+    rerender(
+      <SessionModeProfileField
+        registryChainId={11155420}
+        value={profile}
+        onChange={onChange}
+        onContinue={onContinue}
+      />
+    );
+    fireEvent.click(screen.getByTestId('ce-new-preset-continue'));
+    expect(onContinue).toHaveBeenCalledTimes(1);
   });
 
   it('marks profile custom after an advanced override', () => {

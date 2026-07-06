@@ -654,6 +654,12 @@ const SessionWizard = ({
   const resolvedActiveSessionSlug = sessionRegistryPublishAdapter.normalizeSlug(
     activeSessionSlug ?? ''
   );
+  const currentSessionWizardPathname = (
+    typeof window === 'undefined' || !window.location ? '' : window.location.pathname
+  );
+  const isNewSessionWizardRoute = isNewSessionWizardPathname(
+    currentSessionWizardPathname
+  );
   const cachedWizard = useMemo(() => readSessionWizardCache(), []);
   const cachedDraftHasEmbeddedDeployHelperEnabled = (
     typeof cachedWizard?.draft?.embeddedDeployHelperEnabled === 'boolean'
@@ -680,7 +686,7 @@ const SessionWizard = ({
     resolvedActiveSessionSlug,
   ]);
   const initialDraft = useMemo(() => {
-    return buildSessionWizardInitialDraftFromCache({
+    const draftFromCache = buildSessionWizardInitialDraftFromCache({
       cachedWizard,
       defaultTemplate: DEFAULT_TEMPLATE,
       normalModeSharedHostedWorkerEnabled: NORMAL_MODE_SHARED_HOSTED_WORKER_ENABLED,
@@ -688,7 +694,16 @@ const SessionWizard = ({
         ? null
         : sourceEmbeddedDeployHelperDefault,
     });
-  }, [cachedDraftHasEmbeddedDeployHelperEnabled, cachedWizard, sourceEmbeddedDeployHelperDefault]);
+    if (!isNewSessionWizardRoute) return draftFromCache;
+    const freshNewSessionDraft = { ...draftFromCache };
+    delete freshNewSessionDraft.sessionModeProfile;
+    return freshNewSessionDraft;
+  }, [
+    cachedDraftHasEmbeddedDeployHelperEnabled,
+    cachedWizard,
+    isNewSessionWizardRoute,
+    sourceEmbeddedDeployHelperDefault,
+  ]);
   const initialGates = useMemo<EncryptionGateState[]>(() => {
     const cachedGates = cachedWizard?.encryptionGates;
     if (Array.isArray(cachedGates) && cachedGates.length) return cachedGates as EncryptionGateState[];
@@ -761,6 +776,7 @@ const SessionWizard = ({
   const [sessionPublishState, dispatchSessionPublish] = useReducer(sessionPublishReducer, undefined, () => (
     createInitialSessionPublishState({ status: 'editing' })
   ));
+  const [sessionModeProfileStepComplete, setSessionModeProfileStepComplete] = useState(false);
   const publishBusy = resolveSessionWizardPublishReducerUiState({ state: sessionPublishState }).publishBusy;
   const publishRequestInFlightRef = useRef(false);
   const [publishStepElapsedMs, setPublishStepElapsedMs] = useState(0);
@@ -4245,12 +4261,12 @@ const SessionWizard = ({
     () => getSessionWizardNormalModeBundleUrlOverrideValidationError(normalModeBundleUrlOverride),
     [normalModeBundleUrlOverride]
   );
-  const currentSessionWizardPathname = (
-    typeof window === 'undefined' || !window.location ? '' : window.location.pathname
-  );
-  const isNewSessionWizardRoute = isNewSessionWizardPathname(
-    currentSessionWizardPathname
-  );
+  useEffect(() => {
+    if (isNewSessionWizardRoute) {
+      setSessionModeProfileStepComplete(false);
+    }
+  }, [isNewSessionWizardRoute]);
+  const effectiveSessionModeProfileStepComplete = !isNewSessionWizardRoute || sessionModeProfileStepComplete;
   const newSessionBannerDismissalContextKey = buildSessionWizardNewSessionBannerDismissalContextKey({
     pathname: currentSessionWizardPathname,
     sponsoredBundleId: initialSponsoredBundleId,
@@ -4401,6 +4417,9 @@ const SessionWizard = ({
       sessionIdDisplay={sessionIdDisplay}
     />
   ) : null;
+  const handleSessionModeProfileContinue = useCallback(() => {
+    setSessionModeProfileStepComplete(true);
+  }, []);
   const sessionModeProfileControl = (
     <SessionWizardSessionModeProfileControl
       registryChainId={registryChainId}
@@ -4412,6 +4431,7 @@ const SessionWizard = ({
           return next;
         });
       }}
+      onContinue={handleSessionModeProfileContinue}
     />
   );
 
@@ -4518,7 +4538,10 @@ const SessionWizard = ({
       selectedWizardContractHref={selectedWizardContractHref} selectorSourceChainId={selectorSourceChainId}
       selectorSourceSessionConfig={selectorSourceSessionConfig} sessionHeaderPreviewModalOpen={sessionHeaderPreviewModalOpen}
       sessionHeaderPreviewSrc={sessionHeaderPreviewSrc} sessionMetadataHeaderAccessory={sessionMetadataHeaderAccessory}
-      sessionModeProfileControl={sessionModeProfileControl} sessionUrl={sessionUrl}
+      sessionModeProfileControl={sessionModeProfileControl}
+      showSessionModeProfileControlInSetup={!isNewSessionWizardRoute}
+      sessionModeProfileStepComplete={effectiveSessionModeProfileStepComplete}
+      sessionUrl={sessionUrl}
       setBundleFile={setBundleFile} setBundleMode={setBundleMode}
       setDeployForm={setDeployForm} setDeployHelperUrl={setDeployHelperUrl}
       setNormalModeBundleUrlOverride={setNormalModeBundleUrlOverride} setPersistWorkerSecrets={setPersistWorkerSecrets}
