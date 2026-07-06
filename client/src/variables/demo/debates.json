@@ -5692,14 +5692,14 @@
         "relevance_score": 7
       },
       {
-        "entry_url_or_id": "dwarkesh_elon_musk_feb_2026",
+        "entry_url_or_id": "musk_elon_dwarkesh_2026_ai_in_space",
         "corpus": "dwarkesh-lab-insiders",
         "side": "b",
         "stance_summary": "Musk's orbital-data-center discussion is retained only as speculative industry-response evidence, not as a policy-grade mitigation claim.",
         "relevance_score": 3
       },
       {
-        "entry_url_or_id": "international_ai_safety_report_2026",
+        "entry_url_or_id": "intl_ai_safety_report_2026_policy",
         "corpus": "ai-laws-policy",
         "side": "a",
         "stance_summary": "International safety framing increasingly includes environmental sustainability as one dimension of AI governance capacity.",
@@ -6529,5 +6529,1440 @@
       "added_by": "corpus_audit_fix",
       "date_added": "2026-05-21"
     }
+  },
+  {
+    "id": "debate_government_prerelease_access",
+    "title": "Should Governments Get Pre-Release Access to Frontier Models?",
+    "category": "policy_dispute",
+    "question": "Should frontier AI developers be required or encouraged to give governments pre-release access to models for safety/security assessment?",
+    "status": "active",
+    "premise_extraction": {
+      "shared_premises": [
+        "Frontier AI models pose novel risks that governments have a legitimate interest in understanding before deployment",
+        "Some form of external assessment of frontier models is desirable for public safety",
+        "The current pace of frontier model releases outstrips regulatory capacity to evaluate them",
+        "Both voluntary and mandatory frameworks have precedents in other industries (pharmaceuticals, nuclear, aviation)"
+      ],
+      "contested_premises": [
+        {
+          "premise": "Voluntary pre-release access frameworks are sufficient for safety oversight",
+          "side_a_position": "Voluntary frameworks enable cooperative assessment without chilling innovation; the White House EO's 30-day voluntary window and METR's cooperative pilot with 4 labs demonstrate feasibility",
+          "side_b_position": "Voluntary frameworks lack enforcement teeth — labs can decline access when findings would be inconvenient, making the framework performative rather than protective",
+          "type": "empirical"
+        },
+        {
+          "premise": "Government access to pre-release models creates acceptable security risks",
+          "side_a_position": "Standard classification and compartmentalization protocols can protect model weights and findings; government labs already handle nuclear secrets",
+          "side_b_position": "Concentrating frontier model access in government facilities creates a high-value target for nation-state attackers; the attack surface is broader than nuclear secrets because model weights are software-copyable",
+          "type": "empirical"
+        },
+        {
+          "premise": "Mandatory obligations improve safety outcomes over voluntary commitments",
+          "side_a_position": "The Great American AI Act's binding third-party audits via IVOs ensure accountability; voluntary commitments historically erode under commercial pressure",
+          "side_b_position": "Mandatory obligations create compliance monocultures, disadvantage smaller developers, and risk regulatory capture by incumbents who shape the rules to raise barriers to entry",
+          "type": "values"
+        }
+      ]
+    },
+    "argument_tree": {
+      "root": {
+        "id": "node_1",
+        "claim": "Governments should have structured pre-release access to frontier AI models to enable proactive safety and security assessment",
+        "type": "thesis",
+        "children": [
+          {
+            "id": "node_2",
+            "claim": "The White House Executive Order establishes a viable voluntary framework with up to 30 days pre-release access for federal assessment",
+            "type": "support",
+            "source": {
+              "corpus": "ai_laws",
+              "entry_id": "us_eo_ai_innovation_security_2026",
+              "title": "Executive Order — Promoting Advanced Artificial Intelligence Innovation and Security",
+              "author": "White House",
+              "date": "2026-06-02"
+            },
+            "evidence_strength": "strong",
+            "fact_check_status": "verified",
+            "children": [
+              {
+                "id": "node_3",
+                "claim": "The EO expressly disclaims mandatory licensing in Section 3(c), signaling that voluntary cooperation is the preferred mechanism",
+                "type": "qualification",
+                "source": {
+                  "corpus": "ai_laws",
+                  "entry_id": "us_eo_ai_innovation_security_2026",
+                  "title": "Executive Order — Promoting Advanced Artificial Intelligence Innovation and Security",
+                  "author": "White House",
+                  "date": "2026-06-02"
+                },
+                "evidence_strength": "strong",
+                "fact_check_status": "verified",
+                "children": []
+              }
+            ]
+          },
+          {
+            "id": "node_4",
+            "claim": "METR's cooperative pilot with four frontier labs demonstrates that independent pre-release assessment is operationally feasible and produces actionable safety findings",
+            "type": "support",
+            "source": {
+              "corpus": "metr",
+              "entry_id": "metr_frontier_risk_report_2026",
+              "title": "Frontier Risk Report (February to March 2026)",
+              "author": "METR",
+              "date": "2026-05-19"
+            },
+            "evidence_strength": "strong",
+            "fact_check_status": "verified",
+            "children": [
+              {
+                "id": "node_5",
+                "claim": "The pilot found that current models do not yet demonstrate dangerous autonomous capabilities, but capabilities in relevant areas are improving rapidly",
+                "type": "support",
+                "source": {
+                  "corpus": "metr",
+                  "entry_id": "metr_frontier_risk_report_2026",
+                  "title": "Frontier Risk Report (February to March 2026)",
+                  "author": "METR",
+                  "date": "2026-05-19"
+                },
+                "evidence_strength": "strong",
+                "fact_check_status": "verified",
+                "children": []
+              }
+            ]
+          },
+          {
+            "id": "node_6",
+            "claim": "The Great American AI Act proposes binding obligations including third-party audits via Independent Verification Organizations (IVOs), going beyond voluntary frameworks",
+            "type": "support",
+            "source": {
+              "corpus": "ai_laws",
+              "entry_id": "us_great_american_ai_act_2026",
+              "title": "Great American Artificial Intelligence Act of 2026 (Discussion Draft)",
+              "author": "U.S. Congress",
+              "date": "2026-06-04"
+            },
+            "evidence_strength": "moderate",
+            "fact_check_status": "verified",
+            "children": [
+              {
+                "id": "node_7",
+                "claim": "Mandatory pre-release access creates a security honeypot — concentrating frontier model weights in government facilities presents a high-value target for nation-state attackers",
+                "type": "attack",
+                "source": {
+                  "corpus": "dwarkesh",
+                  "entry_id": "amodei_dario_dwarkesh_2026_end_of_exponential",
+                  "title": "We Are Near the End of the Exponential",
+                  "author": "Dario Amodei",
+                  "date": "2026-02-05"
+                },
+                "evidence_strength": "moderate",
+                "fact_check_status": "verified",
+                "children": [
+                  {
+                    "id": "node_8",
+                    "claim": "The International AI Safety Report documents that sophisticated attackers can bypass current frontier safety defenses, underscoring the risk of centralized model access",
+                    "type": "support",
+                    "source": {
+                      "corpus": "arxiv",
+                      "entry_id": "international_ai_safety_report_2026",
+                      "title": "International AI Safety Report 2026",
+                      "author": "Yoshua Bengio et al.",
+                      "date": "2026-01-01"
+                    },
+                    "evidence_strength": "strong",
+                    "fact_check_status": "verified",
+                    "children": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "node_9",
+            "claim": "California SB 53 charts a middle path: requiring risk framework publication and incident reporting without mandating pre-release government access to model weights",
+            "type": "qualification",
+            "source": {
+              "corpus": "ai_laws",
+              "entry_id": "us_ca_sb53_frontier_ai_transparency",
+              "title": "California Transparency in Frontier Artificial Intelligence Models Act (SB 53)",
+              "author": "California Legislature",
+              "date": "2026-01-15"
+            },
+            "evidence_strength": "strong",
+            "fact_check_status": "verified",
+            "children": []
+          },
+          {
+            "id": "node_10",
+            "claim": "Frontier safety frameworks have doubled across major labs, but the IAISR notes this voluntary adoption may not persist under competitive pressure without regulatory backing",
+            "type": "support",
+            "source": {
+              "corpus": "arxiv",
+              "entry_id": "international_ai_safety_report_2026",
+              "title": "International AI Safety Report 2026",
+              "author": "Yoshua Bengio et al.",
+              "date": "2026-01-01"
+            },
+            "evidence_strength": "moderate",
+            "fact_check_status": "verified",
+            "children": []
+          },
+          {
+            "id": "node_11",
+            "claim": "Dario Amodei advocates for regulation that is targeted and proportional — avoiding both the extremes of no regulation and heavy-handed mandatory licensing",
+            "type": "qualification",
+            "source": {
+              "corpus": "dwarkesh",
+              "entry_id": "amodei_dario_dwarkesh_2026_end_of_exponential",
+              "title": "We Are Near the End of the Exponential",
+              "author": "Dario Amodei",
+              "date": "2026-02-05"
+            },
+            "evidence_strength": "moderate",
+            "fact_check_status": "verified",
+            "children": []
+          }
+        ]
+      }
+    },
+    "fact_layer": [
+      {
+        "claim": "The White House EO establishes a voluntary pre-release access window of up to 30 days and expressly disclaims mandatory licensing in Section 3(c)",
+        "confidence": "green",
+        "sources": [
+          {
+            "corpus": "ai_laws",
+            "entry_id": "us_eo_ai_innovation_security_2026",
+            "finding": "EO signed June 2, 2026; Section 3(c) states the order does not create mandatory licensing obligations"
+          }
+        ],
+        "counter_evidence": []
+      },
+      {
+        "claim": "The Great American AI Act proposes binding third-party audits via Independent Verification Organizations",
+        "confidence": "green",
+        "sources": [
+          {
+            "corpus": "ai_laws",
+            "entry_id": "us_great_american_ai_act_2026",
+            "finding": "Discussion draft released June 4, 2026; includes IVO audit framework for frontier developers"
+          }
+        ],
+        "counter_evidence": [
+          {
+            "corpus": "ai_laws",
+            "entry_id": "us_great_american_ai_act_2026",
+            "finding": "Still a discussion draft — not enacted law; final provisions may differ substantially"
+          }
+        ]
+      },
+      {
+        "claim": "METR conducted a cooperative pre-release assessment pilot with four frontier labs",
+        "confidence": "green",
+        "sources": [
+          {
+            "corpus": "metr",
+            "entry_id": "metr_frontier_risk_report_2026",
+            "finding": "Frontier Risk Report covers February-March 2026 cooperative assessments across four labs"
+          }
+        ],
+        "counter_evidence": []
+      },
+      {
+        "claim": "Frontier safety frameworks have doubled across labs but sophisticated attackers bypass current defenses",
+        "confidence": "yellow",
+        "sources": [
+          {
+            "corpus": "arxiv",
+            "entry_id": "international_ai_safety_report_2026",
+            "finding": "IAISR 2026 documents proliferation of safety frameworks alongside persistent vulnerability to sophisticated attacks"
+          }
+        ],
+        "counter_evidence": []
+      }
+    ],
+    "fallacy_flags": [
+      {
+        "node_id": "node_7",
+        "fallacy_type": "false_analogy",
+        "description": "Comparing government model access to a 'honeypot' implicitly analogizes software model weights to physical assets, but the threat model differs — model weights can be air-gapped and compartmentalized differently than physical stockpiles",
+        "confidence": "medium",
+        "confirmed_by": "unconfirmed"
+      },
+      {
+        "node_id": "node_10",
+        "fallacy_type": "slippery_slope",
+        "description": "Arguing that voluntary frameworks will inevitably erode under competitive pressure assumes a trajectory without evidence of specific erosion cases in the AI safety domain",
+        "confidence": "low",
+        "confirmed_by": "unconfirmed"
+      }
+    ],
+    "steel_man_assists": [
+      {
+        "for_side": "A",
+        "original_argument": "Pre-release access enables proactive risk identification",
+        "steel_manned_version": "METR's cooperative pilot demonstrates that independent pre-release assessment is not merely theoretically desirable but operationally proven: four frontier labs participated voluntarily, producing actionable risk findings. The EO's 30-day window institutionalizes this cooperation. Combined with the IAISR's finding that safety frameworks are proliferating but still insufficient against sophisticated attackers, structured government access provides the systematic oversight that voluntary self-assessment alone cannot guarantee",
+        "source_support": [
+          "metr_frontier_risk_report_2026",
+          "us_eo_ai_innovation_security_2026",
+          "international_ai_safety_report_2026"
+        ]
+      },
+      {
+        "for_side": "B",
+        "original_argument": "Government access creates security risks and chills innovation",
+        "steel_manned_version": "The security concern is not hypothetical: the IAISR documents that sophisticated attackers bypass frontier defenses, meaning any centralized repository of pre-release model weights becomes a high-value target for state-sponsored espionage. Meanwhile, the EO's own Section 3(c) disclaimer acknowledges that mandatory licensing would be counterproductive. California's SB 53 demonstrates that meaningful transparency (risk framework publication, incident reporting) can be achieved without requiring government access to model weights, preserving innovation incentives while satisfying democratic accountability demands",
+        "source_support": [
+          "international_ai_safety_report_2026",
+          "us_eo_ai_innovation_security_2026",
+          "us_ca_sb53_frontier_ai_transparency"
+        ]
+      }
+    ],
+    "goalpost_monitor": [
+      {
+        "who": "Side A (policy advocates)",
+        "original_claim": "Mandatory pre-release licensing is needed for safety",
+        "shifted_claim": "Voluntary pre-release access frameworks with strong incentives are sufficient",
+        "shift_type": "weakening",
+        "detected_at": "node_2"
+      }
+    ],
+    "agreement_map": {
+      "confirmed_agreements": [
+        "Some form of external safety assessment of frontier models is desirable",
+        "The METR cooperative pilot demonstrates feasibility of structured assessment",
+        "Mandatory licensing carries both innovation and security costs"
+      ],
+      "narrowed_disagreement": "Whether voluntary frameworks with strong incentives (EO approach) provide sufficient safety assurance, or whether binding obligations (Great American AI Act approach) are necessary to ensure labs cooperate even when findings are commercially inconvenient"
+    },
+    "burden_of_proof": [
+      {
+        "who": "Side A",
+        "claim": "Pre-release government access improves safety outcomes",
+        "evidence_provided": true,
+        "evidence_quality": "moderate",
+        "status": "partially_fulfilled"
+      },
+      {
+        "who": "Side B",
+        "claim": "Government access creates unacceptable security risks",
+        "evidence_provided": true,
+        "evidence_quality": "moderate",
+        "status": "partially_fulfilled"
+      }
+    ],
+    "audience_sentiment": {
+      "initial_lean": {
+        "side_a": 0.5,
+        "side_b": 0.3,
+        "undecided": 0.2
+      },
+      "pivotal_moments": [
+        {
+          "node_id": "node_5",
+          "shift_description": "METR pilot showing feasibility and actionable findings strengthens the case for structured access",
+          "sentiment_after": {
+            "side_a": 0.55,
+            "side_b": 0.25,
+            "undecided": 0.2
+          }
+        },
+        {
+          "node_id": "node_8",
+          "shift_description": "IAISR evidence that sophisticated attackers bypass defenses raises legitimate concerns about centralizing model access",
+          "sentiment_after": {
+            "side_a": 0.45,
+            "side_b": 0.35,
+            "undecided": 0.2
+          }
+        }
+      ]
+    },
+    "scoring_rubric": {
+      "side_a": {
+        "logical_consistency": 8,
+        "evidence_quality": 8,
+        "responsiveness": 7,
+        "steel_manning": 7,
+        "novel_insight": 7
+      },
+      "side_b": {
+        "logical_consistency": 8,
+        "evidence_quality": 7,
+        "responsiveness": 8,
+        "steel_manning": 8,
+        "novel_insight": 8
+      }
+    },
+    "meta": {
+      "corpora_involved": [
+        "ai_laws",
+        "arxiv",
+        "metr",
+        "dwarkesh"
+      ],
+      "total_sources": 7,
+      "key_tension": "The policy spectrum runs from SB 53's transparency-only approach through the EO's voluntary access to the Great American AI Act's binding IVO audits — the core disagreement is whether voluntary cooperation suffices or binding obligations are necessary, against the backdrop of real security risks from centralizing model access"
+    },
+    "positions": [
+      {
+        "entry_url_or_id": "us_eo_ai_innovation_security_2026",
+        "corpus": "ai-laws-policy",
+        "side": "a",
+        "stance_summary": "White House EO establishes voluntary pre-release access framework with up to 30 days, disclaiming mandatory licensing",
+        "relevance_score": 10
+      },
+      {
+        "entry_url_or_id": "metr_frontier_risk_report_2026",
+        "corpus": "metr-evals-metrics",
+        "side": "a",
+        "stance_summary": "METR cooperative pilot with 4 labs demonstrates feasibility and value of independent pre-release assessment",
+        "relevance_score": 10
+      },
+      {
+        "entry_url_or_id": "us_great_american_ai_act_2026",
+        "corpus": "ai-laws-policy",
+        "side": "a",
+        "stance_summary": "Great American AI Act proposes binding IVO audit obligations for frontier developers",
+        "relevance_score": 9
+      },
+      {
+        "entry_url_or_id": "international_ai_safety_report_2026",
+        "corpus": "arxiv-ai-safety",
+        "side": "a",
+        "stance_summary": "IAISR notes safety frameworks have doubled but sophisticated attackers bypass defenses, supporting need for oversight",
+        "relevance_score": 9
+      },
+      {
+        "entry_url_or_id": "us_ca_sb53_frontier_ai_transparency",
+        "corpus": "ai-laws-policy",
+        "side": "b",
+        "stance_summary": "SB 53 achieves transparency through risk framework publication without requiring government model access",
+        "relevance_score": 8
+      },
+      {
+        "entry_url_or_id": "amodei_dario_dwarkesh_2026_end_of_exponential",
+        "corpus": "dwarkesh-lab-insiders",
+        "side": "b",
+        "stance_summary": "Dario Amodei advocates targeted, proportional regulation — avoiding mandatory licensing extremes",
+        "relevance_score": 8
+      }
+    ],
+    "cross_corpus_references": [
+      {
+        "from_corpus": "ai-laws-policy",
+        "from_id": "us_eo_ai_innovation_security_2026",
+        "to_corpus": "metr-evals-metrics",
+        "to_id": "metr_frontier_risk_report_2026",
+        "relationship": "voluntary_framework_implemented_by",
+        "relevance_score": 9
+      },
+      {
+        "from_corpus": "ai-laws-policy",
+        "from_id": "us_great_american_ai_act_2026",
+        "to_corpus": "ai-laws-policy",
+        "to_id": "us_eo_ai_innovation_security_2026",
+        "relationship": "mandatory_alternative_to",
+        "relevance_score": 9
+      },
+      {
+        "from_corpus": "arxiv-ai-safety",
+        "from_id": "international_ai_safety_report_2026",
+        "to_corpus": "metr-evals-metrics",
+        "to_id": "metr_frontier_risk_report_2026",
+        "relationship": "cites_empirical_evidence_from",
+        "relevance_score": 8
+      },
+      {
+        "from_corpus": "dwarkesh-lab-insiders",
+        "from_id": "amodei_dario_dwarkesh_2026_end_of_exponential",
+        "to_corpus": "ai-laws-policy",
+        "to_id": "us_eo_ai_innovation_security_2026",
+        "relationship": "discusses_policy_implications_of",
+        "relevance_score": 8
+      }
+    ]
+  },
+  {
+    "id": "debate_alignment_tractability_2026",
+    "title": "Is AI Alignment Being Solved or Increasingly Intractable?",
+    "category": "methodology_debate",
+    "question": "Is alignment becoming more tractable as models scale, or are we generating false confidence while fundamental problems remain unsolved?",
+    "status": "active",
+    "premise_extraction": {
+      "shared_premises": [
+        "Alignment is a critical problem for ensuring advanced AI systems act in accordance with human values",
+        "Current frontier models have not yet demonstrated catastrophic misalignment in deployment",
+        "Both interpretability research and safety evaluations have advanced significantly since 2023",
+        "The difficulty of alignment may change qualitatively as model capabilities increase"
+      ],
+      "contested_premises": [
+        {
+          "premise": "Empirical evidence from current models is informative about alignment of future, more capable models",
+          "side_a_position": "METR's frontier risk report shows current models lack dangerous autonomous capabilities — this is evidence, not absence of evidence, and interpretability tools allow us to verify alignment properties",
+          "side_b_position": "Current models may not be capable enough to reveal misalignment risks; absence of observed misalignment at current capability levels tells us little about alignment at superhuman levels",
+          "type": "empirical"
+        },
+        {
+          "premise": "Automated alignment research can reliably assess and improve alignment",
+          "side_a_position": "AI-assisted alignment research accelerates progress by identifying and patching failure modes faster than human researchers alone",
+          "side_b_position": "Irving et al. argue automated alignment could produce catastrophically misleading safety assessments — AI systems optimizing for appearing aligned may mask genuine risks",
+          "type": "empirical"
+        },
+        {
+          "premise": "Safety and capabilities research are complementary rather than in tension",
+          "side_a_position": "Labs have competitive incentives to be safer; Constitutional AI and RLHF demonstrate that capability improvements can incorporate alignment by construction",
+          "side_b_position": "The defence-in-depth model (Singapore Consensus) implicitly acknowledges alignment is NOT solved — if it were, multiple defensive layers would be unnecessary",
+          "type": "values"
+        }
+      ]
+    },
+    "argument_tree": {
+      "root": {
+        "id": "node_1",
+        "claim": "AI alignment is becoming more tractable through empirical advances, interpretability research, and scaling-compatible safety techniques",
+        "type": "thesis",
+        "children": [
+          {
+            "id": "node_2",
+            "claim": "Dario Amodei argues safety and capabilities are complementary — alignment is tractable because safer models are also better models",
+            "type": "support",
+            "source": {
+              "corpus": "dwarkesh",
+              "entry_id": "amodei_dario_dwarkesh_2026_end_of_exponential",
+              "title": "We Are Near the End of the Exponential",
+              "author": "Dario Amodei",
+              "date": "2026-02-05"
+            },
+            "evidence_strength": "moderate",
+            "fact_check_status": "verified",
+            "children": [
+              {
+                "id": "node_3",
+                "claim": "This claim reflects Anthropic's institutional position and may be influenced by commercial incentives to appear confident about safety",
+                "type": "qualification",
+                "source": {
+                  "corpus": "lesswrong",
+                  "entry_id": "alignment_remains_hard_unsolved_2026",
+                  "title": "Alignment remains a hard, unsolved problem",
+                  "author": "Anonymous",
+                  "date": "2026-01-01"
+                },
+                "evidence_strength": "moderate",
+                "fact_check_status": "verified",
+                "children": []
+              }
+            ]
+          },
+          {
+            "id": "node_4",
+            "claim": "METR's empirical assessments show current frontier models do not yet demonstrate dangerous autonomous misalignment, providing a baseline for tractability claims",
+            "type": "support",
+            "source": {
+              "corpus": "metr",
+              "entry_id": "metr_frontier_risk_report_2026",
+              "title": "Frontier Risk Report (February to March 2026)",
+              "author": "METR",
+              "date": "2026-05-19"
+            },
+            "evidence_strength": "strong",
+            "fact_check_status": "verified",
+            "children": [
+              {
+                "id": "node_5",
+                "claim": "METR also notes capabilities in relevant areas are improving rapidly — the absence of misalignment at current capability levels does not guarantee absence at future levels",
+                "type": "qualification",
+                "source": {
+                  "corpus": "metr",
+                  "entry_id": "metr_frontier_risk_report_2026",
+                  "title": "Frontier Risk Report (February to March 2026)",
+                  "author": "METR",
+                  "date": "2026-05-19"
+                },
+                "evidence_strength": "strong",
+                "fact_check_status": "verified",
+                "children": []
+              }
+            ]
+          },
+          {
+            "id": "node_6",
+            "claim": "Automated alignment research could produce catastrophically misleading safety assessments — AI systems optimizing for appearing aligned may systematically mask genuine risks",
+            "type": "attack",
+            "source": {
+              "corpus": "arxiv",
+              "entry_id": "automated_alignment_harder_2026",
+              "title": "Automated Alignment is Harder Than You Think",
+              "author": "Aleksandr Bowkis, Marie Davidsen Buhl, Jacob Pfau, Geoffrey Irving",
+              "date": "2025-06-01"
+            },
+            "evidence_strength": "strong",
+            "fact_check_status": "verified",
+            "children": [
+              {
+                "id": "node_7",
+                "claim": "If AI-generated safety assessments are themselves subject to optimization pressure, the alignment verification problem becomes recursive and potentially unfalsifiable",
+                "type": "support",
+                "source": {
+                  "corpus": "arxiv",
+                  "entry_id": "automated_alignment_harder_2026",
+                  "title": "Automated Alignment is Harder Than You Think",
+                  "author": "Aleksandr Bowkis, Marie Davidsen Buhl, Jacob Pfau, Geoffrey Irving",
+                  "date": "2025-06-01"
+                },
+                "evidence_strength": "moderate",
+                "fact_check_status": "verified",
+                "children": []
+              }
+            ]
+          },
+          {
+            "id": "node_8",
+            "claim": "The Singapore Consensus defence-in-depth model implicitly acknowledges that alignment is not solved — multiple layered defences are prescribed precisely because no single alignment technique is trusted to be sufficient",
+            "type": "attack",
+            "source": {
+              "corpus": "arxiv",
+              "entry_id": "singapore_consensus_ai_safety_2026",
+              "title": "The Singapore Consensus on Global AI Safety Research Priorities",
+              "author": "Yoshua Bengio, Tegan Maharaj, Luke Ong, Stuart Russell et al.",
+              "date": "2025-06-01"
+            },
+            "evidence_strength": "strong",
+            "fact_check_status": "verified",
+            "children": [
+              {
+                "id": "node_9",
+                "claim": "Defence-in-depth is standard engineering practice even for well-understood systems — its prescription does not logically imply alignment is intractable, only that prudent engineering demands redundancy",
+                "type": "attack",
+                "source": {
+                  "corpus": "dwarkesh",
+                  "entry_id": "amodei_dario_dwarkesh_2026_end_of_exponential",
+                  "title": "We Are Near the End of the Exponential",
+                  "author": "Dario Amodei",
+                  "date": "2026-02-05"
+                },
+                "evidence_strength": "moderate",
+                "fact_check_status": "verified",
+                "children": []
+              }
+            ]
+          },
+          {
+            "id": "node_10",
+            "claim": "Alignment should be reframed from preventing catastrophe to enabling human flourishing — positive alignment offers a more tractable and motivating research direction",
+            "type": "support",
+            "source": {
+              "corpus": "arxiv",
+              "entry_id": "positive_alignment_flourishing_2026",
+              "title": "Positive Alignment: Artificial Intelligence for Human Flourishing",
+              "author": "Ruben Laukkonen, Seb Krier, Chloe Bakalar et al.",
+              "date": "2025-06-01"
+            },
+            "evidence_strength": "moderate",
+            "fact_check_status": "verified",
+            "children": [
+              {
+                "id": "node_11",
+                "claim": "Reframing alignment toward flourishing does not solve the core technical problem of ensuring AI systems pursue the goals humans intend — it adds desiderata without reducing difficulty",
+                "type": "attack",
+                "source": {
+                  "corpus": "lesswrong",
+                  "entry_id": "alignment_remains_hard_unsolved_2026",
+                  "title": "Alignment remains a hard, unsolved problem",
+                  "author": "Anonymous",
+                  "date": "2026-01-01"
+                },
+                "evidence_strength": "moderate",
+                "fact_check_status": "verified",
+                "children": []
+              }
+            ]
+          },
+          {
+            "id": "node_12",
+            "claim": "Benchmark performance on safety evaluations does not equal alignment — models that pass alignment benchmarks may still pursue misaligned goals in out-of-distribution scenarios",
+            "type": "attack",
+            "source": {
+              "corpus": "lesswrong",
+              "entry_id": "alignment_remains_hard_unsolved_2026",
+              "title": "Alignment remains a hard, unsolved problem",
+              "author": "Anonymous",
+              "date": "2026-01-01"
+            },
+            "evidence_strength": "moderate",
+            "fact_check_status": "verified",
+            "children": []
+          }
+        ]
+      }
+    },
+    "fact_layer": [
+      {
+        "claim": "METR's frontier risk report found current models do not demonstrate dangerous autonomous capabilities but capabilities in relevant areas are improving rapidly",
+        "confidence": "green",
+        "sources": [
+          {
+            "corpus": "metr",
+            "entry_id": "metr_frontier_risk_report_2026",
+            "finding": "Cooperative assessment of four frontier labs during Feb-Mar 2026 found no dangerous autonomous capabilities but noted rapid improvement"
+          }
+        ],
+        "counter_evidence": [
+          {
+            "corpus": "metr",
+            "entry_id": "metr_frontier_risk_report_2026",
+            "finding": "The report explicitly cautions that absence of current risk does not guarantee future safety as capabilities scale"
+          }
+        ]
+      },
+      {
+        "claim": "Irving et al. argue automated alignment research could produce catastrophically misleading safety assessments",
+        "confidence": "green",
+        "sources": [
+          {
+            "corpus": "arxiv",
+            "entry_id": "automated_alignment_harder_2026",
+            "finding": "Paper argues AI systems optimizing for appearing aligned may generate systematically misleading safety evidence"
+          }
+        ],
+        "counter_evidence": []
+      },
+      {
+        "claim": "The Singapore Consensus prescribes defence-in-depth as the recommended safety paradigm",
+        "confidence": "green",
+        "sources": [
+          {
+            "corpus": "arxiv",
+            "entry_id": "singapore_consensus_ai_safety_2026",
+            "finding": "Multi-stakeholder consensus document recommends layered defences rather than reliance on any single alignment technique"
+          }
+        ],
+        "counter_evidence": []
+      },
+      {
+        "claim": "Dario Amodei characterizes safety and capabilities as complementary at Anthropic",
+        "confidence": "yellow",
+        "sources": [
+          {
+            "corpus": "dwarkesh",
+            "entry_id": "amodei_dario_dwarkesh_2026_end_of_exponential",
+            "finding": "Amodei states alignment is tractable and that making models safer also makes them more capable"
+          }
+        ],
+        "counter_evidence": [
+          {
+            "corpus": "lesswrong",
+            "entry_id": "alignment_remains_hard_unsolved_2026",
+            "finding": "Critics note this framing may reflect commercial incentives rather than technical reality"
+          }
+        ]
+      }
+    ],
+    "fallacy_flags": [
+      {
+        "node_id": "node_2",
+        "fallacy_type": "appeal_to_authority",
+        "description": "Amodei's claim that alignment is tractable carries weight due to his position but may reflect Anthropic's commercial interests in projecting confidence about safety",
+        "confidence": "medium",
+        "confirmed_by": "unconfirmed"
+      },
+      {
+        "node_id": "node_4",
+        "fallacy_type": "argument_from_ignorance",
+        "description": "Citing absence of observed dangerous misalignment as evidence of tractability conflates 'not yet demonstrated' with 'unlikely' — models may not be capable enough to reveal misalignment",
+        "confidence": "high",
+        "confirmed_by": "unconfirmed"
+      },
+      {
+        "node_id": "node_8",
+        "fallacy_type": "non_sequitur",
+        "description": "Inferring that defence-in-depth implies alignment is unsolved conflates engineering prudence with theoretical impossibility — redundancy is standard even in well-understood domains",
+        "confidence": "medium",
+        "confirmed_by": "unconfirmed"
+      }
+    ],
+    "steel_man_assists": [
+      {
+        "for_side": "A",
+        "original_argument": "Alignment is becoming more tractable as models scale",
+        "steel_manned_version": "The empirical evidence from METR's cooperative assessments provides a genuine, verifiable signal: frontier models tested under adversarial conditions do not yet exhibit dangerous autonomous misalignment. Combined with advances in interpretability (mechanistic, probing-based) and Constitutional AI's demonstration that safety can be baked into training rather than bolted on, alignment researchers have more tools and evidence than ever. The positive alignment framing adds a constructive research direction. Labs have competitive incentives to invest in safety precisely because unsafe models are commercial liabilities. The question is not whether alignment is 'solved' but whether the tractability trajectory is encouraging — and it is",
+        "source_support": [
+          "metr_frontier_risk_report_2026",
+          "amodei_dario_dwarkesh_2026_end_of_exponential",
+          "positive_alignment_flourishing_2026"
+        ]
+      },
+      {
+        "for_side": "B",
+        "original_argument": "We are generating false confidence while fundamental problems remain unsolved",
+        "steel_manned_version": "Irving et al.'s analysis reveals a structural problem: as we use AI systems to evaluate AI alignment, the assessment itself becomes subject to the optimization pressures it is meant to detect. This is not a fixable bug but an epistemological trap. The Singapore Consensus's prescription of layered defences is itself evidence that the field's leading safety researchers do not trust any single alignment technique. METR's finding of 'no dangerous misalignment yet' is exactly what you would expect from models not yet capable enough to pursue long-horizon goals — the absence of signal is uninformative, not reassuring. Benchmark performance on safety evaluations suffers from the same Goodharting that plagues capability benchmarks",
+        "source_support": [
+          "automated_alignment_harder_2026",
+          "singapore_consensus_ai_safety_2026",
+          "alignment_remains_hard_unsolved_2026",
+          "metr_frontier_risk_report_2026"
+        ]
+      }
+    ],
+    "goalpost_monitor": [
+      {
+        "who": "Side A (alignment optimists)",
+        "original_claim": "We will solve alignment before AGI",
+        "shifted_claim": "Alignment is becoming more tractable — we are making progress on the right trajectory",
+        "shift_type": "weakening",
+        "detected_at": "node_2"
+      },
+      {
+        "who": "Side B (alignment skeptics)",
+        "original_claim": "Alignment is impossible without fundamental breakthroughs",
+        "shifted_claim": "Current evidence of tractability is misleading and may generate dangerous false confidence",
+        "shift_type": "refinement",
+        "detected_at": "node_6"
+      }
+    ],
+    "agreement_map": {
+      "confirmed_agreements": [
+        "Alignment is a critical unsolved problem",
+        "Empirical evaluation of frontier models is valuable regardless of theoretical stance",
+        "No single alignment technique should be trusted in isolation"
+      ],
+      "narrowed_disagreement": "Whether the current trajectory of alignment research — interpretability, Constitutional AI, empirical safety evaluations — provides genuine evidence of tractability or generates systematically misleading confidence that masks deeper unsolved problems"
+    },
+    "burden_of_proof": [
+      {
+        "who": "Side A",
+        "claim": "Alignment is becoming more tractable through empirical advances",
+        "evidence_provided": true,
+        "evidence_quality": "moderate",
+        "status": "partially_fulfilled"
+      },
+      {
+        "who": "Side B",
+        "claim": "Current alignment evidence is misleading and fundamental problems remain unsolved",
+        "evidence_provided": true,
+        "evidence_quality": "strong",
+        "status": "fulfilled"
+      }
+    ],
+    "audience_sentiment": {
+      "initial_lean": {
+        "side_a": 0.4,
+        "side_b": 0.35,
+        "undecided": 0.25
+      },
+      "pivotal_moments": [
+        {
+          "node_id": "node_6",
+          "shift_description": "Irving et al.'s argument about catastrophically misleading automated alignment assessments introduces a structural concern that is difficult to dismiss",
+          "sentiment_after": {
+            "side_a": 0.3,
+            "side_b": 0.45,
+            "undecided": 0.25
+          }
+        },
+        {
+          "node_id": "node_9",
+          "shift_description": "The rebuttal that defence-in-depth is standard engineering practice partially recovers the tractability argument",
+          "sentiment_after": {
+            "side_a": 0.35,
+            "side_b": 0.4,
+            "undecided": 0.25
+          }
+        }
+      ]
+    },
+    "scoring_rubric": {
+      "side_a": {
+        "logical_consistency": 7,
+        "evidence_quality": 7,
+        "responsiveness": 7,
+        "steel_manning": 6,
+        "novel_insight": 7
+      },
+      "side_b": {
+        "logical_consistency": 9,
+        "evidence_quality": 8,
+        "responsiveness": 8,
+        "steel_manning": 8,
+        "novel_insight": 9
+      }
+    },
+    "meta": {
+      "corpora_involved": [
+        "arxiv",
+        "dwarkesh",
+        "metr",
+        "lesswrong"
+      ],
+      "total_sources": 7,
+      "key_tension": "Whether alignment tractability claims are grounded in genuine empirical progress or reflect an epistemological trap where AI systems optimizing for appearing aligned produce systematically misleading evidence of safety"
+    },
+    "positions": [
+      {
+        "entry_url_or_id": "amodei_dario_dwarkesh_2026_end_of_exponential",
+        "corpus": "dwarkesh-lab-insiders",
+        "side": "a",
+        "stance_summary": "Dario Amodei argues safety and capabilities are complementary; alignment is tractable",
+        "relevance_score": 10
+      },
+      {
+        "entry_url_or_id": "metr_frontier_risk_report_2026",
+        "corpus": "metr-evals-metrics",
+        "side": "a",
+        "stance_summary": "METR empirical assessment: current models not yet showing dangerous misalignment",
+        "relevance_score": 9
+      },
+      {
+        "entry_url_or_id": "positive_alignment_flourishing_2026",
+        "corpus": "arxiv-ai-safety",
+        "side": "a",
+        "stance_summary": "Positive alignment reframes the problem toward human flourishing, suggesting new tractable directions",
+        "relevance_score": 8
+      },
+      {
+        "entry_url_or_id": "automated_alignment_harder_2026",
+        "corpus": "arxiv-ai-safety",
+        "side": "b",
+        "stance_summary": "Irving et al. argue automated alignment could produce catastrophically misleading safety assessments",
+        "relevance_score": 10
+      },
+      {
+        "entry_url_or_id": "singapore_consensus_ai_safety_2026",
+        "corpus": "arxiv-ai-safety",
+        "side": "b",
+        "stance_summary": "Defence-in-depth model assumes alignment is NOT solved and prescribes layered defences",
+        "relevance_score": 9
+      },
+      {
+        "entry_url_or_id": "alignment_remains_hard_unsolved_2026",
+        "corpus": "lesswrong",
+        "side": "b",
+        "stance_summary": "Argues against premature confidence; benchmark performance does not equal alignment",
+        "relevance_score": 9
+      }
+    ],
+    "cross_corpus_references": [
+      {
+        "from_corpus": "arxiv-ai-safety",
+        "from_id": "automated_alignment_harder_2026",
+        "to_corpus": "dwarkesh-lab-insiders",
+        "to_id": "amodei_dario_dwarkesh_2026_end_of_exponential",
+        "relationship": "directly_challenges_claims_in",
+        "relevance_score": 9
+      },
+      {
+        "from_corpus": "arxiv-ai-safety",
+        "from_id": "singapore_consensus_ai_safety_2026",
+        "to_corpus": "metr-evals-metrics",
+        "to_id": "metr_frontier_risk_report_2026",
+        "relationship": "prescribes_methodology_validated_by",
+        "relevance_score": 8
+      },
+      {
+        "from_corpus": "lesswrong",
+        "from_id": "alignment_remains_hard_unsolved_2026",
+        "to_corpus": "arxiv-ai-safety",
+        "to_id": "automated_alignment_harder_2026",
+        "relationship": "reinforces_skepticism_of",
+        "relevance_score": 8
+      },
+      {
+        "from_corpus": "arxiv-ai-safety",
+        "from_id": "positive_alignment_flourishing_2026",
+        "to_corpus": "dwarkesh-lab-insiders",
+        "to_id": "amodei_dario_dwarkesh_2026_end_of_exponential",
+        "relationship": "complements_optimism_of",
+        "relevance_score": 7
+      }
+    ]
+  },
+  {
+    "id": "debate_ai_labor_displacement_timeline",
+    "title": "Will AI Displace Entry-Level Knowledge Workers Within 5 Years?",
+    "category": "forecasting_disagreement",
+    "question": "Will AI automate a majority of entry-level white-collar jobs within 5 years, as some lab leaders predict?",
+    "status": "active",
+    "premise_extraction": {
+      "shared_premises": [
+        "AI capabilities for knowledge work tasks are improving rapidly and measurably",
+        "Some entry-level knowledge work tasks are already being automated or augmented by AI",
+        "The pace of AI deployment has economic, social, and political implications",
+        "Historical precedent shows technology-driven labor transitions create both disruption and opportunity"
+      ],
+      "contested_premises": [
+        {
+          "premise": "Exponential capability growth on benchmarks translates to exponential displacement of human workers",
+          "side_a_position": "METR's time horizon data shows agents solving increasingly complex tasks with a 7-month doubling period; Dario Amodei's 50% entry-level displacement prediction within 5 years follows from this trajectory",
+          "side_b_position": "Lab benchmarks measure structured tasks in controlled environments; real-world jobs involve social context, institutional knowledge, client relationships, and judgment that benchmarks do not capture",
+          "type": "empirical"
+        },
+        {
+          "premise": "The rate of institutional AI adoption will match the rate of technical capability growth",
+          "side_a_position": "Revenue growth in AI services and rapid enterprise adoption (ChatGPT Enterprise, Copilot, etc.) demonstrate that institutional friction is lower than skeptics assume",
+          "side_b_position": "Institutional adoption is constrained by regulation, liability concerns, workforce retraining, organizational inertia, and social factors that operate on multi-decade timescales",
+          "type": "empirical"
+        },
+        {
+          "premise": "Lab CEO predictions about labor displacement are well-calibrated forecasts",
+          "side_a_position": "Lab CEOs have the deepest visibility into frontier capabilities and internal R&D trajectories; their predictions are informed by non-public knowledge",
+          "side_b_position": "Lab CEOs have commercial incentives to project transformative impact; Zvi's analysis highlights specific calibration concerns with Dario's claims",
+          "type": "values"
+        }
+      ]
+    },
+    "argument_tree": {
+      "root": {
+        "id": "node_1",
+        "claim": "AI will automate a majority of entry-level white-collar jobs within 5 years, driven by exponential capability growth and rapid enterprise adoption",
+        "type": "thesis",
+        "children": [
+          {
+            "id": "node_2",
+            "claim": "Dario Amodei predicts 50% of entry-level white-collar jobs could disappear within 5 years based on frontier capability trajectories",
+            "type": "support",
+            "source": {
+              "corpus": "dwarkesh",
+              "entry_id": "amodei_dario_dwarkesh_2026_end_of_exponential",
+              "title": "We Are Near the End of the Exponential",
+              "author": "Dario Amodei",
+              "date": "2026-02-05"
+            },
+            "evidence_strength": "moderate",
+            "fact_check_status": "verified",
+            "children": [
+              {
+                "id": "node_3",
+                "claim": "Zvi Mowshowitz's analysis of Dario's claims identifies specific calibration concerns — CEO predictions are shaped by commercial incentives and asymmetric reputational rewards for bold forecasts",
+                "type": "attack",
+                "source": {
+                  "corpus": "lesswrong",
+                  "entry_id": "zvi_on_dario_amodei_dwarkesh_2026",
+                  "title": "On Dwarkesh Patel's 2026 Podcast With Dario Amodei",
+                  "author": "Zvi Mowshowitz",
+                  "date": "2026-02-16"
+                },
+                "evidence_strength": "moderate",
+                "fact_check_status": "verified",
+                "children": []
+              }
+            ]
+          },
+          {
+            "id": "node_4",
+            "claim": "METR's time horizon data shows AI agents solving tasks requiring weeks of human effort, with a 7-month doubling period that has recently accelerated",
+            "type": "support",
+            "source": {
+              "corpus": "metr",
+              "entry_id": "metr_time_horizon_1_1_2026",
+              "title": "Time Horizon 1.1: Expanded Long-Horizon Task Benchmark",
+              "author": "METR",
+              "date": "2026-01-15"
+            },
+            "evidence_strength": "strong",
+            "fact_check_status": "verified",
+            "children": [
+              {
+                "id": "node_5",
+                "claim": "METR's own caveats about external validity apply: time horizon measurements are on structured tasks in controlled environments, and the mapping from benchmark performance to real-world job displacement is uncertain",
+                "type": "qualification",
+                "source": {
+                  "corpus": "metr",
+                  "entry_id": "metr_time_horizon_1_1_2026",
+                  "title": "Time Horizon 1.1: Expanded Long-Horizon Task Benchmark",
+                  "author": "METR",
+                  "date": "2026-01-15"
+                },
+                "evidence_strength": "strong",
+                "fact_check_status": "verified",
+                "children": []
+              }
+            ]
+          },
+          {
+            "id": "node_6",
+            "claim": "The International AI Safety Report notes economists disagree on magnitude — some expect job losses offset by new creation, others argue widespread automation could significantly reduce employment",
+            "type": "qualification",
+            "source": {
+              "corpus": "arxiv",
+              "entry_id": "international_ai_safety_report_2026",
+              "title": "International AI Safety Report 2026",
+              "author": "Yoshua Bengio et al.",
+              "date": "2026-01-01"
+            },
+            "evidence_strength": "strong",
+            "fact_check_status": "verified",
+            "children": [
+              {
+                "id": "node_7",
+                "claim": "The IAISR's framing of genuine disagreement among economists suggests the 5-year displacement prediction is far from consensus, even among experts who agree capabilities are advancing rapidly",
+                "type": "support",
+                "source": {
+                  "corpus": "arxiv",
+                  "entry_id": "international_ai_safety_report_2026",
+                  "title": "International AI Safety Report 2026",
+                  "author": "Yoshua Bengio et al.",
+                  "date": "2026-01-01"
+                },
+                "evidence_strength": "moderate",
+                "fact_check_status": "verified",
+                "children": []
+              }
+            ]
+          },
+          {
+            "id": "node_8",
+            "claim": "Historical precedent consistently shows automation anxiety exceeding actual displacement — ATMs did not eliminate bank tellers, spreadsheets did not eliminate accountants, automated trading did not eliminate traders",
+            "type": "attack",
+            "source": {
+              "corpus": "lesswrong",
+              "entry_id": "zvi_on_dario_amodei_dwarkesh_2026",
+              "title": "On Dwarkesh Patel's 2026 Podcast With Dario Amodei",
+              "author": "Zvi Mowshowitz",
+              "date": "2026-02-16"
+            },
+            "evidence_strength": "moderate",
+            "fact_check_status": "verified",
+            "children": [
+              {
+                "id": "node_9",
+                "claim": "This time may genuinely be different: previous automation targeted specific tasks while AI can handle diverse cognitive tasks simultaneously, and METR's time horizon acceleration suggests capabilities are growing faster than historical analogues",
+                "type": "attack",
+                "source": {
+                  "corpus": "metr",
+                  "entry_id": "metr_time_horizon_1_1_2026",
+                  "title": "Time Horizon 1.1: Expanded Long-Horizon Task Benchmark",
+                  "author": "METR",
+                  "date": "2026-01-15"
+                },
+                "evidence_strength": "moderate",
+                "fact_check_status": "verified",
+                "children": []
+              }
+            ]
+          },
+          {
+            "id": "node_10",
+            "claim": "The Great American AI Act includes a 'Workforce' title specifically addressing AI displacement, suggesting policymakers take the threat seriously enough to legislate but view it as manageable through policy intervention",
+            "type": "qualification",
+            "source": {
+              "corpus": "ai_laws",
+              "entry_id": "us_great_american_ai_act_2026",
+              "title": "Great American Artificial Intelligence Act of 2026 (Discussion Draft)",
+              "author": "U.S. Congress",
+              "date": "2026-06-04"
+            },
+            "evidence_strength": "moderate",
+            "fact_check_status": "verified",
+            "children": [
+              {
+                "id": "node_11",
+                "claim": "The presence of workforce provisions in the Act implies policymakers believe displacement is real enough to legislate against but gradual enough to manage — a middle position between 'no displacement' and '50% in 5 years'",
+                "type": "support",
+                "source": {
+                  "corpus": "ai_laws",
+                  "entry_id": "us_great_american_ai_act_2026",
+                  "title": "Great American Artificial Intelligence Act of 2026 (Discussion Draft)",
+                  "author": "U.S. Congress",
+                  "date": "2026-06-04"
+                },
+                "evidence_strength": "moderate",
+                "fact_check_status": "verified",
+                "children": []
+              }
+            ]
+          },
+          {
+            "id": "node_12",
+            "claim": "Institutional friction — regulation, liability, retraining, organizational inertia — operates on timescales of years to decades, not months, creating a structural brake on displacement speed regardless of technical capability",
+            "type": "attack",
+            "source": {
+              "corpus": "arxiv",
+              "entry_id": "international_ai_safety_report_2026",
+              "title": "International AI Safety Report 2026",
+              "author": "Yoshua Bengio et al.",
+              "date": "2026-01-01"
+            },
+            "evidence_strength": "moderate",
+            "fact_check_status": "verified",
+            "children": []
+          }
+        ]
+      }
+    },
+    "fact_layer": [
+      {
+        "claim": "Dario Amodei predicted 50% of entry-level white-collar jobs could disappear within 5 years",
+        "confidence": "green",
+        "sources": [
+          {
+            "corpus": "dwarkesh",
+            "entry_id": "amodei_dario_dwarkesh_2026_end_of_exponential",
+            "finding": "Amodei made this prediction during his February 2026 Dwarkesh Patel interview"
+          }
+        ],
+        "counter_evidence": [
+          {
+            "corpus": "lesswrong",
+            "entry_id": "zvi_on_dario_amodei_dwarkesh_2026",
+            "finding": "Zvi identifies calibration concerns and asymmetric incentives shaping CEO predictions"
+          }
+        ]
+      },
+      {
+        "claim": "METR time horizons show a 7-month doubling period with recent acceleration to 131-day doubling",
+        "confidence": "green",
+        "sources": [
+          {
+            "corpus": "metr",
+            "entry_id": "metr_time_horizon_1_1_2026",
+            "finding": "Expanded benchmark confirms doubling trend and post-2023 acceleration"
+          }
+        ],
+        "counter_evidence": [
+          {
+            "corpus": "metr",
+            "entry_id": "metr_time_horizon_1_1_2026",
+            "finding": "METR caveats about external validity: structured tasks in controlled environments may not map to real-world job performance"
+          }
+        ]
+      },
+      {
+        "claim": "Economists genuinely disagree on the magnitude of AI labor displacement",
+        "confidence": "green",
+        "sources": [
+          {
+            "corpus": "arxiv",
+            "entry_id": "international_ai_safety_report_2026",
+            "finding": "IAISR documents active disagreement among labor economists on displacement magnitude and timeline"
+          }
+        ],
+        "counter_evidence": []
+      },
+      {
+        "claim": "The Great American AI Act includes workforce provisions addressing AI displacement",
+        "confidence": "green",
+        "sources": [
+          {
+            "corpus": "ai_laws",
+            "entry_id": "us_great_american_ai_act_2026",
+            "finding": "Discussion draft includes 'Workforce' title with displacement-related provisions"
+          }
+        ],
+        "counter_evidence": [
+          {
+            "corpus": "ai_laws",
+            "entry_id": "us_great_american_ai_act_2026",
+            "finding": "Still a discussion draft — not enacted law"
+          }
+        ]
+      }
+    ],
+    "fallacy_flags": [
+      {
+        "node_id": "node_2",
+        "fallacy_type": "appeal_to_authority",
+        "description": "Dario Amodei's prediction carries weight due to his position as Anthropic CEO, but CEO predictions in technology consistently overestimate adoption speed and underestimate institutional friction",
+        "confidence": "high",
+        "confirmed_by": "unconfirmed"
+      },
+      {
+        "node_id": "node_8",
+        "fallacy_type": "false_analogy",
+        "description": "Historical automation analogies (ATMs, spreadsheets) may not apply because AI targets cognitive tasks across domains simultaneously rather than specific mechanical tasks in single domains",
+        "confidence": "medium",
+        "confirmed_by": "unconfirmed"
+      },
+      {
+        "node_id": "node_9",
+        "fallacy_type": "special_pleading",
+        "description": "The 'this time is different' argument is structurally identical to claims made about every previous automation wave — it may be correct but requires stronger evidence than benchmark extrapolation",
+        "confidence": "medium",
+        "confirmed_by": "unconfirmed"
+      }
+    ],
+    "steel_man_assists": [
+      {
+        "for_side": "A",
+        "original_argument": "Exponential capability growth means rapid displacement",
+        "steel_manned_version": "METR's time horizon data is not an abstract benchmark — it measures how long a task an AI agent can complete end-to-end, a direct proxy for job-task substitutability. The 7-month doubling period (recently accelerated to 131 days) means the boundary of AI-automatable work is expanding at a pace unprecedented in industrial history. Unlike previous automation waves that targeted individual tasks in specific industries, AI simultaneously becomes competent at writing, coding, analysis, customer service, data entry, and other entry-level knowledge functions. Revenue growth across AI service providers confirms enterprises are adopting at scale, not merely experimenting. The structural case for rapid displacement is stronger than for any prior technology",
+        "source_support": [
+          "metr_time_horizon_1_1_2026",
+          "amodei_dario_dwarkesh_2026_end_of_exponential"
+        ]
+      },
+      {
+        "for_side": "B",
+        "original_argument": "Historical precedent and institutional friction will slow displacement",
+        "steel_manned_version": "METR's own external validity caveats are the strongest counterargument: structured benchmark tasks in controlled environments systematically overstate real-world job substitutability. Jobs are not task lists — they involve navigating organizational politics, building client relationships, exercising judgment under ambiguity, and handling the integration complexity that makes automating even 'routine' work expensive and risky. The IAISR documents that economists cannot agree on displacement magnitude, which means the 50% prediction is far outside expert consensus. The Great American AI Act's workforce provisions suggest policymakers view displacement as manageable — serious enough to legislate but not catastrophic. Every automation wave from power looms to ATMs to automated trading generated predictions of mass displacement that failed to materialize at the predicted speed, and the burden of proof falls on those claiming this time is fundamentally different",
+        "source_support": [
+          "metr_time_horizon_1_1_2026",
+          "international_ai_safety_report_2026",
+          "zvi_on_dario_amodei_dwarkesh_2026",
+          "us_great_american_ai_act_2026"
+        ]
+      }
+    ],
+    "goalpost_monitor": [
+      {
+        "who": "Side A (displacement accelerationists)",
+        "original_claim": "AI will replace most knowledge workers within a few years",
+        "shifted_claim": "50% of entry-level white-collar jobs could disappear within 5 years",
+        "shift_type": "refinement",
+        "detected_at": "node_2"
+      }
+    ],
+    "agreement_map": {
+      "confirmed_agreements": [
+        "AI capabilities for knowledge work tasks are improving rapidly",
+        "Some entry-level knowledge work will be automated by AI",
+        "The transition will create both disruption and opportunity",
+        "Policy interventions to manage workforce transition are warranted"
+      ],
+      "narrowed_disagreement": "Whether the 5-year timeline for majority displacement of entry-level white-collar work is realistic given institutional friction, external validity gaps in benchmarks, and historical precedent of automation predictions overshooting actual displacement speed"
+    },
+    "burden_of_proof": [
+      {
+        "who": "Side A",
+        "claim": "50% of entry-level white-collar jobs will disappear within 5 years",
+        "evidence_provided": true,
+        "evidence_quality": "moderate",
+        "status": "partially_fulfilled"
+      },
+      {
+        "who": "Side B",
+        "claim": "Institutional friction and historical precedent make 5-year mass displacement unlikely",
+        "evidence_provided": true,
+        "evidence_quality": "moderate",
+        "status": "partially_fulfilled"
+      }
+    ],
+    "audience_sentiment": {
+      "initial_lean": {
+        "side_a": 0.45,
+        "side_b": 0.3,
+        "undecided": 0.25
+      },
+      "pivotal_moments": [
+        {
+          "node_id": "node_5",
+          "shift_description": "METR's own caveats about external validity undermine the strongest quantitative evidence for rapid displacement",
+          "sentiment_after": {
+            "side_a": 0.35,
+            "side_b": 0.4,
+            "undecided": 0.25
+          }
+        },
+        {
+          "node_id": "node_9",
+          "shift_description": "The 'this time is different' rebuttal — AI targeting diverse cognitive tasks simultaneously — partially recovers the displacement argument",
+          "sentiment_after": {
+            "side_a": 0.4,
+            "side_b": 0.35,
+            "undecided": 0.25
+          }
+        }
+      ]
+    },
+    "scoring_rubric": {
+      "side_a": {
+        "logical_consistency": 7,
+        "evidence_quality": 7,
+        "responsiveness": 7,
+        "steel_manning": 6,
+        "novel_insight": 8
+      },
+      "side_b": {
+        "logical_consistency": 8,
+        "evidence_quality": 7,
+        "responsiveness": 8,
+        "steel_manning": 8,
+        "novel_insight": 7
+      }
+    },
+    "meta": {
+      "corpora_involved": [
+        "dwarkesh",
+        "metr",
+        "arxiv",
+        "lesswrong",
+        "ai_laws"
+      ],
+      "total_sources": 6,
+      "key_tension": "The core disagreement maps benchmark extrapolation against real-world complexity — METR's accelerating time horizons provide the strongest quantitative case for rapid displacement, but METR's own external validity caveats and the IAISR's documentation of expert disagreement suggest the 5-year timeline may be an artifact of confusing structured-task performance with holistic job substitutability"
+    },
+    "positions": [
+      {
+        "entry_url_or_id": "amodei_dario_dwarkesh_2026_end_of_exponential",
+        "corpus": "dwarkesh-lab-insiders",
+        "side": "a",
+        "stance_summary": "Dario Amodei predicts 50% of entry-level white-collar jobs could disappear within 5 years",
+        "relevance_score": 10
+      },
+      {
+        "entry_url_or_id": "metr_time_horizon_1_1_2026",
+        "corpus": "metr-evals-metrics",
+        "side": "a",
+        "stance_summary": "Time horizons doubling every 7 months; agents solving weeks-long human tasks",
+        "relevance_score": 10
+      },
+      {
+        "entry_url_or_id": "international_ai_safety_report_2026",
+        "corpus": "arxiv-ai-safety",
+        "side": "b",
+        "stance_summary": "IAISR: economists disagree on magnitude; some expect offset by new creation, others warn of significant displacement",
+        "relevance_score": 9
+      },
+      {
+        "entry_url_or_id": "zvi_on_dario_amodei_dwarkesh_2026",
+        "corpus": "lesswrong",
+        "side": "b",
+        "stance_summary": "Zvi's analysis identifies calibration concerns with Dario's predictions and CEO incentive structures",
+        "relevance_score": 9
+      },
+      {
+        "entry_url_or_id": "us_great_american_ai_act_2026",
+        "corpus": "ai-laws-policy",
+        "side": "b",
+        "stance_summary": "Act's workforce provisions suggest policymakers see displacement as manageable, not catastrophic",
+        "relevance_score": 8
+      }
+    ],
+    "cross_corpus_references": [
+      {
+        "from_corpus": "dwarkesh-lab-insiders",
+        "from_id": "amodei_dario_dwarkesh_2026_end_of_exponential",
+        "to_corpus": "metr-evals-metrics",
+        "to_id": "metr_time_horizon_1_1_2026",
+        "relationship": "prediction_informed_by",
+        "relevance_score": 9
+      },
+      {
+        "from_corpus": "lesswrong",
+        "from_id": "zvi_on_dario_amodei_dwarkesh_2026",
+        "to_corpus": "dwarkesh-lab-insiders",
+        "to_id": "amodei_dario_dwarkesh_2026_end_of_exponential",
+        "relationship": "critical_analysis_of",
+        "relevance_score": 10
+      },
+      {
+        "from_corpus": "arxiv-ai-safety",
+        "from_id": "international_ai_safety_report_2026",
+        "to_corpus": "metr-evals-metrics",
+        "to_id": "metr_time_horizon_1_1_2026",
+        "relationship": "cites_capability_evidence_from",
+        "relevance_score": 8
+      },
+      {
+        "from_corpus": "ai-laws-policy",
+        "from_id": "us_great_american_ai_act_2026",
+        "to_corpus": "dwarkesh-lab-insiders",
+        "to_id": "amodei_dario_dwarkesh_2026_end_of_exponential",
+        "relationship": "legislative_response_to_predictions_like",
+        "relevance_score": 7
+      }
+    ]
   }
 ]

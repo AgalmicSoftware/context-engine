@@ -63,6 +63,29 @@ export type SurveyResultsAnalysisGeneratedArtifactCompletionPlan = {
   usable: boolean;
 };
 
+export type SurveyResultsAnalysisGeneratedArtifactCompletionWritePort = (
+  artifact: SessionResultsGeneratedAnalysisArtifact
+) => Promise<unknown> | unknown;
+
+export type SurveyResultsAnalysisGeneratedArtifactCompletionRunnerPorts = {
+  writeArtifactToCache?: SurveyResultsAnalysisGeneratedArtifactCompletionWritePort;
+};
+
+export type SurveyResultsAnalysisGeneratedArtifactCompletionRunnerArgs = {
+  plan?: SurveyResultsAnalysisGeneratedArtifactCompletionPlan | null;
+  ports?: SurveyResultsAnalysisGeneratedArtifactCompletionRunnerPorts;
+};
+
+export type SurveyResultsAnalysisGeneratedArtifactCompletionRunnerResult = {
+  cacheWriteAttempted: boolean;
+  cacheWriteSucceeded: boolean;
+  error: unknown | null;
+  errorMessage: string;
+  lifecyclePatchDescriptor: SurveyResultsAnalysisLifecycleStatePatch | null;
+  ok: boolean;
+  plan: SurveyResultsAnalysisGeneratedArtifactCompletionPlan | null;
+};
+
 const buildFailurePatchDescriptor = (
   override: SurveyResultsAnalysisLifecycleStatePatch | null | undefined
 ): SurveyResultsAnalysisLifecycleStatePatch => (
@@ -176,5 +199,73 @@ export const buildSurveyResultsAnalysisGeneratedArtifactCompletionPlan = ({
     status: 'usable',
     target,
     usable: true,
+  };
+};
+
+export const runSurveyResultsAnalysisGeneratedArtifactCompletion = async ({
+  plan = null,
+  ports = {},
+}: SurveyResultsAnalysisGeneratedArtifactCompletionRunnerArgs = {}): Promise<SurveyResultsAnalysisGeneratedArtifactCompletionRunnerResult> => {
+  if (!plan?.usable) {
+    const blockedReason = plan?.blockedReason || 'missing-artifact';
+    return {
+      cacheWriteAttempted: false,
+      cacheWriteSucceeded: false,
+      error: null,
+      errorMessage: `Generated analysis artifact completion failed: ${blockedReason}`,
+      lifecyclePatchDescriptor: null,
+      ok: false,
+      plan,
+    };
+  }
+
+  if (plan.shouldWriteCache && plan.cacheWriteDescriptor) {
+    if (typeof ports.writeArtifactToCache !== 'function') {
+      return {
+        cacheWriteAttempted: false,
+        cacheWriteSucceeded: false,
+        error: null,
+        errorMessage: 'Generated analysis artifact completion cache write port is missing.',
+        lifecyclePatchDescriptor: null,
+        ok: false,
+        plan,
+      };
+    }
+
+    try {
+      await ports.writeArtifactToCache(plan.cacheWriteDescriptor.payload);
+    } catch (error) {
+      return {
+        cacheWriteAttempted: true,
+        cacheWriteSucceeded: false,
+        error,
+        errorMessage: 'Generated analysis artifact completion cache write failed.',
+        lifecyclePatchDescriptor: null,
+        ok: false,
+        plan,
+      };
+    }
+  }
+
+  if (!plan.lifecyclePatchDescriptor) {
+    return {
+      cacheWriteAttempted: false,
+      cacheWriteSucceeded: false,
+      error: null,
+      errorMessage: 'Generated analysis artifact completion did not produce a lifecycle patch.',
+      lifecyclePatchDescriptor: null,
+      ok: false,
+      plan,
+    };
+  }
+
+  return {
+    cacheWriteAttempted: plan.shouldWriteCache && !!plan.cacheWriteDescriptor,
+    cacheWriteSucceeded: plan.shouldWriteCache && !!plan.cacheWriteDescriptor,
+    error: null,
+    errorMessage: '',
+    lifecyclePatchDescriptor: plan.lifecyclePatchDescriptor,
+    ok: true,
+    plan,
   };
 };

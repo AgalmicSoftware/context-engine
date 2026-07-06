@@ -47,10 +47,10 @@ class AccountSection extends Component<AccountSectionProps> {
     const loggedIn = this.props.loginComplete;
     accountLog.log("AccountSection.tsx - loggedIn: ", loggedIn)
 
-    // Pre-compute blockie for all providers (fallback for wagmi/porto which lack social image)
+    // Pre-compute blockie for all providers (fallback for wagmi/passkey which lack social image)
     const blockieUrl = this.props.account ? generateBlockieDataUrl(this.props.account, 8, 4) : '';
 
-    // Standardized display: use AccountDisplayTorus for all logged-in states (Porto, Wagmi)
+    // Standardized display: use AccountDisplayTorus for all logged-in states (passkey wallet, Wagmi)
     const relevantAccountDisplay =
       <AccountDisplayTorus
         account={this.props.account || ''}

@@ -150,7 +150,7 @@ test('normalizeLitChipotleApiBase rejects unsafe API bases', () => {
   const rejectedBases = [
     'https://attacker.example',
     'http://api.chipotle.litprotocol.com',
-    'https://user:pass@api.chipotle.litprotocol.com',
+    'https://user:[redacted-email]',
     'https://api.chipotle.litprotocol.com.evil.example',
     'https://127.0.0.1:8787',
     'https://10.0.0.5',

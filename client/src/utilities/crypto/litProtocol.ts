@@ -137,9 +137,14 @@ type LitGetKeyCacheEntry = {
   value?: unknown;
   errMsg?: string;
 };
+type BufferBigUIntWriter = {
+  writeBigUInt64BE?: (value: string | number | bigint, offset?: number) => unknown;
+  writeBigUint64BE?: (value: string | number | bigint, offset?: number) => unknown;
+};
+
 type BufferCtorLike = {
-  prototype?: UnknownRecord;
-  alloc?: (size: number) => Uint8Array & UnknownRecord;
+  prototype?: BufferBigUIntWriter;
+  alloc?: (size: number) => Uint8Array & BufferBigUIntWriter;
 };
 
 declare global {
@@ -403,18 +408,19 @@ export const ensureLitBufferCompatibility = () => {
   if (!scope) return null;
 
   const runtimeBuffer = scope.Buffer;
+  const bundledBuffer = Buffer as BufferCtorLike;
   if (bufferHasBigUIntWrite(runtimeBuffer)) return runtimeBuffer;
 
-  if (bufferHasBigUIntWrite(Buffer as unknown as BufferCtorLike)) {
-    scope.Buffer = Buffer as unknown as BufferCtorLike;
+  if (bufferHasBigUIntWrite(bundledBuffer)) {
+    scope.Buffer = bundledBuffer;
     return scope.Buffer;
   }
 
   if (installBufferBigUIntWriteShim(runtimeBuffer)) {
     return runtimeBuffer;
   }
-  if (installBufferBigUIntWriteShim(Buffer as unknown as BufferCtorLike)) {
-    scope.Buffer = Buffer as unknown as BufferCtorLike;
+  if (installBufferBigUIntWriteShim(bundledBuffer)) {
+    scope.Buffer = bundledBuffer;
     return scope.Buffer;
   }
   return null;
@@ -423,7 +429,7 @@ export const ensureLitBufferCompatibility = () => {
 ensureLitBufferCompatibility();
 
 const logLit = (level: string, message: string, meta?: unknown) => {
-  const logger = log as unknown as Record<string, (...args: unknown[]) => void>;
+  const logger = log as Record<string, (...args: unknown[]) => void>;
   const fn = logger[level] || logger.log;
   if (meta === undefined) {
     fn(message);

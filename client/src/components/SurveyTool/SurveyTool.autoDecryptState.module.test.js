@@ -7,7 +7,7 @@ import {
   decideAutoDecryptBlocked,
   decideAutomaticPromptDecryptByKind,
 } from './surveyQuestionsDecryptEligibility.js';
-import * as portoFunctions from '../../utilities/web3/portoFunctions.js';
+import * as passkeyWallet from '../../wallet/passkeyWallet.js';
 
 describe('SurveyTool auto-decrypt state', () => {
   afterEach(() => {
@@ -17,10 +17,10 @@ describe('SurveyTool auto-decrypt state', () => {
   });
 
   it('clears auto-decrypt state when a blocked provider toggles auto-decrypt', () => {
-    const getPortoReady = jest.fn(() => true);
+    const getPasskeyReady = jest.fn(() => true);
 
-    expect(decideAutoDecryptBlocked('wagmi', getPortoReady)).toBe(true);
-    expect(getPortoReady).not.toHaveBeenCalled();
+    expect(decideAutoDecryptBlocked('wagmi', getPasskeyReady)).toBe(true);
+    expect(getPasskeyReady).not.toHaveBeenCalled();
     expect(buildAutoDecryptDisabledState()).toEqual({
       autoDecryptEnabled: false,
       decryptingByKey: {},
@@ -35,16 +35,16 @@ describe('SurveyTool auto-decrypt state', () => {
     // disables auto-decrypt and clears busy decrypt flags.
   });
 
-  it('allows Porto auto-decrypt only after session-key auto-sign is ready', () => {
-    jest.spyOn(portoFunctions, 'isPortoAutoSignReady').mockReturnValue(false);
-    const portoReady = () => portoFunctions.isPortoAutoSignReady();
+  it('allows passkey wallet auto-decrypt only after soft-session auto-sign is ready', () => {
+    jest.spyOn(passkeyWallet, 'isPasskeyWalletAutoSignReady').mockReturnValue(false);
+    const passkeyReady = () => passkeyWallet.isPasskeyWalletAutoSignReady();
 
-    expect(decideAutoDecryptBlocked('porto', portoReady)).toBe(true);
-    expect(decideAutomaticPromptDecryptByKind('porto', portoReady)).toBe(false);
+    expect(decideAutoDecryptBlocked('passkey-eoa', passkeyReady)).toBe(true);
+    expect(decideAutomaticPromptDecryptByKind('passkey-eoa', passkeyReady)).toBe(false);
 
-    portoFunctions.isPortoAutoSignReady.mockReturnValue(true);
-    expect(decideAutoDecryptBlocked('porto', portoReady)).toBe(false);
-    expect(decideAutomaticPromptDecryptByKind('porto', portoReady)).toBe(true);
+    passkeyWallet.isPasskeyWalletAutoSignReady.mockReturnValue(true);
+    expect(decideAutoDecryptBlocked('passkey-eoa', passkeyReady)).toBe(false);
+    expect(decideAutomaticPromptDecryptByKind('passkey-eoa', passkeyReady)).toBe(true);
   });
 
   it('clears blocked auto-decrypt sweep internals through the shared helper', () => {

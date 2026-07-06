@@ -17,6 +17,16 @@ import {
 import {
   normalizeEmbeddedDeployHelperEnabled,
 } from '../shared/deployHelperCore.mjs';
+import {
+  rewrapStorageEnvelopeSessionKeyForDeployment,
+  rotateStorageEnvelopeKeys,
+} from './storageEnvelopeEncryption.js';
+import {
+  exportCloudflareEncryptedPayloadEnvelopes,
+} from './storageRouteExecution.js';
+import {
+  dispatchAdminWorkerGroupRequest,
+} from './workerGroups.js';
 
 const ALLOWED_SECRET_KEYS = [
   'openaiKey',
@@ -131,6 +141,26 @@ export const dispatchAdminRequest = async ({
     headers,
     targetSlug,
   } = authorityResult;
+
+  if (action?.startsWith?.('groups/')) {
+    const response = await (deps?.dispatchAdminWorkerGroupRequest || dispatchAdminWorkerGroupRequest)({
+      action,
+      body,
+      env,
+      slug: targetSlug,
+      adminAddress: authorityResult.address || body?.address,
+      headers,
+      deps: {
+        json: deps?.json,
+        isAddress: deps?.isAddress,
+        getAddress: deps?.getAddress,
+        now: deps?.now,
+        randomUUID: deps?.randomUUID,
+        getRandomValues: deps?.getRandomValues,
+      },
+    });
+    if (response) return response;
+  }
 
   if (action === 'set-config') {
     const incoming = buildSetConfigIncomingConfig({
@@ -289,6 +319,89 @@ export const dispatchAdminRequest = async ({
     });
     await deps?.putSessionConfig?.(env, targetSlug, merged);
     return deps?.json?.({ ok: true }, 200, headers);
+  }
+
+  if (action === 'rotate-envelope-keys') {
+    try {
+      const result = await (deps?.rotateStorageEnvelopeKeys || rotateStorageEnvelopeKeys)({
+        env,
+        slug: targetSlug,
+        config: existingConfig,
+        deps: {
+          putSessionConfig: deps?.putSessionConfig,
+          now: deps?.now,
+          randomBytes: deps?.randomBytes,
+          getRandomValues: deps?.getRandomValues,
+          randomUUID: deps?.randomUUID,
+          getStorageEnvelopeKek: deps?.getStorageEnvelopeKek,
+        },
+      });
+      return deps?.json?.({
+        ok: true,
+        rotatedAt: result.rotatedAt,
+        payloadsRewrapped: result.payloadsRewrapped,
+      }, 200, headers);
+    } catch (error) {
+      return deps?.json?.({ error: error?.message || 'Storage envelope key rotation failed.' }, 500, headers);
+    }
+  }
+
+  if (action === 'export-storage-envelopes') {
+    try {
+      const result = await (deps?.exportCloudflareEncryptedPayloadEnvelopes || exportCloudflareEncryptedPayloadEnvelopes)({
+        env,
+        slug: targetSlug,
+        config: existingConfig,
+        resource: toTrimmedString(body?.resource),
+        includeSessionEnvelope: true,
+        deps: {
+          now: deps?.now,
+        },
+      });
+      return deps?.json?.(
+        result?.ok ? result : { error: result?.error || 'Encrypted-envelope export failed.' },
+        result?.ok ? 200 : (result?.status || 500),
+        headers,
+      );
+    } catch (error) {
+      return deps?.json?.({ error: error?.message || 'Encrypted-envelope export failed.' }, 500, headers);
+    }
+  }
+
+  if (action === 'rewrap-envelope-deployment-key') {
+    const newDeploymentKek = toTrimmedString(
+      body?.newDeploymentKek ||
+      body?.deploymentKek ||
+      body?.newKek
+    );
+    if (!newDeploymentKek) {
+      return deps?.json?.({ error: 'Missing newDeploymentKek.' }, 400, headers);
+    }
+    try {
+      const result = await (
+        deps?.rewrapStorageEnvelopeSessionKeyForDeployment ||
+        rewrapStorageEnvelopeSessionKeyForDeployment
+      )({
+        env,
+        slug: targetSlug,
+        config: existingConfig,
+        newDeploymentKek,
+        deps: {
+          putSessionConfig: deps?.putSessionConfig,
+          now: deps?.now,
+          randomBytes: deps?.randomBytes,
+          getRandomValues: deps?.getRandomValues,
+          getStorageEnvelopeKek: deps?.getStorageEnvelopeKek,
+        },
+      });
+      return deps?.json?.({
+        ok: true,
+        rewrappedAt: result.rewrappedAt,
+        keyProvider: result.keyProvider || 'worker_secret',
+      }, 200, headers);
+    } catch (error) {
+      return deps?.json?.({ error: error?.message || 'Storage envelope deployment re-wrap failed.' }, 500, headers);
+    }
   }
 
   if (action === 'issue-sponsored-grants') {

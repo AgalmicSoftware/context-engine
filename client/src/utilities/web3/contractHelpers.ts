@@ -16,27 +16,37 @@ import { extractChainId } from './chainIdResolution.js';
 
 type SessionConfigLike = {
   slug?: string;
+  chainId?: number | string | null;
   networkChainId?: number | string | null;
+  registryChainId?: number | string | null;
+  sessionId?: string | null;
   contracts?: {
     surveys?: {
       chainId?: number | string | null;
       address?: string | null;
-      [key: string]: any;
+      [key: string]: unknown;
     };
     sbtFactory?: {
       chainId?: number | string | null;
       address?: string | null;
-      [key: string]: any;
+      [key: string]: unknown;
     };
-    [key: string]: any;
+    [key: string]: unknown;
   };
   blockLimits?: {
     start?: unknown;
     end?: unknown;
-    [key: string]: any;
+    [key: string]: unknown;
+  };
+  __registry?: {
+    chainId?: number | string | null;
+    registryChainId?: number | string | null;
+    sessionId?: string | null;
+    sessionIdHex?: string | null;
+    [key: string]: unknown;
   };
   __forceLatestBlock?: boolean;
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 type GroupKeyOrCfg = SessionConfigLike | string | null | undefined;
@@ -46,17 +56,17 @@ type RpcMetaLike = {
   providerMode?: string | null;
   providerLabel?: string | null;
   skipGlobalPreferred?: boolean;
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 type ReadProviderLike = {
   getBlockNumber?: () => Promise<number>;
-  getGasPrice?: () => Promise<any>;
-  getBlock?: (blockNumber: number | string) => Promise<any>;
-  getLogs?: (filter: any) => Promise<any[]>;
-  getBalance?: (address: string) => Promise<any>;
+  getGasPrice?: () => Promise<ethers.BigNumber>;
+  getBlock?: (blockNumber: number | string) => Promise<ethers.providers.Block>;
+  getLogs?: (filter: ethers.providers.Filter) => Promise<ethers.providers.Log[]>;
+  getBalance?: (address: string) => Promise<ethers.BigNumber>;
   __CE_RPC_META?: RpcMetaLike;
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 type AsyncCacheSlot<T> = {
@@ -65,20 +75,20 @@ type AsyncCacheSlot<T> = {
   ts: number;
 };
 
-type LatestBlockCache = Map<string, { block: number; timestamp: number } | any> & {
+type LatestBlockCache = Map<string, { block: number; timestamp: number }> & {
   value?: number | null;
   promise?: Promise<number> | null;
   ts?: number;
   _map?: Record<string, AsyncCacheSlot<number>>;
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
-type GasPriceCache = Map<string, any> & {
-  value?: any;
-  promise?: Promise<any> | null;
+type GasPriceCache = Map<string, ethers.BigNumber> & {
+  value?: ethers.BigNumber | null;
+  promise?: Promise<ethers.BigNumber> | null;
   ts?: number;
-  _map?: Record<string, AsyncCacheSlot<any>>;
-  [key: string]: any;
+  _map?: Record<string, AsyncCacheSlot<ethers.BigNumber>>;
+  [key: string]: unknown;
 };
 
 type ContractsLogger = {
@@ -90,8 +100,13 @@ type ContractsLogger = {
 type FundingError = Error & {
   stage?: string;
   status?: number;
-  reason?: string;
+  reason?: unknown;
   details?: unknown;
+};
+
+type ScopeDecisionLike = {
+  allowed?: boolean;
+  [key: string]: unknown;
 };
 
 type RequestContext = {
@@ -99,7 +114,7 @@ type RequestContext = {
   providerLike?: string;
   chainId?: number | string | null;
   networkChainId?: number | string | null;
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 type SendTestnetFundsOptions = {
@@ -110,19 +125,21 @@ type SendTestnetFundsOptions = {
   hashedPassword?: string | null;
   groupPasswordHash?: string | null;
   signature?: string | null;
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 type LatestBlockOptions = {
   contractKey?: string | null;
   force?: boolean;
-  [key: string]: any;
+  _resolvedCfg?: unknown;
+  [key: string]: unknown;
 };
 
 type RelevantBlockWindowOptions = {
   contractKey?: string | null;
   __forceLatestBlock?: boolean;
-  [key: string]: any;
+  _resolvedCfg?: unknown;
+  [key: string]: unknown;
 };
 
 type ProviderScopeCacheKeyArgs = {
@@ -150,20 +167,20 @@ type StoreState = {
     network?: {
       id?: number | string | null;
       chainId?: number | string | null;
-      [key: string]: any;
+      [key: string]: unknown;
     };
-    [key: string]: any;
+    [key: string]: unknown;
   };
   sessionState?: {
     activeSessionSlug?: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 type StoreLike = {
-  getState?: () => StoreState | any;
-  [key: string]: any;
+  getState?: () => StoreState;
+  [key: string]: unknown;
 };
 
 type ContractHelperDeps = {
@@ -171,7 +188,7 @@ type ContractHelperDeps = {
   latestBlockCache: LatestBlockCache;
   gasPriceCache: GasPriceCache;
   BLOCK_CACHE_MS: number;
-  getReadProviderForGroup: (groupKeyOrCfg: GroupKeyOrCfg, opts?: { contractKey?: string }) => any;
+  getReadProviderForGroup: (groupKeyOrCfg: GroupKeyOrCfg, opts?: { contractKey?: string }) => ReadProviderLike;
   shouldLog: (category: string, level?: string) => boolean;
   rpcLog: (...args: unknown[]) => void;
   callWithRetry: <T>(
@@ -182,21 +199,21 @@ type ContractHelperDeps = {
   MAX_CACHE_SIZE: number;
   isLogsRangeTooLargeError: (error: unknown) => boolean;
   contractsLog: ContractsLogger;
-  getReadProviderForChain: ((chainId: number | string | undefined) => any) | null | undefined;
+  getReadProviderForChain: ((chainId: number | string | undefined) => ReadProviderLike) | null | undefined;
   normalizeSessionSlug: (slug: string) => string;
   shouldBypassSessionScopeWindow: (
     groupKeyOrCfg: GroupKeyOrCfg,
     cfg: SessionConfigLike | null | undefined
   ) => boolean;
-  getScopeDecisionForSlug: (slug: string) => any;
-  logScopeWindowSkipOnce: (decision: any) => void;
+  getScopeDecisionForSlug: (slug: string) => ScopeDecisionLike;
+  logScopeWindowSkipOnce: (decision: ScopeDecisionLike) => void;
   parsePositiveBlockNumber: (value: unknown) => number | null | undefined;
   resolveSessionStartFromRegistry: (args: {
     cfg: SessionConfigLike | null | undefined;
     slug: string;
   }) => Promise<number | null | undefined>;
   DEFAULT_CHAIN_ID: number;
-  store: StoreLike | any;
+  store: StoreLike;
   getSessionConfigBySlug: (slug: string) => SessionConfigLike | null | undefined;
   refreshSessionRegistryFieldsCache?: ((args: {
     chainId?: number | string | null;
@@ -222,7 +239,7 @@ type ContractHelperDeps = {
 };
 
 type ContractBlockCacheEntry = {
-  block: any;
+  block: ethers.providers.Block;
   timestamp: number;
 };
 
@@ -233,24 +250,24 @@ type ContractHelperMethods = {
     groupKeyOrCfg?: GroupKeyOrCfg,
     opts?: LatestBlockOptions | null
   ) => Promise<number>;
-  getGasPrice: (groupKeyOrCfg?: GroupKeyOrCfg) => Promise<any>;
+  getGasPrice: (groupKeyOrCfg?: GroupKeyOrCfg) => Promise<ethers.BigNumber>;
   getBlockWithCaching: (
     this: ContractHelperMethods,
-    providerPassedIn: { getBlock: (blockNumber: number | string) => Promise<any> },
+    providerPassedIn: { getBlock: (blockNumber: number | string) => Promise<ethers.providers.Block> },
     blockNumber: number | string,
     providerName?: string,
     chainKey?: string
-  ) => Promise<any>;
+  ) => Promise<ethers.providers.Block>;
   fetchLogsSmart: (
     this: ContractHelperMethods,
-    filter: any,
+    filter: ethers.providers.Filter,
     fromBlock: number,
     toBlock: number,
     depth?: number,
     maxDepth?: number,
     groupKeyOrCfg?: GroupKeyOrCfg
-  ) => Promise<any[]>;
-  getNativeBalance: (address: string, groupKeyOrCfg?: GroupKeyOrCfg) => Promise<any>;
+  ) => Promise<ethers.providers.Log[]>;
+  getNativeBalance: (address: string, groupKeyOrCfg?: GroupKeyOrCfg) => Promise<ethers.BigNumber>;
   getRelevantBlockWindowForFilter: (
     this: ContractHelperMethods,
     groupKeyOrCfg: GroupKeyOrCfg,
@@ -260,7 +277,7 @@ type ContractHelperMethods = {
     recipientAddress: string,
     groupKeyOrCfg?: GroupKeyOrCfg,
     opts?: SendTestnetFundsOptions | null
-  ) => Promise<any>;
+  ) => Promise<Record<string, unknown>>;
   getGasPriceToDisplay: (this: ContractHelperMethods, groupKeyOrCfg?: GroupKeyOrCfg) => Promise<string>;
 };
 
@@ -272,6 +289,19 @@ const createFundingError = (
   message: string,
   extra: Partial<FundingError> = {}
 ): FundingError => Object.assign(new Error(message), extra);
+
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+  !!value && typeof value === 'object' && !Array.isArray(value)
+);
+
+const asSessionConfigLike = (value: unknown): SessionConfigLike | null => (
+  isRecord(value) ? value as SessionConfigLike : null
+);
+
+const readJsonRecord = async (response: Response): Promise<Record<string, unknown>> => {
+  const value = await response.json().catch(() => ({}));
+  return isRecord(value) ? value : {};
+};
 
 const isMissingLocalFaucetKeyFundingError = (error: unknown): boolean => {
   const fundingError = error as FundingError;
@@ -399,12 +429,8 @@ export function createContractHelperMethods(deps: ContractHelperDeps): ContractH
       opts: LatestBlockOptions | null = null
     ): Promise<number> {
       void providerName;
-      const cfg = (
-        opts &&
-        typeof opts === 'object' &&
-        opts._resolvedCfg &&
-        typeof opts._resolvedCfg === 'object'
-      ) ? opts._resolvedCfg : resolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
+      const cfg = asSessionConfigLike(opts?._resolvedCfg) ||
+        resolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
       const contractKey = String(opts?.contractKey || '').trim();
       const chId = resolveChainIdForRead(cfg, contractKey);
       const force = !!(opts && opts.force === true);
@@ -472,7 +498,7 @@ export function createContractHelperMethods(deps: ContractHelperDeps): ContractH
         });
     },
 
-    async getGasPrice(groupKeyOrCfg: GroupKeyOrCfg = null): Promise<any> {
+    async getGasPrice(groupKeyOrCfg: GroupKeyOrCfg = null): Promise<ethers.BigNumber> {
       const cfg = resolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
       const chId = resolveChainIdForRead(cfg, '');
       const provider = getReadProviderForGroup(groupKeyOrCfg) as ReadProviderLike;
@@ -510,7 +536,7 @@ export function createContractHelperMethods(deps: ContractHelperDeps): ContractH
         'getGasPrice',
         { op: 'getGasPrice', chainId: chId || null, groupKey }
       )
-        .then((bn: any) => {
+        .then((bn: ethers.BigNumber) => {
           slot.value = bn;
           slot.promise = null;
           slot.ts = Date.now();
@@ -528,11 +554,11 @@ export function createContractHelperMethods(deps: ContractHelperDeps): ContractH
 
     async getBlockWithCaching(
       this: ContractHelperMethods,
-      providerPassedIn: { getBlock: (blockNumber: number | string) => Promise<any> },
+      providerPassedIn: { getBlock: (blockNumber: number | string) => Promise<ethers.providers.Block> },
       blockNumber: number | string,
       providerName: string = 'none',
       chainKey: string = 'default'
-    ): Promise<any> {
+    ): Promise<ethers.providers.Block> {
       void providerName;
       const blockCache = this._blockCache!;
       const key = `${String(chainKey)}_${String(blockNumber)}`;
@@ -567,13 +593,13 @@ export function createContractHelperMethods(deps: ContractHelperDeps): ContractH
 
     async fetchLogsSmart(
       this: ContractHelperMethods,
-      filter: any,
+      filter: ethers.providers.Filter,
       fromBlock: number,
       toBlock: number,
       depth: number = 0,
       maxDepth: number = 20,
       groupKeyOrCfg: GroupKeyOrCfg = ''
-    ): Promise<any[]> {
+    ): Promise<ethers.providers.Log[]> {
       if (fromBlock > toBlock) return [];
       const rangeName = `logs[${fromBlock}-${toBlock}]`;
       const providerForLogs = getReadProviderForGroup(groupKeyOrCfg) as ReadProviderLike;
@@ -605,7 +631,7 @@ export function createContractHelperMethods(deps: ContractHelperDeps): ContractH
       }
     },
 
-    async getNativeBalance(address: string, groupKeyOrCfg: GroupKeyOrCfg = null): Promise<any> {
+    async getNativeBalance(address: string, groupKeyOrCfg: GroupKeyOrCfg = null): Promise<ethers.BigNumber> {
       if (!address || !ethers.utils.isAddress(address)) {
         contractsLog.warn('[getNativeBalance] invalid address supplied:', address);
         return ethers.BigNumber.from(0);
@@ -635,12 +661,7 @@ export function createContractHelperMethods(deps: ContractHelperDeps): ContractH
       groupKeyOrCfg: GroupKeyOrCfg,
       opts: RelevantBlockWindowOptions | null = null
     ): Promise<BlockWindow> {
-      const cfg = (
-        opts &&
-        typeof opts === 'object' &&
-        opts._resolvedCfg &&
-        typeof opts._resolvedCfg === 'object'
-      ) ? opts._resolvedCfg : resolveSession(groupKeyOrCfg || '');
+      const cfg = asSessionConfigLike(opts?._resolvedCfg) || resolveSession(groupKeyOrCfg || '');
       const slug = normalizeSessionSlug(cfg?.slug || '');
       const contractKey = String(opts?.contractKey || '').trim();
       const forceLatestBlock = !!(
@@ -738,7 +759,7 @@ export function createContractHelperMethods(deps: ContractHelperDeps): ContractH
       recipientAddress: string,
       groupKeyOrCfg: GroupKeyOrCfg = null,
       opts: SendTestnetFundsOptions | null = null
-    ): Promise<any> {
+    ): Promise<Record<string, unknown>> {
       try {
         if (!recipientAddress || !ethers.utils.isAddress(recipientAddress)) {
           throw new Error('Invalid recipient address');
@@ -799,7 +820,7 @@ export function createContractHelperMethods(deps: ContractHelperDeps): ContractH
           sessionSlug?: string | null;
           sessionConfig?: SessionConfigLike | null;
           workerUrlOverride?: string | null;
-        } = {}): Promise<any> => {
+        } = {}): Promise<Record<string, unknown>> => {
           const resolvedSessionSlugForRequest = normalizeSessionSlug(sessionSlug || '');
           let corsWorkerUrl = workerUrlOverride || '';
           if (!corsWorkerUrl) {
@@ -834,10 +855,10 @@ export function createContractHelperMethods(deps: ContractHelperDeps): ContractH
             }
           );
 
-          const data = await res.json().catch(() => ({} as Record<string, any>));
+          const data = await readJsonRecord(res);
           if (!res.ok) {
             throw createFundingError(
-              data?.error || `Faucet request failed (${res.status})`,
+              String(data?.error || `Faucet request failed (${res.status})`),
               {
                 stage: 'faucet-request',
                 status: Number(res.status || 0) || 0,
@@ -890,7 +911,7 @@ export function createContractHelperMethods(deps: ContractHelperDeps): ContractH
         }: {
           workerUrl?: string | null;
           faucetGrantToken?: string | null;
-        } = {}): Promise<any> => {
+        } = {}): Promise<Record<string, unknown>> => {
           const baseUrl = String(workerUrl || '').trim().replace(/\/+$/, '');
           if (!baseUrl || !faucetGrantToken) {
             throw new Error('Sponsored faucet bootstrap grant is unavailable.');
@@ -903,13 +924,13 @@ export function createContractHelperMethods(deps: ContractHelperDeps): ContractH
               to: recipientAddress,
             }),
           });
-          const data = await res.json().catch(() => ({} as Record<string, any>));
+          const data = await readJsonRecord(res);
           if (!res.ok) {
             if (Number(res.status || 0) === 404) {
               clearSponsoredBootstrapFaucetGrantToken();
             }
             throw createFundingError(
-              data?.error || `Faucet request failed (${res.status})`,
+              String(data?.error || `Faucet request failed (${res.status})`),
               {
                 stage: 'faucet-request',
                 status: Number(res.status || 0) || 0,

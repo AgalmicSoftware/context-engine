@@ -8,13 +8,12 @@ Use it for new files, refactors, and cleanup PRs. Legacy exceptions stay listed 
 - `client/` holds the React SPA, frontend assets, and frontend-adjacent tests.
 - `workers/` holds Cloudflare Worker source and worker-specific support files.
 - `contracts/` holds Solidity contracts, interfaces, and contract-focused tests.
-- `script/` holds Foundry Solidity deploy scripts. Keep the singular name; it matches Foundry conventions.
 - `scripts/` holds automation, seeding, audits, migration helpers, and E2E entrypoints.
+- `foundry/` holds Foundry-specific Solidity entry points; `foundry/script/` and `foundry/test/` intentionally keep Foundry's singular directory names one level below repo root.
 - `docs/` holds canonical implementation and operations documentation.
 - `TODO/` is an ignored local area for private planning notes and unshipped work items.
 - `contextEngine-cc/` holds the local Claude Code companion integration.
-- `test/` holds source-of-truth root Foundry and Node test files when source-adjacent tests are not practical.
-- `tests/` is an index/symlink view over selected test surfaces. Do not assume it is the source of truth.
+- `tests/` holds source-of-truth root Node/Jest test harnesses that are not practical to colocate elsewhere; shared helpers live under `tests/helpers/`.
 - `artifacts/`, `broadcast/`, `cache/`, `dist/`, `out/`, and `tmp/` are generated or runtime output locations and are not canonical homes for new source files.
 - New top-level directories are rare. Reuse an existing root area unless the new code has a clearly separate runtime, deployment surface, or ownership boundary.
 

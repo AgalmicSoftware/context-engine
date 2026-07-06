@@ -67,6 +67,7 @@ type RegistryGateSnapshot = {
 };
 type RegistryGateMap = Record<string, RegistryGateSnapshot | AnyRecord | undefined>;
 type RegistryCache = AnyRecord;
+type SessionRegistryCacheEntry = [string, unknown];
 
 const REGISTRY_CACHE_KEY = 'dg:sessionRegistryCache:v1';
 export const SESSION_REGISTRY_CACHE_UPDATED_EVENT = 'ce:session-registry-cache-updated';
@@ -83,6 +84,27 @@ const DEFAULT_RESOURCES = [
   'txGas',
   'lit',
 ];
+const REGISTRY_CHAIN_LOAD_CONCURRENCY = 2;
+const REGISTRY_SESSION_LOAD_CONCURRENCY = 4;
+
+const mapWithConcurrency = async <T, R>(
+  items: T[] = [],
+  limitIn: number = 4,
+  mapper: (item: T, index: number) => Promise<R>
+): Promise<R[]> => {
+  const results = new Array<R>(items.length);
+  const limit = Math.max(1, Math.min(items.length || 1, Math.floor(Number(limitIn) || 1)));
+  let nextIndex = 0;
+  const workers = Array.from({ length: limit }, async () => {
+    while (nextIndex < items.length) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      results[currentIndex] = await mapper(items[currentIndex], currentIndex);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+};
 const SPONSORED_FIELD_KEYS = {
   ai: 'sponsored_ai',
   rpc: 'sponsored_rpc',
@@ -1490,10 +1512,13 @@ export const fetchSessionFromRegistry = async ({
   }
 
   const gatesByResource: RegistryGateMap = {};
-  for (const resourceKey of DEFAULT_RESOURCES) {
+  const gateEntries = await Promise.all(DEFAULT_RESOURCES.map(async (resourceKey) => {
     const gate = await fetchGateForResource(contract, session.slug, resourceKey);
+    return { resourceKey, gate };
+  }));
+  gateEntries.forEach(({ resourceKey, gate }) => {
     gatesByResource[resourceKey] = gate;
-  }
+  });
 
   const fieldsByKey = await fetchSessionFields(contract, session.slug);
 
@@ -1669,22 +1694,21 @@ export const loadSessionRegistryCache = async ({
     sessionsById: {},
   };
 
-  for (const chainId of ids) {
+  const chainResults = await mapWithConcurrency(ids, REGISTRY_CHAIN_LOAD_CONCURRENCY, async (chainId) => {
     const addr = resolveRegistryAddress(chainId);
-    if (!addr) continue;
+    if (!addr) return null;
     const contract = getRegistryContract(
       chainId,
       walletProvider && walletChainId === Number(chainId || 0) ? walletProvider : null,
       { bootstrapRpc: useBootstrapRpc }
     );
-    if (!contract) continue;
+    if (!contract) return null;
 
     let count = 0;
     try {
       count = Number(await contract.getSessionCount());
     } catch (_) {
-      hadLoadErrors = true;
-      continue;
+      return { chainId, chainEntry: null, configs: [], hadLoadErrors: true };
     }
 
     const chainEntry: RegistryCache = {
@@ -1694,24 +1718,23 @@ export const loadSessionRegistryCache = async ({
       sessionsById: {},
     };
 
-    for (let i = 0; i < count; i += 1) {
+    const sessionIndexes = Array.from({ length: Math.max(0, Math.floor(count)) }, (_entry, index) => index);
+    const sessionResults = await mapWithConcurrency(sessionIndexes, REGISTRY_SESSION_LOAD_CONCURRENCY, async (i) => {
       let slug = '';
       try {
         slug = await contract.getSessionSlugByIndex(i);
       } catch (_) {
-        hadLoadErrors = true;
-        continue;
+        return { config: null, hadLoadErrors: true };
       }
-      if (!slug) continue;
+      if (!slug) return { config: null, hadLoadErrors: false };
       let tuple = null;
       try {
         tuple = await contract.getSessionBySlug(slug);
       } catch (_) {
-        hadLoadErrors = true;
-        continue;
+        return { config: null, hadLoadErrors: true };
       }
       const session = decodeSessionTuple(tuple);
-      if (!session) continue;
+      if (!session) return { config: null, hadLoadErrors: false };
 
       let metadata = null;
       const hasMetadataUri = !!(session.metadataURI || session.encryptedMetadataURI);
@@ -1737,10 +1760,13 @@ export const loadSessionRegistryCache = async ({
       }
 
       const gatesByResource: RegistryGateMap = {};
-      for (const resourceKey of DEFAULT_RESOURCES) {
+      const gateEntries = await Promise.all(DEFAULT_RESOURCES.map(async (resourceKey) => {
         const gate = await fetchGateForResource(contract, slug, resourceKey);
+        return { resourceKey, gate };
+      }));
+      gateEntries.forEach(({ resourceKey, gate }) => {
         gatesByResource[resourceKey] = gate;
-      }
+      });
 
       const fieldsByKey = await fetchSessionFields(contract, slug);
 
@@ -1752,11 +1778,31 @@ export const loadSessionRegistryCache = async ({
         registryChainId: chainId,
         metadataLoadState: resolveMetadataLoadState({ metadata, hasMetadataUri }),
       });
-      addSessionConfigToCache(cache, config, { chainEntry, registryChainId: chainId });
-    }
+      return { config, hadLoadErrors: false };
+    });
 
-    cache.chains[String(chainId)] = chainEntry;
-  }
+    return {
+      chainId,
+      chainEntry,
+      configs: sessionResults
+        .map((result) => result?.config)
+        .filter((config): config is AnyRecord => !!config),
+      hadLoadErrors: sessionResults.some((result) => !!result?.hadLoadErrors),
+    };
+  });
+
+  chainResults.forEach((result) => {
+    if (!result) return;
+    if (result.hadLoadErrors) hadLoadErrors = true;
+    if (!result.chainEntry) return;
+    result.configs.forEach((config) => {
+      addSessionConfigToCache(cache, config, {
+        chainEntry: result.chainEntry,
+        registryChainId: result.chainId,
+      });
+    });
+    cache.chains[String(result.chainId)] = result.chainEntry;
+  });
 
   const previousSessions = previousCache?.sessions && typeof previousCache.sessions === 'object'
     ? previousCache.sessions
@@ -2476,10 +2522,10 @@ export const sessionRegistryStore = {
     }
     return null;
   },
-  getAllSessionEntries: () => {
+  getAllSessionEntries: (): SessionRegistryCacheEntry[] => {
     const cache = sessionRegistryStore.readCache();
     if (!cache || !cache.sessions) return [];
-    return Object.entries(cache.sessions).map(([slug, cfg]) => ([
+    return Object.entries(cache.sessions).map(([slug, cfg]): SessionRegistryCacheEntry => ([
       slug,
       overlayCachedSessionWorkerConfig({
         slug,

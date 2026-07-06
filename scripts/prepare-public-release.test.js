@@ -48,7 +48,7 @@ test('prepare-public-release strips review artifacts and preserves the generated
     );
     fs.chmodSync(path.join(sourceDir, 'scripts', 'prepare-public-release.sh'), 0o755);
 
-    writeFile(sourceDir, 'public.txt', 'keep\n');
+    writeFile(sourceDir, 'public.txt', 'keep [redacted-email] and /redacted-home\n');
     writeFile(sourceDir, '.DS_Store', 'mac metadata\n');
     writeFile(sourceDir, '.secrets.baseline', '{"results":{".codex/secret.txt":[]}}\n');
     writeFile(sourceDir, '.env.local', 'SECRET=value\n');
@@ -70,6 +70,7 @@ test('prepare-public-release strips review artifacts and preserves the generated
     writeFile(sourceDir, path.join('docs', 'codebase-health-modernization-2026-05-07.md'), 'local audit notes\n');
     writeFile(sourceDir, path.join('docs', 'assets', 'codebase-health-modernization-2026-05-07.png'), 'local audit chart\n');
     writeFile(sourceDir, path.join('docs', 'telegram-response-export-scope-prd.md'), 'private product planning\n');
+    writeFile(sourceDir, path.join('ai-discourse-corpus', 'corpuses', '_local_helper.js'), 'local helper script\n');
     writeFile(sourceDir, path.join('.tmp-review', 'review.js'), 'temporary review snapshot\n');
     writeFile(sourceDir, 'private-pack.manifest.json', 'tracked root manifest that should be replaced\n');
     writeFile(sourceDir, path.join('TODO', 'secret.md'), 'private planning\n');
@@ -79,7 +80,7 @@ test('prepare-public-release strips review artifacts and preserves the generated
     writeFile(sourceDir, path.join('contextEngine-cc', 'server.mjs'), 'private runtime server\n');
     writeFile(sourceDir, path.join('contextEngine-cc', 'package.json'), '{"private":true}\n');
     writeFile(sourceDir, path.join('contextEngine-cc', 'public', 'js', 'sessionSlugs.mjs'), 'export default [];\n');
-    writeFile(sourceDir, path.join('test', 'private-runtime.private.test.mjs'), 'private companion service worker test\n');
+    writeFile(sourceDir, path.join('tests', 'root', 'private-runtime.private.test.mjs'), 'private companion service worker test\n');
     writeFile(sourceDir, path.join('docs', 'agent-native-contract.md'), 'private agent contract\n');
     writeFile(sourceDir, path.join('docs', 'agent-native-bridge.md'), 'private agent bridge\n');
     writeFile(sourceDir, path.join('client', 'public', 'skill.md'), 'private agent skill\n');
@@ -95,6 +96,10 @@ test('prepare-public-release strips review artifacts and preserves the generated
           scripts: {
             test: 'node scripts/run-node-tests.js',
             'test:worker:agent-bridge': 'node scripts/run-agent-bridge-worker-tests.js',
+            'ai:test-cf-envelope:worker': 'npm run -s ai:node -- scripts/e2e/cloudflare-worker-envelope.js',
+            'ai:test-cf-envelope:all': 'npm run -s ai:test-cf-envelope:worker',
+            'ai:test-session:demo-smoke': 'npm run -s ai:node -- scripts/test-session-demo.ui.js',
+            'ai:test-session:closeout-smoke': 'npm run -s ai:test-session:demo-smoke',
           },
         },
         null,
@@ -106,7 +111,7 @@ test('prepare-public-release strips review artifacts and preserves the generated
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /files stripped, output at /);
 
-    assert.equal(fs.readFileSync(path.join(outputDir, 'public.txt'), 'utf8'), 'keep\n');
+    assert.equal(fs.readFileSync(path.join(outputDir, 'public.txt'), 'utf8'), 'keep [redacted-email] and /redacted-home\n');
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(outputDir, 'package.json'), 'utf8')).scripts, {
       test: 'node scripts/run-node-tests.js',
     });
@@ -131,13 +136,14 @@ test('prepare-public-release strips review artifacts and preserves the generated
     assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'codebase-health-modernization-2026-05-07.md')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'assets', 'codebase-health-modernization-2026-05-07.png')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'telegram-response-export-scope-prd.md')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'ai-discourse-corpus', 'corpuses', '_local_helper.js')), false);
     assert.equal(fs.existsSync(path.join(outputDir, '.tmp-review')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'TODO')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'TODO', `${'PR'}${'D'}s`)), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'contextEngine-cc')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'contextEngine-cc', 'server.mjs')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'contextEngine-cc', 'package.json')), false);
-    assert.equal(fs.existsSync(path.join(outputDir, 'test', 'private-runtime.private.test.mjs')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'tests', 'root', 'private-runtime.private.test.mjs')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'agent-native-contract.md')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'agent-native-bridge.md')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'client', 'public', 'skill.md')), false);
@@ -159,6 +165,7 @@ test('prepare-public-release strips review artifacts and preserves the generated
     assert.doesNotMatch(manifestText, /\.keys/);
     assert.doesNotMatch(manifestText, /codebase-health-modernization/);
     assert.doesNotMatch(manifestText, /telegram-response-export-scope-prd/);
+    assert.doesNotMatch(manifestText, /_local_helper/);
     assert.doesNotMatch(manifestText, /\.private\.test/);
     assert.match(manifestText, /private-pack\.manifest\.json/);
   } finally {

@@ -199,7 +199,7 @@ const SbtPageAdminActions = ({
     {passwordInventoryDisplayState.shouldRenderPasswordGenerationSection && (
       <div className={styles.inviteGenerationSection}>
         <h4>Generate Additional Password Invites</h4>
-        <p>Since there's no max token limit, you can generate more password-based invites as admin.</p>
+        <p>Since there&apos;s no max token limit, you can generate more password-based invites as admin.</p>
         <div className={styles.inviteGenerationControls}>
           <input
             type="number"

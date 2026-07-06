@@ -36,13 +36,14 @@ jest.mock('../../utilities/web3/contractScripts.js', () => ({
   getAllSessionSlugs: jest.fn(() => []),
 }));
 
-jest.mock('../../utilities/web3/portoFunctions.js', () => ({
-  authenticatePorto: jest.fn(),
-  getPortoChain: jest.fn(() => null),
-  loginWithPorto: jest.fn(),
-  logoutPorto: jest.fn(),
-  restoreSession: jest.fn(async () => null),
-  setPortoChain: jest.fn(),
+jest.mock('../../wallet/passkeyWallet.js', () => ({
+  createPasskeyWallet: jest.fn(),
+  getPasskeyWalletChain: jest.fn(() => null),
+  isMissingPasskeyWalletRecordError: jest.fn((error) => error?.code === 'CE_PASSKEY_WALLET_RECORD_MISSING'),
+  unlockPasskeyWallet: jest.fn(),
+  logoutPasskeyWallet: jest.fn(),
+  restorePasskeyWalletSession: jest.fn(async () => null),
+  setPasskeyWalletChain: jest.fn(),
 }));
 
 jest.mock('../../utilities/ai/aiSettings.js', () => {
@@ -108,7 +109,7 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => ({
 
 import { LoginAndSettingsModal, buildBookmarksRoutePath } from './LoginAndSettingsModal';
 import contractScripts from '../../utilities/web3/contractScripts.js';
-import * as portoFunctions from '../../utilities/web3/portoFunctions.js';
+import * as passkeyWallet from '../../wallet/passkeyWallet.js';
 import { saveLocalAiSettings } from '../../utilities/ai/aiSettings.js';
 import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
 import { clearAllWorkerSessionTokens } from '../../utilities/worker/workerAuth.js';
@@ -123,6 +124,7 @@ const DEFAULT_NETWORK = {
 
 const PASSKEY_ADDRESS = '0x1111111111111111111111111111111111111111';
 const WAGMI_ADDRESS = '0x2222222222222222222222222222222222222222';
+const RAW_AGENT_TOKEN = 'ceagt_abcdefghijklmnopqrstuvwxyz123456';
 const ORIGINAL_TERMINOLOGY_MODE = process.env.REACT_APP_TERMINOLOGY_MODE;
 const ORIGINAL_PUBLIC_URL = process.env.PUBLIC_URL;
 
@@ -269,6 +271,18 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     localStorage.clear();
+    passkeyWallet.createPasskeyWallet.mockReset();
+    passkeyWallet.getPasskeyWalletChain.mockReset();
+    passkeyWallet.getPasskeyWalletChain.mockReturnValue(null);
+    passkeyWallet.isMissingPasskeyWalletRecordError.mockReset();
+    passkeyWallet.isMissingPasskeyWalletRecordError.mockImplementation((error) => (
+      error?.code === 'CE_PASSKEY_WALLET_RECORD_MISSING'
+    ));
+    passkeyWallet.unlockPasskeyWallet.mockReset();
+    passkeyWallet.logoutPasskeyWallet.mockReset();
+    passkeyWallet.restorePasskeyWalletSession.mockReset();
+    passkeyWallet.restorePasskeyWalletSession.mockResolvedValue(null);
+    passkeyWallet.setPasskeyWalletChain.mockReset();
     getAllSessionSlugs.mockReturnValue([]);
     getSessionConfigBySlugOrDefault.mockImplementation(() => ({}));
     checkSponsoredAccess.mockImplementation(async () => ({ status: 'unknown' }));
@@ -287,6 +301,26 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open Crypto Login (RainbowKit)' }));
 
     expect(props.openConnectModal).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows an inline recovery hint when login has no stored passkey wallet record', async () => {
+    const missingWalletError = Object.assign(
+      new Error('No encrypted passkey wallet is saved in this browser.'),
+      { code: 'CE_PASSKEY_WALLET_RECORD_MISSING' }
+    );
+    passkeyWallet.unlockPasskeyWallet.mockRejectedValueOnce(missingWalletError);
+
+    render(<LoginAndSettingsModal {...buildProps()} />);
+
+    const loginButton = getPasskeyLoginButton();
+    expect(loginButton).toBeTruthy();
+    fireEvent.click(loginButton);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ce-passkey-wallet-status')).toHaveTextContent(
+        /No passkey wallet is saved in this browser/i
+      );
+    });
   });
 
   it('renders the full auth modal with a centered dialog wrapper', async () => {
@@ -858,10 +892,11 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     expect(screen.queryByText(/Selected 2 sessions?/i)).not.toBeInTheDocument();
   });
 
-  it('completes Porto sign-in from the rendered login view', async () => {
-    portoFunctions.loginWithPorto.mockResolvedValue(PASSKEY_ADDRESS);
+  it('completes passkey wallet sign-in from the rendered login view', async () => {
+    passkeyWallet.unlockPasskeyWallet.mockResolvedValue(PASSKEY_ADDRESS);
     const props = buildProps();
     const subject = new LoginAndSettingsModal(props);
+    subject._isMounted = true;
 
     render(subject.getModalDisplay());
     fireEvent.click(getPasskeyLoginButton());
@@ -869,13 +904,13 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     expect(props.updateLoginInfo).toHaveBeenNthCalledWith(1, {
       loginInProgress: true,
       loginComplete: false,
-      provider: 'porto_passkey',
+      provider: 'passkey_eoa',
     });
 
     await waitFor(() => {
       expect(props.changeAccount).toHaveBeenCalledWith(expect.objectContaining({
         account: PASSKEY_ADDRESS,
-        provider: 'porto_passkey',
+        provider: 'passkey_eoa',
       }));
     });
 
@@ -886,14 +921,15 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     expect(props.updateLoginInfo).toHaveBeenLastCalledWith({
       loginInProgress: false,
       loginComplete: true,
-      provider: 'porto_passkey',
+      provider: 'passkey_eoa',
     });
   });
 
-  it('resets back to a logged-out state when Porto sign-in fails', async () => {
-    portoFunctions.loginWithPorto.mockRejectedValue(new Error('passkey rejected'));
+  it('resets back to a logged-out state when passkey wallet sign-in fails', async () => {
+    passkeyWallet.unlockPasskeyWallet.mockRejectedValue(new Error('passkey rejected'));
     const props = buildProps();
     const subject = new LoginAndSettingsModal(props);
+    subject._isMounted = true;
 
     render(subject.getModalDisplay());
     fireEvent.click(getPasskeyLoginButton());
@@ -1348,5 +1384,70 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     expect(screen.queryByTestId('ce-settings-get-test-gas')).not.toBeInTheDocument();
     expect(screen.queryByTestId('ce-settings-get-test-gas-status')).not.toBeInTheDocument();
     expect(screen.queryByText(/Auto-funding failed/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('LoginAndSettingsModal agent token login', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+    window.history.replaceState({}, '', '/session/alpha');
+    global.fetch = jest.fn(async () => new Response(JSON.stringify({
+      ok: true,
+      tokenType: 'session_worker_jwt',
+      sessionSlug: 'alpha',
+      accountAddress: '0x3333333333333333333333333333333333333333',
+      workerUrl: 'https://session-worker.example',
+      workerToken: 'jwt-session-token',
+      expiresAt: '2027-07-05T00:00:00.000Z',
+    }), { status: 200, headers: { 'content-type': 'application/json' } }));
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+    delete global.__CE_AGENT_CLIENT_LOGIN_ENVELOPES__;
+  });
+
+  it('shows agent-token login only for telegram-first sessions and clears raw token after exchange', async () => {
+    const props = buildProps({
+      activeSessionSlug: 'alpha',
+      sessionConfig: { slug: 'alpha', telegramOnly: true, sessionMode: 'telegram_only' },
+    });
+    render(<LoginAndSettingsModal {...props} />);
+
+    fireEvent.click(screen.getByTestId('ce-agent-token-login-toggle'));
+    const input = screen.getByTestId('ce-agent-token-login-input');
+    fireEvent.change(input, { target: { value: RAW_AGENT_TOKEN } });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('ce-agent-token-login-submit'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(props.updateLoginInfo).toHaveBeenCalledWith(expect.objectContaining({
+        loginComplete: true,
+        provider: 'telegram_agent',
+      }));
+    });
+
+    expect(input).toHaveValue('');
+    expect(window.location.href).not.toContain(RAW_AGENT_TOKEN);
+    expect(JSON.stringify(window.localStorage)).not.toContain(RAW_AGENT_TOKEN);
+    expect(Object.values(window.sessionStorage).join('\n')).not.toContain(RAW_AGENT_TOKEN);
+    expect(JSON.stringify(props.changeAccount.mock.calls)).not.toContain(RAW_AGENT_TOKEN);
+    expect(JSON.stringify(props.updateLoginInfo.mock.calls)).not.toContain(RAW_AGENT_TOKEN);
+  });
+
+  it('hides agent-token login for normal sessions', () => {
+    render(<LoginAndSettingsModal {...buildProps({
+      activeSessionSlug: 'alpha',
+      sessionConfig: { slug: 'alpha', sessionName: 'Normal Session' },
+    })} />);
+
+    expect(screen.queryByTestId('ce-agent-token-login-toggle')).not.toBeInTheDocument();
   });
 });

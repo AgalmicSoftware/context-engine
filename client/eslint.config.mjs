@@ -5,6 +5,19 @@ import reactPlugin from 'eslint-plugin-react';
 import reactHooksPlugin from 'eslint-plugin-react-hooks';
 
 const javascriptFiles = ['src/**/*.{js,jsx,mjs,cjs}'];
+const typedDomainFiles = ['src/domains/**/*.{ts,tsx}'];
+const typedSessionUtilityFiles = ['src/utilities/session/**/*.{ts,tsx}'];
+const typedWorkerUtilityFiles = ['src/utilities/worker/**/*.{ts,tsx}'];
+const typedArweaveUtilityFiles = ['src/utilities/arweave/**/*.{ts,tsx}'];
+const typedWeb3UtilityFiles = ['src/utilities/web3/**/*.{ts,tsx}'];
+const typedCacheUtilityFiles = ['src/utilities/cache/**/*.{ts,tsx}'];
+const typedSurveyUtilityFiles = ['src/utilities/survey/**/*.{ts,tsx}'];
+const typedSbtUtilityFiles = ['src/utilities/sbt/**/*.{ts,tsx}'];
+const typedUserUtilityFiles = ['src/utilities/user/**/*.{ts,tsx}'];
+const typedSponsorUtilityFiles = ['src/utilities/sponsor/**/*.{ts,tsx}'];
+const typedTagsUtilityFiles = ['src/utilities/tags/**/*.{ts,tsx}'];
+const typedContractsUtilityFiles = ['src/utilities/contracts/**/*.{ts,tsx}'];
+const typedSharedUtilityFiles = ['src/utilities/shared/**/*.{ts,tsx}'];
 const typedUiUtilityFiles = ['src/utilities/ui/**/*.{ts,tsx}'];
 const typedSharedComponentFiles = ['src/components/Shared/**/*.{ts,tsx}'];
 const typedInformationalComponentFiles = [
@@ -30,6 +43,17 @@ const typedPolisReportComponentFiles = ['src/components/PolisReport/**/*.{ts,tsx
 const typedDebateMapComponentFiles = ['src/components/DebateMap/**/*.{ts,tsx}'];
 const typedNavbarComponentFiles = ['src/components/Navbar/**/*.{ts,tsx}'];
 const typedContractPageComponentFiles = ['src/components/ContractPage/**/*.{ts,tsx}'];
+const typedOnePageSessionComponentFiles = ['src/components/OnePageSession/**/*.{ts,tsx}'];
+const typedTagPageComponentFiles = ['src/components/TagPage/**/*.{ts,tsx}'];
+const typedDocumentLibraryComponentFiles = ['src/components/DocumentLibrary/**/*.{ts,tsx}'];
+const typedDemoViewsComponentFiles = ['src/components/DemoViews/**/*.{ts,tsx}'];
+const typedAccountComponentFiles = ['src/components/Account/**/*.{ts,tsx}'];
+const typedAdminComponentFiles = ['src/components/Admin/**/*.{ts,tsx}'];
+const typedMainSiteComponentFiles = ['src/components/MainSite/**/*.{ts,tsx}'];
+const typedUserPageComponentFiles = ['src/components/UserPage/**/*.{ts,tsx}'];
+const typedSessionsComponentFiles = ['src/components/Sessions/**/*.{ts,tsx}'];
+const typedSbtComponentFiles = ['src/components/SBTs/**/*.{ts,tsx}'];
+const typedSurveyToolComponentFiles = ['src/components/SurveyTool/**/*.{ts,tsx}'];
 
 const sharedLanguageOptions = {
   parser: tsParser,
@@ -94,6 +118,110 @@ export default [
     rules: {
       ...sharedRules,
       ...reactRules,
+    },
+  },
+  {
+    files: typedDomainFiles,
+    languageOptions: sharedLanguageOptions,
+    rules: {
+      ...sharedRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedSessionUtilityFiles,
+    languageOptions: sharedLanguageOptions,
+    rules: {
+      ...sharedRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedWorkerUtilityFiles,
+    languageOptions: sharedLanguageOptions,
+    rules: {
+      ...sharedRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedArweaveUtilityFiles,
+    languageOptions: sharedLanguageOptions,
+    rules: {
+      ...sharedRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedWeb3UtilityFiles,
+    languageOptions: sharedLanguageOptions,
+    rules: {
+      ...sharedRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedCacheUtilityFiles,
+    languageOptions: sharedLanguageOptions,
+    rules: {
+      ...sharedRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedSurveyUtilityFiles,
+    languageOptions: sharedLanguageOptions,
+    rules: {
+      ...sharedRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedSbtUtilityFiles,
+    languageOptions: sharedLanguageOptions,
+    rules: {
+      ...sharedRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedUserUtilityFiles,
+    languageOptions: sharedLanguageOptions,
+    rules: {
+      ...sharedRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedSponsorUtilityFiles,
+    languageOptions: sharedLanguageOptions,
+    rules: {
+      ...sharedRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedTagsUtilityFiles,
+    languageOptions: sharedLanguageOptions,
+    rules: {
+      ...sharedRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedContractsUtilityFiles,
+    languageOptions: sharedLanguageOptions,
+    rules: {
+      ...sharedRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedSharedUtilityFiles,
+    languageOptions: sharedLanguageOptions,
+    rules: {
+      ...sharedRules,
+      'no-undef': 'off',
     },
   },
   {
@@ -227,6 +355,127 @@ export default [
   },
   {
     files: typedContractPageComponentFiles,
+    languageOptions: sharedLanguageOptions,
+    plugins: reactPlugins,
+    settings: reactSettings,
+    rules: {
+      ...sharedRules,
+      ...reactRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedOnePageSessionComponentFiles,
+    languageOptions: sharedLanguageOptions,
+    plugins: reactPlugins,
+    settings: reactSettings,
+    rules: {
+      ...sharedRules,
+      ...reactRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedTagPageComponentFiles,
+    languageOptions: sharedLanguageOptions,
+    plugins: reactPlugins,
+    settings: reactSettings,
+    rules: {
+      ...sharedRules,
+      ...reactRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedDocumentLibraryComponentFiles,
+    languageOptions: sharedLanguageOptions,
+    plugins: reactPlugins,
+    settings: reactSettings,
+    rules: {
+      ...sharedRules,
+      ...reactRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedDemoViewsComponentFiles,
+    languageOptions: sharedLanguageOptions,
+    plugins: reactPlugins,
+    settings: reactSettings,
+    rules: {
+      ...sharedRules,
+      ...reactRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedAccountComponentFiles,
+    languageOptions: sharedLanguageOptions,
+    plugins: reactPlugins,
+    settings: reactSettings,
+    rules: {
+      ...sharedRules,
+      ...reactRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedAdminComponentFiles,
+    languageOptions: sharedLanguageOptions,
+    plugins: reactPlugins,
+    settings: reactSettings,
+    rules: {
+      ...sharedRules,
+      ...reactRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedMainSiteComponentFiles,
+    languageOptions: sharedLanguageOptions,
+    plugins: reactPlugins,
+    settings: reactSettings,
+    rules: {
+      ...sharedRules,
+      ...reactRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedUserPageComponentFiles,
+    languageOptions: sharedLanguageOptions,
+    plugins: reactPlugins,
+    settings: reactSettings,
+    rules: {
+      ...sharedRules,
+      ...reactRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedSessionsComponentFiles,
+    languageOptions: sharedLanguageOptions,
+    plugins: reactPlugins,
+    settings: reactSettings,
+    rules: {
+      ...sharedRules,
+      ...reactRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedSbtComponentFiles,
+    languageOptions: sharedLanguageOptions,
+    plugins: reactPlugins,
+    settings: reactSettings,
+    rules: {
+      ...sharedRules,
+      ...reactRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedSurveyToolComponentFiles,
     languageOptions: sharedLanguageOptions,
     plugins: reactPlugins,
     settings: reactSettings,

@@ -4,13 +4,17 @@ import {
   normalizeArweaveFailureMeta,
   shouldStopPendingMetadataRetry,
 } from '../arweave/arweaveRetryHelpers.js';
-import { prepareSurveyMetadataCacheEntry } from '../../components/MainSite/metadataCacheEntryBuilders.js';
-import { resolveScopedMetadataSessionSlug } from '../../components/MainSite/metadataSessionBinding.js';
+import { prepareSurveyMetadataCacheEntry } from './metadataCacheEntryBuilders.js';
+import { resolveScopedMetadataSessionSlug } from '../session/metadataSessionBinding.js';
 import {
   normalizeSurveyResponseBatchResult,
   resolveSurveyResponseWatermark,
   type SurveyResponseItem,
 } from './sessionSurveyResponseHelpers.js';
+import {
+  sbtEventStreamsPort,
+} from '../../domains/sbts/sbtEventStreamsPort.js';
+import type { SbtEventStreamsPort } from '../../domains/sbts/sbtPorts.js';
 
 type StateRecord = Record<string, unknown>;
 type CacheRecord = Record<string, unknown>;
@@ -131,6 +135,10 @@ interface SurveyContractScripts {
   ) => unknown;
   removeSurveyEventsListener?: (providerName: string, slug: string) => unknown;
 }
+type SurveyEventStreamsPort = Pick<
+  SbtEventStreamsPort,
+  'listenForSurveyEvents' | 'removeSurveyEventsListener'
+>;
 
 export interface SessionSurveyCacheHost {
   [key: string]: unknown;
@@ -145,6 +153,7 @@ export interface SessionSurveyCacheHost {
   shouldSkipSessionScanForSlug?: (slug: string, op: string, scopeCtx?: unknown) => boolean;
   scanScopeNoop?: (slug: string, op: string, onSkipped?: () => void) => boolean;
   onSurveyEventDetectedForGroup?: (slug: string, event: unknown) => unknown;
+  surveyEventStreamsPort?: SurveyEventStreamsPort;
   checkAllCachesReady?: () => void;
   mergeLegacyNumericNetworkKey?: (cache: Record<string, unknown>, networkID: string) => boolean;
   writeSurveyMetadataToCache?: (
@@ -250,6 +259,7 @@ export const createSessionSurveyCacheController = (
       if (shouldCheckAllCachesReady) checkAllCachesReady();
     });
   };
+  const surveyEventStreams = host.surveyEventStreamsPort || sbtEventStreamsPort;
 
   const isInitInFlight = (slugIn = ''): boolean => {
     const slug = normalizeSessionSlug(slugIn || '');
@@ -878,12 +888,9 @@ export const createSessionSurveyCacheController = (
   const startSurveyAndQuestionEventListenerForGroup = (slugIn: string | null = ''): boolean => {
     const slug = normalizeSessionSlug(slugIn || '');
     mainSiteLog.log('startSurveyAndQuestionEventListenerForGroup() – Setting up survey & question events listener', { slug });
-    if (typeof surveyContractScripts.removeSurveyEventsListener === 'function') {
-      surveyContractScripts.removeSurveyEventsListener('none', slug);
-    }
+    surveyEventStreams.removeSurveyEventsListener('none', slug);
     if (shouldSkipSessionScanForSlug(slug, 'startSurveyAndQuestionEventListenerForGroup')) return false;
-    if (typeof surveyContractScripts.listenForSurveyEvents !== 'function') return false;
-    surveyContractScripts.listenForSurveyEvents(
+    surveyEventStreams.listenForSurveyEvents(
       'none',
       (event: unknown) => onSurveyEventDetectedForGroup(slug, event),
       slug

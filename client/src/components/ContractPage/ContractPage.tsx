@@ -1,10 +1,15 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { connect } from 'react-redux';
-import contractScripts, {
+import {
+  base64urlToBase64,
+  base64urlToHex,
+  hexToBase64url,
+} from '../../domains/storage/arweaveEncoding.js';
+import {
   getDemoSessionConfigBySlug,
   getSessionConfigBySlug,
   getSessionConfigBySlugOrDefault,
-} from '../../utilities/web3/contractScripts.js'; // smart contract info: addresses & content
+} from '../../domains/sessions/sessionConfig.js'; // smart contract info: addresses & content
 import { seedGenPrompt } from '../../prompts/seedGenPrompt.js';
 import { aiRewritePrompt } from '../../prompts/aiRewritePrompt.js';
 import { audioSummaryPrompt } from '../../prompts/audioSummaryPrompt.js';
@@ -53,12 +58,6 @@ type PromptItem = {
   title: string;
   file: string;
   content: string;
-};
-
-const contractScriptUtils = contractScripts as typeof contractScripts & {
-  hexToBase64url: (value: string) => string;
-  base64urlToHex: (value: string) => string;
-  base64urlToBase64: (value: string) => string;
 };
 
 const buildContractsForViewer = buildContractViewerContracts as (options?: {
@@ -236,15 +235,15 @@ export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }: Cont
   };
 
   const handleBytes32ToBase64url = () => {
-    setBase64urlOutput(contractScriptUtils.hexToBase64url(bytes32Input));
+    setBase64urlOutput(hexToBase64url(bytes32Input));
   };
 
   const handleBase64urlToBytes32 = () => {
-    setBytes32Output(contractScriptUtils.base64urlToHex(base64urlInput));
+    setBytes32Output(base64urlToHex(base64urlInput));
   };
 
   const handleBase64urlToBase64 = () => {
-    setBase64Output(contractScriptUtils.base64urlToBase64(base64urlInput));
+    setBase64Output(base64urlToBase64(base64urlInput));
   };
 
   // New handler function for deserializing filter URL/param

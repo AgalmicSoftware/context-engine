@@ -18,8 +18,8 @@ import {
   getAllSessionSlugs,
   getDemoSessionConfigBySlug,
   getSessionConfigBySlug as getStrictSessionConfigBySlug,
-} from '../../utilities/web3/contractScripts.js';
-import { SESSION_REGISTRY_CACHE_UPDATED_EVENT } from '../../utilities/web3/sessionRegistry.js';
+} from '../../domains/sessions/sessionConfig.js';
+import { sessionRegistryReadsPort } from '../../domains/sessions/registry/sessionRegistryReadPorts.js';
 import { normalizeGlobalSessionSelection } from '../../utilities/session/globalSessionState.js';
 import { parseQuestionSessionSlugFromSearch } from '../../utilities/survey/questionRouting.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
@@ -36,6 +36,31 @@ const buildTagInterpretationPromptUntyped = buildTagInterpretationPrompt as (arg
   selectedTags: string[];
   questions: QuestionSummary[];
 }) => string;
+
+const TAG_AI_CACHE_LIMIT = 24;
+
+export const readTagAiCacheEntry = (cache: Map<string, string>, key: string): string => {
+  if (!cache.has(key)) return '';
+  const value = cache.get(key) || '';
+  cache.delete(key);
+  cache.set(key, value);
+  return value;
+};
+
+export const writeTagAiCacheEntry = (
+  cache: Map<string, string>,
+  key: string,
+  value: string,
+  limit = TAG_AI_CACHE_LIMIT
+): void => {
+  if (cache.has(key)) cache.delete(key);
+  cache.set(key, value);
+  while (cache.size > Math.max(1, limit)) {
+    const oldestKey = cache.keys().next().value;
+    if (typeof oldestKey !== 'string') break;
+    cache.delete(oldestKey);
+  }
+};
 
 type FilterMode = 'all' | 'set';
 
@@ -741,10 +766,7 @@ export const TagPageView = ({
       setSessionRegistryRevision((value) => value + 1);
     };
 
-    window.addEventListener(SESSION_REGISTRY_CACHE_UPDATED_EVENT, handleRegistryCacheUpdated);
-    return () => {
-      window.removeEventListener(SESSION_REGISTRY_CACHE_UPDATED_EVENT, handleRegistryCacheUpdated);
-    };
+    return sessionRegistryReadsPort.subscribeToCacheUpdates(window, handleRegistryCacheUpdated);
   }, []);
 
   useEffect(() => {
@@ -1060,7 +1082,7 @@ export const TagPageView = ({
     if (!questions.length || !hasSingleSessionScope) return;
 
     if (!force) {
-      const cachedInterpretation = aiCacheRef.current.get(aiCacheKey);
+      const cachedInterpretation = readTagAiCacheEntry(aiCacheRef.current, aiCacheKey);
       if (cachedInterpretation) {
         setAiInterpretation(cachedInterpretation);
         setAiError(null);
@@ -1081,7 +1103,7 @@ export const TagPageView = ({
       if (aiRequestKeyRef.current !== aiCacheKey) return;
 
       const nextInterpretation = String(result || '').trim() || 'No interpretation generated.';
-      aiCacheRef.current.set(aiCacheKey, nextInterpretation);
+      writeTagAiCacheEntry(aiCacheRef.current, aiCacheKey, nextInterpretation);
       setAiInterpretation(nextInterpretation);
       setAiError(null);
     } catch (error) {

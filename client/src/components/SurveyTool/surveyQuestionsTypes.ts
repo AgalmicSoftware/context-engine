@@ -9,7 +9,8 @@ import {
 } from './surveyToolViewState.js';
 import { filterPendingQuestionMetadataPlaceholders } from './surveyQuestionMetadataPlaceholders.js';
 
-type SurveyQuestionsLegacyRecord = Record<string, any>;
+export type SurveyQuestionsLegacyRecord = Record<string, any>;
+export type SurveyQuestionsLegacyValue = SurveyQuestionsLegacyRecord[string];
 
 export type SurveyQuestionsProps = SurveyQuestionsLegacyRecord & {
   displayAnswerMode?: boolean;

@@ -462,11 +462,13 @@ contract MySBT is ERC721, ERC721Burnable, Ownable, ReentrancyGuard {
     }
 
     /// @notice Returns the shared metadata URI used for all tokens in the collection.
-    /// @dev The `tokenId` parameter is kept for ERC721 compatibility but does not affect the returned URI.
+    /// @dev Reverts for nonexistent or burned tokens, matching ERC-721 metadata expectations.
     /// @param tokenId The token identifier whose metadata URI is being queried.
     /// @return The collection-wide metadata URI.
     function tokenURI(uint256 tokenId) public view virtual override returns (string memory) {
-        tokenId;
+        if (_ownerOf(tokenId) == address(0)) {
+            revert InvalidTokenId();
+        }
         return _tokenURI;
     }
 

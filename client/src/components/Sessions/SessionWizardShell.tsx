@@ -160,6 +160,9 @@ export type SessionWizardShellProps = {
   sessionHeaderPreviewModalOpen: WizardModalsProps['sessionHeaderPreviewModalOpen'];
   sessionHeaderPreviewSrc: WizardModalsProps['sessionHeaderPreviewSrc'];
   sessionMetadataHeaderAccessory: MetadataEditorProps['headerAccessory'];
+  sessionModeProfileControl?: React.ReactNode;
+  showSessionModeProfileControlInSetup?: boolean;
+  sessionModeProfileStepComplete?: boolean;
   sessionUrl: PublishSectionProps['sessionUrl'];
   setBundleFile: WorkerPanelProps['setBundleFile'];
   setBundleMode: WorkerPanelProps['setBundleMode'];
@@ -318,6 +321,9 @@ const SessionWizardShell = ({
   sessionHeaderPreviewModalOpen,
   sessionHeaderPreviewSrc,
   sessionMetadataHeaderAccessory,
+  sessionModeProfileControl = null,
+  showSessionModeProfileControlInSetup = true,
+  sessionModeProfileStepComplete = true,
   sessionUrl,
   setBundleFile,
   setBundleMode,
@@ -357,227 +363,240 @@ const SessionWizardShell = ({
   workerUrlSource,
   wizardDisplaySettingsOpen,
   wizardMode,
-}: SessionWizardShellProps) => (
-  <div className={styles.groupWizard}>
-    <SessionWizardHeader
-      hasSponsoredBundleLink={hasSponsoredBundleLink}
-      isNormalMode={isNormalMode}
-      onCloseDisplaySettings={onCloseDisplaySettings}
-      onEnterAdvancedMode={onEnterAdvancedMode}
-      onEnterNormalMode={onEnterNormalMode}
-      onRegistryChainIdChange={onRegistryChainIdChange}
-      onToggleDisplaySettings={onToggleDisplaySettings}
-      registryAddress={registryAddress}
-      registryChainId={registryChainId}
-      registryChainName={registryChainName}
-      registryChainOptions={registryChainOptions}
-      renderInfoTooltip={renderSessionWizardInfoTooltip}
-      wizardDisplaySettingsOpen={wizardDisplaySettingsOpen}
-      wizardMode={wizardMode}
-    />
+}: SessionWizardShellProps) => {
+  const showSessionModeProfileGate = !!sessionModeProfileControl && !sessionModeProfileStepComplete;
 
-    <SessionWizardIntroStatusRail
-      activeNormalModeIndex={activeNormalModeIndex}
-      collapsedSections={collapsedSections}
-      fundingRequirementHref={newSessionFundingRequirementHref}
-      fundingRequirementLabel={newSessionFundingRequirementLabel}
-      isNormalMode={isNormalMode}
-      newSessionRequiresLitCredential={newSessionRequiresLitCredential}
-      normalModeCards={normalModeCards}
-      onDismissRequirements={onDismissNewSessionRequirementsBanner}
-      onFocusNormalModeSection={focusNormalModeSection}
-      onRetrySponsoredBundle={onRetrySponsoredBundle}
-      showNewSessionRequirementsBanner={showNewSessionRequirementsBanner}
-      sponsoredBundleStatus={sponsoredBundleStatus}
-    />
-
-    {(!isNormalMode || !collapsedSections.encryption) && (
-      <EncryptionPanel
+  return (
+    <div className={styles.groupWizard}>
+      <SessionWizardHeader
+        hasSponsoredBundleLink={hasSponsoredBundleLink}
         isNormalMode={isNormalMode}
-        t={t}
-        renderSessionWizardInfoTooltip={renderSessionWizardInfoTooltip}
-        isCollapsed={collapsedSections.encryption}
-        onToggleCollapsed={() => toggleSection('encryption')}
-        launchCreateSbtModal={launchCreateSbtModal}
-        activeCreateSbtTargetGateId={activeCreateSbtTargetGateId}
-        activeCreateSbtTargetGate={activeCreateSbtTargetGate}
-        encryptionGates={encryptionGates}
-        focusCreateSbtTargetGate={focusCreateSbtTargetGate}
-        updateEncryptionGate={updateEncryptionGate}
-        removeEncryptionGate={removeEncryptionGate}
-        normalizeSbtSelection={normalizeSbtSelection}
-        handleGateAddSbt={handleGateAddSbt}
-        handleGateRemoveSbt={handleGateRemoveSbt}
-        network={network}
-        pendingSbtSelectorOptions={pendingSbtSelectorOptions}
-        selectorSourceChainId={selectorSourceChainId}
-        selectorSourceSessionConfig={selectorSourceSessionConfig}
-        resolvedActiveSessionSlug={resolvedActiveSessionSlug}
-        sbtCacheRevision={sbtCacheRevision}
-        ensureLightSbtUniverse={ensureLightSbtUniverse}
-        addEncryptionGate={addEncryptionGate}
-        pendingSbtDrafts={pendingSbtDrafts}
-        removePendingSbtDraft={removePendingSbtDraft}
-      />
-    )}
-
-    {(!isNormalMode || !collapsedSections.metadata) && (
-      <SessionMetadataEditor
-        isNormalMode={isNormalMode}
+        onCloseDisplaySettings={onCloseDisplaySettings}
+        onEnterAdvancedMode={onEnterAdvancedMode}
+        onEnterNormalMode={onEnterNormalMode}
+        onRegistryChainIdChange={onRegistryChainIdChange}
+        onToggleDisplaySettings={onToggleDisplaySettings}
+        registryAddress={registryAddress}
+        registryChainId={registryChainId}
+        registryChainName={registryChainName}
+        registryChainOptions={registryChainOptions}
+        renderInfoTooltip={renderSessionWizardInfoTooltip}
+        wizardDisplaySettingsOpen={wizardDisplaySettingsOpen}
         wizardMode={wizardMode}
-        isCollapsed={collapsedSections.metadata}
-        onToggleCollapsed={() => toggleSection('metadata')}
-        headerAccessory={sessionMetadataHeaderAccessory}
-        primaryEntries={primaryDraftEntries}
-        moreOptionsEntries={moreOptionsEntries}
-        moreOptionsOpen={moreOptionsOpen}
-        onToggleMoreOptions={onToggleMoreOptions}
-        renderField={renderField}
-        draft={draft}
-        showJsonPreview={showJsonPreview}
-        onToggleJsonPreview={onToggleJsonPreview}
-        onCopyDraftJson={onCopyDraftJson}
-        jsonCopied={jsonCopied}
       />
-    )}
 
-    {(!isNormalMode || (showNormalModeWorkerStep && !collapsedSections.worker)) && (
-      <WorkerPanel
+      <SessionWizardIntroStatusRail
+        activeNormalModeIndex={activeNormalModeIndex}
+        collapsedSections={collapsedSections}
+        fundingRequirementHref={newSessionFundingRequirementHref}
+        fundingRequirementLabel={newSessionFundingRequirementLabel}
         isNormalMode={isNormalMode}
-        t={t}
-        renderSessionWizardInfoTooltip={renderSessionWizardInfoTooltip}
-        isCollapsed={collapsedSections.worker}
-        onToggleCollapsed={() => toggleSection('worker')}
-        showSharedWorkerChoice={showSharedWorkerChoice}
-        workerMode={workerMode}
-        onWorkerModeChange={setWorkerMode}
-        setWorkerUrlAutoFilled={setWorkerUrlAutoFilled}
-        updateDraftValue={updateDraftValue}
-        getDefaultWorkerUrl={getSessionWizardDefaultWorkerUrl}
-        draft={draft}
-        deployWorkerUrl={deployWorkerUrl}
-        deployComplete={deployComplete}
-        devPersistWorkerSecrets={devPersistWorkerSecrets}
-        persistWorkerSecrets={persistWorkerSecrets}
-        setPersistWorkerSecrets={setPersistWorkerSecrets}
-        workerSecretsEnabled={workerSecretsEnabled}
-        setWorkerSecretsEnabled={setWorkerSecretsEnabled}
-        clearWorkerSecretFields={clearWorkerSecretFields}
-        effectivePersistWorkerSecrets={effectivePersistWorkerSecrets}
-        workerResourceKeys={visibleWorkerResourceKeys}
-        renderResourceCard={renderResourceCard}
-        workerAllowOrigins={workerAllowOrigins}
-        setWorkerAllowOrigins={setWorkerAllowOrigins}
-        defaultAllowedOrigins={defaultAllowedOrigins}
-        shouldUseSponsoredAutoDeployFlow={shouldUseSponsoredAutoDeployFlow}
-        deployForm={deployForm}
-        deployHelperToggle={(
-          <WorkerDeployHelperToggle
-            checked={embeddedDeployHelperEnabled}
-            onChange={(nextValue) => updateDraftValue(['embeddedDeployHelperEnabled'], nextValue)}
-            renderInfoTooltip={renderSessionWizardInfoTooltip}
-          />
-        )}
-        shouldShowDeployHelperUrlInput={shouldShowDeployHelperUrlInput}
-        deployHelperUrl={deployHelperUrl}
-        setDeployHelperUrl={setDeployHelperUrl}
-        bundleMode={bundleMode}
-        setBundleMode={setBundleMode}
-        normalModeBundleUrl={normalModeBundleUrl}
-        normalModeBundleHelpText={normalModeBundleHelpText}
-        showNormalModeManualBundleControls={showNormalModeManualBundleControls}
-        normalModeBundleUrlOverride={normalModeBundleUrlOverride}
-        setNormalModeBundleUrlOverride={setNormalModeBundleUrlOverride}
-        normalModeBundleUrlOverrideValidationError={normalModeBundleUrlOverrideValidationError}
-        manualBundleUrlOverrideHelp={manualBundleUrlOverrideHelp}
-        normalModeRetryBundleFileInputRef={normalModeRetryBundleFileInputRef}
-        setBundleFile={setBundleFile}
-        clearSelectedBundleFile={clearSelectedBundleFile}
-        bundleFile={bundleFile}
-        normalModeManualBundleHelpText={normalModeManualBundleHelpText}
-        localWorkerBundleFallbackFilePath={localWorkerBundleFallbackFilePath}
-        advancedBundleFileInputRef={advancedBundleFileInputRef}
-        showSponsoredDeployAccessNotice={showSponsoredDeployAccessNotice}
-        account={account}
-        resolvedActiveSessionSlug={resolvedActiveSessionSlug}
-        setDeployForm={setDeployForm}
-        handleDeployWorker={handleDeployWorker}
-        deployStatusDisplayState={deployStatusDisplayState}
-        showWorkerUrlField={showWorkerUrlField}
-        displayedWorkerUrl={displayedWorkerUrl}
-        renderField={renderField}
-        workerUrlAutoFilled={workerUrlAutoFilled}
+        newSessionRequiresLitCredential={newSessionRequiresLitCredential}
+        normalModeCards={normalModeCards}
+        onDismissRequirements={onDismissNewSessionRequirementsBanner}
+        onFocusNormalModeSection={focusNormalModeSection}
+        onRetrySponsoredBundle={onRetrySponsoredBundle}
+        showNewSessionRequirementsBanner={showNewSessionRequirementsBanner}
+        showNormalModeRail={!showSessionModeProfileGate}
+        sponsoredBundleStatus={sponsoredBundleStatus}
       />
-    )}
 
-    <SessionWizardPublishSection
-      isCollapsed={collapsedSections.publish}
-      isNormalMode={isNormalMode}
-      onToggleCollapsed={() => toggleSection('publish')}
-      normalModePublishSummary={normalModePublishSummary}
-      onPublish={onPublish}
-      onTogglePublishAdvanced={() => onTogglePublishAdvanced()}
-      showSponsoredBundleFallbackInput={showSponsoredBundleFallbackInput}
-      normalModeBundleUrlOverride={normalModeBundleUrlOverride}
-      onNormalModeBundleUrlOverrideChange={onNormalModeBundleUrlOverrideChange}
-      normalModeBundleUrlOverrideValidationError={normalModeBundleUrlOverrideValidationError}
-      manualBundleUrlOverrideHelp={manualBundleUrlOverrideHelp}
-      bundleFileInputRef={sponsoredPublishBundleFileInputRef}
-      onBundleFileChange={setBundleFile}
-      onClearBundleFile={clearSelectedBundleFile}
-      bundleFile={bundleFile}
-      localWorkerBundleFallbackFilePath={localWorkerBundleFallbackFilePath}
-      sponsoredManualBundleRetryMessage={sponsoredManualBundleRetryMessage}
-      publishUiPlan={publishUiPlan}
-      renderInfoTooltip={renderSessionWizardInfoTooltip}
-      resolvedWorkerBaseUrl={resolvedWorkerBaseUrl}
-      workerUrlSource={workerUrlSource}
-      manualMetadataUrl={manualMetadataUrl}
-      onManualMetadataUrlChange={onManualMetadataUrlChange}
-      manualGasLimit={manualGasLimit}
-      onManualGasLimitChange={onManualGasLimitChange}
-      manualGasPriceGwei={manualGasPriceGwei}
-      onManualGasPriceGweiChange={onManualGasPriceGweiChange}
-      manualMaxFeePerGasGwei={manualMaxFeePerGasGwei}
-      onManualMaxFeePerGasGweiChange={onManualMaxFeePerGasGweiChange}
-      manualMaxPriorityFeePerGasGwei={manualMaxPriorityFeePerGasGwei}
-      onManualMaxPriorityFeePerGasGweiChange={onManualMaxPriorityFeePerGasGweiChange}
-      registerTxs={registerTxs}
-      registerExplorerBaseUrl={registerExplorerBaseUrl}
-      sessionUrl={sessionUrl}
-      adminUrl={adminUrl}
-      publishedPendingSbtLinks={publishedPendingSbtLinks}
-      onCopyAdminUrl={handleCopyAdminUrl}
-      adminUrlStatus={adminUrlStatus}
-      status={status}
-    />
+      {showSessionModeProfileGate ? (
+        sessionModeProfileControl
+      ) : (
+        <>
+          {showSessionModeProfileControlInSetup ? sessionModeProfileControl : null}
 
-    <SessionWizardModals
-      account={account}
-      provider={provider}
-      createSbtModalState={createSbtModalState}
-      closeCreateSbtModal={closeCreateSbtModal}
-      createSbtModalNetwork={createSbtModalNetwork}
-      toggleLoginModal={toggleLoginModal}
-      createSbtModalSessionSlug={createSbtModalSessionSlug}
-      draft={draft}
-      createSbtModalChainId={createSbtModalChainId}
-      createSbtModalArweaveJwkOverride={createSbtModalArweaveJwkOverride}
-      encryptionGates={encryptionGates}
-      normalizeSbtSelection={normalizeSbtSelection}
-      defaultGateId={defaultGateId}
-      signBootstrapAdminAction={signBootstrapAdminAction}
-      handleSavePendingSbtDraft={handleSavePendingSbtDraft}
-      contractViewerModalState={contractViewerModalState}
-      selectedWizardContract={selectedWizardContract}
-      closeContractViewerModal={closeContractViewerModal}
-      selectedWizardContractHref={selectedWizardContractHref}
-      sessionHeaderPreviewModalOpen={sessionHeaderPreviewModalOpen}
-      onCloseSessionHeaderPreviewModal={onCloseSessionHeaderPreviewModal}
-      sessionHeaderPreviewSrc={sessionHeaderPreviewSrc}
-      t={t}
-    />
-  </div>
-);
+          {(!isNormalMode || !collapsedSections.encryption) && (
+            <EncryptionPanel
+              isNormalMode={isNormalMode}
+              t={t}
+              renderSessionWizardInfoTooltip={renderSessionWizardInfoTooltip}
+              isCollapsed={collapsedSections.encryption}
+              onToggleCollapsed={() => toggleSection('encryption')}
+              launchCreateSbtModal={launchCreateSbtModal}
+              activeCreateSbtTargetGateId={activeCreateSbtTargetGateId}
+              activeCreateSbtTargetGate={activeCreateSbtTargetGate}
+              encryptionGates={encryptionGates}
+              focusCreateSbtTargetGate={focusCreateSbtTargetGate}
+              updateEncryptionGate={updateEncryptionGate}
+              removeEncryptionGate={removeEncryptionGate}
+              normalizeSbtSelection={normalizeSbtSelection}
+              handleGateAddSbt={handleGateAddSbt}
+              handleGateRemoveSbt={handleGateRemoveSbt}
+              network={network}
+              pendingSbtSelectorOptions={pendingSbtSelectorOptions}
+              selectorSourceChainId={selectorSourceChainId}
+              selectorSourceSessionConfig={selectorSourceSessionConfig}
+              resolvedActiveSessionSlug={resolvedActiveSessionSlug}
+              sbtCacheRevision={sbtCacheRevision}
+              ensureLightSbtUniverse={ensureLightSbtUniverse}
+              addEncryptionGate={addEncryptionGate}
+              pendingSbtDrafts={pendingSbtDrafts}
+              removePendingSbtDraft={removePendingSbtDraft}
+            />
+          )}
+
+          {(!isNormalMode || !collapsedSections.metadata) && (
+            <SessionMetadataEditor
+              isNormalMode={isNormalMode}
+              wizardMode={wizardMode}
+              isCollapsed={collapsedSections.metadata}
+              onToggleCollapsed={() => toggleSection('metadata')}
+              headerAccessory={sessionMetadataHeaderAccessory}
+              primaryEntries={primaryDraftEntries}
+              moreOptionsEntries={moreOptionsEntries}
+              moreOptionsOpen={moreOptionsOpen}
+              onToggleMoreOptions={onToggleMoreOptions}
+              renderField={renderField}
+              draft={draft}
+              showJsonPreview={showJsonPreview}
+              onToggleJsonPreview={onToggleJsonPreview}
+              onCopyDraftJson={onCopyDraftJson}
+              jsonCopied={jsonCopied}
+            />
+          )}
+
+          {(!isNormalMode || (showNormalModeWorkerStep && !collapsedSections.worker)) && (
+            <WorkerPanel
+              isNormalMode={isNormalMode}
+              t={t}
+              renderSessionWizardInfoTooltip={renderSessionWizardInfoTooltip}
+              isCollapsed={collapsedSections.worker}
+              onToggleCollapsed={() => toggleSection('worker')}
+              showSharedWorkerChoice={showSharedWorkerChoice}
+              workerMode={workerMode}
+              onWorkerModeChange={setWorkerMode}
+              setWorkerUrlAutoFilled={setWorkerUrlAutoFilled}
+              updateDraftValue={updateDraftValue}
+              getDefaultWorkerUrl={getSessionWizardDefaultWorkerUrl}
+              draft={draft}
+              deployWorkerUrl={deployWorkerUrl}
+              deployComplete={deployComplete}
+              devPersistWorkerSecrets={devPersistWorkerSecrets}
+              persistWorkerSecrets={persistWorkerSecrets}
+              setPersistWorkerSecrets={setPersistWorkerSecrets}
+              workerSecretsEnabled={workerSecretsEnabled}
+              setWorkerSecretsEnabled={setWorkerSecretsEnabled}
+              clearWorkerSecretFields={clearWorkerSecretFields}
+              effectivePersistWorkerSecrets={effectivePersistWorkerSecrets}
+              workerResourceKeys={visibleWorkerResourceKeys}
+              renderResourceCard={renderResourceCard}
+              workerAllowOrigins={workerAllowOrigins}
+              setWorkerAllowOrigins={setWorkerAllowOrigins}
+              defaultAllowedOrigins={defaultAllowedOrigins}
+              shouldUseSponsoredAutoDeployFlow={shouldUseSponsoredAutoDeployFlow}
+              deployForm={deployForm}
+              deployHelperToggle={(
+                <WorkerDeployHelperToggle
+                  checked={embeddedDeployHelperEnabled}
+                  onChange={(nextValue) => updateDraftValue(['embeddedDeployHelperEnabled'], nextValue)}
+                  renderInfoTooltip={renderSessionWizardInfoTooltip}
+                />
+              )}
+              shouldShowDeployHelperUrlInput={shouldShowDeployHelperUrlInput}
+              deployHelperUrl={deployHelperUrl}
+              setDeployHelperUrl={setDeployHelperUrl}
+              bundleMode={bundleMode}
+              setBundleMode={setBundleMode}
+              normalModeBundleUrl={normalModeBundleUrl}
+              normalModeBundleHelpText={normalModeBundleHelpText}
+              showNormalModeManualBundleControls={showNormalModeManualBundleControls}
+              normalModeBundleUrlOverride={normalModeBundleUrlOverride}
+              setNormalModeBundleUrlOverride={setNormalModeBundleUrlOverride}
+              normalModeBundleUrlOverrideValidationError={normalModeBundleUrlOverrideValidationError}
+              manualBundleUrlOverrideHelp={manualBundleUrlOverrideHelp}
+              normalModeRetryBundleFileInputRef={normalModeRetryBundleFileInputRef}
+              setBundleFile={setBundleFile}
+              clearSelectedBundleFile={clearSelectedBundleFile}
+              bundleFile={bundleFile}
+              normalModeManualBundleHelpText={normalModeManualBundleHelpText}
+              localWorkerBundleFallbackFilePath={localWorkerBundleFallbackFilePath}
+              advancedBundleFileInputRef={advancedBundleFileInputRef}
+              showSponsoredDeployAccessNotice={showSponsoredDeployAccessNotice}
+              account={account}
+              resolvedActiveSessionSlug={resolvedActiveSessionSlug}
+              setDeployForm={setDeployForm}
+              handleDeployWorker={handleDeployWorker}
+              deployStatusDisplayState={deployStatusDisplayState}
+              showWorkerUrlField={showWorkerUrlField}
+              displayedWorkerUrl={displayedWorkerUrl}
+              renderField={renderField}
+              workerUrlAutoFilled={workerUrlAutoFilled}
+            />
+          )}
+
+          <SessionWizardPublishSection
+            isCollapsed={collapsedSections.publish}
+            isNormalMode={isNormalMode}
+            onToggleCollapsed={() => toggleSection('publish')}
+            normalModePublishSummary={normalModePublishSummary}
+            onPublish={onPublish}
+            onTogglePublishAdvanced={() => onTogglePublishAdvanced()}
+            showSponsoredBundleFallbackInput={showSponsoredBundleFallbackInput}
+            normalModeBundleUrlOverride={normalModeBundleUrlOverride}
+            onNormalModeBundleUrlOverrideChange={onNormalModeBundleUrlOverrideChange}
+            normalModeBundleUrlOverrideValidationError={normalModeBundleUrlOverrideValidationError}
+            manualBundleUrlOverrideHelp={manualBundleUrlOverrideHelp}
+            bundleFileInputRef={sponsoredPublishBundleFileInputRef}
+            onBundleFileChange={setBundleFile}
+            onClearBundleFile={clearSelectedBundleFile}
+            bundleFile={bundleFile}
+            localWorkerBundleFallbackFilePath={localWorkerBundleFallbackFilePath}
+            sponsoredManualBundleRetryMessage={sponsoredManualBundleRetryMessage}
+            publishUiPlan={publishUiPlan}
+            renderInfoTooltip={renderSessionWizardInfoTooltip}
+            resolvedWorkerBaseUrl={resolvedWorkerBaseUrl}
+            workerUrlSource={workerUrlSource}
+            manualMetadataUrl={manualMetadataUrl}
+            onManualMetadataUrlChange={onManualMetadataUrlChange}
+            manualGasLimit={manualGasLimit}
+            onManualGasLimitChange={onManualGasLimitChange}
+            manualGasPriceGwei={manualGasPriceGwei}
+            onManualGasPriceGweiChange={onManualGasPriceGweiChange}
+            manualMaxFeePerGasGwei={manualMaxFeePerGasGwei}
+            onManualMaxFeePerGasGweiChange={onManualMaxFeePerGasGweiChange}
+            manualMaxPriorityFeePerGasGwei={manualMaxPriorityFeePerGasGwei}
+            onManualMaxPriorityFeePerGasGweiChange={onManualMaxPriorityFeePerGasGweiChange}
+            registerTxs={registerTxs}
+            registerExplorerBaseUrl={registerExplorerBaseUrl}
+            sessionUrl={sessionUrl}
+            adminUrl={adminUrl}
+            publishedPendingSbtLinks={publishedPendingSbtLinks}
+            onCopyAdminUrl={handleCopyAdminUrl}
+            adminUrlStatus={adminUrlStatus}
+            status={status}
+          />
+
+          <SessionWizardModals
+            account={account}
+            provider={provider}
+            createSbtModalState={createSbtModalState}
+            closeCreateSbtModal={closeCreateSbtModal}
+            createSbtModalNetwork={createSbtModalNetwork}
+            toggleLoginModal={toggleLoginModal}
+            createSbtModalSessionSlug={createSbtModalSessionSlug}
+            draft={draft}
+            createSbtModalChainId={createSbtModalChainId}
+            createSbtModalArweaveJwkOverride={createSbtModalArweaveJwkOverride}
+            encryptionGates={encryptionGates}
+            normalizeSbtSelection={normalizeSbtSelection}
+            defaultGateId={defaultGateId}
+            signBootstrapAdminAction={signBootstrapAdminAction}
+            handleSavePendingSbtDraft={handleSavePendingSbtDraft}
+            contractViewerModalState={contractViewerModalState}
+            selectedWizardContract={selectedWizardContract}
+            closeContractViewerModal={closeContractViewerModal}
+            selectedWizardContractHref={selectedWizardContractHref}
+            sessionHeaderPreviewModalOpen={sessionHeaderPreviewModalOpen}
+            onCloseSessionHeaderPreviewModal={onCloseSessionHeaderPreviewModal}
+            sessionHeaderPreviewSrc={sessionHeaderPreviewSrc}
+            t={t}
+          />
+        </>
+      )}
+    </div>
+  );
+};
 
 export default SessionWizardShell;

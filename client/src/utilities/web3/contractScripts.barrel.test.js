@@ -3,6 +3,11 @@ import contractScripts, {
   getSessionConfigBySlug,
 } from './contractScripts.js';
 import * as contractScriptsModule from './contractScripts.js';
+import chainGateway, {
+  getReadProviderForGroup as getReadProviderForGroupGateway,
+  getSessionConfigBySlug as getSessionConfigBySlugGateway,
+} from './chainGateway.js';
+import * as chainGatewayModule from './chainGateway.js';
 import contractScriptsImpl, {
   getReadProviderForGroup as getReadProviderForGroupImpl,
   getSessionConfigBySlug as getSessionConfigBySlugImpl,
@@ -28,12 +33,26 @@ describe('contractScripts compatibility barrel', () => {
     expect(spy).toHaveBeenCalledWith('ignored');
   });
 
+  it('keeps the canonical chainGateway entrypoint spyable for Jest callers', () => {
+    const mocked = { slug: 'gateway-session' };
+    const spy = jest
+      .spyOn(chainGatewayModule, 'getSessionConfigBySlug')
+      .mockReturnValue(mocked);
+
+    expect(chainGatewayModule.getSessionConfigBySlug('ignored')).toBe(mocked);
+    expect(spy).toHaveBeenCalledWith('ignored');
+  });
+
   it('re-exports the implementation default and named helpers unchanged', () => {
     expect(contractScripts).toBe(contractScriptsImpl);
+    expect(chainGateway).toBe(contractScriptsImpl);
     expect(getSessionConfigBySlug).toBe(getSessionConfigBySlugImpl);
     expect(getReadProviderForGroup).toBe(getReadProviderForGroupImpl);
+    expect(getSessionConfigBySlugGateway).toBe(getSessionConfigBySlugImpl);
+    expect(getReadProviderForGroupGateway).toBe(getReadProviderForGroupImpl);
 
     expect(typeof contractScripts.getLatestBlockNumber).toBe('function');
+    expect(typeof chainGateway.getLatestBlockNumber).toBe('function');
     expect(typeof contractScripts.listenForSurveyEvents).toBe('function');
     expect(typeof contractScripts.getUserActivity).toBe('function');
   });
@@ -46,7 +65,7 @@ describe('contractScripts compatibility barrel', () => {
     const implStubPath = path.join(tmpDir, 'contractScripts.impl.stub.js');
     const viteConfigPath = path.join(tmpDir, 'vite.config.mjs');
     const viteBinPath = path.join(clientRoot, 'node_modules/vite/bin/vite.js');
-    const barrelPath = path.resolve(__dirname, 'contractScripts.ts');
+    const barrelPath = path.resolve(__dirname, 'chainGateway.ts');
 
     fs.mkdirSync(outputDir, { recursive: true });
     fs.writeFileSync(implStubPath, `

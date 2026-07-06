@@ -9,7 +9,6 @@
  *   - in-conversation participant selection
  *   - base/group clustering with silhouette-based k selection
  *   - representative-comment ("repness") ranking
- *   - consensus and group-aware consensus summaries
  */
 
 const SIG_90_Z = 1.2816;
@@ -1025,9 +1024,6 @@ export function computePolisConversationMath(ratingMatrix = [], questionPromptsM
     questionPromptsMap,
     allQuestions
   );
-  const groupVotes = computeGroupVotes(ratingMatrix, clusterAssignments, allQuestions);
-  const groupAwareConsensus = computeGroupAwareConsensus(groupVotes);
-  const consensus = computeConsensusSummary(ratingMatrix, questionPromptsMap, allQuestions);
 
   return {
     stats,
@@ -1043,9 +1039,6 @@ export function computePolisConversationMath(ratingMatrix = [], questionPromptsM
     baseClusters,
     groupClusters: clusteredBase.groupClusters,
     inConversationParticipantIndices,
-    groupVotes,
-    groupAwareConsensus,
-    consensus,
   };
 }
 

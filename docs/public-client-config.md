@@ -33,6 +33,18 @@ the browser bundle at build time, so changes require a rebuild/redeploy.
 
 For a custom-domain self-host, the values to check first are:
 - None are required solely because the app is hosted on Netlify.
+- `NEXT_PUBLIC_RP_ID` / `REACT_APP_NEXT_PUBLIC_RP_ID` before enabling the
+  embedded passkey EOA wallet in production. This is the passkey RP ID and
+  should be an owned parent domain, not a preview host.
+- `NEXT_PUBLIC_APP_ORIGIN` / `REACT_APP_NEXT_PUBLIC_APP_ORIGIN` and
+  `NEXT_PUBLIC_ACCOUNT_ORIGIN` / `REACT_APP_NEXT_PUBLIC_ACCOUNT_ORIGIN` when
+  the wallet app and account origin differ.
+- `NEXT_PUBLIC_WALLET_KEY_MODE` / `REACT_APP_NEXT_PUBLIC_WALLET_KEY_MODE`
+  defaults to `passkey-derived`, where the passkey PRF output derives the EOA
+  private key directly.
+- `NEXT_PUBLIC_WALLET_DERIVATION_NAMESPACE` /
+  `REACT_APP_NEXT_PUBLIC_WALLET_DERIVATION_NAMESPACE` is part of the derived
+  wallet address namespace. Changing it changes derived wallet addresses.
 - `REACT_APP_CE_SHARED_WORKER_URL` when the deployment should use your own
   default/shared `sessionCorsWorker` instead of the demo fallback.
 - `REACT_APP_CE_DEPLOY_HELPER_URL` when `/new` should use your own

@@ -49,7 +49,7 @@ function setupSourceRepo() {
     git(tempRoot, ['init', '--bare', '--initial-branch=main', remoteDir], { stdio: 'ignore' });
     git(tempRoot, ['clone', remoteDir, sourceDir], { stdio: 'ignore' });
     git(sourceDir, ['config', 'user.name', 'Private Dev'], { stdio: 'ignore' });
-    git(sourceDir, ['config', 'user.email', 'private@example.com'], { stdio: 'ignore' });
+    git(sourceDir, ['config', 'user.email', '[redacted-email]'], { stdio: 'ignore' });
 
     installFixture(sourceDir);
 
@@ -91,6 +91,10 @@ function runInstaller(sourceDir) {
   });
 }
 
+function seedRemoteBranch(sourceDir, branchName) {
+  git(sourceDir, ['push', '--quiet', '--no-verify', 'origin', `${branchName}:refs/heads/${branchName}`]);
+}
+
 test('installer configures repo-local hooks and unsets the dev upstream', () => {
   withSourceRepo(({ sourceDir }) => {
     const result = runInstaller(sourceDir);
@@ -122,8 +126,63 @@ test('installed pre-push hook blocks publishing dev to origin', () => {
     });
 
     assert.notEqual(pushResult.status, 0);
-    assert.match(`${pushResult.stderr}${pushResult.stdout}`, /Blocked push of the private `dev` branch to origin\./);
+    assert.match(`${pushResult.stderr}${pushResult.stdout}`, /Blocked push to public Context Engine remote origin\./);
+    assert.doesNotMatch(`${pushResult.stderr}${pushResult.stdout}`, /CE_ALLOW_PRIVATE_BRANCH_PUSH/);
     assert.equal(git(sourceDir, ['ls-remote', '--heads', 'origin', 'dev']).trim(), '');
+  });
+});
+
+test('installed pre-push hook does not honor the old private branch bypass env var', () => {
+  withSourceRepo(({ sourceDir }) => {
+    const installResult = runInstaller(sourceDir);
+    assert.equal(installResult.status, 0);
+
+    const pushResult = spawnSync('git', ['push', '-u', 'origin', 'dev'], {
+      cwd: sourceDir,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        CE_ALLOW_PRIVATE_BRANCH_PUSH: '1',
+      },
+    });
+
+    assert.notEqual(pushResult.status, 0);
+    assert.match(`${pushResult.stderr}${pushResult.stdout}`, /Blocked push to public Context Engine remote origin\./);
+    assert.equal(git(sourceDir, ['ls-remote', '--heads', 'origin', 'dev']).trim(), '');
+  });
+});
+
+test('installed pre-push hook blocks publishing codex agent branches to origin', () => {
+  withSourceRepo(({ sourceDir }) => {
+    const installResult = runInstaller(sourceDir);
+    assert.equal(installResult.status, 0);
+    git(sourceDir, ['checkout', '--quiet', '-b', 'codex/private-agent-branch']);
+
+    const pushResult = spawnSync('git', ['push', '-u', 'origin', 'codex/private-agent-branch'], {
+      cwd: sourceDir,
+      encoding: 'utf8',
+    });
+
+    assert.notEqual(pushResult.status, 0);
+    assert.match(`${pushResult.stderr}${pushResult.stdout}`, /Blocked push to public Context Engine remote origin\./);
+    assert.equal(git(sourceDir, ['ls-remote', '--heads', 'origin', 'codex/private-agent-branch']).trim(), '');
+  });
+});
+
+test('installed pre-push hook blocks publishing edge branches to origin', () => {
+  withSourceRepo(({ sourceDir }) => {
+    const installResult = runInstaller(sourceDir);
+    assert.equal(installResult.status, 0);
+    git(sourceDir, ['checkout', '--quiet', '-b', 'edge-2026']);
+
+    const pushResult = spawnSync('git', ['push', '-u', 'origin', 'edge-2026'], {
+      cwd: sourceDir,
+      encoding: 'utf8',
+    });
+
+    assert.notEqual(pushResult.status, 0);
+    assert.match(`${pushResult.stderr}${pushResult.stdout}`, /Blocked push to public Context Engine remote origin\./);
+    assert.equal(git(sourceDir, ['ls-remote', '--heads', 'origin', 'edge-2026']).trim(), '');
   });
 });
 
@@ -132,14 +191,14 @@ test('installed pre-push hook blocks publishing dev to matching public remotes e
     const installResult = runInstaller(sourceDir);
     assert.equal(installResult.status, 0);
 
-    const hookResult = spawnSync('bash', [path.join(sourceDir, '.githooks', 'pre-push'), 'public', 'git@github.com-agalmic:AgalmicSoftware/context-engine.git'], {
+    const hookResult = spawnSync('bash', [path.join(sourceDir, '.githooks', 'pre-push'), 'public', '[redacted-email]-agalmic:AgalmicSoftware/context-engine.git'], {
       cwd: sourceDir,
       encoding: 'utf8',
       input: 'refs/heads/dev 1111111111111111111111111111111111111111 refs/heads/dev 0000000000000000000000000000000000000000\n',
     });
 
     assert.notEqual(hookResult.status, 0);
-    assert.match(`${hookResult.stderr}${hookResult.stdout}`, /Blocked push of the private `dev` branch to public\./);
+    assert.match(`${hookResult.stderr}${hookResult.stdout}`, /Blocked push to public Context Engine remote public\./);
   });
 });
 
@@ -147,16 +206,7 @@ test('installed pre-push hook still allows deleting a remote dev branch', () => 
   withSourceRepo(({ sourceDir }) => {
     const installResult = runInstaller(sourceDir);
     assert.equal(installResult.status, 0);
-
-    const seededPush = spawnSync('git', ['push', '-u', 'origin', 'dev'], {
-      cwd: sourceDir,
-      encoding: 'utf8',
-      env: {
-        ...process.env,
-        CE_ALLOW_PRIVATE_BRANCH_PUSH: '1',
-      },
-    });
-    assert.equal(seededPush.status, 0);
+    seedRemoteBranch(sourceDir, 'dev');
 
     const deleteResult = spawnSync('git', ['push', 'origin', '--delete', 'dev'], {
       cwd: sourceDir,

@@ -11,8 +11,23 @@ const readClientFile = (relativePath) => {
   return fs.readFileSync(filePath, 'utf8');
 };
 
+const readClientJestConfig = () => require(path.resolve(__dirname, '../../../jest.config.cjs'));
+
 const expectedLintCommand = [
-  'eslint src/',
+  'eslint --no-error-on-unmatched-pattern src/',
+  '"src/domains/**/*.{ts,tsx}"',
+  '"src/utilities/session/**/*.{ts,tsx}"',
+  '"src/utilities/worker/**/*.{ts,tsx}"',
+  '"src/utilities/arweave/**/*.{ts,tsx}"',
+  '"src/utilities/web3/**/*.{ts,tsx}"',
+  '"src/utilities/cache/**/*.{ts,tsx}"',
+  '"src/utilities/survey/**/*.{ts,tsx}"',
+  '"src/utilities/sbt/**/*.{ts,tsx}"',
+  '"src/utilities/user/**/*.{ts,tsx}"',
+  '"src/utilities/sponsor/**/*.{ts,tsx}"',
+  '"src/utilities/tags/**/*.{ts,tsx}"',
+  '"src/utilities/contracts/**/*.{ts,tsx}"',
+  '"src/utilities/shared/**/*.{ts,tsx}"',
   '"src/utilities/ui/**/*.{ts,tsx}"',
   '"src/components/Shared/**/*.{ts,tsx}"',
   '"src/components/About/**/*.{ts,tsx}"',
@@ -32,6 +47,17 @@ const expectedLintCommand = [
   '"src/components/DebateMap/**/*.{ts,tsx}"',
   '"src/components/Navbar/**/*.{ts,tsx}"',
   '"src/components/ContractPage/**/*.{ts,tsx}"',
+  '"src/components/OnePageSession/**/*.{ts,tsx}"',
+  '"src/components/TagPage/**/*.{ts,tsx}"',
+  '"src/components/DocumentLibrary/**/*.{ts,tsx}"',
+  '"src/components/DemoViews/**/*.{ts,tsx}"',
+  '"src/components/Account/**/*.{ts,tsx}"',
+  '"src/components/Admin/**/*.{ts,tsx}"',
+  '"src/components/MainSite/**/*.{ts,tsx}"',
+  '"src/components/UserPage/**/*.{ts,tsx}"',
+  '"src/components/Sessions/**/*.{ts,tsx}"',
+  '"src/components/SBTs/**/*.{ts,tsx}"',
+  '"src/components/SurveyTool/**/*.{ts,tsx}"',
 ].join(' ');
 
 describe('client package modernization contract', () => {
@@ -59,12 +85,36 @@ describe('client package modernization contract', () => {
     expect(pkg.scripts.eject).toBeUndefined();
     expect(pkg.scripts.start).not.toContain('vite');
     expect(eslintConfig).not.toContain('react-app');
+    expect(eslintConfig).toContain("const typedDomainFiles = ['src/domains/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedSessionUtilityFiles = ['src/utilities/session/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedWorkerUtilityFiles = ['src/utilities/worker/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedArweaveUtilityFiles = ['src/utilities/arweave/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedWeb3UtilityFiles = ['src/utilities/web3/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedCacheUtilityFiles = ['src/utilities/cache/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedSurveyUtilityFiles = ['src/utilities/survey/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedSbtUtilityFiles = ['src/utilities/sbt/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedUserUtilityFiles = ['src/utilities/user/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedSponsorUtilityFiles = ['src/utilities/sponsor/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedTagsUtilityFiles = ['src/utilities/tags/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedContractsUtilityFiles = ['src/utilities/contracts/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedSharedUtilityFiles = ['src/utilities/shared/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedGateComponentFiles = ['src/components/Gates/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedCommunityTabComponentFiles = ['src/components/CommunityTab/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedPolisReportComponentFiles = ['src/components/PolisReport/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedDebateMapComponentFiles = ['src/components/DebateMap/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedNavbarComponentFiles = ['src/components/Navbar/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedContractPageComponentFiles = ['src/components/ContractPage/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedOnePageSessionComponentFiles = ['src/components/OnePageSession/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedTagPageComponentFiles = ['src/components/TagPage/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedDocumentLibraryComponentFiles = ['src/components/DocumentLibrary/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedDemoViewsComponentFiles = ['src/components/DemoViews/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedAccountComponentFiles = ['src/components/Account/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedAdminComponentFiles = ['src/components/Admin/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedMainSiteComponentFiles = ['src/components/MainSite/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedUserPageComponentFiles = ['src/components/UserPage/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedSessionsComponentFiles = ['src/components/Sessions/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedSbtComponentFiles = ['src/components/SBTs/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedSurveyToolComponentFiles = ['src/components/SurveyTool/**/*.{ts,tsx}']");
   });
 
   it('keeps web3-sensitive dependencies pinned during modernization', () => {
@@ -74,6 +124,19 @@ describe('client package modernization contract', () => {
     expect(pkg.devDependencies['react-scripts']).toBeUndefined();
     expect(pkg.devDependencies.webpack).toBeUndefined();
     expect(pkg.overrides.webpack).toBeUndefined();
+  });
+
+  it('keeps the client coverage floor pinned to the measured ratchet baseline', () => {
+    const jestConfig = readClientJestConfig();
+
+    expect(jestConfig.coverageThreshold).toEqual({
+      global: {
+        statements: 75.7,
+        branches: 61,
+        functions: 77,
+        lines: 79.1,
+      },
+    });
   });
 
   it('keeps stale dependency overrides out of the client package contract', () => {
@@ -215,6 +278,7 @@ describe('client package modernization contract', () => {
       'src/components/DebateMap/DebateMap.tsx',
       'src/components/SurveyTool/CreateQuestionsAndSurveys.tsx',
       'src/components/ContractPage/contractSourceLoader.ts',
+      'src/utilities/web3/chainGateway.ts',
       'src/utilities/web3/contractScripts.ts',
     ].forEach((relativePath) => {
       expect(readClientFile(relativePath)).not.toMatch(/\brequire\(/);

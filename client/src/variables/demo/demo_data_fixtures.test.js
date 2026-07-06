@@ -68,7 +68,7 @@ describe('demo data fixture cleanup', () => {
     expect(fs.existsSync(path.join(demoDir, 'debates_part1.json'))).toBe(false);
     expect(fs.existsSync(path.join(demoDir, 'debates_part2.json'))).toBe(false);
     expect(Array.isArray(debates)).toBe(true);
-    expect(debates).toHaveLength(13);
+    expect(debates).toHaveLength(16);
     expect(debates.map((debate) => debate.id)).toEqual([
       'debate_exponential_progress',
       'debate_reward_hacking_misalignment',
@@ -83,6 +83,9 @@ describe('demo data fixture cleanup', () => {
       'debate_ai_education_integrity',
       'debate_ai_copyright_training',
       'debate_multimodal_deepfake_governance',
+      'debate_government_prerelease_access',
+      'debate_alignment_tractability_2026',
+      'debate_ai_labor_displacement_timeline',
     ]);
   });
 
@@ -92,7 +95,7 @@ describe('demo data fixture cleanup', () => {
       ai_laws_policy: 20,
       arxiv_ai_safety: 20,
       lesswrong_posts: 20,
-      cross_corpus: 13,
+      cross_corpus: 16,
       dwarkesh_lab_insiders: 20,
       ai_scifi_books: 20,
       metr_evals_metrics: 15,
