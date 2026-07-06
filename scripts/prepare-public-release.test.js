@@ -70,6 +70,7 @@ test('prepare-public-release strips review artifacts and preserves the generated
     writeFile(sourceDir, path.join('docs', 'codebase-health-modernization-2026-05-07.md'), 'local audit notes\n');
     writeFile(sourceDir, path.join('docs', 'assets', 'codebase-health-modernization-2026-05-07.png'), 'local audit chart\n');
     writeFile(sourceDir, path.join('docs', 'telegram-response-export-scope-prd.md'), 'private product planning\n');
+    writeFile(sourceDir, path.join('ai-discourse-corpus', 'corpuses', '_local_helper.js'), 'local helper script\n');
     writeFile(sourceDir, path.join('.tmp-review', 'review.js'), 'temporary review snapshot\n');
     writeFile(sourceDir, 'private-pack.manifest.json', 'tracked root manifest that should be replaced\n');
     writeFile(sourceDir, path.join('TODO', 'secret.md'), 'private planning\n');
@@ -131,6 +132,7 @@ test('prepare-public-release strips review artifacts and preserves the generated
     assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'codebase-health-modernization-2026-05-07.md')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'assets', 'codebase-health-modernization-2026-05-07.png')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'telegram-response-export-scope-prd.md')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'ai-discourse-corpus', 'corpuses', '_local_helper.js')), false);
     assert.equal(fs.existsSync(path.join(outputDir, '.tmp-review')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'TODO')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'TODO', `${'PR'}${'D'}s`)), false);
@@ -159,6 +161,7 @@ test('prepare-public-release strips review artifacts and preserves the generated
     assert.doesNotMatch(manifestText, /\.keys/);
     assert.doesNotMatch(manifestText, /codebase-health-modernization/);
     assert.doesNotMatch(manifestText, /telegram-response-export-scope-prd/);
+    assert.doesNotMatch(manifestText, /_local_helper/);
     assert.doesNotMatch(manifestText, /\.private\.test/);
     assert.match(manifestText, /private-pack\.manifest\.json/);
   } finally {
