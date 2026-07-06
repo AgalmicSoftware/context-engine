@@ -99,12 +99,10 @@ import {
   buildSurveyRespondersPayloadRefSignature,
   buildSurveyRespondersSignature,
   countQuestionModeResponses,
-  formatTsForCsv,
   getSurveyResponseAggregateTimestampMs,
   getSurveyResponseQuestionId,
   hasAnyCountableSurveyAnswer,
   normalizeSurveyResponsePayloadByQuestionId,
-  pickTimestampMs,
   stableSerializeSignatureValue,
   stringifySurveyResultsAggregatorResponses,
   toggleSurveyResultsLockedResponseDetailsPatch,
@@ -169,6 +167,7 @@ import {
   buildSurveyResultsQuestionsJsonExport,
   buildSurveyResultsExportBaseFileName,
   buildSurveyResultsExportControlsDisplayDescriptor,
+  buildSurveyResultsResponsesCsvExport,
   buildSurveyResultsResponsesJsonExport,
 } from './surveyResultsExportPlans.js';
 import {
@@ -464,14 +463,6 @@ type SurveyResultsManagedCacheUpdate = {
 type SurveyResultsQuestionFilterCombinedPayload = SurveyResultsRecord & {
   filteredQuestions?: unknown;
   filteredResponsesByQuestion?: unknown;
-};
-type SurveyResultsCsvLatestEntry = {
-  ms: number;
-  row: string;
-};
-type SurveyResultsCsvResponseEntry = SurveyResultsRecord & {
-  responder?: unknown;
-  response?: unknown;
 };
 type SurveyResultsPollingCountOptions = {
   forceScan?: boolean;
@@ -1025,13 +1016,6 @@ const areValuesEquivalentBySignature = (currentValue: unknown, nextValue: unknow
     return currentValue === nextValue;
   }
   return stableSerializeSignatureValue(currentValue) === stableSerializeSignatureValue(nextValue);
-};
-
-const getConvictionValue = (obj: SurveyResultsResponseRecord | null | undefined): unknown => {
-  if (!obj || typeof obj !== 'object') return '';
-  if (obj.conviction !== undefined && obj.conviction !== null) return obj.conviction;
-  if (obj.importance !== undefined && obj.importance !== null) return obj.importance;
-  return '';
 };
 
 const getResponseQuestionId = (obj: SurveyResultsResponseRecord | null | undefined): string => (
@@ -2348,9 +2332,6 @@ if (stateRef.current.isFilterActive) {
 
 const generateResponsesCSV = (): string => {
 const { viewMode, surveyViewMode, sbtFilteredResponses, sbtFilteredAggregatorQuestionResponses } = stateRef.current;
-let csvContent = '';
-let header = '';
-const csvRows: string[] = [];
 
 if (!hasEffectiveNetworkId()) {
   setState(asSurveyResultsStatePatch(buildSurveyResultsAlertMessagePatch('Network not available for fetching question data.')));
@@ -2400,131 +2381,14 @@ try {
   }
 }
 
-if (viewMode === 'survey' && surveyViewMode === 'individuals') {
-  header = 'responderAddress,questionID,questionPrompt,type,options,importance,answer,answerHash,additionalComments,answerEncrypted,additionalEncrypted,additionalHash,timestamp\n';
-
-  // De-dupe latest per (responder|questionID)
-  const latest = new Map<string, SurveyResultsCsvLatestEntry>();
-  const passthroughRows: string[] = [];
-
-  const filteredResponses = Array.isArray(sbtFilteredResponses)
-    ? sbtFilteredResponses as SurveyResultsCsvResponseEntry[]
-    : [];
-  filteredResponses.forEach((response) => {
-    const parsedResponse = parseResponse(response.response) as SurveyResultsSurveyResponsePayload | null;
-    if (parsedResponse && Array.isArray(parsedResponse.responses)) {
-      parsedResponse.responses.forEach((answer: SurveyResultsResponseRecord) => {
-        const qid = getResponseQuestionId(answer);
-        const responderAddress =
-          typeof response.responder === 'string'
-            ? response.responder
-            : (response.responder && toSurveyResultsRecord(response.responder).address) || response.responder || '';
-
-        const questionData = networkQuestions[qid?.toLowerCase?.() ?? qid];
-        let optionsString = '';
-        if (questionData && questionData.type === 'multichoice' && Array.isArray(questionData.options)) {
-          optionsString = questionData.options.join(';');
-        }
-
-        const ms = pickTimestampMs(answer, parsedResponse, response);
-        const tsOut = formatTsForCsv(ms);
-
-        const row = [
-          responderAddress,
-          qid,
-          getResponseQuestionPrompt(answer, questionData),
-          getResponseQuestionType(answer, questionData),
-          optionsString,
-          getConvictionValue(answer),
-          answer.answer?.value,
-          answer.answer?.hash,
-          answer.additional?.value,
-          answer.answer?.encrypted,
-          answer.additional?.encrypted,
-          answer.additional?.hash,
-          tsOut
-        ].map(formatCell).join(',');
-
-        if (!responderAddress || !qid) {
-          passthroughRows.push(row);
-          return;
-        }
-
-        const key = `${String(responderAddress).toLowerCase()}|${String(qid).toLowerCase()}`;
-        const prev = latest.get(key);
-        if (!prev || ms > prev.ms) {
-          latest.set(key, { ms, row });
-        }
-      });
-    }
-  });
-
-  csvRows.push(...passthroughRows, ...Array.from(latest.values()).map((v) => v.row));
-} else {
-  // 'questions' mode or 'survey' -> 'aggregate' mode (question-centric)
-  header = 'questionID,questionPrompt,type,options,responderAddress,importance,answer,answerHash,additionalComments,answerEncrypted,additionalEncrypted,additionalHash,timestamp\n';
-
-  const dataToExport = toSurveyResultsRecord(sbtFilteredAggregatorQuestionResponses);
-  const latest = new Map<string, SurveyResultsCsvLatestEntry>();
-  const passthroughRows: string[] = [];
-
-  Object.entries(dataToExport).forEach(([questionIdFromBucket, responsesArray]) => {
-    const rows = Array.isArray(responsesArray) ? responsesArray as SurveyResultsCsvResponseEntry[] : [];
-    rows.forEach((respObj) => {
-      const parsed = parseResponse(respObj.response) as SurveyResultsResponseRecord | null;
-      if (!parsed) return;
-
-      let responderAddress = '';
-      if (typeof respObj.responder === 'string') {
-        responderAddress = respObj.responder;
-      } else if (respObj.responder && typeof toSurveyResultsRecord(respObj.responder).address === 'string') {
-        responderAddress = toSurveyResultsRecord(respObj.responder).address as string;
-      }
-
-      const qid = getResponseQuestionId(parsed) || String(questionIdFromBucket || '');
-      const questionData = networkQuestions[qid?.toLowerCase?.() ?? qid];
-      let optionsString = '';
-      if (questionData && questionData.type === 'multichoice' && Array.isArray(questionData.options)) {
-        optionsString = questionData.options.join(';');
-      }
-
-      const ms = pickTimestampMs(parsed, null, respObj);
-      const tsOut = formatTsForCsv(ms);
-
-      const row = [
-        qid,
-        getResponseQuestionPrompt(parsed, questionData),
-        getResponseQuestionType(parsed, questionData),
-        optionsString,
-        responderAddress,
-        getConvictionValue(parsed),
-        parsed.answer?.value,
-        parsed.answer?.hash,
-        parsed.additional?.value,
-        parsed.answer?.encrypted,
-        parsed.additional?.encrypted,
-        parsed.additional?.hash,
-        tsOut
-      ].map(formatCell).join(',');
-
-      if (!responderAddress || !qid) {
-        passthroughRows.push(row);
-        return;
-      }
-
-      const key = `${String(responderAddress).toLowerCase()}|${String(qid).toLowerCase()}`;
-      const prev = latest.get(key);
-      if (!prev || ms > prev.ms) {
-        latest.set(key, { ms, row });
-      }
-    });
-  });
-
-  csvRows.push(...passthroughRows, ...Array.from(latest.values()).map((v) => v.row));
-}
-
-csvContent = header + csvRows.join('\n');
-return csvContent;
+return buildSurveyResultsResponsesCsvExport({
+  aggregatorQuestionResponses: sbtFilteredAggregatorQuestionResponses,
+  filteredResponses: sbtFilteredResponses,
+  networkQuestions,
+  parseResponse,
+  surveyViewMode,
+  viewMode,
+});
 };
 
 const generateResultsJSON = (): string => {

@@ -7,6 +7,7 @@ import {
   buildSurveyResultsExportGenerationPlan,
   buildSurveyResultsQuestionsCsvExport,
   buildSurveyResultsQuestionsJsonExport,
+  buildSurveyResultsResponsesCsvExport,
   buildSurveyResultsResponsesJsonExport,
   getSurveyResultsExportTypeLabel,
 } from './surveyResultsExportPlans';
@@ -177,6 +178,97 @@ describe('surveyResultsExportPlans', () => {
       '"questionID","prompt","type","tags","options"\n'
       + '"q1","Question ""One""","multichoice","tag-a;tag-b","Alpha;Beta"'
     );
+  });
+
+  it('builds survey-individual response CSV with latest-row dedupe', () => {
+    const csv = buildSurveyResultsResponsesCsvExport({
+      filteredResponses: [
+        {
+          responder: '0x111',
+          response: {
+            responses: [
+              {
+                additional: { encrypted: false, hash: 'old-add-hash', value: 'Old note' },
+                answer: { encrypted: false, hash: 'old-hash', value: ['Beta'] },
+                conviction: 2,
+                questionID: 'q1',
+                timeStamp: '2024-12-31T00:00:00.000Z',
+              },
+              {
+                additional: { encrypted: false, hash: 'add-hash-1', value: 'Latest note' },
+                answer: { encrypted: false, hash: 'hash-1', value: ['Alpha', 'Gamma'] },
+                conviction: 7,
+                questionID: 'q1',
+                timeStamp: '2025-01-01T00:00:00.000Z',
+              },
+            ],
+          },
+        },
+        {
+          responder: '0x222',
+          response: {
+            responses: [
+              {
+                additional: { encrypted: false, value: '' },
+                answer: { encrypted: true, value: '*' },
+                importance: 4,
+                questionId: 'q2',
+                timeStamp: '2025-02-02T00:00:00.000Z',
+              },
+            ],
+          },
+        },
+      ],
+      networkQuestions: {
+        q1: { options: ['Alpha', 'Beta', 'Gamma'], prompt: 'Question One', type: 'multichoice' },
+        q2: { prompt: 'Question Two', type: 'freeform' },
+      },
+      surveyViewMode: 'individuals',
+      viewMode: 'survey',
+    });
+
+    const lines = csv.split('\n');
+    expect(lines[0]).toBe('responderAddress,questionID,questionPrompt,type,options,importance,answer,answerHash,additionalComments,answerEncrypted,additionalEncrypted,additionalHash,timestamp');
+    expect(lines[1]).toBe('"0x111","q1","Question One","multichoice","Alpha;Beta;Gamma","7","Alpha, Gamma","hash-1","Latest note","false","false","add-hash-1","2025-01-01T00:00:00.000Z"');
+    expect(lines[2]).toBe('"0x222","q2","Question Two","freeform","","4","*","","","true","false","","2025-02-02T00:00:00.000Z"');
+    expect(csv).not.toContain('Old note');
+    expect(csv).not.toContain('old-hash');
+  });
+
+  it('builds aggregate response CSV from mixed object and string payloads', () => {
+    const csv = buildSurveyResultsResponsesCsvExport({
+      aggregatorQuestionResponses: {
+        q1: [
+          {
+            responder: '0x111',
+            response: JSON.stringify({
+              additional: { encrypted: false, hash: 'add-hash', value: 'Current note' },
+              answer: { encrypted: false, hash: 'ans-hash', value: ['Alpha', 'Gamma'] },
+              conviction: 9,
+              questionID: 'q1',
+              timeStamp: '2025-03-01T00:00:00.000Z',
+            }),
+          },
+          {
+            responder: { address: '0x222' },
+            response: {
+              additional: { encrypted: false, hash: 'second-add-hash', value: 'Second note' },
+              answer: { encrypted: false, hash: 'second-ans-hash', value: ['Beta'] },
+              importance: 5,
+              timeStamp: '2025-03-02T00:00:00.000Z',
+            },
+          },
+        ],
+      },
+      networkQuestions: {
+        q1: { options: ['Alpha', 'Beta', 'Gamma'], prompt: 'Aggregate Question', type: 'multichoice' },
+      },
+    });
+
+    const lines = csv.split('\n');
+    expect(lines[0]).toBe('questionID,questionPrompt,type,options,responderAddress,importance,answer,answerHash,additionalComments,answerEncrypted,additionalEncrypted,additionalHash,timestamp');
+    expect(lines[1]).toBe('"q1","Aggregate Question","multichoice","Alpha;Beta;Gamma","0x111","9","Alpha, Gamma","ans-hash","Current note","false","false","add-hash","2025-03-01T00:00:00.000Z"');
+    expect(lines[2]).toBe('"q1","Aggregate Question","multichoice","Alpha;Beta;Gamma","0x222","5","Beta","second-ans-hash","Second note","false","false","second-add-hash","2025-03-02T00:00:00.000Z"');
   });
 
   it('builds questions JSON from an explicit export snapshot', () => {
