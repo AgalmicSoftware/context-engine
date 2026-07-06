@@ -82,14 +82,10 @@ describe('sessionModeProfile', () => {
       ]));
   });
 
-  it('accepts worker envelope only behind the explicit feature flag', () => {
+  it('accepts worker envelope for Cloudflare without a feature flag', () => {
     const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
     profile.encryption = { mode: 'worker_envelope', keyProvider: 'worker_secret' };
-    expect(validateSessionModeProfile(profile).issues)
-      .toEqual(expect.arrayContaining([
-        expect.objectContaining({ code: 'worker_envelope_feature_disabled' }),
-      ]));
-    expect(validateSessionModeProfile(profile, { enableWorkerEnvelope: true }).valid).toBe(true);
+    expect(validateSessionModeProfile(profile).valid).toBe(true);
 
     const compiled = compileSessionModeProfile(profile);
     expect(compiled.storageProfile).toEqual(expect.objectContaining({
@@ -99,6 +95,46 @@ describe('sessionModeProfile', () => {
     }));
     expect(compiled.payloadAccessControl).toEqual({ gate: 'sbt_gate', encryption: 'worker_envelope' });
     expect(compiled.payloadAccessMode).toBe('worker_sbt_gate');
+  });
+
+  it('rejects worker envelope outside Cloudflare and compiles default conditions where the worker reads them', () => {
+    const invalid = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
+    invalid.encryption = { mode: 'worker_envelope', keyProvider: 'worker_secret' };
+    expect(validateSessionModeProfile(invalid).issues)
+      .toEqual(expect.arrayContaining([
+        expect.objectContaining({ code: 'worker_envelope_requires_cloudflare' }),
+      ]));
+
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    profile.evm.registryChainId = 11155420;
+    profile.encryption = {
+      mode: 'worker_envelope',
+      keyProvider: 'worker_secret',
+      accessConditions: {
+        match: 'all',
+        conditions: [
+          { kind: 'worker_role', role: 'reviewer' },
+          {
+            kind: 'sbt_onchain',
+            chainId: 11155420,
+            contract: '0x00000000000000000000000000000000000000aa',
+            anyOrAll: 'any',
+          },
+          { kind: 'agent_grant_scope', scope: 'storage' },
+        ],
+      },
+    };
+    const compiled = compileSessionModeProfile(profile);
+
+    expect(compiled.storageProfile).toEqual(expect.objectContaining({
+      payloadAccessControl: {
+        gate: 'sbt_gate',
+        encryption: 'worker_envelope',
+        accessConditions: profile.encryption.accessConditions,
+      },
+    }));
+    expect(compiled.payloadAccessControl.accessConditions).toEqual(profile.encryption.accessConditions);
+    expect(validateSessionModeProfile(profile).valid).toBe(true);
   });
 
   it('lets explicit Cloudflare access override the default gate', () => {

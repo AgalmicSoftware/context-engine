@@ -1,8 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { storageRoute } from './storageRouteExecution.js';
-import { rotateStorageEnvelopeKeys } from './storageEnvelopeEncryption.js';
+import {
+  exportCloudflareEncryptedPayloadEnvelopes,
+  storageRoute,
+} from './storageRouteExecution.js';
+import {
+  rewrapStorageEnvelopeSessionKeyForDeployment,
+  rotateStorageEnvelopeKeys,
+} from './storageEnvelopeEncryption.js';
 
 const TX_ID = 'abc123abc123abc123abc123abc123abc123abc1230';
 const CF_ID = 'AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA';
@@ -1412,6 +1418,183 @@ test('storageRoute worker_envelope evaluates any/all and supported condition kin
   assert.equal((await readJson(unknownResponse)).reason, 'unknown_condition_kind');
 });
 
+test('exportCloudflareEncryptedPayloadEnvelopes emits ciphertext and envelope metadata only', async () => {
+  const kv = createMockKv();
+  const env = {
+    CE_STORAGE_INDEX_KV: kv,
+    CE_STORAGE_ENVELOPE_KEK: 'test deployment envelope kek',
+  };
+  let config = createEnvelopeConfig({
+    payloadAccessControl: {
+      accessConditions: {
+        match: 'any',
+        conditions: [{ kind: 'worker_role', role: 'admin' }],
+      },
+    },
+  });
+  const setConfig = (nextConfig) => { config = nextConfig; };
+  const { body: envelopeBody } = await uploadEnvelopePayload({
+    env,
+    config,
+    setConfig,
+    data: 'classified export payload',
+    deps: { randomBytes: createSequenceRandomBytes(41) },
+  });
+
+  const litConfig = {
+    storageProfile: {
+      backend: 'cloudflare',
+      payloadAccessControl: { gate: 'sbt_gate', encryption: 'lit' },
+    },
+  };
+  const litResponse = await storageRoute({
+    path: '/storage/upload',
+    method: 'POST',
+    request: new Request('https://worker.example/storage/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        data: 'lit ciphertext body',
+        contentType: 'text/plain',
+        resource: 'responses',
+        payloadEncrypted: true,
+      }),
+    }),
+    env,
+    config: litConfig,
+    slug: 'session-a',
+    uploaderAddress: '0x0000000000000000000000000000000000000abc',
+    baseHeaders: {},
+    deps: {
+      json,
+      randomBytes: createSequenceRandomBytes(91),
+      now: () => Date.parse('2026-01-02T03:04:07.000Z'),
+    },
+  });
+  assert.equal(litResponse.status, 200);
+
+  const exported = await exportCloudflareEncryptedPayloadEnvelopes({
+    env,
+    config,
+    slug: 'session-a',
+    deps: { now: () => Date.parse('2026-01-02T03:05:00.000Z') },
+  });
+  assert.equal(exported.ok, true);
+  assert.equal(exported.manifest.exportScope, 'encrypted_envelopes_only');
+  assert.equal(exported.manifest.storageBackend, 'cloudflare');
+  assert.equal(exported.manifest.encryptedPayloadCount, 2, JSON.stringify(exported, null, 2));
+  assert.equal(exported.manifest.wrappedKeysIncluded, true);
+  assert.equal(exported.manifest.keyProvider, 'mixed');
+  assert.equal(exported.manifest.rewrapRequiredForNewDeployment, true);
+  assert.ok(exported.sessionEnvelope.sessionKey.wrappedKey);
+  const dump = JSON.stringify(exported);
+  assert.doesNotMatch(dump, /classified export payload/);
+  assert.match(dump, /ciphertextBase64url/);
+  const exportedById = new Map(exported.payloads.map((entry) => [entry.storageRef.id, entry]));
+  const envelopeEntry = exportedById.get(envelopeBody.storageRef.id);
+  assert.equal(envelopeEntry.metadata.payloadAccessControl.encryption, 'worker_envelope');
+  assert.equal(envelopeEntry.keyProvider, 'worker_secret');
+  assert.equal(envelopeEntry.envelope.dek.wrappedKey.length > 0, true);
+  assert.deepEqual(envelopeEntry.envelope.accessConditions, {
+    match: 'any',
+    conditions: [{ kind: 'worker_role', role: 'admin' }],
+  });
+  const litEntry = exported.payloads.find((entry) => entry.metadata.payloadAccessControl.encryption === 'lit');
+  assert.equal(litEntry.keyProvider, 'lit');
+  assert.equal(litEntry.ciphertextBase64url, 'bGl0IGNpcGhlcnRleHQgYm9keQ');
+  assert.equal(litEntry.wrappedKeysIncluded, false);
+});
+
+test('storageRoute /storage/export-envelopes omits session key material', async () => {
+  const kv = createMockKv();
+  const env = {
+    CE_STORAGE_INDEX_KV: kv,
+    CE_STORAGE_ENVELOPE_KEK: 'test deployment envelope kek',
+  };
+  let config = createEnvelopeConfig();
+  const setConfig = (nextConfig) => { config = nextConfig; };
+  await uploadEnvelopePayload({
+    env,
+    config,
+    setConfig,
+    data: 'route export plaintext',
+    deps: { randomBytes: createSequenceRandomBytes(131) },
+  });
+
+  const response = await storageRoute({
+    path: '/storage/export-envelopes',
+    method: 'GET',
+    request: new Request('https://worker.example/storage/export-envelopes?resource=docsContext'),
+    env,
+    config,
+    slug: 'session-a',
+    uploaderAddress: '',
+    baseHeaders: {},
+    deps: { json },
+  });
+  const body = await readJson(response);
+  assert.equal(response.status, 200);
+  assert.equal(body.manifest.exportScope, 'encrypted_envelopes_only');
+  assert.equal(body.payloads.length, 1);
+  assert.equal(Object.hasOwn(body, 'sessionEnvelope'), false);
+  assert.doesNotMatch(JSON.stringify(body), /route export plaintext/);
+  assert.match(JSON.stringify(body), /ciphertextBase64url/);
+
+  const postResponse = await storageRoute({
+    path: '/storage/export-envelopes',
+    method: 'POST',
+    request: new Request('https://worker.example/storage/export-envelopes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resource: 'docsContext' }),
+    }),
+    env,
+    config,
+    slug: 'session-a',
+    uploaderAddress: '',
+    baseHeaders: {},
+    deps: { json },
+  });
+  const postBody = await readJson(postResponse);
+  assert.equal(postResponse.status, 200);
+  assert.equal(postBody.manifest.resource, 'docsContext');
+  assert.equal(postBody.payloads.length, 1);
+});
+
+test('exportCloudflareEncryptedPayloadEnvelopes counts encrypted rows when payload bytes are missing', async () => {
+  const kv = createMockKv();
+  const env = {
+    CE_STORAGE_INDEX_KV: kv,
+    CE_STORAGE_ENVELOPE_KEK: 'test deployment envelope kek',
+  };
+  let config = createEnvelopeConfig();
+  const setConfig = (nextConfig) => { config = nextConfig; };
+  const { body } = await uploadEnvelopePayload({
+    env,
+    config,
+    setConfig,
+    data: 'missing payload bytes',
+    deps: { randomBytes: createSequenceRandomBytes(141) },
+  });
+  kv.store.delete(`ce-storage-payload:session-a:${body.storageRef.id}`);
+
+  const exported = await exportCloudflareEncryptedPayloadEnvelopes({
+    env,
+    config,
+    slug: 'session-a',
+    resource: 'docsContext',
+  });
+
+  assert.equal(exported.ok, true);
+  assert.equal(exported.manifest.encryptedPayloadCount, 1);
+  assert.equal(exported.manifest.exportedPayloadCount, 0);
+  assert.equal(exported.manifest.partial, true);
+  assert.deepEqual(exported.manifest.readErrors, [{
+    id: body.storageRef.id,
+    error: 'payload_bytes_missing',
+  }]);
+});
+
 test('rotateStorageEnvelopeKeys rewraps keys without changing ciphertext bytes', async () => {
   const kv = createMockKv();
   const env = {
@@ -1502,6 +1685,76 @@ test('rotateStorageEnvelopeKeys rewraps keys without changing ciphertext bytes',
   });
   assert.equal(secondReadResponse.status, 200);
   assert.equal(await secondReadResponse.text(), 'second classified payload');
+});
+
+test('rewrapStorageEnvelopeSessionKeyForDeployment changes no ciphertext bytes and retires the old KEK', async () => {
+  const kv = createMockKv();
+  const env = {
+    CE_STORAGE_INDEX_KV: kv,
+    CE_STORAGE_ENVELOPE_KEK: 'test deployment envelope kek',
+  };
+  let config = createEnvelopeConfig();
+  const setConfig = (nextConfig) => { config = nextConfig; };
+  const { body } = await uploadEnvelopePayload({
+    env,
+    config,
+    setConfig,
+    data: 'rehomed classified payload',
+    deps: { randomBytes: createSequenceRandomBytes(151) },
+  });
+  const payloadKey = `ce-storage-payload:session-a:${body.storageRef.id}`;
+  const beforePayload = JSON.parse(kv.store.get(payloadKey));
+  const beforeMetadata = await readStorageIndexMetadata(kv, 'session-a', 'docsContext', body.storageRef.id);
+  const beforeSessionWrappedKey = config.storageEnvelope.sessionKey.wrappedKey;
+
+  const rewrapped = await rewrapStorageEnvelopeSessionKeyForDeployment({
+    env,
+    slug: 'session-a',
+    config,
+    newDeploymentKek: 'new deployment envelope kek',
+    deps: {
+      putSessionConfig: async (_env, _slug, nextConfig) => setConfig(nextConfig),
+      now: () => Date.parse('2026-01-04T03:04:05.000Z'),
+    },
+  });
+  assert.equal(rewrapped.ok, true);
+  assert.equal(rewrapped.keyProvider, 'worker_secret');
+  assert.notEqual(config.storageEnvelope.sessionKey.wrappedKey, beforeSessionWrappedKey);
+
+  const afterPayload = JSON.parse(kv.store.get(payloadKey));
+  const afterMetadata = await readStorageIndexMetadata(kv, 'session-a', 'docsContext', body.storageRef.id);
+  assert.equal(afterPayload.payloadBase64url, beforePayload.payloadBase64url);
+  assert.equal(afterMetadata.envelope.dek.wrappedKey, beforeMetadata.envelope.dek.wrappedKey);
+
+  const oldReadResponse = await storageRoute({
+    path: '/storage/read',
+    method: 'GET',
+    request: new Request(`https://worker.example/storage/read?id=${body.storageRef.id}`),
+    env,
+    config,
+    slug: 'session-a',
+    uploaderAddress: '',
+    baseHeaders: {},
+    deps: { json, randomUUID: () => 'audit-old-kek-read' },
+  });
+  assert.equal(oldReadResponse.status, 403);
+
+  const newReadResponse = await storageRoute({
+    path: '/storage/read',
+    method: 'GET',
+    request: new Request(`https://worker.example/storage/read?id=${body.storageRef.id}`),
+    env: {
+      CE_STORAGE_INDEX_KV: kv,
+      CE_STORAGE_ENVELOPE_KEK: 'new deployment envelope kek',
+    },
+    config,
+    slug: 'session-a',
+    uploaderAddress: '',
+    baseHeaders: {},
+    deps: { json, randomUUID: () => 'audit-new-kek-read' },
+  });
+  assert.equal(newReadResponse.status, 200);
+  assert.equal(await newReadResponse.text(), 'rehomed classified payload');
 });
 
 test('storageRoute lists Cloudflare refs from the metadata index without raw object keys', async () => {

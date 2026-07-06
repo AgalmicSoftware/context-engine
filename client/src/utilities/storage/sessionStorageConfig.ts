@@ -44,6 +44,7 @@ export interface SessionStoragePayloadAccessControl {
   gate: SessionStoragePayloadAccessGate;
   encryption: SessionStoragePayloadEncryptionMode;
   mode: SessionStoragePayloadAccessMode;
+  accessConditions?: UnknownRecord;
 }
 
 interface SessionStorageResources extends Record<string, string> {
@@ -177,10 +178,14 @@ export const normalizeSessionStoragePayloadAccessControl = (raw: unknown): Sessi
     isObj(source) ? source.encryption : undefined,
     fallbackEncryption
   );
+  const accessConditions = isObj(source?.accessConditions)
+    ? JSON.parse(JSON.stringify(source.accessConditions))
+    : (isObj(source?.conditions) ? JSON.parse(JSON.stringify(source.conditions)) : null);
   return {
     gate,
     encryption,
     mode: deriveLegacyPayloadAccessMode({ gate, encryption }),
+    ...(accessConditions ? { accessConditions } : {}),
   };
 };
 

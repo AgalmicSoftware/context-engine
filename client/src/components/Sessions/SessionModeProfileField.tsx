@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { Button, Input, Label } from 'reactstrap';
+import { Button, Input, Label, UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCaretDown, faCaretUp, faCheck } from '@fortawesome/free-solid-svg-icons';
+import { faCaretDown, faCaretUp, faCheck, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 
 import styles from './SessionWizard.module.scss';
 import type { AnyRecord } from '../shellTypes';
@@ -10,6 +10,8 @@ import {
   cloneSessionModePreset,
   compileSessionModeProfile,
   validateSessionModeProfile,
+  type SessionModeAccessConditionDocument,
+  type SessionModeEncryptionMode,
   type SessionModeExportScope,
   type SessionModeProfile,
   type SessionModeResultsVisibility,
@@ -27,7 +29,7 @@ const PRESET_CARDS = [
     id: SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE,
     title: 'Fast & Cheap (Cloudflare)',
     badge: 'Recommended',
-    copy: 'Hosted on Cloudflare. Private by default and session-scoped. Not decentralized; not permanent. Can be publicly anchored later.',
+    copy: 'Hosted on Cloudflare. Session-scoped by default. Not permanent. Can be publicly anchored later.',
   },
   {
     id: SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED,
@@ -87,6 +89,31 @@ const profilesDiffer = (left: SessionModeProfile, right: SessionModeProfile): bo
   JSON.stringify(left) !== JSON.stringify(right)
 );
 
+const cloneAccessConditions = (
+  value?: SessionModeAccessConditionDocument
+): SessionModeAccessConditionDocument => (
+  value
+    ? JSON.parse(JSON.stringify(value))
+    : { match: 'any', conditions: [] }
+);
+
+const defaultSbtChainId = (
+  profile: SessionModeProfile,
+  registryChainId: number | null
+): number => (
+  Number(profile.evm.registryChainId || registryChainId || 11155420) || 11155420
+);
+
+const setWorkerEnvelopeCondition = (
+  profile: SessionModeProfile,
+  conditions: SessionModeAccessConditionDocument
+) => {
+  profile.encryption = {
+    ...profile.encryption,
+    accessConditions: conditions.conditions.length ? conditions : undefined,
+  };
+};
+
 const SessionModeProfileField = ({
   registryChainId = null,
   value = null,
@@ -132,6 +159,9 @@ const SessionModeProfileField = ({
   const selectedSurfaceFilter = new Set(profile?.export.surfaceFilter || []);
   const hasRegistryChain = !!(profile?.evm.registryChainId || registryChainId);
   const litDisabledReason = hasRegistryChain ? '' : 'Choose a registry chain before enabling Lit.';
+  const workerEnvelopeDisabledReason = profile?.storage.backend === 'cloudflare'
+    ? ''
+    : 'Worker envelope encryption is available only with Cloudflare storage. Use Lit for encrypted Arweave artifacts.';
 
   return (
     <section className={styles.modeProfilePanel} aria-label="Session mode">
@@ -210,6 +240,12 @@ const SessionModeProfileField = ({
                     } else {
                       draft.authority.mode = 'evm_registry_canonical';
                       draft.evm.registryChainId = draft.evm.registryChainId || registryChainId || 11155420;
+                      if (draft.encryption.mode === 'worker_envelope') {
+                        draft.encryption = { mode: 'none' };
+                      }
+                      if (draft.export.scope === 'encrypted_envelopes_only' && draft.encryption.mode === 'none') {
+                        draft.export.scope = 'admin_raw';
+                      }
                     }
                   })}
                 />
@@ -221,19 +257,37 @@ const SessionModeProfileField = ({
                   options={[
                     { value: 'none', label: 'None' },
                     { value: 'lit', label: 'Lit', disabled: !!litDisabledReason, title: litDisabledReason },
+                    {
+                      value: 'worker_envelope',
+                      label: 'Worker envelope',
+                      disabled: !!workerEnvelopeDisabledReason,
+                      title: workerEnvelopeDisabledReason,
+                    },
                   ]}
                   value={profile.encryption.mode}
                   onChange={(mode) => updateProfile((draft) => {
-                    draft.encryption = { mode: mode as SessionModeProfile['encryption']['mode'] };
+                    draft.encryption = { mode: mode as SessionModeEncryptionMode };
                     if (mode === 'lit') {
                       draft.evm.registryChainId = draft.evm.registryChainId || registryChainId || 11155420;
+                    }
+                    if (mode === 'worker_envelope') {
+                      draft.encryption.keyProvider = 'worker_secret';
                     }
                     if (mode === 'none' && draft.export.scope === 'encrypted_envelopes_only') {
                       draft.export.scope = 'admin_raw';
                     }
                   })}
+                  dataTestIdPrefix="ce-new-encryption"
                 />
                 {litDisabledReason ? <div className={styles.helperText}>{litDisabledReason}</div> : null}
+                {workerEnvelopeDisabledReason ? <div className={styles.helperText}>{workerEnvelopeDisabledReason}</div> : null}
+                {profile.encryption.mode === 'worker_envelope' ? (
+                  <WorkerEnvelopeOptions
+                    profile={profile}
+                    registryChainId={registryChainId || null}
+                    updateProfile={updateProfile}
+                  />
+                ) : null}
               </FormRow>
 
               <FormRow label="Surfaces">
@@ -384,6 +438,7 @@ type SegmentedButtonsProps = {
   options: Array<{ value: string; label: string; disabled?: boolean; title?: string }>;
   value: string;
   onChange: (value: string) => void;
+  dataTestIdPrefix?: string;
 };
 
 const SegmentedButtons = ({
@@ -391,6 +446,7 @@ const SegmentedButtons = ({
   options,
   value,
   onChange,
+  dataTestIdPrefix = '',
 }: SegmentedButtonsProps): React.ReactElement => (
   <div className={styles.inlineToggleRow} role="radiogroup" aria-label={ariaLabel}>
     {options.map((option) => (
@@ -401,6 +457,7 @@ const SegmentedButtons = ({
         aria-checked={value === option.value}
         disabled={option.disabled}
         title={option.title}
+        data-testid={dataTestIdPrefix ? `${dataTestIdPrefix}-${option.value}` : undefined}
         className={`${styles.workerModePill} ${value === option.value ? styles.workerModePillActive : ''}`}
         onClick={() => onChange(option.value)}
       >
@@ -409,5 +466,168 @@ const SegmentedButtons = ({
     ))}
   </div>
 );
+
+type WorkerEnvelopeOptionsProps = {
+  profile: SessionModeProfile;
+  registryChainId: number | null;
+  updateProfile: (mutate: (draft: SessionModeProfile) => void) => void;
+};
+
+const WorkerEnvelopeOptions = ({
+  profile,
+  registryChainId,
+  updateProfile,
+}: WorkerEnvelopeOptionsProps): React.ReactElement => {
+  const conditions = cloneAccessConditions(profile.encryption.accessConditions);
+
+  const commitConditions = (next: SessionModeAccessConditionDocument) => {
+    updateProfile((draft) => {
+      setWorkerEnvelopeCondition(draft, next);
+    });
+  };
+
+  const addCondition = (kind: SessionModeAccessConditionDocument['conditions'][number]['kind']) => {
+    const next = cloneAccessConditions(profile.encryption.accessConditions);
+    if (kind === 'worker_role') next.conditions.push({ kind, role: 'admin' });
+    if (kind === 'agent_grant_scope') next.conditions.push({ kind, scope: 'storage' });
+    if (kind === 'sbt_onchain') {
+      const chainId = defaultSbtChainId(profile, registryChainId);
+      next.conditions.push({
+        kind,
+        chainId,
+        contract: '',
+        anyOrAll: 'any',
+      });
+      updateProfile((draft) => {
+        draft.evm.registryChainId = draft.evm.registryChainId || chainId;
+        setWorkerEnvelopeCondition(draft, next);
+      });
+      return;
+    }
+    commitConditions(next);
+  };
+
+  const updateCondition = (
+    index: number,
+    mutate: (condition: SessionModeAccessConditionDocument['conditions'][number]) => SessionModeAccessConditionDocument['conditions'][number]
+  ) => {
+    const next = cloneAccessConditions(profile.encryption.accessConditions);
+    const current = next.conditions[index];
+    if (!current) return;
+    next.conditions[index] = mutate(current);
+    commitConditions(next);
+  };
+
+  return (
+    <div className={styles.modeAdvancedNested}>
+      <div className={styles.helperText}>
+        Encrypted at rest. Keys are held by the session worker; decryption is gated by session conditions. Key provider: <strong>worker_secret</strong>{' '}
+        <span id="ce-worker-envelope-copy-tooltip" tabIndex={0}>
+          <FontAwesomeIcon icon={faQuestionCircle} />
+        </span>
+        <UncontrolledTooltip target="ce-worker-envelope-copy-tooltip" placement="right">
+          The operator and Cloudflare runtime can decrypt. This protects storage-layer dumps, not operator trust.
+        </UncontrolledTooltip>
+      </div>
+      <Label className={styles.modeNumberLabel}>
+        Condition match
+        <Input
+          type="select"
+          value={conditions.match}
+          data-testid="ce-new-envelope-condition-match"
+          onChange={(event) => {
+            const next = cloneAccessConditions(profile.encryption.accessConditions);
+            next.match = event.target.value === 'all' ? 'all' : 'any';
+            commitConditions(next);
+          }}
+        >
+          <option value="any">Any condition</option>
+          <option value="all">All conditions</option>
+        </Input>
+      </Label>
+      <div className={styles.inlineToggleRow}>
+        <Button type="button" size="sm" onClick={() => addCondition('worker_role')} data-testid="ce-new-envelope-add-worker-role">
+          Add worker role
+        </Button>
+        <Button type="button" size="sm" onClick={() => addCondition('sbt_onchain')} data-testid="ce-new-envelope-add-sbt-onchain">
+          Add SBT
+        </Button>
+        <Button type="button" size="sm" onClick={() => addCondition('agent_grant_scope')} data-testid="ce-new-envelope-add-agent-scope">
+          Add agent scope
+        </Button>
+      </div>
+      {!conditions.conditions.length ? (
+        <div className={styles.helperText}>No default conditions; the worker falls back to the configured gate.</div>
+      ) : null}
+      {conditions.conditions.map((condition, index) => (
+        <div key={`${condition.kind}-${index}`} className={styles.modeAdvancedRow}>
+          <div className={styles.modeAdvancedLabel}>{condition.kind.replace(/_/g, ' ')}</div>
+          <div className={styles.modeAdvancedControl}>
+            {condition.kind === 'worker_role' ? (
+              <Input
+                value={condition.role}
+                data-testid={`ce-new-envelope-worker-role-${index}`}
+                onChange={(event) => updateCondition(index, () => ({ kind: 'worker_role', role: event.target.value }))}
+              />
+            ) : null}
+            {condition.kind === 'agent_grant_scope' ? (
+              <Input
+                value={condition.scope}
+                data-testid={`ce-new-envelope-agent-scope-${index}`}
+                onChange={(event) => updateCondition(index, () => ({ kind: 'agent_grant_scope', scope: event.target.value }))}
+              />
+            ) : null}
+            {condition.kind === 'sbt_onchain' ? (
+              <div className={styles.modeCheckboxRow}>
+                <Input
+                  type="number"
+                  value={condition.chainId || ''}
+                  data-testid={`ce-new-envelope-sbt-chain-${index}`}
+                  onChange={(event) => updateCondition(index, () => ({
+                    ...condition,
+                    chainId: Number(event.target.value || 0) || 0,
+                  }))}
+                />
+                <Input
+                  value={condition.contract}
+                  placeholder="0x..."
+                  data-testid={`ce-new-envelope-sbt-contract-${index}`}
+                  onChange={(event) => updateCondition(index, () => ({
+                    ...condition,
+                    contract: event.target.value,
+                  }))}
+                />
+                <Input
+                  type="select"
+                  value={condition.anyOrAll}
+                  data-testid={`ce-new-envelope-sbt-match-${index}`}
+                  onChange={(event) => updateCondition(index, () => ({
+                    ...condition,
+                    anyOrAll: event.target.value === 'all' ? 'all' : 'any',
+                  }))}
+                >
+                  <option value="any">Any token</option>
+                  <option value="all">All tokens</option>
+                </Input>
+              </div>
+            ) : null}
+            <Button
+              type="button"
+              size="sm"
+              color="secondary"
+              onClick={() => {
+                const next = cloneAccessConditions(profile.encryption.accessConditions);
+                next.conditions.splice(index, 1);
+                commitConditions(next);
+              }}
+            >
+              Remove
+            </Button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
 
 export default SessionModeProfileField;

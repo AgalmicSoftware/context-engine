@@ -70,10 +70,14 @@ describe('sessionStorageConfig', () => {
   });
 
   test('normalizes v2 worker_envelope access without requiring Lit', () => {
+    const accessConditions = {
+      match: 'any',
+      conditions: [{ kind: 'agent_grant_scope', scope: 'storage' }],
+    };
     const sessionConfig = {
       storageProfile: {
         backend: 'cloudflare',
-        payloadAccessControl: { gate: 'sbt_gate', encryption: 'worker_envelope' },
+        payloadAccessControl: { gate: 'sbt_gate', encryption: 'worker_envelope', accessConditions },
       },
     };
     expect(resolveSessionStorageBackend(sessionConfig, { resource: 'responses' })).toBe(STORAGE_BACKENDS.CLOUDFLARE);
@@ -83,6 +87,7 @@ describe('sessionStorageConfig', () => {
       gate: SESSION_STORAGE_PAYLOAD_ACCESS_GATES.SBT_GATE,
       encryption: SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE,
       mode: SESSION_STORAGE_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE,
+      accessConditions,
     });
   });
 
