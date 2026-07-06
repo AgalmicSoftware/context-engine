@@ -1,5 +1,4 @@
 import type {
-  CompiledSessionModeProfile,
   SessionModeProfile,
 } from '../../utilities/session/sessionModeProfile';
 import type { UnknownRecord } from '../../utilities/session/sessionTypes';
@@ -9,9 +8,9 @@ import { normalizeSessionStorageProfileConfig } from './sessionWizardStorageProf
 
 type SessionWizardModeDraft = UnknownRecord & {
   sessionMode?: unknown;
-  sessionModeProfile?: unknown;
+  sessionModeProfile?: UnknownRecord;
   storageProfile?: unknown;
-  telegram?: unknown;
+  telegram?: UnknownRecord;
   telegramBridgeEnabled?: unknown;
   telegramMode?: unknown;
   telegramOnly?: unknown;
@@ -22,11 +21,11 @@ const isRecord = (value: unknown): value is UnknownRecord => (
   !!value && typeof value === 'object' && !Array.isArray(value)
 );
 
-export const applyStorageProfileChangeToModeDraft = (
-  prev: SessionWizardModeDraft,
+export const applyStorageProfileChangeToModeDraft = <Draft extends SessionWizardModeDraft>(
+  prev: Draft,
   nextProfile: unknown,
-): SessionWizardModeDraft => {
-  const next = deepClone(prev);
+): Draft => {
+  const next = deepClone(prev) as Draft;
   const normalizedProfile = normalizeSessionStorageProfileConfig(nextProfile);
   next.storageProfile = normalizedProfile;
   if (isRecord(next.sessionModeProfile)) {
@@ -55,12 +54,12 @@ export const applyStorageProfileChangeToModeDraft = (
   return next;
 };
 
-export const applySessionModeProfileSelectionToDraft = (
-  prev: SessionWizardModeDraft,
+export const applySessionModeProfileSelectionToDraft = <Draft extends SessionWizardModeDraft>(
+  prev: Draft,
   profile: SessionModeProfile,
-  compiled: CompiledSessionModeProfile,
-): SessionWizardModeDraft => {
-  const next = deepClone(prev);
+  compiled: { storageProfile: UnknownRecord },
+): Draft => {
+  const next = deepClone(prev) as Draft;
   next.sessionModeProfile = { ...profile };
   next.storageProfile = normalizeSessionStorageProfileConfig(compiled.storageProfile);
   delete next.telegramOnly;

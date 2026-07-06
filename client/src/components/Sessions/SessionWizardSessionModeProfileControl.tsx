@@ -1,13 +1,11 @@
-import type {
-  CompiledSessionModeProfile,
-  SessionModeProfile,
-} from '../../utilities/session/sessionModeProfile';
+import type { SessionModeProfile } from '../../utilities/session/sessionModeProfile';
+import type { UnknownRecord } from '../../utilities/session/sessionTypes';
 import SessionModeProfileField from './SessionModeProfileField';
 
 export type SessionWizardSessionModeProfileControlProps = {
   registryChainId?: number | null;
   value?: unknown;
-  onChange: (profile: SessionModeProfile, compiled: CompiledSessionModeProfile) => void;
+  onChange: (profile: SessionModeProfile, compiled: { storageProfile: UnknownRecord }) => void;
 };
 
 const SessionWizardSessionModeProfileControl = ({

@@ -16,6 +16,7 @@ import LazyFallback from '../Shared/LazyFallback';
 import styles from './OnePageSession.module.scss';
 
 const PolisReport = React.lazy(() => import('../PolisReport/PolisReport'));
+const PolisReportCompat = PolisReport as React.ComponentType<Record<string, unknown>>;
 const TelegramQuestionPile = React.lazy(() => import('./telegram/TelegramQuestionPile'));
 const TelegramBucketCards = React.lazy(() => import('./telegram/TelegramBucketCards'));
 const TelegramDebateMapPanel = React.lazy(() => import('./telegram/TelegramDebateMapPanel'));
@@ -219,7 +220,7 @@ const OnePageSessionTelegramShell = ({
                   </p>
                 ) : null}
                 <Suspense fallback={<LazyFallback label="Loading Polis report..." minHeight="20vh" />}>
-                  <PolisReport
+                  <PolisReportCompat
                     onePageDemo={true}
                     miniMode={true}
                     account={account}
