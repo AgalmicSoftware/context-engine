@@ -55,7 +55,6 @@ import {
 } from './surveyResultsBlockNumbers.js';
 import {
   buildSurveyResultsAlertMessagePatch,
-  buildSurveyResultsBookmarkFeedbackPatch,
   buildSurveyResultsBookmarkedQuestionIdsPatch,
   buildSurveyResultsBookmarkedSurveyIdsPatch,
   buildSurveyResultsBooleanTogglePatch,
@@ -159,9 +158,7 @@ import {
   buildSurveyResultsCacheControllerSnapshot,
 } from './surveyResultsCacheControllerSnapshot';
 import {
-  buildSurveyResultsFilterBookmarkWritePlan,
   buildSurveyResultsSurveyQuestionBookmarkWritePlan,
-  type SurveyResultsFilterBookmarkWritePlan,
 } from './surveyResultsCacheWriteEligibilityPlan';
 import {
   buildSurveyResultsBookmarksCacheReadRequest,
@@ -178,9 +175,6 @@ import {
   runSurveyResultsAnalysisLifecycleController,
   type SurveyResultsAnalysisLifecycleStatePatchPort,
 } from './surveyResultsAnalysisLifecycleController';
-import {
-  runSurveyResultsFilterBookmarkWriteController,
-} from './surveyResultsFilterBookmarkWriteController';
 import {
   runSurveyResultsSurveyQuestionBookmarkWriteController,
 } from './surveyResultsSurveyQuestionBookmarkWriteController';
@@ -368,9 +362,6 @@ type SurveyResultsSummaryResponsePayload = SurveyResultsRecord & {
 type SurveyResultsSummaryResponseRow = SurveyResultsAggregateRow & {
   response?: SurveyResultsSummaryResponsePayload | null;
   responder?: unknown;
-};
-type SurveyResultsFiltersCache = SurveyResultsRecord & {
-  bookmarkedFilters?: unknown;
 };
 export type SurveyResultsFilterState = SurveyResultsRecord;
 type SurveyResultsQuestionFilterQuestionsMemo = {
@@ -782,7 +773,6 @@ type SurveyResultsInstanceFields = {
   _unsubscribeCacheUpdates: (() => void) | null;
   _lastNotifiedFilterStateSignature: string | null;
   _pendingFilterLoadingValue: unknown;
-  _bookmarkFeedbackTimer: ReturnType<typeof setTimeout> | null;
   _stableFallbackQuestions: SurveyResultsFallbackQuestionBuckets | null;
   csvFileName: string;
 };
@@ -2997,82 +2987,6 @@ try {
 }
 };
 
-const handleBookmarkFilter = async (): Promise<void> => {
-const filterToBookmark = stateRef.current.filterState;
-const mountedWritePlan = buildSurveyResultsFilterBookmarkWritePlan({
-  filterState: filterToBookmark,
-  isMounted: inst._isMounted,
-});
-if (!mountedWritePlan.shouldReadCache) return;
-const slug = getEffectiveSlug();
-
-let filtersCache: unknown = surveyResultsCachePort.peekCacheSync('filters', slug, { clone: false });
-if (!filtersCache || typeof filtersCache !== 'object') {
-  filtersCache = (await surveyResultsCachePort.readCache('filters', slug)) || {};
-} else {
-  filtersCache = { ...(filtersCache as SurveyResultsFiltersCache) };
-}
-const filtersCacheRecord = toSurveyResultsRecord(filtersCache) as SurveyResultsFiltersCache;
-let writePlan: SurveyResultsFilterBookmarkWritePlan;
-try {
-  writePlan = buildSurveyResultsFilterBookmarkWritePlan({
-    filtersCache: filtersCacheRecord,
-    filtersCacheLoaded: true,
-    filterState: filterToBookmark,
-    isMounted: inst._isMounted,
-    slug,
-  });
-  if (writePlan.bookmarkedFiltersInvalid) {
-    surveyLog.warn('Bookmarked filters cache was not an array. Initializing to empty array.');
-  }
-} catch (e) {
-  surveyLog.error('Error parsing bookmarked filters cache:', e);
-  writePlan = buildSurveyResultsFilterBookmarkWritePlan({
-    filtersCache: {},
-    filtersCacheLoaded: true,
-    filterState: filterToBookmark,
-    isMounted: inst._isMounted,
-    slug,
-  });
-}
-
-if (!writePlan.shouldWrite || !writePlan.payload) return;
-
-const writeResult = await runSurveyResultsFilterBookmarkWriteController({
-  plan: writePlan,
-  ports: {
-    writeFilterBookmark: (namespace, cacheSlug, payload) => (
-      surveyResultsCachePort.writeCache(namespace, cacheSlug, payload)
-    ),
-  },
-});
-if (!writeResult.ok) {
-  if (writeResult.error) {
-    surveyLog.error('Error saving bookmarked filters cache:', writeResult.error);
-  }
-  return;
-}
-
-try {
-  if (writeResult.shouldApplySuccessFeedback) {
-    setState(asSurveyResultsStatePatch(buildSurveyResultsBookmarkFeedbackPatch(true)));
-  }
-
-  if (inst._bookmarkFeedbackTimer) {
-    clearTimeout(inst._bookmarkFeedbackTimer);
-    inst._bookmarkFeedbackTimer = null;
-  }
-  inst._bookmarkFeedbackTimer = setTimeout(() => {
-    inst._bookmarkFeedbackTimer = null;
-    if (inst._isMounted) {
-      setState(asSurveyResultsStatePatch(buildSurveyResultsBookmarkFeedbackPatch(false)));
-    }
-  }, 2000);
-} catch (e) {
-  surveyLog.error('Error saving bookmarked filters cache:', e);
-}
-};
-
 const getHtmlReportModalProps = (): SurveyResultsHtmlReportExportModalProps => {
 const exportedAt = stateRef.current.htmlReportExportedAt || new Date().toISOString();
 const snapshot = buildSessionResultsHtmlReportSnapshot(exportedAt);
@@ -3418,10 +3332,6 @@ return renderSurveyResultsHtmlReportExportModal(getHtmlReportModalProps());
     if (inst._scrollMutationObserver) {
       inst._scrollMutationObserver.disconnect();
       inst._scrollMutationObserver = null;
-    }
-    if (inst._bookmarkFeedbackTimer) {
-      clearTimeout(inst._bookmarkFeedbackTimer);
-      inst._bookmarkFeedbackTimer = null;
     }
     window.removeEventListener('popstate', handleUrlChange);
     document.removeEventListener('visibilitychange', handleDocumentVisibilityChange);

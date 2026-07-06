@@ -89,7 +89,6 @@ export const createSurveyResultsInstanceFields = (): Record<string, unknown> => 
   _unsubscribeCacheUpdates: null,
   _lastNotifiedFilterStateSignature: null,
   _pendingFilterLoadingValue: null,
-  _bookmarkFeedbackTimer: null,
   _stableFallbackQuestions: null,
   csvFileName: '',
 });
