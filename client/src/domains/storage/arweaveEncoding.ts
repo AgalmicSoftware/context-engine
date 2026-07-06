@@ -1,4 +1,4 @@
-import { arweaveScripts as defaultArweaveScripts } from '../../utilities/arweave/arweaveScripts.js';
+import { arweaveClient as defaultArweaveScripts } from '../../utilities/arweave/arweaveClient.js';
 
 export type ArweaveEncodingScripts = {
   hexToBase64url: (hexString: string) => string;

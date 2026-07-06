@@ -20,7 +20,7 @@ import {
   faEraser
 } from '@fortawesome/free-solid-svg-icons';
 import { ethers } from 'ethers';
-import { arweaveScripts } from '../../utilities/arweave/arweaveScripts.js';
+import { arweaveClient as arweaveScripts } from '../../utilities/arweave/arweaveClient.js';
 import { resolvePublishArweaveUploadOptions } from '../../utilities/arweave/publishUploadAuth.js';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import { validateNoLockedPlaintextInPayload } from '../../utilities/arweave/noLeakPayloads.js';

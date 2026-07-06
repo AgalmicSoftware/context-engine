@@ -1,4 +1,4 @@
-import { arweaveScripts as defaultArweaveScripts } from '../../utilities/arweave/arweaveScripts.js';
+import { arweaveClient as defaultArweaveScripts } from '../../utilities/arweave/arweaveClient.js';
 import * as defaultArweaveUrls from '../../utilities/arweave/arweaveUrls.js';
 
 export type AdminArweaveRecord = Record<string, unknown>;
