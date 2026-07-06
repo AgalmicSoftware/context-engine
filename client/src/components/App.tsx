@@ -11,7 +11,8 @@ import CEToaster from './Shared/CEToaster';
 
 import 'assets/css/contextEngine.scss';
 
-import withRouter from './HooksHOC/withRouterBridge';
+import withRouter from "./HooksHOC/withRouterBridge";
+import AppShell from "./MainSite/AppShell";
 import AppErrorBoundary from './ErrorBoundary/AppErrorBoundary';
 import { readColdLoadOnboardingState } from './Onboarding/onboardingConfig.js';
 import { toastTheme } from '../utilities/ui/toastTheme.js';
@@ -257,19 +258,15 @@ class App extends React.Component<AppProps, AppState> {
         <AppQueryClientProvider>
           <WalletUiProvider chains={chains}>
             <Provider store={store}>
-              <AppErrorBoundary>
-                <CEToaster position="bottom-right" toastOptions={{ style: toastTheme }} />
-                <Routes>
-                  <Route
-                    path="*"
-                    element={
-                      <Suspense fallback={null}>
-                        <AppShell path={urlPath} {...siteProps} />
-                      </Suspense>
-                    }
-                  />
-                </Routes>
-              </AppErrorBoundary>
+            <AppErrorBoundary>
+            <CEToaster
+              position='bottom-right'
+              toastOptions={{ style: toastTheme }}
+            />
+            <Routes>
+              <Route path="*" element={<AppShell path={urlPath} {...siteProps} />} />
+            </Routes>
+            </AppErrorBoundary>
             </Provider>
           </WalletUiProvider>
         </AppQueryClientProvider>

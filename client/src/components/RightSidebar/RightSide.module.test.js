@@ -1,8 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 
-describe('RightSide responsive shell styles', () => {
-  it('keeps the medium home route in a row while giving the main card the full width', () => {
+describe('RightSide desktop shell styles', () => {
+  it('keeps the home route in a desktop row and reserves width for the right shell', () => {
     const mainSiteScss = fs.readFileSync(path.join(__dirname, '../MainSite/AppShell.module.scss'), 'utf8');
     const mainContentScss = fs.readFileSync(path.join(__dirname, '../MainContent/MainContent.module.scss'), 'utf8');
 

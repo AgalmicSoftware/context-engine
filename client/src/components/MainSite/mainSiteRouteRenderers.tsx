@@ -1,8 +1,5 @@
 import React, { Suspense } from 'react';
 import { ethers } from 'ethers';
-import type { AppShell } from './AppShell';
-import type { SessionConfigLike as ShellSessionConfigLike } from '../shellTypes';
-import type { MainSiteSessionConfigLike } from '../../utilities/session/mainSiteSessionConfig.js';
 import stylesRaw from './AppShell.module.scss';
 import MainAreaTabsRaw from '../MainContent/MainAreaTabs';
 import RightSideRaw from '../RightSidebar/RightSide';

@@ -15,8 +15,8 @@ import type { RootState } from '../../reducers/index.js';
 import type { MainSiteProps, MainSiteState } from './MainSiteTypes';
 
 // Styles
-import 'assets/css/contextEngine.scss';
-import stylesRaw from './AppShell.module.scss';
+import "assets/css/contextEngine.scss";
+import stylesRaw from "./AppShell.module.scss";
 
 // Smart contract events / interactions
 import {
@@ -4238,6 +4238,4 @@ export const appShellDispatchActions = {
   changeActiveSessionSlug,
 };
 
-export default connect(mapStateToProps, appShellDispatchActions)(AppShellWithWagmiHooks) as React.ComponentType<
-  Record<string, unknown>
->;
+export default connect(mapStateToProps, appShellDispatchActions)(AppShellWithWagmiHooks) as React.ComponentType<Record<string, unknown>>;

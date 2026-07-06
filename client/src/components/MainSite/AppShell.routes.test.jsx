@@ -548,17 +548,15 @@ const createSubject = ({
     return slug === sessionConfig.slug ? sessionConfig : null;
   });
 
-  const subject = new AppShell(
-    buildProps({
-      path,
-      firstVisit,
-      demoSurfaceMode,
-      sessionState: {
-        primarySessionSlug: activeSessionSlug,
-        primarySessionExplicit: true,
-      },
-    }),
-  );
+  const subject = new AppShell(buildProps({
+    path,
+    firstVisit,
+    demoSurfaceMode,
+    sessionState: {
+      primarySessionSlug: activeSessionSlug,
+      primarySessionExplicit: true,
+    },
+  }));
   subject.state = {
     ...subject.state,
     isCacheManagerReady: true,
@@ -669,12 +667,10 @@ const attachDgStore = (subject, initial = {}) => {
 
 describe('AppShell connected export wiring', () => {
   it('wires changeAccount into the connected AppShell export for wagmi hydration', () => {
-    expect(appShellDispatchActions).toEqual(
-      expect.objectContaining({
-        changeAccount: expect.any(Function),
-        updateLoginInfo: expect.any(Function),
-      }),
-    );
+    expect(appShellDispatchActions).toEqual(expect.objectContaining({
+      changeAccount: expect.any(Function),
+      updateLoginInfo: expect.any(Function),
+    }));
   });
 });
 
@@ -2564,13 +2560,11 @@ describe('AppShell route render smoke', () => {
   });
 
   it('wires registry bootstrap promise state through AppShell and clears failures', async () => {
-    const subject = stubMainSiteMountSideEffects(
-      createSubject({
-        path: '/session/edge',
-        activeSessionSlug: 'edge',
-        sessionConfig: buildSessionConfig(),
-      }),
-    );
+    const subject = stubMainSiteMountSideEffects(createSubject({
+      path: '/session/edge',
+      activeSessionSlug: 'edge',
+      sessionConfig: buildSessionConfig(),
+    }));
     const mountBootstrap = createDeferred();
     loadGroupRegistryCache.mockReturnValueOnce(mountBootstrap.promise);
 

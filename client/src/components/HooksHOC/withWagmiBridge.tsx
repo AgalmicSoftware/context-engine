@@ -62,20 +62,21 @@ export function WagmiHooksHOC<P extends object>(Component: React.ComponentType<P
       address: address,
     });
 
-    const componentName = String(Component?.displayName || Component?.name || '');
-    const needsBlockNumber =
-      componentName === 'AppShell' ||
-      componentName === 'AppShellWithWagmiHooks' ||
-      componentName === 'MainSite' ||
-      componentName === 'MainSiteWithWagmiHooks' ||
-      props.__ceRequireWagmiBlockNumber === true;
-    // Only components that consume the value should subscribe/fetch.
-    const { data: blockNumber } = useBlockNumber({
-      watch: false,
-      cacheTime: 30_000,
-      enabled: needsBlockNumber,
-    });
-    const { chain, chains } = useNetwork();
+        const componentName = String(Component?.displayName || Component?.name || '');
+        const needsBlockNumber = (
+          componentName === 'AppShell' ||
+          componentName === 'AppShellWithWagmiHooks' ||
+          componentName === 'MainSite' ||
+          componentName === 'MainSiteWithWagmiHooks' ||
+          props.__ceRequireWagmiBlockNumber === true
+        );
+        // Only components that consume the value should subscribe/fetch.
+        const { data: blockNumber } = useBlockNumber({
+          watch: false,
+          cacheTime: 30_000,
+          enabled: needsBlockNumber,
+        });
+        const { chain, chains } = useNetwork()
 
     // Derive desired chain from activeSessionSlug; fall back gently if absent
     const activeSlug = props.activeSessionSlug || '';
