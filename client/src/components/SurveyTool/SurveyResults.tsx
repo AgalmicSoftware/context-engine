@@ -226,8 +226,8 @@ import {
   runSurveyResultsManualRefreshStatusApplicationController,
 } from './surveyResultsManualRefreshStatusApplicationController';
 import {
-  surveyResultsHtmlReportDownloadPort,
-} from './surveyResultsHtmlReportDownloadPort';
+  surveyResultsHtmlReportExporterPort,
+} from './surveyResultsHtmlReportExporterPort';
 import {
   runSurveyResultsQueuedRefreshController,
 } from './surveyResultsQueuedRefreshController';
@@ -296,7 +296,6 @@ import {
   buildSessionResultsAnalysisPrompt,
   buildRedactedSessionResultsSnapshot,
   evaluateSessionResultsAnalysisEligibility,
-  renderSessionResultsHtmlReport,
   SESSION_RESULTS_ANALYSIS_SECTION_KEYS,
   SESSION_RESULTS_EXPORT_FORMAT_PDF,
   SESSION_RESULTS_EXPORT_FORMAT_VIEWER,
@@ -3323,15 +3322,10 @@ if (downloadPlan.status === 'blocked') {
 
 try {
   const { downloadRequest } = downloadPlan;
-  const html = renderSessionResultsHtmlReport(snapshot, downloadRequest.renderOptions);
-  if (downloadRequest.kind === 'pdf') {
-    await surveyResultsHtmlReportDownloadPort.downloadPdfReport({
-      html,
-      filename: downloadRequest.filename,
-    });
-  } else {
-    surveyResultsHtmlReportDownloadPort.downloadHtmlReport(html, downloadRequest.filename);
-  }
+  await surveyResultsHtmlReportExporterPort.exportReport({
+    downloadRequest,
+    snapshot,
+  });
   setState(asSurveyResultsStatePatch(buildSurveyResultsHtmlReportDownloadSuccessPatch()));
 } catch (error) {
   surveyLog.error('[SurveyResults.downloadHtmlReport] Failed to export HTML report:', error);
