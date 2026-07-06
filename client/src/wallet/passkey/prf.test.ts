@@ -24,7 +24,25 @@ describe('deriveAesGcmKeyFromPrf', () => {
       expect(keyUsages).toEqual(['deriveKey']);
       return key;
     });
-    const deriveKeySpy = jest.spyOn(crypto.subtle, 'deriveKey').mockResolvedValue(key);
+    const deriveKeySpy = jest.spyOn(crypto.subtle, 'deriveKey').mockImplementation(async (
+      algorithm,
+      baseKey,
+      derivedKeyType,
+      extractable,
+      keyUsages
+    ) => {
+      expect(algorithm).toEqual(expect.objectContaining({
+        name: 'HKDF',
+        hash: 'SHA-256',
+      }));
+      expect((algorithm as HkdfParams).salt).toBeInstanceOf(Uint8Array);
+      expect((algorithm as HkdfParams).info).toBeInstanceOf(Uint8Array);
+      expect(baseKey).toBe(key);
+      expect(derivedKeyType).toEqual({ name: 'AES-GCM', length: 256 });
+      expect(extractable).toBe(false);
+      expect(keyUsages).toEqual(['encrypt', 'decrypt']);
+      return key;
+    });
 
     await expect(deriveAesGcmKeyFromPrf(prfOutput, salt)).resolves.toBe(key);
 
