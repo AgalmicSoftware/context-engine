@@ -2,6 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -74,4 +75,35 @@ test('buildDeepE2eSteps only includes private bridge checks when the root script
       'agent bridge worker',
     ],
   );
+});
+
+test('Cloudflare envelope package scripts point to tracked runner files', () => {
+  const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
+  const scripts = packageJson.scripts || {};
+  const scriptNames = [
+    'ai:test-prd649:worker-envelope',
+    'ai:test-prd650:worker-groups',
+    'ai:test-prd649-650:group-envelope',
+    'ai:test-prd649:key-lifecycle',
+  ];
+
+  assert.deepEqual(
+    buildDeepE2eSteps(scripts).find(([label]) => label === 'Cloudflare envelope and groups'),
+    ['Cloudflare envelope and groups', ['run', '-s', 'ai:test-cf-envelope:all']],
+  );
+
+  const tracked = new Set(
+    execFileSync('git', ['ls-files'], { cwd: path.join(__dirname, '..'), encoding: 'utf8' })
+      .split('\n')
+      .filter(Boolean),
+  );
+
+  for (const name of scriptNames) {
+    const command = scripts[name] || '';
+    const match = command.match(/--\s+(scripts\/\S+\.js)\b/);
+    assert.ok(match, `${name} should call a script file`);
+    const scriptPath = match[1];
+    assert.equal(fs.existsSync(path.join(__dirname, '..', scriptPath)), true, `${name} target must exist`);
+    assert.equal(tracked.has(scriptPath), true, `${name} target must be tracked`);
+  }
 });
