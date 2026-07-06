@@ -306,6 +306,10 @@ import {
   type SurveyResultsLocalStoragePollingRuntime,
 } from '../../domains/surveys/surveyResultsLocalStoragePollingRuntime';
 import {
+  buildSurveyResultsLocalStoragePollCountPlan,
+  buildSurveyResultsLocalStoragePollPatchPlan,
+} from './surveyResultsLocalStoragePollDecision';
+import {
   createSurveyResultsQueuedRefreshRuntime,
   type SurveyResultsQueuedRefreshRuntime,
 } from '../../domains/surveys/surveyResultsQueuedRefreshRuntime';
@@ -1963,74 +1967,64 @@ function pollLocalStorageForUpdates(): boolean {
       ? readSurveyResultsLatestBlock(surveyNetCache?.surveyResponsesLatestBlock, currentSurveyId)
       : 0;
 
-    const coarseSignature = [
-      String(stateRef.current.viewMode || ''),
+    const fetchRuntimeSnapshot = fetchResponsesRuntime.getSnapshot();
+    const countPlan = buildSurveyResultsLocalStoragePollCountPlan({
       currentSurveyId,
+      fetchInFlight: fetchRuntimeSnapshot.inFlight,
+      forceRescanEvery: LOCAL_STORAGE_FORCE_RESCAN_EVERY,
       localQBlock,
       localRespBlock,
       localSBlock,
-      inst._lastPolledQuestionRefVersion,
-      currentSurveyId ? inst._lastPolledSurveyResponsesRefVersion : 0,
-    ].join('|');
-    const coarseSignatureUnchanged = coarseSignature === inst._lastLocalStoragePollCoarseSignature;
-    const blockOrRespChanged =
-      localQBlock !== stateRef.current.questionLocalBlock ||
-      localRespBlock !== stateRef.current.responseLocalBlock ||
-      localSBlock !== stateRef.current.surveyLocalBlock;
-
-    const fetchRuntimeSnapshot = fetchResponsesRuntime.getSnapshot();
-    if (fetchRuntimeSnapshot.inFlight && !blockOrRespChanged) {
+      netLatest,
+      previousCoarseSignature: inst._lastLocalStoragePollCoarseSignature,
+      questionLocalBlock: stateRef.current.questionLocalBlock,
+      questionRefVersion: inst._lastPolledQuestionRefVersion,
+      responseLocalBlock: stateRef.current.responseLocalBlock,
+      stableCycles: localStoragePollingRuntime.getStableCycles(),
+      surveyLocalBlock: stateRef.current.surveyLocalBlock,
+      surveyResponsesRefVersion: inst._lastPolledSurveyResponsesRefVersion,
+      viewMode: stateRef.current.viewMode,
+    });
+    if (countPlan.shouldReturnFalseForInFlight) {
       return false;
     }
 
-    const stableCycles = Math.max(0, Number(localStoragePollingRuntime.getStableCycles() || 0));
-    const forceRescanOnStableCycle =
-      stableCycles > 0 &&
-      (stableCycles % LOCAL_STORAGE_FORCE_RESCAN_EVERY) === 0;
-    const shouldForceCountRescan =
-      !fetchRuntimeSnapshot.inFlight &&
-      (!coarseSignatureUnchanged || forceRescanOnStableCycle);
-
-    const newQuestionsCount = fetchRuntimeSnapshot.inFlight
+    const newQuestionsCount = countPlan.useCachedCounts
       ? Number(stateRef.current.cachedQuestionsCount || 0)
       : getMemoizedQuestionsCountForPolling(questionsById, {
-          forceScan: shouldForceCountRescan,
+          forceScan: countPlan.shouldForceCountRescan,
         });
     const localSurveyResponsesCount = currentSurveyId
       ? (
-          fetchRuntimeSnapshot.inFlight
+          countPlan.useCachedCounts
             ? Number(stateRef.current.cachedSurveyResponsesCount || 0)
             : getMemoizedSurveyResponsesCountForPolling(surveyResponsesById, currentSurveyId, {
-                forceScan: shouldForceCountRescan,
+                forceScan: countPlan.shouldForceCountRescan,
               })
         )
       : 0;
-    const detailedSignature = [
-      coarseSignature,
-      newQuestionsCount,
+    const patchPlan = buildSurveyResultsLocalStoragePollPatchPlan({
+      blockOrRespChanged: countPlan.blockOrRespChanged,
+      cachedQuestionsCount: stateRef.current.cachedQuestionsCount,
+      cachedSurveyResponsesCount: stateRef.current.cachedSurveyResponsesCount,
+      coarseSignature: countPlan.coarseSignature,
+      localQBlock,
+      localRespBlock,
+      localSBlock,
       localSurveyResponsesCount,
-      netLatest,
-    ].join('|');
-    if (detailedSignature === inst._lastLocalStoragePollDetailedSignature) {
+      netLatest: countPlan.netLatest,
+      newQuestionsCount,
+      previousDetailedSignature: inst._lastLocalStoragePollDetailedSignature,
+    });
+    if (patchPlan.shouldReturnFalseForUnchangedSignature) {
       return false;
     }
-    inst._lastLocalStoragePollCoarseSignature = coarseSignature;
-    inst._lastLocalStoragePollDetailedSignature = detailedSignature;
+    inst._lastLocalStoragePollCoarseSignature = countPlan.coarseSignature;
+    inst._lastLocalStoragePollDetailedSignature = patchPlan.detailedSignature;
 
-    const questionCountChanged = newQuestionsCount !== stateRef.current.cachedQuestionsCount;
-    const surveyResponseCountChanged =
-      localSurveyResponsesCount !== stateRef.current.cachedSurveyResponsesCount;
-
-    if (blockOrRespChanged || questionCountChanged || surveyResponseCountChanged) {
+    if (patchPlan.shouldApplyPatch && patchPlan.patch) {
       setState(
-        asSurveyResultsStatePatch(buildSurveyResultsLocalStoragePollPatch({
-          questionLocalBlock: localQBlock,
-          responseLocalBlock: localRespBlock,
-          surveyLocalBlock: localSBlock,
-          cachedQuestionsCount: newQuestionsCount,
-          cachedSurveyResponsesCount: localSurveyResponsesCount,
-          networkLatestBlock: netLatest
-        })),
+        asSurveyResultsStatePatch(buildSurveyResultsLocalStoragePollPatch(patchPlan.patch)),
         () => {
           queueResultsRefresh('poll-local-storage-change');
         }
