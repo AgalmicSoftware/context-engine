@@ -126,7 +126,7 @@ describe('SBTFilter performance guards', () => {
     expect(subject.state.loading).toBe(false);
   });
 
-  it('does not enter loading state when the filter snapshot is unchanged', async () => {
+  it('does not enter loading state for pass-through no-op filters', async () => {
     const setFilterLoading = jest.fn();
     const onFilter = jest.fn();
     const subject = createSubject({
@@ -136,7 +136,8 @@ describe('SBTFilter performance guards', () => {
     });
 
     await subject.runApplyFilter('initial');
-    expect(setFilterLoading).toHaveBeenCalledWith(true);
+    expect(onFilter).toHaveBeenCalledWith(['0xa'], expect.any(Object));
+    expect(setFilterLoading).not.toHaveBeenCalledWith(true);
 
     setFilterLoading.mockClear();
     const result = await subject.runApplyFilter('unchanged');

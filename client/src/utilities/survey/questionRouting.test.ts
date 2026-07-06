@@ -222,6 +222,16 @@ describe('questionRouting helper regressions', () => {
     });
 
     expect(resolveQuestionPayloadDisplayState({
+      id: 'q-envelope',
+      prompt: '[encrypted]',
+      payloadAccessControl: { gate: 'sbt_gate', encryption: 'worker_envelope' },
+    })).toMatchObject({
+      status: 'worker_sbt_gate',
+      label: 'Requires session access',
+      requiresAuth: true,
+    });
+
+    expect(resolveQuestionPayloadDisplayState({
       id: 'q-lit',
       prompt: '[encrypted]',
       promptEncrypted: '{"ciphertext":"cipher"}',

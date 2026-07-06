@@ -161,6 +161,62 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
     expect(instance.state.questions).toHaveLength(1);
   });
 
+  it('keeps rapid question type additions in click order', () => {
+    const instance = makeInstance();
+    instance.updateSurveyHash = jest.fn();
+    instance.saveToLocalStorage = jest.fn();
+    instance.state = {
+      ...instance.state,
+      isStandaloneQuestion: true,
+      questions: [],
+    };
+
+    const queued: Array<{ update: any; cb?: () => void }> = [];
+    instance.setState = jest.fn((update: any, cb?: () => void) => {
+      queued.push({ update, cb });
+    });
+
+    instance.quickAdd('binary');
+    instance.quickAdd('rating');
+    instance.quickAdd('freeform');
+
+    const callbacks: Array<() => void> = [];
+    for (const item of queued.splice(0)) {
+      const patch = typeof item.update === 'function'
+        ? item.update(instance.state, instance.props)
+        : item.update;
+      if (patch && typeof patch === 'object') {
+        instance.state = { ...instance.state, ...patch };
+      }
+      if (typeof item.cb === 'function') callbacks.push(item.cb);
+    }
+
+    instance.setState = jest.fn((update: any, cb?: () => void) => {
+      const patch = typeof update === 'function'
+        ? update(instance.state, instance.props)
+        : update;
+      if (patch && typeof patch === 'object') {
+        instance.state = { ...instance.state, ...patch };
+      }
+      if (typeof cb === 'function') cb();
+    });
+    callbacks.forEach((cb) => cb());
+
+    expect(instance.state.questions.map((question: { type?: string }) => question.type))
+      .toEqual(['binary', 'rating', 'freeform']);
+  });
+
+  it('does not schedule a save when the placeholder question type is added', () => {
+    const instance = makeInstance();
+    instance.updateSurveyHash = jest.fn();
+    instance.saveToLocalStorage = jest.fn();
+    instance.addQuestion();
+
+    expect(instance.setState).not.toHaveBeenCalled();
+    expect(instance.updateSurveyHash).not.toHaveBeenCalled();
+    expect(instance.saveToLocalStorage).not.toHaveBeenCalled();
+  });
+
   it('renders the survey title lock without SBT badge text or inline gate dots', () => {
     const instance = makeInstance();
     instance.resolveGateOptions = jest.fn(() => ({
@@ -250,7 +306,7 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
     expect(questionLock.querySelector(`.${gateLockStyles.dots}`)).toBeNull();
   });
 
-  it('shows the default lock for an explicit empty standalone question gate selection', () => {
+  it('keeps an explicit empty standalone question gate selection unlocked', () => {
     const instance = makeInstance();
     instance.resolveGateOptions = jest.fn(() => ({
       gateMap: {
@@ -271,6 +327,7 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
         type: 'freeform',
         prompt: 'Question 1',
         lockGateIds: [],
+        lockGateIdsTouched: true,
         tags: [],
         currentTagInputValue: '',
         aiGeneratedTagsFromSource: [],
@@ -284,8 +341,8 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
     expect(questionLock).not.toBeNull();
     if (!questionLock) throw new Error('Expected question header lock to render');
     const button = within(questionLock).getByTestId(E2E_TESTIDS.GATE_LOCK_BUTTON);
-    expect(button).toHaveAttribute('aria-label', 'Edit locked access rule');
-    expect(button.querySelector('svg')?.getAttribute('data-icon')).toBe('lock');
+    expect(button).toHaveAttribute('aria-label', 'Choose access rule');
+    expect(button.querySelector('svg')?.getAttribute('data-icon')).toBe('lock-open');
   });
 
   it('shows the default lock for an explicit empty survey gate selection', () => {

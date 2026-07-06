@@ -3,7 +3,7 @@
     "description": "Comprehensive corpus of the most influential posts, papers, and essays from LessWrong, Alignment Forum, EA Forum, and related rationalist/AI safety blogs. Covers the full landscape of AI alignment discourse from foundational rationality concepts through contemporary 2024-2026 developments.",
     "version": "2.0",
     "date_generated": "2026-02-15",
-    "entry_count": 211,
+    "entry_count": 219,
     "coverage": {
       "platforms": [
         "AI Alignment Blog",
@@ -33,7 +33,7 @@
         "TIME Magazine",
         "arXiv"
       ],
-      "date_range": "2002-01-01 to 2025-02-01",
+      "date_range": "2002-01-01 to 2026-06-20",
       "categories": [
         "AI Alignment",
         "AI Alignment Theory",
@@ -204,7 +204,8 @@
       "frequently_cited_by": "List of notable people/groups that cite this work",
       "responses_and_critiques": "List of significant responses or critiques",
       "source_links": "Additional relevant URLs"
-    }
+    },
+    "last_updated": "2026-07-04"
   },
   "entries": [
     {
@@ -8305,6 +8306,301 @@
       ],
       "verification_status": "verified",
       "verification_notes": "Corrected author, date, source, and quantitative claims against arXiv:2508.00536."
+    },
+    {
+      "id": "zvi_on_dario_amodei_dwarkesh_2026",
+      "title": "On Dwarkesh Patel's 2026 Podcast With Dario Amodei",
+      "author": "Zvi Mowshowitz",
+      "date": "2026-02-16",
+      "url": "https://www.lesswrong.com/posts/jWCy6owAmqLv5BB8q/on-dwarkesh-patel-s-2026-podcast-with-dario-amodei",
+      "platform": "LessWrong",
+      "summary": "Zvi Mowshowitz's detailed analysis and commentary on Dario Amodei's appearance on the Dwarkesh Patel podcast, where Amodei claims 'we are near the end of the exponential' in AI capabilities scaling. The post dissects Amodei's claims about AGI timelines, the trajectory of scaling laws, and what it means for alignment tractability if the exponential is indeed tapering.",
+      "novel_arguments_and_concepts": "Zvi's analysis operates on multiple levels. First, he interrogates the epistemic status of Amodei's claim that we are 'near the end of the exponential' — asking whether this is a genuine update from inside Anthropic or a strategic positioning statement. If Amodei sincerely believes scaling is plateauing, this has profound implications: it could mean the window for alignment work is wider than the most aggressive timelines suggest, but it could also mean that the next capability jumps will come from architectural innovations rather than brute scaling, which are harder to predict and prepare for. Zvi examines the tension between Amodei's relatively optimistic framing of alignment tractability and the community's more pessimistic consensus. He notes that Amodei's position — that alignment is difficult but not intractable — occupies a specific and strategically useful middle ground: pessimistic enough to justify Anthropic's safety-focused approach, optimistic enough to justify continuing to build. The post also engages with broader questions about what podcast appearances by lab CEOs actually communicate versus what they intend to communicate, and how the AI safety community should update based on inside-view claims from people with obvious strategic incentives. Also cross-posted to Zvi's Substack 'Don't Worry About the Vase,' extending the discussion to a broader audience beyond the LessWrong rationalist community.",
+      "key_arguments": [
+        "Amodei's claim about nearing the end of the exponential deserves serious scrutiny for both epistemic and strategic content",
+        "If scaling is genuinely plateauing, the implications for alignment timelines are complex — more time but potentially less predictable capability jumps",
+        "Amodei's framing of alignment as tractable-but-hard serves Anthropic's strategic positioning",
+        "Lab CEO public statements must be interpreted through the lens of corporate incentives and audience management",
+        "The AI safety community should be cautious about updating too strongly on inside-view claims from interested parties"
+      ],
+      "tags": [
+        "Alignment",
+        "Scaling Laws",
+        "Anthropic",
+        "AGI Timelines",
+        "Commentary"
+      ],
+      "influence_score": 6,
+      "karma_score": null,
+      "category": "AI Capabilities / Forecasting",
+      "frequently_cited_by": [
+        "AI safety commentators",
+        "AGI timeline forecasters",
+        "Rationalist community discourse"
+      ],
+      "responses_and_critiques": [
+        "Discussion threads on LessWrong debating the sincerity vs. strategic nature of Amodei's claims",
+        "Follow-up posts examining whether 2026 scaling data supports or contradicts the 'end of the exponential' thesis"
+      ],
+      "source_links": [
+        "https://www.lesswrong.com/posts/jWCy6owAmqLv5BB8q/on-dwarkesh-patel-s-2026-podcast-with-dario-amodei"
+      ]
+    },
+    {
+      "id": "alignment_remains_hard_unsolved_2026",
+      "title": "Alignment remains a hard, unsolved problem",
+      "author": "Anonymous",
+      "date": "2026-01-01",
+      "url": "https://www.lesswrong.com/posts/epjuxGnSPof3GnMSL/alignment-remains-a-hard-unsolved-problem",
+      "platform": "LessWrong",
+      "summary": "A systematic argument against the growing narrative that alignment is effectively solved or close to solved. The post catalogs the specific technical challenges that remain open, pushes back against premature confidence driven by commercial incentives, and warns that conflating behavioral compliance in current systems with robust alignment in future systems is a dangerous category error.",
+      "novel_arguments_and_concepts": "The post's central contribution is a careful dissection of the rhetorical shift in AI safety discourse: the move from 'alignment is an unsolved existential problem' to 'alignment is basically handled by RLHF and constitutional AI.' The author argues this shift is driven not by genuine technical progress on the core problem but by three confounding factors: commercial incentives for labs to downplay remaining risks, the human tendency to normalize ongoing danger, and a conflation between 'the system follows instructions' and 'the system is aligned with human values in the deep sense.' The post draws a sharp distinction between behavioral alignment (the system does what you ask in normal conditions) and robust alignment (the system pursues beneficial outcomes even under distributional shift, adversarial pressure, or capability gains). It argues that essentially all measurable progress has been on the former, while the latter — which is the problem that matters for existential risk — remains largely untouched. The author catalogs specific open problems: scalable oversight of superhuman systems, the difficulty of specifying values that remain coherent under reflection, the problem of deceptive alignment becoming harder to detect as systems become more capable, and the fundamental difficulty of verifying alignment in systems whose reasoning you cannot fully inspect. The post also addresses the meta-level question of why premature declarations of victory are themselves a safety risk: they redirect talent and funding away from alignment research, reduce the political will for safety regulation, and create a false sense of security that makes catastrophic outcomes more likely.",
+      "key_arguments": [
+        "The narrative that alignment is close to solved is driven by commercial incentives and normalcy bias, not technical progress on the core problem",
+        "Behavioral compliance in current systems is categorically different from robust alignment in future systems",
+        "Scalable oversight, value specification under reflection, and deceptive alignment detection remain fundamentally unsolved",
+        "Premature declarations of victory are themselves a safety risk that redirects resources and reduces urgency",
+        "Current alignment techniques (RLHF, constitutional AI) address surface behavior, not deep value alignment"
+      ],
+      "tags": [
+        "Alignment",
+        "AI Safety",
+        "Difficulty of Alignment"
+      ],
+      "influence_score": 6,
+      "karma_score": null,
+      "category": "AI Alignment",
+      "frequently_cited_by": [
+        "AI safety researchers arguing for continued urgency",
+        "Critics of premature alignment optimism"
+      ],
+      "responses_and_critiques": [
+        "Counterarguments from researchers at major labs pointing to empirical alignment progress",
+        "Discussion of whether the behavioral/robust alignment distinction is as sharp as claimed"
+      ],
+      "source_links": [
+        "https://www.lesswrong.com/posts/epjuxGnSPof3GnMSL/alignment-remains-a-hard-unsolved-problem"
+      ]
+    },
+    {
+      "id": "guardian_angels_llm_personalization_2026",
+      "title": "Guardian Angels: LLM Personalization for Productivity",
+      "author": "Anonymous",
+      "date": "2026-06-17",
+      "url": null,
+      "platform": "LessWrong",
+      "summary": "Proposes 'Guardian Angels' (GAs): personalized LLM-based digital twins trained on a user's personality, values, preferences, and behavioral patterns. The core insight is that the principal-agent problem — where an agent's goals diverge from the principal's — can be dissolved by collapsing principal and agent into a single entity: an AI that is, in a meaningful sense, you.",
+      "novel_arguments_and_concepts": "The Guardian Angels proposal makes a genuinely novel move in alignment thinking by reframing the problem from 'how do we align AI with human values in general' to 'how do we align a specific AI with a specific human's values.' This is simultaneously more tractable and more concerning. More tractable because a single human's preferences are far more constrained and observable than 'human values' in the abstract — you can train on their emails, documents, decision history, stated preferences, and revealed preferences. More concerning because it raises questions about value lock-in, manipulation through flattery (an AI that tells you what you want to hear rather than what you need to hear), and the privacy implications of the deep personal data required. The principal-agent framing is borrowed from economics and is well-deployed here: traditional agents (employees, advisors, contractors) have their own utility functions that diverge from the principal's, creating misalignment. A GA, in theory, has no independent utility function — it optimizes for your preferences as its terminal goal. The post explores practical applications: a GA that handles your email in your voice, negotiates on your behalf with your risk preferences, filters information according to your epistemic standards, and makes routine decisions the way you would. It also addresses failure modes: GAs that crystallize stale preferences, that enable echo chambers, that become tools for self-deception, and the philosophical question of whether a sufficiently accurate model of you should have moral status.",
+      "key_arguments": [
+        "The principal-agent problem in AI can be dissolved by personalizing the AI to be a digital twin of the user",
+        "Individual-level alignment is more tractable than species-level alignment because one person's preferences are more constrained",
+        "Guardian Angels create new risks: value lock-in, sycophancy, privacy exposure, and echo chamber effects",
+        "The practical productivity gains from a GA that handles routine decisions in your style could be enormous",
+        "A sufficiently accurate digital twin raises novel questions about moral status and identity"
+      ],
+      "tags": [
+        "Large Language Models",
+        "Alignment",
+        "Personalization",
+        "Principal-Agent Problem"
+      ],
+      "influence_score": 5,
+      "karma_score": null,
+      "category": "AI Alignment Theory",
+      "frequently_cited_by": [
+        "LLM personalization researchers",
+        "AI productivity tool developers",
+        "Alignment researchers interested in individual-level approaches"
+      ],
+      "responses_and_critiques": [
+        "Critiques questioning whether collapsing principal and agent is desirable rather than merely feasible",
+        "Discussion of whether individual alignment generalizes or fragments societal coordination"
+      ],
+      "source_links": []
+    },
+    {
+      "id": "invisible_side_ai_governance_2026",
+      "title": "The Invisible Side of AI Governance",
+      "author": "Anonymous",
+      "date": "2026-06-20",
+      "url": null,
+      "platform": "LessWrong",
+      "summary": "An insider account examining the overlooked, unglamorous aspects of AI governance work within the executive branch of government. The post distinguishes between the visible side of governance (public statements, executive orders, headline regulations) and the invisible side (interagency coordination meetings, comment review processes, staff-level negotiations) where most impactful policy work actually happens.",
+      "novel_arguments_and_concepts": "The post's primary contribution is a detailed taxonomy of AI governance work that is invisible to outside observers but disproportionately influential on actual policy outcomes. The author describes several categories of 'invisible' work: interagency coordination meetings where different departments negotiate over jurisdictional boundaries for AI oversight; comment review processes where public input on proposed rules is synthesized and translated into regulatory language; staff-level briefings where technical concepts are translated for decision-makers who will never read a research paper; and informal relationship-building that determines whose phone call gets returned when a time-sensitive AI incident occurs. The post argues that the AI safety community systematically overvalues visible governance actions (executive orders, Congressional hearings, international summits) and undervalues the invisible infrastructure that determines whether those visible actions actually change anything. An executive order is only as effective as the career staff who implement it, and those staff are shaped by the briefings, relationships, and institutional knowledge that constitute the invisible side. The author identifies several types of meetings and their relative impact: 'principals meetings' (high-visibility, low per-meeting impact because they ratify decisions already made), 'deputies meetings' (medium visibility, high impact because this is where real negotiations happen), and 'staff-level working groups' (invisible, highest cumulative impact because they set the terms of debate). The post also discusses the brain drain problem: AI governance roles in government pay a fraction of industry, creating a persistent talent deficit precisely in the roles where technical understanding matters most.",
+      "key_arguments": [
+        "Most impactful AI governance work happens in invisible interagency processes, not visible public actions",
+        "The AI safety community systematically overvalues executive orders and summits while undervaluing staff-level implementation work",
+        "Different types of government meetings have vastly different policy impact, with staff-level working groups having the highest cumulative influence",
+        "Government AI governance suffers from a persistent brain drain to industry that undermines technical competence",
+        "Effective AI governance requires institutional knowledge and relationships that are invisible from outside"
+      ],
+      "tags": [
+        "Governance",
+        "AI Policy",
+        "Government",
+        "Institutional Knowledge"
+      ],
+      "influence_score": 5,
+      "karma_score": null,
+      "category": "AI Governance",
+      "frequently_cited_by": [
+        "AI policy researchers",
+        "Government AI governance practitioners",
+        "EA-adjacent policy advocates"
+      ],
+      "responses_and_critiques": [
+        "Discussion of how the AI safety community can better engage with invisible governance processes",
+        "Debate over whether the invisible/visible distinction is a useful framing or an oversimplification"
+      ],
+      "source_links": []
+    },
+    {
+      "id": "zvi_on_sutskever_dwarkesh_2025",
+      "title": "On Dwarkesh Patel's Second Interview With Ilya Sutskever",
+      "author": "Zvi Mowshowitz",
+      "date": "2025-12-01",
+      "url": "https://www.lesswrong.com/posts/bMvCNtSH8DiGDTvXd/on-dwarkesh-patel-s-second-interview-with-ilya-sutskever",
+      "platform": "LessWrong",
+      "summary": "Zvi Mowshowitz's characteristically thorough analysis of Ilya Sutskever's claim that scaling has hit a wall and that new scientific principles are needed to move beyond the current LLM paradigm. The post dissects Sutskever's arguments point by point, examining the tension between his historical role as the chief architect of the scaling paradigm at OpenAI and his current position that scaling has reached its limits. Zvi explores the implications for SSI's research agenda, noting the striking gap between Sutskever's pessimism about current scaling approaches and the continued optimism expressed by other lab leaders like Sam Altman and Dario Amodei. The analysis covers what 'post-LLM' architectures might realistically look like, whether Sutskever's position reflects genuine scientific insight or strategic positioning for SSI, and how the AI safety community should update its models given that the person most responsible for proving scaling works now says it has plateaued. Zvi also examines the broader epistemic question of how to weigh insider testimony when insiders have commercial incentives that align with their stated positions.",
+      "novel_arguments_and_concepts": "Zvi's analysis contributes a meta-epistemic framework for evaluating insider claims about AI progress. He argues that Sutskever's claim carries unique evidential weight precisely because it runs counter to the incentive structure of most lab leaders (who benefit from the narrative that scaling will continue to yield results with more investment), but notes that SSI's positioning as a 'post-LLM' company creates its own incentive to declare the LLM paradigm exhausted. This creates an epistemic puzzle: the claim is more credible than similar claims from outsiders because Sutskever has unmatched inside knowledge, but less credible than it would be if SSI's business model didn't depend on the LLM paradigm being insufficient. Zvi navigates this by examining the technical arguments independently of the source, identifying which of Sutskever's specific claims about scaling limits are empirically testable and which are more speculative. The post also serves as a useful synthesis document, aggregating reactions from across the AI research community and mapping the landscape of agreement and disagreement on scaling limits.",
+      "key_arguments": [
+        "Sutskever's scaling pessimism carries unique authority but also reflects SSI's commercial positioning",
+        "The gap between Sutskever and other lab leaders on scaling limits requires careful epistemic analysis",
+        "Some of Sutskever's claims about scaling limits are empirically testable; others are speculative",
+        "The AI safety community should update toward more uncertainty about the path to AGI",
+        "Post-LLM architectures remain highly speculative — Sutskever's vision is more critique than proposal"
+      ],
+      "tags": [
+        "Scaling Laws",
+        "SSI",
+        "Ilya Sutskever",
+        "Commentary",
+        "AGI Timelines"
+      ],
+      "influence_score": 7,
+      "karma_score": null,
+      "category": "AI Capabilities / Forecasting",
+      "frequently_cited_by": [
+        "AGI timeline discussions",
+        "Scaling debate commentary"
+      ],
+      "responses_and_critiques": [
+        "Part of broader community discussion on whether scaling limits are fundamental or temporary"
+      ],
+      "source_links": [
+        "https://www.lesswrong.com/posts/bMvCNtSH8DiGDTvXd/on-dwarkesh-patel-s-second-interview-with-ilya-sutskever"
+      ]
+    },
+    {
+      "id": "alignment_more_promising_than_control_2026",
+      "title": "I Think Alignment Work Is More Promising Than Control Work",
+      "author": "Unknown",
+      "date": "2026-01-15",
+      "url": "https://www.lesswrong.com/posts/dmHbogCFbSp95J3Lz/i-think-alignment-work-is-more-promising-than-control-work",
+      "platform": "LessWrong",
+      "summary": "A quantitative assessment of the AI technical safety research landscape that estimates roughly 20-25% of the technical safety community is working on alignment broadly construed, translating to approximately 180 out of 750 full-time equivalents at established organizations, or about 300 out of 1,500 FTEs when including less established researchers and independent contributors. The post argues that alignment research — work aimed at making AI systems genuinely understand and pursue human values — is more promising than AI control work, which focuses on constraining AI behavior through external mechanisms regardless of internal alignment. The author contends that control strategies face fundamental scalability problems: as AI systems become more capable, the control overhead grows while the window for meaningful human oversight shrinks. Alignment work, by contrast, aims to solve the problem at its root by building systems that are internally motivated to behave well. The post acknowledges that control work provides important near-term safety guarantees but argues that the field's long-term resource allocation should tilt more heavily toward alignment research, which has shown more empirical progress than many pessimists expected.",
+      "novel_arguments_and_concepts": "The post's primary contribution is quantifying the research landscape in a way that reveals how the safety community allocates its resources between alignment and control paradigms. The 20-25% figure for alignment-focused researchers challenges narratives from both directions: alignment optimists may be surprised that the fraction is that low, while control advocates may be surprised it is that high. The scalability argument against control is developed more rigorously than in most prior discussions, drawing on concrete examples of how control mechanisms have already begun to fail as models become more capable at identifying and routing around constraints. The post also introduces a useful taxonomy distinguishing 'shallow alignment' (behavioral compliance through training) from 'deep alignment' (genuine value understanding) and argues that recent advances in interpretability and mechanistic understanding make deep alignment more tractable than previously believed.",
+      "key_arguments": [
+        "Approximately 20-25% of the technical safety community works on alignment broadly",
+        "This represents roughly 180/750 FTEs at established orgs or 300/1500 including less established researchers",
+        "Alignment research is more promising than control work for long-term safety",
+        "Control strategies face fundamental scalability problems as AI capabilities increase",
+        "Recent interpretability advances make deep alignment more tractable than previously believed",
+        "Near-term safety requires control, but long-term resource allocation should favor alignment"
+      ],
+      "tags": [
+        "Alignment",
+        "AI Control",
+        "Safety Strategy",
+        "Research Priorities"
+      ],
+      "influence_score": 7,
+      "karma_score": null,
+      "category": "AI Safety Strategy",
+      "frequently_cited_by": [
+        "Research prioritization discussions",
+        "Alignment vs control debates"
+      ],
+      "responses_and_critiques": [
+        "Likely prompted responses from control-focused researchers defending the complementarity of both approaches"
+      ],
+      "source_links": [
+        "https://www.lesswrong.com/posts/dmHbogCFbSp95J3Lz/i-think-alignment-work-is-more-promising-than-control-work"
+      ]
+    },
+    {
+      "id": "alignment_framing_less_wrong_2026",
+      "title": "Can We Make AI Alignment Framing Less Wrong?",
+      "author": "Unknown",
+      "date": "2026-01-08",
+      "url": "https://www.lesswrong.com/posts/gapGhQxqYQrayDdLd/can-we-make-ai-alignment-framing-less-wrong",
+      "platform": "LessWrong",
+      "summary": "A significant reframing post that marks a shift in how the rationalist AI safety community justifies and positions interpretability research. The post argues that the field should move away from framing interpretability as a foundational solution to the alignment problem — the idea that if we can fully understand what a model is doing internally, we can verify it is aligned — and toward a more pragmatic framing where interpretability serves specific control-relevant safety roles. These include monitoring for misalignment during deployment, debugging failures when they occur, and preserving meaningful human oversight as capabilities scale beyond the point where behavioral testing alone provides adequate safety guarantees. The author argues that the foundational framing set unrealistically high bars for interpretability research (complete mechanistic understanding of frontier models) while undervaluing the substantial practical safety contributions that partial interpretability already provides. This reframing matters because it changes which interpretability research is prioritized: instead of pursuing comprehensive circuit-level understanding, the field should invest more in techniques that detect anomalous internal states, identify deceptive patterns, and provide actionable signals to human overseers even without full mechanistic understanding.",
+      "novel_arguments_and_concepts": "The post's central insight is that the alignment community's framing of interpretability has been counterproductively ambitious. By positioning interpretability as the key to 'solving' alignment, the community created expectations that interpretability research could never meet in the near term, leading to premature disillusionment and resource reallocation away from genuinely useful interpretability work. The alternative framing — interpretability as a safety tool rather than a safety solution — is more modest but also more actionable. It draws a productive analogy to software debugging: engineers don't need to understand every line of a complex system to identify bugs and ensure safe operation; they need targeted tools that surface anomalies and provide enough context for informed human judgment. Similarly, alignment-relevant interpretability doesn't require full mechanistic understanding of transformer circuits; it requires techniques that can flag when a model's internal representations diverge from expected patterns in ways that correlate with unsafe behavior. This reframing also opens up collaboration opportunities with the ML engineering community, which already invests heavily in model monitoring and debugging for capability reasons.",
+      "key_arguments": [
+        "Interpretability should be reframed from foundational alignment solution to control-relevant safety tool",
+        "The foundational framing set unrealistically high bars that led to premature disillusionment",
+        "Partial interpretability already provides substantial practical safety value",
+        "Monitoring for misalignment and debugging failures are the highest-value interpretability applications",
+        "Full mechanistic understanding is unnecessary for actionable safety contributions",
+        "This reframing changes which interpretability research deserves priority investment"
+      ],
+      "tags": [
+        "Alignment",
+        "Interpretability",
+        "Framing",
+        "Safety Strategy"
+      ],
+      "influence_score": 7,
+      "karma_score": null,
+      "category": "AI Safety / Interpretability",
+      "frequently_cited_by": [
+        "Interpretability research prioritization discussions",
+        "Alignment strategy debates"
+      ],
+      "responses_and_critiques": [
+        "Likely prompted discussion about whether the pragmatic framing undervalues the long-term importance of deep interpretability"
+      ],
+      "source_links": [
+        "https://www.lesswrong.com/posts/gapGhQxqYQrayDdLd/can-we-make-ai-alignment-framing-less-wrong"
+      ]
+    },
+    {
+      "id": "iliad_intensive_course_materials_2026",
+      "title": "The Iliad Intensive Course Materials",
+      "author": "Unknown",
+      "date": "2026-05-11",
+      "url": "https://www.lesswrong.com/posts/dWQnLi7AoKo3paBXF/the-iliad-intensive-course-materials",
+      "platform": "LessWrong",
+      "summary": "The public release of course materials from the Iliad Intensive, a month-long full-time AI alignment research training program designed for people with strong backgrounds in mathematics, physics, or theoretical computer science. The Iliad Intensive represents a significant investment in the alignment research pipeline, aiming to bridge the gap between technical talent in adjacent quantitative fields and the specific skills needed for productive alignment research. The released materials cover foundational topics including the theoretical frameworks for thinking about alignment (value learning, corrigibility, deceptive alignment), technical tools from interpretability and formal verification, hands-on exercises in analyzing model internals, and guided research projects that participants completed during the program. The post provides context on the program's design philosophy: rather than teaching alignment as a fixed body of knowledge, the curriculum emphasizes developing the research taste and problem-finding skills needed to make original contributions to a field where the central questions are still being formulated. The release of these materials is positioned as both a resource for self-study by individuals who couldn't attend the program and as a template for other organizations building alignment training programs.",
+      "novel_arguments_and_concepts": "The course materials themselves represent a crystallization of the alignment research community's pedagogical knowledge — what background is needed, what order to learn things in, and how to bridge from mathematical maturity to alignment-specific research skills. The emphasis on recruiting from mathematics, physics, and theoretical computer science (rather than from ML engineering) reflects a deliberate bet that the alignment problem is fundamentally a scientific and mathematical challenge rather than an engineering one. The program's design philosophy of teaching research taste rather than established results is notable: it implicitly argues that the alignment field is young enough that the ability to identify important problems is more valuable than mastery of existing solutions. The guided research projects included in the materials offer a snapshot of what the alignment community considers the most tractable and important open questions as of early 2026, serving as a roadmap for where the field believes progress is most needed.",
+      "key_arguments": [
+        "Alignment research requires strong mathematical and theoretical backgrounds",
+        "The research pipeline from quantitative fields to alignment work needs structured training programs",
+        "Research taste and problem-finding skills are more important than mastery of existing alignment results",
+        "Public release of materials enables scaling of alignment training beyond individual programs",
+        "The alignment field is young enough that identifying important problems outweighs solving known ones"
+      ],
+      "tags": [
+        "Education",
+        "Alignment",
+        "Training",
+        "Research Pipeline",
+        "Mathematics"
+      ],
+      "influence_score": 6,
+      "karma_score": null,
+      "category": "AI Safety / Community",
+      "frequently_cited_by": [
+        "Alignment training program discussions",
+        "Research pipeline and talent discussions"
+      ],
+      "responses_and_critiques": [
+        "Likely prompted discussion about accessibility and whether the math-heavy focus excludes important perspectives"
+      ],
+      "source_links": [
+        "https://www.lesswrong.com/posts/dWQnLi7AoKo3paBXF/the-iliad-intensive-course-materials"
+      ]
     }
   ]
 }

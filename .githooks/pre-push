@@ -21,11 +21,11 @@ should_protect_remote() {
   return 1
 }
 
-is_protected_branch_ref() {
+is_allowed_public_ref() {
   local ref_name="$1"
 
   case "$ref_name" in
-    refs/heads/dev)
+    refs/heads/main|refs/heads/release-staging*|refs/tags/*)
       return 0
       ;;
   esac
@@ -33,13 +33,26 @@ is_protected_branch_ref() {
   return 1
 }
 
-if [ "${CE_ALLOW_PRIVATE_BRANCH_PUSH:-0}" = "1" ]; then
-  exit 0
-fi
+consume_push_override() {
+  local git_dir
+  local override_path
+
+  git_dir="$(git rev-parse --git-dir 2>/dev/null || true)"
+  [ -n "$git_dir" ] || return 1
+
+  override_path="$git_dir/CE_PUSH_OVERRIDE"
+  [ -f "$override_path" ] || return 1
+
+  rm -f "$override_path"
+  printf 'warning: consumed one-time CE push override for %s.\n' "${REMOTE_NAME:-remote}" >&2
+  return 0
+}
 
 if ! should_protect_remote; then
   exit 0
 fi
+
+blocked_refs=()
 
 while read -r local_ref local_sha remote_ref remote_sha; do
   [ -n "${local_ref:-}" ] || continue
@@ -48,12 +61,29 @@ while read -r local_ref local_sha remote_ref remote_sha; do
     continue
   fi
 
-  if is_protected_branch_ref "$local_ref" || is_protected_branch_ref "$remote_ref"; then
-    printf 'Blocked push of the private `dev` branch to %s.\n' "$REMOTE_NAME" >&2
-    printf 'Use `scripts/sync-public-history.sh` to publish `release-staging` instead.\n' >&2
-    printf 'If this push is truly intentional, rerun with `CE_ALLOW_PRIVATE_BRANCH_PUSH=1`.\n' >&2
-    exit 1
+  if ! is_allowed_public_ref "$remote_ref"; then
+    blocked_refs+=("$remote_ref")
+    continue
   fi
+
+  case "$local_ref" in
+    refs/heads/*|refs/tags/*)
+      if ! is_allowed_public_ref "$local_ref"; then
+        blocked_refs+=("$local_ref")
+      fi
+      ;;
+  esac
 done
+
+if [ "${#blocked_refs[@]}" -gt 0 ]; then
+  if consume_push_override; then
+    exit 0
+  fi
+
+  printf 'Blocked push to public Context Engine remote %s.\n' "${REMOTE_NAME:-remote}" >&2
+  printf 'Allowed refs are refs/heads/main, refs/heads/release-staging*, and refs/tags/*.\n' >&2
+  printf 'Rejected ref: %s\n' "${blocked_refs[0]}" >&2
+  exit 1
+fi
 
 exit 0

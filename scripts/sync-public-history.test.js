@@ -90,7 +90,7 @@ function setupSourceRepo() {
     git(tempRoot, ['init', '--bare', '--initial-branch=main', remoteDir], { stdio: 'ignore' });
     git(tempRoot, ['clone', remoteDir, sourceDir], { stdio: 'ignore' });
     git(sourceDir, ['config', 'user.name', 'Private Dev'], { stdio: 'ignore' });
-    git(sourceDir, ['config', 'user.email', 'private@example.com'], { stdio: 'ignore' });
+    git(sourceDir, ['config', 'user.email', '[redacted-email]'], { stdio: 'ignore' });
 
     installSyncScriptFixture(sourceDir);
 
@@ -214,6 +214,47 @@ test('sync-public-history accepts an explicit source branch', () => {
   });
 });
 
+test('sync-public-history can replay patch-new commits from a source branch diverged from main', () => {
+  withSourceRepo(({ sourceDir }) => {
+    git(sourceDir, ['checkout', '--quiet', 'main']);
+    writeFile(sourceDir, 'main-only.txt', 'direct main change\n');
+    commitAll(sourceDir, 'Direct main commit', {
+      authorDate: '2025-01-02T00:00:00Z',
+      committerDate: '2025-01-02T00:00:00Z',
+    });
+    git(sourceDir, ['push', '--quiet', 'origin', 'main']);
+    git(sourceDir, ['checkout', '--quiet', 'dev']);
+
+    const defaultResult = runSyncScript(sourceDir, ['--dry-run', 'release-candidate']);
+    assert.equal(defaultResult.status, 1);
+    assert.match(defaultResult.stderr, /origin\/main is not an ancestor of dev/);
+    assert.match(defaultResult.stderr, /--allow-diverged-source/);
+
+    const result = runSyncScript(sourceDir, ['--allow-diverged-source', 'release-candidate']);
+
+    assert.equal(result.status, 0);
+    assert.match(result.stderr, /using git cherry to replay patch-new non-merge commits/);
+    assert.match(result.stdout, /Replay complete\./);
+    assert.match(result.stdout, /Branch name: release-candidate/);
+    assert.match(result.stdout, /Replayed commits: 2/);
+    assert.match(result.stdout, /Skipped commits: 2/);
+
+    const historySubjects = git(sourceDir, [
+      'log',
+      '--reverse',
+      '--format=%s',
+      'origin/main..release-candidate',
+    ]).trim().split('\n');
+    assert.deepEqual(historySubjects, [
+      'Public commit title',
+      'Mixed commit',
+    ]);
+
+    assert.equal(git(sourceDir, ['show', 'release-candidate:main-only.txt']), 'direct main change\n');
+    assert.equal(git(sourceDir, ['show', 'release-candidate:public.txt']), 'public one\npublic two\n');
+  });
+});
+
 test('sync-public-history installs the private dev push guard before replaying', () => {
   withSourceRepo(({ sourceDir }) => {
     git(sourceDir, ['branch', '--set-upstream-to=origin/main', 'dev'], { stdio: 'ignore' });
@@ -258,8 +299,8 @@ test('sync-public-history replays public commits, skips private-only commits, an
     ]).trim().split('\n');
 
     assert.deepEqual(historyLines, [
-      'Public commit title|2025-01-02T03:04:05Z|2025-01-02T03:04:05Z|Agalmic <agalmicsoftware@protonmail.com>|Agalmic <agalmicsoftware@protonmail.com>',
-      'Mixed commit|2025-01-04T05:06:07Z|2025-01-04T05:06:07Z|Agalmic <agalmicsoftware@protonmail.com>|Agalmic <agalmicsoftware@protonmail.com>',
+      'Public commit title|2025-01-02T03:04:05Z|2025-01-02T03:04:05Z|Agalmic <[redacted-email]>|Agalmic <[redacted-email]>',
+      'Mixed commit|2025-01-04T05:06:07Z|2025-01-04T05:06:07Z|Agalmic <[redacted-email]>|Agalmic <[redacted-email]>',
     ]);
 
     const replayedShas = git(sourceDir, [
@@ -426,6 +467,29 @@ test('sync-public-history rejects replayed commit messages that mention private 
     assert.match(result.stderr, /Refusing to replay .*Public change/);
     assert.match(result.stderr, /Commit message mentions private release token: agent-native/);
     assert.equal(git(sourceDir, ['branch', '--list', 'release-candidate']).trim(), '');
+  });
+});
+
+test('sync-public-history can sanitize private tokens in otherwise public replay messages', () => {
+  withSourceRepo(({ sourceDir }) => {
+    writeFile(sourceDir, 'public-sanitized.txt', 'public change\n');
+    commitAll(sourceDir, 'Public sanitized change\n\nMentions contextEngine-cc and agent-native follow-up details.\n', {
+      authorDate: '2025-01-05T06:07:08Z',
+      committerDate: '2025-01-05T06:07:08Z',
+    });
+
+    const result = runSyncScript(sourceDir, ['--sanitize-private-replay-messages', 'release-candidate']);
+
+    assert.equal(result.status, 0);
+    assert.match(result.stderr, /Sanitized private replay message tokens/);
+    assert.match(result.stdout, /Replayed commits: 3/);
+
+    const latestMessage = git(sourceDir, ['log', '-1', '--format=%B', 'release-candidate']);
+    assert.match(latestMessage, /Public sanitized change/);
+    assert.match(latestMessage, /private companion tooling/);
+    assert.match(latestMessage, /private integration/);
+    assert.doesNotMatch(latestMessage, /contextEngine-cc/i);
+    assert.doesNotMatch(latestMessage, /agent-native/i);
   });
 });
 

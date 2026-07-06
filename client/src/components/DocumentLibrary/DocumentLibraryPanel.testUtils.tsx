@@ -64,12 +64,13 @@ jest.mock('../../utilities/crypto/litProtocol.js', () => ({
   resolveLitChain: jest.fn(() => 'ethereum'),
 }));
 
-jest.mock('../../utilities/arweave/arweaveScripts.js', () => ({
-  arweaveScripts: {
+jest.mock('../../utilities/arweave/arweaveClient.js', () => {
+  const arweaveClient = {
     buildArweaveGatewayUrl: (txId: string, gateway = 'https://arweave.example.test') => `${gateway}/${txId}`,
     downloadDataFromArweave: jest.fn(),
-  },
-}));
+  };
+  return { arweaveClient, arweaveScripts: arweaveClient };
+});
 
 jest.mock('../../utilities/docLibrary/uploads.js', () => ({
   resolveDocUploadsGate: (...args: any[]) => mockResolveDocUploadsGate(...args),

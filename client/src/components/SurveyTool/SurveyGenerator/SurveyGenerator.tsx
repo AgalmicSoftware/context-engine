@@ -91,7 +91,7 @@ import { createLogger } from 'utilities/logging.js';
 import { toStr } from '../../../utilities/shared/primitives.js';
 import { generateQuestionId as generateSharedQuestionId } from '../../../utilities/shared/questionUtils.mjs';
 import { notify } from '../../../utilities/ui/notify.js';
-import { fetchImageFromURL } from '../../../utilities/ui/imageScripts.js';
+import { fetchImageFromURL } from '../../../utilities/ui/imageFetchClient.js';
 import { E2E_TESTIDS } from '../../../utilities/e2eTestIds.js';
 import {
   MAX_QUESTION_COUNT,

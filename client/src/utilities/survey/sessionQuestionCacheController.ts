@@ -23,15 +23,20 @@ import {
   shouldClearQuestionProgressInFinalize,
   shouldCommitThrottledProgress,
   shouldFlushCoalescedRun,
-} from '../../components/MainSite/progressHelpers.js';
+} from '../session/mainSiteProgressHelpers.js';
 import {
   MASKED_Q_DECRYPT_BACKOFF_MAX,
   MASKED_Q_DECRYPT_BACKOFF_TTL_MS,
-} from '../../components/MainSite/cacheConstants.js';
+} from '../cache/sessionCacheConstants.js';
 import {
   isMaskedQuestionPayload,
   pickBetterQuestionPayload,
 } from './questionRouting.js';
+import {
+  compareResponseRecency,
+  toResponseRecencyPair,
+  type ResponseRecencyPair,
+} from './responseRecency';
 
 type CacheRecord = Record<string, unknown>;
 type StateRecord = {
@@ -90,13 +95,6 @@ interface PendingQuestionMetadataEntry extends CacheRecord {
   state?: string;
   lastStatus?: number | null;
   message?: string;
-}
-
-interface ResponseRecencyPair extends CacheRecord {
-  bn: number;
-  txi: number;
-  li: number;
-  ts: number;
 }
 
 type QuestionResponsesByResponder = Record<string, unknown>;
@@ -778,40 +776,6 @@ export const createSessionQuestionCacheController = (
           const freshQRMeta = (freshNet && typeof freshNet.questionResponsesMeta === 'object')
             ? freshNet.questionResponsesMeta
             : {};
-          const toResponseRecencyPair = (
-            value: unknown,
-            responseValue: unknown = null
-          ): ResponseRecencyPair => {
-            const src = isRecord(value) ? value : {};
-            const responseObj = isRecord(responseValue) ? responseValue : {};
-            return {
-              bn: Number(src.bn ?? src.blockNumber ?? responseObj.blockNumber ?? responseObj.bn ?? 0) || 0,
-              txi: Number(
-                src.txi ??
-                src.transactionIndex ??
-                src.txIndex ??
-                responseObj.transactionIndex ??
-                responseObj.txIndex ??
-                0
-              ) || 0,
-              li: Number(src.li ?? src.logIndex ?? responseObj.logIndex ?? responseObj.li ?? 0) || 0,
-              ts: Number(src.ts ?? src.timestamp ?? responseObj.timestamp ?? 0) || 0,
-            };
-          };
-          const compareResponseRecency = (
-            incomingRecency: ResponseRecencyPair,
-            existingRecency: ResponseRecencyPair
-          ): number => {
-            if (incomingRecency.bn > existingRecency.bn) return 1;
-            if (incomingRecency.bn < existingRecency.bn) return -1;
-            if (incomingRecency.txi > existingRecency.txi) return 1;
-            if (incomingRecency.txi < existingRecency.txi) return -1;
-            if (incomingRecency.li > existingRecency.li) return 1;
-            if (incomingRecency.li < existingRecency.li) return -1;
-            if (incomingRecency.ts > existingRecency.ts) return 1;
-            if (incomingRecency.ts < existingRecency.ts) return -1;
-            return 0;
-          };
           const shouldApplyIncomingResponse = ({
             existingMeta,
             incomingMeta,
@@ -1704,8 +1668,8 @@ export const createSessionQuestionCacheController = (
       /**********************************************************************
       * 2) Filter out those we already have in the cache. We only load new ones
       **********************************************************************/
-      const existingQIDs = Object.keys(questionsCache[networkID].questions).map((id) => id.toLowerCase());
-      let finalNewQIDs = newQIDsForDiscovery.filter((id) => !existingQIDs.includes(id));
+      const existingQIDs = new Set(Object.keys(questionsCache[networkID].questions).map((id) => id.toLowerCase()));
+      let finalNewQIDs = newQIDsForDiscovery.filter((id) => !existingQIDs.has(String(id || '').toLowerCase()));
       finalNewQIDs = Array.from(new Set([
         ...finalNewQIDs,
         ...cachedQuestionRefreshIds,

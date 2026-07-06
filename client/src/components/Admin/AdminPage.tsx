@@ -8,32 +8,18 @@ import styles from './AdminPage.module.scss';
 import {
   USE_ONCHAIN_SESSION_REGISTRY,
 } from '../../variables/appConfig.js';
-import { getDefaultHttpRpc } from '../../variables/chains.js';
-import { corsProxyUtils } from '../../utilities/worker/corsProxy.js';
-import {
-  buildSiweMessage,
-  buildSignedAdminActionAuth,
-  fetchWorkerWithAuth,
-} from '../../utilities/worker/workerAuth.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
-import { arweaveScripts } from '../../utilities/arweave/arweaveScripts.js';
 import { encryptedFieldsUtils } from '../../utilities/crypto/encryptedFields.js';
 import { normalizeOriginList } from '../../utilities/urlUtils.js';
-import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
-import { buildWorkerAllowOrigins } from '../../utilities/worker/workerCorsOrigins.js';
-import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { rpcProvidersChainReadsPort } from '../../domains/chain/rpcProvidersChainReadsPort';
+import { adminWorkerPorts } from '../../domains/worker/adminWorkerPorts.js';
+import { adminArweavePort } from '../../domains/storage/adminArweavePorts.js';
 import {
-  loadSessionRegistryCache,
-  SESSION_REGISTRY_CACHE_UPDATED_EVENT,
-  sessionRegistryStore,
-  setSessionFieldsOnChain,
-  setResourceGatesOnChain,
-  fetchSessionFromRegistry,
-  upsertSessionRegistryCache,
-  uploadSessionMetadata,
-  updateSessionMetadataOnChain,
-  sessionRegistryUtils,
-} from '../../utilities/web3/sessionRegistry.js';
+  adminSessionRegistryPorts,
+  type AdminSessionRegistryEntry,
+} from '../../domains/sessions/registry/sessionRegistryAdminPorts.js';
+import { normalizeSessionMediaUrl } from '../../domains/sessions/sessionMediaUrls.js';
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
   buildSbtAccessControlConditions,
   getGlobalLitHooks,
@@ -159,6 +145,26 @@ type AdminMetadataBlockLimitsDraft = {
   start: string;
   end: string;
 };
+type AdminSessionConfigLike = {
+  sessionName?: unknown;
+  sessionId?: unknown;
+  networkChainId?: unknown;
+  __registry?: Record<string, unknown>;
+  [key: string]: unknown;
+};
+type AdminPageProps = {
+  account?: string;
+  provider?: string;
+  network?: {
+    id?: unknown;
+    chainId?: unknown;
+  } | null;
+  toggleLoginModal?: (payload?: unknown) => unknown;
+  loginComplete?: boolean;
+  ensureLightSbtUniverse?: () => unknown;
+  initialSessionId?: unknown;
+  initialRegistryChainId?: unknown;
+};
 
 export const __adminPageTestUtils = {
   applyAdminMetadataDraft,
@@ -176,6 +182,12 @@ const buildSecretPresenceTargetKey = ({ slug, workerUrl }: { slug?: unknown; wor
   return normalizedWorkerUrl ? `${normalizedSlug}\n${normalizedWorkerUrl}` : '';
 };
 
+const asAdminSessionConfig = (value: unknown): AdminSessionConfigLike => (
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? value as AdminSessionConfigLike
+    : {}
+);
+
 const AdminPage = ({
   account,
   provider,
@@ -185,8 +197,8 @@ const AdminPage = ({
   ensureLightSbtUniverse,
   initialSessionId,
   initialRegistryChainId,
-}: any) => {
-  const [sessions, setSessions] = useState<any>([]);
+}: AdminPageProps) => {
+  const [sessions, setSessions] = useState<AdminSessionRegistryEntry[]>([]);
   const [selectedSlug, setSelectedSlug] = useState('');
   const [ignoreRequestedSession, setIgnoreRequestedSession] = useState(false);
   const [workerUrl, setWorkerUrl] = useState('');
@@ -226,8 +238,8 @@ const AdminPage = ({
   const [transcribeText, setTranscribeText] = useState('');
   const [openSection, setOpenSection] = useState('');
   const [showTestsPanel, setShowTestsPanel] = useState(false);
-  const [encryptedFields, setEncryptedFields] = useState<any>({});
-  const [decryptedFields, setDecryptedFields] = useState<any>({});
+  const [encryptedFields, setEncryptedFields] = useState<Record<string, unknown>>({});
+  const [decryptedFields, setDecryptedFields] = useState<AdminDecryptedFieldMap>({});
   const [sessionLookupStatus, setSessionLookupStatus] = useState('');
   const [sessionsRefreshStatus, setSessionsRefreshStatus] = useState('');
   const [sessionsRefreshBusy, setSessionsRefreshBusy] = useState(false);
@@ -279,14 +291,14 @@ const AdminPage = ({
   const litResourceRequestRef = useRef(0);
   const secretPresenceRequestRef = useRef(0);
   const secretPresenceTargetKeyRef = useRef('');
-  const rawMetadataCopyResetRef = useRef<any>(null);
+  const rawMetadataCopyResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevSelectedSlugForDraftRef = useRef(selectedSlug);
   const prevSelectedSlugForAllowOriginsDraftRef = useRef(selectedSlug);
   const encryptedFieldsSessionKeyRef = useRef('');
   const metadataDraftTouchedRef = useRef(metadataDraftTouched);
   metadataDraftTouchedRef.current = metadataDraftTouched;
 
-  const handleSecretChange = useCallback((key: any, value: any) => {
+  const handleSecretChange = useCallback((key: string, value: string) => {
     setSecrets((prev) => ({ ...prev, [key]: value }));
     setWorkerSecretsDirty(true);
     setClearedSecretKeys((prev) => {
@@ -297,7 +309,7 @@ const AdminPage = ({
     });
   }, []);
 
-  const handleClearSecret = useCallback((key: any) => {
+  const handleClearSecret = useCallback((key: string) => {
     setSecrets((prev) => ({ ...prev, [key]: '' }));
     setWorkerSecretsDirty(true);
     setClearedSecretKeys((prev) => {
@@ -307,7 +319,7 @@ const AdminPage = ({
     });
   }, []);
 
-  const updateMetadataConfigDraft = useCallback((key: any, value: any) => {
+  const updateMetadataConfigDraft = useCallback((key: string, value: unknown) => {
     setMetadataDraftTouched(true);
     if (key === 'contractSurveysAddress' || key === 'contractSbtFactoryAddress' || key === 'contractSessionRegistryAddress') {
       setMetadataContractDraftTouched(true);
@@ -317,7 +329,7 @@ const AdminPage = ({
   }, []);
 
   const requestedSessionRaw = toStr(initialSessionId).trim();
-  const requestedSessionIdHex = sessionRegistryUtils.normalizeSessionIdHex(requestedSessionRaw);
+  const requestedSessionIdHex = adminSessionRegistryPorts.reads.normalizeSessionIdHex(requestedSessionRaw);
   const requestedSessionSlug = requestedSessionIdHex ? '' : normalizeSlug(requestedSessionRaw);
   const requestedChainId = parseChainIdInput(initialRegistryChainId) || null;
   const requestedFetchKeyRef = useRef('');
@@ -331,7 +343,7 @@ const AdminPage = ({
   }, [requestedSessionRaw, requestedChainId]);
 
   const syncSessionsFromRegistryCache = useCallback(() => {
-    const cached = sessionRegistryStore.getAllSessionEntries();
+    const cached = adminSessionRegistryPorts.reads.getAllSessionEntries();
     const nextSessions = Array.isArray(cached) ? cached : [];
     setSessions(nextSessions);
     return nextSessions;
@@ -344,7 +356,7 @@ const AdminPage = ({
     const shouldForceRegistryRead = !USE_ONCHAIN_SESSION_REGISTRY || !!forceOnChain;
     const runRegistryLoad = async (bootstrapRpc: any) => {
       try {
-        return await loadSessionRegistryCache({
+        return await adminSessionRegistryPorts.reads.loadSessionRegistryCache({
           ...(chainIds ? { chainIds } : {}),
           force: shouldForceRegistryRead,
           // In /admin, never auto-decrypt registry metadata; keep wallet prompts behind user actions.
@@ -382,7 +394,7 @@ const AdminPage = ({
       requestedFetchKeyRef.current = '';
       await loadSessions({ forceOnChain: true });
       if (!ignoreRequestedSession && requestedSessionRaw && requestedChainId) {
-        const config: any = await fetchSessionFromRegistry({
+        const config: any = await adminSessionRegistryPorts.reads.fetchSessionFromRegistry({
           chainId: requestedChainId,
           sessionId: requestedSessionIdHex || '',
           slug: requestedSessionSlug || '',
@@ -393,8 +405,8 @@ const AdminPage = ({
           bootstrapRpc: true,
         });
         if (config) {
-          upsertSessionRegistryCache({ config });
-          const refreshed = sessionRegistryStore.getAllSessionEntries();
+          adminSessionRegistryPorts.reads.upsertSessionRegistryCache({ config });
+          const refreshed = adminSessionRegistryPorts.reads.getAllSessionEntries();
           setSessions(refreshed || []);
           setSelectedSlug(normalizeSlug(config.slug));
         }
@@ -423,30 +435,31 @@ const AdminPage = ({
     const handleRegistryCacheUpdated = () => {
       syncSessionsFromRegistryCache();
     };
-    window.addEventListener(SESSION_REGISTRY_CACHE_UPDATED_EVENT, handleRegistryCacheUpdated);
-    return () => {
-      window.removeEventListener(SESSION_REGISTRY_CACHE_UPDATED_EVENT, handleRegistryCacheUpdated);
-    };
+    return adminSessionRegistryPorts.reads.subscribeToCacheUpdates(window, handleRegistryCacheUpdated);
   }, [syncSessionsFromRegistryCache]);
 
   const sessionsForChain = useMemo(() => {
     if (!requestedChainId) return sessions || [];
-    return (sessions || []).filter(([, cfg]: any) => {
-      const chainId = Number(cfg?.__registry?.registryChainId || cfg?.__registry?.chainId || 0) || 0;
+    return (sessions || []).filter(([, rawCfg]) => {
+      const cfg = asAdminSessionConfig(rawCfg);
+      const registry = asAdminSessionConfig(cfg.__registry);
+      const chainId = Number(registry.registryChainId || registry.chainId || 0) || 0;
       return chainId === requestedChainId;
     });
   }, [sessions, requestedChainId]);
 
-  const availableSessions = useMemo(() => sessionsForChain, [sessionsForChain]);
+  const availableSessions = sessionsForChain;
   const requestedSessionMatch = useMemo(() => {
     if (!requestedSessionRaw) return null;
     if (requestedSessionIdHex) {
-      return availableSessions.find(([, cfg]: any) => {
-        const cfgId = sessionRegistryUtils.normalizeSessionIdHex(cfg?.__registry?.sessionIdHex || cfg?.sessionId);
+      return availableSessions.find(([, rawCfg]) => {
+        const cfg = asAdminSessionConfig(rawCfg);
+        const registry = asAdminSessionConfig(cfg.__registry);
+        const cfgId = adminSessionRegistryPorts.reads.normalizeSessionIdHex(registry.sessionIdHex || cfg.sessionId);
         return cfgId && cfgId === requestedSessionIdHex;
       }) || null;
     }
-    return availableSessions.find(([slug]: any) => slug === requestedSessionSlug) || null;
+    return availableSessions.find(([slug]) => slug === requestedSessionSlug) || null;
   }, [availableSessions, requestedSessionRaw, requestedSessionIdHex, requestedSessionSlug]);
 
   useEffect(() => {
@@ -489,7 +502,7 @@ const AdminPage = ({
       setSelectedSlug(availableSessions[0][0] || '');
       return;
     }
-    const hasSelected = availableSessions.some(([slug]: any) => slug === selectedSlug);
+    const hasSelected = availableSessions.some(([slug]) => slug === selectedSlug);
     if (!hasSelected) setSelectedSlug(availableSessions[0][0] || '');
   }, [
     availableSessions,
@@ -512,7 +525,7 @@ const AdminPage = ({
     const run = async () => {
       setSessionLookupStatus(`Fetching session from chain ${requestedChainId}…`);
       try {
-        const config: any = await fetchSessionFromRegistry({
+        const config: any = await adminSessionRegistryPorts.reads.fetchSessionFromRegistry({
           chainId: requestedChainId,
           sessionId: requestedSessionIdHex || '',
           slug: requestedSessionSlug || '',
@@ -525,8 +538,8 @@ const AdminPage = ({
         if (!config) {
           throw new Error(`Session not found on chain ${requestedChainId}: ${requestedSessionRaw}`);
         }
-        upsertSessionRegistryCache({ config });
-        const refreshed = sessionRegistryStore.getAllSessionEntries();
+        adminSessionRegistryPorts.reads.upsertSessionRegistryCache({ config });
+        const refreshed = adminSessionRegistryPorts.reads.getAllSessionEntries();
         if (cancelled) return;
         setSessions(refreshed || []);
         setSelectedSlug(normalizeSlug(config.slug));
@@ -553,8 +566,8 @@ const AdminPage = ({
   ]);
 
   const selectedConfig: any = useMemo(() => {
-    const match = availableSessions.find(([slug]: any) => slug === selectedSlug);
-    return match ? match[1] : null;
+    const match = availableSessions.find(([slug]) => slug === selectedSlug);
+    return match ? asAdminSessionConfig(match[1]) : null;
   }, [availableSessions, selectedSlug]);
   const effectiveWorkerAllowOrigins = useMemo(() => {
     if (!selectedConfig) return [];
@@ -681,23 +694,10 @@ const AdminPage = ({
       setMetadataLatestBlockStatus('');
       return;
     }
-    const rpcUrl = (
-      getDefaultHttpRpc(relevantSessionChainId, { allowPath: false }) ||
-      getDefaultHttpRpc(relevantSessionChainId)
-    );
-    if (!rpcUrl) {
-      setMetadataLatestBlock(null);
-      setMetadataLatestBlockStatus('Current block unavailable for the selected session chain.');
-      return;
-    }
     let cancelled = false;
     setMetadataLatestBlockStatus('Loading current block…');
-    const readProvider = new ethers.providers.JsonRpcProvider(rpcUrl, {
-      chainId: relevantSessionChainId,
-      name: `chain-${relevantSessionChainId}`,
-    });
-    readProvider.getBlockNumber()
-      .then((blockNumber: any) => {
+    rpcProvidersChainReadsPort.getLatestBlockNumberForChain(relevantSessionChainId)
+      .then((blockNumber: number) => {
         if (cancelled) return;
         setMetadataLatestBlock(blockNumber);
         setMetadataLatestBlockStatus('');
@@ -815,10 +815,6 @@ const AdminPage = ({
     currentSponsored?.lit === true ||
     toStr(currentSponsored?.lit).trim() === '1'
   );
-  const nextSponsored = useMemo(() => buildSponsoredSessionFlagFields({
-    secrets,
-    includeCustomRpcInAi: true,
-  }), [secrets]);
   const resourceSessionConfig = groupMetadata || selectedConfig;
   const selectedConfigWorkerUrl = useMemo(() => (
     normalizeWorkerUrl(getUsableSessionWorkerUrl({
@@ -867,7 +863,7 @@ const AdminPage = ({
       setWorkerStatus('Resolving worker URL…');
       let resolved;
       try {
-        resolved = await corsProxyUtils.resolveCorsProxyUrl({
+        resolved = await adminWorkerPorts.workerUrl.resolveCorsProxyUrl({
           sessionSlug: selectedSlug,
           sessionConfig: selectedConfig,
           // Never auto-decrypt worker URLs here; keep wallet prompts behind user actions.
@@ -927,13 +923,13 @@ const AdminPage = ({
 
     let address = '';
     try {
-      const arweaveBalance = await arweaveScripts.readArweaveWalletBalance(parsedJwk);
+      const arweaveBalance = await adminArweavePort.readArweaveWalletBalance(parsedJwk);
       address = arweaveBalance.address;
       if (requestId !== arweaveResourceRequestRef.current) return;
       setArweaveResource(buildAdminArweaveBalanceResource({
         address,
         winston: arweaveBalance.winston,
-        formatWinstonToAr: arweaveScripts.formatWinstonToAr,
+        formatWinstonToAr: adminArweavePort.formatWinstonToAr,
         shortAddress,
       }));
     } catch (err) {
@@ -964,7 +960,7 @@ const AdminPage = ({
     }
 
     const sessionChainLabel = relevantSessionChainLabel || (sessionReadRpc.chainId ? String(sessionReadRpc.chainId) : '');
-    if (!sessionReadRpc.rpcUrl || !sessionReadRpc.chainId) {
+    if (!sessionReadRpc.chainId) {
       if (requestId !== faucetResourceRequestRef.current) return;
       setFaucetResource(buildAdminFaucetRpcUnavailableResource({
         address,
@@ -980,11 +976,10 @@ const AdminPage = ({
     }));
 
     try {
-      const readProvider = new ethers.providers.JsonRpcProvider(sessionReadRpc.rpcUrl, {
-        chainId: sessionReadRpc.chainId,
-        name: `chain-${sessionReadRpc.chainId}`,
-      });
-      const balanceWei = await readProvider.getBalance(address);
+      const balanceWei = await rpcProvidersChainReadsPort.getNativeBalanceWeiForChain(
+        sessionReadRpc.chainId,
+        address
+      );
       if (requestId !== faucetResourceRequestRef.current) return;
       setFaucetResource(buildAdminFaucetBalanceResource({
         address,
@@ -1000,7 +995,7 @@ const AdminPage = ({
         shortAddress,
       }));
     }
-  }, [relevantSessionChainLabel, secrets.faucetPrivateKey, sessionReadRpc.chainId, sessionReadRpc.rpcUrl]);
+  }, [relevantSessionChainLabel, secrets.faucetPrivateKey, sessionReadRpc.chainId]);
 
   useEffect(() => {
     refreshArweaveResource();
@@ -1038,7 +1033,7 @@ const AdminPage = ({
       1
     ) || 1;
 
-    return buildSignedAdminActionAuth({
+    return adminWorkerPorts.adminAuth.buildSignedAdminActionAuth({
       action,
       slug,
       body,
@@ -1324,7 +1319,7 @@ const AdminPage = ({
         currentOrigin = toStr(window.location.origin).trim();
       }
     } catch (_) {}
-    return buildWorkerAllowOrigins({
+    return adminWorkerPorts.workerUrl.buildWorkerAllowOrigins({
       currentOrigin,
       extraOrigins,
     });
@@ -1454,13 +1449,15 @@ const AdminPage = ({
         !Object.prototype.hasOwnProperty.call(secretsPayload, 'litAccountApiKey') &&
         !Object.prototype.hasOwnProperty.call(secretsPayload, 'litUsageApiKey')
       );
-      const sponsoredFields = buildSponsoredSessionFlagFields({
-        secrets: secretsPayload,
-        fallbackFields: shouldPreserveSponsoredLit ? { sponsored_lit: '1' } : {},
-        includeCustomRpcInAi: true,
+      const sponsoredFields = adminSessionRegistryPorts.writes.buildRegistrySessionFields({
+        sponsoredFields: buildSponsoredSessionFlagFields({
+          secrets: secretsPayload,
+          fallbackFields: shouldPreserveSponsoredLit ? { sponsored_lit: '1' } : {},
+          includeCustomRpcInAi: true,
+        }),
       });
       setChainStatus('Updating sponsored flags on-chain…');
-      await setSessionFieldsOnChain({
+      await adminSessionRegistryPorts.writes.setSessionFieldsOnChain({
         providerLike: provider,
         chainId: registryChainId,
         slug,
@@ -1479,8 +1476,6 @@ const AdminPage = ({
       const msg = getErrorMessage(err, 'Failed to update secrets.');
       if (msg.toLowerCase().includes('flag')) {
         setChainStatus(msg);
-      } else if (saveStatus) {
-        setSaveStatus(msg);
       } else {
         setSaveStatus(msg);
       }
@@ -1496,20 +1491,11 @@ const AdminPage = ({
     const baseUrl = normalizeWorkerUrl(workerUrl);
     if (!baseUrl) throw new Error('Worker URL is missing.');
 
-    const nonceResp = await fetch(`${baseUrl}/auth/nonce`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ address: account, sessionSlug: slug }),
-    });
-    const nonceData = await nonceResp.json().catch(() => ({}));
-    if (!nonceResp.ok) {
-      throw new Error(nonceData?.error || `Nonce request failed (${nonceResp.status}).`);
-    }
-
     const chainId = Number(selectedConfig?.__registry?.chainId || selectedConfig?.networkChainId || network?.id || 1) || 1;
-    const message = buildSiweMessage({
+    const { message } = await adminWorkerPorts.siweLogin.prepareSiweLogin({
+      workerUrl: baseUrl,
       address: account,
-      nonce: nonceData?.nonce,
+      sessionSlug: slug,
       chainId,
       statement: 'Sign in to Context Engine.',
     });
@@ -1568,7 +1554,7 @@ const AdminPage = ({
         0
       ) || 0;
       if (!registryChainId) throw new Error('Registry chain id is missing.');
-      const registrySlug = sessionRegistryUtils.toRegistrySlug(selectedSlug);
+      const registrySlug = adminSessionRegistryPorts.reads.toRegistrySlug(selectedSlug);
       const sbtAddresses = dedupeSbtSelections(defaultGateDraft.sbts || []).map((entry: any) => entry.address);
       if (!sbtAddresses.length) throw new Error('Provide at least one SBT address.');
       const gateChainId = parseChainIdInput(defaultGateDraft.chainId) ||
@@ -1578,7 +1564,7 @@ const AdminPage = ({
           0
         ) || 0;
       const mode = normalizeGateMode(defaultGateDraft.mode) === 'all' ? 1 : 0;
-      const result = await setResourceGatesOnChain({
+      const result = await adminSessionRegistryPorts.writes.setResourceGatesOnChain({
         providerLike: provider,
         chainId: registryChainId,
         slug: registrySlug,
@@ -1736,15 +1722,15 @@ const AdminPage = ({
         }
       }
       const data = await withSessionConfigRetry(async () => {
-        const resp = await fetchWorkerWithAuth(`${healthBase}/health`, {
+        const resp = await adminWorkerPorts.adminAuth.fetchWorkerWithAuth(`${healthBase}/health`, {
           method: 'GET',
         }, {
           sessionSlug: selectedSlug,
           context: testContext,
           workerUrl: baseWorkerUrl,
         });
-        const payload = await resp.json().catch(() => ({}));
-        if (!resp.ok) throw new Error(payload?.error || `Health check failed (${resp.status})`);
+        const payload: Record<string, unknown> = await resp.json().catch(() => ({}));
+        if (!resp.ok) throw new Error(String(payload?.error || `Health check failed (${resp.status})`));
         return payload;
       });
       setTestResults((prev) => ({ ...prev, health: `OK (${data?.ts ? new Date(data.ts).toISOString() : 'healthy'})` }));
@@ -1829,7 +1815,7 @@ const AdminPage = ({
       };
 
       const data = await withSessionConfigRetry(async () => {
-        const resp = await fetchWorkerWithAuth(`${baseWorkerUrl}/ai`, {
+        const resp = await adminWorkerPorts.adminAuth.fetchWorkerWithAuth(`${baseWorkerUrl}/ai`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -1838,8 +1824,8 @@ const AdminPage = ({
           context: testContext,
           workerUrl: baseWorkerUrl,
         });
-        const parsed = await resp.json().catch(() => ({}));
-        if (!resp.ok) throw new Error(parsed?.error || `AI test failed (${resp.status})`);
+        const parsed: Record<string, unknown> = await resp.json().catch(() => ({}));
+        if (!resp.ok) throw new Error(String(parsed?.error || `AI test failed (${resp.status})`));
         return parsed;
       });
       const preview = data?.completion || data?.content?.[0]?.text || 'ok';
@@ -1871,7 +1857,7 @@ const AdminPage = ({
         ts: new Date().toISOString(),
         slug: selectedSlug || 'general',
       };
-      const txId = await withSessionConfigRetry(() => arweaveScripts.uploadDataToArweave(payload, 'json', {
+      const txId = await withSessionConfigRetry(() => adminArweavePort.uploadDataToArweave(payload, 'json', {
         sessionConfig: testSessionConfig,
         sessionSlug: selectedSlug,
         context: testContext,
@@ -1880,7 +1866,7 @@ const AdminPage = ({
       }));
       const tx = String(txId || '').trim();
       const txLabel = tx ? `OK (tx ${tx.slice(0, 12)}…)` : 'OK';
-      const txUrl = tx ? arweaveScripts.buildArweaveGatewayUrl(tx) : '';
+      const txUrl = tx ? adminArweavePort.buildArweaveGatewayUrl(tx) : '';
       setTestResults((prev) => ({ ...prev, arweave: { label: txLabel, href: txUrl } }));
       setTestStatus('Arweave upload succeeded.');
     } catch (err: any) {
@@ -1906,7 +1892,7 @@ const AdminPage = ({
     setTestStatus(`Testing faucet transfer (${shortAddress(burnAddress)})…`);
     try {
       const data = await withSessionConfigRetry(async () => {
-        const resp = await fetchWorkerWithAuth(`${baseWorkerUrl}/`, {
+        const resp = await adminWorkerPorts.adminAuth.fetchWorkerWithAuth(`${baseWorkerUrl}/`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1919,7 +1905,7 @@ const AdminPage = ({
           context: testContext,
           workerUrl: baseWorkerUrl,
         });
-        const parsed = await resp.json().catch(() => ({}));
+        const parsed: Record<string, unknown> = await resp.json().catch(() => ({}));
         if (!resp.ok) {
           const details = [
             parsed?.error,
@@ -2067,7 +2053,7 @@ const AdminPage = ({
         hasAutoFeatureOverride: metadataAutoFeatureTouched,
         advancedDraft: metadataConfigDraft,
       });
-      const uploadResult = await uploadSessionMetadata(metadata, {
+      const uploadResult = await adminSessionRegistryPorts.writes.uploadSessionMetadata(metadata, {
         sessionConfig: selectedConfig,
         sessionSlug: selectedSlug,
         context: testContext,
@@ -2075,7 +2061,7 @@ const AdminPage = ({
         ...(toStr(secrets.arweaveJwk).trim() ? { arweaveJwk: toStr(secrets.arweaveJwk).trim() } : {}),
       });
       setMetadataUpdateStatus('Updating SessionRegistry metadata URI…');
-      const registryResult = await updateSessionMetadataOnChain({
+      const registryResult = await adminSessionRegistryPorts.writes.updateSessionMetadataOnChain({
         providerLike: provider,
         chainId: relevantRegistryChainId,
         slug: selectedSlug,
@@ -2091,8 +2077,8 @@ const AdminPage = ({
           encryptedMetadataURI: toStr(selectedConfig?.__registry?.encryptedMetadataURI).trim(),
         },
       };
-      upsertSessionRegistryCache({ config: nextConfig });
-      setSessions(sessionRegistryStore.getAllSessionEntries() || []);
+      adminSessionRegistryPorts.reads.upsertSessionRegistryCache({ config: nextConfig });
+      setSessions(adminSessionRegistryPorts.reads.getAllSessionEntries() || []);
       setMetadataDraftTouched(false);
 	      const txUrl = buildTxExplorerUrl(registryResult?.txHash, relevantRegistryChainId);
 	      const baseSuccessStatus = txUrl ? `Session metadata updated. ${txUrl}` : 'Session metadata updated.';
@@ -2129,7 +2115,7 @@ const AdminPage = ({
     }
   };
 
-  const resolvedSessionHeader = normalizeArweaveUrl(
+  const resolvedSessionHeader = normalizeSessionMediaUrl(
     groupMetadata?.sessionHeaderImg || groupMetadata?.sessionHeader || '',
     { contextLabel: 'session_header_image' }
   );
@@ -2176,7 +2162,7 @@ const AdminPage = ({
   const metadataAdminUrl = buildUserPageUrl(metadataAdminAddress);
   const metadataUriValue = toStr(groupMetadata?.__registry?.metadataURI || '').trim();
   const metadataUriUrl = metadataUriValue
-    ? normalizeArweaveUrl(metadataUriValue, { contextLabel: 'admin_metadata_uri' }) || metadataUriValue
+    ? adminArweavePort.normalizeArweaveUrl(metadataUriValue, { contextLabel: 'admin_metadata_uri' }) || metadataUriValue
     : '';
   const metadataLoadState = toStr(groupMetadata?.__registry?.metadataLoadState).trim() || (metadataUriValue ? 'loaded' : 'none');
   const metadataDefaultedContractKeys = Array.isArray(groupMetadata?.__registry?.metadataDefaultedContractKeys)
@@ -2299,7 +2285,7 @@ const AdminPage = ({
                   )}
                 </div>
                 <div className={styles.heroSessionPrimaryBody}>
-                  {!!availableSessions.length ? (
+                  {availableSessions.length > 0 ? (
                     <Input
                       type="select"
                       value={selectedSlug}
@@ -2315,11 +2301,14 @@ const AdminPage = ({
                           Requested: {requestedSessionRaw}
                         </option>
                       )}
-                      {availableSessions.map(([slug, cfg]: any) => (
-                        <option key={slug} value={slug}>
-                          {slug || 'general'}{cfg?.sessionName ? ` — ${cfg?.sessionName}` : ''}
-                        </option>
-                      ))}
+                      {availableSessions.map(([slug, rawCfg]) => {
+                        const cfg = asAdminSessionConfig(rawCfg);
+                        return (
+                          <option key={slug} value={slug}>
+                            {slug || 'general'}{cfg.sessionName ? ` — ${cfg.sessionName}` : ''}
+                          </option>
+                        );
+                      })}
                     </Input>
                   ) : (
                     <strong className={styles.heroStatValue}>{selectedSessionName}</strong>
@@ -2362,7 +2351,7 @@ const AdminPage = ({
                       </div>
                     )}
                   </div>
-                  {!!selectedConfig ? (
+                  {selectedConfig ? (
                     <div className={styles.heroSessionDetailBody}>
                       <div className={styles.heroWorkerRow}>
                         <div className={styles.heroCardInputShell}>

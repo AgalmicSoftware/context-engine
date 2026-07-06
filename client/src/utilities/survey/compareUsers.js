@@ -460,9 +460,23 @@ export function fallbackBullets(users = []) {
     }
 
     // Disagreements via answer diffs on same prompt
+    const normalizeFallbackAnswer = (answer) => {
+      if (Array.isArray(answer)) {
+        return answer.map((entry) => normalizeFallbackAnswer(entry)).sort();
+      }
+      if (answer && typeof answer === 'object') {
+        if (Object.prototype.hasOwnProperty.call(answer, 'value')) {
+          return normalizeFallbackAnswer(answer.value);
+        }
+        if (Object.prototype.hasOwnProperty.call(answer, 'answer')) {
+          return normalizeFallbackAnswer(answer.answer);
+        }
+      }
+      return answer;
+    };
     const pmaps = (users||[]).map(u => {
       const m = new Map(); (u?.questions||[]).forEach(q => {
-        const key = (q?.prompt||'').trim().toLowerCase(); if (key) m.set(key, q?.answer);
+        const key = (q?.prompt||'').trim().toLowerCase(); if (key) m.set(key, normalizeFallbackAnswer(q?.answer));
       }); return m;
     });
     const allPrompts = new Set(pmaps.flatMap(m=>Array.from(m.keys())));

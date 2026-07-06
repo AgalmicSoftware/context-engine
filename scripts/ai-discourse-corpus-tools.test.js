@@ -16,8 +16,8 @@ test('summarizes corpus files without dumping full JSON records', () => {
   const crossCorpus = summary.corpuses.find((entry) => entry.corpus === 'cross-corpus');
   const tweets = summary.corpuses.find((entry) => entry.corpus === 'tweets');
 
-  assert.equal(crossCorpus.count, 13);
-  assert.equal(summary.clientDebates.count, 13);
+  assert.equal(crossCorpus.count, 16);
+  assert.equal(summary.clientDebates.count, 16);
   assert.equal(tweets.count, 4036);
   assert.ok(tweets.sizeBytes > 10_000_000);
 });

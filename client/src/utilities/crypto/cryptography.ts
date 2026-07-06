@@ -44,7 +44,7 @@ type ProviderLike = string | (UnknownRecord & {
   provider?: unknown;
   request?: Eip1193Provider['request'];
 }) | null | undefined;
-type ProviderKind = 'wagmi' | 'porto' | 'web3auth';
+type ProviderKind = 'wagmi' | 'passkey-eoa' | 'web3auth';
 type ByteInput = Uint8Array | ArrayBuffer | ArrayBufferView | ArrayLike<number>;
 type MaybePromise<T> = T | Promise<T>;
 type PoseidonHashValue = string | number | bigint;
@@ -191,8 +191,8 @@ type DecryptCacheEntry = {
 
 declare global {
   interface Window {
-    __portoMockProvider?: Eip1193Provider & { isPorto?: boolean };
-    __ceCreatePortoProviderMock?: () => Eip1193Provider | null;
+    __passkeyEoaProvider?: Eip1193Provider & { isPasskeyEoa?: boolean };
+    __ceCreatePasskeyEip1193Provider?: () => Eip1193Provider | null;
     web3authProvider?: Eip1193Provider;
     ethereum?: Eip1193Provider;
     poseidon?: PoseidonHasher;
@@ -298,7 +298,7 @@ const toUint8Array = (value: unknown): Uint8Array => {
 
 /**
  * @typedef {object} CryptoUtilsApi
- * @property {(providerLike: unknown) => ('wagmi' | 'porto' | 'web3auth')} getProviderKind
+ * @property {(providerLike: unknown) => ('wagmi' | 'passkey-eoa' | 'web3auth')} getProviderKind
  * @property {(providerLike: unknown) => { request: (request: { method: string, params?: unknown[] }) => Promise<unknown> }} _getProvider
  * @property {(surveyState: CryptoAnswerSlice & Record<string, unknown>, optsOrPubKey?: CryptoEncryptOptions | string, extraOpts?: CryptoEncryptOptions) => Promise<CryptoAnswerSlice>} encryptMultipleAnswers
  * @property {(slice: CryptoAnswerSlice & Record<string, unknown>, questionPool?: Array<Record<string, unknown>>, accountOrOpts?: string | CryptoDecryptOptions, providerKind?: string, opts?: CryptoDecryptOptions) => Promise<CryptoAnswerSlice>} decryptMultipleAnswers
@@ -626,14 +626,14 @@ const aesGcmDecrypt = async (
 const safeLower = (x: unknown) => (typeof x === 'string' ? x.toLowerCase() : x);
 
 /**
- * Determine provider kind by heuristics ('wagmi' | 'porto' | 'web3auth').
+ * Determine provider kind by heuristics ('wagmi' | 'passkey-eoa' | 'web3auth').
  * Keep the Web3Auth branch for easy re-enable; it is no-op without a provider.
  */
 const getProviderKind = (providerLike: ProviderLike): ProviderKind => {
   try {
     if (typeof providerLike === 'string') {
       const s = providerLike.trim().toLowerCase();
-      if (s === 'porto_passkey' || s === 'porto') return 'porto';
+      if (s === 'passkey_eoa' || s === 'passkey-eoa') return 'passkey-eoa';
       if (s === 'web3auth') return 'web3auth';
       return 'wagmi';
     }
@@ -644,9 +644,9 @@ const getProviderKind = (providerLike: ProviderLike): ProviderKind => {
       (typeof window !== 'undefined' ? window.ethereum : null)
     ) as (UnknownRecord & { provider?: UnknownRecord }) | null;
 
-    // Check for Porto provider first (must come before other checks)
-    if (p && p.isPorto === true) {
-      return 'porto';
+    // Check for the embedded passkey provider first (must come before other checks).
+    if (p && p.isPasskeyEoa === true) {
+      return 'passkey-eoa';
     }
 
     // Keep Web3Auth detection; it is cheap and enables quick re-enable.
@@ -672,10 +672,10 @@ const getProviderKind = (providerLike: ProviderLike): ProviderKind => {
 const _getProvider = (providerLike: ProviderLike): Eip1193Provider => {
   const providerRecord = isRecord(providerLike) ? providerLike : null;
   const candidate = ((providerRecord && providerRecord.provider) || providerLike) as
-    (UnknownRecord & { provider?: unknown; request?: Eip1193Provider['request']; isPorto?: boolean }) | null;
+    (UnknownRecord & { provider?: unknown; request?: Eip1193Provider['request']; isPasskeyEoa?: boolean }) | null;
 
-  // Check for Porto provider first - return directly if it has isPorto flag and request method
-  if (candidate && candidate.isPorto === true && typeof candidate.request === 'function') {
+  // Check for embedded passkey provider first.
+  if (candidate && candidate.isPasskeyEoa === true && typeof candidate.request === 'function') {
     return candidate as Eip1193Provider;
   }
 
@@ -687,47 +687,47 @@ const _getProvider = (providerLike: ProviderLike): Eip1193Provider => {
   if (typeof providerLike === 'string') {
     const s = providerLike.trim().toLowerCase();
 
-    // Handle Porto provider string. Prefer the seeded window global when a signing
-    // client is already warm, but synthesize the lazy mock provider on demand so
-    // post-login auth flows can still trigger a passkey assertion only when signing.
-    if (s === 'porto_passkey' || s === 'porto') {
-      if (typeof window !== 'undefined' && window.__portoMockProvider && window.__portoMockProvider.isPorto) {
-        return window.__portoMockProvider;
+    // Handle embedded passkey provider strings. Prefer the seeded window global
+    // when a signing client is already warm, but synthesize the lazy provider on
+    // demand so post-login auth flows can still trigger a passkey assertion only
+    // when signing.
+    if (s === 'passkey_eoa' || s === 'passkey-eoa') {
+      if (typeof window !== 'undefined' && window.__passkeyEoaProvider && window.__passkeyEoaProvider.isPasskeyEoa) {
+        return window.__passkeyEoaProvider;
       }
       try {
-        const globalBuildPortoProvider =
-          typeof window !== 'undefined' && typeof window.__ceCreatePortoProviderMock === 'function'
-            ? window.__ceCreatePortoProviderMock
+        const globalBuildPasskeyProvider =
+          typeof window !== 'undefined' && typeof window.__ceCreatePasskeyEip1193Provider === 'function'
+            ? window.__ceCreatePasskeyEip1193Provider
             : null;
-        if (globalBuildPortoProvider) {
-          const portoProvider = globalBuildPortoProvider();
-          if (portoProvider && portoProvider.isPorto === true && typeof portoProvider.request === 'function') {
+        if (globalBuildPasskeyProvider) {
+          const passkeyProvider = globalBuildPasskeyProvider();
+          if (passkeyProvider && passkeyProvider.isPasskeyEoa === true && typeof passkeyProvider.request === 'function') {
             if (typeof window !== 'undefined') {
-              window.__portoMockProvider = portoProvider;
+              window.__passkeyEoaProvider = passkeyProvider;
             }
-            return portoProvider;
+            return passkeyProvider;
           }
         }
-        // Avoid a hard module cycle at load time: portoFunctions imports contractScripts,
-        // which already depends on cryptography.
+        // Avoid a hard module cycle at load time.
         // eslint-disable-next-line global-require
-        const portoModule = require('../web3/portoFunctions.js');
-        const buildPortoProvider =
-          portoModule?.createPortoProviderMock ||
-          portoModule?.default?.createPortoProviderMock;
-        const portoProvider = typeof buildPortoProvider === 'function'
-          ? buildPortoProvider()
+        const walletModule = require('../../wallet/passkeyWallet.js');
+        const buildPasskeyProvider =
+          walletModule?.createPasskeyEip1193Provider ||
+          walletModule?.default?.createPasskeyEip1193Provider;
+        const passkeyProvider = typeof buildPasskeyProvider === 'function'
+          ? buildPasskeyProvider()
           : null;
-        if (portoProvider && portoProvider.isPorto === true && typeof portoProvider.request === 'function') {
+        if (passkeyProvider && passkeyProvider.isPasskeyEoa === true && typeof passkeyProvider.request === 'function') {
           if (typeof window !== 'undefined') {
-            window.__portoMockProvider = portoProvider;
+            window.__passkeyEoaProvider = passkeyProvider;
           }
-          return portoProvider;
+          return passkeyProvider;
         }
       } catch (e) {
         logCryptoFallback(e);
       }
-      throw new Error('Porto provider not initialized. Please authenticate with Passkey first.');
+      throw new Error('Passkey wallet provider not initialized. Please unlock your wallet first.');
     }
 
     // Keep Web3Auth path for easy re-enable; no overhead without provider.

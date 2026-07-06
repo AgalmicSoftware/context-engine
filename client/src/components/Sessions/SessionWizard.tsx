@@ -1,5 +1,5 @@
 /** @file SessionWizard.tsx */
-import { type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { ethers } from 'ethers';
 import { Button, Input, Label, FormGroup } from 'reactstrap';
 import { ReactReduxContext } from 'react-redux';
@@ -13,7 +13,7 @@ import SessionHeaderField from './SessionHeaderField';
 import FeaturedSbtField from './FeaturedSbtField';
 import CollapsibleFieldGroup from './CollapsibleFieldGroup';
 import SessionWizardContractsField from './SessionWizardContractsField';
-import SessionWizardStorageProfileField from './SessionWizardStorageProfileField';
+import SessionWizardStorageProfileMetadataField from './SessionWizardStorageProfileMetadataField';
 import type { WorkerPanelProps } from './WorkerPanel';
 import WorkerResourceCard from './WorkerResourceCard';
 import WorkerResourceInputs from './WorkerResourceInputs';
@@ -26,14 +26,7 @@ import {
   setGlobalLitHooks,
 } from '../../utilities/crypto/litProtocol.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
-import { arweaveScripts } from '../../utilities/arweave/arweaveScripts.js';
-import { resolvePublishArweaveUploadOptions } from '../../utilities/arweave/publishUploadAuth.js';
-import {
-  normalizeSparseSponsoredBundlePayload,
-} from '../../utilities/arweave/sponsoredBundles.js';
 import { getEffectiveArweaveKey } from '../../utilities/session/resourceKeys.js';
-import { sessionRegistryUtils, registerSessionOnChain } from '../../utilities/web3/sessionRegistry.js';
-import contractScripts from '../../utilities/web3/contractScripts.js';
 import { seedGenPrompt } from '../../prompts/seedGenPrompt.js';
 import {
   CLOUDFLARE_DEPLOY_HELPER_URL,
@@ -47,12 +40,6 @@ import {
   getSessionRegistryAddress,
   getSessionRegistryChains,
 } from '../../variables/chains.js';
-import {
-  buildSignedAdminActionAuth,
-  buildSignedBootstrapAdminAuth,
-  normalizeWorkerUrl as normalizeWorkerAuthUrl,
-} from '../../utilities/worker/workerAuth.js';
-import { resolveSbtAddressFromFactoryReceipt } from '../../utilities/web3/sbtFactoryReceipt.js';
 import type { SessionConfig, UnknownRecord } from '../../utilities/session/sessionTypes.js';
 import { normalizeBlockLimitsForConfig } from '../../utilities/session/blockLimits.js';
 import { normalizeBaseUrl } from '../../utilities/urlUtils.js';
@@ -104,12 +91,35 @@ import useSessionWizardTooltipPreference from './hooks/useSessionWizardTooltipPr
 import useSessionWizardNormalModeSectionVisibility from './hooks/useSessionWizardNormalModeSectionVisibility';
 import useSessionWizardPublishElapsed from './hooks/useSessionWizardPublishElapsed';
 import useSessionWizardCleanupEffect from './hooks/useSessionWizardCleanupEffect';
+import {
+  arweavePublishAdapter,
+  sbtFactoryReceiptPublishAdapter,
+  sessionPublishSbtMetadataAdapter,
+  sessionRegistryPublishAdapter,
+  sponsoredBundlePublishAdapter,
+  workerAuthPublishAdapter,
+} from '../../domains/sessions/publish/sessionPublishAdapters.js';
+import {
+  createInitialSessionPublishState,
+  sessionPublishReducer,
+  type SessionPublishEffect,
+} from '../../domains/sessions/publish/sessionPublishReducer.js';
+import { beginSessionPublishReducerAttempt, markSessionPublishEffectFailed, markSessionPublishEffectSucceeded, runSessionPublishEffect } from '../../domains/sessions/publish/sessionPublishDispatch.js';
+import {
+  resolveSessionWizardPublishReducerUiPlan,
+  resolveSessionWizardPublishReducerUiState,
+} from './sessionWizardPublishReducerUiState';
 import SessionWizardInfoTooltip, {
   type SessionWizardTooltipRenderOptions,
 } from './SessionWizardInfoTooltip';
 import { SESSION_WIZARD_REQUIREMENT_LINKS } from './SessionWizardRequirementsBanner';
 import SessionWizardShell from './SessionWizardShell';
 import SessionWizardSessionIdBadge from './SessionWizardSessionIdBadge';
+import SessionWizardSessionModeProfileControl from './SessionWizardSessionModeProfileControl';
+import {
+  applySessionModeProfileSelectionToDraft,
+  applyStorageProfileChangeToModeDraft,
+} from './sessionWizardModeProfileDraftController';
 import {
   buildNormalModeCards,
   buildNormalModePublishSummary,
@@ -126,6 +136,7 @@ import {
 } from './sessionWizardPublishFlow';
 import {
   appendSessionWizardRegisterTxEntry,
+  isSessionWizardRegisterDuplicatePreflightError,
   resolveSessionWizardPublishCompletionRequest,
   resolveSessionWizardPublishFailureSettlementDescriptor,
   resolveSessionWizardRegisterFailureSettlementDescriptor,
@@ -412,7 +423,7 @@ export const resolveSessionWizardChipotleHookConfig = ({
 } = {}) => {
   if (!workerSecretsEnabled) return null;
   const litCredentials = buildWorkerLitCredentialsConfig(workerSecrets);
-  const normalizedWorkerUrl = normalizeWorkerAuthUrl(resolvedWorkerUrl);
+  const normalizedWorkerUrl = workerAuthPublishAdapter.normalizeWorkerUrl(resolvedWorkerUrl);
   if (
     !normalizedWorkerUrl ||
     !toStr(litCredentials?.litApiBase).trim() ||
@@ -479,6 +490,7 @@ type DraftState = UnknownRecord & NonNullable<WorkerPanelProps['draft']> & {
   lit?: UnknownRecord;
   rpc?: UnknownRecord;
   sponsored?: DraftSponsoredState;
+  sessionModeProfile?: UnknownRecord;
   __registry?: UnknownRecord;
 };
 
@@ -532,6 +544,8 @@ type SessionRegistryReadContract = {
 };
 
 type WorkerSecretsUpdateFn = (current: WorkerSecretsLike) => WorkerSecretsLike | UnknownRecord | null | undefined;
+
+const ignoreSessionPublishStep = (_publishStep: number): void => {};
 
 type SponsoredBundleDeploymentStatePatch = {
   deployForm?: DeployFormState;
@@ -613,46 +627,11 @@ const buildProvisionedSponsoredContextState = (
   return {
     ...buildEmptyProvisionedSponsoredContext(),
     ...context,
-    sessionSlug: sessionRegistryUtils.normalizeSlug(context.sessionSlug),
-    workerUrl: normalizeWorkerAuthUrl(toStr(context.workerUrl).trim()),
+    sessionSlug: sessionRegistryPublishAdapter.normalizeSlug(context.sessionSlug),
+    workerUrl: workerAuthPublishAdapter.normalizeWorkerUrl(toStr(context.workerUrl).trim()),
     fields: sanitizeSessionWizardSponsoredFieldSnapshotForLitMode(context.fields as UnknownRecord | undefined),
   };
 };
-
-const readSessionWizardSbtMetadata = async (
-  sbtAddress: string,
-  lookupContext: UnknownRecord
-): Promise<unknown> => {
-  const getSbtMetadata = (
-    contractScripts.getSbtMetadata as unknown as (
-      providerName: string,
-      sbtAddress: string,
-      groupKeyOrCfg?: UnknownRecord
-    ) => Promise<unknown>
-  ).bind(contractScripts);
-  return getSbtMetadata('none', sbtAddress, lookupContext);
-};
-
-const buildSessionWizardSignedBootstrapAdminAuth = buildSignedBootstrapAdminAuth as unknown as (
-  input: {
-    slug?: unknown;
-    workerUrl?: unknown;
-    statement?: unknown;
-    context?: UnknownRecord;
-    nonce?: unknown;
-  }
-) => Promise<UnknownRecord>;
-
-const buildSessionWizardSignedAdminActionAuth = buildSignedAdminActionAuth as unknown as (
-  input: {
-    action?: unknown;
-    slug?: unknown;
-    body?: UnknownRecord;
-    workerUrl?: unknown;
-    context?: UnknownRecord;
-    nonce?: unknown;
-  }
-) => Promise<UnknownRecord>;
 
 const SessionWizard = ({
   account,
@@ -672,8 +651,14 @@ const SessionWizard = ({
   const reduxContext = useContext(ReactReduxContext);
   const tooltipPreferenceStore = reduxContext?.store || null;
   const sessionWizardTooltipsEnabled = useSessionWizardTooltipPreference(tooltipPreferenceStore);
-  const resolvedActiveSessionSlug = sessionRegistryUtils.normalizeSlug(
+  const resolvedActiveSessionSlug = sessionRegistryPublishAdapter.normalizeSlug(
     activeSessionSlug ?? ''
+  );
+  const currentSessionWizardPathname = (
+    typeof window === 'undefined' || !window.location ? '' : window.location.pathname
+  );
+  const isNewSessionWizardRoute = isNewSessionWizardPathname(
+    currentSessionWizardPathname
   );
   const cachedWizard = useMemo(() => readSessionWizardCache(), []);
   const cachedDraftHasEmbeddedDeployHelperEnabled = (
@@ -701,7 +686,7 @@ const SessionWizard = ({
     resolvedActiveSessionSlug,
   ]);
   const initialDraft = useMemo(() => {
-    return buildSessionWizardInitialDraftFromCache({
+    const draftFromCache = buildSessionWizardInitialDraftFromCache({
       cachedWizard,
       defaultTemplate: DEFAULT_TEMPLATE,
       normalModeSharedHostedWorkerEnabled: NORMAL_MODE_SHARED_HOSTED_WORKER_ENABLED,
@@ -709,7 +694,16 @@ const SessionWizard = ({
         ? null
         : sourceEmbeddedDeployHelperDefault,
     });
-  }, [cachedDraftHasEmbeddedDeployHelperEnabled, cachedWizard, sourceEmbeddedDeployHelperDefault]);
+    if (!isNewSessionWizardRoute) return draftFromCache;
+    const freshNewSessionDraft = { ...draftFromCache };
+    delete freshNewSessionDraft.sessionModeProfile;
+    return freshNewSessionDraft;
+  }, [
+    cachedDraftHasEmbeddedDeployHelperEnabled,
+    cachedWizard,
+    isNewSessionWizardRoute,
+    sourceEmbeddedDeployHelperDefault,
+  ]);
   const initialGates = useMemo<EncryptionGateState[]>(() => {
     const cachedGates = cachedWizard?.encryptionGates;
     if (Array.isArray(cachedGates) && cachedGates.length) return cachedGates as EncryptionGateState[];
@@ -730,9 +724,9 @@ const SessionWizard = ({
     [cachedWizard]
   );
   const initialSessionIdValue = useMemo(() => {
-    const fromQuery = sessionRegistryUtils.formatSessionId(initialSessionId);
+    const fromQuery = sessionRegistryPublishAdapter.formatSessionId(initialSessionId);
     if (fromQuery) return fromQuery;
-    const fromCache = sessionRegistryUtils.formatSessionId(cachedWizard?.sessionId);
+    const fromCache = sessionRegistryPublishAdapter.formatSessionId(cachedWizard?.sessionId);
     if (fromCache) return fromCache;
     return generateSessionId();
   }, [cachedWizard?.sessionId, initialSessionId]);
@@ -779,8 +773,12 @@ const SessionWizard = ({
   const [adminUrl, setAdminUrl] = useState('');
   const [publishedPendingSbtLinks, setPublishedPendingSbtLinks] = useState<PublishedPendingSbtLink[]>([]);
   const [adminUrlStatus, setAdminUrlStatus] = useState('');
-  const [publishStep, setPublishStep] = useState(0); // 0=idle, 1=deploying sbts/uploading, 2=uploading, 3=registering, 4=done
-  const [publishBusy, setPublishBusy] = useState(false);
+  const [sessionPublishState, dispatchSessionPublish] = useReducer(sessionPublishReducer, undefined, () => (
+    createInitialSessionPublishState({ status: 'editing' })
+  ));
+  const [sessionModeProfileStepComplete, setSessionModeProfileStepComplete] = useState(false);
+  const publishBusy = resolveSessionWizardPublishReducerUiState({ state: sessionPublishState }).publishBusy;
+  const publishRequestInFlightRef = useRef(false);
   const [publishStepElapsedMs, setPublishStepElapsedMs] = useState(0);
   const [wizardMode, setWizardMode] = useState('normal');
   const [registryChainId, setRegistryChainId] = useState<number>(() => {
@@ -800,14 +798,14 @@ const SessionWizard = ({
     registryChainId: chainId,
     slug,
   }: SessionSlugExistsArgs): Promise<boolean> => {
-    const registryRead = sessionRegistryUtils.getRegistryContract(
+    const registryRead = sessionRegistryPublishAdapter.getRegistryContract({
       chainId,
-      null
-    ) as SessionRegistryReadContract | null;
+      providerLike: null,
+    }) as SessionRegistryReadContract | null;
     if (!registryRead || typeof registryRead.sessionExists !== 'function') {
       throw new Error('Session registry read contract not available.');
     }
-    return !!(await registryRead.sessionExists(sessionRegistryUtils.toRegistrySlug(slug)));
+    return !!(await registryRead.sessionExists(sessionRegistryPublishAdapter.toRegistrySlug(slug)));
   }, []);
   const { slugAvailability } = useSessionSlugState({
     slug: draft?.slug,
@@ -1600,10 +1598,11 @@ const SessionWizard = ({
     const run = async () => {
       let sbtName: string = defaultAddr;
       try {
-        const info = await readSessionWizardSbtMetadata(
-          defaultAddr,
-          defaultSponsoredSbtLookupContext
-        );
+        const info = await sessionPublishSbtMetadataAdapter.getSbtMetadata({
+          providerName: 'none',
+          sbtAddress: defaultAddr,
+          groupKeyOrCfg: defaultSponsoredSbtLookupContext,
+        });
         const displayName = toStr(getSbtDisplayName(info)).trim();
         if (displayName) sbtName = displayName;
       } catch (e) { log.warn('SessionWizard: fallback', e); }
@@ -1795,12 +1794,6 @@ const SessionWizard = ({
     setPendingCreateSbtLaunch(null);
   }, [account, pendingCreateSbtLaunch]);
 
-  useSessionWizardPublishElapsed({
-    publishBusy,
-    publishStep,
-    setPublishStepElapsedMs,
-  });
-
   useEffect(() => {
     const resolvedGateId = resolveCreateSbtTargetGateIdRef.current?.(createSbtTargetGateId) || '';
     if (resolvedGateId !== toStr(createSbtTargetGateId).trim()) {
@@ -1821,7 +1814,7 @@ const SessionWizard = ({
         if (next) {
           const currentSlug = toStr(current.slug).trim();
           lastManualSlugRef.current = currentSlug;
-          const desiredSlug = sessionRegistryUtils.formatSessionId(sessionId) || toStr(sessionId).trim();
+          const desiredSlug = sessionRegistryPublishAdapter.formatSessionId(sessionId) || toStr(sessionId).trim();
           if (desiredSlug) {
             nextDraft.slug = desiredSlug;
           }
@@ -2283,6 +2276,7 @@ const SessionWizard = ({
     const isSessionHeaderField = keyString === 'sessionHeader';
     const isCorsWorkerField = keyString === 'corsWorkerUrl';
     const isNetworkChainField = keyString === 'networkChainId';
+    if (path.length === 0 && key === 'sessionModeProfile') return null;
     const e2eTestId = (() => {
       if (keyString === 'sessionName') return E2E_TESTIDS.WIZARD_SESSION_NAME;
       if (keyString === 'sessionInfo') return E2E_TESTIDS.WIZARD_SESSION_INFO;
@@ -2517,15 +2511,19 @@ const SessionWizard = ({
       if (wizardMode !== 'advanced') return null;
       const isCollapsed = metadataObjectCollapsed.storageProfile;
       return (
-        <SessionWizardStorageProfileField
+        <SessionWizardStorageProfileMetadataField
           key={keyString}
           title={displayLabel}
           value={value}
           isCollapsed={isCollapsed}
-          onToggleCollapsed={() =>
-            setMetadataObjectCollapsed((prev) => ({ ...prev, storageProfile: !prev.storageProfile }))
-          }
-          onStorageProfileChange={(nextProfile) => updateDraftValue(['storageProfile'], nextProfile)}
+          onToggleCollapsed={() => setMetadataObjectCollapsed((prev) => ({ ...prev, storageProfile: !prev.storageProfile }))}
+          onStorageProfileChange={(nextProfile) => {
+            setDraft((prev) => {
+              const next = applyStorageProfileChangeToModeDraft(prev, nextProfile);
+              draftRef.current = next;
+              return next;
+            });
+          }}
         />
       );
     }
@@ -3015,7 +3013,7 @@ const SessionWizard = ({
           arweaveJwk = resolved?.arweaveJwk || '';
         }
         const headerRequestId = `arw_header_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-        const baseUrl = normalizeWorkerAuthUrl(toStr(workerUrlOverride).trim()) || resolveWorkerBaseUrl();
+        const baseUrl = workerAuthPublishAdapter.normalizeWorkerUrl(toStr(workerUrlOverride).trim()) || resolveWorkerBaseUrl();
         const uploadAuthOptions = await buildSessionWizardPublishArweaveUploadOptions({
           arweaveJwk,
           workerUrl: baseUrl,
@@ -3032,12 +3030,16 @@ const SessionWizard = ({
         });
         let headerTxId: string | undefined;
         try {
-          headerTxId = await arweaveScripts.uploadDataToArweave(sessionHeaderFile, format, {
-            sessionConfig: metadata,
-            sessionSlug: metadata.slug || '',
-            context: { account: authAccount, providerLike: provider, chainId: metadata.networkChainId || registryChainId },
-            requestId: headerRequestId,
-            ...uploadAuthOptions,
+          headerTxId = await arweavePublishAdapter.uploadDataToArweave({
+            data: sessionHeaderFile,
+            format,
+            options: {
+              sessionConfig: metadata,
+              sessionSlug: metadata.slug || '',
+              context: { account: authAccount, providerLike: provider, chainId: metadata.networkChainId || registryChainId },
+              requestId: headerRequestId,
+              ...uploadAuthOptions,
+            },
           }) as string;
         } catch (err) {
           log.error('[arweave][ui] header upload error', {
@@ -3111,14 +3113,14 @@ const SessionWizard = ({
       let arweaveJwk = toStr(getCurrentWorkerSecrets().arweaveJwk).trim();
       if (!arweaveJwk && !workerSecretsEnabled) {
         const resolved = await getEffectiveArweaveKey({
-          sessionConfig: draft as unknown as SessionConfig,
+          sessionConfig: draft as SessionConfig,
           sessionSlug: draft.slug || '',
           context: { account: authAccount, providerLike: provider, chainId: draft.networkChainId || registryChainId },
         });
         arweaveJwk = resolved?.arweaveJwk || '';
       }
       uploadRequestId = `arw_meta_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-      const baseUrl = normalizeWorkerAuthUrl(toStr(workerUrlOverride).trim()) || resolveWorkerBaseUrl();
+      const baseUrl = workerAuthPublishAdapter.normalizeWorkerUrl(toStr(workerUrlOverride).trim()) || resolveWorkerBaseUrl();
       const uploadAuthOptions = await buildSessionWizardPublishArweaveUploadOptions({
         arweaveJwk,
         workerUrl: baseUrl,
@@ -3133,12 +3135,16 @@ const SessionWizard = ({
         hasJwk: !!uploadAuthOptions.arweaveJwk,
         ts: new Date().toISOString(),
       });
-      const txId = await arweaveScripts.uploadDataToArweave(metadata, 'json', {
-        sessionConfig: draft as unknown as SessionConfig,
-        sessionSlug: draft.slug || '',
-        context: { account: authAccount, providerLike: provider, chainId: draft.networkChainId || registryChainId },
-        requestId: uploadRequestId,
-        ...uploadAuthOptions,
+      const txId = await arweavePublishAdapter.uploadDataToArweave({
+        data: metadata,
+        format: 'json',
+        options: {
+            sessionConfig: draft as SessionConfig,
+          sessionSlug: draft.slug || '',
+          context: { account: authAccount, providerLike: provider, chainId: draft.networkChainId || registryChainId },
+          requestId: uploadRequestId,
+          ...uploadAuthOptions,
+        },
       }) as string;
       log.info('[arweave][ui] metadata upload success', {
         requestId: uploadRequestId,
@@ -3179,7 +3185,7 @@ const SessionWizard = ({
     getEnabledWorkerArweaveJwk,
     network,
     normalizeSbtSelection,
-    normalizeWorkerAuthUrl,
+    normalizeWorkerAuthUrl: workerAuthPublishAdapter.normalizeWorkerUrl,
     provider,
     registryChainId,
     resolvedActiveSessionSlug,
@@ -3262,7 +3268,7 @@ const SessionWizard = ({
         )));
       }
 
-      const sbtAddress = resolveSbtAddressFromFactoryReceipt(receipt);
+      const sbtAddress = sbtFactoryReceiptPublishAdapter.resolveSbtAddressFromFactoryReceipt({ receipt });
       if (!sbtAddress || !ethers.utils.isAddress(sbtAddress)) {
         throw new Error(`Failed to resolve deployed address for ${finalizedDraft.displayName}.`);
       }
@@ -3316,16 +3322,16 @@ const SessionWizard = ({
       sessionIdHexValue,
       registryChainIdValue,
     } = registerIdentityDescriptor;
+    const registerDuplicateCheckDescriptor = resolveSessionWizardRegisterDuplicateCheckDescriptor({
+      registryChainId: registryChainIdValue,
+      registrySlug,
+      sessionIdHexValue,
+    });
     try {
-      const registerDuplicateCheckDescriptor = resolveSessionWizardRegisterDuplicateCheckDescriptor({
-        registryChainId: registryChainIdValue,
-        registrySlug,
-        sessionIdHexValue,
-      });
-      const registryRead = sessionRegistryUtils.getRegistryContract(
-        registerDuplicateCheckDescriptor.chainId,
-        null
-      ) as SessionRegistryReadContract | null;
+      const registryRead = sessionRegistryPublishAdapter.getRegistryContract({
+        chainId: registerDuplicateCheckDescriptor.chainId,
+        providerLike: null,
+      }) as SessionRegistryReadContract | null;
       if (registryRead) {
         if (
           registerDuplicateCheckDescriptor.shouldCheckSlug &&
@@ -3347,7 +3353,11 @@ const SessionWizard = ({
         }
       }
     } catch (err) {
-      if (getSessionWizardErrorMessage(err)) throw err;
+      const message = getSessionWizardErrorMessage(err);
+      if (isSessionWizardRegisterDuplicatePreflightError(message, registerDuplicateCheckDescriptor)) throw err;
+      if (message) {
+        console.warn('SessionWizard: duplicate preflight check unavailable; continuing to publish flow', err);
+      }
     }
     return registerIdentityDescriptor;
   };
@@ -3389,7 +3399,7 @@ const SessionWizard = ({
           registerArgs: registerPreflightDescriptor.registerArgs,
         },
         ports: {
-          registerSessionOnChain,
+          registerSessionOnChain: (args) => sessionRegistryPublishAdapter.registerSession(args),
         },
         callbacks: {
           setRegisterTxs,
@@ -3412,14 +3422,12 @@ const SessionWizard = ({
       setSessionId(nextSessionId);
       setSessionIdStatus(registerSuccessSettlement.nextSessionIdStatus);
       try {
-        const refreshed = await sessionRegistryUtils.fetchSessionFromRegistry(
-          {
-            ...registerSuccessSettlement.registryRefreshArgs,
-            lit: getGlobalLitHooks(),
-          }
-        );
+        const refreshed = await sessionRegistryPublishAdapter.fetchSessionFromRegistry({
+          ...registerSuccessSettlement.registryRefreshArgs,
+          lit: getGlobalLitHooks(),
+        });
         if (refreshed) {
-          sessionRegistryUtils.upsertSessionRegistryCache({ config: refreshed });
+          sessionRegistryPublishAdapter.upsertSessionRegistryCache({ config: refreshed });
         }
       } catch (e) { log.warn('SessionWizard: fallback', e); }
     } catch (err) {
@@ -3436,6 +3444,16 @@ const SessionWizard = ({
   };
 
   const handlePublish = async () => {
+    if (!draft?.sessionModeProfile) {
+      setStatus('Choose a session mode before publishing.');
+      return;
+    }
+    if (publishRequestInFlightRef.current) {
+      setStatus('Publish already in progress.');
+      return;
+    }
+    publishRequestInFlightRef.current = true;
+    try {
     const publishStartPreflightDescriptor = resolveSessionWizardPublishStartPreflightDescriptor({
       publishBusy,
       draftSlug: draft?.slug,
@@ -3444,7 +3462,7 @@ const SessionWizard = ({
     });
     if (publishStartPreflightDescriptor.status === 'blocked') {
       if (publishStartPreflightDescriptor.shouldResetPublishState) {
-        setPublishStep(0);
+        dispatchSessionPublish({ type: 'edit' });
         setSessionUrl('');
         setPublishedPendingSbtLinks([]);
       }
@@ -3464,10 +3482,10 @@ const SessionWizard = ({
     } catch (err) {
       const publishFailureSettlement = resolveSessionWizardPublishFailureSettlementDescriptor({ error: err });
       setStatus(publishFailureSettlement.errorMessage);
-      setPublishStep(publishFailureSettlement.publishStep);
+      dispatchSessionPublish({ type: 'edit' });
       return;
     }
-    setPublishStep(0);
+    dispatchSessionPublish({ type: 'edit' });
     setSessionUrl('');
     setPublishedPendingSbtLinks([]);
     const resolvedPublisher = await resolveConnectedAdminAddress();
@@ -3487,7 +3505,10 @@ const SessionWizard = ({
       return;
     }
     const signerAccountOverride = publishAdminPreflightDescriptor.signerAccountOverride;
-    setPublishBusy(true);
+    let activeSessionPublishEffect: SessionPublishEffect = 'checkRequirements';
+    const runTrackedPublishEffect = <Result,>(effect: SessionPublishEffect, run: () => Promise<Result>): Promise<Result> => {
+      activeSessionPublishEffect = effect; return run();
+    };
     try {
       const pendingDraftSnapshot = normalizePendingSbtDrafts(pendingSbtDrafts);
       const currentWorkerSecrets = getCurrentWorkerSecrets();
@@ -3510,6 +3531,7 @@ const SessionWizard = ({
         canUploadMetadataNow,
       });
       const { publishExecutionPlan } = publishRequestDescriptor;
+      beginSessionPublishReducerAttempt(dispatchSessionPublish, publishExecutionPlan);
       let uploadResult = null;
       let workerUrlOverride = '';
       let deployedPendingDrafts = [];
@@ -3519,17 +3541,33 @@ const SessionWizard = ({
           signerAccountOverride,
         },
         ports: {
-          deployWorker: () => handleDeployWorker({ forceSponsoredAutoDeploy: true }),
+          deployWorker: () => runSessionPublishEffect({
+            dispatch: dispatchSessionPublish,
+            effect: 'deployWorker',
+            getErrorMessage: getSessionWizardErrorMessage,
+            run: () => runTrackedPublishEffect('deployWorker', () => (
+              handleDeployWorker({ forceSponsoredAutoDeploy: true })
+            )),
+            result: (deployResult) => ({ workerUrl: deployResult?.workerUrl || '' }),
+          }),
           deployPendingSbts: ({ workerUrlOverride: pendingWorkerUrlOverride, signerAccountOverride }) => (
-            deployPendingSbtDrafts({
-              workerUrlOverride: pendingWorkerUrlOverride,
-              signerAccountOverride,
+            runSessionPublishEffect({
+              dispatch: dispatchSessionPublish,
+              effect: 'deployPendingSbts',
+              getErrorMessage: getSessionWizardErrorMessage,
+              run: () => runTrackedPublishEffect('deployPendingSbts', () => (
+                deployPendingSbtDrafts({
+                  workerUrlOverride: pendingWorkerUrlOverride,
+                  signerAccountOverride,
+                })
+              )),
+              result: (deployedDrafts) => ({
+                deployedPendingSbtCount: deployedDrafts.length,
+              }),
             })
           ),
         },
-        callbacks: {
-          setPublishStep,
-        },
+        callbacks: { setPublishStep: ignoreSessionPublishStep },
       });
       workerUrlOverride = publishControllerResult.workerUrlOverride;
       deployedPendingDrafts = publishControllerResult.deployedPendingDrafts;
@@ -3541,19 +3579,29 @@ const SessionWizard = ({
       const metadataUploadControllerResult = await runSessionWizardPublishMetadataUploadController({
         request: metadataUploadRequest,
         ports: {
-          uploadMetadata: (args) => handleUploadMetadata(args),
+          uploadMetadata: (args) => runSessionPublishEffect({
+            dispatch: dispatchSessionPublish,
+            effect: 'uploadMetadata',
+            getErrorMessage: getSessionWizardErrorMessage,
+            run: () => runTrackedPublishEffect('uploadMetadata', () => handleUploadMetadata(args)),
+            result: (result) => ({ metadataUri: result?.metadataUri || '' }),
+          }),
         },
-        callbacks: {
-          setPublishStep,
-        },
+        callbacks: { setPublishStep: ignoreSessionPublishStep },
       });
       uploadResult = metadataUploadControllerResult.uploadResult;
       const registerStepRequest = resolveSessionWizardRegisterStepRequest({
         publishExecutionPlan,
         uploadResult,
       });
-      setPublishStep(registerStepRequest.publishStep);
-      await handleRegisterGroup(registerStepRequest.registerGroupArgs);
+      activeSessionPublishEffect = 'registerSession';
+      await runSessionPublishEffect({
+        dispatch: dispatchSessionPublish,
+        effect: 'registerSession',
+        getErrorMessage: getSessionWizardErrorMessage,
+        run: () => handleRegisterGroup(registerStepRequest.registerGroupArgs),
+      });
+      markSessionPublishEffectSucceeded(dispatchSessionPublish, 'refreshRegistryCache');
       const completionRequest = resolveSessionWizardPublishCompletionRequest({
         publishExecutionPlan,
         deployedPendingDrafts,
@@ -3570,15 +3618,16 @@ const SessionWizard = ({
           promoteDeployedPendingSbtSelections,
           setPublishedPendingSbtLinks,
           clearPendingSbtDrafts: () => setPendingSbtDrafts([]),
-          setPublishStep,
+          setPublishStep: ignoreSessionPublishStep,
         },
       });
     } catch (err) {
       const publishFailureSettlement = resolveSessionWizardPublishFailureSettlementDescriptor({ error: err });
+      markSessionPublishEffectFailed(dispatchSessionPublish, activeSessionPublishEffect, publishFailureSettlement.errorMessage);
       setStatus(publishFailureSettlement.errorMessage);
-      setPublishStep(publishFailureSettlement.publishStep);
+    }
     } finally {
-      setPublishBusy(false);
+      publishRequestInFlightRef.current = false;
     }
   };
 
@@ -3631,7 +3680,7 @@ const SessionWizard = ({
     scheduleAdminUrlStatusReset();
   };
 
-  const sessionIdDisplay = sessionRegistryUtils.formatSessionId(sessionId) || toStr(sessionId).trim();
+  const sessionIdDisplay = sessionRegistryPublishAdapter.formatSessionId(sessionId) || toStr(sessionId).trim();
 
   const handleCopySessionId = async () => {
     const value = sessionIdDisplay || '';
@@ -3718,7 +3767,7 @@ const SessionWizard = ({
 
   const buildSponsoredFlagFields = (secretsSnapshot: WorkerSecretsLike = getCurrentWorkerSecrets()) => {
     const currentSlug = normalizeSlug(draft?.slug || '');
-    const currentWorkerUrl = normalizeWorkerAuthUrl(resolvedWorkerBaseUrlForDelegation);
+    const currentWorkerUrl = workerAuthPublishAdapter.normalizeWorkerUrl(resolvedWorkerBaseUrlForDelegation);
     const fallbackFields = (
       currentSlug &&
       currentSlug === normalizeSlug(provisionedSponsoredContext?.sessionSlug || '') &&
@@ -3915,7 +3964,7 @@ const SessionWizard = ({
     const baseUrl = normalizeWorkerUrl(toStr(workerUrl || resolveWorkerBaseUrl()).trim());
     if (!baseUrl) throw new Error('Worker URL is missing.');
     const authAccount = toStr(accountOverride || resolvedWalletAccountRef.current || account).trim();
-    return buildSessionWizardSignedBootstrapAdminAuth({
+    return workerAuthPublishAdapter.buildSignedBootstrapAdminAuth({
       slug: normalizeSlug(targetSlug),
       workerUrl: baseUrl,
       statement: toStr(statement).trim(),
@@ -3936,10 +3985,10 @@ const SessionWizard = ({
     // Regression guard: keep session metadata/header uploads on the same
     // sponsored-JWK path as deferred SBT finalization so /new publish does not
     // fix only one Arweave leg and regress the next.
-    resolvePublishArweaveUploadOptions({
-      arweaveJwk,
-      workerUrl,
-      preferDirectArweaveUpload: !!toStr(arweaveJwk).trim(),
+      arweavePublishAdapter.resolveUploadOptions({
+        arweaveJwk,
+        workerUrl,
+        preferDirectArweaveUpload: !!toStr(arweaveJwk).trim(),
       allowDirectFallbackOnBootstrapFailure: false,
       requireAdminAuthWithoutJwk: true,
       buildAdminAuth: ({ workerUrl: resolvedWorkerUrl }) => (
@@ -3963,7 +4012,7 @@ const SessionWizard = ({
     const baseUrl = normalizeWorkerUrl(toStr(workerUrl || resolveWorkerBaseUrl()).trim());
     if (!baseUrl) throw new Error('Worker URL is missing.');
     const authAccount = toStr(accountOverride || resolvedWalletAccountRef.current || account).trim();
-    return buildSessionWizardSignedAdminActionAuth({
+    return workerAuthPublishAdapter.buildSignedAdminActionAuth({
       action: toStr(action).trim() || 'set-config',
       slug: normalizeSlug(targetSlug),
       body,
@@ -3976,7 +4025,7 @@ const SessionWizard = ({
     });
   };
 
-  const sessionIdHex = sessionRegistryUtils.normalizeSessionIdHex(sessionId);
+  const sessionIdHex = sessionRegistryPublishAdapter.normalizeSessionIdHex(sessionId);
   const embeddedDeployHelperEnabled = typeof draft.embeddedDeployHelperEnabled === 'boolean'
     ? draft.embeddedDeployHelperEnabled
     : (CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED !== false);
@@ -4120,7 +4169,7 @@ const SessionWizard = ({
   const registerChainId = Number(registryChainId || draft.networkChainId || 0) || null;
   const registerExplorerBaseUrl = getExplorerBaseUrl(registerChainId);
   const isNormalMode = wizardMode !== 'advanced';
-  const hasConfiguredDeployHelperUrl = !!normalizeWorkerAuthUrl(toStr(CLOUDFLARE_DEPLOY_HELPER_URL).trim());
+  const hasConfiguredDeployHelperUrl = !!workerAuthPublishAdapter.normalizeWorkerUrl(toStr(CLOUDFLARE_DEPLOY_HELPER_URL).trim());
   const shouldShowDeployHelperUrlInput = !isNormalMode || !hasConfiguredDeployHelperUrl;
 
   const { primaryEntries: primaryDraftEntries, moreOptionsEntries } = useMemo(
@@ -4212,12 +4261,12 @@ const SessionWizard = ({
     () => getSessionWizardNormalModeBundleUrlOverrideValidationError(normalModeBundleUrlOverride),
     [normalModeBundleUrlOverride]
   );
-  const currentSessionWizardPathname = (
-    typeof window === 'undefined' || !window.location ? '' : window.location.pathname
-  );
-  const isNewSessionWizardRoute = isNewSessionWizardPathname(
-    currentSessionWizardPathname
-  );
+  useEffect(() => {
+    if (isNewSessionWizardRoute) {
+      setSessionModeProfileStepComplete(false);
+    }
+  }, [isNewSessionWizardRoute]);
+  const effectiveSessionModeProfileStepComplete = !isNewSessionWizardRoute || sessionModeProfileStepComplete;
   const newSessionBannerDismissalContextKey = buildSessionWizardNewSessionBannerDismissalContextKey({
     pathname: currentSessionWizardPathname,
     sponsoredBundleId: initialSponsoredBundleId,
@@ -4231,7 +4280,7 @@ const SessionWizard = ({
     hasSponsoredBundleLink,
     newSessionBannerDismissalContextKey,
   });
-  const normalizedAppliedSponsoredBundle = normalizeSparseSponsoredBundlePayload(
+  const normalizedAppliedSponsoredBundle = sponsoredBundlePublishAdapter.normalizeSparseSponsoredBundlePayload(
     sponsoredBundleAppliedBundleRef.current
   );
   const {
@@ -4248,7 +4297,8 @@ const SessionWizard = ({
     persistedNewSessionBannerDismissed,
     sponsoredBundleStatus,
   });
-  const publishUiPlan = resolveSessionWizardPublishUiPlan({
+  const publishUiPlan = resolveSessionWizardPublishReducerUiPlan({
+    state: sessionPublishState,
     resolvedWorkerBaseUrl,
     workerMode,
     usesDefaultWorkerUrl,
@@ -4257,16 +4307,16 @@ const SessionWizard = ({
     canUseSponsoredAutoDeployNow,
     manualMetadataUrl,
     metadataUrl,
-    buildMetadataGatewayUrl: arweaveScripts.buildArweaveGatewayUrl,
+    buildMetadataGatewayUrl: (txId) => arweavePublishAdapter.buildArweaveGatewayUrl({ txId }),
     deployComplete,
     hasPendingDrafts: hasUndeployedPendingSbtDrafts,
     isNormalMode,
     publishAdvancedOpen,
-    publishBusy,
-    publishStep,
     publishStepElapsedMs,
     sbtsLabel: t('sbts'),
   });
+  const { publishProgressDisplayState: { publishStep } } = publishUiPlan;
+  useSessionWizardPublishElapsed({ publishBusy, publishStep, setPublishStepElapsedMs });
   const {
     canUploadMetadataNow,
   } = publishUiPlan.publishReadiness;
@@ -4367,6 +4417,23 @@ const SessionWizard = ({
       sessionIdDisplay={sessionIdDisplay}
     />
   ) : null;
+  const handleSessionModeProfileContinue = useCallback(() => {
+    setSessionModeProfileStepComplete(true);
+  }, []);
+  const sessionModeProfileControl = (
+    <SessionWizardSessionModeProfileControl
+      registryChainId={registryChainId}
+      value={draft.sessionModeProfile}
+      onChange={(profile, compiled) => {
+        setDraft((prev) => {
+          const next = applySessionModeProfileSelectionToDraft(prev, profile, compiled);
+          draftRef.current = next;
+          return next;
+        });
+      }}
+      onContinue={handleSessionModeProfileContinue}
+    />
+  );
 
   return (
     <SessionWizardShell
@@ -4457,73 +4524,43 @@ const SessionWizard = ({
       onToggleJsonPreview={() => setShowJsonPreview((prev) => !prev)}
       onToggleMoreOptions={() => setMoreOptionsOpen((prev) => !prev)}
       onTogglePublishAdvanced={() => setPublishAdvancedOpen((prev) => !prev)}
-      pendingSbtDrafts={pendingSbtDrafts}
-      pendingSbtSelectorOptions={pendingSbtSelectorOptions}
-      persistWorkerSecrets={persistWorkerSecrets}
-      primaryDraftEntries={primaryDraftEntries}
-      provider={provider}
-      publishUiPlan={publishUiPlan}
-      publishedPendingSbtLinks={publishedPendingSbtLinks}
-      registerExplorerBaseUrl={registerExplorerBaseUrl}
-      registerTxs={registerTxs}
-      registryAddress={registryAddress}
-      registryChainId={registryChainId}
-      registryChainName={registryChainName}
-      registryChainOptions={registryChainOptions}
-      removeEncryptionGate={removeEncryptionGate}
-      removePendingSbtDraft={removePendingSbtDraft}
-      renderField={renderField}
-      renderResourceCard={renderResourceCard}
-      renderSessionWizardInfoTooltip={renderSessionWizardInfoTooltip}
-      resolvedActiveSessionSlug={resolvedActiveSessionSlug}
-      resolvedWorkerBaseUrl={resolvedWorkerBaseUrl}
-      sbtCacheRevision={sbtCacheRevision}
-      selectedWizardContract={selectedWizardContract}
-      selectedWizardContractHref={selectedWizardContractHref}
-      selectorSourceChainId={selectorSourceChainId}
-      selectorSourceSessionConfig={selectorSourceSessionConfig}
-      sessionHeaderPreviewModalOpen={sessionHeaderPreviewModalOpen}
-      sessionHeaderPreviewSrc={sessionHeaderPreviewSrc}
-      sessionMetadataHeaderAccessory={sessionMetadataHeaderAccessory}
+      pendingSbtDrafts={pendingSbtDrafts} pendingSbtSelectorOptions={pendingSbtSelectorOptions}
+      persistWorkerSecrets={persistWorkerSecrets} primaryDraftEntries={primaryDraftEntries}
+      provider={provider} publishUiPlan={publishUiPlan}
+      publishedPendingSbtLinks={publishedPendingSbtLinks} registerExplorerBaseUrl={registerExplorerBaseUrl}
+      registerTxs={registerTxs} registryAddress={registryAddress}
+      registryChainId={registryChainId} registryChainName={registryChainName}
+      registryChainOptions={registryChainOptions} removeEncryptionGate={removeEncryptionGate}
+      removePendingSbtDraft={removePendingSbtDraft} renderField={renderField}
+      renderResourceCard={renderResourceCard} renderSessionWizardInfoTooltip={renderSessionWizardInfoTooltip}
+      resolvedActiveSessionSlug={resolvedActiveSessionSlug} resolvedWorkerBaseUrl={resolvedWorkerBaseUrl}
+      sbtCacheRevision={sbtCacheRevision} selectedWizardContract={selectedWizardContract}
+      selectedWizardContractHref={selectedWizardContractHref} selectorSourceChainId={selectorSourceChainId}
+      selectorSourceSessionConfig={selectorSourceSessionConfig} sessionHeaderPreviewModalOpen={sessionHeaderPreviewModalOpen}
+      sessionHeaderPreviewSrc={sessionHeaderPreviewSrc} sessionMetadataHeaderAccessory={sessionMetadataHeaderAccessory}
+      sessionModeProfileControl={sessionModeProfileControl}
+      showSessionModeProfileControlInSetup={!isNewSessionWizardRoute}
+      sessionModeProfileStepComplete={effectiveSessionModeProfileStepComplete}
       sessionUrl={sessionUrl}
-      setBundleFile={setBundleFile}
-      setBundleMode={setBundleMode}
-      setDeployForm={setDeployForm}
-      setDeployHelperUrl={setDeployHelperUrl}
-      setNormalModeBundleUrlOverride={setNormalModeBundleUrlOverride}
-      setPersistWorkerSecrets={setPersistWorkerSecrets}
-      setWorkerAllowOrigins={setWorkerAllowOrigins}
-      setWorkerMode={setWorkerMode}
-      setWorkerSecretsEnabled={setWorkerSecretsEnabled}
-      setWorkerUrlAutoFilled={setWorkerUrlAutoFilled}
-      shouldShowDeployHelperUrlInput={shouldShowDeployHelperUrlInput}
-      shouldUseSponsoredAutoDeployFlow={shouldUseSponsoredAutoDeployFlow}
-      showJsonPreview={showJsonPreview}
-      showNewSessionRequirementsBanner={showNewSessionRequirementsBanner}
-      showNormalModeManualBundleControls={showNormalModeManualBundleControls}
-      showNormalModeWorkerStep={showNormalModeWorkerStep}
-      showSharedWorkerChoice={showSharedWorkerChoice}
-      showSponsoredBundleFallbackInput={showSponsoredBundleFallbackInput}
-      showSponsoredDeployAccessNotice={showSponsoredDeployAccessNotice}
-      showWorkerUrlField={showWorkerUrlField}
-      signBootstrapAdminAction={signBootstrapAdminAction}
-      sponsoredBundleStatus={sponsoredBundleStatus}
-      sponsoredManualBundleRetryMessage={SPONSORED_MANUAL_BUNDLE_RETRY_MESSAGE}
-      sponsoredPublishBundleFileInputRef={sponsoredPublishBundleFileInputRef}
-      status={status}
-      t={t}
-      toggleLoginModal={toggleLoginModal}
-      toggleSection={toggleSection}
-      updateDraftValue={updateDraftValue}
-      updateEncryptionGate={updateEncryptionGate}
-      visibleWorkerResourceKeys={visibleWorkerResourceKeys}
-      workerAllowOrigins={workerAllowOrigins}
-      workerMode={workerMode}
-      workerSecretsEnabled={workerSecretsEnabled}
-      workerUrlAutoFilled={workerUrlAutoFilled}
-      workerUrlSource={workerUrlSource}
-      wizardDisplaySettingsOpen={wizardDisplaySettingsOpen}
-      wizardMode={wizardMode}
+      setBundleFile={setBundleFile} setBundleMode={setBundleMode}
+      setDeployForm={setDeployForm} setDeployHelperUrl={setDeployHelperUrl}
+      setNormalModeBundleUrlOverride={setNormalModeBundleUrlOverride} setPersistWorkerSecrets={setPersistWorkerSecrets}
+      setWorkerAllowOrigins={setWorkerAllowOrigins} setWorkerMode={setWorkerMode}
+      setWorkerSecretsEnabled={setWorkerSecretsEnabled} setWorkerUrlAutoFilled={setWorkerUrlAutoFilled}
+      shouldShowDeployHelperUrlInput={shouldShowDeployHelperUrlInput} shouldUseSponsoredAutoDeployFlow={shouldUseSponsoredAutoDeployFlow}
+      showJsonPreview={showJsonPreview} showNewSessionRequirementsBanner={showNewSessionRequirementsBanner}
+      showNormalModeManualBundleControls={showNormalModeManualBundleControls} showNormalModeWorkerStep={showNormalModeWorkerStep}
+      showSharedWorkerChoice={showSharedWorkerChoice} showSponsoredBundleFallbackInput={showSponsoredBundleFallbackInput}
+      showSponsoredDeployAccessNotice={showSponsoredDeployAccessNotice} showWorkerUrlField={showWorkerUrlField}
+      signBootstrapAdminAction={signBootstrapAdminAction} sponsoredBundleStatus={sponsoredBundleStatus}
+      sponsoredManualBundleRetryMessage={SPONSORED_MANUAL_BUNDLE_RETRY_MESSAGE} sponsoredPublishBundleFileInputRef={sponsoredPublishBundleFileInputRef}
+      status={status} t={t}
+      toggleLoginModal={toggleLoginModal} toggleSection={toggleSection}
+      updateDraftValue={updateDraftValue} updateEncryptionGate={updateEncryptionGate}
+      visibleWorkerResourceKeys={visibleWorkerResourceKeys} workerAllowOrigins={workerAllowOrigins}
+      workerMode={workerMode} workerSecretsEnabled={workerSecretsEnabled}
+      workerUrlAutoFilled={workerUrlAutoFilled} workerUrlSource={workerUrlSource}
+      wizardDisplaySettingsOpen={wizardDisplaySettingsOpen} wizardMode={wizardMode}
       normalizeSbtSelection={normalizeSbtSelection}
     />
   );

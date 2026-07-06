@@ -213,7 +213,6 @@ export const buildResponsePayload = (
       return {
         timeStamp: Date.now(),
         sessionName,
-        ...(sessionName ? { sessionName: sessionName } : {}),
         ...responses[0],
       };
     }
@@ -223,7 +222,6 @@ export const buildResponsePayload = (
       return {
         timeStamp: Date.now(),
         sessionName,
-        ...(sessionName ? { sessionName: sessionName } : {}),
         questionID: q.id,
         type: q.type,
         prompt: opts.sanitizeQuestionPromptForResponsePayload(q, {
@@ -257,7 +255,6 @@ export const buildResponsePayload = (
     responder: opts.account,
     timeStamp: Date.now(),
     sessionName,
-    ...(sessionName ? { sessionName: sessionName } : {}),
     responses,
   };
 };

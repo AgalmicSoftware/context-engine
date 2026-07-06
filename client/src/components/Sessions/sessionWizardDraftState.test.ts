@@ -50,6 +50,40 @@ describe('sessionWizardDraftState', () => {
         thinking: expect.objectContaining({ provider: 'openai', model: 'gpt-5' }),
       }),
     }));
+    expect(template.sessionModeProfile).toBeUndefined();
+    expect(template.telegramOnly).toBeUndefined();
+    expect(template.sessionMode).toBeUndefined();
+    expect(template.telegramBridgeEnabled).toBeUndefined();
+  });
+
+  it('normalizes cached legacy Telegram drafts into the profile without rewriting legacy fields', () => {
+    const normalized = normalizeSessionWizardDraftShape({
+      sessionName: 'Legacy Telegram',
+      telegramOnly: true,
+      sessionMode: 'telegram_only',
+      telegramBridgeEnabled: true,
+      telegram: { only: true, mode: 'telegram_only' },
+      storageProfile: { backend: 'cloudflare' },
+    });
+
+    expect(normalized.sessionModeProfile).toEqual(expect.objectContaining({
+      preset: 'custom',
+      authority: { mode: 'worker_canonical' },
+      storage: expect.objectContaining({ backend: 'cloudflare' }),
+      surfaces: expect.objectContaining({
+        telegram: true,
+        miniApp: true,
+        web: true,
+      }),
+    }));
+    expect(normalized.storageProfile).toEqual(expect.objectContaining({
+      backend: 'cloudflare',
+      payloadAccessControl: expect.objectContaining({ mode: 'worker_sbt_gate' }),
+    }));
+    expect(normalized.telegramOnly).toBeUndefined();
+    expect(normalized.sessionMode).toBeUndefined();
+    expect(normalized.telegramBridgeEnabled).toBeUndefined();
+    expect(normalized.telegram).toBeUndefined();
   });
 
   it('merges cached wizard drafts with source defaults and normal-mode worker fallback', () => {
@@ -93,6 +127,34 @@ describe('sessionWizardDraftState', () => {
     })).toEqual(expect.objectContaining({
       corsWorkerUrl: 'https://cached.example/worker',
       embeddedDeployHelperEnabled: false,
+    }));
+  });
+
+  it('migrates cached Cloudflare Lit storage drafts into a session mode profile', () => {
+    const normalized = buildSessionWizardInitialDraftFromCache({
+      cachedWizard: {
+        draft: {
+          sessionName: 'Cached Lit Cloudflare Session',
+          storageProfile: {
+            backend: 'cloudflare',
+            payloadAccessControl: { mode: 'lit_encrypted' },
+          },
+        },
+      },
+    });
+
+    expect(normalized.sessionModeProfile).toEqual(expect.objectContaining({
+      preset: 'custom',
+      authority: { mode: 'worker_canonical' },
+      storage: expect.objectContaining({ backend: 'cloudflare' }),
+      encryption: { mode: 'lit' },
+    }));
+    expect(normalized.storageProfile).toEqual(expect.objectContaining({
+      backend: 'cloudflare',
+      payloadAccessControl: expect.objectContaining({ mode: 'lit_encrypted' }),
+      sbtGatedAccess: expect.objectContaining({
+        litRequired: 'required_for_cloudflare_payload_encryption',
+      }),
     }));
   });
 

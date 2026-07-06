@@ -8,9 +8,6 @@ import {
   faExternalLinkAlt,
   faQuestionCircle,
   faSpinner,
-  faCheck,
-  faTimes,
-  faImage,
   faArrowLeft,
   faExpand,
   faPlus,
@@ -26,7 +23,17 @@ import styles from './OnePageSession.module.scss';
 
 import LazyFallback from '../Shared/LazyFallback';
 
-import contractScripts, { getAllSessionSlugs } from '../../utilities/web3/contractScripts.js';
+import {
+  getLegacyEthBalance,
+  getNativeBalance,
+  hasLegacyEthBalanceReader,
+  hasNativeBalanceReader,
+  type SessionBalance,
+} from '../../domains/sessions/sessionBalanceReaders.js';
+import { getAllSessionSlugs } from '../../domains/sessions/sessionConfig.js';
+import { sbtGroupMintAuthorizationPort } from '../../domains/sbts/sbtGroupMintAuthorizationPort.js';
+import { sbtMetadataReadsPort } from '../../domains/sbts/sbtMetadataReadsPort.js';
+import { sbtMintExecutionPort } from '../../domains/sbts/sbtMintExecutionPort.js';
 
 import { resolveEffectiveSlug, normalizeSurveyToolFilterState } from '../SurveyTool/surveyToolUtils.js';
 import { resolvePolisDemoQuestionPool } from '../SurveyTool/surveyPolisDemoQuestionPool.js';
@@ -47,7 +54,6 @@ import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 import { lazyWithRetry } from '../../utilities/ui/lazyImportRetry.js';
 import { hasCachedCreateSbtForm as hasCachedCreateSbtFormCache } from '../../utilities/sbt/sbtCreateFormCache.js';
-import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { isDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
 import { isCryptoMode, sbtsListPath, t } from '../../utilities/ui/terminology.js';
@@ -55,14 +61,36 @@ import { PUBLIC_AI_DISCOURSE_CORPUS_URL } from '../../variables/publicRepoMetada
 import { resolveMainSiteLitSessionConfig } from '../MainSite/litSessionConfig.js';
 import type { RiskMatrixRestoreState } from '../MainContent/RiskMatrix';
 import {
+  clearAgentClientLoginEnvelope,
+  readAgentClientLoginEnvelope,
+} from '../../utilities/session/agentClientLogin';
+import {
+  envelopeAllowsSubmit,
+  loadQuestions as loadTelegramQuestions,
+  loadResultsDataset as loadTelegramResultsDataset,
+  submitAnswer as submitTelegramAnswer,
+} from '../../utilities/session/telegramSessionBackend';
+import { isTelegramAgentAuthFailure } from '../../utilities/session/telegramAgentData';
+import {
   buildAggregatorFromLocalCache,
   computeAggregatorDataSignature,
   computeAggregatorQuestionMetadataSignature,
   computeAggregatorSourceSnapshotSignature,
 } from './onePageSessionAggregator';
+import OnePageSessionAutoMintAlerts from './OnePageSessionAutoMintAlerts';
+import OnePageSessionTelegramShell from './OnePageSessionTelegramShell';
+import {
+  buildCurrentSessionConfigRequest,
+  isOnePageTelegramBackendMode,
+  normalizeOnePageSessionSlug,
+  resolveCurrentSessionSlugForProps,
+  resolveTelegramAgentBridgeUrl as resolveTelegramAgentBridgeUrlForSession,
+  type OnePageSessionPropsLike,
+} from './onePageSessionTelegramController';
+import { buildInitialTelegramState, createOnePageSessionTelegramActions, type OnePageSessionTelegramState } from './onePageSessionTelegramActions';
 
 const SurveyPage = React.lazy(() => import('../SurveyTool/SurveyPage'));
-const MemoSurveyPage = React.memo((props: any) => <SurveyPage {...props} />);
+const MemoSurveyPage = React.memo((props: Record<string, unknown>) => <SurveyPage {...props} />);
 const SBTsPage = React.lazy(() => import('../SBTs/SBTsPage'));
 const PolisReport = React.lazy(() => import('../PolisReport/PolisReport'));
 const DebateMap = React.lazy(() => import('../DebateMap/DebateMap'));
@@ -82,42 +110,26 @@ const DEFAULT_CORPUS_VIEWER_LOAD_STATE = Object.freeze({
   disableLoadButton: false,
   error: '',
 });
-type UnknownRecord = Record<string, unknown>;
+type OnePageGlobalState = typeof globalThis & {
+  ENABLE_CE_UI_PERF_STATS?: boolean;
+  ENABLE_CE_DEBUG_COUNTERS?: boolean;
+  __CE_DEBUG_COUNTERS__?: boolean;
+  __CE_PERF_COUNTERS__?: Record<string, Record<string, number>>;
+};
+const globalState = globalThis as OnePageGlobalState;
+const DebateMapAny = DebateMap as React.ComponentType<Record<string, unknown>>;
 
-const toUnknownRecord = (value: unknown): UnknownRecord => (
-  value && typeof value === 'object' && !Array.isArray(value)
-    ? value as UnknownRecord
-    : {}
-);
-
-const globalState: any = globalThis as any;
-const contractScriptsAny: any = contractScripts as any;
-const DebateMapAny: any = DebateMap;
-
-const getErrorMessage = (error: any, fallback = 'Unknown error') => (
-  error && typeof error === 'object' && typeof error.message === 'string'
-    ? error.message
+const getErrorMessage = (error: unknown, fallback = 'Unknown error') => (
+  error && typeof error === 'object' && typeof (error as { message?: unknown }).message === 'string'
+    ? (error as { message: string }).message
     : fallback
 );
 
-const resolveAutoFeatureBySessionSlug = (metadata: any) => (
+const resolveAutoFeatureBySessionSlug = (metadata: Record<string, unknown> | null | undefined) => (
   metadata?.autoFeatureSBTsBySessionSlug !== undefined
     ? metadata.autoFeatureSBTsBySessionSlug
     : metadata?.autoFeatureSBTsWithFeaturedSbtTags
 );
-
-const isTelegramOnlySessionConfig = (metadata: unknown) => {
-  const config = toUnknownRecord(metadata);
-  const telegramConfig = toUnknownRecord(config.telegram);
-  return (
-    config.telegramOnly === true ||
-    config.telegram_only === true ||
-    config.sessionMode === 'telegram_only' ||
-    config.telegramMode === 'telegram_only' ||
-    telegramConfig.only === true ||
-    telegramConfig.mode === 'telegram_only'
-  );
-};
 
 const isPerfCountersEnabled = () => {
   try {
@@ -131,7 +143,7 @@ const isPerfCountersEnabled = () => {
   }
 };
 
-const bumpPerfCounter = (key: any, inc: any = 1) => {
+const bumpPerfCounter = (key: string, inc: number = 1) => {
   if (!isPerfCountersEnabled()) return;
   try {
     if (!globalState.__CE_PERF_COUNTERS__ || typeof globalState.__CE_PERF_COUNTERS__ !== 'object') {
@@ -158,7 +170,7 @@ const buildOnePageSessionEmptyFilterState = () => ({
   selectedTags: [],
 });
 
-const normalizeOnePageSessionFilterState = (value: any = {}) => {
+const normalizeOnePageSessionFilterState = (value: unknown = {}) => {
   const normalized = normalizeSurveyToolFilterState(
     (value && typeof value === 'object')
       ? value
@@ -169,30 +181,29 @@ const normalizeOnePageSessionFilterState = (value: any = {}) => {
     : buildOnePageSessionEmptyFilterState();
 };
 
-const serializeOnePageSessionFilterState = (value: any = {}) => (
+const serializeOnePageSessionFilterState = (value: unknown = {}) => (
   serializeFilterState(normalizeOnePageSessionFilterState(value))
 );
 
-const normalizeOnePageSessionSlug = (value: any = '') => {
-  const normalized = String(value || '').trim().toLowerCase();
-  return normalized === 'general' ? '' : normalized;
-};
-
-const hasOwn = (value: any, key: string) => (
+const hasOwn = (value: unknown, key: string) => (
   !!value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, key)
 );
 
-const resolveOnePageSessionSurveySlug = (props: any = '') => {
-  if (hasOwn(props, 'questionSessionSlug')) {
-    return normalizeOnePageSessionSlug(props.questionSessionSlug);
+const resolveOnePageSessionSurveySlug = (props: Record<string, unknown> | string = '') => {
+  const propsRecord = props && typeof props === 'object' ? props : {};
+  const sessionConfig = propsRecord.sessionConfig && typeof propsRecord.sessionConfig === 'object'
+    ? propsRecord.sessionConfig as Record<string, unknown>
+    : {};
+  if (hasOwn(propsRecord, 'questionSessionSlug')) {
+    return normalizeOnePageSessionSlug(propsRecord.questionSessionSlug);
   }
-  if (hasOwn(props.sessionConfig, 'slug')) {
-    return normalizeOnePageSessionSlug(props.sessionConfig.slug);
+  if (hasOwn(sessionConfig, 'slug')) {
+    return normalizeOnePageSessionSlug(sessionConfig.slug);
   }
-  return normalizeOnePageSessionSlug(props.slug || '');
+  return normalizeOnePageSessionSlug(propsRecord.slug || '');
 };
 
-const getUniqueAggregatorCandidateSlugs = (...slugs: any[]) => {
+const getUniqueAggregatorCandidateSlugs = (...slugs: unknown[]) => {
   const seen = new Set<string>();
   return slugs
     .map((value) => normalizeOnePageSessionSlug(value))
@@ -204,7 +215,7 @@ const getUniqueAggregatorCandidateSlugs = (...slugs: any[]) => {
     });
 };
 
-const shouldUseBuiltInDemoAggregatorFallback = (displaySlug: any = '', questionSourceSlug: any = '') => {
+const shouldUseBuiltInDemoAggregatorFallback = (displaySlug: unknown = '', questionSourceSlug: unknown = '') => {
   const normalizedDisplaySlug = normalizeOnePageSessionSlug(displaySlug);
   const normalizedQuestionSourceSlug = normalizeOnePageSessionSlug(questionSourceSlug);
   return normalizedDisplaySlug === 'demo' && (
@@ -213,10 +224,10 @@ const shouldUseBuiltInDemoAggregatorFallback = (displaySlug: any = '', questionS
   );
 };
 
-const buildAggregatorFallbackQuestions = (questionPool: any[] = [], sessionSlug: any = '') => {
-  const out: Record<string, any> = {};
+const buildAggregatorFallbackQuestions = (questionPool: Array<Record<string, unknown>> = [], sessionSlug: unknown = '') => {
+  const out: Record<string, Record<string, unknown>> = {};
   const normalizedSessionSlug = normalizeOnePageSessionSlug(sessionSlug);
-  (Array.isArray(questionPool) ? questionPool : []).forEach((entry: any) => {
+  (Array.isArray(questionPool) ? questionPool : []).forEach((entry) => {
     const questionId = String(entry?.id || '').trim();
     if (!questionId) return;
     out[questionId.toLowerCase()] = {
@@ -423,6 +434,8 @@ class OnePageSession extends Component<any, any> {
       dismissedAutoMintingBanner: false,
       autoMintCountdown: null, // null = not counting, number = seconds remaining
       dismissedStatusItems: {},
+
+      ...buildInitialTelegramState(initialSlug, readAgentClientLoginEnvelope),
     };
 
     // Ensure idempotent auto-open of Groups on mount (do not fight user toggles)
@@ -495,6 +508,26 @@ class OnePageSession extends Component<any, any> {
 
     // view-all handler
     this.handleViewAllQuestionsClick = this.handleViewAllQuestionsClick.bind(this);
+
+    const telegramActions = createOnePageSessionTelegramActions({
+      getState: () => this.state as OnePageSessionTelegramState,
+      isTelegramBackendMode: (sessionConfig) => this.isTelegramBackendMode(sessionConfig),
+      ports: {
+        clearStoredEnvelope: clearAgentClientLoginEnvelope,
+        envelopeAllowsSubmit,
+        fetchImpl: fetch,
+        isAuthFailure: isTelegramAgentAuthFailure,
+        loadQuestions: loadTelegramQuestions,
+        loadResultsDataset: loadTelegramResultsDataset,
+        readStoredEnvelope: readAgentClientLoginEnvelope,
+        submitAnswer: submitTelegramAnswer,
+      },
+      resolveCurrentSessionConfig: () => this.resolveCurrentSessionConfig(),
+      resolveCurrentSessionSlug: () => this.resolveCurrentSessionSlug(),
+      resolveTelegramAgentBridgeUrl: (sessionConfig) => this.resolveTelegramAgentBridgeUrl(sessionConfig),
+      setState: (patch, callback) => this.setState(patch, callback),
+    });
+    Object.assign(this, telegramActions);
   }
 
   kickoffLightSbtUniverseScan(propsIn: any = this.props) {
@@ -550,6 +583,7 @@ class OnePageSession extends Component<any, any> {
     }
 
     window.addEventListener('sbt-mint-success', this.onSbtMintSuccess);
+    window.addEventListener('ce-agent-client-login', this.handleAgentClientLoginEvent as EventListener);
 
     // Auto-open Groups section if a Create-SBT cache exists (idempotent, group-aware)
     try {
@@ -561,11 +595,14 @@ class OnePageSession extends Component<any, any> {
     } catch (e) { demoLog.warn('OnePageSession: fallback', e); }
 
     this._aggregatorInputSig = this.buildAggregatorInputSignature(this.props, this.state);
+
+    this.bootstrapTelegramSession();
   }
 
 
 
   componentWillUnmount() {
+    window.removeEventListener('ce-agent-client-login', this.handleAgentClientLoginEvent as EventListener);
     if (this._autoOpenResultsTimer) {
       clearTimeout(this._autoOpenResultsTimer);
       this._autoOpenResultsTimer = null;
@@ -695,6 +732,29 @@ class OnePageSession extends Component<any, any> {
         ...chipotle,
         sessionSlug,
       },
+    });
+  }
+
+  resolveCurrentSessionSlug(propsIn: OnePageSessionPropsLike = this.props) {
+    return resolveCurrentSessionSlugForProps(propsIn, resolveEffectiveSlug);
+  }
+
+  resolveCurrentSessionConfig(propsIn: OnePageSessionPropsLike = this.props) {
+    return this.getResolvedSessionConfig(buildCurrentSessionConfigRequest(propsIn, resolveEffectiveSlug));
+  }
+
+  resolveTelegramAgentBridgeUrl(sessionConfig: unknown = this.resolveCurrentSessionConfig()) {
+    return resolveTelegramAgentBridgeUrlForSession(sessionConfig);
+  }
+
+  isTelegramBackendMode(
+    sessionConfig: unknown = this.resolveCurrentSessionConfig(),
+    sessionSlug: unknown = this.resolveCurrentSessionSlug(),
+  ) {
+    return isOnePageTelegramBackendMode({
+      sessionConfig,
+      telegramSessionMeta: this.state.telegramSessionMeta,
+      sessionSlug,
     });
   }
 
@@ -832,6 +892,11 @@ class OnePageSession extends Component<any, any> {
         this.primeAutoMintTargets(retryTargets);
       }
     }
+
+    this.handleTelegramComponentDidUpdate({
+      slugChanged,
+      loginJustCompleted: !prevProps.loginComplete && this.props.loginComplete,
+    });
   }
 
   scheduleBuildAggregator(delayMs: any = 100, inputSig: any = this.buildAggregatorInputSignature(this.props, this.state)) {
@@ -1163,7 +1228,7 @@ class OnePageSession extends Component<any, any> {
           let info: any = null;
           try {
             // Use internal read provider ('none' resolves to read-only)
-            info = await contractScriptsAny.getSbtMetadata('none', addr, slug);
+            info = await sbtMetadataReadsPort.getSbtMetadata('none', addr, slug);
           } catch (e) { demoLog.warn('OnePageSession: fallback', e); }
           const name = getSbtDisplayName(info) || `Group ${addr.slice(0,6)}...`;
           fetchedNames[addr] = name;
@@ -1341,7 +1406,7 @@ class OnePageSession extends Component<any, any> {
     const slug = resolveEffectiveSlug(this.props);
     try {
       // Read-only provider internally
-      const onchainGph = await contractScriptsAny.getGroupPasswordHash('none', sbtAddress, slug);
+      const onchainGph = await sbtMetadataReadsPort.getGroupPasswordHash('none', sbtAddress, slug);
       const pw = cryptoUtils.normalizeGroupPasswordInput(password);
       if (!pw) return false;
 
@@ -1402,17 +1467,17 @@ class OnePageSession extends Component<any, any> {
         return true;
       }
       const readBalance =
-        (typeof contractScriptsAny.getNativeBalance === 'function' && contractScriptsAny.getNativeBalance.bind(contractScripts))
-        || (typeof contractScriptsAny.getETHBalance === 'function' && contractScriptsAny.getETHBalance.bind(contractScripts))
+        (hasNativeBalanceReader() && getNativeBalance)
+        || (hasLegacyEthBalanceReader() && getLegacyEthBalance)
         || null;
       if (!readBalance) {
         return false;
       }
 
-      // Group-aware read: rely on contractScripts (no ad-hoc provider instantiation)
+      // Group-aware read: rely on the session balance domain (no ad-hoc provider instantiation)
       const slug = resolveEffectiveSlug(this.props);
-      const getBalance = async () => {
-        try { return await readBalance(address, slug); }
+      const getBalance = async (): Promise<SessionBalance> => {
+        try { return await readBalance(address, slug) || ethers.BigNumber.from(0); }
         catch { return ethers.BigNumber.from(0); }
       };
 
@@ -1575,7 +1640,7 @@ class OnePageSession extends Component<any, any> {
         // 2. NETWORK FALLBACK (Last Resort)
         if (!sbtInfo) {
            // 'none' provider = read-only RPC
-           sbtInfo = await contractScriptsAny.getSbtMetadata('none', sbtAddr, currentSlug);
+           sbtInfo = await sbtMetadataReadsPort.getSbtMetadata('none', sbtAddr, currentSlug);
         }
 
         // 3. PREFLIGHT CHECKS
@@ -1652,7 +1717,7 @@ class OnePageSession extends Component<any, any> {
           }
           path = 'invite';
         } else {
-          const gph = await contractScriptsAny.getGroupPasswordHash('none', sbtAddr, currentSlug);
+          const gph = await sbtMetadataReadsPort.getGroupPasswordHash('none', sbtAddr, currentSlug);
           const hasGroupPassword = !!gph && gph !== ethers.constants.HashZero;
 
           let isPublic = false;
@@ -1681,7 +1746,7 @@ class OnePageSession extends Component<any, any> {
               }
               if (maxTokensLimit === null && hasGroupPassword) {
                 try {
-                  const onchainInfo = await contractScriptsAny.getSbtMetadata('none', sbtAddr, currentSlug);
+                  const onchainInfo = await sbtMetadataReadsPort.getSbtMetadata('none', sbtAddr, currentSlug);
                   const rawMax = onchainInfo?.maxTokens;
                   if (rawMax !== undefined && rawMax !== null && rawMax !== '' && rawMax !== '0') {
                     maxTokensLimit = ethers.BigNumber.from(rawMax);
@@ -1731,7 +1796,7 @@ class OnePageSession extends Component<any, any> {
         }
 
         if (path === 'public') {
-          await contractScripts.claim(this.props.provider, sbtAddr);
+          await sbtMintExecutionPort.claim(this.props.provider, sbtAddr);
           this.consumeAutoMintAttempt(sbtAddr, userAddr);
           updateStatus(sbtKey, { status: 'success', name: `Joined: ${sbtName || 'Group'}` });
           this.onSbtMintSuccess(sbtAddr);
@@ -1741,28 +1806,24 @@ class OnePageSession extends Component<any, any> {
             const password = cryptoUtils.normalizeGroupPasswordInput(invitePassword);
             if (!password) throw new Error('Invalid group password');
             let walletScopeSbtAddress = sbtAddr;
-            try {
-              const onchainHash = await contractScriptsAny.getGroupPasswordHash('none', sbtAddr, currentSlug);
-              if (onchainHash && onchainHash !== ethers.constants.HashZero) {
-                walletScopeSbtAddress = cryptoUtils.resolveGroupPasswordWalletScopeAddress({
-                  password,
-                  sbtAddress: sbtAddr,
-                  groupPasswordHash: onchainHash
-                });
-                const localHash = walletScopeSbtAddress === null
-                  ? null
-                  : contractScriptsAny.computeGroupPasswordHash({
-                      password,
-                      sbtAddress: walletScopeSbtAddress
-                    });
-                demoLog.log('[INVITE_DEBUG v4] auto-mint local groupPasswordHash:', localHash);
-                demoLog.log('[INVITE_DEBUG v4] auto-mint on-chain groupPasswordHash:', onchainHash);
-                if (!localHash || String(localHash).toLowerCase() !== String(onchainHash).toLowerCase()) {
-                  throw new Error('Group password mismatch');
-                }
+            const onchainHash = await sbtMetadataReadsPort.getGroupPasswordHash('none', sbtAddr, currentSlug);
+            if (onchainHash && onchainHash !== ethers.constants.HashZero) {
+              walletScopeSbtAddress = cryptoUtils.resolveGroupPasswordWalletScopeAddress({
+                password,
+                sbtAddress: sbtAddr,
+                groupPasswordHash: onchainHash
+              });
+              const localHash = walletScopeSbtAddress === null
+                ? null
+                : sbtGroupMintAuthorizationPort.computeGroupPasswordHash({
+                    password,
+                    sbtAddress: walletScopeSbtAddress
+                  });
+              demoLog.log('[INVITE_DEBUG v4] auto-mint local groupPasswordHash:', localHash);
+              demoLog.log('[INVITE_DEBUG v4] auto-mint on-chain groupPasswordHash:', onchainHash);
+              if (!localHash || String(localHash).toLowerCase() !== String(onchainHash).toLowerCase()) {
+                throw new Error('Group password mismatch');
               }
-            } catch (hashErr) {
-              throw hashErr;
             }
             let maxTokens: any = null;
             try {
@@ -1780,7 +1841,7 @@ class OnePageSession extends Component<any, any> {
             for (let attempt = 0; attempt < maxAttempts; attempt++) {
               let mintedTokens: any = null;
               try {
-                mintedTokens = await contractScriptsAny.getMintedTokens('none', sbtAddr, currentSlug);
+                mintedTokens = await sbtMetadataReadsPort.getMintedTokens('none', sbtAddr, currentSlug);
               } catch (_) {
                 mintedTokens = null;
               }
@@ -1805,7 +1866,7 @@ class OnePageSession extends Component<any, any> {
               }
 
               const nonce = mintedBig.add(1).toString();
-              const invites = await contractScripts.generateInvitePayloads({
+              const invites = await sbtGroupMintAuthorizationPort.generateInvitePayloads({
                 password,
                 sbtAddress: sbtAddr,
                 nonces: [nonce],
@@ -1815,7 +1876,12 @@ class OnePageSession extends Component<any, any> {
               if (!payload) throw new Error('Failed to generate invite');
 
               try {
-                await contractScripts.claimWithInvite(this.props.provider, sbtAddr, payload.nonce, payload.signature);
+                await sbtMintExecutionPort.claimWithInvite(
+                  this.props.provider,
+                  sbtAddr,
+                  String(payload.nonce),
+                  String(payload.signature),
+                );
                 lastError = null;
                 break;
               } catch (err) {
@@ -1824,7 +1890,7 @@ class OnePageSession extends Component<any, any> {
 
               let mintedAfter: any = null;
               try {
-                mintedAfter = await contractScriptsAny.getMintedTokens('none', sbtAddr, currentSlug);
+                mintedAfter = await sbtMetadataReadsPort.getMintedTokens('none', sbtAddr, currentSlug);
               } catch (_) {
                 mintedAfter = null;
               }
@@ -1845,7 +1911,12 @@ class OnePageSession extends Component<any, any> {
               throw lastError;
             }
           } else {
-            await contractScripts.claimWithInvite(this.props.provider, sbtAddr, payload.nonce, payload.signature);
+            await sbtMintExecutionPort.claimWithInvite(
+              this.props.provider,
+              sbtAddr,
+              String(payload.nonce),
+              String(payload.signature),
+            );
           }
           this.consumeAutoMintAttempt(sbtAddr, userAddr);
           updateStatus(sbtKey, { status: 'success', name: `Joined: ${sbtName || 'Group'}` });
@@ -1900,7 +1971,7 @@ class OnePageSession extends Component<any, any> {
       throw new Error('Group password is required.');
     }
 
-    const onchain = await contractScriptsAny.getGroupPasswordHash('none', sbtAddress, resolveEffectiveSlug(this.props));
+    const onchain = await sbtMetadataReadsPort.getGroupPasswordHash('none', sbtAddress, resolveEffectiveSlug(this.props));
     if (!onchain || onchain === ethers.constants.HashZero) throw new Error('No group password set on-chain');
 
     const walletScopeSbtAddress = cryptoUtils.resolveGroupPasswordWalletScopeAddress({
@@ -1910,7 +1981,7 @@ class OnePageSession extends Component<any, any> {
     });
     const local = walletScopeSbtAddress === null
       ? null
-      : contractScriptsAny.computeGroupPasswordHash({
+      : sbtGroupMintAuthorizationPort.computeGroupPasswordHash({
           password: pw,
           sbtAddress: walletScopeSbtAddress
         });
@@ -1920,14 +1991,14 @@ class OnePageSession extends Component<any, any> {
 
     this.setState({ mintingStatus: 'pending', lastTransactionType: 'mint' });
 
-    const sig = await contractScriptsAny.signGroupMintAuthorization({
+    const sig = await sbtGroupMintAuthorizationPort.signGroupMintAuthorization({
       password: pw,
       sbtAddress,
-      userAddress: this.props.account,
+      userAddress: String(this.props.account || ''),
       walletScopeSbtAddress
     });
 
-    const tx = await contractScriptsAny.mintWithGroupSignature(this.props.provider, sbtAddress, sig);
+    const tx = await sbtMintExecutionPort.mintWithGroupSignature(this.props.provider, sbtAddress, String(sig || ''));
 
     this.setState({
       mintingStatus: 'success',
@@ -2291,16 +2362,6 @@ class OnePageSession extends Component<any, any> {
       !isDemoSlug ? styles.sectionsGridTwoUp : '',
     ].filter(Boolean).join(' ');
 
-    // Resolve first target group name (spinner if not ready)
-    const firstTargetAddrLower =
-      (this.state.autoMintTargets && this.state.autoMintTargets[0] && this.state.autoMintTargets[0].sbt)
-        ? this.state.autoMintTargets[0].sbt.toLowerCase()
-        : null;
-    const firstTargetName = firstTargetAddrLower ? this.state.sbtNames[firstTargetAddrLower] : null;
-
-    // Ensure close button is visible; prefer module class if present, else use existing global fallback
-    const alertCloseClass = styles.alertCloseButton || 'sbt-alert-close-btn';
-
     const fallbackSessionLabel = (slug && String(slug).trim()) ? String(slug).trim() : 'Session';
     const titleText = sessionName ? `${sessionName}` : fallbackSessionLabel;
     const renderSectionHeading = (title: any, subtitle: any) => (
@@ -2326,200 +2387,74 @@ class OnePageSession extends Component<any, any> {
       styles.titleContainer,
       pileSubmitRailActive ? styles.titleContainerWithPileSubmitRail : '',
     ].filter(Boolean).join(' ');
-    const telegramOnlySession = isTelegramOnlySessionConfig(resolvedSessionConfig);
+    const isTelegramSession = isOnePageTelegramBackendMode({
+      sessionConfig: resolvedSessionConfig,
+      telegramSessionMeta: this.state.telegramSessionMeta,
+      sessionSlug: displaySessionSlug,
+    });
 
-    if (telegramOnlySession) {
+    if (isTelegramSession) {
       return (
-        <div className={styles.onePageDemoContainer}>
-          <div className={styles.telegramOnlyShell}>
-            <div className={titleContainerClassName}>
-              <h2 className={styles.brandingSectionTitle}>{titleText}</h2>
-            </div>
-            <Alert
-              color="info"
-              className={styles.telegramOnlyNotice}
-              data-testid={E2E_TESTIDS.SESSION_TELEGRAM_ONLY_NOTICE}
-              fade={false}
-            >
-              <strong>Telegram-only session</strong>
-              <span>
-                This session is configured for Telegram bot and Mini App participation. Open it from the Telegram bot to answer questions or view Telegram-only results.
-              </span>
-            </Alert>
-          </div>
-        </div>
+        <OnePageSessionTelegramShell
+          account={this.props.account}
+          blockLimits={blockLimits}
+          contracts={contracts}
+          defaultTags={defaultTags}
+          disclaimersActive={this.state.disclaimersActive}
+          displaySessionSlug={displaySessionSlug}
+          filterState={this.state.filterState}
+          loginComplete={this.props.loginComplete}
+          network={this.props.network}
+          networkChainId={networkChainId}
+          provider={this.props.provider}
+          questionResponsesNonce={this.props.questionResponsesNonce}
+          questionScanProgress={this.props.questionScanProgress}
+          resultsViewMode={this.state.resultsViewMode}
+          sessionHeader={sessionHeader}
+          sessionInfo={sessionInfo}
+          sessionName={sessionName}
+          telegramAgentQuestions={this.state.telegramAgentQuestions || []}
+          telegramAgentQuestionsStatus={this.state.telegramAgentQuestionsStatus}
+          telegramAgentResults={this.state.telegramAgentResults}
+          telegramAgentResultsStatus={this.state.telegramAgentResultsStatus}
+          telegramClientEnvelope={this.state.telegramClientEnvelope}
+          telegramPolisDataset={this.state.telegramPolisDataset}
+          telegramQuestionPileIndex={this.state.telegramQuestionPileIndex}
+          telegramQuestionSubmitError={this.state.telegramQuestionSubmitError}
+          telegramSessionMeta={this.state.telegramSessionMeta}
+          telegramSubmittedQuestionIds={this.state.telegramSubmittedQuestionIds}
+          telegramSubmittingQuestionId={this.state.telegramSubmittingQuestionId}
+          titleText={titleText}
+          onLogout={this.handleTelegramLogout}
+          onOpenLoginModal={() => this.props.toggleLoginModal?.(true)}
+          onQuestionPileIndexChange={(telegramQuestionPileIndex: number) => this.setState({ telegramQuestionPileIndex })}
+          onRefresh={() => this.loadTelegramAgentData(true)}
+          onResultsModeChange={(resultsViewMode) => this.setState({ resultsViewMode })}
+          onSubmitAnswer={this.handleTelegramQuestionSubmit}
+        />
       );
     }
 
     return (
       <div className={styles.onePageDemoContainer}>
-        {/* Sticky banners */}
-        {this.state.needsLoginForAutoMint && (
-          <Alert
-            color="warning"
-            className={styles.sbtMintStatusItem}
-            data-testid={E2E_TESTIDS.SESSION_AUTO_MINT_LOGIN_BANNER}
-            style={{
-              position: 'sticky',
-              top: 0,
-              marginBottom: '12px',
-              fontWeight: '600',
-              fontSize: '1.5em'
-            }}
-            isOpen={!this.state.dismissedLoginBanner}
-            fade={false}
-            toggle={this.dismissLoginBanner}
-            closeClassName={alertCloseClass}
-          >
-            {`Login to Join ${t('sbt')}:`}&nbsp;
-            {firstTargetName
-              ? firstTargetName
-              : <FontAwesomeIcon icon={faSpinner} spin aria-label="loading group name" />}
-          </Alert>
-        )}
-
-        {this.state.autoMintCountdown !== null && (
-          <Alert
-            color='info'
-            className={styles.sbtMintStatusItem}
-            isOpen={true}
-            fade={false}
-            data-testid={E2E_TESTIDS.SESSION_AUTO_MINT_COUNTDOWN}
-            style={{ fontSize: '1.15rem', fontWeight: 600 }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span>
-                <FontAwesomeIcon icon={faSpinner} spin style={{ marginRight: '8px' }} />
-                Joining group in {this.state.autoMintCountdown}...
-              </span>
-              <button
-                className='btn btn-outline-light'
-                style={{ padding: '4px 16px', cursor: 'pointer', marginLeft: '12px', fontSize: '1rem' }}
-                onClick={this.cancelAutoMintCountdown}
-              >
-                Cancel
-              </button>
-            </div>
-          </Alert>
-        )}
-
-        {/* Per-SBT status sub-banners */}
-        {this.state.autoMintStatuses && Object.keys(this.state.autoMintStatuses).length > 0 && (
-          <div className={styles.sbtMintBannerContainer}>
-            {Object.entries(this.state.autoMintStatuses).map(([addrKey, v]: any) => {
-              const color =
-                v.status === 'success'
-                  ? 'success'
-                  : v.status === 'failed'
-                  ? 'danger'
-                  : v.status === 'skipped'
-                  ? 'secondary'
-                  : 'info';
-              const isOpen = !this.state.dismissedStatusItems[(addrKey || '').toLowerCase()];
-              const isExpanded = !!this.state.expandedImages[(addrKey || '').toLowerCase()];
-              const sbtImage = this.state.sbtImages[(addrKey || '').toLowerCase()];
-              const isTerminalError = !!(
-                v.error &&
-                /max(imum)?\s*(tokens?\s*)?mint|supply\s*exhaust|mint.*expir|period.*end|group\s*limit/i.test(v.error)
-              );
-
-              // Map status to icon
-              let statusIcon: any = null;
-              if (v.status === 'pending') statusIcon = <FontAwesomeIcon icon={faSpinner} spin />;
-              else if (v.status === 'success') statusIcon = <FontAwesomeIcon icon={faCheck} />;
-              else if (v.status === 'failed') statusIcon = <FontAwesomeIcon icon={faTimes} />;
-              else statusIcon = <FontAwesomeIcon icon={faQuestionCircle} />; // skipped/info
-
-              return (
-                <Alert
-                  key={addrKey}
-                  color={color}
-                  className={styles.sbtMintStatusItem}
-                  isOpen={isOpen}
-                  fade={false}
-                  data-testid={E2E_TESTIDS.SESSION_AUTO_MINT_STATUS}
-                  data-ce-sbt-address={(addrKey || '').toLowerCase() || undefined}
-                  data-ce-status={String(v.status || '').trim().toLowerCase() || undefined}
-                  toggle={() => this.dismissStatusItem(addrKey)}
-                  closeClassName={alertCloseClass}
-                  style={{ fontSize: '1.15rem', fontWeight: 600 }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      {statusIcon}
-                      <span>
-                        <a
-                          href={`${basePath}${buildSbtDetailPath(addrKey, effectiveSlug)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{ textDecoration: 'underline', color: 'inherit' }}
-                        >
-                          {v.name || addrKey}
-                        </a>
-                      </span>
-                      {sbtImage && (
-                        <button
-                          onClick={() => this.toggleStatusImagePreview(addrKey)}
-                          style={{
-                             background: 'none',
-                             border: 'none',
-                             cursor: 'pointer',
-                             opacity: 0.7,
-                             marginLeft: '5px',
-                             padding: '0 5px'
-                          }}
-                          title={isExpanded ? "Hide Preview" : "Show Preview"}
-                        >
-                          {sbtImage ? (
-                            <img
-                              src={sbtImage}
-                              alt={t('sbt')}
-                              loading="lazy"
-                              referrerPolicy="no-referrer"
-                              style={{
-                                height: '24px',
-                                width: '24px',
-                                borderRadius: '4px',
-                                objectFit: 'cover',
-                                verticalAlign: 'middle'
-                              }}
-                            />
-                          ) : (
-                            <FontAwesomeIcon icon={faImage} />
-                          )}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {v.error && <div style={{ fontSize: '0.9em', marginTop: '4px', marginLeft: '26px', fontWeight: 400 }}>{v.error}</div>}
-
-                  {v.status === 'failed' && !isTerminalError && (
-                    <div style={{ marginTop: '6px', marginLeft: '26px' }}>
-                      <button
-                        className="btn btn-sm btn-outline-dark"
-                        style={{ padding: '2px 10px', border: '1px solid rgba(0,0,0,0.2)', cursor: 'pointer' }}
-                        onClick={() => this.kickoffAutoMintIfNeeded()}
-                      >
-                        Retry
-                      </button>
-                    </div>
-                  )}
-
-                  {isExpanded && sbtImage && (
-                    <div style={{ marginTop: '10px', marginLeft: '26px' }}>
-                      <img
-                        src={sbtImage}
-                        alt={`${t('sbt')} Preview`}
-                        style={{ maxHeight: '100px', borderRadius: '4px', border: '1px solid rgba(0,0,0,0.1)' }}
-                      />
-                    </div>
-                  )}
-                </Alert>
-              );
-            })}
-          </div>
-        )}
+        <OnePageSessionAutoMintAlerts
+          autoMintCountdown={this.state.autoMintCountdown}
+          autoMintStatuses={this.state.autoMintStatuses || {}}
+          autoMintTargets={this.state.autoMintTargets || []}
+          basePath={basePath}
+          dismissedLoginBanner={this.state.dismissedLoginBanner}
+          dismissedStatusItems={this.state.dismissedStatusItems || {}}
+          effectiveSlug={effectiveSlug}
+          expandedImages={this.state.expandedImages || {}}
+          needsLoginForAutoMint={this.state.needsLoginForAutoMint}
+          sbtImages={this.state.sbtImages || {}}
+          sbtNames={this.state.sbtNames || {}}
+          onCancelAutoMintCountdown={this.cancelAutoMintCountdown}
+          onDismissLoginBanner={this.dismissLoginBanner}
+          onDismissStatusItem={this.dismissStatusItem}
+          onKickoffAutoMintIfNeeded={this.kickoffAutoMintIfNeeded}
+          onToggleStatusImagePreview={this.toggleStatusImagePreview}
+        />
 
         {/* Branding/header */}
         <div className={brandingSectionClassName}>

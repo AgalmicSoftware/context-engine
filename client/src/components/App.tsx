@@ -3,7 +3,7 @@ import React from "react";
 import { Routes, Route } from 'react-router-dom'
 import { Provider } from 'react-redux';
 import store from '../store.js';
-import { CE_ENABLE_WALLETCONNECT_FALLBACK, SERVER } from '../variables/appConfig.js';
+import { SERVER } from '../variables/appConfig.js';
 import { installCeAgent } from '../utilities/ceAgent.js';
 import { createLogger } from '../utilities/logging';
 import { syncPublicPageHead } from '../utilities/ui/publicPageHead.js';
@@ -12,7 +12,7 @@ import CEToaster from './Shared/CEToaster';
 import "assets/css/contextEngine.scss";
 
 import withRouter from "./HooksHOC/withRouterBridge";
-import MainSite from "./MainSite/MainSite";
+import AppShell from "./MainSite/AppShell";
 import AppErrorBoundary from './ErrorBoundary/AppErrorBoundary';
 import { readColdLoadOnboardingState } from './Onboarding/onboardingConfig.js';
 import { toastTheme } from '../utilities/ui/toastTheme.js';
@@ -20,33 +20,10 @@ import { toastTheme } from '../utilities/ui/toastTheme.js';
 import '@rainbow-me/rainbowkit/styles.css';
 
 import {
-  connectorsForWallets,
   RainbowKitProvider,
 } from '@rainbow-me/rainbowkit';
-import type { Wallet } from '@rainbow-me/rainbowkit';
-import {
-  metaMaskWallet,
-} from '@rainbow-me/rainbowkit/wallets';
-import { configureChains, createClient, createStorage, WagmiConfig } from 'wagmi';
-import { noopStorage } from '@wagmi/core';
-import { MetaMaskConnector } from 'wagmi/connectors/metaMask';
-import { goerli, localhost } from 'wagmi/chains';
-import {
-  mainnet,
-  base,
-  optimism,
-  arbitrum,
-  baseSepolia,
-  optimismSepolia,
-  arbitrumSepolia,
-} from '../variables/chains.js'
-import {
-  getFallbackRpcUrlForChain,
-  getPrimaryRpcUrlForChain,
-} from '../utilities/web3/rpcSelection.js';
-import { wrapEthersJsonRpcSend } from '../utilities/web3/rpcReadCache.js';
-import { wasUserExplicitlyDisconnected } from '../utilities/web3/wagmiDisconnectState.js';
-import { jsonRpcProvider } from 'wagmi/providers/jsonRpc';
+import { WagmiConfig } from 'wagmi';
+import { chains, wagmiClient } from '../app/runtime/appWagmiRuntime';
 
 const log = createLogger('general');
 
@@ -71,99 +48,6 @@ type ColdLoadSnapshot = {
   firstVisit: boolean;
   shouldStartOnboarding: boolean;
 };
-
-const buildBackoffJsonRpcProvider = (
-  providerKey: string,
-  resolveUrl: (chain: any) => string,
-): any => {
-  const baseProvider: any = jsonRpcProvider({
-    rpc: (chain: any) => {
-      const url = resolveUrl(chain);
-      return url ? { http: url } : null;
-    },
-  });
-
-  return (chain: any): any => {
-    const config = typeof baseProvider === 'function' ? baseProvider(chain) : null;
-    if (!config || typeof config.provider !== 'function') return config;
-    const selectedUrl = (
-      config?.chain?.rpcUrls?.default?.http?.[0]
-      || config?.chain?.rpcUrls?.public?.http?.[0]
-      || resolveUrl(chain)
-      || ''
-    );
-    return {
-      ...config,
-      provider: (): any => wrapEthersJsonRpcSend(config.provider() as any, {
-        chainId: Number(chain?.id || config?.chain?.id || 0) || 0,
-        providerKey,
-        providerLabel: providerKey,
-        url: selectedUrl,
-      }) as any,
-    };
-  };
-};
-
-const { chains, provider, webSocketProvider } = configureChains(
-  [
-    mainnet,
-    base,
-    optimism,
-    arbitrum,
-    baseSepolia,
-    optimismSepolia,
-    arbitrumSepolia,
-    goerli,
-    localhost,
-  ],
-  [
-    // NOTE: `publicProvider()` is intentionally not used here.
-    // We keep deterministic ordering by resolving primary/fallback RPC URLs ourselves
-    // (from chains.js + chain rpcUrls public/default lists) via jsonRpcProvider.
-    buildBackoffJsonRpcProvider('wagmi-primary', getPrimaryRpcUrlForChain),
-    buildBackoffJsonRpcProvider('wagmi-fallback', getFallbackRpcUrlForChain),
-  ]
-);
-
-const buildMetaMaskWallet = (): Wallet => {
-  const wallet = metaMaskWallet({ chains, shimDisconnect: true });
-  if (CE_ENABLE_WALLETCONNECT_FALLBACK) return wallet;
-
-  return {
-    ...wallet,
-    createConnector: () => ({
-      connector: new MetaMaskConnector({
-        chains,
-        options: { shimDisconnect: true },
-      }),
-    }),
-  };
-};
-
-const connectors = connectorsForWallets([
-  {
-    groupName: "Recommended",
-    wallets: [
-              buildMetaMaskWallet(),
-    ],
-  },]);
-
-const userExplicitlyDisconnected = wasUserExplicitlyDisconnected();
-const safeStorage = (() => {
-  try {
-    return window.localStorage;
-  } catch (_) {
-    return noopStorage;
-  }
-})();
-
-const wagmiClient = createClient({
-  autoConnect: !userExplicitlyDisconnected,
-  storage: createStorage({ storage: safeStorage }),
-  connectors,
-  provider,
-  webSocketProvider
-})
 
 let socket: unknown;
 let firstVisit = false;
@@ -380,7 +264,7 @@ class App extends React.Component<AppProps, AppState> {
               toastOptions={{ style: toastTheme }}
             />
             <Routes>
-              <Route path="*" element={<MainSite path={urlPath} {...siteProps} />} />
+              <Route path="*" element={<AppShell path={urlPath} {...siteProps} />} />
             </Routes>
             </AppErrorBoundary>
             </Provider>

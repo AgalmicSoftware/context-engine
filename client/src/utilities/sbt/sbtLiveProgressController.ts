@@ -3,7 +3,7 @@ import {
   mergeSbtLiveProgressEntry,
   SBT_PROGRESS_MIN_INTERVAL_MS,
   shouldCommitThrottledProgress,
-} from '../../components/MainSite/progressHelpers.js';
+} from '../session/mainSiteProgressHelpers.js';
 
 interface BuildSbtCountsInitialProgressOptions {
   startBlock?: unknown;

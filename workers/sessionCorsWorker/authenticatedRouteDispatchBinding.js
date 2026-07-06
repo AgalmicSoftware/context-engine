@@ -21,6 +21,8 @@ export const dispatchAuthenticatedRouteWithWorkerDeps = async ({
           checkRateLimit: deps?.checkRateLimit,
           getSessionSecrets: deps?.getSessionSecrets,
           json: deps?.json,
+          isAddress: deps?.isAddress,
+          getAddress: deps?.getAddress,
           transcribe: deps?.transcribe,
           arweaveUpload: deps?.arweaveUpload,
           storageRoute: deps?.storageRoute,

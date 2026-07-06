@@ -37,6 +37,22 @@ const mockEncryptWithPassword = jest.fn();
 const mockUploadDataToArweave = jest.fn();
 const mockBuildSignedBootstrapAdminAuth = jest.fn();
 const mockBuildSignedAdminActionAuth = jest.fn();
+const mockNormalizeWorkerUrl = jest.fn((url = '') => {
+  const raw = String(url || '').trim();
+  if (!raw || raw.startsWith('/')) return '';
+  const ensured = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+  try {
+    const parsed = new URL(ensured);
+    const path = parsed.pathname.replace(/\/+$/, '');
+    const suffixes = ['/auth/nonce', '/auth/login', '/arweave/upload'];
+    const stripped = suffixes.reduce((current, suffix) => (
+      current.toLowerCase().endsWith(suffix) ? current.slice(0, -suffix.length) : current
+    ), path);
+    return stripped && stripped !== '/' ? `${parsed.origin}${stripped}` : parsed.origin;
+  } catch {
+    return '';
+  }
+});
 const mockNormalizeSessionIdHex = jest.fn((value = '') => (
   String(value || '').trim() === 'edge-session-id' ? '0xedge-session-id' : ''
 ));
@@ -48,6 +64,7 @@ jest.mock('../../utilities/worker/corsProxy.js', () => ({
 }));
 
 jest.mock('../../utilities/worker/workerAuth.js', () => ({
+  normalizeWorkerUrl: (...args: any[]) => mockNormalizeWorkerUrl(...args),
   buildSignedBootstrapAdminAuth: (...args: any[]) => mockBuildSignedBootstrapAdminAuth(...args),
   buildSignedAdminActionAuth: (...args: any[]) => mockBuildSignedAdminActionAuth(...args),
 }));
@@ -73,7 +90,9 @@ jest.mock('../../utilities/web3/sessionRegistry.js', () => ({
     getAllSessionEntries: (...args: any[]) => mockGetAllSessionEntries(...args),
   },
   sessionRegistryUtils: {
+    fetchSessionFromRegistry: (...args: any[]) => mockFetchSessionFromRegistry(...args),
     normalizeSessionIdHex: (...args: any[]) => mockNormalizeSessionIdHex(...args),
+    upsertSessionRegistryCache: (...args: any[]) => mockUpsertSessionRegistryCache(...args),
   },
   upsertSessionRegistryCache: (...args: any[]) => mockUpsertSessionRegistryCache(...args),
 }));
@@ -144,6 +163,7 @@ const createDeferred = <T = any>(): Deferred<T> => {
 describe('SponsorPage', () => {
   const originalFetch = global.fetch;
   const originalCrypto = global.crypto;
+  const originalGetRandomValues = originalCrypto?.getRandomValues;
   let sessionEntries: any[];
 
   beforeEach(() => {
@@ -193,16 +213,30 @@ describe('SponsorPage', () => {
       audience: 'http://localhost',
       expiration: 4102444800,
     });
-    if (!global.crypto) (global as any).crypto = {};
-    (global.crypto as any).getRandomValues = jest.fn((buffer: any) => {
+    const fixtureCrypto = Object.create(originalCrypto || null);
+    fixtureCrypto.getRandomValues = jest.fn((buffer: any) => {
       for (let i = 0; i < buffer.length; i += 1) buffer[i] = i + 1;
       return buffer;
+    });
+    Object.defineProperty(global, 'crypto', {
+      configurable: true,
+      value: fixtureCrypto,
     });
   });
 
   afterEach(() => {
     global.fetch = originalFetch;
     global.crypto = originalCrypto;
+  });
+
+  it('uses an isolated deterministic random source for fixtures', () => {
+    expect(global.crypto).not.toBe(originalCrypto);
+    if (originalCrypto?.getRandomValues) {
+      expect(originalCrypto.getRandomValues).toBe(originalGetRandomValues);
+    }
+    const bytes = new Uint8Array(3);
+    global.crypto.getRandomValues(bytes);
+    expect(Array.from(bytes)).toEqual([1, 2, 3]);
   });
 
   it('renders paste-first credential inputs and lets the admin unlock the worker URL for editing', async () => {
@@ -260,6 +294,44 @@ describe('SponsorPage', () => {
     await waitFor(() => {
       expect(screen.getByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('edge');
     });
+  });
+
+  it('fetches a requested registry session that is missing from the local cache and selects it', async () => {
+    const otherConfig = buildSessionConfig({
+      slug: 'other',
+      sessionName: 'Other Session',
+      __registry: { sessionIdHex: '0xother-session-id' },
+    });
+    const fetchedConfig = buildSessionConfig({
+      sessionName: 'Fetched Edge Session',
+    });
+    sessionEntries = [['other', otherConfig]];
+    mockFetchSessionFromRegistry.mockResolvedValueOnce(fetchedConfig);
+    mockUpsertSessionRegistryCache.mockImplementationOnce(({ config }: any) => {
+      sessionEntries = [
+        ['other', otherConfig],
+        ['edge', config],
+      ];
+    });
+
+    await renderSponsorPage({
+      initialSessionId: 'edge-session-id',
+      initialRegistryChainId: 'chain-84532',
+    });
+
+    await waitFor(() => {
+      expect(mockFetchSessionFromRegistry).toHaveBeenCalledWith(expect.objectContaining({
+        chainId: 84532,
+        sessionId: '0xedge-session-id',
+        slug: '',
+        bootstrapRpc: true,
+      }));
+    });
+    expect(mockUpsertSessionRegistryCache).toHaveBeenCalledWith({ config: fetchedConfig });
+    await waitFor(() => {
+      expect(screen.getByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('edge');
+    });
+    expect(screen.getByRole('option', { name: 'Fetched Edge Session' })).toBeInTheDocument();
   });
 
   it('ignores late mount-time session loads after the page unmounts', async () => {
@@ -614,6 +686,23 @@ describe('SponsorPage', () => {
     expect(getFieldInputByLabel('Label')).toHaveValue('Repeatable sponsor bundle');
     expect(getFieldInputByLabel('OpenAI key')).toHaveValue('');
     expect(getFieldInputByLabel('Cloudflare API token')).toHaveValue('');
+  });
+
+  it('drops expired sponsor draft expiry values during restore', async () => {
+    localStorage.setItem('ce:sponsorPageDraft:v1', JSON.stringify({
+      v: 1,
+      persistBundleDraft: true,
+      bundleForm: {
+        label: 'Expired sponsor bundle',
+      },
+      expiresAt: '2000-01-01T00:00:00.000Z',
+    }));
+
+    await renderSponsorPage();
+
+    expect(await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('edge');
+    expect(getFieldInputByLabel('Label')).toHaveValue('Expired sponsor bundle');
+    expect(screen.getByTestId('ce-sponsor-expiry-input')).toHaveValue('');
   });
 
   it('redacts legacy sponsor draft caches that contain raw secrets', async () => {

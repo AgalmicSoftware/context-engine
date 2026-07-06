@@ -188,15 +188,39 @@ import SessionWizard from './SessionWizard';
 const SessionWizardComponent = SessionWizard as React.ComponentType<any>;
 const mockedBuildContractViewerContracts = buildContractViewerContracts as jest.Mock;
 
-const renderLoggedInSessionWizard = (props: Record<string, any> = {}) => render(
-  <SessionWizardComponent
-    network={{ id: 84532 }}
-    account={TEST_ADMIN_ADDRESS}
-    loginComplete
-    toggleLoginModal={jest.fn()}
-    {...props}
-  />
-);
+const commitSessionModeProfileGateIfPresent = () => {
+  if (screen.queryByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)) return;
+  let continueButton = screen.queryByTestId('ce-new-preset-continue') as HTMLButtonElement | null;
+  if (!continueButton) return;
+  if (continueButton.disabled) {
+    const preset = screen.queryByTestId('ce-new-preset-fast_cheap_cloudflare');
+    if (preset) {
+      act(() => {
+        fireEvent.click(preset);
+      });
+    }
+  }
+  continueButton = screen.queryByTestId('ce-new-preset-continue') as HTMLButtonElement | null;
+  if (continueButton && !continueButton.disabled) {
+    act(() => {
+      fireEvent.click(continueButton);
+    });
+  }
+};
+
+const renderLoggedInSessionWizard = (props: Record<string, any> = {}) => {
+  const view = render(
+    <SessionWizardComponent
+      network={{ id: 84532 }}
+      account={TEST_ADMIN_ADDRESS}
+      loginComplete
+      toggleLoginModal={jest.fn()}
+      {...props}
+    />
+  );
+  commitSessionModeProfileGateIfPresent();
+  return view;
+};
 const setControlledInputValue = (input: HTMLElement, value: string) => {
   const inputWithReactProps = input as any;
   const reactPropsKey = Object.keys(inputWithReactProps).find((key) => key.startsWith('__reactProps$'));

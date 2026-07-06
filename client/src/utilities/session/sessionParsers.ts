@@ -18,7 +18,7 @@ import { normalizeWorkerUrl } from '../worker/workerUrl.js';
 import type {
   LocalResourceOverrides,
   SessionIdentity,
-  SessionMetadata,
+  SessionMetadataRecord,
   SessionWorkerConfig,
   UnknownRecord,
 } from './sessionTypes.js';
@@ -29,7 +29,7 @@ type ParsedSessionIdentity = {
 } & SessionIdentity;
 type ParsedSessionMetadata = {
   ok: boolean;
-  metadata: SessionMetadata;
+  metadata: SessionMetadataRecord;
   errors: string[];
 };
 type ParsedWorkerConfig = {

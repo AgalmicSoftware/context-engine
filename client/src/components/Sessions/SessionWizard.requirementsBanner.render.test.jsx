@@ -72,9 +72,9 @@ describe('SessionWizard new-session requirements banner', () => {
     expect(
       screen.getByText(/in the meantime, you can get a sponsored session url by contacting/i)
     ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'contextengine@protonmail.com' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: '[redacted-email]' })).toHaveAttribute(
       'href',
-      'mailto:contextengine@protonmail.com'
+      'mailto:[redacted-email]'
     );
   });
 

@@ -120,6 +120,7 @@ type SbtFilterSelectionListKey = Exclude<keyof SbtFilterSelectionState, 'onlyVer
 type SbtFilterQuickChipKey = 'ir' | 'er' | 'ia' | 'ea' | 'ic' | 'ec' | 'ir2' | 'er2';
 type SbtFilterCallback = (result: unknown, filterState: SbtFilterSelectionState) => unknown;
 type SbtFilterProps = {
+  activeSessionSlug?: unknown;
   autoExpand?: unknown;
   buttonSurface?: unknown;
   defaultFeaturedSBTs?: unknown;
@@ -404,8 +405,6 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
         return false;
       }
 
-      this.setFilterLoading(true);
-
       if (this.isLatestApplyRun(effectiveRunId)) {
         this.setState(buildSbtFilterLastAppliedSnapshotPatch({ snapshot: newFilterSnapshot }));
       }
@@ -425,6 +424,8 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
         }
         return;
       }
+
+      this.setFilterLoading(true);
 
       const allSbtEntries = buildSbtFilterSelectedEntryList({
         selectedSBTGroupsCreator,
@@ -1233,6 +1234,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
     });
     const layoutDisplayState = resolveSbtFilterLayoutDisplayState();
     const sbtSelectorWarmStartProps = {
+      activeSessionSlug: this.props.activeSessionSlug,
       sessionSlug: this.props.sessionSlug,
       sessionConfig: this.props.sessionConfig,
       ensureLightSbtUniverse: this.props.ensureLightSbtUniverse,

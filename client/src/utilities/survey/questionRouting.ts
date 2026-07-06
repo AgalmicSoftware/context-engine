@@ -9,6 +9,7 @@ import { normalizeSessionSlug } from '../session/sessionNaming.js';
 import {
   SESSION_STORAGE_PAYLOAD_ACCESS_MODES,
   normalizeSessionStorageConfig,
+  normalizeSessionStoragePayloadAccessControl,
 } from '../storage/sessionStorageConfig.js';
 
 type SessionConfig = {
@@ -93,6 +94,12 @@ const normalizePayloadAccessModeValue = (value: unknown): string => {
 
 const readPayloadAccessMode = (value: unknown): string => {
   if (!isRecord(value)) return normalizePayloadAccessModeValue(value);
+  if (
+    Object.prototype.hasOwnProperty.call(value, 'gate') ||
+    Object.prototype.hasOwnProperty.call(value, 'encryption')
+  ) {
+    return normalizeSessionStoragePayloadAccessControl(value).mode;
+  }
   return normalizePayloadAccessModeValue(
     value.mode ??
     value.payloadAccessMode ??

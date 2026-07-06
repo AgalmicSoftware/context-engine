@@ -14,7 +14,7 @@ import { Button, Input } from 'reactstrap';
 
 import styles from './DocumentLibraryPanel.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { arweaveScripts } from '../../utilities/arweave/arweaveScripts.js';
+import { arweaveClient as arweaveScripts } from '../../utilities/arweave/arweaveClient.js';
 import { DOC_LIBRARY_DOC_ROLES } from '../../utilities/docLibrary/tags.js';
 import { getGlobalLitHooks, litStorage } from '../../utilities/crypto/litProtocol.js';
 import {

@@ -4,18 +4,18 @@ import {
   removeCache,
   writeCacheOptimistic,
 } from '../../utilities/cache/cacheScripts.js';
-import { DG_MANAGED_CACHE_NAMES } from '../../components/MainSite/cacheConstants.js';
+import { DG_MANAGED_CACHE_NAMES } from './sessionCacheConstants.js';
 import {
   evictOldDgEntries,
   removeDgMetaTimestamp,
   trimLargeArrays,
   updateDgMetaTimestamp,
-} from '../../components/MainSite/storageEviction.js';
+} from './sessionCacheEviction.js';
 import {
   bumpMainSitePerfCounter,
   getMainSitePerfNow,
   isMainSitePerfCountersEnabled,
-} from '../../components/MainSite/mainSiteUtils.js';
+} from '../session/mainSiteUtils.js';
 
 export interface MainSiteDgStorage {
   key: (name: string, slug: string) => string;

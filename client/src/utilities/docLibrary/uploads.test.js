@@ -12,13 +12,14 @@ import {
 const mockUploadDataToArweave = jest.fn();
 const mockDownloadDataFromArweave = jest.fn();
 
-jest.mock('../arweave/arweaveScripts.js', () => ({
-  arweaveScripts: {
+jest.mock('../arweave/arweaveClient.js', () => {
+  const arweaveClient = {
     uploadDataToArweave: (...args) => mockUploadDataToArweave(...args),
     downloadDataFromArweave: (...args) => mockDownloadDataFromArweave(...args),
     buildArweaveGatewayUrl: (txId, gateway = 'https://arweave.example.test') => `${gateway}/${txId}`,
-  },
-}));
+  };
+  return { arweaveClient, arweaveScripts: arweaveClient };
+});
 
 const ACCOUNT = '0x00000000000000000000000000000000000000aa';
 const CHAIN_ID = 84532;

@@ -54,7 +54,7 @@ jest.mock('./questionResponsesWatermark.js', () => ({
   resolvePersistedQuestionResponsesWatermark: jest.fn(),
 }));
 
-jest.mock('../../components/MainSite/progressHelpers.js', () => ({
+jest.mock('../session/mainSiteProgressHelpers.js', () => ({
   __esModule: true,
   shouldFlushCoalescedRun: jest.fn(),
 }));
@@ -74,7 +74,7 @@ const {
 } = require('./questionResponsesWatermark.js');
 const {
   shouldFlushCoalescedRun,
-} = require('../../components/MainSite/progressHelpers.js');
+} = require('../session/mainSiteProgressHelpers.js');
 
 const NETWORK_ID = '11155420';
 const SESSION_SLUG = 'alpha';

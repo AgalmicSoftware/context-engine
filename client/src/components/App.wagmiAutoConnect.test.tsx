@@ -50,7 +50,7 @@ const mockReadColdLoadOnboardingState = jest.fn((_storage?: Storage, _pathname?:
 const mockStoreDispatch = jest.fn();
 const mockSyncPublicPageHead = jest.fn();
 const mockToaster = jest.fn((_props?: any) => null);
-let MockMainSiteComponent: React.ComponentType<any> = () => null;
+let MockAppShellComponent: React.ComponentType<any> = () => null;
 let routeProps: any[] = [];
 let mockWalletConnectFallbackEnabled = false;
 
@@ -122,9 +122,9 @@ const mockAppDependencies = () => {
     __esModule: true,
     default: (Comp: React.ComponentType<any>) => Comp,
   }));
-  jest.doMock('./MainSite/MainSite', () => ({
+  jest.doMock('./MainSite/AppShell', () => ({
     __esModule: true,
-    default: (props: any) => <MockMainSiteComponent {...props} />,
+    default: (props: any) => <MockAppShellComponent {...props} />,
   }));
   jest.doMock('./Onboarding/onboardingConfig.js', () => ({
     readColdLoadOnboardingState: mockReadColdLoadOnboardingState,
@@ -204,7 +204,7 @@ describe('App wagmi auto-connect persistence', () => {
     sessionStorage.clear();
     window.history.replaceState({}, '', '/');
     routeProps = [];
-    MockMainSiteComponent = () => null;
+    MockAppShellComponent = () => null;
     mockWalletConnectFallbackEnabled = false;
     mockCreateClient.mockImplementation(() => ({}));
     mockConfigureChains.mockImplementation(buildMockConfigureChainsResult);
@@ -340,7 +340,7 @@ describe('App wagmi auto-connect persistence', () => {
     );
   });
 
-  it('passes firstVisit to MainSite during the initial render', () => {
+  it('passes firstVisit to AppShell during the initial render', () => {
     const { default: App } = loadAppModule();
 
     render(
@@ -443,7 +443,7 @@ describe('App wagmi auto-connect persistence', () => {
     expect(mockSyncPublicPageHead).toHaveBeenLastCalledWith();
   });
 
-  it('re-renders MainSite with the browser path after direct history.replaceState updates', () => {
+  it('re-renders AppShell with the browser path after direct history.replaceState updates', () => {
     const { default: App } = loadAppModule();
 
     render(
