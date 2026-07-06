@@ -239,6 +239,11 @@ import {
   buildSurveyResultsHtmlReportDownloadExecutionPlan,
 } from './surveyResultsHtmlReportDownloadRequest';
 import {
+  buildSurveyResultsHtmlReportParticipantCount,
+  buildSurveyResultsHtmlReportQuestionsForExport,
+  buildSurveyResultsHtmlReportResponseCountsByQuestion,
+} from './surveyResultsHtmlReportDataModel';
+import {
   buildSurveyResultsHtmlReportModalProps,
 } from './surveyResultsHtmlReportModalProps';
 import {
@@ -313,7 +318,6 @@ import {
   type SessionResultsExportFormat,
   type SessionResultsGeneratedAnalysisArtifact,
   type SessionResultsHtmlSnapshot,
-  type SessionResultsReportQuestion,
   type SessionResultsSectionSelection,
 } from '../../utilities/sessionResultsExport';
 import type { SurveyResultsDisplayPanelsArgs } from './SurveyResultsDisplayPanels';
@@ -2506,77 +2510,30 @@ return chainId ? `Chain ${chainId}` : '';
 };
 
 const getHtmlReportResponseCountsByQuestion = (): Map<string, number> => {
-const counts = new Map<string, number>();
-const addCount = (questionId: unknown, amount = 1): void => {
-  const normalized = String(questionId || '').trim().toLowerCase();
-  if (!normalized) return;
-  counts.set(normalized, (counts.get(normalized) || 0) + amount);
-};
-
-if (stateRef.current.viewMode === 'survey' && stateRef.current.surveyViewMode === 'individuals') {
-  const filteredResponses = Array.isArray(stateRef.current.sbtFilteredResponses)
-    ? stateRef.current.sbtFilteredResponses as SurveyResultsResponseListEntry[]
-    : [];
-  filteredResponses.forEach((responseRow) => {
-    const parsedResponse = parseResponse(responseRow.response) as SurveyResultsSurveyResponsePayload | null;
-    const responseRows = Array.isArray(parsedResponse?.responses) ? parsedResponse.responses : [];
-    responseRows.forEach((answer) => {
-      addCount(getResponseQuestionId(answer));
-    });
-  });
-  return counts;
-}
-
-const aggregator = toSurveyResultsRecord(stateRef.current.sbtFilteredAggregatorQuestionResponses);
-Object.entries(aggregator).forEach(([questionId, rows]) => {
-  addCount(questionId, Array.isArray(rows) ? rows.length : 0);
+return buildSurveyResultsHtmlReportResponseCountsByQuestion({
+  aggregatorQuestionResponses: stateRef.current.sbtFilteredAggregatorQuestionResponses,
+  filteredResponses: stateRef.current.sbtFilteredResponses,
+  getResponseQuestionId: (answer) => getResponseQuestionId(toSurveyResultsRecord(answer) as SurveyResultsResponseRecord),
+  parseResponse,
+  surveyViewMode: stateRef.current.surveyViewMode,
+  viewMode: stateRef.current.viewMode,
 });
-return counts;
 };
 
 const getHtmlReportParticipantCount = (): number => {
-const participants = new Set<string>();
-const addParticipant = (value: unknown): void => {
-  if (typeof value === 'string' && value.trim()) {
-    participants.add(value.trim().toLowerCase());
-    return;
-  }
-  const record = toSurveyResultsRecord(value);
-  const address = String(record.address || record.walletAddress || '').trim();
-  if (address) participants.add(address.toLowerCase());
-};
-
-if (stateRef.current.viewMode === 'survey' && stateRef.current.surveyViewMode === 'individuals') {
-  const filteredResponses = Array.isArray(stateRef.current.sbtFilteredResponses)
-    ? stateRef.current.sbtFilteredResponses as SurveyResultsResponseListEntry[]
-    : [];
-  filteredResponses.forEach((responseRow) => addParticipant(responseRow.responder));
-  return participants.size;
-}
-
-const aggregator = toSurveyResultsRecord(stateRef.current.sbtFilteredAggregatorQuestionResponses);
-Object.values(aggregator).forEach((rows) => {
-  if (!Array.isArray(rows)) return;
-  rows.forEach((row) => addParticipant((toSurveyResultsRecord(row)).responder));
+return buildSurveyResultsHtmlReportParticipantCount({
+  aggregatorQuestionResponses: stateRef.current.sbtFilteredAggregatorQuestionResponses,
+  filteredResponses: stateRef.current.sbtFilteredResponses,
+  surveyViewMode: stateRef.current.surveyViewMode,
+  viewMode: stateRef.current.viewMode,
 });
-return participants.size;
 };
 
-const getHtmlReportQuestionsForExport = (): SessionResultsReportQuestion[] => {
+const getHtmlReportQuestionsForExport = () => {
 const countsByQuestion = getHtmlReportResponseCountsByQuestion();
-return getFilteredQuestionsForExport().map((question) => {
-  const id = String(question.id || '').trim();
-  const countKey = id.toLowerCase();
-  return {
-    id,
-    prompt: String(question.prompt || '').trim(),
-    type: String(question.type || '').trim(),
-    tags: Array.isArray(question.tags) ? question.tags.map((tag) => String(tag || '').trim()).filter(Boolean) : [],
-    options: Array.isArray(question.options)
-      ? question.options.map((option) => String(option || '').trim()).filter(Boolean)
-      : [],
-    responseCount: countsByQuestion.get(countKey) || 0,
-  };
+return buildSurveyResultsHtmlReportQuestionsForExport({
+  filteredQuestions: getFilteredQuestionsForExport(),
+  responseCountsByQuestion: countsByQuestion,
 });
 };
 
