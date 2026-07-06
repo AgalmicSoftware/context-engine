@@ -310,6 +310,9 @@ import {
   isSurveyResultsDemoQuestionResultsContext,
 } from './surveyResultsDemoQuestionFallback';
 import {
+  createSurveyResultsInstanceFields,
+} from './surveyResultsInstanceFields';
+import {
   surveyResultsCachePort,
 } from '../../domains/surveys/surveyResultsCachePort';
 import {
@@ -845,98 +848,6 @@ type SurveyResultsInstanceFields = {
   csvFileName: string;
 };
 
-const createSurveyResultsInstanceFields = (): SurveyResultsInstanceFields => ({
-  _syncLoadingStartedAt: null,
-  _scrollMutationObserver: null,
-  _scrollToQuestionRetryTimer: null,
-  _isMounted: false,
-  _questionFilterQuestionsMemo: {
-      questionResponsesRef: null,
-      networkQuestionsRef: null,
-      questionResponsesNonceKey: null,
-      questionsCacheNonceKey: null,
-      result: [],
-    },
-  _questionTableEntriesMemo: {
-      questionMapRef: null,
-      networkQuestionsRef: null,
-      sortBy: '',
-      sortAsc: true,
-      result: [],
-    },
-  _lockedResponsesModelMemo: {
-      viewMode: '',
-      surveyViewMode: '',
-      responsesRef: null,
-      aggregatorRef: null,
-      questionLookupRef: null,
-      overridesRef: null,
-      slug: '',
-      result: {
-        lockedRows: [],
-        lockedCount: 0,
-        gateDetails: [],
-        hasGenericGateMessage: false,
-      },
-    },
-  _lastLocalStoragePollCoarseSignature: '',
-  _lastLocalStoragePollDetailedSignature: '',
-  _lastPolledQuestionsRef: null,
-  _lastPolledSurveyResponsesRef: null,
-  _lastPolledQuestionRefVersion: 0,
-  _lastPolledSurveyResponsesRefVersion: 0,
-  _pollQuestionCountMemo: {
-      questionsRef: null,
-      count: 0,
-    },
-  _scopedQuestionNetworkDataSyncMemo: {
-      viewMode: '',
-      netIdStr: '',
-      slugsKey: '',
-      bucketRefs: [],
-      result: EMPTY_SCOPED_QUESTION_NETWORK_DATA,
-    },
-  _pollSurveyResponsesCountMemo: {
-      surveyId: '',
-      responsesRef: null,
-      count: 0,
-    },
-  _nonceTickInFlight: false,
-  _nonceTickQueued: false,
-  _pollLatestBlockFetchInFlight: false,
-  _pollLatestBlockLastAttemptAt: 0,
-  _responseParseMemo: new Map(),
-  _surveyModeSourceSignature: '',
-  _surveyModeSourceCoarseSignature: '',
-  _surveyModeSourcePayloadRefSignature: '',
-  _surveyModeSourceCacheNonce: 0,
-  _individualResponsesAggregatorMemo: {
-      responsesRef: null,
-      result: {},
-    },
-  _aggregatorEntriesMemo: {
-      aggregatorRef: null,
-      entries: [],
-    },
-  _polisQuestionResponsesMemo: {
-      selected: false,
-      sourceRef: null,
-      result: null,
-    },
-  _effectiveSlugScanMemo: {
-      surveyId: '',
-      nonceKey: '',
-      slug: '',
-    },
-  _surveysCacheChangeNonce: 0,
-  _unsubscribeCacheUpdates: null,
-  _lastNotifiedFilterStateSignature: null,
-  _pendingFilterLoadingValue: null,
-  _bookmarkFeedbackTimer: null,
-  _stableFallbackQuestions: null,
-  csvFileName: '',
-});
-
 const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
   const [state, dispatch] = useReducer(surveyResultsReducer, props, createInitialSurveyResultsState);
   const stateRef = useRef(state);
@@ -947,7 +858,7 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
   const questionFilterRef = useRef<QuestionFilterHandle>(null);
   const instRef = useRef<SurveyResultsInstanceFields | null>(null);
   if (instRef.current === null) {
-    instRef.current = createSurveyResultsInstanceFields();
+    instRef.current = createSurveyResultsInstanceFields() as SurveyResultsInstanceFields;
   }
   const inst = instRef.current;
   const pendingSetStateCallbacksRef = useRef<VoidFunction[]>([]);
