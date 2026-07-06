@@ -35,6 +35,7 @@ test('collectNodeTestFiles includes static, script, and e2e helper tests when pr
     writeFile(rootDir, 'tests/root/private-runtime.private.test.mjs');
     writeFile(rootDir, 'scripts/pre-push-guard.test.js');
     writeFile(rootDir, 'scripts/verify-test-wiring.test.js');
+    writeFile(rootDir, 'scripts/verify-public-release-pii.test.js');
     writeFile(rootDir, 'scripts/run-node-tests.test.js');
     writeFile(rootDir, 'scripts/lib/e2e/tx.test.js');
     writeFile(rootDir, 'scripts/lib/e2e/network-default-consumers.test.js');
@@ -51,6 +52,7 @@ test('collectNodeTestFiles includes static, script, and e2e helper tests when pr
       'tests/root/private-runtime.private.test.mjs',
       path.join('scripts', 'pre-push-guard.test.js'),
       path.join('scripts', 'run-node-tests.test.js'),
+      path.join('scripts', 'verify-public-release-pii.test.js'),
       path.join('scripts', 'verify-test-wiring.test.js'),
       path.join('scripts', 'lib', 'e2e', 'network-default-consumers.test.js'),
       path.join('scripts', 'lib', 'e2e', 'tx.test.js'),
