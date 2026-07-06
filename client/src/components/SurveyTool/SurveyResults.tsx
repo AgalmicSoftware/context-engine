@@ -165,8 +165,11 @@ import {
   buildSurveyResultsDemoAnalysisArtifact,
 } from './surveyResultsDemoAnalysisArtifact.js';
 import {
+  buildSurveyResultsQuestionsCsvExport,
+  buildSurveyResultsQuestionsJsonExport,
   buildSurveyResultsExportBaseFileName,
   buildSurveyResultsExportControlsDisplayDescriptor,
+  buildSurveyResultsResponsesJsonExport,
 } from './surveyResultsExportPlans.js';
 import {
   buildSurveyResultsFilteredQuestionIdsForExport,
@@ -202,6 +205,7 @@ import {
 } from './surveyResultsAnalysisArtifactWriteController';
 import {
   buildSurveyResultsAnalysisGeneratedArtifactCompletionPlan,
+  runSurveyResultsAnalysisGeneratedArtifactCompletion,
   type SurveyResultsAnalysisGeneratedArtifactCompletionPlan,
 } from './surveyResultsAnalysisGeneratedArtifactCompletionPlan';
 import {
@@ -2538,30 +2542,24 @@ const {
   sbtFilteredAggregatorQuestionResponses,
 } = stateRef.current;
 
-const filteredQuestions = getFilteredQuestionsForExport();
-
-return JSON.stringify(
-  {
-    exportedAt: new Date().toISOString(),
-    sessionSlug: getEffectiveSlug() || '',
-    viewMode,
-    surveyViewMode,
-    surveyId: surveyId || null,
-    surveyTitle: surveyTitle || '',
+return buildSurveyResultsResponsesJsonExport({
     counts: {
       totalQuestions: totalQuestionsCount,
       filteredQuestions: filteredQuestionsCount,
       totalResponses: totalResponsesCount,
       filteredResponses: filteredResponsesCount,
     },
-    filterState: filterState || {},
-    filteredQuestions,
+    exportedAt: new Date().toISOString(),
     filteredQuestionResponses: sbtFilteredAggregatorQuestionResponses || {},
+    filteredQuestions: getFilteredQuestionsForExport(),
     filteredResponses: sbtFilteredResponses || [],
-  },
-  null,
-  2
-);
+    filterState: filterState || {},
+    sessionSlug: getEffectiveSlug() || '',
+    surveyId: surveyId || null,
+    surveyTitle: surveyTitle || '',
+    surveyViewMode,
+    viewMode,
+  });
 };
 
 const getFilteredQuestionIdsForExport = (): string[] => {
@@ -2594,26 +2592,22 @@ const {
   filterState,
 } = stateRef.current;
 
-return JSON.stringify(
-  {
-    exportedAt: new Date().toISOString(),
-    sessionSlug: getEffectiveSlug() || '',
-    viewMode,
-    surveyViewMode,
-    surveyId: surveyId || null,
-    surveyTitle: surveyTitle || '',
+return buildSurveyResultsQuestionsJsonExport({
     counts: {
       totalQuestions: totalQuestionsCount,
       filteredQuestions: filteredQuestionsCount,
       totalResponses: totalResponsesCount,
       filteredResponses: filteredResponsesCount,
     },
-    filterState: filterState || {},
+    exportedAt: new Date().toISOString(),
     filteredQuestions: getFilteredQuestionsForExport(),
-  },
-  null,
-  2
-);
+    filterState: filterState || {},
+    sessionSlug: getEffectiveSlug() || '',
+    surveyId: surveyId || null,
+    surveyTitle: surveyTitle || '',
+    surveyViewMode,
+    viewMode,
+  });
 };
 
 const generateQuestionsCSV = (): string => {
@@ -2628,20 +2622,7 @@ if (!filteredQuestions.length) {
   return '';
 }
 
-const header = '"questionID","prompt","type","tags","options"\n';
-const csvRows = filteredQuestions.map((question) => {
-  const tags = Array.isArray(question?.tags) ? question.tags.join(';') : '';
-  const options = Array.isArray(question?.options) ? question.options.join(';') : '';
-  return [
-    `"${String(question?.id || '').replace(/"/g, '""')}"`,
-    `"${String(question?.prompt || '').replace(/"/g, '""')}"`,
-    `"${String(question?.type || '').replace(/"/g, '""')}"`,
-    `"${String(tags).replace(/"/g, '""')}"`,
-    `"${String(options).replace(/"/g, '""')}"`,
-  ].join(',');
-});
-
-return header + csvRows.join('\n');
+return buildSurveyResultsQuestionsCsvExport(filteredQuestions);
 };
 
 const getHtmlReportChainId = (): number | null => {
@@ -3247,6 +3228,7 @@ if (!lifecycleResult.shouldGenerate) {
 try {
   const missingSections = analysisLifecyclePlan.missingSections;
   let completionPlan: SurveyResultsAnalysisGeneratedArtifactCompletionPlan | null = null;
+  let completionLifecyclePatch: unknown = null;
   for (let index = 0; index < missingSections.length; index += 1) {
     const section = missingSections[index];
     const label = HTML_REPORT_ANALYSIS_SECTION_LABELS[section];
@@ -3283,17 +3265,22 @@ try {
       requestedSections: analysisLifecyclePlan.sectionsToGenerate,
       slug: getSessionResultsAnalysisCacheSlug(),
     });
-    if (!completionPlan.usable) {
-      throw new Error(`Generated analysis artifact completion failed: ${completionPlan.blockedReason}`);
+    const completionResult = await runSurveyResultsAnalysisGeneratedArtifactCompletion({
+      plan: completionPlan,
+      ports: {
+        writeArtifactToCache: writeSessionResultsAnalysisArtifactToCache,
+      },
+    });
+    if (!completionResult.ok) {
+      if (completionResult.error instanceof Error) throw completionResult.error;
+      throw new Error(completionResult.errorMessage);
     }
-    if (completionPlan.shouldWriteCache && completionPlan.cacheWriteDescriptor) {
-      await writeSessionResultsAnalysisArtifactToCache(completionPlan.cacheWriteDescriptor.payload);
-    }
+    completionLifecyclePatch = completionResult.lifecyclePatchDescriptor;
   }
-  if (!completionPlan?.lifecyclePatchDescriptor) {
+  if (!completionPlan || !completionLifecyclePatch) {
     throw new Error('Generated analysis artifact completion did not produce a lifecycle patch.');
   }
-  setState(asSurveyResultsStatePatch(completionPlan.lifecyclePatchDescriptor));
+  setState(asSurveyResultsStatePatch(completionLifecyclePatch));
 } catch (error) {
   surveyLog.error('[SurveyResults.generateHtmlReportAnalysisViews] Failed to generate analysis:', error);
   runSurveyResultsAnalysisLifecycleController({

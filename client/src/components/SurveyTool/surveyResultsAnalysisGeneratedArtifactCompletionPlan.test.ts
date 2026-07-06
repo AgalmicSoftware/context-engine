@@ -1,5 +1,6 @@
 import {
   buildSurveyResultsAnalysisGeneratedArtifactCompletionPlan,
+  runSurveyResultsAnalysisGeneratedArtifactCompletion,
 } from './surveyResultsAnalysisGeneratedArtifactCompletionPlan';
 import type {
   SessionResultsAnalysisSectionKey,
@@ -171,5 +172,115 @@ describe('surveyResultsAnalysisGeneratedArtifactCompletionPlan', () => {
     expect(plan.cacheWriteBlockedReason).toBe('missing-cache-key');
     expect(plan.cacheWriteDescriptor).toBeNull();
     expect(plan.lifecyclePatchDescriptor?.htmlReportAnalysisArtifact).toBe(artifact);
+  });
+
+  it('runs cache write before returning lifecycle completion eligibility', async () => {
+    const artifact = createArtifact('runner-input');
+    const events: string[] = [];
+    const plan = buildSurveyResultsAnalysisGeneratedArtifactCompletionPlan({
+      artifact,
+      cacheKey: 'sessionResultsAnalysis:v1:OP Sepolia:runner-input',
+      inputSignature: 'runner-input',
+      requestedSections,
+      slug: 'runner-session',
+    });
+
+    const result = await runSurveyResultsAnalysisGeneratedArtifactCompletion({
+      plan,
+      ports: {
+        writeArtifactToCache: async (payload) => {
+          events.push(`write:${payload.inputSignature}`);
+        },
+      },
+    });
+
+    expect(events).toEqual(['write:runner-input']);
+    expect(result).toEqual(expect.objectContaining({
+      cacheWriteAttempted: true,
+      cacheWriteSucceeded: true,
+      error: null,
+      errorMessage: '',
+      ok: true,
+    }));
+    expect(result.lifecyclePatchDescriptor?.htmlReportAnalysisArtifact).toBe(artifact);
+  });
+
+  it('does not write cache or expose lifecycle completion for unusable plans', async () => {
+    const plan = buildSurveyResultsAnalysisGeneratedArtifactCompletionPlan({
+      artifact: null,
+      inputSignature: 'missing-input',
+      requestedSections,
+      slug: 'missing-session',
+    });
+    const writes: SessionResultsGeneratedAnalysisArtifact[] = [];
+
+    const result = await runSurveyResultsAnalysisGeneratedArtifactCompletion({
+      plan,
+      ports: {
+        writeArtifactToCache: (payload) => {
+          writes.push(payload);
+        },
+      },
+    });
+
+    expect(writes).toEqual([]);
+    expect(result.ok).toBe(false);
+    expect(result.errorMessage).toBe('Generated analysis artifact completion failed: missing-artifact');
+    expect(result.lifecyclePatchDescriptor).toBeNull();
+  });
+
+  it('allows display-only lifecycle completion when cache identity is unavailable', async () => {
+    const artifact = createArtifact('display-only-runner');
+    const plan = buildSurveyResultsAnalysisGeneratedArtifactCompletionPlan({
+      artifact,
+      cacheKey: '',
+      inputSignature: 'display-only-runner',
+      requestedSections,
+      slug: 'display-session',
+    });
+
+    const result = await runSurveyResultsAnalysisGeneratedArtifactCompletion({
+      plan,
+      ports: {
+        writeArtifactToCache: () => {
+          throw new Error('should not write');
+        },
+      },
+    });
+
+    expect(result.cacheWriteAttempted).toBe(false);
+    expect(result.cacheWriteSucceeded).toBe(false);
+    expect(result.ok).toBe(true);
+    expect(result.lifecyclePatchDescriptor?.htmlReportAnalysisArtifact).toBe(artifact);
+  });
+
+  it('blocks lifecycle completion when cache write fails', async () => {
+    const artifact = createArtifact('cache-failure');
+    const error = new Error('cache unavailable');
+    const plan = buildSurveyResultsAnalysisGeneratedArtifactCompletionPlan({
+      artifact,
+      cacheKey: 'sessionResultsAnalysis:v1:OP Sepolia:cache-failure',
+      inputSignature: 'cache-failure',
+      requestedSections,
+      slug: 'cache-failure-session',
+    });
+
+    const result = await runSurveyResultsAnalysisGeneratedArtifactCompletion({
+      plan,
+      ports: {
+        writeArtifactToCache: () => {
+          throw error;
+        },
+      },
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      cacheWriteAttempted: true,
+      cacheWriteSucceeded: false,
+      error,
+      errorMessage: 'Generated analysis artifact completion cache write failed.',
+      lifecyclePatchDescriptor: null,
+      ok: false,
+    }));
   });
 });

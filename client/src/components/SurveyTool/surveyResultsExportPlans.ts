@@ -3,6 +3,38 @@ export type SurveyResultsExportOption = {
   value: string;
 };
 
+type SurveyResultsJsonExportCounts = {
+  filteredQuestions?: unknown;
+  filteredResponses?: unknown;
+  totalQuestions?: unknown;
+  totalResponses?: unknown;
+};
+
+export type SurveyResultsQuestionsJsonExportArgs = {
+  counts?: SurveyResultsJsonExportCounts;
+  exportedAt?: unknown;
+  filteredQuestions?: unknown;
+  filterState?: unknown;
+  sessionSlug?: unknown;
+  surveyId?: unknown;
+  surveyTitle?: unknown;
+  surveyViewMode?: unknown;
+  viewMode?: unknown;
+};
+
+export type SurveyResultsResponsesJsonExportArgs = SurveyResultsQuestionsJsonExportArgs & {
+  filteredQuestionResponses?: unknown;
+  filteredResponses?: unknown;
+};
+
+export type SurveyResultsQuestionCsvExportRecord = {
+  id?: unknown;
+  options?: unknown;
+  prompt?: unknown;
+  tags?: unknown;
+  type?: unknown;
+};
+
 export const SURVEY_RESULTS_EXPORT_TYPES = Object.freeze({
   CSV_QUESTIONS: 'csv-questions',
   CSV_QUESTIONS_AND_RESPONSES: 'csv-questions-and-responses',
@@ -255,3 +287,75 @@ export const buildSurveyResultsExportBaseFileName = ({
 
   return questionsOnly ? 'contextEngine_filteredQuestions' : 'contextEngine_questionResults';
 };
+
+const quoteCsvCell = (value: unknown): string => (
+  `"${String(value !== undefined && value !== null ? value : '').replace(/"/g, '""')}"`
+);
+
+export const buildSurveyResultsQuestionsCsvExport = (
+  filteredQuestions: readonly SurveyResultsQuestionCsvExportRecord[] = []
+): string => {
+  const header = '"questionID","prompt","type","tags","options"\n';
+  const csvRows = filteredQuestions.map((question) => {
+    const tags = Array.isArray(question?.tags) ? question.tags.join(';') : '';
+    const options = Array.isArray(question?.options) ? question.options.join(';') : '';
+    return [
+      quoteCsvCell(question?.id),
+      quoteCsvCell(question?.prompt),
+      quoteCsvCell(question?.type),
+      quoteCsvCell(tags),
+      quoteCsvCell(options),
+    ].join(',');
+  });
+
+  return header + csvRows.join('\n');
+};
+
+const buildCommonSurveyResultsJsonExport = ({
+  counts = {},
+  exportedAt = '',
+  filteredQuestions = [],
+  filterState = {},
+  sessionSlug = '',
+  surveyId = null,
+  surveyTitle = '',
+  surveyViewMode = '',
+  viewMode = '',
+}: SurveyResultsQuestionsJsonExportArgs = {}) => ({
+  exportedAt,
+  sessionSlug: String(sessionSlug || ''),
+  viewMode,
+  surveyViewMode,
+  surveyId: surveyId || null,
+  surveyTitle: surveyTitle || '',
+  counts: {
+    totalQuestions: counts.totalQuestions,
+    filteredQuestions: counts.filteredQuestions,
+    totalResponses: counts.totalResponses,
+    filteredResponses: counts.filteredResponses,
+  },
+  filterState: filterState || {},
+  filteredQuestions,
+});
+
+export const buildSurveyResultsQuestionsJsonExport = (
+  args: SurveyResultsQuestionsJsonExportArgs = {}
+): string => JSON.stringify(
+  buildCommonSurveyResultsJsonExport(args),
+  null,
+  2
+);
+
+export const buildSurveyResultsResponsesJsonExport = ({
+  filteredQuestionResponses = {},
+  filteredResponses = [],
+  ...args
+}: SurveyResultsResponsesJsonExportArgs = {}): string => JSON.stringify(
+  {
+    ...buildCommonSurveyResultsJsonExport(args),
+    filteredQuestionResponses: filteredQuestionResponses || {},
+    filteredResponses: filteredResponses || [],
+  },
+  null,
+  2
+);
