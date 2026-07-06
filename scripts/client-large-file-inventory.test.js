@@ -31,7 +31,7 @@ const LARGE_CLIENT_FILE_BASELINE = Object.freeze({
   'client/src/components/OnePageSession/OnePageSession.tsx': 2897,
   'client/src/components/SurveyTool/surveyToolHydrationFlow.ts': 2840,
   'client/src/components/SurveyTool/SurveyPileViewMode.tsx': 3020,
-  'client/src/utilities/arweave/arweaveScripts.js': 2703,
+  'client/src/utilities/arweave/arweaveClient.js': 2698,
   'client/src/utilities/web3/sessionRegistry.ts': 2571,
   'client/src/components/SBTs/SBTSelector.tsx': 2267,
   'client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.tsx': 2114,

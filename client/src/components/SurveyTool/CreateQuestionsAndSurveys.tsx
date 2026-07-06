@@ -27,7 +27,7 @@ import {
   faQuestionCircle
 } from '@fortawesome/free-solid-svg-icons';
 import styles from './CreateQuestionsAndSurveys.module.scss';
-import { arweaveScripts } from '../../utilities/arweave/arweaveScripts';
+import { arweaveClient as arweaveScripts } from '../../utilities/arweave/arweaveClient';
 import CETooltip from '../Shared/CETooltip';
 import CEConfirmDialog from '../Shared/CEConfirmDialog';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';

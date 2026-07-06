@@ -9,7 +9,7 @@ import styles from './DocumentLibraryPanel.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { DOC_LIBRARY_ARWEAVE_GATEWAYS } from '../../variables/arweaveGateways.js';
 
-import { arweaveScripts } from '../../utilities/arweave/arweaveScripts.js';
+import { arweaveClient as arweaveScripts } from '../../utilities/arweave/arweaveClient.js';
 import {
   buildSbtAccessControlConditions,
   getUnsupportedLitContractAccessControlError,

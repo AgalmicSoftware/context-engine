@@ -56,14 +56,15 @@ jest.mock('../../utilities/crypto/cryptography.js', () => ({
   },
 }));
 
-jest.mock('../../utilities/arweave/arweaveScripts.js', () => ({
-  arweaveScripts: {
+jest.mock('../../utilities/arweave/arweaveClient.js', () => {
+  const arweaveClient = {
     uploadDataToArweave: jest.fn(),
     downloadDataFromArweave: jest.fn(),
     readArweaveWalletBalance: (...args) => mockReadArweaveWalletBalance(...args),
     formatWinstonToAr: (...args) => mockFormatWinstonToAr(...args),
-  },
-}));
+  };
+  return { arweaveClient, arweaveScripts: arweaveClient };
+});
 
 jest.mock('../../utilities/crypto/encryptedFields.js', () => ({
   encryptedFieldsUtils: {
