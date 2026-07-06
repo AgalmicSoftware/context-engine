@@ -310,6 +310,10 @@ import {
   buildSurveyResultsLocalStoragePollPatchPlan,
 } from './surveyResultsLocalStoragePollDecision';
 import {
+  buildSurveyResultsDemoSurfaceProps,
+  createSurveyResultsDemoSurfaceParentProps,
+} from './surveyResultsDemoSurfaceProps';
+import {
   createSurveyResultsQueuedRefreshRuntime,
   type SurveyResultsQueuedRefreshRuntime,
 } from '../../domains/surveys/surveyResultsQueuedRefreshRuntime';
@@ -4509,29 +4513,17 @@ const displayPanelsProps: SurveyResultsDisplayPanelsArgs = {
   trailingLabelStyle: SURVEY_RESULTS_TRAILING_LABEL_STYLE,
   viewMode,
 };
-const demoSurfaceProps = isDemoAlternateResultsView
-  ? {
-      activeSlug: slug,
-      atlasNodeId: stateRef.current.demoResultsAtlasNodeId,
-      defaultTags: propsRef.current.defaultTags,
-      filterState: propsRef.current.filterState || stateRef.current.filterState,
-      isQuestionCacheReady: propsRef.current.isQuestionCacheReady,
-      isResponsesCacheReady: propsRef.current.isResponsesCacheReady,
-      network: propsRef.current.network,
-      networkChainId: propsRef.current.networkChainId,
-      onAtlasModalClose: handleDemoAtlasModalClose,
-      onAtlasNodeOpen: handleDemoAtlasOpen,
-      questionResponses: getMemoizedPolisQuestionResponses(
-        true,
-        stateRef.current.viewMode === 'survey' && stateRef.current.surveyViewMode === 'individuals'
-          ? getMemoizedIndividualsAggregator(stateRef.current.sbtFilteredResponses)
-          : (stateRef.current.sbtFilteredAggregatorQuestionResponses || {})
-      ),
-      questionResponsesNonce: propsRef.current.questionResponsesNonce,
-      questionScanProgress: propsRef.current.questionScanProgress,
-      viewKey: demoResultsViewMode,
-    }
-  : null;
+const demoSurfaceProps = buildSurveyResultsDemoSurfaceProps({
+  activeSlug: slug,
+  getIndividualsAggregator: getMemoizedIndividualsAggregator,
+  getPolisQuestionResponses: getMemoizedPolisQuestionResponses,
+  isDemoAlternateResultsView,
+  onAtlasModalClose: handleDemoAtlasModalClose,
+  onAtlasNodeOpen: handleDemoAtlasOpen,
+  parentProps: createSurveyResultsDemoSurfaceParentProps(propsRef.current),
+  state: stateRef.current,
+  viewKey: demoResultsViewMode,
+});
 
 return (
   <SurveyResultsReportSurface
