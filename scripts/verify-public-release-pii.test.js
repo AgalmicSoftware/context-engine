@@ -37,6 +37,8 @@ test('verify-public-release-pii passes clean text while warning on public 0x val
       '# Fixture',
       'Published contract: 0x1111111111111111111111111111111111111111',
       'API_TOKEN=REPLACE_WITH_PUBLIC_TOKEN',
+      'const AgentTokenPanel = ({ agentTokenStatus }) => agentTokenStatus;',
+      'const tokenType = "session_jwt";',
       '',
     ].join('\n'));
 
@@ -50,12 +52,17 @@ test('verify-public-release-pii passes clean text while warning on public 0x val
 
 test('verify-public-release-pii fails emails, home paths, secrets, PEMs, and private keys', () => {
   withFixture((rootDir) => {
+    const email = `owner${'@'}example.test`;
+    const homePath = `/${'Us'}ers/alice/project/context-engine`;
+    const privateKeyPemHeader = `-----BEGIN ${'PRIVATE KEY'}-----`;
+    const privateKeyHex = `0x${'abcdef'.repeat(10)}abcd`;
+
     writeFile(rootDir, 'docs/leak.md', [
-      'Contact owner@example.test',
-      'Local path: /Users/alice/project/context-engine',
+      `Contact ${email}`,
+      `Local path: ${homePath}`,
       'SECRET_TOKEN=super-secret-value-12345',
-      '-----BEGIN PRIVATE KEY-----',
-      'privateKey: "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd"',
+      privateKeyPemHeader,
+      `privateKey: "${privateKeyHex}"`,
       '',
     ].join('\n'));
 

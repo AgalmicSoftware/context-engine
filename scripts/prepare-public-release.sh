@@ -162,6 +162,64 @@ fs.writeFileSync(packageJsonPath, `${JSON.stringify(packageJson, null, 2)}\n`);
 NODE
 }
 
+scrub_public_pii_text() {
+  if ! command -v node >/dev/null 2>&1; then
+    printf 'node is required to scrub public PII text.\n' >&2
+    return 1
+  fi
+
+  node - "$STAGING_ROOT" <<'NODE'
+const fs = require('node:fs');
+const path = require('node:path');
+
+const rootDir = path.resolve(process.argv[2]);
+const skipDirs = new Set(['.git', 'node_modules', 'build', 'dist', 'coverage']);
+const emailRe = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/ig;
+const homePathRe = /(?:^|[\s"'(=:{])((?:\/Users|\/home)\/[A-Za-z0-9._-]+(?:\/[^\s"'`<>\\)]*)?)/g;
+
+function isProbablyBinary(buffer) {
+  if (buffer.includes(0)) return true;
+  const sampleLength = Math.min(buffer.length, 4096);
+  if (sampleLength === 0) return false;
+
+  let controlBytes = 0;
+  for (let index = 0; index < sampleLength; index += 1) {
+    const byte = buffer[index];
+    if ((byte < 8) || (byte > 13 && byte < 32)) controlBytes += 1;
+  }
+  return controlBytes > Math.max(8, sampleLength * 0.02);
+}
+
+function scrubFile(absolutePath) {
+  const buffer = fs.readFileSync(absolutePath);
+  if (isProbablyBinary(buffer)) return;
+
+  const original = buffer.toString('utf8');
+  const scrubbed = original
+    .replace(emailRe, '[redacted-email]')
+    .replace(homePathRe, (match, homePath) => match.replace(homePath, '/redacted-home'));
+
+  if (scrubbed !== original) {
+    fs.writeFileSync(absolutePath, scrubbed);
+  }
+}
+
+function walk(absoluteDir) {
+  for (const entry of fs.readdirSync(absoluteDir, { withFileTypes: true })) {
+    const absolutePath = path.join(absoluteDir, entry.name);
+    if (entry.isDirectory()) {
+      if (skipDirs.has(entry.name)) continue;
+      walk(absolutePath);
+      continue;
+    }
+    if (entry.isFile()) scrubFile(absolutePath);
+  }
+}
+
+walk(rootDir);
+NODE
+}
+
 if [ "$OUTPUT_ABS" = "$REPO_ROOT" ]; then
   printf 'Refusing to overwrite the repo root.\n' >&2
   exit 1
@@ -333,6 +391,7 @@ while IFS= read -r path; do
 done < "$MATCHED_PATHS_FILE"
 
 scrub_public_package_json
+scrub_public_pii_text
 
 (
   cd "$STAGING_ROOT"
