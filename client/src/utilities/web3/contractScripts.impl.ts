@@ -44,7 +44,6 @@ import {
   resolveArweaveUploadOpts,
 } from '../arweave/arweaveUploadHelpers.js';
 import { validateNoLockedPlaintextInPayload } from '../arweave/noLeakPayloads.js';
-import { getGlobalLitHooks } from '../crypto/litProtocol.js';
 import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
 import { normalizeAddress } from './addressNormalization.js';
@@ -104,6 +103,12 @@ import { createContractHelperMethods } from './contractHelpers.js';
 import { createContractEventListenerMethods } from './contractEventListeners.js';
 import { createContractProfileMethods } from './contractProfile.js';
 import { createContractScriptsEventScanMethods } from './contractScriptsEventScans.js';
+import {
+  buildArweaveReadModeTag,
+  buildDecryptModeTag,
+  buildFailureModeTag,
+  createContractScriptsMetadataResolutionHelpers,
+} from './contractScriptsMetadataResolution.js';
 import {
   getReadProviderForGroup,
   getReadProviderForSession,
@@ -170,7 +175,6 @@ import {
   extractChainId,
 } from './contractScripts.corePureHelpers.js';
 import {
-  coerceStringArray,
   normalizeConvictionImportance,
   normalizeQuestionFlags,
 } from './contractScripts.payloadNormalizers.js';
@@ -282,127 +286,7 @@ const RPC_STATS_MAX = 200;
 /* ------------------------------------------------------------------ */
 
 const MAX_CACHE_SIZE = 500;
-/** @type {Map<string, any>} */
-const _encryptedValueCache = new Map();
-/** @type {Set<string>} */
-const _decryptFailureLogCache = new Set();
-
-const toLower = (val: any) => toStr(val).trim().toLowerCase();
-const isObj = (val: any) => !!val && typeof val === 'object' && !Array.isArray(val);
-
-const getLitGetKey = (ctx: any = {}) => {
-  if (ctx?.litOpts && typeof ctx.litOpts.getKey === 'function') return ctx.litOpts.getKey;
-  if (ctx?.litHooks && typeof ctx.litHooks.getKey === 'function') return ctx.litHooks.getKey;
-  if (ctx?.lit && typeof ctx.lit.getKey === 'function') return ctx.lit.getKey;
-  return null;
-};
-
-const buildDecryptContextTag = (ctx: any = {}) => {
-  const account = normalizeAddress(ctx?.account || '');
-  const providerLike = toLower(ctx?.providerLike || '');
-  const chainId = Number(ctx?.chainId || 0) || 0;
-  const hasLitGetKey = !!getLitGetKey(ctx);
-  const preferLitRecipients = ctx?.preferLitRecipients ? '1' : '0';
-  return `${account}|${providerLike}|${chainId}|lit:${hasLitGetKey ? '1' : '0'}|litFirst:${preferLitRecipients}`;
-};
-
-const resolveDefaultProviderLike = () => {
-  try {
-    const state = store?.getState ? store.getState() : null;
-    const fromStore = toStr(state?.profile?.provider || '').trim();
-    if (fromStore) return fromStore;
-  } catch (err: any) {
-    contractsLog.debug('resolveDefaultProviderLike error:', err);
-  }
-  if (typeof window !== 'undefined') {
-    if (window.__passkeyEoaProvider && window.__passkeyEoaProvider.isPasskeyEoa) return 'passkey_eoa';
-    if (window.ethereum) return 'wagmi';
-    if (window.web3authProvider) return 'web3auth';
-  }
-  // Default to the embedded passkey EOA because passkey auth is the primary wallet path.
-  return 'passkey_eoa';
-};
-
-const classifyDecryptFailure = (err: any, ctx: any = {}) => {
-  const msg = toLower(err?.message || err?.reason || '');
-  if (!ctx?.chainId) return 'missing-chain';
-  if (!ctx?.providerLike) return 'missing-provider';
-  if (!ctx?.account) return 'missing-account';
-  if (!getLitGetKey(ctx)) return 'missing-lit-hooks';
-  if (
-    msg.includes('access control') ||
-    msg.includes('unable to unwrap cek') ||
-    msg.includes('not authorized') ||
-    msg.includes('unauthorized') ||
-    msg.includes('auth sig')
-  ) {
-    return 'acc-failed';
-  }
-  if (
-    msg.includes('wrong chain') ||
-    msg.includes('wrong network') ||
-    msg.includes('chain mismatch')
-  ) {
-    return 'wrong-chain';
-  }
-  return 'decrypt-failed';
-};
-
-const getDecryptFailureMessage = (reason: any) => {
-  switch (reason) {
-    case 'missing-chain':
-      return 'Missing chainId for decrypt context.';
-    case 'missing-provider':
-      return 'Missing provider for decrypt context.';
-    case 'missing-account':
-      return 'Missing account for decrypt context.';
-    case 'missing-lit-hooks':
-      return 'Missing Lit hooks for decrypt context.';
-    case 'acc-failed':
-      return 'Lit access control check failed.';
-    case 'wrong-chain':
-      return 'Decrypt attempted on the wrong network.';
-    case 'decrypt-failed':
-      return 'Encrypted payload failed integrity checks.';
-    default:
-      return 'Unknown decrypt failure.';
-  }
-};
-
-const buildDecryptFailureResult = (reason: any, err: any = null) => {
-  let type = 'unknown';
-  let retryable = false;
-  switch (reason) {
-    case 'missing-chain':
-    case 'missing-provider':
-    case 'missing-account':
-    case 'missing-lit-hooks':
-      type = 'key_unavailable';
-      retryable = true;
-      break;
-    case 'acc-failed':
-      type = 'lit_failure';
-      break;
-    case 'wrong-chain':
-      type = 'network';
-      retryable = true;
-      break;
-    case 'decrypt-failed':
-      type = 'aes_integrity';
-      break;
-    default:
-      type = 'unknown';
-      break;
-  }
-  return {
-    value: null,
-    error: {
-      type,
-      message: err?.message || err?.reason || getDecryptFailureMessage(reason),
-      retryable,
-    },
-  };
-};
+const isObj = (val: unknown): val is Record<string, unknown> => !!val && typeof val === 'object' && !Array.isArray(val);
 
 const isRetryableSurveyResponseReadError = (error: any) => {
   if (!error) return false;
@@ -550,511 +434,7 @@ const getSurveysReadProviderForSession = (groupKeyOrCfg: any, cfg: any, chainId:
   getReadProviderForChain(chainId)
 );
 
-const logDecryptFailure = (reason: any, err: any, meta: any = {}, ctx: any = {}) => {
-  const key = `${reason}|${meta?.field || ''}|${meta?.slug || ''}|${meta?.questionId || ''}|${buildDecryptContextTag(ctx)}`;
-  if (_decryptFailureLogCache.has(key)) return;
-  if (_decryptFailureLogCache.size >= MAX_CACHE_SIZE) {
-    const oldest = _decryptFailureLogCache.values().next().value;
-    _decryptFailureLogCache.delete(oldest);
-  }
-  _decryptFailureLogCache.add(key);
-  contractsLog.debug('[decrypt] question metadata decrypt skipped', {
-    reason,
-    field: meta?.field || undefined,
-    questionId: meta?.questionId || undefined,
-    slug: meta?.slug || undefined,
-    chainId: ctx?.chainId || undefined,
-    hasAccount: !!ctx?.account,
-    providerLike: ctx?.providerLike || undefined,
-    hasLitGetKey: !!getLitGetKey(ctx),
-    error: err?.message || undefined,
-  });
-};
-
-const getDecryptContext = (groupCfg: any = null, context: any = null) => {
-  const ctxIn = isObj(context) ? context : {};
-  let account = String(ctxIn.account || '').trim();
-  let providerLike = toStr(ctxIn.providerLike || ctxIn.provider || '').trim();
-  let chainId = Number(ctxIn.chainId || 0) || null;
-  try {
-    const state = store?.getState ? store.getState() : null;
-    if (!account) account = state?.profile?.account || '';
-    if (!providerLike) providerLike = toStr(state?.profile?.provider || '').trim();
-    if (!chainId) chainId = state?.profile?.network?.id || state?.profile?.network?.chainId || null;
-  } catch (err: any) {
-    contractsLog.debug('getDecryptContext error:', err);
-  }
-  if (!providerLike) providerLike = resolveDefaultProviderLike();
-
-  const groupChainId = Number(groupCfg?.networkChainId || 0) || undefined;
-  if (groupChainId) chainId = groupChainId;
-
-  const litHooks = ctxIn.litHooks || ctxIn.lit || getGlobalLitHooks();
-  const litGetKey =
-    (ctxIn.litOpts && typeof ctxIn.litOpts.getKey === 'function')
-      ? ctxIn.litOpts.getKey
-      : (litHooks && typeof litHooks.getKey === 'function' ? litHooks.getKey : null);
-
-  const litOpts = litGetKey
-    ? {
-        ...(isObj(ctxIn.litOpts) ? ctxIn.litOpts : {}),
-        getKey: litGetKey,
-      }
-    : null;
-
-  return { account, providerLike, chainId, litOpts, litHooks };
-};
-
-const decryptEnvelopeCached = async (envelopeJson: any, ctx: any, meta: any = {}) => {
-  if (!envelopeJson) return { value: null, error: null };
-  const key = typeof envelopeJson === 'string'
-    ? envelopeJson
-    : JSON.stringify(envelopeJson || {});
-  const cacheKey = `${buildDecryptContextTag(ctx)}::${key}`;
-  if (_encryptedValueCache.has(cacheKey)) return _encryptedValueCache.get(cacheKey);
-  const hasLitGetKey = !!getLitGetKey(ctx);
-  const hasSignerCtx = !!(ctx?.account && ctx?.providerLike);
-  if (!ctx || (!hasSignerCtx && !hasLitGetKey)) {
-    const reason = classifyDecryptFailure(null, ctx || {});
-    logDecryptFailure(reason, null, meta, ctx);
-    return buildDecryptFailureResult(reason);
-  }
-  if (!ctx?.account) {
-    // Lit ACC evaluation and self EIP-712 unwrapping both require a requester/account.
-    // Avoid expensive (and guaranteed-to-fail) decrypt attempts during logged-out cache hydration.
-    const reason = 'missing-account';
-    logDecryptFailure(reason, null, meta, ctx);
-    return buildDecryptFailureResult(reason);
-  }
-  if (!ctx?.chainId) {
-    const reason = 'missing-chain';
-    logDecryptFailure(reason, null, meta, ctx);
-    return buildDecryptFailureResult(reason);
-  }
-  if (!ctx?.providerLike && !hasLitGetKey) {
-    const reason = 'missing-provider';
-    logDecryptFailure(reason, null, meta, ctx);
-    return buildDecryptFailureResult(reason);
-  }
-  try {
-    const value = await cryptoUtils.decryptEnvelopeValue(envelopeJson, {
-      account: ctx.account,
-      chainId: ctx.chainId,
-      providerLike: ctx.providerLike,
-      litOpts: ctx.litOpts || undefined,
-      preferLitRecipients: !!ctx.preferLitRecipients,
-    });
-    if (_encryptedValueCache.size >= MAX_CACHE_SIZE) {
-      const oldest = _encryptedValueCache.keys().next().value;
-      _encryptedValueCache.delete(oldest);
-    }
-    const result: any = { value, error: null };
-    _encryptedValueCache.set(cacheKey, result);
-    return result;
-  } catch (err: any) {
-    const reason = classifyDecryptFailure(err, ctx);
-    logDecryptFailure(reason, err, meta, ctx);
-    contractsLog.debug('decryptEnvelopeCached error:', err?.message || err);
-    return buildDecryptFailureResult(reason, err);
-  }
-};
-
-const shouldPreferLitRecipientsForPayload = (payload: any, ctx: any) => {
-  const accountLower = toLower(ctx?.account || '');
-  const creatorLower = normalizeAddress(payload?.creator || payload?.creatorAddress || '');
-  return !!(
-    accountLower &&
-    creatorLower &&
-    accountLower !== creatorLower &&
-    getLitGetKey(ctx)
-  );
-};
-
-/* ------------------------------------------------------------------ */
-/* 1c. Gate-aware decrypt gating (avoid noisy Lit decrypt attempts)     */
-/* ------------------------------------------------------------------ */
-
-// Cache whether a given account satisfies a given SBT gate (TTL-based).
-// This is used to skip Lit decrypt attempts when we already know the viewer
-// cannot satisfy the access control conditions.
-const SBT_GATE_ACCESS_TTL_MS = 30000;
-// Throttle for RPC/unknown failures so we don't hammer providers when the network is flaky.
-const SBT_GATE_ACCESS_ERROR_TTL_MS = 3000;
-/** @type {Map<string, { ts: number, value: boolean }>} */
-const _sbtGateAccessCache = new Map();
-/** @type {Map<string, { ts: number }>} */
-const _sbtGateAccessErrorCache = new Map();
-/** @type {Map<string, Promise<boolean|null>>} */
-const _sbtGateAccessInFlight = new Map();
-
-const normalizeGateMode = (gate: any = {}) => {
-  try {
-    if (gate && gate.requireAll === true) return 'all';
-    const raw = toLower(gate?.mode || gate?.operator || gate?.gateMode || gate?.require || '');
-    if (raw === 'all' || raw === 'and' || raw === '1') return 'all';
-  } catch (err: any) {
-    contractsLog.debug('normalizeGateMode error:', err);
-  }
-  return 'any';
-};
-
-const getGateSbtAddresses = (gate: any = {}) => {
-  const out: any[] = [];
-  const seen = new Set();
-  const push = (addr: any) => {
-    try {
-      if (!ethers.utils.isAddress(addr)) return;
-      const lower = normalizeAddress(addr);
-      if (seen.has(lower)) return;
-      seen.add(lower);
-      out.push(lower);
-    } catch (err: any) {
-      contractsLog.debug('getGateSbtAddresses error:', err);
-    }
-  };
-  try {
-    if (Array.isArray(gate?.sbtAddresses)) gate.sbtAddresses.forEach(push);
-    if (gate?.sbtAddress) push(gate.sbtAddress);
-  } catch (err: any) {
-    contractsLog.debug('getGateSbtAddresses error:', err);
-  }
-  return out;
-};
-
-const extractSbtGateFromAccConditions = (accessControlConditions: any) => {
-  const conds = Array.isArray(accessControlConditions) ? accessControlConditions : [];
-  if (!conds.length) return null;
-
-  const sbtAddresses: any[] = [];
-  const seen = new Set();
-  const operators = new Set();
-
-  conds.forEach((entry: any) => {
-    if (!entry) return;
-
-    const op = entry?.operator;
-    if (op) {
-      const normalized = String(op).trim().toLowerCase();
-      if (normalized === 'and' || normalized === 'or') operators.add(normalized);
-      return;
-    }
-
-    if (typeof entry !== 'object') return;
-    const method = String(entry.method || '').trim().toLowerCase();
-    if (method !== 'balanceof') return;
-
-    const addr = String(entry.contractAddress || '').trim();
-    if (!ethers.utils.isAddress(addr)) return;
-
-    // Keep this conservative: only treat standard "balanceOf(:userAddress) > 0" as an SBT gate.
-    const params = Array.isArray(entry.parameters) ? entry.parameters : [];
-    const hasUserParam = params.some((p: any) => String(p || '').trim() === ':userAddress');
-    if (!hasUserParam) return;
-    const cmp = String(entry?.returnValueTest?.comparator || '').trim();
-    const val = String(entry?.returnValueTest?.value || '').trim();
-    if (cmp && cmp !== '>') return;
-    if (val && val !== '0') return;
-
-    const lower = normalizeAddress(addr);
-    if (seen.has(lower)) return;
-    seen.add(lower);
-    sbtAddresses.push(lower);
-  });
-
-  if (!sbtAddresses.length) return null;
-  const mode = operators.has('and') ? 'all' : 'any';
-  // Mixed boolean logic isn't expected for our SBT gates; treat as unknown to avoid false positives.
-  if (operators.has('and') && operators.has('or')) return null;
-  return { sbtAddresses, mode };
-};
-
-const extractSbtGatesFromEnvelope = (envelopeJson: any) => {
-  if (!envelopeJson) return [];
-  let env;
-  try {
-    env = typeof envelopeJson === 'string' ? JSON.parse(envelopeJson) : (envelopeJson || null);
-  } catch (err: any) {
-    contractsLog.debug('extractSbtGatesFromEnvelope error:', err);
-    return [];
-  }
-  const recipients = Array.isArray(env?.recipients) ? env.recipients : [];
-  const out: any[] = [];
-  const dedupe = new Set();
-
-  recipients.forEach((r: any) => {
-    if (!r || r.type !== 'lit-sbt-v1' || !isObj(r.lit)) return;
-    const gate = extractSbtGateFromAccConditions(r.lit.accessControlConditions);
-    if (!gate) return;
-    const sig = `${gate.mode}:${gate.sbtAddresses.map((a: any) => a.toLowerCase()).sort().join('|')}`;
-    if (dedupe.has(sig)) return;
-    dedupe.add(sig);
-    out.push({ ...gate });
-  });
-
-  return out;
-};
-
-const extractSbtGatesFromEncryptionMeta = (payload: any = {}) => {
-  const enc = isObj(payload?.encryption) ? payload.encryption : null;
-  if (!enc || enc.enabled === false) return [];
-
-  const gates = Array.isArray(enc.gates)
-    ? enc.gates.filter(Boolean)
-    : (isObj(enc.gate) ? [enc.gate] : []);
-  if (!gates.length) return [];
-
-  const out: any[] = [];
-  const dedupe = new Set();
-  gates.forEach((gate: any) => {
-    if (!gate || typeof gate !== 'object') return;
-    const sbtAddresses = getGateSbtAddresses(gate);
-    if (!sbtAddresses.length) return;
-    const mode = normalizeGateMode(gate);
-    const sig = `${mode}:${sbtAddresses.map((a: any) => a.toLowerCase()).sort().join('|')}`;
-    if (dedupe.has(sig)) return;
-    dedupe.add(sig);
-    out.push({ sbtAddresses, mode });
-  });
-  return out;
-};
-
-const checkAccountSatisfiesSbtGate = async ({ account, chainId, gate, groupKeyOrCfg }: any = {}) => {
-  const acct = normalizeAddress(account || '');
-  if (!acct || !ethers.utils.isAddress(acct)) return false;
-  const sbtAddresses = Array.isArray(gate?.sbtAddresses) ? gate.sbtAddresses : [];
-  if (!sbtAddresses.length) return false;
-  const mode = gate?.mode === 'all' ? 'all' : 'any';
-  const normalizedSbtAddresses = sbtAddresses.map((a: any) => normalizeAddress(a)).filter(Boolean);
-  if (!normalizedSbtAddresses.length) return false;
-  const addressesKey = normalizedSbtAddresses.slice().sort().join('|');
-  const cacheKey = `${acct}:${String(chainId || '')}:${mode}:${addressesKey}`;
-
-  const cached = _sbtGateAccessCache.get(cacheKey);
-  if (cached) {
-    const ts = Number(cached.ts || 0);
-    if (ts && (Date.now() - ts) < SBT_GATE_ACCESS_TTL_MS) return !!cached.value;
-    _sbtGateAccessCache.delete(cacheKey);
-  }
-  const errCached = _sbtGateAccessErrorCache.get(cacheKey);
-  if (errCached) {
-    const ts = Number(errCached.ts || 0);
-    if (ts && (Date.now() - ts) < SBT_GATE_ACCESS_ERROR_TTL_MS) return null;
-    _sbtGateAccessErrorCache.delete(cacheKey);
-  }
-  const inflight = _sbtGateAccessInFlight.get(cacheKey);
-  if (inflight) return await inflight;
-
-  const run = (async () => {
-    try {
-      const checks = await Promise.all(
-        normalizedSbtAddresses.map((addr: any) =>
-          // Reads only; uses group-aware chain provider resolution.
-          contractScripts.userHasSBT('none', addr, acct, 0, 'latest', groupKeyOrCfg)
-        )
-      );
-      const has = mode === 'all' ? checks.every(Boolean) : checks.some(Boolean);
-      _sbtGateAccessCache.set(cacheKey, { ts: Date.now(), value: has });
-      _sbtGateAccessErrorCache.delete(cacheKey);
-      return has;
-    } catch (error: unknown) {
-      contractsLog.debug('checkAccountSatisfiesSbtGate error:', error);
-      // Unknown (RPC/etc) - do not overwrite the last known value; just throttle retries briefly.
-      _sbtGateAccessErrorCache.set(cacheKey, { ts: Date.now() });
-      return null;
-    }
-  })();
-
-  _sbtGateAccessInFlight.set(cacheKey, run);
-  try {
-    return await run;
-  } finally {
-    if (_sbtGateAccessInFlight.get(cacheKey) === run) {
-      _sbtGateAccessInFlight.delete(cacheKey);
-    }
-  }
-};
-
-const shouldAttemptGateDecrypt = async ({ payload, encryptedFields, ctx, groupKeyOrCfg }: any = {}) => {
-  // 1) Creator can always decrypt via self recipient; skip gate checks.
-  const accountLower = toLower(ctx?.account || '');
-  const creatorLower = normalizeAddress(payload?.creator || payload?.creatorAddress || '');
-  if (accountLower && creatorLower && accountLower === creatorLower) return true;
-
-  // 2) Non-creator decrypt requires Lit hooks.
-  if (!getLitGetKey(ctx)) return false;
-
-  const chainId = Number(ctx?.chainId || 0) || null;
-
-  // Prefer explicit encryption metadata (gates) when present.
-  let gates = extractSbtGatesFromEncryptionMeta(payload);
-
-  // Fallback: parse any provided envelope(s) to recover Lit ACC gates.
-  if (!gates.length) {
-    const list = Array.isArray(encryptedFields) ? encryptedFields : [];
-    for (const field of list) {
-      const extracted = extractSbtGatesFromEnvelope(field);
-      if (extracted.length) {
-        gates = extracted;
-        break;
-      }
-    }
-  }
-
-  // NOTE: Gate pre-check currently only understands our SBT-style gates. If/when we add other
-  // access-control gate types, update the gate extraction + check logic here.
-  // Backward compat: if we can't parse an SBT gate, fall back to attempting decrypt. This preserves
-  // legacy/non-SBT Lit ACC formats; we just can't pre-check them here.
-  if (!gates.length) return true;
-
-  let hasUnknownGate = false;
-  for (const gate of gates) {
-    // eslint-disable-next-line no-await-in-loop
-    const ok = await checkAccountSatisfiesSbtGate({
-      account: ctx?.account,
-      chainId,
-      gate,
-      groupKeyOrCfg,
-    });
-    if (ok === true) return true;
-    if (ok == null) hasUnknownGate = true;
-  }
-
-  // If we couldn't verify gate membership (RPC errors), fall back to attempting decrypt rather than
-  // incorrectly treating "unknown" as "denied". Decrypt/Lit-level caches already throttle failures.
-  return hasUnknownGate;
-};
-
-const maybeDecryptSurveyPayload = async (surveyData: any, groupKeyOrCfg: any, opts: any = {}) => {
-  if (!surveyData || typeof surveyData !== 'object') return surveyData;
-  const encryptedTitle = surveyData.titleEncrypted || surveyData.encryptedTitle || null;
-  const encryptedDocs = surveyData.documentURLsEncrypted || surveyData.docUrlsEncrypted || null;
-  if (!encryptedTitle && !encryptedDocs) return surveyData;
-
-  const cfg = memoizedResolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
-  const ctx = getDecryptContext(cfg, opts.decryptContext || null);
-  const decryptCtx = shouldPreferLitRecipientsForPayload(surveyData, ctx)
-    ? { ...ctx, preferLitRecipients: true }
-    : ctx;
-
-  const shouldAttempt = await shouldAttemptGateDecrypt({
-    payload: surveyData,
-    encryptedFields: [encryptedTitle, encryptedDocs],
-    ctx: decryptCtx,
-    groupKeyOrCfg: cfg,
-  });
-  if (!shouldAttempt) {
-    logDecryptFailure('acc-failed', null, { field: 'survey', slug: cfg?.slug || '', surveyId: surveyData?.id || '' }, decryptCtx);
-    return surveyData;
-  }
-
-  if (encryptedTitle) {
-    const result = await decryptEnvelopeCached(encryptedTitle, decryptCtx, {
-      field: 'title',
-      slug: cfg?.slug || '',
-      surveyId: surveyData?.id || '',
-    });
-    if (result.error) {
-      surveyData.titleDecryptError = result.error.type;
-    } else if (result.value !== null && result.value !== undefined && result.value !== '') {
-      surveyData.title = String(result.value);
-      surveyData.titleDecrypted = true;
-    }
-  }
-
-  if (encryptedDocs) {
-    const result = await decryptEnvelopeCached(encryptedDocs, decryptCtx, {
-      field: 'documentURLs',
-      slug: cfg?.slug || '',
-      surveyId: surveyData?.id || '',
-    });
-    if (result.error) {
-      surveyData.docsUrlsDecryptError = result.error.type;
-    } else {
-      const urls = coerceStringArray(result.value);
-      if (urls.length) {
-        surveyData.documentURLs = urls;
-        surveyData.documentURLsDecrypted = true;
-      }
-    }
-  }
-
-  return surveyData;
-};
-
-const maybeDecryptQuestionPayload = async (questionData: any, groupKeyOrCfg: any, opts: any = {}) => {
-  if (!questionData || typeof questionData !== 'object') return questionData;
-  const encryptedPrompt = questionData.promptEncrypted || questionData.encryptedPrompt || null;
-  const encryptedOptions = questionData.optionsEncrypted || questionData.encryptedOptions || null;
-  const encryptedTags = questionData.tagsEncrypted || questionData.encryptedTags || null;
-  if (!encryptedPrompt && !encryptedOptions && !encryptedTags) return questionData;
-
-  const cfg = memoizedResolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
-  const ctx = getDecryptContext(cfg, opts.decryptContext || null);
-  const decryptCtx = shouldPreferLitRecipientsForPayload(questionData, ctx)
-    ? { ...ctx, preferLitRecipients: true }
-    : ctx;
-
-  const shouldAttempt = await shouldAttemptGateDecrypt({
-    payload: questionData,
-    encryptedFields: [encryptedPrompt, encryptedOptions, encryptedTags],
-    ctx: decryptCtx,
-    groupKeyOrCfg: cfg,
-  });
-  if (!shouldAttempt) {
-    logDecryptFailure('acc-failed', null, { field: 'question', slug: cfg?.slug || '', questionId: questionData?.id || '' }, decryptCtx);
-    return questionData;
-  }
-
-  if (encryptedPrompt) {
-    const result = await decryptEnvelopeCached(encryptedPrompt, decryptCtx, {
-      field: 'prompt',
-      slug: cfg?.slug || '',
-      questionId: questionData?.id || '',
-    });
-    if (result.error) {
-      questionData.promptDecryptError = result.error.type;
-    } else if (result.value !== null && result.value !== undefined && result.value !== '') {
-      questionData.prompt = String(result.value);
-      questionData.promptDecrypted = true;
-    }
-  }
-
-  if (encryptedOptions) {
-    const result = await decryptEnvelopeCached(encryptedOptions, decryptCtx, {
-      field: 'options',
-      slug: cfg?.slug || '',
-      questionId: questionData?.id || '',
-    });
-    if (result.error) {
-      questionData.optionsDecryptError = result.error.type;
-    } else {
-      const options = coerceStringArray(result.value);
-      if (options.length) {
-        questionData.options = options;
-        questionData.optionsDecrypted = true;
-      }
-    }
-  }
-
-  if (encryptedTags) {
-    const result = await decryptEnvelopeCached(encryptedTags, decryptCtx, {
-      field: 'tags',
-      slug: cfg?.slug || '',
-      questionId: questionData?.id || '',
-    });
-    if (result.error) {
-      questionData.tagsDecryptError = result.error.type;
-    } else {
-      const tags = coerceStringArray(result.value);
-      if (tags.length) {
-        questionData.tags = tags;
-        questionData.tagsDecrypted = true;
-      }
-    }
-  }
-
-  return questionData;
-};
+let contractMetadataResolutionHelpers: ReturnType<typeof createContractScriptsMetadataResolutionHelpers>;
 
 function recordRpcStat(fnName: any, meta: any) {
   try {
@@ -1439,35 +819,6 @@ const runInFlightCoalesced = async (map: any, key: any, task: any) => {
   } finally {
     if (map.get(key) === run) map.delete(key);
   }
-};
-
-const buildDecryptModeTag = (opts: any = {}) => {
-  const skipDecrypt = !!(opts && (opts.skipDecrypt || opts.decrypt === false));
-  if (skipDecrypt) return 'raw';
-  const ctx = opts?.decryptContext || {};
-  const account = normalizeAddress(ctx?.account || '');
-  const providerLike = String(ctx?.providerLike || '').trim().toLowerCase();
-  const chainId = Number(ctx?.chainId || 0) || 0;
-  const hasLit = !!(
-    (ctx?.litOpts && typeof ctx.litOpts.getKey === 'function') ||
-    (ctx?.litHooks && typeof ctx.litHooks.getKey === 'function') ||
-    (ctx?.lit && typeof ctx.lit.getKey === 'function')
-  );
-  return `decrypt|${account}|${providerLike}|${chainId}|lit:${hasLit ? '1' : '0'}`;
-};
-
-const buildFailureModeTag = (opts: any = {}) => (
-  opts && opts.throwOnFailure ? 'strict' : 'soft'
-);
-
-const buildArweaveReadModeTag = (opts: any = {}) => {
-  const retries = Number.isFinite(Number(opts?.arweaveRetries))
-    ? Math.max(0, Number(opts.arweaveRetries))
-    : 'default';
-  const gatewayTimeoutMs = Number.isFinite(Number(opts?.arweaveGatewayTimeoutMs))
-    ? Math.max(300, Number(opts.arweaveGatewayTimeoutMs))
-    : 'default';
-  return `arweave|retries:${retries}|timeout:${gatewayTimeoutMs}`;
 };
 
 const contractHelperDeps: any = {
@@ -2420,7 +1771,7 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
         normalizeSessionNameFields(surveyData);
         const skipDecrypt = !!(opts && (opts.skipDecrypt || opts.decrypt === false));
         if (!skipDecrypt) {
-          await maybeDecryptSurveyPayload(surveyData, groupKeyOrCfg, opts);
+          await contractMetadataResolutionHelpers.maybeDecryptSurveyPayload(surveyData, groupKeyOrCfg, opts);
         }
         return surveyData;
       }
@@ -3405,7 +2756,7 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
           normalizeQuestionFlags(questionData);
           const skipDecrypt = !!(opts && (opts.skipDecrypt || opts.decrypt === false));
           if (!skipDecrypt) {
-            await maybeDecryptQuestionPayload(questionData, groupKeyOrCfg, opts);
+            await contractMetadataResolutionHelpers.maybeDecryptQuestionPayload(questionData, groupKeyOrCfg, opts);
           }
           return attachPayloadPointerFields(
             questionData,
@@ -3427,12 +2778,12 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
   // This is useful for "gate just changed" refreshes where we already have the encrypted
   // prompt/options/tags envelopes cached locally.
   async decryptQuestionPayloadInPlace(questionData: any, groupKeyOrCfg: any = null, opts: any = {}) {
-    return maybeDecryptQuestionPayload(questionData, groupKeyOrCfg, opts);
+    return contractMetadataResolutionHelpers.maybeDecryptQuestionPayload(questionData, groupKeyOrCfg, opts);
   },
 
   // Decrypt masked survey metadata without re-downloading the payload from Arweave.
   async decryptSurveyPayloadInPlace(surveyData: any, groupKeyOrCfg: any = null, opts: any = {}) {
-    return maybeDecryptSurveyPayload(surveyData, groupKeyOrCfg, opts);
+    return contractMetadataResolutionHelpers.maybeDecryptSurveyPayload(surveyData, groupKeyOrCfg, opts);
   },
 
 
@@ -3496,7 +2847,7 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
           normalizeSessionNameFields(parsed);
           const skipDecrypt = !!(opts && (opts.skipDecrypt || opts.decrypt === false));
           if (!skipDecrypt) {
-            await maybeDecryptSurveyPayload(parsed, groupKeyOrCfg, opts);
+            await contractMetadataResolutionHelpers.maybeDecryptSurveyPayload(parsed, groupKeyOrCfg, opts);
           }
           return attachPayloadPointerFields(
             parsed,
@@ -5244,6 +4595,9 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
 
 // Convenience: expose named read-provider resolver on default export
 (contractScripts as any).getReadProviderForGroup = getReadProviderForGroup;
+contractMetadataResolutionHelpers = createContractScriptsMetadataResolutionHelpers({
+  userHasSBT: (...args: unknown[]) => contractScripts.userHasSBT(...args),
+});
 // Back-compat alias retained for older callers that still use the legacy name.
 (contractScripts as any).getETHBalance = (contractScripts as any).getNativeBalance;
 export const __test__contractScriptsArweaveCache: any = {
