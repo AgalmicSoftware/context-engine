@@ -1,4 +1,4 @@
-/** @file MainSite.tsx */
+/** @file AppShell.tsx */
 
 import React, { Component, Suspense } from "react";
 import { connect } from 'react-redux';
@@ -17,7 +17,7 @@ import type { MainSiteProps, MainSiteState } from './MainSiteTypes';
 
 // Styles
 import "assets/css/contextEngine.scss";
-import stylesRaw from "./MainSite.module.scss";
+import stylesRaw from "./AppShell.module.scss";
 
 // Smart contract events / interactions
 import {
@@ -673,7 +673,7 @@ const getMainSiteRuntimeWindow = (): (Window & MainSiteRuntimeFlags) | null => (
   typeof window === 'undefined' ? null : window as Window & MainSiteRuntimeFlags
 );
 
-export class MainSite extends Component<MainSiteProps, MainSiteState> {
+export class AppShell extends Component<MainSiteProps, MainSiteState> {
   state: MainSiteState = {
     // Cache readiness flags
     isSBTCacheReady: false,
@@ -4087,9 +4087,9 @@ const mapStateToProps = (state: RootState) => ({
   activeSessionSlug: state.sessionState.activeSessionSlug,
 });
 
-const MainSiteWithWagmiHooks = WagmiHooksHOC(MainSite);
+const AppShellWithWagmiHooks = WagmiHooksHOC(AppShell);
 
-export const mainSiteDispatchActions = {
+export const appShellDispatchActions = {
   fetchAccount,
   changeAccount,
   fetchSessionState,
@@ -4100,4 +4100,4 @@ export const mainSiteDispatchActions = {
   changeActiveSessionSlug
 };
 
-export default connect(mapStateToProps, mainSiteDispatchActions)(MainSiteWithWagmiHooks) as React.ComponentType<Record<string, unknown>>;
+export default connect(mapStateToProps, appShellDispatchActions)(AppShellWithWagmiHooks) as React.ComponentType<Record<string, unknown>>;

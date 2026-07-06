@@ -1,6 +1,6 @@
 import React, { Suspense } from 'react';
 import { ethers } from 'ethers';
-import stylesRaw from './MainSite.module.scss';
+import stylesRaw from './AppShell.module.scss';
 import MainAreaTabsRaw from '../MainContent/MainAreaTabs';
 import RightSideRaw from '../RightSidebar/RightSide';
 import LazyFallbackRaw from '../Shared/LazyFallback';

@@ -167,7 +167,7 @@ Decrypt:  Client ──▸ Lit SDK decrypt(payload) ──▸ Lit nodes verify S
 
 | Area | Files |
 |------|-------|
-| Entry / routing | `components/MainSite/MainSite.tsx` |
+| Entry / routing | `components/MainSite/AppShell.tsx` |
 | Home tab shell | `components/MainContent/MainAreaTabs.tsx`, `ToolExplorer.tsx`, `OnboardingWalkthrough.tsx` |
 | Account / login settings | `components/Account/LoginAndSettingsModal.tsx`, `LoginButton.tsx` |
 | Session wizard | `components/Sessions/SessionWizard.tsx` |

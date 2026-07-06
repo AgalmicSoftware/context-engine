@@ -1,4 +1,4 @@
-# ADR-0005: MainSite Route Table Migration
+# ADR-0005: AppShell Route Table Migration
 
 ## Status
 
@@ -6,20 +6,21 @@ Accepted.
 
 ## Context
 
-`MainSite` is still a class component and the application shell. Its route
+`AppShell` is still a class component and the application shell. Its route
 dispatch used to be interleaved with rendering and runtime orchestration, which
 made route ordering hard to reason about while modernization work moved other
 runtime effects behind ports.
 
 Route dispatch is now classified by the pure
 `resolveMainSiteRouteMatch` table in
-`client/src/components/MainSite/routeTable.ts`. `MainSite.getMainView` remains
-the caller that renders views and owns URL side effects.
+`client/src/components/MainSite/routeTable.ts`. The host-bound `getMainView`
+wrapper remains the caller that renders views and owns URL side effects.
 
 ## Decision
 
 Keep route classification as pure data/functions and keep rendering in
-`MainSite`.
+`AppShell` through the host-bound renderers in
+`client/src/components/MainSite/mainSiteRouteRenderers.tsx`.
 
 The route table owns:
 
@@ -29,7 +30,7 @@ The route table owns:
   SBT address;
 - cache-wait metadata used by the caller.
 
-`MainSite` owns:
+`AppShell` owns:
 
 - rendering lazy route components;
 - navigation and URL side effects;
@@ -57,7 +58,7 @@ route behavior remains the compatibility target.
 
 ## Constraints
 
-- Do not convert `MainSite` from a class component as part of route-table work.
+- Do not convert `AppShell` from a class component as part of route-table work.
 - Do not move `contractScripts`, `sessionRegistry`, or `arweaveRetryHelpers`
   imports as part of route classification changes. Later domain-port lanes may
   move those runtime seams independently when they are behavior-pinned.
@@ -69,5 +70,5 @@ route behavior remains the compatibility target.
 ## Consequences
 
 Route matching can now be reviewed and tested without rendering the full shell.
-The migration also gives future MainSite port work a stable seam: runtime effects
-can move behind ports without re-litigating basic route classification.
+The migration also gives future AppShell port work a stable seam: runtime
+effects can move behind ports without re-litigating basic route classification.

@@ -1,25 +1,25 @@
-# MainSite Map
+# AppShell Map
 
 ## Quick Reference
 
-- File: `client/src/components/MainSite/MainSite.tsx`
-- Component type: typed React class component (`MainSite extends Component`)
+- File: `client/src/components/MainSite/AppShell.tsx`
+- Component type: typed React class component (`AppShell extends Component`)
 - Type definitions: `client/src/components/MainSite/MainSiteTypes.ts`
 - Route classifier: `client/src/components/MainSite/routeTable.ts`
 - Route view map: `client/src/components/MainSite/mainSiteRouteViewMap.ts`
 - Route renderers: `client/src/components/MainSite/mainSiteRouteRenderers.tsx`
 - Profile scan runtime: `client/src/components/MainSite/mainSiteProfileScanRuntime.ts`
 - Route classifier tests: `client/src/components/MainSite/routeTable.test.ts`
-- Runtime characterization tests: `client/src/components/MainSite/MainSite.routes.test.jsx`
+- Runtime characterization tests: `client/src/components/MainSite/AppShell.routes.test.jsx`
 - Session media URL domain helper: `client/src/domains/sessions/sessionMediaUrls.ts`
 
-`MainSite` is still the application shell and runtime orchestrator. It resolves session context from URL, Redux, registry cache, and wallet/network state; wires cache/readiness/profile/SBT/survey/question/response controllers; manages listener lifecycle; and dispatches lazy route views.
+`AppShell` is the application shell and runtime orchestrator. It resolves session context from URL, Redux, registry cache, and wallet/network state; wires cache/readiness/profile/SBT/survey/question/response controllers; manages listener lifecycle; and dispatches lazy route views.
 
-This map intentionally avoids exact line numbers. MainSite is still changing during the PRD 645/646 modernization lanes, so name-based navigation is the durable index.
+This map intentionally avoids exact line numbers. The file still lives in the `components/MainSite/` namespace while the shell component basename is now `AppShell`, so name-based navigation is the durable index.
 
 ## Route Dispatch
 
-Route matching is now classified by the pure `resolveMainSiteRouteMatch` table in `routeTable.ts`, while route-key-to-view assembly lives in `mainSiteRouteViewMap.ts`. `mainSiteRouteRenderers.tsx` owns the route renderer bodies and the extracted `getMainView` dispatch wrapper; `MainSite` binds those host-aware functions so URL side effects such as `/new` canonicalization and question/survey responder query normalization keep the same runtime host state.
+Route matching is now classified by the pure `resolveMainSiteRouteMatch` table in `routeTable.ts`, while route-key-to-view assembly lives in `mainSiteRouteViewMap.ts`. `mainSiteRouteRenderers.tsx` owns the route renderer bodies and the extracted `getMainView` dispatch wrapper; `AppShell` binds those host-aware functions so URL side effects such as `/new` canonicalization and question/survey responder query normalization keep the same runtime host state.
 Degenerate double-slash SBT address URLs such as `//sbt/0x...` and `//group/0x...` intentionally resolve as SBT detail routes; this PRD 647 decision is pinned in `routeTable.test.ts`.
 
 Covered route keys:
@@ -64,10 +64,10 @@ Golden route coverage lives in `routeTable.test.ts` for:
 
 ## Runtime Characterization
 
-`MainSite.routes.test.jsx` pins the runtime bodies that were previously easy to stub around:
+`AppShell.routes.test.jsx` pins the runtime bodies that were previously easy to stub around:
 
 - Listener lifecycle: registry cache listener, SBT listener, and survey listener registration/removal across mount, stable update, and unmount.
-- Registry bootstrap: MainSite wiring of `_registryBootstrapPromise` and `_registryBootstrapScopeKey`, failure cleanup, same-scope reuse, and scope-change restart.
+- Registry bootstrap: AppShell wiring of `_registryBootstrapPromise` and `_registryBootstrapScopeKey`, failure cleanup, same-scope reuse, and scope-change restart.
 - User profile scan fan-out: invalid-address early exit, in-flight dedupe, contract read arguments, and cache writes for user/SBT/survey/question discoveries.
 - Survey event reconciliation: real `SurveyAdded` body writes survey/question caches and preserves Arweave retry branches.
 - Network re-init: SBT detail route tears down active/detail listeners before rebuilding cache/listener state.
@@ -98,9 +98,9 @@ The characterization tests intentionally pin behavior as-is. The follow-up domai
 - `client/src/components/MainSite/mainSiteRouteViewMap.ts`
   Pure route-key-to-view assembly used by the extracted `getMainView` dispatch wrapper.
 - `client/src/components/MainSite/mainSiteRouteRenderers.tsx`
-  Host-aware route renderer bodies and route dispatch wrapper. MainSite binds these functions but no longer carries the JSX route bodies directly.
+  Host-aware route renderer bodies and route dispatch wrapper. AppShell binds these functions but no longer carries the JSX route bodies directly.
 - `client/src/domains/sessions/sessionMediaUrls.ts`
-  Typed domain wrapper for session media URL normalization. MainSite uses this instead of importing `utilities/arweave/arweaveUrls` directly.
+  Typed domain wrapper for session media URL normalization. AppShell uses this instead of importing `utilities/arweave/arweaveUrls` directly.
 - `client/src/utilities/session/sessionBackendKind.ts`
   Pure page-boundary classifier for session page backend mode. Shared render
   bodies should receive the resolved mode instead of branching on inline
@@ -109,7 +109,7 @@ The characterization tests intentionally pin behavior as-is. The follow-up domai
 ### Domain ports
 
 - `client/src/domains/sessions/registry/sessionRegistryReadPorts.ts`
-  Typed session-registry read/cache port used by MainSite for cache load, store reads, session fetches, cache-update subscription, session config reads, and session ID formatting.
+  Typed session-registry read/cache port used by AppShell for cache load, store reads, session fetches, cache-update subscription, session config reads, and session ID formatting.
 - `client/src/domains/chain/chainScanReadsPort.ts`
   Typed chain-scan read port for latest-block, relevant block-window, and session read-provider access.
 - `client/src/domains/profiles/profileScanPort.ts`
@@ -121,7 +121,7 @@ The characterization tests intentionally pin behavior as-is. The follow-up domai
 - `client/src/domains/surveys/surveyChainReadsPort.ts`
   Typed survey/question read port for survey hashes, survey/question data, and response reads.
 - `client/src/domains/worker/faucetFundingPort.ts`
-  Typed faucet funding port for the MainSite testnet-funding call.
+  Typed faucet funding port for the AppShell testnet-funding call.
 - `client/src/domains/surveys/questionArweaveCacheBranches.ts`
   Domain home for question Arweave cache branch preservation and merge helpers. The legacy utility module re-exports these helpers for remaining low-level consumers.
 
@@ -134,7 +134,7 @@ The characterization tests intentionally pin behavior as-is. The follow-up domai
 - `client/src/utilities/session/profileScanReportHelpers.js`
   Pure profile-scan fan-out plan and report-shape helpers.
 - `client/src/components/MainSite/mainSiteProfileScanRuntime.ts`
-  Host-aware profile scan runtime body for `scanSpecificUserProfile`. MainSite keeps the public method seam while the cache writes, fan-out execution, and telemetry body live here.
+  Host-aware profile scan runtime body for `scanSpecificUserProfile`. AppShell keeps the public method seam while the cache writes, fan-out execution, and telemetry body live here.
 
 ### Metadata and cache entry shaping
 
@@ -168,9 +168,9 @@ The characterization tests intentionally pin behavior as-is. The follow-up domai
 - `client/src/utilities/survey/sessionResponseHydrationController.ts`
   Question response hydration and chunked refresh.
 
-## MainSite-Owned Bodies
+## AppShell-Owned Bodies
 
-These remain inside `MainSite.tsx` by design for this lane:
+These remain inside `AppShell.tsx` by design for this lane:
 
 - `componentDidMount`
 - `componentWillUnmount`
@@ -197,7 +197,7 @@ URL + Redux session state + wallet/network
 
 ## Boundary Seams
 
-MainSite started the modernization lane with four client-boundary baseline entries:
+AppShell started the modernization lane with four client-boundary baseline entries:
 
 - `utilities/arweave/arweaveUrls`
 - `utilities/arweave/arweaveRetryHelpers`
@@ -217,13 +217,13 @@ The client-boundary baseline is now 0/0.
 
 | Area | Controller-routed | Typed contract module present | Test-pinned | Parent-owned | Blocked reason | Next safe lane |
 |---|---|---|---|---|---|---|
-| Route classification and view-map assembly | Yes | N/A | Yes | `mainSiteRouteRenderers.tsx` owns route bodies; MainSite binds the host-aware wrappers | None | Route props can move only after route-table and route-view consumers stabilize |
-| Session media URL normalization | Yes | Yes | Yes | MainSite supplies helper to `sessionDisplayHelpers` | None | Share with Admin/storage URL domain when Admin lane lands |
-| Listener lifecycle | Partial | Yes | Yes | MainSite lifecycle starts/removes listeners | Listener orchestration still crosses mount/update/unmount state | Extract listener orchestration after attach-side controller ports converge |
-| Registry bootstrap and route session lookup | Partial | Yes | Yes | MainSite + `sessionProfileScanController` bridge state | Bootstrap promise identity and route/session state stay parent-owned | Session bootstrap controller extraction |
-| User profile scan fan-out | Partial | Yes | Yes | `mainSiteProfileScanRuntime.ts` owns the scan body through MainSite host methods | Scan body still writes multiple caches and UI flags | Profile scan reducer/controller extraction |
-| Survey event reconciliation | Partial | Yes | Yes | MainSite owns real-time cache reconciliation | Event reconciliation still owns cache writes and merge decisions | Survey/question event reconciliation controller |
-| Arweave retry branch merge | Yes | Yes | Yes | MainSite owns cache merge call sites | Cache merge call sites remain inside scan/hydration bodies | Question cache hydration/retry controller |
+| Route classification and view-map assembly | Yes | N/A | Yes | `mainSiteRouteRenderers.tsx` owns route bodies; AppShell binds the host-aware wrappers | None | Route props can move only after route-table and route-view consumers stabilize |
+| Session media URL normalization | Yes | Yes | Yes | AppShell supplies helper to `sessionDisplayHelpers` | None | Share with Admin/storage URL domain when Admin lane lands |
+| Listener lifecycle | Partial | Yes | Yes | AppShell lifecycle starts/removes listeners | Listener orchestration still crosses mount/update/unmount state | Extract listener orchestration after attach-side controller ports converge |
+| Registry bootstrap and route session lookup | Partial | Yes | Yes | AppShell + `sessionProfileScanController` bridge state | Bootstrap promise identity and route/session state stay parent-owned | Session bootstrap controller extraction |
+| User profile scan fan-out | Partial | Yes | Yes | `mainSiteProfileScanRuntime.ts` owns the scan body through AppShell host methods | Scan body still writes multiple caches and UI flags | Profile scan reducer/controller extraction |
+| Survey event reconciliation | Partial | Yes | Yes | AppShell owns real-time cache reconciliation | Event reconciliation still owns cache writes and merge decisions | Survey/question event reconciliation controller |
+| Arweave retry branch merge | Yes | Yes | Yes | AppShell owns cache merge call sites | Cache merge call sites remain inside scan/hydration bodies | Question cache hydration/retry controller |
 
 ## Edit Heuristics
 

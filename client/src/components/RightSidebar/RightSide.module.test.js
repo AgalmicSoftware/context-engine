@@ -3,7 +3,7 @@ import path from 'path';
 
 describe('RightSide desktop shell styles', () => {
   it('keeps the home route in a desktop row and reserves width for the right shell', () => {
-    const mainSiteScss = fs.readFileSync(path.join(__dirname, '../MainSite/MainSite.module.scss'), 'utf8');
+    const mainSiteScss = fs.readFileSync(path.join(__dirname, '../MainSite/AppShell.module.scss'), 'utf8');
     const mainContentScss = fs.readFileSync(path.join(__dirname, '../MainContent/MainContent.module.scss'), 'utf8');
 
     expect(mainSiteScss).toMatch(/@media \(min-width:\s*769px\) and \(max-width:\s*1366px\)\s*{[\s\S]*?\.main\s*{[\s\S]*?flex-direction:\s*row;[\s\S]*?align-items:\s*stretch;/);

@@ -1,7 +1,7 @@
 import React from 'react';
 import { act, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { MainSite, mainSiteDispatchActions } from './MainSite';
+import { AppShell, appShellDispatchActions } from './AppShell';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import contractScripts from '../../utilities/web3/contractScripts.js';
 import { initCacheManager } from '../../utilities/cache/cacheScripts.js';
@@ -456,7 +456,7 @@ const createSubject = ({
     return slug === sessionConfig.slug ? sessionConfig : null;
   });
 
-  const subject = new MainSite(buildProps({
+  const subject = new AppShell(buildProps({
     path,
     firstVisit,
     demoSurfaceMode,
@@ -579,16 +579,16 @@ const attachDgStore = (subject, initial = {}) => {
   };
 };
 
-describe('MainSite connected export wiring', () => {
-  it('wires changeAccount into the connected MainSite export for wagmi hydration', () => {
-    expect(mainSiteDispatchActions).toEqual(expect.objectContaining({
+describe('AppShell connected export wiring', () => {
+  it('wires changeAccount into the connected AppShell export for wagmi hydration', () => {
+    expect(appShellDispatchActions).toEqual(expect.objectContaining({
       changeAccount: expect.any(Function),
       updateLoginInfo: expect.any(Function),
     }));
   });
 });
 
-describe('MainSite route render smoke', () => {
+describe('AppShell route render smoke', () => {
   const originalPublicUrl = process.env.PUBLIC_URL;
 
   beforeEach(() => {
@@ -887,7 +887,7 @@ describe('MainSite route render smoke', () => {
       },
     });
     setRoute('/session/edge');
-    const subject = new MainSite(props);
+    const subject = new AppShell(props);
     subject.setState = jest.fn((next) => {
       const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
       subject.state = { ...subject.state, ...(patch || {}) };
@@ -925,7 +925,7 @@ describe('MainSite route render smoke', () => {
     expect(props.changeActiveSessionSlug).not.toHaveBeenCalled();
   });
 
-  it('routes survey listener events through the MainSite survey controller host', () => {
+  it('routes survey listener events through the AppShell survey controller host', () => {
     const subject = createSubject({
       path: '/surveys',
       activeSessionSlug: 'edge',
@@ -1933,7 +1933,7 @@ describe('MainSite route render smoke', () => {
     expect(contractScripts.removeSBTInstanceEventsListener).toHaveBeenLastCalledWith('none', [], 'edge');
   });
 
-  it('wires registry bootstrap promise state through MainSite and clears failures', async () => {
+  it('wires registry bootstrap promise state through AppShell and clears failures', async () => {
     const subject = stubMainSiteMountSideEffects(createSubject({
       path: '/session/edge',
       activeSessionSlug: 'edge',
@@ -2273,7 +2273,7 @@ describe('MainSite route render smoke', () => {
   });
 });
 
-describe('MainSite single-SBT counts checkpoints', () => {
+describe('AppShell single-SBT counts checkpoints', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({

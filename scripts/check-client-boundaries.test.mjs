@@ -97,7 +97,7 @@ test('isProductionClientSourceFile excludes tests, fixtures, and harness files',
 
 test('isRouteOrPageCode identifies route/page owners conservatively', () => {
   assert.equal(isRouteOrPageCode('client/src/components/Admin/AdminPage.tsx'), true);
-  assert.equal(isRouteOrPageCode('client/src/components/MainSite/MainSite.tsx'), true);
+  assert.equal(isRouteOrPageCode('client/src/components/MainSite/AppShell.tsx'), true);
   assert.equal(isRouteOrPageCode('client/src/app/routes/session.tsx'), true);
   assert.equal(isRouteOrPageCode('client/src/components/Shared/Button.tsx'), false);
 });
@@ -117,7 +117,7 @@ test('collectClientBoundaryViolations enforces stable non-baselined boundaries',
     writeFile(
       rootDir,
       'client/src/components/ui/IconButton.tsx',
-      "import MainSite from '../MainSite/MainSite';\n"
+      "import AppShell from '../MainSite/AppShell';\n"
     );
 
     const violations = collectClientBoundaryViolations({ rootDir });
@@ -142,7 +142,7 @@ test('collectClientBoundaryViolations returns stable sorted results from unsorte
     writeFile(
       rootDir,
       uiFile,
-      "import MainSite from '../MainSite/MainSite';\n"
+      "import AppShell from '../MainSite/AppShell';\n"
     );
     writeFile(
       rootDir,
