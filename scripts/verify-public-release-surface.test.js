@@ -97,7 +97,7 @@ EOF
     );
     writeFile(
       rootDir,
-      path.join('scripts', 'e2e', 'prd652', 'prd652-cloudflare.js'),
+      path.join('scripts', 'e2e', 'cloudflare', 'session-worker.js'),
       `const { DEFAULT_PASSKEY_A } = require('${strippedImport}');\n`,
     );
 

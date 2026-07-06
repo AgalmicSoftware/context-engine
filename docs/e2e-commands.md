@@ -51,16 +51,16 @@ passkey EOA-style test wallet.
     - `artifacts/session-workflows/gated-decrypt-all-types-<run-tag>.json`
     - `artifacts/screenshots/gated-decrypt-all-types-<run-tag>.png`
 - Expanded CE E2E backlog coverage runners:
-  - PRD 648 close-out smokes:
-    - `BASE_URL=http://127.0.0.1:3000 npm run ai:test-prd648:telegram-client`
-    - `BASE_URL=http://127.0.0.1:3000 npm run ai:test-prd648:new-mode`
-    - `BASE_URL=http://127.0.0.1:3000 npm run ai:test-prd648:session-demo`
-    - `BASE_URL=http://127.0.0.1:3000 npm run ai:test-prd648:closeout-smoke`
-  - PRD 649/650 Cloudflare storage, envelope encryption, and worker groups:
-    - `npm run ai:test-prd649:worker-envelope`
-    - `npm run ai:test-prd650:worker-groups`
-    - `npm run ai:test-prd649-650:group-envelope`
-    - `npm run ai:test-prd649:key-lifecycle`
+  - Telegram/session close-out smokes:
+    - `BASE_URL=http://127.0.0.1:3000 npm run ai:test-telegram:client-login`
+    - `BASE_URL=http://127.0.0.1:3000 npm run ai:test-session:new-mode-presets`
+    - `BASE_URL=http://127.0.0.1:3000 npm run ai:test-session:demo-smoke`
+    - `BASE_URL=http://127.0.0.1:3000 npm run ai:test-session:closeout-smoke`
+  - Cloudflare storage, envelope encryption, and worker groups:
+    - `npm run ai:test-cf-envelope:worker`
+    - `npm run ai:test-cf-envelope:groups`
+    - `npm run ai:test-cf-envelope:group-gates`
+    - `npm run ai:test-cf-envelope:key-lifecycle`
     - `npm run ai:test-cf-envelope:all`
     - These live suites deploy a dedicated session worker through the same deploy helper used by `/new`, pass a Cloudflare `storageProfile`, register a non-identifying test session on the configured SessionRegistry, and then exercise worker routes against the fresh worker.
     - Assertions cover `/new` worker-envelope selectability, `worker_envelope` ciphertext-only storage/export, admin envelope export, worker group CRUD and visibility, `group_gate`, `group_allowlist`, `worker_group` conditions, removal/deletion revocation, envelope rotation, deployment-KEK rewrap, and no plaintext marker leakage in denied/export responses.
