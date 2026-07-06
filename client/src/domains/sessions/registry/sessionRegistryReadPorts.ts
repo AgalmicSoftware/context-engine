@@ -5,7 +5,7 @@ import {
 } from '../publish/sessionPublishAdapters.js';
 
 export type SessionRegistryRecord = Record<string, unknown>;
-export type SessionRegistryRawEntry = unknown[];
+export type SessionRegistryRawEntry = [string, unknown];
 export type SessionRegistryEntry = [string, unknown];
 
 export type SessionRegistryCacheTarget = {
@@ -91,7 +91,7 @@ export const bindSessionRegistryReadsPort = ({
       readSessionRegistry().loadGroupRegistryCache(input)
     ),
     getAllSessionEntries: () => (
-      readSessionRegistry().sessionRegistryStore.getAllSessionEntries() as SessionRegistryEntry[]
+      readSessionRegistry().sessionRegistryStore.getAllSessionEntries()
     ),
     getSessionConfig: (slug) => (
       readSessionRegistry().sessionRegistryStore.getSessionConfig(slug)

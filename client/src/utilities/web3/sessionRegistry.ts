@@ -67,6 +67,7 @@ type RegistryGateSnapshot = {
 };
 type RegistryGateMap = Record<string, RegistryGateSnapshot | AnyRecord | undefined>;
 type RegistryCache = AnyRecord;
+type SessionRegistryCacheEntry = [string, unknown];
 
 const REGISTRY_CACHE_KEY = 'dg:sessionRegistryCache:v1';
 export const SESSION_REGISTRY_CACHE_UPDATED_EVENT = 'ce:session-registry-cache-updated';
@@ -2516,10 +2517,10 @@ export const sessionRegistryStore = {
     }
     return null;
   },
-  getAllSessionEntries: () => {
+  getAllSessionEntries: (): SessionRegistryCacheEntry[] => {
     const cache = sessionRegistryStore.readCache();
     if (!cache || !cache.sessions) return [];
-    return Object.entries(cache.sessions).map(([slug, cfg]) => ([
+    return Object.entries(cache.sessions).map(([slug, cfg]): SessionRegistryCacheEntry => ([
       slug,
       overlayCachedSessionWorkerConfig({
         slug,

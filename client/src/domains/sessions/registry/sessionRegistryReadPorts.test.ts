@@ -94,6 +94,28 @@ describe('session registry read ports', () => {
     expect(secondModule.sessionRegistryUtils.formatSessionId).toHaveBeenCalledWith('session');
   });
 
+  it('models registry store entries as Object.entries-shaped tuples', () => {
+    const sessions = {
+      alpha: { slug: 'alpha', chainId: 11155420 },
+    };
+    const registryModule = buildRegistryModule({
+      sessionRegistryStore: {
+        getAllSessionEntries: jest.fn(() => Object.entries(sessions)),
+        getSessionConfig: jest.fn(() => null),
+        getSessionConfigById: jest.fn(() => null),
+      },
+    });
+    const port = bindSessionRegistryReadsPort({
+      sessionRegistry: () => registryModule,
+    });
+
+    const [[slug, config]] = port.getAllSessionEntries();
+
+    expect(slug).toBe('alpha');
+    expect(config).toEqual({ slug: 'alpha', chainId: 11155420 });
+    expect(registryModule.sessionRegistryStore.getAllSessionEntries).toHaveBeenCalledTimes(1);
+  });
+
   it('subscribes and unsubscribes from the cache update event with the same listener', () => {
     const addEventListener = jest.fn();
     const removeEventListener = jest.fn();
