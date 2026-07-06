@@ -9,7 +9,7 @@
   - `client/src/utilities/web3/chainEventStreams.ts`
   - `client/src/utilities/web3/contractProfile.ts`
   - `client/src/utilities/web3/chainEventScans.ts`
-  - `client/src/utilities/web3/contractScriptsMetadataResolution.ts`
+  - `client/src/utilities/web3/chainMetadataResolution.ts`
 - Current lengths:
   - `contractScripts.js`: **12 lines**
   - `contractScripts.impl.ts`: **4,691 lines**
@@ -20,7 +20,8 @@
   - `contractProfile.ts`: **1,151 lines**
   - `chainEventScans.ts`: **511 lines**
   - `contractScriptsEventScans.ts`: **5-line compatibility alias**
-  - `contractScriptsMetadataResolution.ts`: **797 lines**
+  - `chainMetadataResolution.ts`: **797 lines**
+  - `contractScriptsMetadataResolution.ts`: **9-line compatibility alias**
 - This map intentionally avoids exact line numbers. Phase 4 TypeScript extraction and helper splits move code frequently, so name-based navigation stays more accurate than stale ranges.
 - `sessionRegistry.ts` and `contractScripts.impl.ts` typecheck without `@ts-nocheck`. The typed web3-core milestone was verified on OP Sepolia with the gate and gated-decrypt E2E suites; Lit v3 remains chain-configured and is not tied to a single testnet.
 
@@ -32,7 +33,7 @@ contractScripts.js  [CJS compatibility barrel for jest.spyOn]
      -> createContractEventListenerMethods(...) [SBT / survey chain event streams]
      -> createContractProfileMethods(...)       [SBT universe + user activity/profile scans]
      -> chainEventScans.ts                     [stateless event-scan helpers]
-     -> contractScriptsMetadataResolution.ts    [metadata read / resolution helpers]
+     -> chainMetadataResolution.ts             [metadata read / resolution helpers]
 ```
 
 `contractScripts` is still the main web3 integration layer between React and chain, Arweave, Lit, and registry state. The TypeScript split moved reusable helper families plus stateless event-scan and metadata-resolution helpers out of the monolith; `contractScripts.impl.ts` still owns session resolution, provider selection, decrypt policy, survey/question writes, SBT flows, and the final default export wiring.
@@ -46,7 +47,7 @@ Route/page code now reaches selected `contractScripts` operations through purpos
 - Start in `chainEventStreams.ts` for long-lived listener registration and cleanup.
 - Start in `contractProfile.ts` for user-profile scans, SBT universe discovery, and memoized holdings/activity views.
 - Start in `chainEventScans.ts` for stateless historical event-scan helpers delegated from the main export object.
-- Start in `contractScriptsMetadataResolution.ts` for metadata URI resolution and stateless metadata read helpers delegated from the main export object.
+- Start in `chainMetadataResolution.ts` for metadata URI resolution and stateless metadata read helpers delegated from the main export object.
 - Start in `contractScripts.impl.ts` for everything else: session lookup, decrypt policy, Arweave IO, tx submission, SBT creation/claim flows, and dependency wiring.
 - Start in `client/src/domains/sbts/`, `client/src/domains/chain/`, `client/src/domains/profiles/`, `client/src/domains/surveys/`, or `client/src/domains/worker/` when a page already uses a purpose port for a narrow read/write/listener/faucet operation.
 
@@ -87,8 +88,9 @@ Route/page code now reaches selected `contractScripts` operations through purpos
 - Owns stateless historical event-scan helpers split from the main implementation while preserving call-time delegation through the `contractScripts` object.
 - `contractScriptsEventScans.ts` remains as a naming-migration alias for existing imports while callers move to the canonical scan name.
 
-### `contractScriptsMetadataResolution.ts`
+### `chainMetadataResolution.ts`
 - Owns stateless metadata URI resolution, fetch, and normalization helpers split from the main implementation while preserving call-time delegation through the `contractScripts` object.
+- `contractScriptsMetadataResolution.ts` remains as a naming-migration alias for existing imports while callers move to the canonical metadata name.
 
 ## Method Guide
 
