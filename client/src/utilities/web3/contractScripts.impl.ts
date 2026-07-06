@@ -102,7 +102,7 @@ import { sessionRegistryStore, sessionRegistryUtils } from './sessionRegistry.js
 import { createContractHelperMethods } from './contractHelpers.js';
 import { createContractEventListenerMethods } from './chainEventStreams.js';
 import { createContractProfileMethods } from './contractProfile.js';
-import { createContractScriptsEventScanMethods } from './contractScriptsEventScans.js';
+import { createChainEventScanMethods } from './chainEventScans.js';
 import {
   buildArweaveReadModeTag,
   buildDecryptModeTag,
@@ -885,7 +885,7 @@ const contractProfileDeps: any = {
   latestBlockCache,
 };
 
-const contractEventScanMethods = createContractScriptsEventScanMethods({
+const contractEventScanMethods = createChainEventScanMethods({
   ethers,
   SURVEYS,
   SURVEYS_INTERFACE,
