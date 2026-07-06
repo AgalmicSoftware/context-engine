@@ -14,7 +14,7 @@ const LARGE_FILE_SHRINK_TOLERANCE = 100;
 const LARGE_CLIENT_FILE_BASELINE = Object.freeze({
   'client/src/components/SurveyTool/SurveyQuestions.tsx': 8761,
   'client/src/components/MainSite/MainSite.tsx': 6736,
-  'client/src/components/SurveyTool/SurveyResults.tsx': 4418,
+  'client/src/components/SurveyTool/SurveyResults.tsx': 4360,
   'client/src/utilities/web3/contractScripts.impl.ts': 4691,
   'client/src/components/SBTs/SBTPage.tsx': 4214,
   'client/src/components/Sessions/SessionWizard.tsx': 4546,
