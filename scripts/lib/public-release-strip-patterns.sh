@@ -61,6 +61,7 @@ whitepaper/Slides.pdf
 whitepaper/IdeasMap.md
 client/src/utilities/worker/sessionCorsWorker.*.proxy.test.js
 client/src/utilities/web3/contractScripts.*.proxy.test.js
+ai-discourse-corpus/corpuses/_*.js
 EOF
 }
 
@@ -80,6 +81,7 @@ docs/assets/codebase-*
 docs/*PRD*.md
 docs/*prd*.md
 tests/root/*.private.test.*
+ai-discourse-corpus/corpuses/_*.js
 EOF
 }
 
@@ -131,5 +133,6 @@ scripts/vendor-cecc-ethers-bundle.js
 tests/root/*.private.test.*
 whitepaper/Slides.pdf
 whitepaper/IdeasMap.md
+ai-discourse-corpus/corpuses/_*.js
 EOF
 }
