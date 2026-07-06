@@ -80,14 +80,10 @@ import {
   buildSurveyResultsQuestionFilterCountPatch,
   buildSurveyResultsQuestionFilterPatch,
   buildSurveyResultsQuestionFilterQuestions,
-  buildSurveyResultsQuestionScopeResetPatch,
   buildSurveyResultsRefreshStatusSequencePlan,
-  buildSurveyResultsSurveyIdPropChangePatch,
-  buildSurveyResultsSurveyIdStateChangePatch,
   buildSurveyResultsSurveyModeHydratedPatch,
   buildSurveyResultsSurveyViewModePatch,
   buildSurveyResultsUnfilteredQuestionModeHydratedPatch,
-  buildSurveyResultsViewModeResetPatch,
   buildSurveyResultsViewStatePatch,
   buildSurveyRespondersPayloadRefSignature,
   buildSurveyRespondersSignature,
@@ -121,9 +117,6 @@ import {
 import {
   renderSurveyResultsSyncStatusPanel,
 } from './SurveyResultsPanels';
-import {
-  isSurveyResultsStateSynced,
-} from './surveyResultsSyncHelpers.js';
 import {
   createInitialSurveyResultsState,
   preserveSurveyResultsFilterStateValue,
@@ -190,9 +183,6 @@ import {
 import {
   surveyResultsAnalysisGenerationPort,
 } from './surveyResultsAnalysisGenerationPort';
-import {
-  runSurveyResultsQueuedRefreshController,
-} from './surveyResultsQueuedRefreshController';
 import {
   buildSurveyResultsHtmlReportDownloadExecutionPlan,
 } from './surveyResultsHtmlReportDownloadRequest';
@@ -294,6 +284,9 @@ import {
   type SurveyResultsQueuedRefreshRuntime,
 } from '../../domains/surveys/surveyResultsQueuedRefreshRuntime';
 import {
+  runSurveyResultsComponentDidUpdate,
+} from './surveyResultsLifecycleRuntime';
+import {
   chainScanReadsPort,
 } from '../../domains/chain/contractScriptsChainScanReadsPort';
 import {
@@ -316,7 +309,6 @@ import type { SurveyResultsDisplayPanelsArgs } from './SurveyResultsDisplayPanel
 import { renderSurveyResultsFilterExportControls } from './SurveyResultsFilterExportControls';
 import type { QuestionFilterHandle } from './QuestionFilter';
 import {
-  renderSurveyResultsHtmlReportExportModal,
   type SurveyResultsHtmlReportExportModalProps,
 } from './SurveyResultsHtmlReportExportModal';
 import SurveyResultsReportSurface from './SurveyResultsReportSurface';
@@ -953,10 +945,6 @@ function shouldRequireAuthoritativeQuestionScope(
     // pile view and the inline Polis report are already rendering from the same bucket.
     if (propsRef.current.preventUrlChange && propsRef.current.sessionSlugPinned) return false;
     return hasExplicitSessionQueryPinInPath(`${window.location.pathname || ''}${window.location.search || ''}`);
-  }
-
-function buildQuestionResultsScopeResetPatch(): SurveyResultsRecord {
-    return buildSurveyResultsQuestionScopeResetPatch();
   }
 
 function buildQuestionReadScopeSignature({
@@ -3016,218 +3004,26 @@ return buildSurveyResultsHtmlReportModalProps({
 });
 };
 
-const renderHtmlReportExportModal = (): React.ReactNode => {
-return renderSurveyResultsHtmlReportExportModal(getHtmlReportModalProps());
-};
-
   function runComponentDidUpdate(prevProps: SurveyResultsProps, prevState: SurveyResultsState): void {
-    const refreshReasons: Set<string> = new Set();
-    const pendingStatePatch: SurveyResultsRecord = {};
-    let hasPendingStatePatch = false;
-    let runPostPatchTasks: VoidFunction | null = null;
-    const clearResponseParseMemo = (): void => {
-      if (inst._responseParseMemo && typeof inst._responseParseMemo.clear === 'function') {
-        inst._responseParseMemo.clear();
-      }
-    };
-    const queueStatePatch = (key: string, value: unknown): void => {
-      if (stateRef.current[key] === value) return;
-      pendingStatePatch[key] = value;
-      hasPendingStatePatch = true;
-    };
-    const wasSynced = isSurveyResultsStateSynced(prevState);
-    const isSyncedNow = isSurveyResultsStateSynced(stateRef.current);
-    if (!wasSynced && isSyncedNow) {
-      inst._syncLoadingStartedAt = null;
-    } else if (!isSyncedNow && inst._syncLoadingStartedAt === null) {
-      inst._syncLoadingStartedAt = Date.now();
-    }
-
-    // Sync local filteredQuestionsCount from props
-    if (
-      propsRef.current.filteredQuestionsCount !== prevProps.filteredQuestionsCount &&
-      propsRef.current.filteredQuestionsCount !== stateRef.current.filteredQuestionsCount
-    ) {
-      queueStatePatch('filteredQuestionsCount', propsRef.current.filteredQuestionsCount);
-    }
-
-    // If the modal just closed, revert the URL and stop polling
-    if (prevProps.isOpen && !propsRef.current.isOpen) {
-      clearResponseParseMemo();
-      queueStatePatch('questionResultsHydrated', false);
-      queueStatePatch('surveyResultsHydrated', false);
-      queueStatePatch('demoResultsViewMode', 'raw');
-      queueStatePatch('demoResultsAtlasNodeId', null);
-      if (!propsRef.current.preventUrlChange) {
-        let basePath;
-        if (stateRef.current.viewMode === 'questions') {
-          basePath = '/questions';
-        } else if (stateRef.current.surveyId) {
-          basePath = `/survey/${stateRef.current.surveyId}`;
-        } else {
-          basePath = '/questions';
-        }
-        basePath = appendSessionHintToSurveyPath(basePath);
-        window.history.pushState({}, '', applyExistingGroupPrefix(basePath));
-      }
-      stopLocalStoragePolling();
-      resetLocalStoragePollingBackoff('modal-closed');
-      inst._syncLoadingStartedAt = null;
-    }
-
-    // If the modal just opened
-    if (!prevProps.isOpen && propsRef.current.isOpen) {
-      resetLocalStoragePollingBackoff('modal-open');
-      if (String(stateRef.current.viewMode || '').trim().toLowerCase() === 'questions') {
-        queueStatePatch('questionResultsHydrated', false);
-      } else {
-        queueStatePatch('surveyResultsHydrated', false);
-      }
-      queueStatePatch('demoResultsViewMode', 'raw');
-      queueStatePatch('demoResultsAtlasNodeId', null);
-      // Reset then re-seed sync timer if currently loading
-      const isSyncedOnOpen = isSurveyResultsStateSynced(stateRef.current);
-      inst._syncLoadingStartedAt = isSyncedOnOpen ? null : Date.now();
-      updateLocalStoragePollingState();
-      // Re-open should re-emit current filter state so URL/query filter sync is restored.
-      inst._lastNotifiedFilterStateSignature = null;
-      refreshReasons.add('modal-open');
-
-      const filterStatePropChanged =
-        getFilterStateSignature(propsRef.current.filterState) !==
-        getFilterStateSignature(prevProps.filterState);
-
-      const updateTasks = () => {
-        updateParentWithCurrentFiltersForUrl();
-
-        if (!propsRef.current.preventUrlChange && !window.location.pathname.endsWith('/results')) {
-          const path =
-            stateRef.current.viewMode === 'questions'
-              ? '/questions/results'
-              : (stateRef.current.surveyId ? `/survey/${stateRef.current.surveyId}/results` : '/questions/results');
-          window.history.pushState({}, '', applyExistingGroupPrefix(appendSessionHintToSurveyPath(path)));
-        }
-      };
-
-      if (filterStatePropChanged) {
-        queueStatePatch('filterState', propsRef.current.filterState || {});
-        runPostPatchTasks = updateTasks;
-      } else {
-        updateTasks();
-      }
-    }
-
-    // If the modal is open and a cache just became ready, refresh
-    const cacheJustBecameReady =
-      (stateRef.current.viewMode === 'questions' &&
-        !prevProps.isQuestionCacheReady &&
-        propsRef.current.isQuestionCacheReady) ||
-      (stateRef.current.viewMode === 'survey' &&
-        !prevProps.isSurveyCacheReady &&
-        propsRef.current.isSurveyCacheReady);
-
-    if (propsRef.current.isOpen && cacheJustBecameReady) {
-      refreshReasons.add('cache-ready');
-    }
-
-    // If responses cache flips ready while open, refresh
-    if (
-      propsRef.current.isOpen &&
-      prevProps.isResponsesCacheReady !== propsRef.current.isResponsesCacheReady &&
-      propsRef.current.isResponsesCacheReady
-    ) {
-      refreshReasons.add('responses-cache-ready');
-    }
-
-    // View mode changed (questions <-> survey)
-    if (prevState.viewMode !== stateRef.current.viewMode) {
-      // Invalidate survey-mode source memo so returning to the same survey rebuilds state.
-      inst._surveyModeSourceSignature = '';
-      clearResponseParseMemo();
-      setState(
-        asSurveyResultsStatePatch(buildSurveyResultsViewModeResetPatch({
-          questionResultsHydrated: stateRef.current.questionResultsHydrated,
-          surveyId: stateRef.current.surveyId,
-          surveyResultsHydrated: stateRef.current.surveyResultsHydrated,
-          viewMode: stateRef.current.viewMode,
-        })),
-        () => {
-          resetLocalStoragePollingBackoff('view-mode-change');
-          queueResultsRefresh('view-mode-change');
-        }
-      );
-    }
-
-    // Survey identity changed (prop or internal)
-    if ((propsRef.current.surveyId !== prevProps.surveyId) || (prevState.surveyId !== stateRef.current.surveyId)) {
-      clearResponseParseMemo();
-      if (propsRef.current.surveyId && propsRef.current.surveyId !== stateRef.current.surveyId) {
-        setState(
-          asSurveyResultsStatePatch(buildSurveyResultsSurveyIdPropChangePatch(propsRef.current.surveyId)),
-          () => {
-            resetLocalStoragePollingBackoff('survey-id-prop-change');
-            queueResultsRefresh('survey-id-prop-change');
-          }
-        );
-      } else if (prevState.surveyId !== stateRef.current.surveyId && stateRef.current.viewMode === 'survey') {
-        setState(
-          asSurveyResultsStatePatch(buildSurveyResultsSurveyIdStateChangePatch()),
-          () => {
-            resetLocalStoragePollingBackoff('survey-id-state-change');
-            queueResultsRefresh('survey-id-state-change');
-          }
-        );
-      }
-    }
-
-    // Upstream "responses changed" signal
-    if (prevProps.questionResponsesNonce !== propsRef.current.questionResponsesNonce) {
-      handleNonceTick();
-    }
-
-    if (prevProps.isOpen !== propsRef.current.isOpen) {
-      if (propsRef.current.isOpen) {
-        resetLocalStoragePollingBackoff('modal-open-state-change');
-      }
-      updateLocalStoragePollingState();
-    }
-
-    const prevQuestionScopeSignature = buildQuestionReadScopeSignature({
-      props: prevProps,
-      state: prevState,
-      viewMode: prevState.viewMode || prevProps.viewMode || 'questions',
-    });
-    const nextQuestionScopeSignature = buildQuestionReadScopeSignature({
+    runSurveyResultsComponentDidUpdate({
+      instance: inst,
+      ports: {
+        appendSessionHintToSurveyPath,
+        applyStatePatch: (patch, afterApply) => {
+          setState(asSurveyResultsStatePatch(patch), afterApply);
+        },
+        buildQuestionReadScopeSignature,
+        handleNonceTick,
+        queueResultsRefresh,
+        resetLocalStoragePollingBackoff,
+        stopLocalStoragePolling,
+        updateLocalStoragePollingState,
+        updateParentWithCurrentFiltersForUrl,
+      },
+      prevProps,
+      prevState,
       props: propsRef.current,
       state: stateRef.current,
-      viewMode: stateRef.current.viewMode || propsRef.current.viewMode || 'questions',
-    });
-    if (
-      propsRef.current.isOpen &&
-      String(stateRef.current.viewMode || '').trim().toLowerCase() === 'questions' &&
-      prevQuestionScopeSignature !== nextQuestionScopeSignature
-    ) {
-      clearResponseParseMemo();
-      const questionScopeResetPatch: SurveyResultsRecord = buildQuestionResultsScopeResetPatch();
-      Object.keys(questionScopeResetPatch).forEach((key) => {
-        queueStatePatch(key, questionScopeResetPatch[key]);
-      });
-      refreshReasons.add('question-scope-change');
-    }
-
-    if (hasPendingStatePatch) {
-      setState(pendingStatePatch, () => {
-        if (typeof runPostPatchTasks === 'function') runPostPatchTasks();
-      });
-    } else if (typeof runPostPatchTasks === 'function') {
-      runPostPatchTasks();
-    }
-
-    runSurveyResultsQueuedRefreshController({
-      ports: {
-        queueResultsRefresh: queueResultsRefresh,
-      },
-      reasons: refreshReasons,
     });
   }
 
