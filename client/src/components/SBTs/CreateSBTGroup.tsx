@@ -27,7 +27,7 @@ import { validateNoLockedPlaintextInPayload } from '../../utilities/arweave/noLe
 import contractScripts, { getSessionConfigBySlugOrDefault, normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
 import { getEffectiveArweaveKey } from '../../utilities/session/resourceKeys.js';
 import { toStr } from '../../utilities/shared/primitives.js';
-import { fetchImageFromURL } from '../../utilities/ui/imageScripts.js'
+import { fetchImageFromURL } from '../../utilities/ui/imageFetchClient.js'
 import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 import styles from './CreateSBTGroup.module.scss';
 import { QRCodeSVG } from 'qrcode.react';
