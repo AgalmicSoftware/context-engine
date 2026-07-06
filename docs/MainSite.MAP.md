@@ -227,5 +227,5 @@ The client-boundary baseline is now 0/0.
 - For route session slug/ID behavior, inspect `routeSessionResolution.ts` and `sessionPathResolverController.ts` before editing MainSite.
 - For session header/media display, inspect `sessionDisplayHelpers.ts` and `domains/sessions/sessionMediaUrls.ts`.
 - For profile scans, inspect `sessionProfileScanController.ts` and `profileScanReportHelpers.ts` before touching `scanSpecificUserProfile`.
-- For listener leaks or duplicate events, inspect `contractEventListeners.ts`, `sessionSbtCacheController.js`, `sessionSurveyCacheController.ts`, and the listener characterization tests before editing lifecycle code.
+- For listener leaks or duplicate events, inspect `chainEventStreams.ts`, `sessionSbtCacheController.js`, `sessionSurveyCacheController.ts`, and the listener characterization tests before editing lifecycle code.
 - For cache readiness drift, inspect `sessionCacheReadinessController.ts` and `sessionCachePersistenceController.ts` before editing mount/update code.

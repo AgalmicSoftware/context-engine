@@ -6,7 +6,7 @@
 - Session registry helper: `client/src/utilities/web3/sessionRegistry.ts`
 - Split helper modules:
   - `client/src/utilities/web3/contractHelpers.ts`
-  - `client/src/utilities/web3/contractEventListeners.ts`
+  - `client/src/utilities/web3/chainEventStreams.ts`
   - `client/src/utilities/web3/contractProfile.ts`
   - `client/src/utilities/web3/contractScriptsEventScans.ts`
   - `client/src/utilities/web3/contractScriptsMetadataResolution.ts`
@@ -15,7 +15,8 @@
   - `contractScripts.impl.ts`: **4,691 lines**
   - `sessionRegistry.ts`: **2,571 lines**
   - `contractHelpers.ts`: **1,040 lines**
-  - `contractEventListeners.ts`: **554 lines**
+  - `chainEventStreams.ts`: **554 lines**
+  - `contractEventListeners.ts`: **2-line compatibility alias**
   - `contractProfile.ts`: **1,151 lines**
   - `contractScriptsEventScans.ts`: **511 lines**
   - `contractScriptsMetadataResolution.ts`: **797 lines**
@@ -27,7 +28,7 @@ contractScripts.js  [CJS compatibility barrel for jest.spyOn]
   -> contractScripts.impl.ts  [main export object + shared helpers]
      -> sessionRegistry.ts                 [session registry reads / cache / config]
      -> createContractHelperMethods(...)        [provider / block-window / cache helpers]
-     -> createContractEventListenerMethods(...) [SBT / survey listener wiring]
+     -> createContractEventListenerMethods(...) [SBT / survey chain event streams]
      -> createContractProfileMethods(...)       [SBT universe + user activity/profile scans]
      -> contractScriptsEventScans.ts            [stateless event-scan helpers]
      -> contractScriptsMetadataResolution.ts    [metadata read / resolution helpers]
@@ -41,7 +42,7 @@ Route/page code now reaches selected `contractScripts` operations through purpos
 - Start in `contractScripts.js` only if you need barrel-export behavior or `jest.spyOn` compatibility.
 - Start in `sessionRegistry.ts` for session registry lookups, registry cache behavior, session config normalization, or chain-aware session metadata.
 - Start in `contractHelpers.ts` for block windows, latest block/gas, read-provider behavior, or faucet helpers.
-- Start in `contractEventListeners.ts` for long-lived listener registration and cleanup.
+- Start in `chainEventStreams.ts` for long-lived listener registration and cleanup.
 - Start in `contractProfile.ts` for user-profile scans, SBT universe discovery, and memoized holdings/activity views.
 - Start in `contractScriptsEventScans.ts` for stateless historical event-scan helpers delegated from the main export object.
 - Start in `contractScriptsMetadataResolution.ts` for metadata URI resolution and stateless metadata read helpers delegated from the main export object.
@@ -73,9 +74,10 @@ Route/page code now reaches selected `contractScripts` operations through purpos
 - Contains block, gas, and provider-cache helpers shared by the main implementation.
 - Owns smart log fetching, native-balance reads, session block-window policy, and faucet display/write helpers.
 
-### `contractEventListeners.ts`
+### `chainEventStreams.ts`
 - Owns SBT factory listeners, per-SBT activity listeners, and survey listeners.
 - Central place for attach/remove logic and listener dedupe behavior.
+- `contractEventListeners.ts` remains as a naming-migration alias for existing imports while callers move to the canonical stream name.
 
 ### `contractProfile.ts`
 - Owns token-owner lookups, SBT universe discovery, per-user holdings memoization, minimal SBT summaries, and cross-domain activity aggregation.
@@ -207,6 +209,6 @@ getAllSbtAddressesCached
 - If a bug is about stale reads, dedupe, or "why is this still cached?", inspect `READ_MEMO`, `READ_INFLIGHT`, and `clearReadCachesForGroup` in `contractScripts.impl.ts`.
 - If a bug is about missing results because of session scoping, inspect `getRelevantBlockWindowForFilter` in `contractHelpers.ts` plus the scope helpers in `contractScripts.impl.ts`.
 - If a bug is about masked metadata not decrypting, inspect `shouldAttemptGateDecrypt`, `maybeDecryptQuestionPayload`, `maybeDecryptSurveyPayload`, and the `get*Data` methods in `contractScripts.impl.ts`.
-- If a bug is about listeners double-firing or leaking, inspect `contractEventListeners.ts` before touching `MainSite`.
+- If a bug is about listeners double-firing or leaking, inspect `chainEventStreams.ts` before touching `MainSite`.
 - If a bug is about profile or SBT universe scans, inspect `contractProfile.ts` before expanding `contractScripts.impl.ts`.
 - If a test needs to spy on named exports, remember the stable entry point is still `contractScripts.js`, not `contractScripts.impl.ts`.
