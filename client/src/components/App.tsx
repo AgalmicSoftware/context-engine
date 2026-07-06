@@ -12,7 +12,7 @@ import CEToaster from './Shared/CEToaster';
 import "assets/css/contextEngine.scss";
 
 import withRouter from "./HooksHOC/withRouterBridge";
-import MainSite from "./MainSite/MainSite";
+import AppShell from "./MainSite/AppShell";
 import AppErrorBoundary from './ErrorBoundary/AppErrorBoundary';
 import { readColdLoadOnboardingState } from './Onboarding/onboardingConfig.js';
 import { toastTheme } from '../utilities/ui/toastTheme.js';
@@ -264,7 +264,7 @@ class App extends React.Component<AppProps, AppState> {
               toastOptions={{ style: toastTheme }}
             />
             <Routes>
-              <Route path="*" element={<MainSite path={urlPath} {...siteProps} />} />
+              <Route path="*" element={<AppShell path={urlPath} {...siteProps} />} />
             </Routes>
             </AppErrorBoundary>
             </Provider>

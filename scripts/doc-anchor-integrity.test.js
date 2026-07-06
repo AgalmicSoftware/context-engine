@@ -32,7 +32,7 @@ const MIGRATED_COMPONENT_DOC_PATHS = Object.freeze([
   'client/src/components/DemoViews/DemosIndex.tsx',
   'client/src/components/DemoViews/RiskMatrixDemo.tsx',
   'client/src/components/DebateMap/DebateMap.tsx',
-  'client/src/components/MainSite/MainSite.tsx',
+  'client/src/components/MainSite/AppShell.tsx',
   'client/src/components/MainContent/MainAreaTabs.tsx',
   'client/src/components/MainContent/ToolExplorer.tsx',
   'client/src/components/Navbar/AccountSection.tsx',

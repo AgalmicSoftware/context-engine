@@ -39,7 +39,7 @@ npm run ai:seed-survey:question-types            # seed question type data
 ## Project map
 | Path | What it is |
 |------|------------|
-| `client/src/components/MainSite/MainSite.tsx` | See [`docs/MainSite.MAP.md`](docs/MainSite.MAP.md) for the MainSite section index |
+| `client/src/components/MainSite/AppShell.tsx` | See [`docs/MainSite.MAP.md`](docs/MainSite.MAP.md) for the app shell section index |
 | `client/src/components/MainContent/` | Home tab surface: `MainAreaTabs.tsx`, `ToolExplorer.tsx`, `OnboardingWalkthrough.tsx`, `RiskMatrix.tsx` |
 | `client/src/components/Account/` | Account/login/settings surface: `LoginAndSettingsModal.tsx`, `LoginButton.tsx` |
 | `client/src/components/SurveyTool/SurveyTool.tsx` | See [`docs/SurveyTool.MAP.md`](docs/SurveyTool.MAP.md) for the SurveyTool component hierarchy |

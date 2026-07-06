@@ -291,6 +291,7 @@ export function isRouteOrPageCode(filePath) {
   const basename = path.posix.basename(normalizedPath);
   return (
     basename === 'App'
+    || basename === 'AppShell'
     || basename === 'MainSite'
     || basename === 'OnePageSession'
     || basename === 'SessionWizard'
