@@ -315,6 +315,37 @@ const resolveRoleAddressSet = ({ config = {}, role }) => {
   return addresses;
 };
 
+const listDelimitedAddresses = (value) => {
+  if (typeof value === 'string') {
+    return value.split(/[\s,;]+/).map(normalizeAddress).filter(Boolean);
+  }
+  return listRoleAddresses(value);
+};
+
+const resolveEnvelopeExportAddressSet = (config = {}) => {
+  const addresses = new Set(resolveRoleAddressSet({ config, role: 'admin' }));
+  listDelimitedAddresses(config.responseExportAllowedAddresses).forEach((address) => addresses.add(address));
+  listDelimitedAddresses(config.telegramResponseExportAllowedAddresses).forEach((address) => addresses.add(address));
+  listDelimitedAddresses(config.export?.allowedAddresses).forEach((address) => addresses.add(address));
+  listDelimitedAddresses(config.export?.adminAddresses).forEach((address) => addresses.add(address));
+  return addresses;
+};
+
+const isEnvelopeExportAuthorized = ({ config, requesterAddress, authScopes }) => {
+  const scopes = isObj(authScopes) ? authScopes : {};
+  if (
+    scopes.admin === true ||
+    scopes.responseExport === true ||
+    scopes.response_export === true ||
+    scopes.encryptedEnvelopeExport === true
+  ) {
+    return true;
+  }
+  const address = normalizeAddress(requesterAddress);
+  if (!address) return false;
+  return resolveEnvelopeExportAddressSet(config).has(address);
+};
+
 const evaluateWorkerRoleCondition = ({ condition, config, requesterAddress }) => {
   const role = trim(condition.role || condition.name || 'admin').toLowerCase();
   const address = normalizeAddress(requesterAddress);
@@ -1128,6 +1159,9 @@ export const storageRoute = async ({ path, method, request, env, config, slug, u
     return handleCloudflareList({ request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps });
   }
   if (path === '/storage/export-envelopes' && (method === 'GET' || method === 'POST')) {
+    if (!isEnvelopeExportAuthorized({ config, requesterAddress: uploaderAddress, authScopes })) {
+      return responseJson(deps, { error: 'Encrypted-envelope export requires session export admin authorization.' }, 403, baseHeaders);
+    }
     const url = new URL(request.url);
     let resource = trim(url.searchParams.get('resource'));
     if (!resource && method === 'POST') {

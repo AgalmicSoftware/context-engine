@@ -1521,6 +1521,23 @@ test('storageRoute /storage/export-envelopes omits session key material', async 
     deps: { randomBytes: createSequenceRandomBytes(131) },
   });
 
+  const deniedResponse = await storageRoute({
+    path: '/storage/export-envelopes',
+    method: 'GET',
+    request: new Request('https://worker.example/storage/export-envelopes?resource=docsContext'),
+    env,
+    config,
+    slug: 'session-a',
+    uploaderAddress: '0x0000000000000000000000000000000000000bad',
+    authScopes: { storage: true },
+    baseHeaders: {},
+    deps: { json },
+  });
+  assert.equal(deniedResponse.status, 403);
+  assert.deepEqual(await readJson(deniedResponse), {
+    error: 'Encrypted-envelope export requires session export admin authorization.',
+  });
+
   const response = await storageRoute({
     path: '/storage/export-envelopes',
     method: 'GET',
@@ -1528,7 +1545,8 @@ test('storageRoute /storage/export-envelopes omits session key material', async 
     env,
     config,
     slug: 'session-a',
-    uploaderAddress: '',
+    uploaderAddress: '0x0000000000000000000000000000000000000abc',
+    authScopes: { storage: true },
     baseHeaders: {},
     deps: { json },
   });
@@ -1551,7 +1569,8 @@ test('storageRoute /storage/export-envelopes omits session key material', async 
     env,
     config,
     slug: 'session-a',
-    uploaderAddress: '',
+    uploaderAddress: '0x0000000000000000000000000000000000000abc',
+    authScopes: { storage: true },
     baseHeaders: {},
     deps: { json },
   });
