@@ -684,10 +684,9 @@ describe('SurveyResults bookmark cache writes', () => {
   });
 
   it('blocks filter bookmark writes when the results view is unmounted', async () => {
-    // port note: SurveyResults.handleBookmarkFilter is not wired to any rendered control (filter
-    // bookmarking lives inside the mocked QuestionFilter child), so the unmounted-entry guard
-    // cannot be driven behaviorally; only the no-filters-write invariant across mount/unmount is
-    // preserved. The isMounted guard is covered by buildSurveyResultsFilterBookmarkWritePlan units.
+    // port note: results no longer owns filter bookmarking; that behavior lives inside the
+    // mocked QuestionFilter child and the pure write-plan units. Preserve the render-side
+    // invariant that results never writes filter bookmarks across mount/unmount.
     const peekSpy = mockPeekCacheSync(buildPeekImpl({}));
     const readSpy = jest.spyOn(cacheScripts, 'readCache');
     const writeSpy = jest.spyOn(cacheScripts, 'writeCache');
@@ -706,10 +705,8 @@ describe('SurveyResults bookmark cache writes', () => {
   });
 
   it('writes eligible filter bookmarks to the active slug and toggles success feedback', async () => {
-    // port note: there is no DOM control bound to handleBookmarkFilter and no rendered
-    // filterBookmarkedFeedback affordance, so the eligible-write + feedback-timer facets are
-    // unportable; only the render-side no-filters-write invariant is asserted. The write payload
-    // and feedback plan belong in surveyResultsFilterBookmarkWriteController unit tests.
+    // port note: eligible filter bookmark writes and feedback now belong to QuestionFilter plus
+    // the write-plan/controller units. Results preserves the no-filters-write invariant.
     const peekSpy = mockPeekCacheSync(buildPeekImpl({}));
     const writeSpy = jest.spyOn(cacheScripts, 'writeCache');
     renderSurveyResults({
@@ -725,9 +722,8 @@ describe('SurveyResults bookmark cache writes', () => {
   });
 
   it('falls back to async filter cache reads before writing bookmark payloads', async () => {
-    // port note: handleBookmarkFilter is unreachable from the DOM, so the peek->read->write
-    // ordering facet is unportable here; recommend covering it in the filter bookmark write
-    // controller unit tests. Render-side invariant preserved: no filters reads happen unprompted.
+    // port note: filter bookmark cache ordering belongs in the filter bookmark write controller
+    // units. Render-side invariant preserved: no filters reads happen unprompted.
     const peekSpy = mockPeekCacheSync(buildPeekImpl({}));
     const readSpy = jest.spyOn(cacheScripts, 'readCache');
     renderSurveyResults({
@@ -743,8 +739,7 @@ describe('SurveyResults bookmark cache writes', () => {
   });
 
   it('initializes invalid bookmarked filter cache shape without changing the target identity', async () => {
-    // port note: handleBookmarkFilter is unreachable from the DOM; the invalid-shape
-    // normalization facet is unportable here and belongs in
+    // port note: invalid-shape normalization is no longer results-owned and belongs in
     // surveyResultsFilterBookmarkWriteController unit tests. Render-side invariant preserved.
     const invalidCache = {
       bookmarkedFilters: 'not-an-array',
@@ -768,8 +763,7 @@ describe('SurveyResults bookmark cache writes', () => {
   });
 
   it('does not mutate live bookmarkedFilters cache when filter write fails', async () => {
-    // port note: handleBookmarkFilter is unreachable from the DOM; the failed-write
-    // non-mutation facet is unportable here and belongs in
+    // port note: failed-write non-mutation is no longer results-owned and belongs in
     // surveyResultsFilterBookmarkWriteController unit tests. Render-side invariant preserved.
     const liveCache = { bookmarkedFilters: ['existing-filter'] };
     mockPeekCacheSync((namespace: string) => (namespace === 'filters' ? liveCache : null));
@@ -787,8 +781,7 @@ describe('SurveyResults bookmark cache writes', () => {
   });
 
   it('keeps failed filter bookmark writes inert and allows a later successful retry', async () => {
-    // port note: handleBookmarkFilter is unreachable from the DOM; the reject-then-retry and
-    // feedback-timer facets are unportable here and belong in
+    // port note: reject-then-retry and feedback-timer facets are no longer results-owned and belong in
     // surveyResultsFilterBookmarkWriteController unit tests. Render-side invariant preserved.
     const liveCache = { bookmarkedFilters: ['existing-filter'] };
     mockPeekCacheSync((namespace: string) => (namespace === 'filters' ? liveCache : null));
