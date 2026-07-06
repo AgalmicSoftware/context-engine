@@ -35,12 +35,7 @@ import {
   getSessionConfigBySlug,
 } from '../../utilities/web3/contractScripts.js';
 import { getShortenedAddress, getShortenedSurveyID } from 'utilities/ui/displayHelpers.js';
-import { serializeFilterState } from '../../utilities/survey/filterStateUtils.js';
 import { createLogger } from 'utilities/logging.js';
-import {
-  parseQuestionSessionIdFromSearch,
-  parseQuestionSessionSlugFromSearch,
-} from '../../utilities/survey/questionRouting.js';
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 import { buildResponseGatePolicy } from '../../utilities/crypto/litGatePolicy.js';
 import { resolveSbtDisplayLabel } from '../../utilities/sbt/sbtDisplayNames.js';
@@ -103,7 +98,6 @@ import {
   getSurveyResponseQuestionId,
   hasAnyCountableSurveyAnswer,
   normalizeSurveyResponsePayloadByQuestionId,
-  stableSerializeSignatureValue,
   stringifySurveyResultsAggregatorResponses,
   toggleSurveyResultsLockedResponseDetailsPatch,
   type SurveyResultsAggregateRow,
@@ -264,6 +258,18 @@ import {
   type SurveyResultsGateRecord,
   type SurveyResultsResponseRecord,
 } from './surveyResultsLockedFieldHelpers';
+import {
+  applyExistingGroupPrefix,
+  areValuesEquivalentBySignature,
+  getFilterStateSignature,
+  getResponseQuestionId,
+  getResponseQuestionPrompt,
+  getResponseQuestionType,
+  hasExplicitSessionQueryPinInPath,
+  normalizeNonceKey,
+  resolveNetBucketReadOnly,
+  unifyAggregatorWithAllQuestionIDs,
+} from './surveyResultsRuntimeHelpers';
 import {
   buildSurveyResultsAnalysisResponsesForExport,
   buildSurveyResultsAnalysisSegmentDimensionsForExport,
@@ -799,106 +805,6 @@ const scheduleMicrotask = (cb: unknown): void => {
   }
   Promise.resolve().then(task);
 };
-
-/**
-* Helper that merges aggregator keys in lowercase, ensuring zero-response question IDs are included.
-*/
-function unifyAggregatorWithAllQuestionIDs(
-  baseAggregator: Record<string, unknown[]> = {},
-  allKnownQuestionIds: string[] = []
-): Record<string, unknown[]> {
-  const loweredMap: Record<string, unknown[]> = {};
-  for (const key of Object.keys(baseAggregator)) {
-    const lowerKey = key.toLowerCase();
-    if (!loweredMap[lowerKey]) {
-      loweredMap[lowerKey] = baseAggregator[key];
-    } else {
-      loweredMap[lowerKey] = loweredMap[lowerKey].concat(baseAggregator[key]);
-    }
-  }
-  for (const qId of allKnownQuestionIds) {
-    const qLower = qId.toLowerCase();
-    if (!loweredMap[qLower]) {
-      loweredMap[qLower] = [];
-    }
-  }
-  return loweredMap;
-}
-
-/** Prefix-preserver used by SurveySelector */
-const readPathSearch = (path: unknown = ''): string => {
-  const value = String(path || '');
-  const queryIndex = value.indexOf('?');
-  return queryIndex >= 0 ? value.slice(queryIndex) : '';
-};
-
-const hasExplicitSessionQueryPinInPath = (path: unknown = ''): boolean => {
-  const search = readPathSearch(path);
-  return (
-    parseQuestionSessionSlugFromSearch(search) !== null ||
-    parseQuestionSessionIdFromSearch(search) !== null
-  );
-};
-
-function applyExistingGroupPrefix(newPath: string): string {
-  try {
-    if (hasExplicitSessionQueryPinInPath(newPath)) return newPath;
-    const p = (typeof window !== 'undefined' && window.location && window.location.pathname) || '';
-    const pathOnly = p.split('?')[0].split('#')[0];
-    const segs = pathOnly.split('/').filter(Boolean);
-    const RESERVED: Set<string> = new Set(['questions','question','survey','surveys']);
-    if (segs.length >= 2 && !RESERVED.has(segs[0])) {
-      const base = `/${segs[0]}/${segs[1]}`;
-      if (!newPath.startsWith(base)) {
-        return `${base}${newPath.startsWith('/') ? '' : '/'}${newPath}`;
-      }
-    }
-  } catch (e) { surveyLog.warn('SurveyResults: fallback', e); }
-  return newPath;
-}
-
-function resolveNetBucketReadOnly(cacheObj: unknown, netIdStr: unknown, fallbackValue: unknown): unknown {
-  const fallback = fallbackValue === undefined ? {} : fallbackValue;
-  if (!cacheObj || typeof cacheObj !== 'object' || !netIdStr) return fallback;
-  const bucket = (cacheObj as SurveyResultsRecord)[String(netIdStr)];
-  return (bucket && typeof bucket === 'object') ? bucket : fallback;
-}
-
-const normalizeNonceKey = (value: unknown): number | null => {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-};
-
-const getFilterStateSignature = (
-  filterState: unknown
-): string => serializeFilterState(filterState as SurveyResultsFilterState | null | undefined) || '';
-const areValuesEquivalentBySignature = (currentValue: unknown, nextValue: unknown): boolean => {
-  if (currentValue === nextValue) return true;
-  if (currentValue == null || nextValue == null) return currentValue === nextValue;
-  if (typeof currentValue !== 'object' && typeof nextValue !== 'object') {
-    return currentValue === nextValue;
-  }
-  return stableSerializeSignatureValue(currentValue) === stableSerializeSignatureValue(nextValue);
-};
-
-const getResponseQuestionId = (obj: SurveyResultsResponseRecord | null | undefined): string => (
-  String(obj?.questionID || obj?.questionId || '').trim()
-);
-
-const getResponseQuestionPrompt = (
-  obj: SurveyResultsResponseRecord | null | undefined,
-  questionData: SurveyResultsRecord | null = null
-): unknown => (
-  obj?.prompt || questionData?.prompt || ''
-);
-
-const getResponseQuestionType = (
-  obj: SurveyResultsResponseRecord | null | undefined,
-  questionData: SurveyResultsRecord | null = null
-): unknown => (
-  obj?.type || questionData?.type || ''
-);
-
 
 type SurveyResultsInstanceFields = {
   _syncLoadingStartedAt: number | null;
