@@ -1,9 +1,9 @@
 ---
-title: Agent Village Wrapped and the Agent Mirror Test
+title: Agent Village Wrapped and related agent evaluations
 date: 2026-07-06
 ---
 
-# Agent Village Wrapped and the Agent Mirror Test
+# Agent Village Wrapped and related agent evaluations
 
 People hate filling out surveys. The same people will happily take a "which TV character are you?" quiz and post the result. A quiz is about you, and the output is fun to share.
 
@@ -21,9 +21,9 @@ Agent Village Wrapped applies that observation to a research question: how accur
 
 ## The eval
 
-The poster gets people in the door. The measurement happens on the review screen, where each prediction can be accepted, changed, or skipped. The data people change when they see their agent's prediction is the eval: every untouched prediction is a hit, and every correction is a labeled miss with the person's real answer attached.
+The poster gets people in the door. The measurement happens in review, through the Telegram bot, where each prediction can be accepted, changed, or skipped. The data people change when they see their agent's prediction is the eval: every untouched prediction is a hit, and every correction is a labeled miss with the person's real answer attached.
 
-This uses an old internet principle, sometimes called Cunningham's Law: the fastest way to get a right answer online is to post a wrong one. People who won't volunteer information will readily correct information that is wrong about them. Civic tech has struggled with the volunteering side for years — most people read, few react, almost nobody writes (Nielsen's "90-9-1" rule). A blank survey is the hard path; a draft of your views that you can correct is the easy one.
+This is Cunningham's Law — the fastest way to get a right answer online is to post a wrong one — applied to yourself. People who won't volunteer information will happily correct information that is wrong about them, which is exactly the participation problem civic tech has never solved: most people read, few react, almost nobody writes. A blank survey is the hard path; a draft of your views you can correct is the easy one.
 
 The instrumentation exists in the Context Engine worker. Each answer carries a provenance record: whether the agent drafted it, fingerprints of the agent's version and the final version, edit counts, when the person first viewed the prediction (corrections only count after it was seen), and a typed delta — stance flip, rating shift, choice change, freeform rewrite.
 
@@ -80,6 +80,15 @@ Show a person their agent's model of them, and score what survives contact. Thre
 
 One known limitation: seeing a prediction anchors people, so acceptance overstates accuracy. The fix is a blind holdout — a few questions answered before the agent's guess is shown. The gap between blind and post-view agreement measures the anchoring itself.
 
+## Extensions
+
+- **Blind holdouts** — quantify anchoring.
+- **Cross-model mirrors** — two models predict the same person from the same context; the corrections become a head-to-head.
+- **Memory curves** — does Mirror Score rise with months of shared context?
+- **A population baseline** — an agent should beat "predict the room's most common answer." If it can't, it has memory theater, not memory.
+- **Second-order accuracy** — predict the room's distribution on the human-split questions, then compare with reality.
+- **Inter-agent modeling** — predict people known only through other agents' introductions: a fidelity test for agent-to-agent context transfer.
+
 ## Running it over Telegram
 
 Context Engine ships a Telegram bot and agent skills, so any group already organized on Telegram can run a session with almost no setup: invite tokens handle onboarding, a skill tells the agent which endpoints to call, and a Mini App handles review and corrections. We think Telegram has real security problems and would not run sensitive sessions there — but it is one of the best platforms for reaching people through bots, and for an opt-in experiment at an event the tradeoff is reasonable. Groups with stricter requirements can use Context Engine's web application with encrypted responses.
@@ -89,15 +98,6 @@ Context Engine ships a Telegram bot and agent skills, so any group already organ
 The runtime has been generalized: a session-wrapped skill now points at any Context Engine session with an invite token — question bank, prediction run, poster, and correction loop included. Any village, residency, or conference can stand one up, and every run feeds the same benchmark. Repeat it at each gathering and you get a curve nobody currently has: agent fidelity to human intent, by model, over time.
 
 An improved version will be available for the next Agent Village and will be demoed at EDDY 2026.
-
-## Extensions
-
-- **Blind holdouts** — quantify anchoring.
-- **Cross-model mirrors** — two models predict the same person from the same context; the corrections become a head-to-head.
-- **Memory curves** — does Mirror Score rise with months of shared context?
-- **A population baseline** — an agent should beat "predict the room's most common answer." If it can't, it has memory theater, not memory.
-- **Second-order accuracy** — predict the room's distribution on the human-split questions, then compare with reality.
-- **Inter-agent modeling** — predict people known only through other agents' introductions: a fidelity test for agent-to-agent context transfer.
 
 ---
 
