@@ -36,31 +36,37 @@ const readDualIntEnv = (nextKey: string, reactKey: string, fallback = 0): number
 const getWindowOrigin = (): string => {
   try {
     if (typeof window !== 'undefined' && window.location?.origin) return window.location.origin;
-  } catch (e) { void e; }
+  } catch (e) {
+    void e;
+  }
   return '';
 };
 
 const getWindowHostname = (): string => {
   try {
     if (typeof window !== 'undefined' && window.location?.hostname) return window.location.hostname;
-  } catch (e) { void e; }
+  } catch (e) {
+    void e;
+  }
   return '';
 };
 
-const normalizeHostname = (value: unknown): string => (
-  String(value || '').trim().toLowerCase().replace(/^\[(.*)\]$/, '$1').replace(/\.$/, '')
-);
+const normalizeHostname = (value: unknown): string =>
+  String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^\[(.*)\]$/, '$1')
+    .replace(/\.$/, '');
 
-const normalizeDerivationNamespace = (value: unknown): string => (
-  String(value || '').trim().toLowerCase().replace(/[^a-z0-9._:-]+/g, '-').replace(/^-+|-+$/g, '')
-);
+const normalizeDerivationNamespace = (value: unknown): string =>
+  String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._:-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 
-const isLocalHost = (host: string): boolean => (
-  host === 'localhost' ||
-  host === '127.0.0.1' ||
-  host === '0.0.0.0' ||
-  host === '::1'
-);
+const isLocalHost = (host: string): boolean =>
+  host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0' || host === '::1';
 
 const isPreviewHost = (host: string): boolean => PREVIEW_HOST_PATTERNS.some((pattern) => pattern.test(host));
 
@@ -83,6 +89,17 @@ export const isRpIdAllowedForOrigin = (rpId: string, origin: string): boolean =>
 export const validatePasskeyWalletConfig = (config: PasskeyWalletConfig): PasskeyWalletConfig => {
   const rpId = normalizeHostname(config.rpId);
   const derivationNamespace = normalizeDerivationNamespace(config.derivationNamespace) || DEFAULT_DERIVATION_NAMESPACE;
+  if (config.walletMode !== 'passkey-eoa') {
+    throw new Error(`Unsupported passkey wallet mode "${String(config.walletMode || '')}". Expected "passkey-eoa".`);
+  }
+  if (config.walletKeyMode !== 'passkey-derived' && config.walletKeyMode !== 'encrypted-private-key') {
+    throw new Error(
+      `Unsupported passkey wallet key mode "${String(config.walletKeyMode || '')}". Expected "passkey-derived" or "encrypted-private-key".`,
+    );
+  }
+  if (config.sessionMode !== 'soft') {
+    throw new Error(`Unsupported passkey wallet session mode "${String(config.sessionMode || '')}". Expected "soft".`);
+  }
   if (!rpId) {
     throw new Error('Passkey wallet RP ID is required. Set NEXT_PUBLIC_RP_ID or REACT_APP_NEXT_PUBLIC_RP_ID.');
   }
@@ -111,13 +128,13 @@ export const getPasskeyWalletConfig = (): PasskeyWalletConfig => {
   const ttlSeconds = readDualIntEnv(
     'NEXT_PUBLIC_WALLET_UNLOCK_TTL_SECONDS',
     'REACT_APP_NEXT_PUBLIC_WALLET_UNLOCK_TTL_SECONDS',
-    DEFAULT_TTL_SECONDS
+    DEFAULT_TTL_SECONDS,
   );
   const walletMode = readDualEnv('NEXT_PUBLIC_WALLET_MODE', 'REACT_APP_NEXT_PUBLIC_WALLET_MODE', 'passkey-eoa');
   const walletKeyMode = readDualEnv(
     'NEXT_PUBLIC_WALLET_KEY_MODE',
     'REACT_APP_NEXT_PUBLIC_WALLET_KEY_MODE',
-    DEFAULT_WALLET_KEY_MODE
+    DEFAULT_WALLET_KEY_MODE,
   );
   const sessionMode = readDualEnv('NEXT_PUBLIC_SESSION_MODE', 'REACT_APP_NEXT_PUBLIC_SESSION_MODE', 'soft');
 
@@ -133,13 +150,13 @@ export const getPasskeyWalletConfig = (): PasskeyWalletConfig => {
     allowPreviewRpId: readDualBoolEnv(
       'NEXT_PUBLIC_ALLOW_PREVIEW_RP_ID',
       'REACT_APP_NEXT_PUBLIC_ALLOW_PREVIEW_RP_ID',
-      false
+      false,
     ),
     storageMode: 'indexeddb',
     derivationNamespace: readDualEnv(
       'NEXT_PUBLIC_WALLET_DERIVATION_NAMESPACE',
       'REACT_APP_NEXT_PUBLIC_WALLET_DERIVATION_NAMESPACE',
-      DEFAULT_DERIVATION_NAMESPACE
+      DEFAULT_DERIVATION_NAMESPACE,
     ),
   });
 };

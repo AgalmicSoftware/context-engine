@@ -32,26 +32,29 @@ describe('surveyPileViewState', () => {
   it('uses questionPool as the early visible pile source until the sorted pile catches up', () => {
     const earlyQuestion = { id: 'q1', prompt: 'Early question' };
 
-    expect(resolveEarlyVisiblePileQuestions({
-      pileQuestions: [],
-      questionPool: [
-        earlyQuestion,
-        { id: 'q2', prompt: '[encrypted]', promptDecrypted: false },
-      ],
-      isFilterActive: false,
-    })).toEqual([earlyQuestion]);
+    expect(
+      resolveEarlyVisiblePileQuestions({
+        pileQuestions: [],
+        questionPool: [earlyQuestion, { id: 'q2', prompt: '[encrypted]', promptDecrypted: false }],
+        isFilterActive: false,
+      }),
+    ).toEqual([earlyQuestion]);
 
-    expect(resolveEarlyVisiblePileQuestions({
-      pileQuestions: [{ id: 'pile-q', prompt: 'Sorted pile question' }],
-      questionPool: [earlyQuestion],
-      isFilterActive: false,
-    })).toEqual([{ id: 'pile-q', prompt: 'Sorted pile question' }]);
+    expect(
+      resolveEarlyVisiblePileQuestions({
+        pileQuestions: [{ id: 'pile-q', prompt: 'Sorted pile question' }],
+        questionPool: [earlyQuestion],
+        isFilterActive: false,
+      }),
+    ).toEqual([{ id: 'pile-q', prompt: 'Sorted pile question' }]);
 
-    expect(resolveEarlyVisiblePileQuestions({
-      pileQuestions: [],
-      questionPool: [earlyQuestion],
-      isFilterActive: true,
-    })).toEqual([]);
+    expect(
+      resolveEarlyVisiblePileQuestions({
+        pileQuestions: [],
+        questionPool: [earlyQuestion],
+        isFilterActive: true,
+      }),
+    ).toEqual([]);
   });
 
   it('builds the pile submit success-badge presentation state', () => {

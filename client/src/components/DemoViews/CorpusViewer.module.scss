@@ -40,7 +40,9 @@ $text: #f4f7ff;
   opacity: 0.55;
   padding: 14px 18px 16px;
   scroll-snap-align: start;
-  transition: opacity 0.15s ease, background 0.15s ease;
+  transition:
+    opacity 0.15s ease,
+    background 0.15s ease;
 }
 
 .tabButton:hover {
@@ -227,15 +229,15 @@ $text: #f4f7ff;
 }
 
 .policyLegendSwatchLive {
-  background: rgba(77,255,164,0.9);
+  background: rgba(77, 255, 164, 0.9);
 }
 
 .policyLegendSwatchProposed {
-  background: rgba(255,179,71,0.9);
+  background: rgba(255, 179, 71, 0.9);
 }
 
 .policyLegendSwatchMixed {
-  background: rgba(122,140,255,0.9);
+  background: rgba(122, 140, 255, 0.9);
 }
 
 .scrollArea {
@@ -562,7 +564,6 @@ $text: #f4f7ff;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
 }
-
 
 .sentimentBadge {
   border-radius: var(--ce-radius-pill);

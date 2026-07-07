@@ -109,7 +109,7 @@ describe('SessionWizard worker panel rendering', () => {
       admin: TEST_ADMIN_ADDRESS,
     });
 
-    sessionStorage.setItem(
+    localStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
         draft: {
@@ -158,7 +158,7 @@ describe('SessionWizard worker panel rendering', () => {
   });
 
   it('hides an empty cached worker URL in normal mode until a real worker exists', async () => {
-    sessionStorage.setItem(
+    localStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
         draft: {
@@ -183,7 +183,7 @@ describe('SessionWizard worker panel rendering', () => {
   });
 
   it('does not resurrect a stale cached deploy URL after deploy verification was cleared', async () => {
-    sessionStorage.setItem(
+    localStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
         draft: {
@@ -205,7 +205,7 @@ describe('SessionWizard worker panel rendering', () => {
 
   it('shows the worker URL in normal mode after a worker has been deployed', async () => {
     const deployedWorkerUrl = 'https://deployed.example.test';
-    sessionStorage.setItem(
+    localStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
         draft: {

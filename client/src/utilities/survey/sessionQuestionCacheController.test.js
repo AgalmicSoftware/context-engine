@@ -89,9 +89,7 @@ const {
   readSessionScanMaxBlockRange,
   resolveValidatedSessionScanWindow,
 } = require('../session/sessionScanScope.js');
-const {
-  getTemporaryDemoSessionQuestionFixtures,
-} = require('../session/demoSessionQuestionFixtures.js');
+const { getTemporaryDemoSessionQuestionFixtures } = require('../session/demoSessionQuestionFixtures.js');
 const { getGlobalLitHooks } = require('../crypto/litProtocol.js');
 const {
   buildQuestionDecryptContextForSession,
@@ -104,78 +102,12 @@ const {
   shouldFlushCoalescedRun,
 } = require('../session/mainSiteProgressHelpers.js');
 const { isMaskedQuestionPayload, pickBetterQuestionPayload } = require('./questionRouting.js');
-const { resolveWorkerCanonicalCacheIdentity } = require('./workerCanonicalCacheIdentity.js');
 
 const NETWORK_ID = '11155420';
 const SESSION_SLUG = 'alpha';
 const ACCOUNT = '0xUser';
 const PROVIDER_LIKE = 'provider-like';
 const WORKER_SESSION_ID = `0x${'3'.repeat(32)}`;
-
-const createWorkerCanonicalSessionConfig = ({
-  hybrid = false,
-  sessionId = WORKER_SESSION_ID,
-  workerUrl = 'https://alpha-worker.example.test',
-} = {}) => ({
-  slug: SESSION_SLUG,
-  sessionId,
-  corsWorkerUrl: workerUrl,
-  sessionModeProfile: {
-    profileVersion: 1,
-    preset: 'custom',
-    authority: { mode: 'worker_canonical' },
-    evm: { registryChainId: hybrid ? 11155420 : null },
-    storage: {
-      backend: 'cloudflare',
-      payloadAccessControl: { gate: 'none', encryption: hybrid ? 'worker_envelope' : 'none' },
-    },
-    identity: { default: 'passkey', enabled: ['passkey'] },
-    authorization: { mechanisms: ['worker_roles'] },
-    encryption: hybrid
-      ? {
-          mode: 'worker_envelope',
-          keyProvider: 'worker_secret',
-          accessConditions: {
-            match: 'any',
-            conditions: [
-              {
-                kind: 'sbt_onchain',
-                chainId: 11155420,
-                contract: '0x1111111111111111111111111111111111111111',
-                anyOrAll: 'any',
-              },
-            ],
-          },
-        }
-      : { mode: 'none' },
-    surfaces: {
-      web: true,
-      telegram: false,
-      miniApp: false,
-      agentHttp: false,
-      mcp: false,
-      ceCc: false,
-    },
-    results: {
-      visibility: hybrid ? 'participant_aggregate' : 'public_full_if_storage_public',
-      exposure: {
-        aggregateResultsEnabled: true,
-        anonymizedGroupsEnabled: false,
-        minGroupSize: 2,
-      },
-    },
-    export: { scope: 'all_session' },
-  },
-  storageProfile: {
-    backend: 'cloudflare',
-    resources: { questions: 'active', surveys: 'active' },
-    payloadAccessControl: {
-      gate: 'none',
-      encryption: 'none',
-      mode: 'public_read',
-    },
-  },
-});
 
 const deepClone = (value) => (value == null ? value : JSON.parse(JSON.stringify(value)));
 
@@ -425,11 +357,10 @@ describe('createSessionQuestionCacheController', () => {
     shouldCommitThrottledProgress.mockImplementation(({ force }) => !!force);
     shouldFlushCoalescedRun.mockImplementation(({ force }) => !!force);
     getTemporaryDemoSessionQuestionFixtures.mockReturnValue([]);
-    isMaskedQuestionPayload.mockImplementation((question) => (
-      !!question?.masked ||
-      String(question?.prompt || '') === '[encrypted]' ||
-      question?.promptDecrypted === false
-    ));
+    isMaskedQuestionPayload.mockImplementation(
+      (question) =>
+        !!question?.masked || String(question?.prompt || '') === '[encrypted]' || question?.promptDecrypted === false,
+    );
     pickBetterQuestionPayload.mockImplementation((prev, next) => next);
   });
 
@@ -738,6 +669,7 @@ describe('createSessionQuestionCacheController', () => {
       expect(stored?.[NETWORK_ID]).toEqual(
         expect.objectContaining({
           questionsLatestBlock: 12,
+          questionsDiscoveryCheckpointBlock: 12,
           questions: {},
           questionResponses: {},
           questionResponsesMeta: {},
@@ -748,7 +680,6 @@ describe('createSessionQuestionCacheController', () => {
           questionHydrationMeta: {},
         }),
       );
-      expect(stored?.[NETWORK_ID]?.questionsDiscoveryCheckpointBlock).toBeUndefined();
     });
 
     it('resets empty discovery watermarks when a gated empty recovery forces a rescan', async () => {
@@ -837,13 +768,12 @@ describe('createSessionQuestionCacheController', () => {
       await flushMicrotasks(6);
 
       expect(contractScripts.getRelevantBlockWindowForFilter).toHaveBeenCalledWith('demo-1');
-      expect(host.getStored('questionsCache', 'demo-1')?.[NETWORK_ID]?.questions?.['0xabcdef'])
-        .toMatchObject({
-          id: '0xabcdef',
-          prompt: 'Fixture prompt',
-          sessionSlug: 'demo-1',
-          temporaryDemoSeed: true,
-        });
+      expect(host.getStored('questionsCache', 'demo-1')?.[NETWORK_ID]?.questions?.['0xabcdef']).toMatchObject({
+        id: '0xabcdef',
+        prompt: 'Fixture prompt',
+        sessionSlug: 'demo-1',
+        temporaryDemoSeed: true,
+      });
       expect(host.getStateSnapshot()).toMatchObject({
         isQuestionCacheReady: true,
         questionResponsesNonce: 1,
@@ -891,9 +821,7 @@ describe('createSessionQuestionCacheController', () => {
         maxBlockRange: DEFAULT_SESSION_SCAN_MAX_BLOCK_RANGE,
         wasCapped: false,
       });
-      contractScripts.getAllQuestionIDsChunkedWithCallback.mockReturnValueOnce(
-        discoveryDeferred.promise
-      );
+      contractScripts.getAllQuestionIDsChunkedWithCallback.mockReturnValueOnce(discoveryDeferred.promise);
 
       const initPromise = controller.initializeQuestionCacheForGroup('demo-1');
       await flushMicrotasks(10);
@@ -902,17 +830,17 @@ describe('createSessionQuestionCacheController', () => {
         'demo-1',
         expect.objectContaining({
           demoCompatibilitySeed: { temporary: true },
-        })
+        }),
       );
-      expect(host.getStored('questionsCache', 'demo-1')?.[NETWORK_ID]?.questions?.['0xabcdef'])
-        .toMatchObject({
-          id: '0xabcdef',
-          prompt: 'Fixture prompt',
-          sessionSlug: 'demo-1',
-          temporaryDemoSeed: true,
-        });
-      expect(host.getStored('questionsCache', 'demo-1')?.[NETWORK_ID]?.pendingQuestionMetadata?.['0xabcdef'])
-        .toBeUndefined();
+      expect(host.getStored('questionsCache', 'demo-1')?.[NETWORK_ID]?.questions?.['0xabcdef']).toMatchObject({
+        id: '0xabcdef',
+        prompt: 'Fixture prompt',
+        sessionSlug: 'demo-1',
+        temporaryDemoSeed: true,
+      });
+      expect(
+        host.getStored('questionsCache', 'demo-1')?.[NETWORK_ID]?.pendingQuestionMetadata?.['0xabcdef'],
+      ).toBeUndefined();
       expect(host.getStateSnapshot()).toMatchObject({
         isQuestionCacheReady: true,
         questionResponsesNonce: 1,

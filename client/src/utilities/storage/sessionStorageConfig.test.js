@@ -30,7 +30,14 @@ describe('sessionStorageConfig', () => {
     expect(resolveSessionStorageBackend(sessionConfig, { resource: 'responses' })).toBe(STORAGE_BACKENDS.CLOUDFLARE);
     expect(usesCloudflareSessionStorage(sessionConfig)).toBe(true);
     expect(usesWorkerSbtGateCloudflareStorage(sessionConfig)).toBe(true);
-    expect(normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.mode).toBe(SESSION_STORAGE_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE);
+    expect(normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.mode).toBe(
+      SESSION_STORAGE_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE,
+    );
+    expect(normalizeSessionStorageConfig(sessionConfig).payloadAccessControl).toEqual({
+      gate: SESSION_STORAGE_PAYLOAD_ACCESS_GATES.SBT_GATE,
+      encryption: SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES.NONE,
+      mode: SESSION_STORAGE_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE,
+    });
     expect(requiresLitForSessionStorage(sessionConfig, { encrypted: true })).toBe(false);
   });
 
@@ -44,7 +51,12 @@ describe('sessionStorageConfig', () => {
     expect(resolveSessionStorageBackend(sessionConfig, { resource: 'responses' })).toBe(STORAGE_BACKENDS.CLOUDFLARE);
     expect(requiresLitForSessionStorage(sessionConfig, { resource: 'responses' })).toBe(true);
     expect(usesWorkerSbtGateCloudflareStorage(sessionConfig)).toBe(false);
-    expect(normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.mode).toBe(SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED);
+    expect(normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.mode).toBe(
+      SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED,
+    );
+    expect(normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.encryption).toBe(
+      SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES.LIT,
+    );
   });
 
   test('marks Cloudflare public_read mode as non-Lit and non-SBT-gated', () => {
@@ -57,8 +69,13 @@ describe('sessionStorageConfig', () => {
     expect(resolveSessionStorageBackend(sessionConfig, { resource: 'questions' })).toBe(STORAGE_BACKENDS.CLOUDFLARE);
     expect(requiresLitForSessionStorage(sessionConfig, { resource: 'questions' })).toBe(false);
     expect(usesWorkerSbtGateCloudflareStorage(sessionConfig)).toBe(false);
-    expect(normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.mode).toBe(SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ);
-    expect(normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.gate).toBe(SESSION_STORAGE_PAYLOAD_ACCESS_GATES.NONE);
+    expect(usesPublicReadCloudflareStorage(sessionConfig)).toBe(true);
+    expect(normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.mode).toBe(
+      SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ,
+    );
+    expect(normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.gate).toBe(
+      SESSION_STORAGE_PAYLOAD_ACCESS_GATES.NONE,
+    );
   });
 
   test('normalizes v2 worker_envelope access without requiring Lit', () => {

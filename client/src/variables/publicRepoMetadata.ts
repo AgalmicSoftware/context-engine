@@ -11,16 +11,13 @@ export const PUBLIC_DISCOVERABILITY_URL = 'https://contextengine.xyz/discoverabi
 export const PUBLIC_LLMS_URL = 'https://contextengine.xyz/llms.txt';
 export const PUBLIC_DISCOVERABILITY_PATH = '/discoverability.html';
 export const PUBLIC_LLMS_PATH = '/llms.txt';
-export const buildPublicRepoLatestReleaseAssetUrl = (filename = '') => (
-  filename ? `${PUBLIC_REPO_URL}/releases/latest/download/${String(filename).replace(/^\/+/, '')}` : ''
-);
-export const buildPublicRepoBlobUrl = (pathname = '') => (
-  pathname ? `${PUBLIC_REPO_URL}/blob/${PUBLIC_GITHUB_BRANCH}/${String(pathname).replace(/^\/+/, '')}` : ''
-);
-export const buildPublicRepoTreeUrl = (pathname = '') => (
-  pathname ? `${PUBLIC_REPO_URL}/tree/${PUBLIC_GITHUB_BRANCH}/${String(pathname).replace(/^\/+/, '')}` : ''
-);
-export const buildPublicRepoRawUrl = (pathname = '') => (
+export const buildPublicRepoLatestReleaseAssetUrl = (filename = ''): string =>
+  filename ? `${PUBLIC_REPO_URL}/releases/latest/download/${String(filename).replace(/^\/+/, '')}` : '';
+export const buildPublicRepoBlobUrl = (pathname = ''): string =>
+  pathname ? `${PUBLIC_REPO_URL}/blob/${PUBLIC_GITHUB_BRANCH}/${String(pathname).replace(/^\/+/, '')}` : '';
+export const buildPublicRepoTreeUrl = (pathname = ''): string =>
+  pathname ? `${PUBLIC_REPO_URL}/tree/${PUBLIC_GITHUB_BRANCH}/${String(pathname).replace(/^\/+/, '')}` : '';
+export const buildPublicRepoRawUrl = (pathname = ''): string =>
   pathname
     ? `https://raw.githubusercontent.com/${PUBLIC_GITHUB_ORG}/${PUBLIC_GITHUB_REPO}/${PUBLIC_GITHUB_BRANCH}/${String(pathname).replace(/^\/+/, '')}`
     : '';

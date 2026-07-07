@@ -32,11 +32,8 @@ type SurveyQuestionsSubmitFooterProps = {
   uploadStatusText?: React.ReactNode;
 };
 
-const renderSubmissionErrorText = (submissionError: string): string => (
-  submissionError.length > 50
-    ? `${submissionError.substring(0, 47)}...`
-    : submissionError
-);
+const renderSubmissionErrorText = (submissionError: string): string =>
+  submissionError.length > 50 ? `${submissionError.substring(0, 47)}...` : submissionError;
 
 const SurveyQuestionsSubmitFooter = ({
   isSingleQuestionView = false,
@@ -52,28 +49,30 @@ const SurveyQuestionsSubmitFooter = ({
   submissionError = '',
   uploadStatusText = 'Uploading...',
 }: SurveyQuestionsSubmitFooterProps): React.ReactElement => {
-  const submitFooterClassName = [
-    styles.footer,
-    isSingleQuestionView ? styles.singleQuestionSubmitFooter : '',
-  ].filter(Boolean).join(' ') || undefined;
+  const {
+    showSubmitAux = false,
+    submitDisabled = false,
+    submittedIndicatorActive = false,
+    uploadStatusText = 'Uploading...',
+  } = displayState;
+  const submitFooterClassName =
+    [styles.footer, isSingleQuestionView ? styles.singleQuestionSubmitFooter : ''].filter(Boolean).join(' ') ||
+    undefined;
   const singleQuestionSubmittedIndicatorActive = !isSingleQuestionView && submittedIndicatorActive;
-  const submitButtonClassName = [
-    isSingleQuestionView ? styles.singleQuestionSubmitButton : '',
-    pendingEditCount > 0 ? styles.submitGlow : '',
-    singleQuestionSubmittedIndicatorActive ? styles.submittedButtonNoIcon : '',
-  ].filter(Boolean).join(' ') || undefined;
-  const submitAuxClassName = [
-    styles.submitAux,
-    isSingleQuestionView ? styles.singleQuestionSubmitAux : '',
-  ].filter(Boolean).join(' ') || undefined;
+  const submitButtonClassName =
+    [
+      isSingleQuestionView ? styles.singleQuestionSubmitButton : '',
+      pendingEditCount > 0 ? styles.submitGlow : '',
+      singleQuestionSubmittedIndicatorActive ? styles.submittedButtonNoIcon : '',
+    ]
+      .filter(Boolean)
+      .join(' ') || undefined;
+  const submitAuxClassName =
+    [styles.submitAux, isSingleQuestionView ? styles.singleQuestionSubmitAux : ''].filter(Boolean).join(' ') ||
+    undefined;
   const submitLinkClassName = isSingleQuestionView ? styles.singleQuestionSubmitLink : undefined;
-  const showClearChanges =
-    pendingEditCount > 0 &&
-    !isSubmitting &&
-    !singleQuestionSubmittedIndicatorActive;
-  const showSubmittedResponseLink =
-    singleQuestionSubmittedIndicatorActive &&
-    !!responseUrl;
+  const showClearChanges = pendingEditCount > 0 && !isSubmitting && !singleQuestionSubmittedIndicatorActive;
+  const showSubmittedResponseLink = singleQuestionSubmittedIndicatorActive && !!responseUrl;
 
   return (
     <div className={submitFooterClassName} id={styles.surveyFooter}>
@@ -90,10 +89,7 @@ const SurveyQuestionsSubmitFooter = ({
             {uploadStatusText}
           </div>
         ) : singleQuestionSubmittedIndicatorActive ? (
-          <div
-            className={styles.submittedIndicatorText}
-            data-testid={E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR}
-          >
+          <div className={styles.submittedIndicatorText} data-testid={E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR}>
             Submitted
           </div>
         ) : submissionError ? (

@@ -103,8 +103,9 @@ describe('SessionWizard worker resource rendering', () => {
     await waitFor(() => {
       expect(screen.getByRole('radio', { name: 'Lit encrypted' })).toHaveAttribute('aria-checked', 'true');
     });
-    expect(screen.getByText(/Lit-encrypted mode is configured for encrypted Cloudflare payload envelopes/i))
-      .toBeInTheDocument();
+    expect(
+      screen.getByText(/Lit-encrypted mode is configured for encrypted Cloudflare payload envelopes/i),
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
 
@@ -118,33 +119,36 @@ describe('SessionWizard worker resource rendering', () => {
   });
 
   it('blocks publishing worker resources with unrepresentable All gate groups', async () => {
-    localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
-      draft: {
-        sessionName: 'Unrepresentable All Gates',
-        slug: 'unrepresentable-all-gates',
-        networkChainId: 11155420,
-      },
-      encryptionGates: [
-        {
-          id: 'gate-all-a',
-          label: 'All A',
-          mode: 'all',
-          chainId: 11155420,
-          sbts: [{ address: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', name: 'All A SBT' }],
+    localStorage.setItem(
+      'ce:sessionWizardDraft:v1',
+      JSON.stringify({
+        draft: {
+          sessionName: 'Unrepresentable All Gates',
+          slug: 'unrepresentable-all-gates',
+          networkChainId: 11155420,
         },
-        {
-          id: 'gate-all-b',
-          label: 'All B',
-          mode: 'all',
-          chainId: 11155420,
-          sbts: [{ address: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', name: 'All B SBT' }],
+        encryptionGates: [
+          {
+            id: 'gate-all-a',
+            label: 'All A',
+            mode: 'all',
+            chainId: 11155420,
+            sbts: [{ address: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', name: 'All A SBT' }],
+          },
+          {
+            id: 'gate-all-b',
+            label: 'All B',
+            mode: 'all',
+            chainId: 11155420,
+            sbts: [{ address: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', name: 'All B SBT' }],
+          },
+        ],
+        defaultGateId: 'gate-all-a',
+        resourceGateMap: {
+          ai: ['gate-all-a', 'gate-all-b'],
         },
-      ],
-      defaultGateId: 'gate-all-a',
-      resourceGateMap: {
-        ai: ['gate-all-a', 'gate-all-b'],
-      },
-    }));
+      }),
+    );
 
     renderLoggedInSessionWizard();
     enableAdvancedMode();
@@ -166,15 +170,18 @@ describe('SessionWizard worker resource rendering', () => {
   });
 
   it('hides Lit worker inputs for Cloudflare worker SBT gate mode and restores them for Lit encrypted mode', async () => {
-    localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
-      draft: {
-        storageProfile: {
-          backend: 'cloudflare',
-          payloadAccessControl: { mode: 'worker_sbt_gate' },
+    localStorage.setItem(
+      'ce:sessionWizardDraft:v1',
+      JSON.stringify({
+        draft: {
+          storageProfile: {
+            backend: 'cloudflare',
+            payloadAccessControl: { mode: 'worker_sbt_gate' },
+          },
         },
-      },
-      workerSecretsEnabled: true,
-    }));
+        workerSecretsEnabled: true,
+      }),
+    );
 
     const firstRender = renderLoggedInSessionWizard();
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
@@ -185,15 +192,18 @@ describe('SessionWizard worker resource rendering', () => {
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_ACCOUNT_API_KEY)).not.toBeInTheDocument();
 
     firstRender.unmount();
-    localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
-      draft: {
-        storageProfile: {
-          backend: 'cloudflare',
-          payloadAccessControl: { mode: 'lit_encrypted' },
+    localStorage.setItem(
+      'ce:sessionWizardDraft:v1',
+      JSON.stringify({
+        draft: {
+          storageProfile: {
+            backend: 'cloudflare',
+            payloadAccessControl: { mode: 'lit_encrypted' },
+          },
         },
-      },
-      workerSecretsEnabled: true,
-    }));
+        workerSecretsEnabled: true,
+      }),
+    );
 
     renderLoggedInSessionWizard();
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
@@ -212,34 +222,27 @@ describe('SessionWizard worker resource rendering', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
 
     expect(await screen.findByText('Worker Deployment')).toBeInTheDocument();
-    expect(screen.getByText('Sessions use a Cloudflare Worker for CORS proxy, AI, and faucet services.')).toBeInTheDocument();
     expect(
-      screen.getByText('The default hosted worker is used automatically unless a custom worker URL is configured.')
+      screen.getByText('Sessions use a Cloudflare Worker for CORS proxy, AI, and faucet services.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('The default hosted worker is used automatically unless a custom worker URL is configured.'),
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /worker source/i })).toHaveAttribute(
       'href',
-      expect.stringContaining('/tree/main/workers/sessionCorsWorker')
+      expect.stringContaining('/tree/main/workers/sessionCorsWorker'),
     );
-    expect(screen.getByRole('link', { name: /worker source/i })).toHaveAttribute(
-      'rel',
-      'noopener noreferrer'
-    );
+    expect(screen.getByRole('link', { name: /worker source/i })).toHaveAttribute('rel', 'noopener noreferrer');
     expect(screen.getByRole('link', { name: /deploy helper/i })).toHaveAttribute(
       'href',
-      expect.stringContaining('/tree/main/workers/deploy-helper')
+      expect.stringContaining('/tree/main/workers/deploy-helper'),
     );
-    expect(screen.getByRole('link', { name: /deploy helper/i })).toHaveAttribute(
-      'rel',
-      'noopener noreferrer'
-    );
+    expect(screen.getByRole('link', { name: /deploy helper/i })).toHaveAttribute('rel', 'noopener noreferrer');
     expect(screen.getByRole('link', { name: /worker docs/i })).toHaveAttribute(
       'href',
-      expect.stringContaining('/blob/main/docs/session-cors-worker.md')
+      expect.stringContaining('/blob/main/docs/session-cors-worker.md'),
     );
-    expect(screen.getByRole('link', { name: /worker docs/i })).toHaveAttribute(
-      'rel',
-      'noopener noreferrer'
-    );
+    expect(screen.getByRole('link', { name: /worker docs/i })).toHaveAttribute('rel', 'noopener noreferrer');
     expect(screen.queryByText('Worker code (unbundled, copy + paste)')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /copy worker code/i })).not.toBeInTheDocument();
   });
@@ -305,15 +308,18 @@ describe('SessionWizard worker resource rendering', () => {
   it('waits for a worker URL before enabling Chipotle wizard hooks', async () => {
     const litProtocol = require('../../utilities/crypto/litProtocol.js');
     litProtocol.createLitHooks.mockClear();
-    localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
-      workerSecretsEnabled: true,
-      workerSecrets: {
-        litApiBase: 'https://api.chipotle.litprotocol.com',
-        litGroupId: 'group_123',
-        litPkpId: 'pkp_123',
-        litActionCid: 'bafy123',
-      },
-    }));
+    localStorage.setItem(
+      'ce:sessionWizardDraft:v1',
+      JSON.stringify({
+        workerSecretsEnabled: true,
+        workerSecrets: {
+          litApiBase: 'https://api.chipotle.litprotocol.com',
+          litGroupId: 'group_123',
+          litPkpId: 'pkp_123',
+          litActionCid: 'bafy123',
+        },
+      }),
+    );
 
     renderSessionWizard();
 
@@ -335,9 +341,11 @@ describe('SessionWizard worker resource rendering', () => {
 
       const trigger = await screen.findByTestId('ce-wizard-resource-tooltip-lit');
       fireEvent.mouseOver(trigger);
-      expect(await screen.findByText(
-        'Worker-mediated Lit Chipotle setup. Paste one Lit API key; the worker derives the scoped group, PKP, and CE action after deploy.'
-      )).toBeInTheDocument();
+      expect(
+        await screen.findByText(
+          'Worker-mediated Lit Chipotle setup. Paste one Lit API key; the worker derives the scoped group, PKP, and CE action after deploy.',
+        ),
+      ).toBeInTheDocument();
       fireEvent.mouseOut(trigger);
     } finally {
       act(() => {
@@ -360,7 +368,10 @@ describe('SessionWizard worker resource rendering', () => {
         ['rpc', 'Authenticated RPC endpoint used by the worker for chain reads and related operations.'],
         ['arweave', 'Account used to pay for Arweave uploads and storage.'],
         ['txGas', 'Faucet signer used to send small testnet funding grants.'],
-        ['lit', 'Worker-mediated Lit Chipotle setup. Paste one Lit API key; the worker derives the scoped group, PKP, and CE action after deploy.'],
+        [
+          'lit',
+          'Worker-mediated Lit Chipotle setup. Paste one Lit API key; the worker derives the scoped group, PKP, and CE action after deploy.',
+        ],
       ];
 
       for (const [resourceKey, copy] of tooltipCases) {
@@ -389,7 +400,11 @@ describe('SessionWizard worker resource rendering', () => {
       const allowedOriginsTrigger = await screen.findByTestId('ce-wizard-worker-tooltip-gw-allowed-origins');
 
       fireEvent.mouseOver(rpcTooltipTrigger);
-      expect(await screen.findByText('Authenticated RPC endpoint used by the worker for chain reads and related operations.')).toBeInTheDocument();
+      expect(
+        await screen.findByText(
+          'Authenticated RPC endpoint used by the worker for chain reads and related operations.',
+        ),
+      ).toBeInTheDocument();
       fireEvent.mouseOut(rpcTooltipTrigger);
 
       expect(allowedOriginsTrigger).toBeInTheDocument();
@@ -411,7 +426,11 @@ describe('SessionWizard worker resource rendering', () => {
       expect(await screen.findByTestId('ce-wizard-worker-tooltip-gw-allowed-origins')).toBeInTheDocument();
 
       fireEvent.click(restoredTrigger);
-      expect(await screen.findByText('Authenticated RPC endpoint used by the worker for chain reads and related operations.')).toBeInTheDocument();
+      expect(
+        await screen.findByText(
+          'Authenticated RPC endpoint used by the worker for chain reads and related operations.',
+        ),
+      ).toBeInTheDocument();
     } finally {
       act(() => {
         jest.runOnlyPendingTimers();
@@ -441,20 +460,23 @@ describe('SessionWizard worker resource rendering', () => {
   it('keeps Chipotle Lit UI visible while stripping cached legacy payer secrets from saved drafts', async () => {
     const litProtocol = require('../../utilities/crypto/litProtocol.js');
     const cachedLitKey = '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5';
-    localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
-      workerSecretsEnabled: true,
-      workerSecrets: {
-        litPayerPrivateKey: cachedLitKey,
-        litPayerAddress: ethers.utils.computeAddress(cachedLitKey),
-      },
-      provisionedSponsoredContext: {
-        sessionSlug: 'edge',
-        workerUrl: 'https://deployed.example.test',
-        fields: {
-          sponsored_lit: '1',
+    localStorage.setItem(
+      'ce:sessionWizardDraft:v1',
+      JSON.stringify({
+        workerSecretsEnabled: true,
+        workerSecrets: {
+          litPayerPrivateKey: cachedLitKey,
+          litPayerAddress: ethers.utils.computeAddress(cachedLitKey),
         },
-      },
-    }));
+        provisionedSponsoredContext: {
+          sessionSlug: 'edge',
+          workerUrl: 'https://deployed.example.test',
+          fields: {
+            sponsored_lit: '1',
+          },
+        },
+      }),
+    );
 
     renderSessionWizard();
     selectNormalModeCard('Worker');

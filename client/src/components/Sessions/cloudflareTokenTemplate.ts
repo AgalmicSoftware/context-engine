@@ -116,10 +116,15 @@ export const buildCloudflareTokenTemplateUrl = ({
   includeDocStorage?: boolean;
 } = {}): string => {
   const params = new URLSearchParams();
-  params.set('permissionGroupKeys', JSON.stringify(buildCloudflareTokenTemplatePermissions({
-    includeWorkersDevSubdomainSetup,
-    includeDocStorage,
-  })));
+  params.set(
+    'permissionGroupKeys',
+    JSON.stringify(
+      buildCloudflareTokenTemplatePermissions({
+        includeWorkersDevSubdomainSetup,
+        includeDocStorage,
+      }),
+    ),
+  );
   params.set('accountId', toStr(accountId).trim() || '*');
   params.set('zoneId', 'all');
   params.set('name', buildTokenName(slug));

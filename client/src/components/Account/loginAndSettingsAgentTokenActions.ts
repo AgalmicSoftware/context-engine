@@ -11,6 +11,11 @@ export type LoginAgentSessionContext = {
   sessionSlug: string;
 };
 
+type AgentClientTokenValidation = { ok: boolean; reason?: string };
+type AgentTokenStatePatch =
+  | { agentTokenError: string; agentTokenInput: string; agentTokenStatus: string }
+  | { agentTokenError: string; agentTokenInput: string; agentTokenLoginOpen: boolean; agentTokenStatus: string };
+
 export type LoginAgentActionsDeps = {
   changeAccount: (payload: unknown) => void;
   exchangeAgentClientLogin: (args: {
@@ -44,19 +49,23 @@ export type LoginAgentActions = {
   toggleAgentTokenLogin: () => void;
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isRecord = (value: unknown): value is UnknownRecord =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
+
+const toRecord = (value: unknown): UnknownRecord => (isRecord(value) ? value : {});
 
 const toStr = (value: unknown): string => String(value ?? '').trim();
 
 export const formatAgentTokenError = (error: unknown): string => {
   const reason = toStr(isRecord(error) && 'message' in error ? error.message : error);
-  if (reason.includes('expired')) return 'This token is expired. Create a fresh agent token in Telegram and paste it again.';
+  if (reason.includes('expired'))
+    return 'This token is expired. Create a fresh agent token in Telegram and paste it again.';
   if (reason.includes('session_mismatch')) return 'This token is for a different session.';
   if (reason.includes('scope_denied')) return 'This token does not have permission to unlock the client view.';
-  if (reason.includes('origin_denied') || reason.includes('origin_not_allowed')) return 'This browser origin is not allowed for this session.';
-  if (reason.includes('not_enabled') || reason.includes('disabled')) return 'Client token login is not enabled for this session.';
+  if (reason.includes('origin_denied') || reason.includes('origin_not_allowed'))
+    return 'This browser origin is not allowed for this session.';
+  if (reason.includes('not_enabled') || reason.includes('disabled'))
+    return 'Client token login is not enabled for this session.';
   if (reason.includes('empty')) return 'Paste a Context Engine agent token first.';
   if (reason.includes('multiline')) return 'Paste one token or token link on a single line.';
   if (reason.includes('unsupported_format')) return 'Paste a ceagt_ token or a Context Engine token link.';
@@ -75,15 +84,13 @@ export const createLoginAgentActions = (deps: LoginAgentActionsDeps): LoginAgent
     }
     return (
       cfgIn ||
-      deps.getSessionConfigBySlugOrDefault(slug) ||
-      deps.getDemoSessionConfigBySlug(slug, { allowDemoFallback: true }) ||
-      {}
+        deps.getSessionConfigBySlugOrDefault(slug) ||
+        deps.getDemoSessionConfigBySlug(slug, { allowDemoFallback: true }) ||
+        {},
     );
   };
 
-  const resolveAgentBridgeUrl = (sessionConfig: unknown = null): string => (
-    resolveTelegramAgentBridgeUrl(sessionConfig)
-  );
+  const resolveAgentBridgeUrl = (sessionConfig: unknown = null): string => resolveTelegramAgentBridgeUrl(sessionConfig);
 
   const getAgentTokenLoginSessionContext = (): LoginAgentSessionContext => {
     const sessionSlug = deps.getActiveSessionSlug();
@@ -116,9 +123,11 @@ export const createLoginAgentActions = (deps: LoginAgentActionsDeps): LoginAgent
       cacheAgentClientLoginEnvelope(envelope);
       const windowTarget = deps.windowTarget ?? (typeof window !== 'undefined' ? window : null);
       if (windowTarget && typeof windowTarget.dispatchEvent === 'function') {
-        windowTarget.dispatchEvent(new CustomEvent('ce-agent-client-login', {
-          detail: { sessionSlug: envelope.sessionSlug, envelope },
-        }));
+        windowTarget.dispatchEvent(
+          new CustomEvent('ce-agent-client-login', {
+            detail: { sessionSlug: envelope.sessionSlug, envelope },
+          }),
+        );
       }
     } catch (_) {}
     deps.changeAccount({

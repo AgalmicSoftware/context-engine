@@ -2,11 +2,8 @@ import { normalizeSessionSlug } from './sessionNaming.js';
 
 type UnknownRecord = Record<string, unknown>;
 
-const asRecord = (value: unknown): UnknownRecord => (
-  value && typeof value === 'object' && !Array.isArray(value)
-    ? value as UnknownRecord
-    : {}
-);
+const asRecord = (value: unknown): UnknownRecord =>
+  value && typeof value === 'object' && !Array.isArray(value) ? (value as UnknownRecord) : {};
 
 const firstNormalizedSlug = (...values: unknown[]): string => {
   for (const value of values) {
@@ -36,14 +33,11 @@ export const resolveResponseSessionSlug = (response: unknown): string => {
     metaRecord.sessionSlug,
     metaRecord.slug,
     contextRecord.sessionSlug,
-    contextRecord.slug
+    contextRecord.slug,
   );
 };
 
-export const isResponseAllowedForSessionSlug = (
-  response: unknown,
-  expectedSessionSlug: unknown = ''
-): boolean => {
+export const isResponseAllowedForSessionSlug = (response: unknown, expectedSessionSlug: unknown = ''): boolean => {
   const expected = normalizeSessionSlug(expectedSessionSlug || '');
   if (!expected) return true;
   const actual = resolveResponseSessionSlug(response);

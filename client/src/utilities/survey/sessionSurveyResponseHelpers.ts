@@ -18,9 +18,7 @@ interface ResolveSurveyResponseWatermarkArgs {
   lowestFailedBlock: number | null;
 }
 
-export const normalizeSurveyResponseBatchResult = (
-  batchResult: unknown
-): NormalizedSurveyResponseBatchResult => {
+export const normalizeSurveyResponseBatchResult = (batchResult: unknown): NormalizedSurveyResponseBatchResult => {
   if (Array.isArray(batchResult)) {
     return {
       responses: batchResult as SurveyResponseItem[],
@@ -28,14 +26,8 @@ export const normalizeSurveyResponseBatchResult = (
       lowestFailedBlock: null,
     };
   }
-  const batchRecord = (
-    batchResult && typeof batchResult === 'object'
-      ? batchResult
-      : {}
-  ) as CacheRecord;
-  const responses = Array.isArray(batchRecord.responses)
-    ? (batchRecord.responses as SurveyResponseItem[])
-    : [];
+  const batchRecord = (batchResult && typeof batchResult === 'object' ? batchResult : {}) as CacheRecord;
+  const responses = Array.isArray(batchRecord.responses) ? (batchRecord.responses as SurveyResponseItem[]) : [];
   const lowestFailedBlock = Number(batchRecord.lowestFailedBlock);
   return {
     responses,
@@ -53,8 +45,5 @@ export const resolveSurveyResponseWatermark = ({
   if (!hadPartialFailure) return latestBlock;
   const failedBlock = Number(lowestFailedBlock);
   if (!Number.isFinite(failedBlock)) return latestBlock;
-  return Math.max(
-    Math.max(0, Number(startBlock) - 1),
-    Math.min(Number(latestBlock) || 0, failedBlock - 1)
-  );
+  return Math.max(Math.max(0, Number(startBlock) - 1), Math.min(Number(latestBlock) || 0, failedBlock - 1));
 };

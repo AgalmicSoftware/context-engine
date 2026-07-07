@@ -66,7 +66,7 @@ export const buildSponsoredFlagFields = ({
     [SPONSORED_FIELD_KEYS.rpc]: customRpcUrl || customRpcKey ? '1' : '0',
     [SPONSORED_FIELD_KEYS.faucet]: faucetKey ? '1' : '0',
     [SPONSORED_FIELD_KEYS.arweave]: arweaveJwk ? '1' : '0',
-    [SPONSORED_FIELD_KEYS.lit]: (litUsageApiKey || litAccountApiKey) ? '1' : '0',
+    [SPONSORED_FIELD_KEYS.lit]: litUsageApiKey || litAccountApiKey ? '1' : '0',
     [SPONSORED_FIELD_KEYS.transcribe]: openaiKey ? '1' : '0',
   };
 

@@ -149,8 +149,7 @@ const getPerformance = (): ExtendedPerformance | null => {
   return null;
 };
 
-const isPlainObject = (value: unknown): value is UnknownRecord =>
-  !!value && typeof value === 'object' && !Array.isArray(value);
+const isPlainObject = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
 
 const readRecord = (value: unknown, key: string): unknown => (isPlainObject(value) ? value[key] : undefined);
 
@@ -223,7 +222,7 @@ const isCeRuntimeStatsEnabled = () => {
   }
 };
 
-const normalizeNamespace = (namespaceIn: unknown = '') => {
+const normalizeNamespace = (namespaceIn = '') => {
   const raw = String(namespaceIn || '')
     .trim()
     .toLowerCase();

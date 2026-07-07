@@ -37,14 +37,18 @@ describe('sessionWizardModeProfileDraftController', () => {
   it('stores selected mode profiles and clears legacy telegram flags', () => {
     const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
     const compiled = compileSessionModeProfile(profile);
-    const next = applySessionModeProfileSelectionToDraft({
-      telegramOnly: true,
-      telegram_only: true,
-      telegramMode: true,
-      sessionMode: 'telegram',
-      telegramBridgeEnabled: true,
-      telegram: { only: true, mode: 'client', keep: 'value' },
-    }, profile, compiled);
+    const next = applySessionModeProfileSelectionToDraft(
+      {
+        telegramOnly: true,
+        telegram_only: true,
+        telegramMode: true,
+        sessionMode: 'telegram',
+        telegramBridgeEnabled: true,
+        telegram: { only: true, mode: 'client', keep: 'value' },
+      },
+      profile,
+      compiled,
+    );
 
     expect(next.sessionModeProfile).toMatchObject({ preset: profile.preset });
     expect(next.storageProfile).toMatchObject(compiled.storageProfile);

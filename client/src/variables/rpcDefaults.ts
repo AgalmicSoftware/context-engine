@@ -55,17 +55,9 @@ const publicRpcUrlsByChainId = freezeUrlListMap({
     'https://optimism-sepolia.publicnode.com',
     'https://optimism-sepolia-rpc.publicnode.com',
   ],
-  42161: [
-    'https://arb1.arbitrum.io/rpc',
-    'https://arbitrum.publicnode.com',
-  ],
-  421614: [
-    'https://sepolia-rollup.arbitrum.io/rpc',
-    'https://arbitrum-sepolia.publicnode.com',
-  ],
-  747474: [
-    'https://rpc.katana.network',
-  ],
+  42161: ['https://arb1.arbitrum.io/rpc', 'https://arbitrum.publicnode.com'],
+  421614: ['https://sepolia-rollup.arbitrum.io/rpc', 'https://arbitrum-sepolia.publicnode.com'],
+  747474: ['https://rpc.katana.network'],
 });
 
 const pathRpcUrlsByChainId = freezeUrlMap({

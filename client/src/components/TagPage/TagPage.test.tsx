@@ -159,58 +159,6 @@ describe('tag AI cache helpers', () => {
   });
 });
 
-const createTagPageStore = (sessionStateOverrides: Record<string, any> = {}) => createStore(
-  (state = {
-    profile: {
-      network: { id: 84532 },
-    },
-    sessionState: {
-      activeSessionSlug: 'edge',
-      primarySessionSlug: 'edge',
-      primarySessionExplicit: false,
-      selectedSessionScope: 'active',
-      selectedSessionSlugs: [],
-      ...sessionStateOverrides,
-    },
-  }) => state
-);
-
-describe('tag AI cache helpers', () => {
-  it('refreshes cache recency when reading an existing interpretation', () => {
-    const cache = new Map([
-      ['old', 'Old summary'],
-      ['keep', 'Kept summary'],
-      ['new', 'New summary'],
-    ]);
-
-    expect(readTagAiCacheEntry(cache, 'old')).toBe('Old summary');
-    expect([...cache.keys()]).toEqual(['keep', 'new', 'old']);
-    expect(readTagAiCacheEntry(cache, 'missing')).toBe('');
-    expect([...cache.keys()]).toEqual(['keep', 'new', 'old']);
-  });
-
-  it('evicts the least recent entries when writing beyond the cache limit', () => {
-    const cache = new Map([
-      ['first', 'First summary'],
-      ['second', 'Second summary'],
-    ]);
-
-    writeTagAiCacheEntry(cache, 'third', 'Third summary', 2);
-
-    expect([...cache.entries()]).toEqual([
-      ['second', 'Second summary'],
-      ['third', 'Third summary'],
-    ]);
-
-    writeTagAiCacheEntry(cache, 'second', 'Updated summary', 2);
-
-    expect([...cache.entries()]).toEqual([
-      ['third', 'Third summary'],
-      ['second', 'Updated summary'],
-    ]);
-  });
-});
-
 const createTagPageStore = (sessionStateOverrides: Record<string, any> = {}) =>
   createStore(
     (
@@ -319,13 +267,11 @@ const renderTagPage = ({
   tagPageProps = {},
 }: Record<string, any> = {}) =>
   render(
-    <AppQueryProvider>
-      <Provider store={createTagPageStore(sessionState)}>
-        <MemoryRouter initialEntries={[entry]}>
-          <TagPageComponent questionResponsesNonce={0} isQuestionCacheReady={isQuestionCacheReady} {...tagPageProps} />
-        </MemoryRouter>
-      </Provider>
-    </AppQueryProvider>,
+    <Provider store={createTagPageStore(sessionState)}>
+      <MemoryRouter initialEntries={[entry]}>
+        <TagPageComponent questionResponsesNonce={0} isQuestionCacheReady={isQuestionCacheReady} {...tagPageProps} />
+      </MemoryRouter>
+    </Provider>,
   );
 
 const renderTagModal = ({
@@ -338,19 +284,17 @@ const renderTagModal = ({
   toggle = jest.fn(),
 }: Record<string, any> = {}) =>
   render(
-    <AppQueryProvider>
-      <Provider store={createTagPageStore(sessionState)}>
-        <MemoryRouter initialEntries={[entry]}>
-          <TagModalComponent
-            isOpen={isOpen}
-            toggle={toggle}
-            activeTag={activeTag}
-            demoCorpusMode={demoCorpusMode}
-            demoCorpusRecords={demoCorpusRecordsOverride}
-          />
-        </MemoryRouter>
-      </Provider>
-    </AppQueryProvider>,
+    <Provider store={createTagPageStore(sessionState)}>
+      <MemoryRouter initialEntries={[entry]}>
+        <TagModalComponent
+          isOpen={isOpen}
+          toggle={toggle}
+          activeTag={activeTag}
+          demoCorpusMode={demoCorpusMode}
+          demoCorpusRecords={demoCorpusRecordsOverride}
+        />
+      </MemoryRouter>
+    </Provider>,
   );
 
 describe('TagPage', () => {
@@ -1060,9 +1004,7 @@ describe('TagModal', () => {
     expect(
       screen.getByText(/demo corpus mode uses the demo corpus records currently loaded in this view/i),
     ).toBeInTheDocument();
-    expect(screen.getByText(/session scope: Registry Edge \(edge\)/i)).toBeInTheDocument();
-    expect(mockPortGetAllSessionSlugs).not.toHaveBeenCalled();
-    expect(mockPortGetSessionConfigBySlug).toHaveBeenCalledWith('edge');
+    expect(screen.getByText(/session scope: edge/i)).toBeInTheDocument();
     expect(screen.queryByTestId('ce-tag-page-session-selector-toggle')).not.toBeInTheDocument();
   });
 
@@ -1096,19 +1038,17 @@ describe('TagModal', () => {
     scrollArea.scrollTop = 240;
 
     rerender(
-      <AppQueryProvider>
-        <Provider store={createTagPageStore({})}>
-          <MemoryRouter initialEntries={['/demo/corpus-viewer']}>
-            <TagModalComponent
-              isOpen={true}
-              toggle={toggle}
-              activeTag="Open Source"
-              demoCorpusMode={false}
-              demoCorpusRecords={[]}
-            />
-          </MemoryRouter>
-        </Provider>
-      </AppQueryProvider>,
+      <Provider store={createTagPageStore({})}>
+        <MemoryRouter initialEntries={['/demo/corpus-viewer']}>
+          <TagModalComponent
+            isOpen={true}
+            toggle={toggle}
+            activeTag="Open Source"
+            demoCorpusMode={false}
+            demoCorpusRecords={[]}
+          />
+        </MemoryRouter>
+      </Provider>,
     );
 
     expect(screen.getByRole('heading', { name: '#Open Source' })).toBeInTheDocument();

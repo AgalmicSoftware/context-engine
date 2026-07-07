@@ -295,7 +295,7 @@ describe('sbtPage password and metadata helpers', () => {
         sbtAddr: '0xabc',
         sbtBasePathValue: '/sbt',
       }),
-    ).toBe('https://app.example/s/alpha?auto=1&sbt=0xabc');
+    ).toBe('https://app.example/s/alpha?auto=1&sbt=0xabc&gp=enc%3Aone%20two');
     expect(
       buildSbtPagePasswordInviteLink({
         baseUrl: 'https://app.example',
@@ -304,7 +304,7 @@ describe('sbtPage password and metadata helpers', () => {
         sbtAddr: '0xdef',
         sbtBasePathValue: '/sbt',
       }),
-    ).toBe('https://app.example/sbt/0xdef');
+    ).toBe('https://app.example/sbt/0xdef/pw1');
 
     const inviteRows = buildSbtPagePasswordExportRows({
       baseUrl: 'https://app.example',
@@ -320,7 +320,7 @@ describe('sbtPage password and metadata helpers', () => {
     expect(inviteRows).toEqual([
       {
         groupPassword: 'one two',
-        inviteLink: 'https://app.example/s/alpha?auto=1&sbt=0xabc',
+        inviteLink: 'https://app.example/s/alpha?auto=1&sbt=0xabc&gp=enc%3Aone%20two',
       },
     ]);
 
@@ -335,7 +335,7 @@ describe('sbtPage password and metadata helpers', () => {
     expect(passwordRows).toEqual([
       {
         password: 'pw1',
-        inviteLink: 'https://app.example/sbt/0xdef',
+        inviteLink: 'https://app.example/sbt/0xdef/pw1',
       },
     ]);
 
@@ -349,7 +349,7 @@ describe('sbtPage password and metadata helpers', () => {
         sbtSymbolOrName: 'ALPHA',
       }),
     ).toEqual({
-      content: 'index,password,inviteLink\n0,pw1,https://app.example/sbt/0xdef',
+      content: 'index,password,inviteLink\n0,pw1,https://app.example/sbt/0xdef/pw1',
       fileName: 'ALPHA_passwords_2026-05-05.csv',
       mimeType: 'text/csv',
     });
@@ -557,10 +557,7 @@ describe('sbtPage password and metadata helpers', () => {
     expect(firstState.activeIndex).toBe(0);
     expect(firstState.src).toBe(`https://arweave.net/${txId}`);
     expect(firstState.canRetry).toBe(true);
-    expect(firstState.candidates).toEqual([
-      `https://arweave.net/${txId}`,
-      `https://gateway.irys.xyz/${txId}`,
-    ]);
+    expect(firstState.candidates).toEqual([`https://arweave.net/${txId}`, `https://gateway.irys.xyz/${txId}`]);
 
     const fallbackState = getDisplayImageRenderState(
       { image },
@@ -579,7 +576,7 @@ describe('sbtPage password and metadata helpers', () => {
         displayImageFallbackKey: image,
         displayImageFallbackIndex: 2,
       },
-      '/default.png'
+      '/default.png',
     );
     expect(defaultFallbackState.activeIndex).toBe(2);
     expect(defaultFallbackState.src).toBe('/default.png');

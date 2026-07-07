@@ -284,7 +284,7 @@ describe('App wagmi auto-connect persistence', () => {
     expect(mockCreateClient).toHaveBeenCalledWith(
       expect.objectContaining({
         webSocketProvider: { kind: 'configured-websocket-provider' },
-      })
+      }),
     );
     expect(mockMetaMaskWalletCreateConnector).not.toHaveBeenCalled();
   });

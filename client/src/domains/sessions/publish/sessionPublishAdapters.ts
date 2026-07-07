@@ -37,8 +37,8 @@ export const bindArweavePublishAdapter = ({
   resolveUploadOptions = defaultResolvePublishArweaveUploadOptions,
 }: BindArweavePublishAdapterArgs) => ({
   uploadDataToArweave: ({ data, format, options }: ArweaveUploadInput) =>
-    readArweaveClient().uploadDataToArweave(data, format, options),
-  buildArweaveGatewayUrl: ({ txId }: ArweaveGatewayUrlInput) => readArweaveClient().buildArweaveGatewayUrl(txId),
+    readArweaveScripts().uploadDataToArweave(data, format, options),
+  buildArweaveGatewayUrl: ({ txId }: ArweaveGatewayUrlInput) => readArweaveScripts().buildArweaveGatewayUrl(txId),
   resolveUploadOptions: (input: Parameters<ResolvePublishArweaveUploadOptions>[0]) => resolveUploadOptions(input),
 });
 

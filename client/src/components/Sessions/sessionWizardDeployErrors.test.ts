@@ -67,16 +67,6 @@ describe('sessionWizardDeployErrors', () => {
     });
     expect(
       resolveSessionWizardDeployStatusDisplayState({
-        deployStatus: 'Worker deployed.',
-        workerCanonicalPublishCompleted: true,
-      }),
-    ).toEqual({
-      deployButtonDisabled: true,
-      deployStatusText: 'Worker deployed.',
-      isError: false,
-    });
-    expect(
-      resolveSessionWizardDeployStatusDisplayState({
         deployStatus: 'Missing API token.',
       }),
     ).toEqual({

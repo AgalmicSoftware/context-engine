@@ -87,6 +87,54 @@ export type {
   SbtListSessionLoadingStatusSnapshot,
   SbtListSessionProgressSnapshot,
 } from './sbtListSessionLoadingHelpers';
+export { collectSbtListLinkedScopedEntries } from './sbtListScopedEntryHelpers';
+export type { SbtListScopedEntryOptions } from './sbtListScopedEntryHelpers';
+export { buildSbtListPassiveLatestLookupPlan } from './sbtListPassiveLatestLookupHelpers';
+export type {
+  SbtPassiveLatestLookupInFlightBySlug,
+  SbtPassiveLatestLookupPlan,
+  SbtPassiveLatestLookupProgressSnapshot,
+  SbtPassiveLatestLookupRequest,
+  SbtPassiveLatestLookupState,
+  SbtPassiveLatestLookupStateBySlug,
+} from './sbtListPassiveLatestLookupHelpers';
+export {
+  buildSbtListRealtimeProgressInputPlan,
+  resolveSbtListRealtimeProgressRetentionPlan,
+} from './sbtListRealtimeProgressHelpers';
+export type {
+  SbtListRealtimeProgressBySlug,
+  SbtListRealtimeProgressInputPlan,
+  SbtListRealtimeProgressRecord,
+  SbtListRealtimeProgressRetentionPlan,
+} from './sbtListRealtimeProgressHelpers';
+export {
+  buildSbtListChipProgressDisplayPlan,
+  buildSbtListChipProgressDesiredVisibilityBySlug,
+  resolveSbtListChipProgressVisibilityPlan,
+} from './sbtListChipProgressVisibilityHelpers';
+export type {
+  SbtListChipProgressBooleanBySlug,
+  SbtListChipProgressChipState,
+  SbtListChipProgressDisplayPlan,
+  SbtListChipProgressStatus,
+  SbtListChipProgressStyle,
+  SbtListChipProgressVisibilityAction,
+  SbtListChipProgressVisibilityMeta,
+  SbtListChipProgressVisibilityPlan,
+} from './sbtListChipProgressVisibilityHelpers';
+export {
+  buildSbtListSessionRouteHref,
+  buildSbtListSessionSelectorOptions,
+  resolveSbtListSessionSelectorSummarySlugs,
+} from './sbtListSessionSelectorDisplayHelpers';
+export type {
+  SbtListSessionSelectorChipState,
+  SbtListSessionSelectorOption,
+  SbtListSessionSelectorRouteConfig,
+} from './sbtListSessionSelectorDisplayHelpers';
+export { resolveSbtListRegistryRetryPlan } from './sbtListRegistryLifecycleHelpers';
+export type { SbtListRegistryRetryPlan, SbtListRegistryRetrySnapshot } from './sbtListRegistryLifecycleHelpers';
 export {
   buildSbtListExpandedCardShellClassName,
   buildSbtListFilterContainerClassName,
@@ -123,8 +171,5 @@ export {
   resolveSbtListItemSessionSlug,
 } from './sbtListSessionBindingHelpers';
 export { buildSbtListRenderBuckets } from './sbtListRenderBucketHelpers';
-export type {
-  BuildSbtRenderBucketsOptions,
-  SbtRenderBuckets,
-} from './sbtListRenderBucketHelpers';
+export type { BuildSbtRenderBucketsOptions, SbtRenderBuckets } from './sbtListRenderBucketHelpers';
 export { buildSbtListDetailHref } from './sbtListRouteHelpers';

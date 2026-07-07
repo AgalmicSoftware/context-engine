@@ -49,31 +49,24 @@ export const resolveQuestionFilterSectionHeaderStyle = ({
   opacity: disabled ? 0.5 : 1,
 });
 
-export const buildQuestionFilterSectionIconClassName = (
-  styleMap: Record<string, string>,
-  isOpen: unknown
-) => `${styleMap.icon} ${isOpen ? styleMap.expanded : ''}`;
+export const buildQuestionFilterSectionIconClassName = (styleMap: Record<string, string>, isOpen: unknown) =>
+  `${styleMap.icon} ${isOpen ? styleMap.expanded : ''}`;
 
-export const resolveQuestionFilterSectionBodyStyle = (
-  isOpen: unknown,
-  disabled: unknown
-): React.CSSProperties => ({
+export const resolveQuestionFilterSectionBodyStyle = (isOpen: unknown, disabled: unknown): React.CSSProperties => ({
   display: isOpen && !disabled ? 'block' : 'none',
 });
 
-export const resolveQuestionFilterClearIconStyle = (
-  isDefault: unknown
-): React.CSSProperties => ({
+export const resolveQuestionFilterClearIconStyle = (isDefault: unknown): React.CSSProperties => ({
   cursor: isDefault ? 'not-allowed' : 'pointer',
   marginRight: '12px',
 });
 
 export const resolveQuestionFilterCopyIconStyle = (
   isDefault: unknown,
-  copiedUrlSuccess: unknown
+  copiedUrlSuccess: unknown,
 ): React.CSSProperties => ({
   cursor: isDefault || copiedUrlSuccess ? 'not-allowed' : 'pointer',
-  color: copiedUrlSuccess ? 'green' : (isDefault ? '#cccccc' : '#6c757d'),
+  color: copiedUrlSuccess ? 'green' : isDefault ? '#cccccc' : '#6c757d',
   fontSize: '1.1em',
   marginRight: '15px',
 });
@@ -81,62 +74,48 @@ export const resolveQuestionFilterCopyIconStyle = (
 export const resolveQuestionFilterBookmarkIconStyle = (
   isDefault: unknown,
   isCurrentFilterBookmarked: unknown,
-  filterBookmarkedFeedback: unknown
+  filterBookmarkedFeedback: unknown,
 ): React.CSSProperties => ({
   cursor: isDefault ? 'not-allowed' : 'pointer',
-  color: isCurrentFilterBookmarked || filterBookmarkedFeedback ? 'gold' : (isDefault ? '#cccccc' : '#6c757d'),
+  color: isCurrentFilterBookmarked || filterBookmarkedFeedback ? 'gold' : isDefault ? '#cccccc' : '#6c757d',
   fontSize: '1.1em',
   marginRight: '8px',
 });
 
 export const resolveQuestionFilterEncryptedCountBadgeStyle = (
-  marginLeft: React.CSSProperties['marginLeft'] = '8px'
+  marginLeft: React.CSSProperties['marginLeft'] = '8px',
 ): React.CSSProperties => ({
   marginLeft,
   opacity: 0.7,
 });
 
-export const buildQuestionFilterTagBubbleClassName = (
-  styleMap: Record<string, string>,
-  isSelected: unknown
-) => [
-  styleMap.tagBubble,
-  isSelected ? styleMap.tagBubbleSelected : '',
-].filter(Boolean).join(' ');
+export const buildQuestionFilterTagBubbleClassName = (styleMap: Record<string, string>, isSelected: unknown) =>
+  [styleMap.tagBubble, isSelected ? styleMap.tagBubbleSelected : ''].filter(Boolean).join(' ');
 
-export const buildQuestionFilterTypeButtonClassName = (
-  styleMap: Record<string, string>,
-  isSelected: unknown
-) => [
-  styleMap.typeButton,
-  isSelected ? styleMap.typeButtonActive : '',
-].filter(Boolean).join(' ');
+export const buildQuestionFilterTypeButtonClassName = (styleMap: Record<string, string>, isSelected: unknown) =>
+  [styleMap.typeButton, isSelected ? styleMap.typeButtonActive : ''].filter(Boolean).join(' ');
 
 export const buildQuestionFilterTypePillClassName = (
   styleMap: Record<string, string>,
-  variant?: 'agree' | 'unsure' | 'disagree'
+  variant?: 'agree' | 'unsure' | 'disagree',
 ) => {
-  const variantClassName = variant === 'agree'
-    ? styleMap.typePillAgree
-    : variant === 'unsure'
-      ? styleMap.typePillUnsure
-      : variant === 'disagree'
-        ? styleMap.typePillDisagree
-        : '';
+  const variantClassName =
+    variant === 'agree'
+      ? styleMap.typePillAgree
+      : variant === 'unsure'
+        ? styleMap.typePillUnsure
+        : variant === 'disagree'
+          ? styleMap.typePillDisagree
+          : '';
   return [styleMap.typePill, variantClassName].filter(Boolean).join(' ');
 };
 
-export const buildQuestionFilterAiCombineRowClassName = (
-  styleMap: Record<string, string>
-) => [styleMap.filterOption, styleMap.aiCombineRow].filter(Boolean).join(' ');
+export const buildQuestionFilterAiCombineRowClassName = (styleMap: Record<string, string>) =>
+  [styleMap.filterOption, styleMap.aiCombineRow].filter(Boolean).join(' ');
 
-export const buildQuestionFilterDisabledSectionClassName = (
-  styleMap: Record<string, string>,
-  isDisabled: unknown
-) => isDisabled ? styleMap.disabledSection : '';
+export const buildQuestionFilterDisabledSectionClassName = (styleMap: Record<string, string>, isDisabled: unknown) =>
+  isDisabled ? styleMap.disabledSection : '';
 
-export const resolveQuestionFilterInlineVisibilityStyle = (
-  filterModalOpen: unknown
-): React.CSSProperties => ({
+export const resolveQuestionFilterInlineVisibilityStyle = (filterModalOpen: unknown): React.CSSProperties => ({
   display: filterModalOpen ? 'block' : 'none',
 });

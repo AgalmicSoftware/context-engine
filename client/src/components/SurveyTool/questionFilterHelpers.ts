@@ -299,7 +299,7 @@ export const buildQuestionFilterSelectedTagsPatch = (selectedTags: unknown) => (
 
 export const buildQuestionFilterTopQuestionsCountPatch = (
   pendingTopQuestionsCount: unknown,
-  fallback = DEFAULT_TOP_QUESTIONS_COUNT
+  fallback = DEFAULT_TOP_QUESTIONS_COUNT,
 ) => ({
   pendingTopQuestionsCount: normalizePositiveInt(pendingTopQuestionsCount, fallback),
 });

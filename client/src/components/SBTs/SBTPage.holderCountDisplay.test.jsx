@@ -107,18 +107,12 @@ describe('SBTPage holder count display', () => {
         '0x00000000000000000000000000000000000000b6',
         '0x00000000000000000000000000000000000000b7',
       ],
-      burnedAddresses: [
-        '0x00000000000000000000000000000000000000b6',
-        '0x00000000000000000000000000000000000000b7',
-      ],
+      burnedAddresses: ['0x00000000000000000000000000000000000000b6', '0x00000000000000000000000000000000000000b7'],
       mintedTokensOverride: '7',
     });
 
     const tree = subject.render();
-    const modalCount = findElementInTree(
-      tree,
-      (element) => element?.props?.className === styles.modalTitleCount
-    );
+    const modalCount = findElementInTree(tree, (element) => element?.props?.className === styles.modalTitleCount);
     expect(modalCount).toBeTruthy();
     expect(flattenText(modalCount)).toBe('(5)');
   });
@@ -149,17 +143,12 @@ describe('SBTPage holder count display', () => {
         '0x00000000000000000000000000000000000000b3',
         '0x00000000000000000000000000000000000000b4',
       ],
-      burnedAddresses: [
-        '0x00000000000000000000000000000000000000b3',
-      ],
+      burnedAddresses: ['0x00000000000000000000000000000000000000b3'],
       mintedTokensOverride: null,
     });
 
     const tree = subject.render();
-    const modalCount = findElementInTree(
-      tree,
-      (element) => element?.props?.className === styles.modalTitleCount
-    );
+    const modalCount = findElementInTree(tree, (element) => element?.props?.className === styles.modalTitleCount);
     expect(modalCount).toBeTruthy();
     expect(flattenText(modalCount)).toBe('(3)');
   });
@@ -169,22 +158,13 @@ describe('SBTPage holder count display', () => {
       SBTAddress: '0x00000000000000000000000000000000000000a1',
     });
     setRenderableSbtState(subject, {
-      mintedAddresses: [
-        '0x00000000000000000000000000000000000000b1',
-        '0x00000000000000000000000000000000000000b2',
-      ],
-      burnedAddresses: [
-        '0x00000000000000000000000000000000000000b1',
-        '0x00000000000000000000000000000000000000b2',
-      ],
+      mintedAddresses: ['0x00000000000000000000000000000000000000b1', '0x00000000000000000000000000000000000000b2'],
+      burnedAddresses: ['0x00000000000000000000000000000000000000b1', '0x00000000000000000000000000000000000000b2'],
       mintedTokensOverride: null,
     });
 
     const tree = subject.render();
-    const modalCount = findElementInTree(
-      tree,
-      (element) => element?.props?.className === styles.modalTitleCount
-    );
+    const modalCount = findElementInTree(tree, (element) => element?.props?.className === styles.modalTitleCount);
     expect(modalCount).toBeTruthy();
     expect(flattenText(modalCount)).toBe('(0)');
   });

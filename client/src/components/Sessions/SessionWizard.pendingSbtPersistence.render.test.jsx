@@ -37,8 +37,8 @@ describe('SessionWizard pending SBT tab-memory rendering', () => {
     });
   });
 
-  it('does not restore pending SBT drafts embedded in the main wizard cache', async () => {
-    sessionStorage.setItem(
+  it('does not restore cached pending SBT drafts from localStorage', async () => {
+    localStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
         pendingSbtDrafts: [
@@ -83,7 +83,10 @@ describe('SessionWizard pending SBT tab-memory rendering', () => {
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
     selectNormalModeCard('Privacy');
 
-    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_PENDING_SBT)).not.toBeInTheDocument();
-    expect(sessionStorage.getItem('ce:sessionWizardPendingSbtDrafts:v1')).toBeNull();
+    expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_PENDING_SBT)).toHaveAttribute(
+      'data-ce-sbt-address',
+      mockPendingSbtAddress.toLowerCase(),
+    );
+    expect(screen.getByText(mockPendingSbtAddress)).toBeInTheDocument();
   });
 });

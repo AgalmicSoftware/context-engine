@@ -12,7 +12,7 @@ describe('ConvictionImportanceSliderControl', () => {
         value={4}
         onChange={onChange}
         onChangeComplete={onChangeComplete}
-      />
+      />,
     );
 
     const slider = screen.getByRole('slider');

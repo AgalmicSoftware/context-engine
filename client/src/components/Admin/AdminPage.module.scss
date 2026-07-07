@@ -587,20 +587,20 @@ $card-shadow: tokens.$ce-card-shadow;
 }
 
 .collapseToggle:global(.btn) {
-    opacity: 0.5;
-    display: inline-flex;
-    font-size: 3em;
-    align-items: center;
-    justify-content: center;
-    width: 38px;
-    min-width: 38px;
-    height: 38px;
-    padding: 0;
-    border: 0px solid rgba(255, 255, 255, 0.14);
-    /* border-radius: 12px; */
-    /* background: rgba(255, 255, 255, 0.04); */
-    color: rgba(255, 255, 255, 0.76);
-    box-shadow: none;
+  opacity: 0.5;
+  display: inline-flex;
+  font-size: 3em;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  min-width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 0px solid rgba(255, 255, 255, 0.14);
+  /* border-radius: 12px; */
+  /* background: rgba(255, 255, 255, 0.04); */
+  color: rgba(255, 255, 255, 0.76);
+  box-shadow: none;
 }
 
 .collapseToggle:global(.btn:hover:not(:disabled)),

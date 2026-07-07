@@ -85,7 +85,9 @@ const getSbtPageAutoMintAddressInfo = (propsIn: SbtPageAutoMintAddressPropsLike 
 };
 
 const normalizeAutoMintScopePart = (value: unknown, fallback: string): string => {
-  const normalized = String(value ?? '').trim().toLowerCase();
+  const normalized = String(value ?? '')
+    .trim()
+    .toLowerCase();
   return normalized || fallback;
 };
 
@@ -98,7 +100,9 @@ export const buildSbtPageAutoMintStorageKey = ({
   sbtAddress?: unknown;
   sessionSlug?: unknown;
 } = {}): string | null => {
-  const address = String(sbtAddress || '').trim().toLowerCase();
+  const address = String(sbtAddress || '')
+    .trim()
+    .toLowerCase();
   if (!address) return null;
   return [
     'autoMint',
@@ -310,11 +314,7 @@ export const resolveSbtPageUrlAutoMintIntent = ({
     sessionSlug: resolvedSessionSlug,
     sbtAddress: currentSbtAddrLower,
   });
-  const alreadyTried = !!(
-    autoKey &&
-    sessionStorageRef?.getItem &&
-    sessionStorageRef.getItem(autoKey) === 'done'
-  );
+  const alreadyTried = !!(autoKey && sessionStorageRef?.getItem && sessionStorageRef.getItem(autoKey) === 'done');
 
   return {
     currentSbtAddress,

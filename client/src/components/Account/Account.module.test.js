@@ -28,38 +28,4 @@ describe('Account.module.scss modal account layout guards', () => {
       /:global\(\.modal-login \.close\)\s*(?:,[^{]*?)?\s*{[\s\S]*?position:\s*absolute;[\s\S]*?top:\s*1rem;[\s\S]*?right:\s*1rem;[\s\S]*?background:\s*transparent;[\s\S]*?opacity:\s*0\.5;/,
     );
   });
-
-  it('styles preference controls as switches and keeps the session summary in the config control family', () => {
-    const scss = fs.readFileSync(path.join(__dirname, 'Account.module.scss'), 'utf8');
-
-    expect(scss).toMatch(
-      /\.preferenceToggleTrack\s*{[\s\S]*?width:\s*38px;[\s\S]*?height:\s*22px;[\s\S]*?border-radius:\s*var\(--ce-radius-pill\);/,
-    );
-    expect(scss).toMatch(
-      /\.preferenceToggleButton\[aria-pressed='true'\] \.preferenceToggleThumb\s*{[\s\S]*?background:\s*#4dffa4;[\s\S]*?transform:\s*translateX\(16px\);/,
-    );
-    expect(scss).toMatch(
-      /\.settingsSessionRoute\s*{[\s\S]*?min-height:\s*44px;[\s\S]*?border-radius:\s*var\(--ce-radius-10\);[\s\S]*?border:\s*1px solid rgba\(255, 255, 255, 0\.36\);[\s\S]*?background:\s*transparent;/,
-    );
-    expect(scss).toMatch(
-      /\.sendTestnetFundsButton\.settingsConfigToggleButton,[\s\S]*?\.sendTestnetFundsButton\.preferenceToggleButton\s*{[\s\S]*?border-color:\s*rgba\(255, 255, 255, 0\.36\);/,
-    );
-  });
-
-  it('wraps settings controls into non-overlapping half rows at medium widths', () => {
-    const scss = fs.readFileSync(path.join(__dirname, 'Account.module.scss'), 'utf8');
-
-    expect(scss).toMatch(
-      /@media \(min-width:\s*769px\) and \(max-width:\s*1023px\)\s*{[\s\S]*?\.settingsRow\s*{[\s\S]*?flex-wrap:\s*wrap;[\s\S]*?justify-content:\s*center;/,
-    );
-    expect(scss).toMatch(
-      /@media \(min-width:\s*769px\) and \(max-width:\s*1023px\)[\s\S]*?\.settingsRow > \*\s*{[\s\S]*?flex:\s*1 1 calc\(50% - 6px\);[\s\S]*?min-width:\s*0;[\s\S]*?max-width:\s*100%;/,
-    );
-    expect(scss).toMatch(
-      /@media \(min-width:\s*769px\) and \(max-width:\s*1023px\)[\s\S]*?\.settingsSessionRoute,[\s\S]*?\.settingsConfigToggleButton\s*{[\s\S]*?width:\s*100%;[\s\S]*?justify-content:\s*center;/,
-    );
-    expect(scss).toMatch(
-      /@media \(min-width:\s*769px\) and \(max-width:\s*1023px\)[\s\S]*?\.tooltipsToggleButton\s*{[\s\S]*?flex:\s*1 1 auto;[\s\S]*?width:\s*auto;[\s\S]*?min-width:\s*0;[\s\S]*?justify-content:\s*center;/,
-    );
-  });
 });

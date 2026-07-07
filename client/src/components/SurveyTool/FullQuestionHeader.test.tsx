@@ -8,7 +8,7 @@ describe('FullQuestionHeader', () => {
       <FullQuestionHeader>
         <span>Prompt content</span>
         <span>Action content</span>
-      </FullQuestionHeader>
+      </FullQuestionHeader>,
     );
 
     expect(screen.getByText('Prompt content')).toBeInTheDocument();

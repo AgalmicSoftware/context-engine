@@ -62,13 +62,15 @@ describe('loginSettingsSponsoredStatusHelpers', () => {
       rpc: { status: 'granted' },
     };
 
-    expect(buildLoginSettingsSponsorshipCard({
-      activeSession,
-      key: 'rpc',
-      sponsoredAccess,
-      sponsorSessions,
-      title: 'RPC',
-    })).toEqual({
+    expect(
+      buildLoginSettingsSponsorshipCard({
+        activeSession,
+        key: 'rpc',
+        sponsoredAccess,
+        sponsorSessions,
+        title: 'RPC',
+      }),
+    ).toEqual({
       key: 'rpc',
       title: 'RPC',
       status: {
@@ -142,29 +144,33 @@ describe('loginSettingsSponsoredStatusHelpers', () => {
           { slug: 'active', label: 'Active', isActive: true },
           { slug: 'backup', label: 'Backup', isActive: false },
         ],
-        arweave: [
-          { slug: 'archive', label: 'Archive', isActive: false },
-        ],
+        arweave: [{ slug: 'archive', label: 'Archive', isActive: false }],
       },
     };
 
-    expect(formatResourceSponsorHint({
-      resourceKey: 'rpc',
-      resourceLabel: 'RPC',
-      sponsoredKeys: { rpc: 'key' },
-      sponsorSessions,
-    })).toBe('RPC sponsor is configured for the active session. Other sessions also sponsor RPC: Backup.');
-    expect(formatResourceSponsorHint({
-      resourceKey: 'arweave',
-      resourceLabel: 'Arweave',
-      sponsoredKeys: {},
-      sponsorSessions,
-    })).toBe('No active-session Arweave sponsor. Other sessions with Arweave: Archive. Switch sessions to use one.');
-    expect(formatResourceSponsorHint({
-      resourceKey: 'ai',
-      resourceLabel: 'AI',
-      sponsoredKeys: {},
-      sponsorSessions,
-    })).toBe('No active-session AI sponsor configured.');
+    expect(
+      formatResourceSponsorHint({
+        resourceKey: 'rpc',
+        resourceLabel: 'RPC',
+        sponsoredKeys: { rpc: 'key' },
+        sponsorSessions,
+      }),
+    ).toBe('RPC sponsor is configured for the active session. Other sessions also sponsor RPC: Backup.');
+    expect(
+      formatResourceSponsorHint({
+        resourceKey: 'arweave',
+        resourceLabel: 'Arweave',
+        sponsoredKeys: {},
+        sponsorSessions,
+      }),
+    ).toBe('No active-session Arweave sponsor. Other sessions with Arweave: Archive. Switch sessions to use one.');
+    expect(
+      formatResourceSponsorHint({
+        resourceKey: 'ai',
+        resourceLabel: 'AI',
+        sponsoredKeys: {},
+        sponsorSessions,
+      }),
+    ).toBe('No active-session AI sponsor configured.');
   });
 });

@@ -122,12 +122,7 @@ jest.mock('../SBTs/SBTSelector', () => () => <div data-testid="mock-admin-sbt-se
 
 const AdminPage = require('./AdminPage').default;
 
-const renderAdminPage = async ({
-  account = ADMIN_ADDRESS,
-  initialSessionId,
-  initialRegistryChainId,
-  initialSessionConfig,
-} = {}) => {
+const renderAdminPage = async ({ account = ADMIN_ADDRESS, initialSessionId, initialRegistryChainId } = {}) => {
   let utils;
   await act(async () => {
     utils = render(
@@ -138,7 +133,6 @@ const renderAdminPage = async ({
         toggleLoginModal={jest.fn()}
         initialSessionId={initialSessionId}
         initialRegistryChainId={initialRegistryChainId}
-        initialSessionConfig={initialSessionConfig}
       />,
     );
     await Promise.resolve();
@@ -262,228 +256,6 @@ describe('AdminPage rendered interactions', () => {
         sessionConfig: expect.objectContaining({ slug: 'edge' }),
       }),
     );
-  });
-
-  it('uses an explicit worker-canonical config without loading the registry', async () => {
-    sessionEntries = [];
-    const initialSessionConfig = {
-      slug: 'worker-admin',
-      sessionId: '0x1234567890abcdef1234567890abcdef',
-      sessionName: 'Worker Admin Session',
-      corsWorkerUrl: 'https://worker-admin.example.test',
-      adminAddress: ADMIN_ADDRESS,
-      configRevision: 'worker-admin-revision',
-      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
-    };
-    mockResolveCorsProxyUrl.mockResolvedValue({
-      url: initialSessionConfig.corsWorkerUrl,
-      source: 'session-config',
-      status: 'ok',
-    });
-
-    await renderAdminPage({ initialSessionConfig });
-
-    expect(await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('worker-admin');
-    expect(await screen.findByDisplayValue(initialSessionConfig.corsWorkerUrl)).toBeInTheDocument();
-    expect(mockLoadSessionRegistryCache).not.toHaveBeenCalled();
-    expect(mockFetchSessionFromRegistry).not.toHaveBeenCalled();
-    const metadataPanel = screen.getByText('Session metadata').closest('section');
-    fireEvent.click(within(metadataPanel).getByRole('button', { name: 'Toggle Session metadata section' }));
-    expect(screen.getByText('Cloudflare Session Worker')).toBeInTheDocument();
-    expect(screen.getByText('worker-admin-revision')).toBeInTheDocument();
-    expect(screen.getByText('Not reported')).toBeInTheDocument();
-    expect(screen.queryByText('Chain / Registry')).not.toBeInTheDocument();
-    expect(screen.queryByText('Metadata URI')).not.toBeInTheDocument();
-    expect(screen.queryByText('On-chain default gate')).not.toBeInTheDocument();
-    expect(within(metadataPanel).getByText('AI defaults')).toBeInTheDocument();
-    expect(within(metadataPanel).getByText('Highlighted question IDs')).toBeInTheDocument();
-    expect(within(metadataPanel).queryByText('Contracts')).not.toBeInTheDocument();
-    expect(within(metadataPanel).queryByText('Ignored SBT list')).not.toBeInTheDocument();
-    expect(within(metadataPanel).queryByText('Start block')).not.toBeInTheDocument();
-    expect(within(metadataPanel).queryByText('Faucet amount (ETH)')).not.toBeInTheDocument();
-    expect(screen.getByTestId('ce-admin-worker-groups')).toHaveTextContent(/Native Worker Groups/i);
-    expect(screen.getByTestId('ce-admin-worker-groups')).toHaveTextContent(/Worker-owned participant groups/i);
-  });
-
-  it('keeps Worker SBT conditions separate from the registry transaction editor', async () => {
-    sessionEntries = [];
-    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
-    sessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
-    sessionModeProfile.evm.registryChainId = 11155420;
-    sessionModeProfile.authorization.mechanisms.push('sbt_onchain');
-    sessionModeProfile.encryption.accessConditions = {
-      match: 'any',
-      conditions: [
-        {
-          kind: 'sbt_onchain',
-          chainId: 11155420,
-          contract: '0x1111111111111111111111111111111111111111',
-          anyOrAll: 'any',
-        },
-      ],
-    };
-    const initialSessionConfig = {
-      slug: 'worker-sbt-admin',
-      sessionId: '0x1234567890abcdef1234567890abcdef',
-      sessionName: 'Worker SBT Admin Session',
-      corsWorkerUrl: 'https://worker-sbt-admin.example.test',
-      adminAddress: ADMIN_ADDRESS,
-      sessionModeProfile,
-    };
-    mockResolveCorsProxyUrl.mockResolvedValue({
-      url: initialSessionConfig.corsWorkerUrl,
-      source: 'session-config',
-      status: 'ok',
-    });
-
-    await renderAdminPage({ initialSessionConfig });
-
-    expect(await screen.findByTestId('ce-admin-worker-sbt-gates')).toHaveTextContent(/Advanced on-chain access gates/i);
-    expect(screen.getByTestId('ce-admin-worker-sbt-gates')).toHaveTextContent(/read-only/i);
-    expect(screen.getByTestId('ce-admin-worker-sbt-gates')).toHaveTextContent(/No registry transaction/i);
-    expect(screen.queryByText('On-chain default gate')).not.toBeInTheDocument();
-    expect(screen.queryByTestId(E2E_TESTIDS.ADMIN_GATE_UPDATE_BUTTON)).not.toBeInTheDocument();
-  });
-
-  it('labels Worker groups as a separate agent authorization domain for an enabled Wrapped registry session', async () => {
-    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
-    sessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
-    sessionModeProfile.surfaces.agentHttp = true;
-    sessionEntries = [
-      [
-        'edge',
-        buildSessionConfig({
-          sessionModeProfile,
-          agentSessionWrapped: AGENT_SESSION_WRAPPED_CAPABILITY,
-        }),
-      ],
-    ];
-
-    await renderAdminPage();
-
-    const workerGroupsPanel = await screen.findByTestId('ce-admin-worker-groups');
-    expect(workerGroupsPanel).toHaveTextContent(/Worker\/agent access groups/i);
-    expect(workerGroupsPanel).toHaveTextContent(/separate from registry SBT Groups/i);
-  });
-
-  it('rebinds worker actions across route-only worker session navigation A to B to A', async () => {
-    sessionEntries = [];
-    global.fetch = jest.fn((url) =>
-      Promise.resolve(
-        String(url).endsWith('/health')
-          ? { ok: false, status: 401, json: async () => ({ error: 'auth required' }) }
-          : { ok: true, status: 200, json: async () => ({ ok: true }) },
-      ),
-    );
-    const buildWorkerConfig = (slug) => ({
-      slug,
-      sessionId: slug === 'worker-a' ? '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' : '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-      sessionName: `Session ${slug}`,
-      corsWorkerUrl: `https://${slug}.example.test`,
-      adminAddress: ADMIN_ADDRESS,
-      configRevision: `revision-${slug}`,
-      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
-    });
-    const props = {
-      account: ADMIN_ADDRESS,
-      network: { id: 84532 },
-      loginComplete: true,
-      toggleLoginModal: jest.fn(),
-    };
-    mockResolveCorsProxyUrl.mockImplementation(async ({ sessionConfig }) => ({
-      url: sessionConfig.corsWorkerUrl,
-      source: 'session-config',
-      status: 'ok',
-    }));
-    mockFetchWorkerWithAuth.mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ({ ts: '2026-07-14T00:00:00.000Z' }),
-    });
-
-    const view = render(<AdminPage {...props} initialSessionConfig={buildWorkerConfig('worker-a')} />);
-
-    const probeCurrentSession = async (slug) => {
-      expect(await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue(slug);
-      expect(await screen.findByDisplayValue(`https://${slug}.example.test`)).toBeInTheDocument();
-      await clickAndSettle(screen.getByRole('button', { name: 'Test' }));
-      const testsPanel = screen.getByText('Tests').closest('section');
-      await clickAndSettle(within(testsPanel).getByTitle('Click to test /health'));
-      await waitFor(() =>
-        expect(mockFetchWorkerWithAuth).toHaveBeenLastCalledWith(
-          `https://${slug}.example.test/health`,
-          { method: 'GET' },
-          expect.objectContaining({
-            sessionSlug: slug,
-            workerUrl: `https://${slug}.example.test`,
-          }),
-        ),
-      );
-    };
-
-    await probeCurrentSession('worker-a');
-    view.rerender(<AdminPage {...props} initialSessionConfig={buildWorkerConfig('worker-b')} />);
-    await probeCurrentSession('worker-b');
-    view.rerender(<AdminPage {...props} initialSessionConfig={buildWorkerConfig('worker-a')} />);
-    await probeCurrentSession('worker-a');
-  });
-
-  it('does not admit an invalid raw Worker profile as a route-owned admin session', async () => {
-    sessionEntries = [];
-
-    await renderAdminPage({
-      initialSessionConfig: {
-        slug: 'invalid-worker',
-        corsWorkerUrl: 'https://invalid-worker.example.test',
-        adminAddress: ADMIN_ADDRESS,
-        sessionModeProfile: {
-          profileVersion: 999,
-          authority: { mode: 'worker_canonical' },
-        },
-      },
-    });
-
-    await waitFor(() => expect(mockLoadSessionRegistryCache).toHaveBeenCalled());
-    expect(screen.queryByDisplayValue('https://invalid-worker.example.test')).not.toBeInTheDocument();
-  });
-
-  it('shows profile repair guidance for an invalid selected session instead of on-chain registration advice', async () => {
-    sessionEntries = [
-      [
-        'invalid-profile',
-        buildSessionConfig({
-          slug: 'invalid-profile',
-          sessionModeProfile: {
-            profileVersion: 999,
-            authority: { mode: 'worker_canonical' },
-          },
-        }),
-      ],
-    ];
-
-    await renderAdminPage();
-
-    expect(await screen.findByText(/session capability profile is invalid or unsupported/i)).toBeInTheDocument();
-    expect(screen.queryByText(/Register in \/new before using worker actions/i)).not.toBeInTheDocument();
-  });
-
-  it('shows canonical-config repair guidance when the selected session profile is missing', async () => {
-    sessionEntries = [
-      [
-        'missing-profile',
-        {
-          slug: 'missing-profile',
-          sessionName: 'Missing Profile',
-          corsWorkerUrl: 'https://missing-profile.example.test',
-          networkChainId: 11155420,
-        },
-      ],
-    ];
-
-    await renderAdminPage();
-
-    expect(await screen.findByText(/missing a canonical capability profile/i)).toBeInTheDocument();
-    expect(screen.queryByText(/Register in \/new before using worker actions/i)).not.toBeInTheDocument();
   });
 
   it('reveals the tests section only after the worker Test button is clicked', async () => {
@@ -858,72 +630,7 @@ describe('AdminPage rendered interactions', () => {
         chainIds: [84532],
         bootstrapRpc: false,
       }),
-    ]];
-    global.fetch = jest.fn((url) => Promise.resolve(
-      String(url).endsWith('/auth/nonce')
-        ? { ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) }
-        : { ok: true, json: async () => ({ ok: true }) }
-    ));
-
-    await renderAdminPage();
-    await waitForResolvedWorkerUrl();
-
-    const workerSecretsPanel = await openWorkerSecretsPanel();
-    fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'AI' }));
-
-    fireEvent.change(getSecretInputByLabel('OpenAI API key'), {
-      target: { value: 'sk-live-test' },
-    });
-
-    await clickAndSettle(await screen.findByRole('button', { name: 'Save worker secrets' }));
-
-    await waitFor(() => {
-      expect(mockSetSessionFieldsOnChain).toHaveBeenCalledWith(expect.objectContaining({
-        slug: 'test_a',
-      }));
-    });
-
-    const adminCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/admin/set-secrets'));
-    const payload = JSON.parse(adminCall[1].body);
-    expect(payload.sessionSlug).toBe('test_a');
-    expect(payload.slug).toBe('test_a');
-  });
-
-  it('saves Lit account API keys and updates the sponsored_lit session flag', async () => {
-    global.fetch = jest.fn((url) => Promise.resolve(
-      String(url).endsWith('/auth/nonce')
-        ? { ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) }
-        : { ok: true, json: async () => ({ ok: true }) }
-    ));
-
-    await renderAdminPage();
-    await waitForResolvedWorkerUrl();
-
-    const workerSecretsPanel = await openWorkerSecretsPanel();
-    fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Lit' }));
-
-    fireEvent.change(getSecretInputByLabel('Lit account API key'), {
-      target: { value: 'account-secret' },
-    });
-
-    await clickAndSettle(await screen.findByRole('button', { name: 'Save worker secrets' }));
-
-    await waitFor(() => {
-      expect(screen.getByText(/Worker secrets saved for edge/)).toBeInTheDocument();
-    });
-
-    const adminCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/admin/set-secrets'));
-    const payload = JSON.parse(adminCall[1].body);
-    expect(payload.secrets).toEqual(expect.objectContaining({
-      litAccountApiKey: 'account-secret',
-    }));
-    expect(mockSetSessionFieldsOnChain).toHaveBeenCalledWith(expect.objectContaining({
-      chainId: 84532,
-      slug: 'edge',
-      fields: expect.objectContaining({
-        sponsored_lit: '1',
-      }),
-    }));
+    );
   });
 
   it('saves Lit usage API keys and updates the sponsored_lit session flag', async () => {
@@ -1883,6 +1590,63 @@ describe('AdminPage rendered interactions', () => {
     expect(sessionSelect).toHaveValue('edge');
   });
 
+  it('round-trips requested registry refreshes through fetch, upsert, and store reads', async () => {
+    sessionEntries = [];
+    const requestedConfig = buildSessionConfig({
+      slug: 'requested-edge',
+      sessionName: 'Requested Edge Session',
+    });
+    mockFetchSessionFromRegistry.mockResolvedValue(requestedConfig);
+    mockUpsertSessionRegistryCache.mockImplementation(({ config }) => {
+      sessionEntries = [[config.slug, config]];
+    });
+
+    await renderAdminPage({
+      initialSessionId: 'requested-edge',
+      initialRegistryChainId: '84532',
+    });
+
+    await clickAndSettle(screen.getByRole('button', { name: 'Refresh sessions' }));
+
+    await waitFor(() => {
+      expect(mockFetchSessionFromRegistry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          chainId: 84532,
+          slug: 'requested-edge',
+          providerLike: null,
+          account: '',
+          lit: null,
+          bootstrapRpc: true,
+        }),
+      );
+      expect(mockUpsertSessionRegistryCache).toHaveBeenCalledWith({
+        config: requestedConfig,
+      });
+      expect(screen.getByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('requested-edge');
+    });
+    expect(mockGetAllSessionEntries).toHaveBeenCalled();
+  });
+
+  it('subscribes and unsubscribes the registry cache update listener with the same callback', async () => {
+    const addEventListenerSpy = jest.spyOn(window, 'addEventListener');
+    const removeEventListenerSpy = jest.spyOn(window, 'removeEventListener');
+    try {
+      const { unmount } = await renderAdminPage();
+
+      const addCall = addEventListenerSpy.mock.calls.find(
+        ([eventName]) => eventName === SESSION_REGISTRY_CACHE_UPDATED_EVENT,
+      );
+      expect(addCall).toBeTruthy();
+
+      unmount();
+
+      expect(removeEventListenerSpy).toHaveBeenCalledWith(SESSION_REGISTRY_CACHE_UPDATED_EVENT, addCall[1]);
+    } finally {
+      addEventListenerSpy.mockRestore();
+      removeEventListenerSpy.mockRestore();
+    }
+  });
+
   it('preserves decrypted encrypted fields across equivalent registry cache refreshes', async () => {
     const { encryptedFieldsUtils } = require('../../utilities/crypto/encryptedFields.js');
     const firstEnvelope = {
@@ -1922,33 +1686,38 @@ describe('AdminPage rendered interactions', () => {
       status: 'encrypted',
       encryptedAvailable: true,
     });
-    sessionEntries = [[
-      'edge',
-      buildSessionConfig({
-        encryptedFields: {
-          'ai.providers.openai.apiKey': firstEnvelope,
-        },
-      }),
-    ]];
+    sessionEntries = [
+      [
+        'edge',
+        buildSessionConfig({
+          encryptedFields: {
+            'ai.providers.openai.apiKey': firstEnvelope,
+          },
+        }),
+      ],
+    ];
 
     await renderAdminPage();
 
-    const decryptButton = (await screen.findAllByRole('button', { name: 'Decrypt' }))
-      .find((button) => button.getAttribute('title') === 'Decrypt fields (wallet signature prompts)');
+    const decryptButton = (await screen.findAllByRole('button', { name: 'Decrypt' })).find(
+      (button) => button.getAttribute('title') === 'Decrypt fields (wallet signature prompts)',
+    );
     expect(decryptButton).toBeTruthy();
     fireEvent.click(decryptButton);
 
     expect(await screen.findByText('admin-openai-secret')).toBeInTheDocument();
     expect(encryptedFieldsUtils.resolveEncryptedValue).toHaveBeenCalledTimes(1);
 
-    sessionEntries = [[
-      'edge',
-      buildSessionConfig({
-        encryptedFields: {
-          'ai.providers.openai.apiKey': clonedEnvelope,
-        },
-      }),
-    ]];
+    sessionEntries = [
+      [
+        'edge',
+        buildSessionConfig({
+          encryptedFields: {
+            'ai.providers.openai.apiKey': clonedEnvelope,
+          },
+        }),
+      ],
+    ];
     act(() => {
       window.dispatchEvent(new Event(SESSION_REGISTRY_CACHE_UPDATED_EVENT));
     });
@@ -1958,5 +1727,4 @@ describe('AdminPage rendered interactions', () => {
     });
     expect(encryptedFieldsUtils.resolveEncryptedValue).toHaveBeenCalledTimes(1);
   });
-
 });

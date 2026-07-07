@@ -2,11 +2,7 @@ import { useCallback, useState, type Dispatch, type SetStateAction } from 'react
 import type { WorkerPanelProps } from '../WorkerPanel';
 import { normalizeBaseUrl } from '../../../utilities/urlUtils.js';
 import { toStr } from '../../../utilities/shared/primitives.js';
-import {
-  sanitizeSessionWizardWorkerSecretsForLitMode,
-  WORKER_SECRET_CACHE_SAFE_FIELDS,
-} from '../sessionWizardWorkerSecretSupport';
-import type { SessionWizardWorkerRequirementProof } from '../sessionWizardWorkerRequirementProof';
+import { sanitizeSessionWizardWorkerSecretsForLitMode } from '../sessionWizardWorkerSecretSupport';
 import type { WorkerSecretsLike } from '../../shellTypes';
 
 type DeployFormState = NonNullable<WorkerPanelProps['deployForm']> & {
@@ -55,12 +51,11 @@ const useSessionWizardWorkerState = <TProvisionedSponsoredContext>({
   const [workerSecretsEnabled, setWorkerSecretsEnabled] = useState(() =>
     typeof cachedWizard?.workerSecretsEnabled === 'boolean' ? cachedWizard.workerSecretsEnabled : true,
   );
-  const persistWorkerSecrets = false;
-  const setPersistWorkerSecrets = useCallback<Dispatch<SetStateAction<boolean>>>((nextValue) => {
-    // Kept as a compatibility callback for sponsored-bundle state restoration.
-    // Secret persistence is intentionally unsupported in every build.
-    void nextValue;
-  }, []);
+  const [persistWorkerSecrets, setPersistWorkerSecrets] = useState(() =>
+    typeof cachedWizard?.persistWorkerSecrets === 'boolean'
+      ? cachedWizard.persistWorkerSecrets
+      : devPersistWorkerSecrets,
+  );
   const [deployHelperUrl, setDeployHelperUrl] = useState(() => toStr(deployHelperUrlDefault));
   const [deployForm, setDeployForm] = useState<DeployFormState>({
     // Cloudflare deployment tokens are request-only. Ignore legacy cache values.
@@ -75,29 +70,18 @@ const useSessionWizardWorkerState = <TProvisionedSponsoredContext>({
   const [normalModeBundleUrlOverride, setNormalModeBundleUrlOverride] = useState('');
   const [deployStatus, setDeployStatus] = useState('');
   const [deployInFlight, setDeployInFlight] = useState(false);
-  const [deployComplete, setDeployComplete] = useState(
-    () =>
-      !!cachedWizard?.deployComplete &&
-      !(cachedWizard as CachedWorkerState & { workerRequirementProof?: unknown })?.workerRequirementProof,
-  );
+  const [deployComplete, setDeployComplete] = useState(() => !!cachedWizard?.deployComplete);
   const [deployWorkerUrl, setDeployWorkerUrl] = useState(() =>
     normalizeBaseUrl(toStr(cachedWizard?.deployWorkerUrl).trim()),
-  );
-  // Requirement evidence contains live-only salted secret comparisons. Never
-  // hydrate it from storage; reloads must reverify the stable deploy attempt.
-  const [workerRequirementProof, setWorkerRequirementProof] = useState<SessionWizardWorkerRequirementProof | null>(
-    null,
   );
   const [provisionedSponsoredContext, setProvisionedSponsoredContext] = useState<TProvisionedSponsoredContext>(() =>
     buildProvisionedSponsoredContextState(cachedWizard?.provisionedSponsoredContext),
   );
   const [workerSecrets, setWorkerSecrets] = useState<WorkerSecretsLike>(() => {
     const cached = cachedWizard?.workerSecrets;
-    const safePublicConfig = WORKER_SECRET_CACHE_SAFE_FIELDS.reduce<WorkerSecretsLike>((next, key) => {
-      if (cached && typeof cached === 'object') next[key] = (cached as WorkerSecretsLike)[key];
-      return next;
-    }, {});
-    return sanitizeSessionWizardWorkerSecretsForLitMode(safePublicConfig);
+    return sanitizeSessionWizardWorkerSecretsForLitMode(
+      cached && typeof cached === 'object' ? (cached as WorkerSecretsLike) : {},
+    );
   });
   const [workerUrlAutoFilled, setWorkerUrlAutoFilled] = useState(false);
   const [workerAllowOrigins, setWorkerAllowOrigins] = useState(defaultAllowedOrigins);

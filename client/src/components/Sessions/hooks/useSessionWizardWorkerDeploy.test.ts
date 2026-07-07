@@ -331,9 +331,12 @@ describe('useSessionWizardWorkerDeploy', () => {
 
   it('skips a concurrent worker deploy while the first deploy is still resolving', async () => {
     let resolveAccounts: ((accounts: string[]) => void) | undefined;
-    const providerRequest = jest.fn(() => new Promise<string[]>((resolve) => {
-      resolveAccounts = resolve;
-    }));
+    const providerRequest = jest.fn(
+      () =>
+        new Promise<string[]>((resolve) => {
+          resolveAccounts = resolve;
+        }),
+    );
     (cryptoUtils._getProvider as jest.Mock).mockReturnValue({
       request: providerRequest,
     });
@@ -376,5 +379,70 @@ describe('useSessionWizardWorkerDeploy', () => {
     expect(options.updateDeploymentState).toHaveBeenCalledWith({
       deployInFlight: false,
     });
+  });
+
+  it('includes the normalized Cloudflare storage profile in deploy-helper payloads', async () => {
+    const fetchMock = mockSuccessfulWorkerDeployFetch();
+    const options = buildDeployHookOptions();
+    options.refs.runtimeRef.current.draft = {
+      ...options.refs.runtimeRef.current.draft,
+      storageProfile: {
+        backend: 'cloudflare',
+        resources: { questions: 'active', responses: 'active' },
+        payloadAccessControl: { gate: 'sbt_gate', encryption: 'worker_envelope' },
+        cloudflare: {
+          useR2: true,
+          r2BucketName: 'ce-session-payloads',
+        },
+      },
+    };
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+
+    await act(async () => {
+      await result.current.handleDeployWorker();
+    });
+
+    const deployCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
+    expect(deployCall).toBeTruthy();
+    const deployPayload = JSON.parse(String(deployCall?.[1]?.body || '{}'));
+    expect(deployPayload.storageProfile).toEqual(
+      expect.objectContaining({
+        backend: 'cloudflare',
+        sessionOwned: true,
+        telegramOwned: false,
+        payloadAccessControl: expect.objectContaining({
+          gate: 'sbt_gate',
+          encryption: 'worker_envelope',
+          mode: 'worker_sbt_gate',
+        }),
+        cloudflare: expect.objectContaining({
+          payloadAccessMode: 'worker_sbt_gate',
+          r2BucketName: 'ce-session-payloads',
+        }),
+      }),
+    );
+    expect(deployPayload.storageProfile.resources.questions).toBe('active');
+    expect(deployPayload.storageProfile.resources.responses).toBe('active');
+  });
+
+  it('keeps non-Cloudflare deploy-helper payloads on the legacy shape', async () => {
+    const fetchMock = mockSuccessfulWorkerDeployFetch();
+    const options = buildDeployHookOptions();
+    options.refs.runtimeRef.current.draft = {
+      ...options.refs.runtimeRef.current.draft,
+      storageProfile: {
+        backend: 'arweave',
+      },
+    };
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+
+    await act(async () => {
+      await result.current.handleDeployWorker();
+    });
+
+    const deployCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
+    expect(deployCall).toBeTruthy();
+    const deployPayload = JSON.parse(String(deployCall?.[1]?.body || '{}'));
+    expect(deployPayload.storageProfile).toBeUndefined();
   });
 });

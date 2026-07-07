@@ -133,18 +133,6 @@ const WorkerDeploySection = ({
   onNativeWorkerVerified,
   verifyNativeWorker,
 }: WorkerDeploySectionProps) => {
-  const [nativeSetupSecrets, setNativeSetupSecrets] = React.useState<{
-    tokenHmacSecret: string;
-    storageEnvelopeKek: string;
-  } | null>(null);
-  const [nativeSetupSecretsIdentity, setNativeSetupSecretsIdentity] = React.useState('');
-  const [nativeSetupError, setNativeSetupError] = React.useState('');
-  const [nativeProgress, setNativeProgress] = React.useState<'generated' | 'opened' | 'verifying' | 'verified' | ''>(
-    '',
-  );
-  const [nativeStatus, setNativeStatus] = React.useState('');
-  const [copiedNativeField, setCopiedNativeField] = React.useState('');
-  const [verifiedNativeIdentity, setVerifiedNativeIdentity] = React.useState('');
   const renderTooltip = typeof renderInfoTooltip === 'function' ? renderInfoTooltip : () => null;
   const {
     deployButtonDisabled,
@@ -281,10 +269,10 @@ const WorkerDeploySection = ({
       )}
       {shouldUseSponsoredAutoDeployFlow && (
         <div className={styles.statusNote}>
-          Sponsored deploy bundle is ready. Guided setup will use the GitHub-hosted worker bundle automatically. If a
+          Sponsored deploy bundle is ready. Normal mode will use the GitHub-hosted worker bundle automatically. If a
           retry needs a different source, keep that Git URL as the default and add a manual bundle URL or upload
-          override after a fetch failure. While customizing, you can switch between Upload file and Use URL for manual
-          testing.
+          override after a fetch failure. In advanced mode you can still switch between Upload file and Use URL for
+          manual testing.
         </div>
       )}
       {(!shouldUseSponsoredAutoDeployFlow || !isNormalMode) && (
@@ -294,7 +282,9 @@ const WorkerDeploySection = ({
               <div className={styles.workerDeployName} data-testid={E2E_TESTIDS.WIZARD_WORKER_NAME}>
                 {deployForm.workerName}
               </div>
-            ) : <span />}
+            ) : (
+              <span />
+            )}
           </div>
           <div className={styles.workerDeployGrid}>
             {deployHelperToggle}
@@ -340,38 +330,8 @@ const WorkerDeploySection = ({
               <>
                 <FormGroup key="normal-mode-bundle-url">
                   <Label>Worker bundle URL (release asset)</Label>
-                  <Input
-                    value={normalModeBundleUrl ?? ''}
-                    readOnly
-                    data-testid={E2E_TESTIDS.WIZARD_BUNDLE_URL}
-                  />
-                </FormGroup>
-              )}
-              {!isNormalMode && (
-                <FormGroup className={styles.bundleToggleGroup}>
-                  <Label>Worker bundle source</Label>
-                  <div className={styles.inlineToggleRow}>
-                    <Label className={styles.workerRadio}>
-                      <Input
-                        type="radio"
-                        name="bundleMode"
-                        checked={bundleMode === 'upload'}
-                        data-testid={E2E_TESTIDS.WIZARD_BUNDLE_MODE_UPLOAD}
-                        onChange={() => setBundleMode('upload')}
-                      />
-                      Upload file
-                    </Label>
-                    <Label className={styles.workerRadio}>
-                      <Input
-                        type="radio"
-                        name="bundleMode"
-                        checked={bundleMode === 'url'}
-                        data-testid={E2E_TESTIDS.WIZARD_BUNDLE_MODE_URL}
-                        onChange={() => setBundleMode('url')}
-                      />
-                      Use URL
-                    </Label>
-                  </div>
+                  <Input value={normalModeBundleUrl ?? ''} readOnly data-testid={E2E_TESTIDS.WIZARD_BUNDLE_URL} />
+                  <div className={styles.helperText}>{normalModeBundleHelpText}</div>
                 </FormGroup>
                 {showNormalModeManualBundleControls && (
                   <>
@@ -385,9 +345,7 @@ const WorkerDeploySection = ({
                         invalid={!!normalModeBundleUrlOverrideValidationError}
                         onChange={(e) => setNormalModeBundleUrlOverride(e.target.value)}
                       />
-                      <div className={styles.helperText}>
-                        {manualBundleUrlOverrideHelp}
-                      </div>
+                      <div className={styles.helperText}>{manualBundleUrlOverrideHelp}</div>
                       {normalModeBundleUrlOverrideValidationError && (
                         <div className={styles.errorText}>{normalModeBundleUrlOverrideValidationError}</div>
                       )}
@@ -403,33 +361,20 @@ const WorkerDeploySection = ({
                           invalid={!!normalModeBundleUrlOverrideValidationError}
                           onChange={(e) => setNormalModeBundleUrlOverride(e.target.value)}
                         />
-                        <div className={styles.helperText}>{manualBundleUrlOverrideHelp}</div>
-                        {normalModeBundleUrlOverrideValidationError && (
-                          <div className={styles.errorText}>{normalModeBundleUrlOverrideValidationError}</div>
-                        )}
-                      </FormGroup>
-                      <FormGroup key="normal-mode-bundle-file">
-                        <Label>Upload bundle file (optional)</Label>
-                        <div className={styles.bundleFileInputRow}>
-                          <Input
-                            type="file"
-                            accept=".js,.mjs"
-                            innerRef={normalModeRetryBundleFileInputRef}
-                            data-testid={E2E_TESTIDS.WIZARD_BUNDLE_FILE_INPUT}
-                            onChange={(e) => {
-                              const file = e.target.files && e.target.files[0];
-                              setBundleFile(file || null);
-                            }}
-                          />
-                          <Button
-                            type="button"
-                            className={styles.secondaryButton}
-                            onClick={clearSelectedBundleFile}
-                            data-testid={E2E_TESTIDS.WIZARD_CLEAR_BUNDLE_FILE_DEPLOY}
-                            disabled={!bundleFile}
-                          >
-                            Clear bundle file
-                          </Button>
+                        <Button
+                          type="button"
+                          className={styles.secondaryButton}
+                          onClick={clearSelectedBundleFile}
+                          data-testid={E2E_TESTIDS.WIZARD_CLEAR_BUNDLE_FILE_DEPLOY}
+                          disabled={!bundleFile}
+                        >
+                          Clear bundle file
+                        </Button>
+                      </div>
+                      <div className={styles.helperText}>{normalModeManualBundleHelpText}</div>
+                      {bundleFile && (
+                        <div className={styles.helperText}>
+                          Using {bundleFile.name || localWorkerBundleFallbackFilePath} for this deploy.
                         </div>
                       )}
                     </FormGroup>
@@ -476,7 +421,8 @@ const WorkerDeploySection = ({
                 <span>Cloudflare API token</span>
                 {renderTooltip({
                   id: 'gw-cf-token-tip',
-                  content: 'Use the prefilled template link below. It includes Workers, R2 objects, D1 or KV metadata indexes, and Durable Objects for signer coordination only. Add Account Settings: Edit only when creating or changing the workers.dev subdomain.',
+                  content:
+                    'Use the prefilled template link below. It includes Workers, R2 objects, D1 or KV metadata indexes, and Durable Objects for signer coordination only. Add Account Settings: Edit only when creating or changing the workers.dev subdomain.',
                   placement: 'right',
                   testId: 'ce-wizard-worker-tooltip-gw-cf-token-tip',
                   ariaLabel: 'Cloudflare API token info',
@@ -490,34 +436,50 @@ const WorkerDeploySection = ({
               />
               {!isNormalMode && showSponsoredDeployAccessNotice && (
                 <div className={styles.helperText}>
-                  <a
-                    href={cloudflareTokenTemplateHref}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`${styles.secondaryButton} btn btn-secondary`}
-                    data-testid={E2E_TESTIDS.WIZARD_CLOUDFLARE_TOKEN_CREATE_LINK}
-                  >
-                    Create prefilled API token
-                  </a>
+                  Deploy access is currently provided by the sponsored bundle. Enter a Cloudflare API token here to
+                  override it.
                 </div>
-                <div className={styles.helperText}>
-                  You must be logged into Cloudflare before using the prefilled API token link. Create the token, copy
-                  its generated value, then paste it into the field above.
-                </div>
-                <div className={styles.helperText}>
-                  <a href={CLOUDFLARE_TOKEN_SETUP_GUIDE_URL} target="_blank" rel="noopener noreferrer">
-                    Cloudflare API token setup and security guide
-                  </a>
-                </div>
-              </FormGroup>
-              <FormGroup>
-                <Label>Admin address</Label>
-                <Input
-                  value={deployForm.adminAddress ?? ''}
-                  placeholder={account || '0x...'}
-                  onChange={(e) => setDeployForm((prev) => ({ ...prev, adminAddress: e.target.value }))}
-                />
-              </FormGroup>
+              )}
+              <div className={styles.helperText}>
+                <Button
+                  type="button"
+                  className={styles.secondaryButton}
+                  onClick={() => window.open(buildCloudflareTokenTemplateUrl({ slug: cloudflareTokenSlug }), '_blank')}
+                >
+                  Create prefilled API token
+                </Button>
+              </div>
+              <div className={styles.helperText}>
+                You must be logged into Cloudflare before using the prefilled API token button.
+              </div>
+              <div className={styles.helperText}>Account is inferred from the API token during deploy.</div>
+            </FormGroup>
+            <FormGroup>
+              <Label>Admin address</Label>
+              <Input
+                value={deployForm.adminAddress ?? ''}
+                placeholder={account || '0x...'}
+                onChange={(e) => setDeployForm((prev) => ({ ...prev, adminAddress: e.target.value }))}
+              />
+            </FormGroup>
+          </div>
+          <div className={styles.workerDeployActions}>
+            <Button
+              type="button"
+              className={styles.actionButton}
+              data-testid={E2E_TESTIDS.WIZARD_DEPLOY_WORKER}
+              onClick={handleDeployWorker}
+              disabled={deployButtonDisabled}
+            >
+              Deploy worker
+            </Button>
+          </div>
+          {deployStatusText && (
+            <div
+              className={`${styles.copyStatus} ${deployStatusIsError ? styles.copyStatusError : ''}`}
+              data-testid={E2E_TESTIDS.WIZARD_DEPLOY_STATUS}
+            >
+              {deployStatusText}
             </div>
             <div className={styles.workerDeployActions}>
               <Button

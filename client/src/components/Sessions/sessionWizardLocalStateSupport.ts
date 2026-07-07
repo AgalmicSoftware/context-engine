@@ -115,11 +115,11 @@ export const readSessionWizardCache = ({
   return isSessionWizardCachedState(cachedValue) ? cachedValue : null;
 };
 
-export const writeSessionWizardCache = (payload: unknown, options: WriteCacheDeps = {}) => {
-  const { expectedCachedPayload, logger = log, writeDraftCache = writeSessionWizardDraftCache } = options;
-  const result = Object.prototype.hasOwnProperty.call(options, 'expectedCachedPayload')
-    ? writeDraftCache(payload, { expectedCachedPayload })
-    : writeDraftCache(payload);
+export const writeSessionWizardCache = (
+  payload: unknown,
+  { logger = log, writeDraftCache = writeSessionWizardDraftCache }: WriteCacheDeps = {},
+) => {
+  const result = writeDraftCache(payload);
   if (!result.ok) logger.warn?.('SessionWizard: fallback', result.error || result.status);
   return result;
 };

@@ -25,6 +25,21 @@ type SurveyResultsIndividualResponsesListProps = {
   styleMap: Record<string, string>;
 };
 
+export const buildSurveyResultsResponseRowId = (
+  response: SurveyResultsResponseListEntry,
+  fallbackSurveyId = '',
+  index = 0,
+): string => {
+  const responder = String(response?.responder || '')
+    .trim()
+    .toLowerCase();
+  const surveyId = String(response?.surveyId || fallbackSurveyId || '').trim();
+  if (responder || surveyId) {
+    return `${surveyId || 'unknown-survey'}:${responder || 'unknown-responder'}`;
+  }
+  return `response-row:${index}`;
+};
+
 const SurveyResultsIndividualResponsesList = ({
   activeToggles = {},
   currentSurveyId = '',

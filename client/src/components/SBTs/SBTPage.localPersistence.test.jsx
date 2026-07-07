@@ -44,9 +44,11 @@ describe('SBTPage local persistence', () => {
       'edge',
       expect.objectContaining({
         sbts: expect.arrayContaining(['0xabc0000000000000000000000000000000000000']),
-      })
+      }),
     );
-    expect(JSON.parse(localStorage.getItem('bookmarks'))?.sbts || []).toContain('0xAbC0000000000000000000000000000000000000');
+    expect(JSON.parse(localStorage.getItem('bookmarks'))?.sbts || []).toContain(
+      '0xAbC0000000000000000000000000000000000000',
+    );
   });
 
   it('uses props.slug as the bookmark cache fallback when explicit session props are absent', () => {
@@ -67,7 +69,7 @@ describe('SBTPage local persistence', () => {
       'route-slug',
       expect.objectContaining({
         sbts: expect.arrayContaining(['0xabd0000000000000000000000000000000000000']),
-      })
+      }),
     );
   });
 

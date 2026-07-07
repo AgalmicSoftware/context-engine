@@ -24,6 +24,10 @@ const mockDebateMap = jest.fn();
 const mockRiskMatrix = jest.fn();
 const mockDebateSelector = jest.fn();
 const mockDemoAnalysisWorkspace = jest.fn();
+const originalFetch = global.fetch;
+const fullCrossCorpusPayload = JSON.parse(
+  fs.readFileSync(path.join(__dirname, '../../../../ai-discourse-corpus/corpuses/cross-corpus-debates.json'), 'utf8'),
+);
 
 const extractMediaBlock = (scss, query, requiredSnippet = '') => {
   let searchFrom = 0;
@@ -75,10 +79,6 @@ jest.mock('../SurveyTool/SurveyPage.jsx', () => (props) => {
 jest.mock('../SBTs/SBTsPage', () => (props) => {
   mockSBTsPage(props);
   return <div data-testid="sbts-page">{props.showCreateGroupExternal ? 'Create Open' : 'Create Closed'}</div>;
-});
-jest.mock('./WorkerSessionGroupsPanel', () => (props) => {
-  mockWorkerSessionGroupsPanel(props);
-  return <div data-testid="worker-session-groups-panel">Worker-native groups</div>;
 });
 jest.mock('../PolisReport/PolisReport', () => (props) => {
   mockPolisReport(props);
@@ -249,29 +249,25 @@ describe('OnePageSession view gating', () => {
 
     expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
 
-    rerender(
-      <OnePageSession
-        {...buildProps()}
-        network={null}
-        questionResponsesNonce={1}
-      />
-    );
+    rerender(<OnePageSession {...buildProps()} network={null} questionResponsesNonce={1} />);
 
     expect(screen.getByTestId('survey-page-pile')).toBeInTheDocument();
   });
 
   it('shows a Telegram-first sign-in prompt instead of the web session UI when unauthenticated', async () => {
-    render(<OnePageSession
-      {...buildProps()}
-      sessionConfig={{
-        ...buildProps().sessionConfig,
-        telegramOnly: true,
-        sessionMode: 'telegram_only',
-      }}
-    />);
+    render(
+      <OnePageSession
+        {...buildProps()}
+        sessionConfig={{
+          ...buildProps().sessionConfig,
+          telegramOnly: true,
+          sessionMode: 'telegram_only',
+        }}
+      />,
+    );
 
     expect(await screen.findByTestId(E2E_TESTIDS.SESSION_TELEGRAM_ONLY_NOTICE)).toHaveTextContent(
-      /Telegram-first session/i
+      /Telegram-first session/i,
     );
     expect(screen.getByTestId('ce-session-telegram-login-open')).toBeInTheDocument();
     expect(screen.queryByTestId('survey-page-pile')).not.toBeInTheDocument();
@@ -293,63 +289,84 @@ describe('OnePageSession view gating', () => {
       value: jest.fn(async (url) => {
         const parsed = new URL(String(url));
         if (parsed.pathname.endsWith('/api/agent/session-meta')) {
-          return new Response(JSON.stringify({
-            ok: true,
-            sessionSlug: 'edge',
-            telegramOnly: true,
-            telegramBridgeEnabled: true,
-            clientSubmitReady: true,
-          }), { status: 200, headers: { 'content-type': 'application/json' } });
+          return new Response(
+            JSON.stringify({
+              ok: true,
+              sessionSlug: 'edge',
+              telegramOnly: true,
+              telegramBridgeEnabled: true,
+              clientSubmitReady: true,
+            }),
+            { status: 200, headers: { 'content-type': 'application/json' } },
+          );
         }
         if (parsed.pathname.endsWith('/api/agent/questions')) {
-          return new Response(JSON.stringify({
-            ok: true,
-            questions: [{
-              questionId: 'q1',
-              questionType: 'binary',
-              prompt: 'Should the client render Telegram questions?',
-              options: [],
-              tags: ['client'],
-              answeredByUser: false,
-              answerable: true,
-            }],
-            answerState: { answeredCount: 0, unansweredCount: 1, sort: 'unanswered_first' },
-          }), { status: 200, headers: { 'content-type': 'application/json' } });
+          return new Response(
+            JSON.stringify({
+              ok: true,
+              questions: [
+                {
+                  questionId: 'q1',
+                  questionType: 'binary',
+                  prompt: 'Should the client render Telegram questions?',
+                  options: [],
+                  tags: ['client'],
+                  answeredByUser: false,
+                  answerable: true,
+                },
+              ],
+              answerState: { answeredCount: 0, unansweredCount: 1, sort: 'unanswered_first' },
+            }),
+            { status: 200, headers: { 'content-type': 'application/json' } },
+          );
         }
         if (parsed.pathname.endsWith('/api/agent/results')) {
           const view = parsed.searchParams.get('view');
           if (view === 'consensus' || view === 'difference') {
-            return new Response(JSON.stringify({
-              ok: true,
-              questions: [{
-                questionId: 'q1',
-                prompt: 'Should the client render Telegram questions?',
-                participants: 3,
-                counts: [{ label: 'Agree', count: 2 }, { label: 'Disagree', count: 1 }],
-              }],
-            }), { status: 200, headers: { 'content-type': 'application/json' } });
+            return new Response(
+              JSON.stringify({
+                ok: true,
+                questions: [
+                  {
+                    questionId: 'q1',
+                    prompt: 'Should the client render Telegram questions?',
+                    participants: 3,
+                    counts: [
+                      { label: 'Agree', count: 2 },
+                      { label: 'Disagree', count: 1 },
+                    ],
+                  },
+                ],
+              }),
+              { status: 200, headers: { 'content-type': 'application/json' } },
+            );
           }
           return new Response(JSON.stringify({ ok: true, counts: { questions: 1 } }), {
             status: 200,
             headers: { 'content-type': 'application/json' },
           });
         }
-        return new Response(JSON.stringify({ ok: false }), { status: 404, headers: { 'content-type': 'application/json' } });
+        return new Response(JSON.stringify({ ok: false }), {
+          status: 404,
+          headers: { 'content-type': 'application/json' },
+        });
       }),
     });
 
-    render(<OnePageSession
-      {...buildProps()}
-      loginComplete={true}
-      sessionConfig={{
-        ...buildProps().sessionConfig,
-        telegramOnly: true,
-        sessionMode: 'telegram_only',
-      }}
-    />);
+    render(
+      <OnePageSession
+        {...buildProps()}
+        loginComplete={true}
+        sessionConfig={{
+          ...buildProps().sessionConfig,
+          telegramOnly: true,
+          sessionMode: 'telegram_only',
+        }}
+      />,
+    );
 
     expect(await screen.findByTestId('ce-session-telegram-questions')).toHaveTextContent(
-      /Should the client render Telegram questions/i
+      /Should the client render Telegram questions/i,
     );
     expect(await screen.findByTestId('ce-session-telegram-report-approx')).toHaveTextContent(/Approximate report/i);
     expect(await screen.findByTestId('polis-report')).toBeInTheDocument();
@@ -357,36 +374,40 @@ describe('OnePageSession view gating', () => {
   });
 
   it('derives scoped Chipotle Lit hooks for embedded survey pages from session config', async () => {
-    render(<OnePageSession
-      {...buildProps()}
-      account="0x1E9a72A127dAB666fd47dFAFAe15CCd9e08505eE"
-      loginComplete={true}
-      sessionConfig={{
-        ...buildProps().sessionConfig,
-        slug: 'chipotle-session',
-        corsWorkerUrl: 'https://worker.example.test',
-        __registry: {
-          gateAuthority: 'onchain',
-          gatesByResource: {
-            default: {
-              lookupStatus: 'ok',
-              sbtAddresses: ['0x0000000000000000000000000000000000000001'],
-              chainId: 11155420,
-              mode: 'any',
+    render(
+      <OnePageSession
+        {...buildProps()}
+        account="0x1E9a72A127dAB666fd47dFAFAe15CCd9e08505eE"
+        loginComplete={true}
+        sessionConfig={{
+          ...buildProps().sessionConfig,
+          slug: 'chipotle-session',
+          corsWorkerUrl: 'https://worker.example.test',
+          __registry: {
+            gateAuthority: 'onchain',
+            gatesByResource: {
+              default: {
+                lookupStatus: 'ok',
+                sbtAddresses: ['0x0000000000000000000000000000000000000001'],
+                chainId: 11155420,
+                mode: 'any',
+              },
             },
           },
-        },
-      }}
-    />);
+        }}
+      />,
+    );
 
     expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
     const pileProps = mockSurveyPage.mock.calls.find(([props]) => props?.minifiedMode === 'pile')?.[0];
 
-    expect(pileProps?.litHooks).toEqual(expect.objectContaining({
-      saveKey: expect.any(Function),
-      getKey: expect.any(Function),
-      litNetwork: 'chipotle',
-    }));
+    expect(pileProps?.litHooks).toEqual(
+      expect.objectContaining({
+        saveKey: expect.any(Function),
+        getKey: expect.any(Function),
+        litNetwork: 'chipotle',
+      }),
+    );
   });
 
   it('uses the title container slot to keep the pile submit rail off the header title', async () => {
@@ -419,12 +440,22 @@ describe('OnePageSession view gating', () => {
     const phoneRailBlock = extractMediaBlock(
       scss,
       '@media only screen and (max-width: 480px)',
-      '.titleContainerWithPileSubmitRail'
+      '.titleContainerWithPileSubmitRail',
+    );
+    const desktopRailBlock = extractMediaBlock(
+      scss,
+      '@media only screen and (min-width: 769px) and (max-width: 1366px)',
+      '.titleContainerWithPileSubmitRail',
+    );
+    const widescreenRailBlock = extractMediaBlock(
+      scss,
+      '@media only screen and (min-width: 1367px)',
+      '.titleContainerWithPileSubmitRail',
     );
     const tabletRailBlock = extractMediaBlock(
       scss,
-      '@media only screen and (max-width: 600px)',
-      '.titleContainerWithPileSubmitRail'
+      '@media only screen and (min-width: 481px) and (max-width: 768px)',
+      '.titleContainerWithPileSubmitRail',
     );
 
     expect(phoneRailBlock).toContain('.titleContainerWithPileSubmitRail');
@@ -500,7 +531,7 @@ describe('OnePageSession view gating', () => {
           sessionName: 'Context Engine',
           networkChainId: 11155420,
         }}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
@@ -510,10 +541,12 @@ describe('OnePageSession view gating', () => {
     });
 
     const polisCalls = mockPolisReport.mock.calls.map((args) => args[0]).filter(Boolean);
-    expect(polisCalls[polisCalls.length - 1]).toEqual(expect.objectContaining({
-      sessionSlug: 'demo',
-      demoDataFirstLoad: true,
-    }));
+    expect(polisCalls[polisCalls.length - 1]).toEqual(
+      expect.objectContaining({
+        sessionSlug: 'demo',
+        demoDataFirstLoad: true,
+      }),
+    );
   });
 
   it('does not pass generated demo Polis responses as live embedded report rows', async () => {
@@ -528,7 +561,7 @@ describe('OnePageSession view gating', () => {
           sessionName: 'Context Engine',
           networkChainId: 11155420,
         }}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
@@ -541,10 +574,12 @@ describe('OnePageSession view gating', () => {
     const latestReportProps = polisCalls[polisCalls.length - 1] || {};
     const questionResponses = latestReportProps.questionResponses || {};
 
-    expect(latestReportProps).toEqual(expect.objectContaining({
-      sessionSlug: 'demo',
-      demoDataFirstLoad: true,
-    }));
+    expect(latestReportProps).toEqual(
+      expect.objectContaining({
+        sessionSlug: 'demo',
+        demoDataFirstLoad: true,
+      }),
+    );
     expect(questionResponses).toEqual({});
   });
 
@@ -560,7 +595,7 @@ describe('OnePageSession view gating', () => {
       if (namespace !== 'questionsCache') return {};
       if (slug === '') {
         return {
-          '84532': {
+          84532: {
             questions: {
               qforeign: {
                 id: 'qforeign',
@@ -581,7 +616,7 @@ describe('OnePageSession view gating', () => {
       }
       if (slug === 'demo') {
         return {
-          '84532': {
+          84532: {
             questions: {
               [demoQuestion.id]: {
                 id: demoQuestion.id,
@@ -628,7 +663,7 @@ describe('OnePageSession view gating', () => {
             sessionName: 'Context Engine',
             networkChainId: 84532,
           }}
-        />
+        />,
       );
 
       fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
@@ -639,10 +674,12 @@ describe('OnePageSession view gating', () => {
       await waitFor(() => {
         const polisCalls = mockPolisReport.mock.calls.map((args) => args[0]).filter(Boolean);
         const latestReportProps = polisCalls[polisCalls.length - 1] || {};
-        expect(latestReportProps).toEqual(expect.objectContaining({
-          sessionSlug: 'demo',
-          demoDataFirstLoad: true,
-        }));
+        expect(latestReportProps).toEqual(
+          expect.objectContaining({
+            sessionSlug: 'demo',
+            demoDataFirstLoad: true,
+          }),
+        );
         expect(latestReportProps.questionResponses).toEqual({
           [demoQuestion.id]: [
             expect.objectContaining({
@@ -674,7 +711,7 @@ describe('OnePageSession view gating', () => {
       if (namespace !== 'questionsCache') return {};
       if (slug === '') {
         return {
-          '84532': {
+          84532: {
             questions: {},
             questionResponses: {},
           },
@@ -682,7 +719,7 @@ describe('OnePageSession view gating', () => {
       }
       if (slug === 'demo') {
         return {
-          '84532': {
+          84532: {
             questions: {},
             questionResponses: {
               [demoQuestion.id]: {
@@ -712,7 +749,7 @@ describe('OnePageSession view gating', () => {
             sessionName: 'Context Engine',
             networkChainId: 84532,
           }}
-        />
+        />,
       );
 
       fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
@@ -750,7 +787,7 @@ describe('OnePageSession view gating', () => {
       if (namespace !== 'questionsCache') return {};
       if (slug === '') {
         return {
-          '84532': {
+          84532: {
             questions: {},
             questionResponses: {},
           },
@@ -758,7 +795,7 @@ describe('OnePageSession view gating', () => {
       }
       if (slug === 'demo') {
         return {
-          '84532': {
+          84532: {
             questions: {},
             questionResponses: {
               [demoQuestion.id]: {
@@ -788,7 +825,7 @@ describe('OnePageSession view gating', () => {
             sessionName: 'Context Engine',
             networkChainId: 84532,
           }}
-        />
+        />,
       );
 
       fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
@@ -826,7 +863,7 @@ describe('OnePageSession view gating', () => {
       if (namespace !== 'questionsCache') return {};
       if (slug === '') {
         return {
-          '84532': {
+          84532: {
             questions: {},
             questionResponses: {},
           },
@@ -834,7 +871,7 @@ describe('OnePageSession view gating', () => {
       }
       if (slug === 'demo') {
         return {
-          '84532': {
+          84532: {
             questions: {},
             questionResponses: {
               [demoQuestion.id]: {
@@ -870,7 +907,7 @@ describe('OnePageSession view gating', () => {
             sessionName: 'Context Engine',
             networkChainId: 84532,
           }}
-        />
+        />,
       );
 
       fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
@@ -894,7 +931,6 @@ describe('OnePageSession view gating', () => {
       window.history.replaceState({}, '', priorUrl || '/');
     }
   });
-
 
   it('uses shared session-universe discovery when bootstrapping embedded groups', () => {
     const ensureLightSbtUniverse = jest.fn(() => Promise.resolve());
@@ -952,7 +988,7 @@ describe('OnePageSession view gating', () => {
         if (namespace !== 'questionsCache') return {};
         if (slug === 'edge') {
           return {
-            '84532': {
+            84532: {
               questions: {
                 q1: { id: 'q1', prompt: 'Edge prompt', type: 'binary' },
                 qPending: {
@@ -1072,12 +1108,50 @@ describe('OnePageSession view gating', () => {
     expect(within(fullHeader).getByText('Answer or Add')).toHaveClass(styles.sectionHeaderSubtitle);
   });
 
+  it('renders the Context header title and View subtitle with the shared section header classes', async () => {
+    render(
+      <OnePageSession
+        {...buildProps()}
+        slug="demo"
+        sessionConfig={{
+          ...buildProps().sessionConfig,
+          slug: 'demo',
+          sessionName: 'Context Engine',
+          networkChainId: 11155420,
+        }}
+      />,
+    );
+
+    expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
+    const contextHeader = screen.getByTestId('ce-demo-documents-toggle');
+    const contextTitle = within(contextHeader).getByText('Context');
+    const contextSubtitle = within(contextHeader).getByText('View');
+    const contextTextWrap = contextTitle.closest(`.${styles.sectionHeaderText}`);
+
+    expect(contextTitle).toHaveClass(styles.sectionHeaderTitle);
+    expect(contextSubtitle).toHaveClass(styles.sectionHeaderSubtitle);
+    expect(contextTextWrap).toBeTruthy();
+    expect(contextTextWrap.parentElement).toBe(contextHeader);
+  });
+
   it('keeps section-card headers inline through 767px without pulling full phone layout onto tablets', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
     const phoneBlock = extractMediaBlock(scss, '@media only screen and (max-width: 600px)', '.onePageDemoContainer');
-    const smallTabletBlock = extractMediaBlock(scss, '@media only screen and (min-width: 601px) and (max-width: 767px)', '.sectionHeader {');
-    const tabletBlock = extractMediaBlock(scss, '@media only screen and (min-width: 768px) and (max-width: 1024px)', '.onePageDemoContainer');
-    const resultsTabletBlock = extractMediaBlock(scss, '@media only screen and (max-width: 1024px)', '.resultsModeActionsScroller');
+    const smallTabletBlock = extractMediaBlock(
+      scss,
+      '@media only screen and (min-width: 601px) and (max-width: 767px)',
+      '.sectionHeader {',
+    );
+    const tabletBlock = extractMediaBlock(
+      scss,
+      '@media only screen and (min-width: 768px) and (max-width: 1024px)',
+      '.onePageDemoContainer',
+    );
+    const resultsTabletBlock = extractMediaBlock(
+      scss,
+      '@media only screen and (max-width: 1024px)',
+      '.resultsModeActionsScroller',
+    );
     const sectionContainerBlock = extractMediaBlock(scss, '.sectionContainer {');
     const sectionHeaderRowBlock = extractMediaBlock(scss, '.sectionHeaderRow {');
     const sectionActionsScrollerBlock = extractMediaBlock(scss, '.sectionHeaderActionsScroller {');
@@ -1173,7 +1247,9 @@ describe('OnePageSession view gating', () => {
     expect(tabletBlock).toContain('.pileHeaderTitleWrap {');
     expect(tabletBlock).toContain('width: auto;');
     expect(tabletBlock).toContain('font-size: clamp(1.4rem, 3.2vw, 1.9rem);');
-    expect(scss).toMatch(/@media only screen and \(min-width:\s*768px\) and \(max-width:\s*1024px\)\s*{[\s\S]*?\.sectionHeader \.sectionHeaderText\s*{[\s\S]*?flex-direction:\s*column;[\s\S]*?align-items:\s*flex-start;/);
+    expect(scss).toMatch(
+      /@media only screen and \(min-width:\s*768px\) and \(max-width:\s*1024px\)\s*{[\s\S]*?\.sectionHeader \.sectionHeaderText\s*{[\s\S]*?flex-direction:\s*column;[\s\S]*?align-items:\s*flex-start;/,
+    );
   });
 
   it('shows groups header actions only while expanded and drives embedded create state from the header', async () => {
@@ -1218,12 +1294,7 @@ describe('OnePageSession view gating', () => {
     };
 
     const { rerender } = render(
-      <OnePageSession
-        {...buildProps()}
-        slug="demo"
-        questionSessionSlug=""
-        sessionConfig={demoSessionConfig}
-      />
+      <OnePageSession {...buildProps()} slug="demo" questionSessionSlug="" sessionConfig={demoSessionConfig} />,
     );
 
     await waitFor(() => {
@@ -1236,11 +1307,13 @@ describe('OnePageSession view gating', () => {
       .pop();
     expect(pileProps?.sessionSlug).toBe('demo');
     expect(pileProps?.questionPool).toHaveLength(42);
-    expect(pileProps?.questionPool?.[0]).toEqual(expect.objectContaining({
-      source: 'demo-polis-data',
-      sessionSlug: 'demo',
-      sessionSlugExplicit: true,
-    }));
+    expect(pileProps?.questionPool?.[0]).toEqual(
+      expect.objectContaining({
+        source: 'demo-polis-data',
+        sessionSlug: 'demo',
+        sessionSlugExplicit: true,
+      }),
+    );
 
     rerender(
       <OnePageSession
@@ -1249,7 +1322,7 @@ describe('OnePageSession view gating', () => {
         questionSessionSlug=""
         routeQuestionsOpen={true}
         sessionConfig={demoSessionConfig}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -1271,13 +1344,47 @@ describe('OnePageSession view gating', () => {
       sessionName: 'Context Engine',
       networkChainId: 11155420,
     };
+    render(<OnePageSession {...buildProps()} slug="demo" questionSessionSlug="" sessionConfig={demoSessionConfig} />);
+
+    fireEvent.click(screen.getByText(t('sbts')));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('sbts-page')).toBeInTheDocument();
+    });
+
+    const latestSbtProps = mockSBTsPage.mock.calls
+      .map((args) => args[0])
+      .filter(Boolean)
+      .pop();
+    expect(latestSbtProps?.sessionSlug).toBe('demo');
+    expect(latestSbtProps?.requireExplicitAutoFeatureSessionSlug).toBe(true);
+    expect(latestSbtProps?.sessionConfig).toEqual(
+      expect.objectContaining({
+        slug: 'demo',
+      }),
+    );
+    expect(latestSbtProps?.sessionConfig?.autoFeatureSBTsBySessionSlug).not.toBe(true);
+  });
+
+  it('preserves demo-1 embedded groups featured list and auto-feature policy', async () => {
+    const featuredSbt = '0x29563ff3aCC8AFb220D810F8022218095e25C1f6';
+    const demoSessionConfig = {
+      ...buildProps().sessionConfig,
+      slug: 'demo-1',
+      sessionName: 'Demo Session',
+      networkChainId: 11155420,
+      defaultFeaturedSBTs: [featuredSbt],
+      autoFeatureSBTsBySessionSlug: false,
+    };
+
     render(
       <OnePageSession
         {...buildProps()}
-        slug="demo"
-        questionSessionSlug=""
+        slug="demo-1"
+        questionSessionSlug="demo-1"
+        defaultFeaturedSBTs={[featuredSbt]}
         sessionConfig={demoSessionConfig}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByText(t('sbts')));
@@ -1286,13 +1393,19 @@ describe('OnePageSession view gating', () => {
       expect(screen.getByTestId('sbts-page')).toBeInTheDocument();
     });
 
-    const latestSbtProps = mockSBTsPage.mock.calls.map((args) => args[0]).filter(Boolean).pop();
-    expect(latestSbtProps?.sessionSlug).toBe('demo');
+    const latestSbtProps = mockSBTsPage.mock.calls
+      .map((args) => args[0])
+      .filter(Boolean)
+      .pop();
+    expect(latestSbtProps?.sessionSlug).toBe('demo-1');
+    expect(latestSbtProps?.defaultFeaturedSBTs).toEqual([featuredSbt]);
     expect(latestSbtProps?.requireExplicitAutoFeatureSessionSlug).toBe(true);
-    expect(latestSbtProps?.sessionConfig).toEqual(expect.objectContaining({
-      slug: 'demo',
-      autoFeatureSBTsBySessionSlug: true,
-    }));
+    expect(latestSbtProps?.sessionConfig).toEqual(
+      expect.objectContaining({
+        slug: 'demo-1',
+        autoFeatureSBTsBySessionSlug: false,
+      }),
+    );
   });
 
   it('keeps /session/demo on the canonical fixture when routed source slug is demo', async () => {
@@ -1307,12 +1420,7 @@ describe('OnePageSession view gating', () => {
 
     try {
       render(
-        <OnePageSession
-          {...buildProps()}
-          slug="demo"
-          questionSessionSlug="demo"
-          sessionConfig={demoSessionConfig}
-        />
+        <OnePageSession {...buildProps()} slug="demo" questionSessionSlug="demo" sessionConfig={demoSessionConfig} />,
       );
 
       await waitFor(() => {
@@ -1332,13 +1440,18 @@ describe('OnePageSession view gating', () => {
         expect(screen.getByTestId('sbts-page')).toBeInTheDocument();
       });
 
-      const latestSbtProps = mockSBTsPage.mock.calls.map((args) => args[0]).filter(Boolean).pop();
+      const latestSbtProps = mockSBTsPage.mock.calls
+        .map((args) => args[0])
+        .filter(Boolean)
+        .pop();
       expect(latestSbtProps?.sessionSlug).toBe('demo');
       expect(latestSbtProps?.requireExplicitAutoFeatureSessionSlug).toBe(true);
-      expect(latestSbtProps?.sessionConfig).toEqual(expect.objectContaining({
-        slug: 'demo',
-        autoFeatureSBTsBySessionSlug: true,
-      }));
+      expect(latestSbtProps?.sessionConfig).toEqual(
+        expect.objectContaining({
+          slug: 'demo',
+          autoFeatureSBTsBySessionSlug: false,
+        }),
+      );
     } finally {
       window.history.replaceState({}, '', priorUrl || '/');
     }
@@ -1362,7 +1475,7 @@ describe('OnePageSession view gating', () => {
           questionSessionSlug="demo"
           routeQuestionsOpen={true}
           sessionConfig={demoSessionConfig}
-        />
+        />,
       );
 
       await waitFor(() => {
@@ -1375,14 +1488,15 @@ describe('OnePageSession view gating', () => {
         .pop();
       expect(fullProps?.sessionSlug).toBe('demo');
       expect(fullProps?.questionPool).toHaveLength(42);
-      expect(fullProps?.questionPool?.[0]).toEqual(expect.objectContaining({
-        source: 'demo-polis-data',
-        sessionSlug: 'demo',
-        sessionSlugExplicit: true,
-      }));
+      expect(fullProps?.questionPool?.[0]).toEqual(
+        expect.objectContaining({
+          source: 'demo-polis-data',
+          sessionSlug: 'demo',
+          sessionSlugExplicit: true,
+        }),
+      );
     } finally {
       window.history.replaceState({}, '', priorUrl || '/');
     }
   });
-
 });

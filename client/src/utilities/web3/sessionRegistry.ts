@@ -460,7 +460,7 @@ const sendWithNonceRetry = async ({
     try {
       const tx = await sendWithGasFallback({
         estimate,
-
+        // eslint-disable-next-line no-loop-func
         send: (overrides: TxFeeOverrides) =>
           send({
             ...overrides,
@@ -858,7 +858,10 @@ const describeChainTarget = (chainId: unknown) => {
   return chain?.name ? `${chain.name} (${id})` : `chain ${id}`;
 };
 
-const readSignerChainId = async (signer, ethersProvider = null) => {
+const readSignerChainId = async (
+  signer: AnyRecord | null,
+  ethersProvider: ethers.providers.Web3Provider | null = null,
+) => {
   try {
     if (typeof signer?.getChainId === 'function') {
       const signerChainId = Number(await signer.getChainId());
@@ -1261,11 +1264,9 @@ const mergeSessionFieldsIntoCachedConfig = ({
   registryChainId,
 }) => {
   const base = normalizeSessionNaming(
-    baseConfig && typeof baseConfig === 'object' ? { ...baseConfig } : {}
-  );
-  const registryMeta = base.__registry && typeof base.__registry === 'object'
-    ? base.__registry
-    : {};
+    baseConfig && typeof baseConfig === 'object' ? { ...baseConfig } : {},
+  ) as AnyRecord;
+  const registryMeta = base.__registry && typeof base.__registry === 'object' ? base.__registry : {};
   const sessionIdHex = normalizeSessionIdHex(session?.sessionIdHex || session?.sessionId || registryMeta.sessionIdHex);
   const sessionId = formatSessionId(sessionIdHex);
   const networkChainId = Number(session?.chainId || base.networkChainId || registryMeta.chainId || 0) || null;
@@ -1572,62 +1573,6 @@ export const refreshSessionRegistryFieldsCache = async ({
 }: AnyRecord = {}) => {
   const registrySlug = toRegistrySlug(slug || '');
   const existingConfig = sessionRegistryStore.getSessionConfig(registrySlug);
-  const existingRegistry = existingConfig?.__registry && typeof existingConfig.__registry === 'object'
-    ? existingConfig.__registry
-    : {};
-  const resolvedChainId = Number(
-    chainId ||
-    existingRegistry.registryChainId ||
-    existingRegistry.chainId ||
-    existingConfig?.networkChainId ||
-    0
-  ) || 0;
-  if (!resolvedChainId) throw new Error('Registry chain id is required.');
-
-  const useBootstrapRpc = typeof bootstrapRpc === 'boolean' ? bootstrapRpc : true;
-  let contract = getRegistryContract(resolvedChainId, null, { bootstrapRpc: useBootstrapRpc });
-  if (!contract && providerLike) {
-    const provider = cryptoUtils._getProvider(providerLike || 'wagmi');
-    contract = getRegistryContract(
-      resolvedChainId,
-      new ethers.providers.Web3Provider(provider, 'any'),
-      { bootstrapRpc: useBootstrapRpc }
-    );
-  }
-  if (!contract) throw new Error('Session registry contract not configured.');
-
-  const sessionIdHex = normalizeSessionIdHex(sessionId);
-  const tuple = await resolveSessionTuple({
-    contract,
-    registrySlug,
-    sessionIdHex,
-  });
-  const session = decodeSessionTuple(tuple);
-  if (!session || !session.slug) return null;
-
-  const fieldsByKey = await fetchSessionFields(
-    contract,
-    session.slug,
-    Array.isArray(fieldKeys) && fieldKeys.length ? fieldKeys : DEFAULT_FIELDS
-  );
-  const config = mergeSessionFieldsIntoCachedConfig({
-    baseConfig: existingConfig,
-    session,
-    fieldsByKey,
-    registryChainId: resolvedChainId,
-  });
-  upsertSessionRegistryCache({ config });
-  return config;
-};
-
-export const loadSessionRegistryCache = async ({
-  chainIds,
-  providerLike,
-  fieldKeys,
-  bootstrapRpc,
-}: AnyRecord = {}) => {
-  const registrySlug = toRegistrySlug(slug || '');
-  const existingConfig = sessionRegistryStore.getSessionConfig(registrySlug);
   const existingRegistry =
     existingConfig?.__registry && typeof existingConfig.__registry === 'object' ? existingConfig.__registry : {};
   const resolvedChainId =
@@ -1671,7 +1616,7 @@ export const loadSessionRegistryCache = async ({
 };
 
 export const loadSessionRegistryCache = async (
-  { chainIds, slugs, providerLike, account, lit, force, bootstrapRpc } = {} as AnyRecord,
+  { chainIds, providerLike, account, lit, force, bootstrapRpc } = {} as AnyRecord,
 ) => {
   if (!USE_ONCHAIN_SESSION_REGISTRY && !force) return null;
   const useBootstrapRpc = typeof bootstrapRpc === 'boolean' ? bootstrapRpc : true;
@@ -1697,9 +1642,6 @@ export const loadSessionRegistryCache = async (
   }
 
   const ids = Array.isArray(chainIds) && chainIds.length ? chainIds : getSessionRegistryChainIds();
-  const requestedSlugs = Array.isArray(slugs)
-    ? Array.from(new Set(slugs.map((slug) => toRegistrySlug(slug)).filter(Boolean)))
-    : [];
 
   const cache: RegistryCache = {
     ts: Date.now(),
@@ -1805,9 +1747,38 @@ export const loadSessionRegistryCache = async (
           registryChainId: chainId,
           metadataLoadState: resolveMetadataLoadState({ metadata, hasMetadataUri }),
         });
-        return { config, hadLoadErrors: false };
-      },
-    );
+        const decrypted = await tryDecryptEnvelope(encrypted, {
+          account,
+          providerLike,
+          chainId: session.chainId || chainId,
+          lit,
+        });
+        metadata = decrypted || null;
+      }
+
+      const gatesByResource: RegistryGateMap = {};
+      const gateEntries = await Promise.all(
+        DEFAULT_RESOURCES.map(async (resourceKey) => {
+          const gate = await fetchGateForResource(contract, slug, resourceKey);
+          return { resourceKey, gate };
+        }),
+      );
+      gateEntries.forEach(({ resourceKey, gate }) => {
+        gatesByResource[resourceKey] = gate;
+      });
+
+      const fieldsByKey = await fetchSessionFields(contract, slug);
+
+      const config = buildSessionConfigFromRegistry({
+        session,
+        metadata,
+        gatesByResource,
+        fieldsByKey,
+        registryChainId: chainId,
+        metadataLoadState: resolveMetadataLoadState({ metadata, hasMetadataUri }),
+      });
+      return { config, hadLoadErrors: false };
+    });
 
     return {
       chainId,

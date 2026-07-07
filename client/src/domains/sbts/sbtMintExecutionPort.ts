@@ -1,4 +1,4 @@
-import chainGateway from '../../utilities/web3/chainGateway.js';
+import chainGateway from '../../utilities/web3/contractScripts.js';
 import type { SbtMintExecutionPort, SbtProviderRef, SbtTransactionResult } from './sbtPorts.js';
 
 type SbtMintExecutionChainGateway = {

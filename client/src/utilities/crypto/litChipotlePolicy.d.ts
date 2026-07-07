@@ -41,7 +41,7 @@ export function buildLitChipotlePolicy(options?: BuildLitChipotlePolicyOptions):
 export function fingerprintLitChipotlePolicy(options?: BuildLitChipotlePolicyOptions): string;
 export function normalizeChipotleCekHex(value: unknown): string;
 export function buildLitChipotleWrappedPlaintext(
-  options?: BuildLitChipotleWrappedPlaintextOptions
+  options?: BuildLitChipotleWrappedPlaintextOptions,
 ): LitChipotleWrappedPlaintext;
 export function parseLitChipotleWrappedPlaintext(value: unknown): LitChipotleWrappedPlaintext;
 export function normalizeLitChipotleMetadataVersion(chipotle?: unknown): number;

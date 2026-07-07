@@ -1,7 +1,6 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
-import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import SessionWizardRequirementsBanner, { SESSION_WIZARD_REQUIREMENT_LINKS } from './SessionWizardRequirementsBanner';
 
 describe('SessionWizardRequirementsBanner', () => {

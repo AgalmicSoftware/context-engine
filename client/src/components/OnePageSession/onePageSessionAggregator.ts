@@ -4,7 +4,34 @@ import { isResponseAllowedForSessionSlug } from '../../utilities/session/respons
 const demoLog = createLogger('demo');
 const AGGREGATOR_PARSE_MEMO_MAX = 3000;
 
-const hashMix = (seed: any, text: any) => {
+type UnknownRecord = Record<string, unknown>;
+type AggregatorRow = {
+  responder: string;
+  questionId: string;
+  response: string;
+};
+type AggregatorMap = Record<string, AggregatorRow[]>;
+type RowSignaturesByQuestion = Record<string, string[]>;
+type QuestionResponses = Record<string, unknown>;
+type AggregatorNetworkNode = {
+  questions?: UnknownRecord;
+  questionResponses?: Record<string, QuestionResponses>;
+};
+type AggregatorBuildOptions = {
+  parseMemo?: Map<string, unknown> | null;
+  sessionSlug?: unknown;
+};
+type AggregatorBuildResult = {
+  map: AggregatorMap;
+  dirty: boolean;
+  signature?: string;
+};
+
+const isRecord = (value: unknown): value is UnknownRecord => !!value && typeof value === 'object';
+
+const asRecord = (value: unknown): UnknownRecord => (isRecord(value) ? value : {});
+
+const hashMix = (seed: unknown, text: unknown) => {
   let h = Number(seed) >>> 0;
   const str = String(text || '');
   for (let i = 0; i < str.length; i += 1) {
@@ -33,7 +60,10 @@ export const computeAggregatorDataSignature = (map: any = {}) => {
   return `${qids.length}:${totalEntries}:${hash >>> 0}`;
 };
 
-const computeAggregatorDataSignatureFromRows = (qids: any = [], rowSignaturesByQuestion: any = {}) => {
+const computeAggregatorDataSignatureFromRows = (
+  qids: unknown[] = [],
+  rowSignaturesByQuestion: RowSignaturesByQuestion = {},
+) => {
   const normalizedQids = Array.isArray(qids) ? qids.filter(Boolean).sort() : [];
   if (normalizedQids.length === 0) return '0:0:0';
   let hash = 2166136261;
@@ -85,22 +115,33 @@ export const computeAggregatorSourceSnapshotSignature = (questionResponses: any 
   return `${qids.length}:${totalEntries}:${hash >>> 0}`;
 };
 
-const normalizeAggregatorSessionSlug = (value: any = '') => {
-  const normalized = String(value || '').trim().toLowerCase();
+const normalizeAggregatorSessionSlug = (value: unknown = '') => {
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase();
   return normalized === 'general' ? '' : normalized;
 };
 
-const isPendingQuestionMetadataPlaceholder = (question: any = null) => (
-  !!question && typeof question === 'object' && question.__ceQuestionMetadataPending === true
-);
+const isPendingQuestionMetadataPlaceholder = (question: unknown = null) =>
+  isRecord(question) && question.__ceQuestionMetadataPending === true;
+
+const hasOwn = (obj: unknown, key: PropertyKey) => isRecord(obj) && Object.prototype.hasOwnProperty.call(obj, key);
+
+const getQuestionSessionSlugExplicitSignature = (question: unknown = {}) => {
+  const questionRecord = asRecord(question);
+  if (questionRecord.sessionSlugExplicit === true) return 'explicit';
+  if (questionRecord.sessionSlugExplicit === false) return 'bucket';
+  return 'implicit';
+};
 
 const hasVisibleQuestionMetadataForAggregator = (
-  questions: any = {},
-  qId: any = '',
-  sessionSlug: any = ''
+  questions: UnknownRecord = {},
+  qId: unknown = '',
+  sessionSlug: unknown = '',
 ) => {
-  if (!questions || typeof questions !== 'object') return false;
-  const lowerQid = String(qId || '').trim().toLowerCase();
+  const lowerQid = String(qId || '')
+    .trim()
+    .toLowerCase();
   if (!lowerQid) return false;
   const question = questions[lowerQid] || questions[qId];
   if (!question || typeof question !== 'object' || isPendingQuestionMetadataPlaceholder(question)) return false;
@@ -110,11 +151,8 @@ const hasVisibleQuestionMetadataForAggregator = (
   return true;
 };
 
-const isDemoPolisFixtureResponse = (response: any = null) => (
-  !!response &&
-  typeof response === 'object' &&
-  response.source === 'demo-polis-data'
-);
+const isDemoPolisFixtureResponse = (response: unknown = null) =>
+  isRecord(response) && response.source === 'demo-polis-data';
 
 export const computeAggregatorQuestionMetadataSignature = (questions: any = {}) => {
   if (!questions || typeof questions !== 'object') return '0:0';
@@ -131,14 +169,17 @@ export const computeAggregatorQuestionMetadataSignature = (questions: any = {}) 
   return `${qids.length}:${hash >>> 0}`;
 };
 
-export function buildAggregatorFromLocalCache(networkObj: any, opts: any = {}) {
+export function buildAggregatorFromLocalCache(
+  networkObj: AggregatorNetworkNode | null | undefined,
+  opts: AggregatorBuildOptions = {},
+): AggregatorBuildResult {
   if (!networkObj) return { map: {}, dirty: false };
   const parseMemo = opts?.parseMemo instanceof Map ? opts.parseMemo : null;
   const sessionSlug = opts?.sessionSlug || '';
-  const questions = networkObj.questions || {};
-  const questionResponses = networkObj.questionResponses || {};
-  const aggregatorMap: Record<string, any> = {};
-  const rowSignaturesByQuestion: Record<string, any> = {};
+  const questions = asRecord(networkObj.questions);
+  const questionResponses = isRecord(networkObj.questionResponses) ? networkObj.questionResponses : {};
+  const aggregatorMap: AggregatorMap = {};
+  const rowSignaturesByQuestion: RowSignaturesByQuestion = {};
   let dirty = false;
 
   Object.keys(questionResponses).forEach((qId: any) => {
@@ -172,7 +213,12 @@ export function buildAggregatorFromLocalCache(networkObj: any, opts: any = {}) {
           parsed = rawResponse;
         }
       } catch {
-        try { delete responderMap[resAddr]; dirty = true; } catch (e) { demoLog.warn('OnePageSession: fallback', e); }
+        try {
+          delete responderMap[resAddr];
+          dirty = true;
+        } catch (e) {
+          demoLog.warn('OnePageSession: fallback', e);
+        }
         parsed = null;
       }
       if (!parsed) return;
@@ -199,9 +245,6 @@ export function buildAggregatorFromLocalCache(networkObj: any, opts: any = {}) {
   return {
     map: aggregatorMap,
     dirty,
-    signature: computeAggregatorDataSignatureFromRows(
-      Object.keys(aggregatorMap),
-      rowSignaturesByQuestion,
-    ),
+    signature: computeAggregatorDataSignatureFromRows(Object.keys(aggregatorMap), rowSignaturesByQuestion),
   };
 }

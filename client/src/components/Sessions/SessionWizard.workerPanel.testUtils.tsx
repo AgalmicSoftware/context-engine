@@ -370,9 +370,8 @@ const readCachedSessionWizardDraft = () => {
 };
 const resolveSessionModePresetTestId = () => {
   const cachedDraft = readCachedSessionWizardDraft();
-  const storageProfile = cachedDraft.storageProfile && typeof cachedDraft.storageProfile === 'object'
-    ? cachedDraft.storageProfile
-    : {};
+  const storageProfile =
+    cachedDraft.storageProfile && typeof cachedDraft.storageProfile === 'object' ? cachedDraft.storageProfile : {};
   return storageProfile.backend === 'cloudflare'
     ? 'ce-new-preset-fast_cheap_cloudflare'
     : 'ce-new-preset-trustless_public_decentralized';
@@ -412,30 +411,6 @@ const ensureSessionModeProfileSelected = () => {
 const selectNormalModeCard = (label) => {
   ensureSessionModeProfileSelected();
   fireEvent.click(screen.getByRole('button', { name: new RegExp(label, 'i') }));
-};
-const createPublicWorkerVerificationResponder = () => {
-  type PublicWorkerVerificationConfig = {
-    ai?: {
-      models?: unknown;
-    };
-    litCredentials?: unknown;
-    [key: string]: unknown;
-  };
-  let publicConfig: PublicWorkerVerificationConfig = {};
-  return (url: unknown, options: RequestInit = {}) => {
-    const normalizedUrl = String(url);
-    if (normalizedUrl.endsWith('/admin/set-config')) {
-      const payload = JSON.parse(String(options.body || '{}'));
-      publicConfig = payload.config || publicConfig;
-      return { ok: true, status: 200, json: async () => ({ ok: true }) };
-    }
-    if (normalizedUrl.includes('/session-config')) {
-      const { litCredentials: _privateLitDescriptor, ...verifiedConfig } = publicConfig;
-      if (verifiedConfig.ai) verifiedConfig.ai = { models: verifiedConfig.ai.models };
-      return { ok: true, status: 200, json: async () => ({ config: verifiedConfig }) };
-    }
-    return null;
-  };
 };
 const getMockSelectorById = (selectorId) =>
   screen
@@ -483,8 +458,6 @@ const createPendingFeaturedDraft = async () => {
 
 const resetSessionWizardWorkerPanelTestState = () => {
   jest.clearAllMocks();
-  clearSessionWizardPendingSbtDraftsCache();
-  __test__resetSessionWizardSponsoredBundleCacheKey();
   if (!ethers.providers.JsonRpcProvider.prototype.getBlockNumber._isMockFunction) {
     jest.spyOn(ethers.providers.JsonRpcProvider.prototype, 'getBlockNumber');
   }

@@ -12,7 +12,7 @@ export type BindArweaveEncodingArgs = {
   client: () => ArweaveEncodingScripts;
 };
 
-export const bindArweaveEncoding = ({ client: readScripts }: BindArweaveEncodingArgs): ArweaveEncodingPort => ({
+export const bindArweaveEncoding = ({ scripts: readScripts }: BindArweaveEncodingArgs): ArweaveEncodingPort => ({
   hexToBase64url: (hexString) => readScripts().hexToBase64url(hexString),
   base64urlToHex: (base64url) => readScripts().base64urlToHex(base64url),
   base64urlToBase64: (base64url) => readScripts().base64urlToBase64(base64url),

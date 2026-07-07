@@ -62,11 +62,6 @@ class Footer extends React.Component<FooterProps> {
                   ABOUT
                 </NavLink>
               </li>
-              <li>
-                <NavLink href={buildPublicRoute('/posts')} target="" className={styles.footerLink}>
-                  POSTS
-                </NavLink>
-              </li>
               {/* <li>
                   <NavLink
                     href="/contributors"

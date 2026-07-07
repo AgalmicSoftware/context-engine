@@ -1,10 +1,4 @@
 import { peekCacheSync, readCache, writeCacheOptimistic } from '../../utilities/cache/cacheScripts.js';
-import {
-  workerCanonicalCacheIdentityMatches,
-  withWorkerCanonicalCacheIdentity,
-  WORKER_CANONICAL_CACHE_SCOPE_KEY,
-  type WorkerCanonicalCacheIdentity,
-} from '../../utilities/survey/workerCanonicalCacheIdentity.js';
 import { normalizeQuestionIdKey } from './surveyToolSignatures.js';
 import type { UnknownRecord } from './surveyToolTypes.js';
 
@@ -64,8 +58,8 @@ export function readQuestionsCacheRef(slug: string): QuestionsCacheByNetwork {
   return peekCacheSync<QuestionsCacheByNetwork>('questionsCache', slug, { clone: false }) || {};
 }
 
-export async function readQuestionsCacheAsync(slug: string): Promise<QuestionsCacheByNetwork> {
-  const value = await readCache<QuestionsCacheByNetwork>('questionsCache', slug);
+export async function readQuestionsCacheAsync(slug: string) {
+  const value = await readCache('questionsCache', slug);
   return value && typeof value === 'object' ? value : readQuestionsCache(slug) || {};
 }
 
@@ -106,8 +100,8 @@ export function readSurveysCacheRef(slug: string): SurveysCacheByNetwork {
   return peekCacheSync<SurveysCacheByNetwork>('surveysCache', slug, { clone: false }) || {};
 }
 
-export async function readSurveysCacheAsync(slug: string): Promise<SurveysCacheByNetwork> {
-  const value = await readCache<SurveysCacheByNetwork>('surveysCache', slug);
+export async function readSurveysCacheAsync(slug: string) {
+  const value = await readCache('surveysCache', slug);
   return value && typeof value === 'object' ? value : readSurveysCache(slug) || {};
 }
 
@@ -198,19 +192,9 @@ export function mergeSurveyToolCachePatchIntoSurveysCache(
   cache: UnknownRecord = {},
   netIdStr: string,
   patch: UnknownRecord = {},
-  { workerIdentity = null }: { workerIdentity?: WorkerCanonicalCacheIdentity | null } = {},
 ): Record<string, SurveyNetworkCache> {
   if (!netIdStr) return cache && typeof cache === 'object' ? (cache as Record<string, SurveyNetworkCache>) : {};
-  let cacheSeed = cache && typeof cache === 'object' ? cache : {};
-  if (netIdStr === WORKER_CANONICAL_CACHE_SCOPE_KEY) {
-    if (!workerIdentity) return cacheSeed as Record<string, SurveyNetworkCache>;
-    if (!workerCanonicalCacheIdentityMatches(cacheSeed[netIdStr], workerIdentity)) {
-      cacheSeed = { ...cacheSeed };
-      delete cacheSeed[netIdStr];
-    }
-  }
-
-  const global = ensureSurveysNet(cacheSeed, netIdStr);
+  const global = ensureSurveysNet(cache, netIdStr);
   const net = global[netIdStr];
   if (!net) return global;
 

@@ -116,19 +116,6 @@ describe('surveyToolViewState', () => {
     });
   });
 
-  it('unlocks encrypted additional comments directly from the lock button', () => {
-    expect(
-      buildLockAudienceButtonAction({
-        effectiveFieldKey: 'additional',
-        fieldEncrypted: true,
-        hasAudienceMenu: true,
-        menuOpen: false,
-      }),
-    ).toEqual({
-      kind: 'disable-field-encryption-and-close-menu',
-    });
-  });
-
   it('builds masked-prompt, answer-lock, and gated-notice view state', () => {
     expect(
       isQuestionPromptMasked({
@@ -165,23 +152,27 @@ describe('surveyToolViewState', () => {
       lockTitle: 'Encrypted',
     });
 
-    expect(buildAnswerLockDisplayState({
-      field: { encrypted: false },
-      masked: false,
-      isSubmitting: true,
-    })).toEqual({
+    expect(
+      buildAnswerLockDisplayState({
+        field: { encrypted: false },
+        masked: false,
+        isSubmitting: true,
+      }),
+    ).toEqual({
       lockDisabled: true,
       lockTitle: 'Not encrypted',
     });
 
-    expect(buildGatedPromptNoticeState({
-      questionId: 'Q 1',
-      tooltipIdSuffix: 'pile',
-      gateNames: ['Gate Alpha', 'Gate Beta'],
-      sbtLabel: 'SBT',
-      gateLabel: 'gate',
-      gatesLabel: 'gates',
-    })).toEqual({
+    expect(
+      buildGatedPromptNoticeState({
+        questionId: 'Q 1',
+        tooltipIdSuffix: 'pile',
+        gateNames: ['Gate Alpha', 'Gate Beta'],
+        sbtLabel: 'SBT',
+        gateLabel: 'gate',
+        gatesLabel: 'gates',
+      }),
+    ).toEqual({
       tooltipId: 'ce-gated-prompt-tip-q-1-pile',
       tooltipText: 'Required SBT gates: Gate Alpha, Gate Beta',
     });
@@ -201,39 +192,43 @@ describe('surveyToolViewState', () => {
       tooltipText: 'SBT gate required',
     });
 
-    expect(buildGatedPromptNoticeState({
-      questionId: ' Q/2 ',
-      tooltipIdSuffix: 'full',
-      gateNames: [' ', 'Contributors'],
-      sbtLabel: 'Badge',
-      gateLabel: 'audience',
-      gatesLabel: 'audiences',
-    })).toEqual({
+    expect(
+      buildGatedPromptNoticeState({
+        questionId: ' Q/2 ',
+        tooltipIdSuffix: 'full',
+        gateNames: [' ', 'Contributors'],
+        sbtLabel: 'Badge',
+        gateLabel: 'audience',
+        gatesLabel: 'audiences',
+      }),
+    ).toEqual({
       tooltipId: 'ce-gated-prompt-tip-q-2-full',
       tooltipText: 'Required Badge audience: Contributors',
     });
   });
 
   it('builds gated prompt decrypt display state from payload and auth state', () => {
-    expect(buildQuestionPromptDecryptDisplayState({
-      account: '',
-      canReloadPrompt: true,
-      loginComplete: false,
-      payloadDisplay: {
-        requiresAuth: true,
-        actionTitle: 'Open wallet',
-        label: 'Unlock prompt',
-        busyLabel: 'Unlocking...',
-        actionLabel: 'Decrypt Prompt',
-        noticeLeadingText: 'This prompt is',
-        noticeStatusText: 'private',
-        noticeSuffix: 'Unlock to respond.',
-      },
-      promptMasked: true,
-      promptReloading: true,
-      promptText: '[encrypted]',
-      questionId: ' Q1 ',
-    })).toEqual({
+    expect(
+      buildQuestionPromptDecryptDisplayState({
+        account: '',
+        canReloadPrompt: true,
+        loginComplete: false,
+        payloadDisplay: {
+          requiresAuth: true,
+          actionTitle: 'Open wallet',
+          label: 'Unlock prompt',
+          busyLabel: 'Unlocking...',
+          actionLabel: 'Decrypt Prompt',
+          noticeLeadingText: 'This prompt is',
+          noticeStatusText: 'private',
+          noticeSuffix: 'Unlock to respond.',
+        },
+        promptMasked: true,
+        promptReloading: true,
+        promptText: '[encrypted]',
+        questionId: ' Q1 ',
+      }),
+    ).toEqual({
       qid: 'q1',
       promptText: '[encrypted]',
       promptMasked: true,
@@ -253,14 +248,16 @@ describe('surveyToolViewState', () => {
   });
 
   it('builds plaintext prompt and default decrypt notice labels', () => {
-    expect(buildQuestionPromptDecryptDisplayState({
-      account: '0xabc',
-      loginComplete: true,
-      payloadDisplay: {},
-      promptMasked: false,
-      promptText: 'Visible prompt',
-      questionId: '',
-    })).toMatchObject({
+    expect(
+      buildQuestionPromptDecryptDisplayState({
+        account: '0xabc',
+        loginComplete: true,
+        payloadDisplay: {},
+        promptMasked: false,
+        promptText: 'Visible prompt',
+        questionId: '',
+      }),
+    ).toMatchObject({
       qid: '',
       promptText: 'Visible prompt',
       promptMasked: false,

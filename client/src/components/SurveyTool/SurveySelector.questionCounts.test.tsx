@@ -147,7 +147,7 @@ describe('SurveySelector question counts', () => {
     jest
       .spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault')
       .mockImplementation((slug: any) => strictLookup(slug) || generalCfg);
-    const readCacheSpy = jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({
       '84532': {
         questions: {
           q1: {

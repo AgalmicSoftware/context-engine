@@ -108,7 +108,11 @@
   line-height: 1.1;
   cursor: pointer;
   box-shadow: 0 4px 12px rgba(15, 94, 199, 0.08);
-  transition: transform 0.14s ease, background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+  transition:
+    transform 0.14s ease,
+    background 0.14s ease,
+    border-color 0.14s ease,
+    color 0.14s ease;
 
   &:hover,
   &:focus-visible {
@@ -721,8 +725,7 @@
   border: 1px solid #e0e6ef;
   border-radius: 14px;
   overflow: hidden;
-  background:
-    linear-gradient(180deg, rgba(248, 250, 252, 0.98) 0%, rgba(244, 247, 251, 0.96) 100%);
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.98) 0%, rgba(244, 247, 251, 0.96) 100%);
 }
 
 .mapFrameViewport {

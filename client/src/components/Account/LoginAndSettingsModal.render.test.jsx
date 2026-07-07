@@ -140,7 +140,7 @@ import {
   getAllSessionSlugs,
   getSessionConfigBySlugOrDefault,
   getSessionNetwork,
-} from '../../utilities/web3/chainGateway.js';
+} from '../../utilities/web3/contractScripts.js';
 
 const DEFAULT_NETWORK = {
   id: 84532,
@@ -256,8 +256,9 @@ const loadIsolatedSettingsModal = () => {
   jest.isolateModules(() => {
     loaded = {
       LoginAndSettingsModal: require('./LoginAndSettingsModal').LoginAndSettingsModal,
-      getAllSessionSlugs: require('../../utilities/web3/chainGateway.js').getAllSessionSlugs,
-      getSessionConfigBySlugOrDefault: require('../../utilities/web3/chainGateway.js').getSessionConfigBySlugOrDefault,
+      getAllSessionSlugs: require('../../utilities/web3/contractScripts.js').getAllSessionSlugs,
+      getSessionConfigBySlugOrDefault: require('../../utilities/web3/contractScripts.js')
+        .getSessionConfigBySlugOrDefault,
       checkSponsoredAccess: require('../../utilities/web3/sponsoredAccess.js').checkSponsoredAccess,
     };
   });
@@ -267,12 +268,7 @@ const loadIsolatedSettingsModal = () => {
   return loaded;
 };
 
-const buildWrongNetworkSubject = ({
-  mode = undefined,
-  aiSettingsOpen = false,
-  activeSessionSlug = 'edge',
-  sessionConfig = null,
-} = {}) => {
+const buildWrongNetworkSubject = ({ mode = undefined, aiSettingsOpen = false, activeSessionSlug = 'edge' } = {}) => {
   if (typeof mode === 'undefined') {
     delete process.env.REACT_APP_TERMINOLOGY_MODE;
   } else {
@@ -291,12 +287,7 @@ const buildWrongNetworkSubject = ({
     String(slug || '')
       .trim()
       .toLowerCase() === 'edge'
-      ? sessionConfig ||
-        buildRegistrySessionConfig({
-          slug: 'edge',
-          sessionName: 'Edge Session',
-          sponsoredKeys: { rpc: 'edge-rpc' },
-        })
+      ? { slug: 'edge', sessionName: 'Edge Session' }
       : {},
   );
   isolatedCheckSponsoredAccess.mockImplementation(async () => ({ status: 'unknown' }));
@@ -315,7 +306,6 @@ const buildWrongNetworkSubject = ({
       },
     }),
   );
-  subject._sessionCapabilityProjectionResolver = resolveSessionCapabilityProjection;
 
   if (aiSettingsOpen) {
     subject.state = {
@@ -360,9 +350,9 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     passkeyWallet.getPasskeyWalletChain.mockReset();
     passkeyWallet.getPasskeyWalletChain.mockReturnValue(null);
     passkeyWallet.isMissingPasskeyWalletRecordError.mockReset();
-    passkeyWallet.isMissingPasskeyWalletRecordError.mockImplementation((error) => (
-      error?.code === 'CE_PASSKEY_WALLET_RECORD_MISSING'
-    ));
+    passkeyWallet.isMissingPasskeyWalletRecordError.mockImplementation(
+      (error) => error?.code === 'CE_PASSKEY_WALLET_RECORD_MISSING',
+    );
     passkeyWallet.unlockPasskeyWallet.mockReset();
     passkeyWallet.logoutPasskeyWallet.mockReset();
     passkeyWallet.restorePasskeyWalletSession.mockReset();
@@ -496,10 +486,9 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
   });
 
   it('shows an inline recovery hint when login has no stored passkey wallet record', async () => {
-    const missingWalletError = Object.assign(
-      new Error('No encrypted passkey wallet is saved in this browser.'),
-      { code: 'CE_PASSKEY_WALLET_RECORD_MISSING' }
-    );
+    const missingWalletError = Object.assign(new Error('No encrypted passkey wallet is saved in this browser.'), {
+      code: 'CE_PASSKEY_WALLET_RECORD_MISSING',
+    });
     passkeyWallet.unlockPasskeyWallet.mockRejectedValueOnce(missingWalletError);
 
     render(<LoginAndSettingsModal {...buildProps()} />);
@@ -510,7 +499,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('ce-passkey-wallet-status')).toHaveTextContent(
-        /No passkey wallet is saved in this browser/i
+        /No passkey wallet is saved in this browser/i,
       );
     });
   });
@@ -569,12 +558,6 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     render(subject.getSettingsDisplay());
 
     expect(screen.getByRole('link', { name: 'Open session Edge Session' })).toHaveAttribute('href', '/ce/session/edge');
-  });
-
-  it('preserves PUBLIC_URL when building the Bookmarks route', () => {
-    process.env.PUBLIC_URL = '/ce/';
-
-    expect(buildBookmarksRoutePath()).toBe('/ce/bookmarks');
   });
 
   it('preserves PUBLIC_URL when building the Bookmarks route', () => {
@@ -1047,7 +1030,6 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
         selectedSessionSlugs: ['edge', 'rxc'],
       }),
     );
-    subject._sessionCapabilityProjectionResolver = resolveSessionCapabilityProjection;
     subject.state = {
       ...subject.state,
       preLoginSettingsOpen: true,
@@ -1119,10 +1101,12 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     });
 
     await waitFor(() => {
-      expect(props.changeAccount).toHaveBeenCalledWith(expect.objectContaining({
-        account: PASSKEY_ADDRESS,
-        provider: 'passkey_eoa',
-      }));
+      expect(props.changeAccount).toHaveBeenCalledWith(
+        expect.objectContaining({
+          account: PASSKEY_ADDRESS,
+          provider: 'passkey_eoa',
+        }),
+      );
     });
 
     const payload = props.changeAccount.mock.calls[0][0];
@@ -1157,11 +1141,9 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
   });
 
   it('renders logged-in controls and disconnects wagmi users from the modal', async () => {
-    getSessionConfigBySlugOrDefault.mockImplementation((slug) => (
-      slug === 'demo-1'
-        ? { slug: 'demo-1', sessionName: 'Demo Session', networkChainId: 11155420 }
-        : {}
-    ));
+    getSessionConfigBySlugOrDefault.mockImplementation((slug) =>
+      slug === 'demo-1' ? { slug: 'demo-1', sessionName: 'Demo Session', networkChainId: 11155420 } : {},
+    );
     const props = buildProps({
       account: WAGMI_ADDRESS,
       activeSessionSlug: 'demo-1',
@@ -1275,7 +1257,6 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
         provider: 'wagmi',
       }),
     );
-    subject._sessionCapabilityProjectionResolver = resolveSessionCapabilityProjection;
     subject.state = {
       ...subject.state,
       aiSettingsOpen: true,
@@ -1367,9 +1348,27 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
       });
     });
 
-    expect(await screen.findByText('AI')).toBeInTheDocument();
-    expect(screen.queryByText('RPC')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Resource keys/i })).not.toBeInTheDocument();
+    const rpcCard = (await screen.findByText('RPC')).closest(`.${styles.supportedResourceCard}`);
+    expect(rpcCard).toBeTruthy();
+    expect(within(rpcCard).getByText('Not sponsored')).toBeInTheDocument();
+    expect(within(rpcCard).queryByText('Gate locked')).not.toBeInTheDocument();
+    expect(within(rpcCard).getByText('General')).toBeInTheDocument();
+    expect(within(rpcCard).getByText('not configured here')).toBeInTheDocument();
+    expect(within(rpcCard).queryByText('OP Session Test')).not.toBeInTheDocument();
+
+    fireEvent.click(within(rpcCard).getByRole('button', { name: 'Show other RPC sponsor sessions' }));
+
+    await waitFor(() => {
+      expect(within(rpcCard).getByText('OP Session Test')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Resource keys/i }));
+
+    expect(
+      await screen.findByText(
+        'No active-session RPC sponsor. Other sessions with RPC: OP Session Test. Switch sessions to use one.',
+      ),
+    ).toBeInTheDocument();
   });
 
   it('does not render the legacy send-testnet-funds control in settings', () => {
@@ -1642,15 +1641,21 @@ describe('LoginAndSettingsModal agent token login', () => {
     window.localStorage.clear();
     window.sessionStorage.clear();
     window.history.replaceState({}, '', '/session/alpha');
-    global.fetch = jest.fn(async () => new Response(JSON.stringify({
-      ok: true,
-      tokenType: 'session_worker_jwt',
-      sessionSlug: 'alpha',
-      accountAddress: '0x3333333333333333333333333333333333333333',
-      workerUrl: 'https://session-worker.example',
-      workerToken: 'jwt-session-token',
-      expiresAt: '2027-07-05T00:00:00.000Z',
-    }), { status: 200, headers: { 'content-type': 'application/json' } }));
+    global.fetch = jest.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            ok: true,
+            tokenType: 'session_worker_jwt',
+            sessionSlug: 'alpha',
+            accountAddress: '0x3333333333333333333333333333333333333333',
+            workerUrl: 'https://session-worker.example',
+            workerToken: 'jwt-session-token',
+            expiresAt: '2027-07-05T00:00:00.000Z',
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+    );
   });
 
   afterEach(() => {
@@ -1678,10 +1683,12 @@ describe('LoginAndSettingsModal agent token login', () => {
     });
 
     await waitFor(() => {
-      expect(props.updateLoginInfo).toHaveBeenCalledWith(expect.objectContaining({
-        loginComplete: true,
-        provider: 'telegram_agent',
-      }));
+      expect(props.updateLoginInfo).toHaveBeenCalledWith(
+        expect.objectContaining({
+          loginComplete: true,
+          provider: 'telegram_agent',
+        }),
+      );
     });
 
     expect(input).toHaveValue('');
@@ -1693,10 +1700,14 @@ describe('LoginAndSettingsModal agent token login', () => {
   });
 
   it('hides agent-token login for normal sessions', () => {
-    render(<LoginAndSettingsModal {...buildProps({
-      activeSessionSlug: 'alpha',
-      sessionConfig: { slug: 'alpha', sessionName: 'Normal Session' },
-    })} />);
+    render(
+      <LoginAndSettingsModal
+        {...buildProps({
+          activeSessionSlug: 'alpha',
+          sessionConfig: { slug: 'alpha', sessionName: 'Normal Session' },
+        })}
+      />,
+    );
 
     expect(screen.queryByTestId('ce-agent-token-login-toggle')).not.toBeInTheDocument();
   });

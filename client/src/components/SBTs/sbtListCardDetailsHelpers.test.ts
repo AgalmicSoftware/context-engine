@@ -7,30 +7,23 @@ import {
 
 describe('sbtListCardDetailsHelpers', () => {
   it('collects card tags and document URLs from metadata variants', () => {
-    expect(collectSbtTagValues(
-      ['Builder', { label: 'builder' }],
-      'Research, Ops',
-      [{ name: 'Signal' }]
-    )).toEqual(['Builder', 'Research', 'Ops', 'Signal']);
-    expect(collectSbtDocumentUrls(
-      [{ href: 'ipfs://bafy-doc' }],
-      { docUrl: 'ar://abc123' },
-      'https://example.com/readme',
-      { url: 'https://example.com/readme' }
-    )).toEqual([
-      'ipfs://bafy-doc',
-      'ar://abc123',
-      'https://example.com/readme',
+    expect(collectSbtTagValues(['Builder', { label: 'builder' }], 'Research, Ops', [{ name: 'Signal' }])).toEqual([
+      'Builder',
+      'Research',
+      'Ops',
+      'Signal',
     ]);
+    expect(
+      collectSbtDocumentUrls([{ href: 'ipfs://bafy-doc' }], { docUrl: 'ar://abc123' }, 'https://example.com/readme', {
+        url: 'https://example.com/readme',
+      }),
+    ).toEqual(['ipfs://bafy-doc', 'ar://abc123', 'https://example.com/readme']);
   });
 
   it('normalizes SBT card detail links without hydrating token metadata', () => {
     const details = getSbtCardDetails({
       tags: ['Builder', { label: 'builder' }],
-      documentUrls: [
-        { href: 'ipfs://bafy-doc' },
-        { value: 'https://example.com/readme' },
-      ],
+      documentUrls: [{ href: 'ipfs://bafy-doc' }, { value: 'https://example.com/readme' }],
       sbtInfo: {
         featuredSbtTags: [{ value: 'Signal' }],
         documents: [{ docUrl: 'ar://abc123' }],

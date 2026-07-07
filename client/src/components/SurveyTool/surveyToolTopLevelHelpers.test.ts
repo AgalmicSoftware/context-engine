@@ -278,38 +278,24 @@ describe('surveyToolTopLevelHelpers', () => {
   });
 
   it('resolves SurveyTool prop-change lifecycle guards', () => {
-    const registrySessionConfig = {
-      slug: 'legacy',
-      networkChainId: 1,
-      __registry: {
-        chainId: 1,
-        sessionIdHex: '0x00112233445566778899aabbccddeeff',
-      },
-    };
     expect(
       shouldFetchSurveyToolSurveysOnPropsChange({
-        prevProps: { network: { id: 1 }, isSurveyCacheReady: false, sessionConfig: registrySessionConfig },
-        props: { network: { id: 2 }, isSurveyCacheReady: false, sessionConfig: registrySessionConfig },
+        prevProps: { network: { id: 1 }, isSurveyCacheReady: false },
+        props: { network: { id: 2 }, isSurveyCacheReady: false },
       }),
     ).toBe(true);
     expect(
       shouldFetchSurveyToolSurveysOnPropsChange({
-        prevProps: { network: { id: 1 }, isSurveyCacheReady: false, sessionConfig: registrySessionConfig },
-        props: { network: { id: 1 }, isSurveyCacheReady: true, sessionConfig: registrySessionConfig },
+        prevProps: { network: { id: 1 }, isSurveyCacheReady: false },
+        props: { network: { id: 1 }, isSurveyCacheReady: true },
       }),
     ).toBe(true);
     expect(
       shouldFetchSurveyToolSurveysOnPropsChange({
-        prevProps: { network: { id: 1 }, isSurveyCacheReady: true, sessionConfig: registrySessionConfig },
-        props: { network: { id: 1 }, isSurveyCacheReady: false, sessionConfig: registrySessionConfig },
+        prevProps: { network: { id: 1 }, isSurveyCacheReady: true },
+        props: { network: { id: 1 }, isSurveyCacheReady: false },
       }),
     ).toBe(false);
-    expect(
-      shouldFetchSurveyToolSurveysOnPropsChange({
-        prevProps: { minifiedMode: 'pile', network: { id: 1 }, sessionConfig: registrySessionConfig },
-        props: { network: { id: 1 }, isSurveyCacheReady: false, sessionConfig: registrySessionConfig },
-      }),
-    ).toBe(true);
 
     expect(
       shouldOpenSurveyToolResultsOnPropsChange({
@@ -358,142 +344,16 @@ describe('surveyToolTopLevelHelpers', () => {
     ).toBe(false);
   });
 
-  it('discovers the legacy survey index only for registry authority', () => {
-    const pureWorkerProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
-    const workerSbtProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
-    workerSbtProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
-    workerSbtProfile.evm.registryChainId = 11155420;
-    workerSbtProfile.encryption.accessConditions = {
-      match: 'any',
-      conditions: [
-        {
-          kind: 'sbt_onchain',
-          chainId: 11155420,
-          contract: '0x00000000000000000000000000000000000000aa',
-          anyOrAll: 'any',
-        },
-      ],
-    };
-    const workerLitProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
-    workerLitProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
-    workerLitProfile.evm.registryChainId = 11155420;
-    workerLitProfile.encryption = { mode: 'lit' };
-    workerLitProfile.storage.payloadAccessControl!.encryption = 'lit';
-    const registryProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
-
-    expect(shouldFetchSurveyToolSurveyIndex({ minifiedMode: 'pile' })).toBe(false);
-    expect(shouldFetchSurveyToolSurveyIndex({ singleQuestionMode: true })).toBe(false);
-    [pureWorkerProfile, workerSbtProfile, workerLitProfile].forEach((sessionModeProfile) => {
-      expect(
-        shouldFetchSurveyToolSurveyIndex({
-          sessionConfig: {
-            slug: 'worker-session',
-            networkChainId: 11155420,
-            sessionModeProfile,
-          },
-        }),
-      ).toBe(false);
-    });
-    expect(
-      shouldFetchSurveyToolSurveyIndex({
-        sessionConfig: {
-          slug: 'invalid',
-          sessionModeProfile: { authority: { mode: 'worker_canonical' } },
-        },
-      }),
-    ).toBe(false);
-    expect(shouldFetchSurveyToolSurveyIndex({ sessionConfig: { slug: 'missing', networkChainId: 11155420 } })).toBe(
-      false,
-    );
-    expect(shouldFetchSurveyToolSurveyIndex({ network: { id: 11155420 } })).toBe(false);
-    expect(
-      shouldFetchSurveyToolSurveyIndex({
-        sessionConfig: { slug: 'registry', sessionModeProfile: registryProfile },
-      }),
-    ).toBe(true);
-    expect(
-      shouldFetchSurveyToolSurveyIndex({
-        sessionConfig: {
-          slug: 'legacy',
-          networkChainId: 11155420,
-          __registry: {
-            chainId: 11155420,
-            sessionIdHex: '0x00112233445566778899aabbccddeeff',
-          },
-        },
-      }),
-    ).toBe(true);
-  });
-
   it('resolves results modal close URL state', () => {
     expect(
       resolveSurveyToolResultsModalCloseState({
         pathname: '/session/edge/questions/results',
-        search: '?worker=https%3A%2F%2Fworker.example.test&session=edge',
-        hash: '#responses',
         hasExternalCloseHandler: false,
       }),
     ).toEqual({
       shouldTrimResultsPath: true,
       nextPathname: '/session/edge',
       nextUrl: '/session/edge?worker=https%3A%2F%2Fworker.example.test&session=edge#responses',
-      shouldCallExternalCloseHandler: false,
-    });
-    expect(
-      resolveSurveyToolResultsModalCloseState({
-        pathname: '/ce/session/edge/questions/results',
-        hasExternalCloseHandler: false,
-      }),
-    ).toEqual({
-      shouldTrimResultsPath: true,
-      nextPathname: '/ce/session/edge',
-      nextUrl: '/ce/session/edge',
-      shouldCallExternalCloseHandler: false,
-    });
-    expect(
-      resolveSurveyToolResultsModalCloseState({
-        pathname: '/session/edge/questions/results/',
-        hasExternalCloseHandler: false,
-      }),
-    ).toEqual({
-      shouldTrimResultsPath: true,
-      nextPathname: '/session/edge',
-      nextUrl: '/session/edge',
-      shouldCallExternalCloseHandler: false,
-    });
-    expect(
-      resolveSurveyToolResultsModalCloseState({
-        pathname: '/session/edge/QUESTIONS/RESULTS',
-        hasExternalCloseHandler: false,
-      }),
-    ).toEqual({
-      shouldTrimResultsPath: true,
-      nextPathname: '/session/edge',
-      nextUrl: '/session/edge',
-      shouldCallExternalCloseHandler: false,
-    });
-    expect(
-      resolveSurveyToolResultsModalCloseState({
-        pathname: '/questions/results',
-        hasExternalCloseHandler: false,
-      }),
-    ).toEqual({
-      shouldTrimResultsPath: true,
-      nextPathname: '/questions',
-      nextUrl: '/questions',
-      shouldCallExternalCloseHandler: false,
-    });
-    expect(
-      resolveSurveyToolResultsModalCloseState({
-        pathname: '/ce/questions/RESULTS/',
-        search: '?session=edge',
-        hash: '#summary',
-        hasExternalCloseHandler: false,
-      }),
-    ).toEqual({
-      shouldTrimResultsPath: true,
-      nextPathname: '/ce/questions',
-      nextUrl: '/ce/questions?session=edge#summary',
       shouldCallExternalCloseHandler: false,
     });
     expect(

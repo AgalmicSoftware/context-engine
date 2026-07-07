@@ -213,14 +213,16 @@ type ContractHelperDeps = {
   DEFAULT_CHAIN_ID: number;
   store: StoreLike;
   getSessionConfigBySlug: (slug: string) => SessionConfigLike | null | undefined;
-  refreshSessionRegistryFieldsCache?: ((args: {
-    chainId?: number | string | null;
-    slug?: string | null;
-    sessionId?: string | null;
-    providerLike?: unknown;
-    fieldKeys?: string[];
-    bootstrapRpc?: boolean;
-  }) => Promise<SessionConfigLike | null | undefined>) | null;
+  refreshSessionRegistryFieldsCache?:
+    | ((args: {
+        chainId?: number | string | null;
+        slug?: string | null;
+        sessionId?: string | null;
+        providerLike?: unknown;
+        fieldKeys?: string[];
+        bootstrapRpc?: boolean;
+      }) => Promise<SessionConfigLike | null | undefined>)
+    | null;
   getCorsProxyUrlOrThrow: (args: {
     sessionConfig?: SessionConfigLike | null;
     sessionSlug?: string;
@@ -334,7 +336,9 @@ const isRetryableSponsoredBootstrapFundingError = (error: unknown): boolean => {
 
 const isRetryableWorkerUrlResolutionFundingError = (error: unknown): boolean => {
   const fundingError = error as FundingError;
-  const stage = String(fundingError?.stage || '').trim().toLowerCase();
+  const stage = String(fundingError?.stage || '')
+    .trim()
+    .toLowerCase();
   if (stage !== 'worker-url-resolution') return false;
   const message = normalizeFundingErrorMessage(error);
   return (
@@ -551,14 +555,30 @@ export function createContractHelperMethods(deps: ContractHelperDeps): ContractH
       chainKey: string = 'default',
     ): Promise<ethers.providers.Block> {
       void providerName;
-      return resolveContractBlockWithCache({
-        provider: providerPassedIn,
-        blockNumber,
-        chainKey,
-        ttlMs: BLOCK_CACHE_MS,
-        maxEntries: MAX_CACHE_SIZE,
-        callWithRetry,
+      const blockCache = this._blockCache!;
+      const key = `${String(chainKey)}_${String(blockNumber)}`;
+      if (blockCache[key] && Date.now() - blockCache[key].timestamp < BLOCK_CACHE_MS) {
+        return blockCache[key].block;
+      }
+
+      const block = await callWithRetry(() => providerPassedIn.getBlock(blockNumber), `getBlock(${blockNumber})`);
+      const now = Date.now();
+      Object.keys(blockCache).forEach((cacheKey: string) => {
+        if (now - (blockCache[cacheKey]?.timestamp || 0) >= BLOCK_CACHE_MS) {
+          delete blockCache[cacheKey];
+        }
       });
+
+      blockCache[key] = { block, timestamp: now };
+
+      const keys = Object.keys(blockCache);
+      if (keys.length > MAX_CACHE_SIZE) {
+        keys.sort((a: string, b: string) => (blockCache[a]?.timestamp || 0) - (blockCache[b]?.timestamp || 0));
+        for (let i = 0; i < keys.length - MAX_CACHE_SIZE; i += 1) {
+          delete blockCache[keys[i]];
+        }
+      }
+      return block;
     },
 
     async fetchLogsSmart(
@@ -666,7 +686,7 @@ export function createContractHelperMethods(deps: ContractHelperDeps): ContractH
           } catch (e: unknown) {
             contractsLog.warn('contractHelpers: fallback', e);
           }
-          contractsLog.warn('[blockLimits] Recovered missing blockLimits.start from SessionRegistry creation data.', {
+          contractsLog.warn('[blockLimits] Recovered missing blockLimits.start from SessionRegistry.SessionCreated.', {
             slug: slugLabel,
             chainId: extractChainId(cfg) || null,
             start: fallbackStart,
@@ -818,14 +838,13 @@ export function createContractHelperMethods(deps: ContractHelperDeps): ContractH
         };
         const refreshSessionFieldsForFunding = async (): Promise<SessionConfigLike | null> => {
           if (!resolvedSessionSlug || typeof refreshSessionRegistryFieldsCache !== 'function') return null;
-          const refreshChainId = (
+          const refreshChainId =
             sessionChainId ||
             cfg?.__registry?.registryChainId ||
             cfg?.__registry?.chainId ||
             cfg?.networkChainId ||
             context.chainId ||
-            null
-          );
+            null;
           try {
             const refreshed = await refreshSessionRegistryFieldsCache({
               chainId: refreshChainId,
@@ -833,11 +852,7 @@ export function createContractHelperMethods(deps: ContractHelperDeps): ContractH
               sessionId: cfg?.sessionId || cfg?.__registry?.sessionId || cfg?.__registry?.sessionIdHex || null,
               providerLike: context.providerLike,
             });
-            return (
-              refreshed ||
-              getSessionConfigBySlug(resolvedSessionSlug) ||
-              null
-            );
+            return refreshed || getSessionConfigBySlug(resolvedSessionSlug) || null;
           } catch (refreshError: any) {
             contractsLog.warn('[faucet] Failed to refresh session registry fields before funding retry.', {
               slug: resolvedSessionSlug,
@@ -914,15 +929,11 @@ export function createContractHelperMethods(deps: ContractHelperDeps): ContractH
               }
             }
           }
-          const shouldRetryWithSponsoredBootstrap = (
+          const shouldRetryWithSponsoredBootstrap =
             (bootstrapSessionSlug || bootstrapWorkerUrl) &&
             bootstrapTargetSessionSlug === resolvedSessionSlug &&
-            (
-              bootstrapSessionSlug !== resolvedSessionSlug ||
-              !!bootstrapWorkerUrl
-            ) &&
-            isRetryableSponsoredBootstrapFundingError(fundingErrorForFallback)
-          );
+            (bootstrapSessionSlug !== resolvedSessionSlug || !!bootstrapWorkerUrl) &&
+            isRetryableSponsoredBootstrapFundingError(fundingErrorForFallback);
           if (!shouldRetryWithSponsoredBootstrap) {
             throw fundingErrorForFallback;
           }

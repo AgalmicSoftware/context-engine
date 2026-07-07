@@ -434,7 +434,7 @@ describe('arweaveClient.downloadDataFromArweave', () => {
       text: async () => '{"ok":"canonicalized"}',
     });
 
-    const text = await arweaveClient.downloadDataFromArweave(`https://example.example.test/ar/${txId}?view=1`, {
+    const text = await arweaveScripts.downloadDataFromArweave(`https://example.example.test/ar/${txId}?view=1`, {
       gateways: [TEST_ARWEAVE_GATEWAY],
       retries: 0,
       bypassCache: true,
@@ -689,5 +689,4 @@ describe('arweaveClient.downloadDataFromArweave', () => {
     const fallbackUrl = String(global.fetch.mock.calls[3]?.[0] || '');
     expect(fallbackUrl).toContain('wf-gateway.example.test');
   });
-
 });

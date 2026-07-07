@@ -278,7 +278,7 @@ describe('SessionWizard blank bundle render regression', () => {
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_FILE_INPUT)).toBeInTheDocument();
     expect(
       screen.getAllByText(
-        'No default hosted worker bundle URL is configured for guided setup. Provide a manual bundle URL or upload a bundle file below. Optional fallback: Run nvm use 20 && npm run worker:bundle from the repo root, then choose /dist/sessionCorsWorker.bundle.js.',
+        'No default hosted worker bundle URL is configured for normal mode. Provide a manual bundle URL or upload a bundle file below. Optional fallback: Run nvm use 20 && npm run worker:bundle from the repo root, then choose /dist/sessionCorsWorker.bundle.js.',
       ),
     ).toHaveLength(2);
 
@@ -296,8 +296,8 @@ describe('SessionWizard blank bundle render regression', () => {
       resolveSponsoredBundle = resolve;
     });
 
-    window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id');
-    sessionStorage.setItem(
+    window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id#k=sponsor-secret');
+    localStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
         draft: {
@@ -352,7 +352,7 @@ describe('SessionWizard blank bundle render regression', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
-        'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, RPC URL, Lit API key, deploy access.'
+        'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, RPC URL, Lit API key, deploy access.',
       );
     });
 
@@ -380,8 +380,8 @@ describe('SessionWizard blank bundle render regression', () => {
       resolveSponsoredBundle = resolve;
     });
 
-    window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id');
-    sessionStorage.setItem(
+    window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id#k=sponsor-secret');
+    localStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
         draft: {
@@ -436,7 +436,7 @@ describe('SessionWizard blank bundle render regression', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
-        'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, RPC URL, Lit API key, deploy access.'
+        'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, RPC URL, Lit API key, deploy access.',
       );
     });
 
@@ -463,7 +463,7 @@ describe('SessionWizard blank bundle render regression', () => {
     const staleAdvancedBundleUrl = 'https://assets.example.test/stale-advanced-sessionCorsWorker.bundle.js';
     const fallbackFetch = createDefaultFetchMock();
 
-    sessionStorage.setItem(
+    localStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
         deployForm: {

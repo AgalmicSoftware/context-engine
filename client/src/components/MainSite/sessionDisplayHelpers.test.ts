@@ -111,14 +111,23 @@ describe('sessionDisplayHelpers', () => {
     });
 
     it('does not mask missing registry metadata with demo fallback fields', () => {
-      const opts = createTextOpts({}, {
-        description: 'Demo description',
-      });
+      const opts = createTextOpts(
+        {},
+        {
+          description: 'Demo description',
+        },
+      );
 
-      expect(getSessionInfoForGroup({
-        slug: 'alpha',
-        __registry: { sessionIdHex: '0xabc' },
-      }, 'alpha', opts)).toBe('');
+      expect(
+        getSessionInfoForGroup(
+          {
+            slug: 'alpha',
+            __registry: { sessionIdHex: '0xabc' },
+          },
+          'alpha',
+          opts,
+        ),
+      ).toBe('');
       expect(opts.getDemoSessionConfigBySlug).not.toHaveBeenCalled();
     });
   });
@@ -174,14 +183,23 @@ describe('sessionDisplayHelpers', () => {
     });
 
     it('does not mask missing registry title metadata with demo fallback fields', () => {
-      const opts = createTextOpts({}, {
-        title: 'Demo title',
-      });
+      const opts = createTextOpts(
+        {},
+        {
+          title: 'Demo title',
+        },
+      );
 
-      expect(getSessionNameForGroup({
-        slug: 'alpha',
-        __registry: { metadataURI: 'ar://metadata' },
-      }, 'alpha', opts)).toBe('');
+      expect(
+        getSessionNameForGroup(
+          {
+            slug: 'alpha',
+            __registry: { metadataURI: 'ar://metadata' },
+          },
+          'alpha',
+          opts,
+        ),
+      ).toBe('');
       expect(opts.getDemoSessionConfigBySlug).not.toHaveBeenCalled();
     });
   });
@@ -232,14 +250,23 @@ describe('sessionDisplayHelpers', () => {
     });
 
     it('does not mask missing registry header metadata with a demo fallback image', () => {
-      const opts = createHeaderOpts({}, {
-        sessionHeader: ' ar://demo-header ',
-      });
+      const opts = createHeaderOpts(
+        {},
+        {
+          sessionHeader: ' ar://demo-header ',
+        },
+      );
 
-      expect(getSessionHeaderForGroup({
-        slug: 'alpha',
-        sessionId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-      }, 'alpha', opts)).toBe('normalized:');
+      expect(
+        getSessionHeaderForGroup(
+          {
+            slug: 'alpha',
+            sessionId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+          },
+          'alpha',
+          opts,
+        ),
+      ).toBe('normalized:');
       expect(opts.getDemoSessionConfigBySlug).not.toHaveBeenCalled();
     });
   });

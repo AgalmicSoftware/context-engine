@@ -56,34 +56,18 @@ export const resolveSessionWizardNewSessionRequirementsDisplayState = ({
     { hasPendingSbtDrafts: !!hasPendingSbtDrafts },
   );
   const sponsoredBundleStatusTone = toRequirementString(sponsoredBundleStatus?.tone).trim().toLowerCase();
-  const hasAnyAiProviderKey = ['openaiKey', 'anthropicKey', 'openrouterKey'].some(
-    (key) => !!toRequirementString(currentWorkerSecrets?.[key]).trim(),
-  );
-  const hasNewSessionAiRequirementCovered = modeRequirements.isWorkerCanonical
-    ? resolveSessionWizardResourceSecretFields('ai', sessionAi).every(
-        (field) => !!toRequirementString(currentWorkerSecrets?.[field.key]).trim(),
-      )
-    : hasAnyAiProviderKey;
-  const hasNewSessionArweaveRequirementCovered =
-    (modeRequirements.selected && !modeRequirements.requiresArweave) ||
-    !!toRequirementString(currentWorkerSecrets?.arweaveJwk).trim();
-  const newSessionRequiresLitCredential = modeRequirements.selected
-    ? modeRequirements.requiresLit
-    : !cloudflareWorkerSbtGateMode;
+  const hasNewSessionAiRequirementCovered = !!toRequirementString(currentWorkerSecrets?.openaiKey).trim();
+  const hasNewSessionArweaveRequirementCovered = !!toRequirementString(currentWorkerSecrets?.arweaveJwk).trim();
+  const newSessionRequiresLitCredential = !cloudflareWorkerSbtGateMode;
   const hasNewSessionLitRequirementCovered =
     !newSessionRequiresLitCredential || !!toRequirementString(currentWorkerSecrets?.litAccountApiKey).trim();
-  const hasNewSessionFundingRequirementCovered =
-    (modeRequirements.selected && !modeRequirements.requiresFunding) ||
-    !!(
-      toRequirementString(currentWorkerSecrets?.faucetPrivateKey).trim() ||
-      toRequirementString(normalizedAppliedSponsoredBundle?.faucetGrantToken).trim()
-    );
-  const requiresCloudflareDeploy = modeRequirements.requiredRequirementIds.some(
-    (requirementId) => requirementId === 'cloudflareAccount' || requirementId === 'cloudflareApiToken',
+  const hasNewSessionFundingRequirementCovered = !!(
+    toRequirementString(currentWorkerSecrets?.faucetPrivateKey).trim() ||
+    toRequirementString(normalizedAppliedSponsoredBundle?.faucetGrantToken).trim()
   );
-  const hasNewSessionDeployRequirementCovered =
-    (modeRequirements.selected && !requiresCloudflareDeploy) ||
-    !!toRequirementString(normalizedAppliedSponsoredBundle?.deployGrantToken).trim();
+  const hasNewSessionDeployRequirementCovered = !!toRequirementString(
+    normalizedAppliedSponsoredBundle?.deployGrantToken,
+  ).trim();
   const sponsoredBundleCoversNewSessionRequirements =
     sponsoredBundleStatusTone === 'success' &&
     hasNewSessionAiRequirementCovered &&

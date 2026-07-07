@@ -1,16 +1,11 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import DeferredRatingSlider from './DeferredRatingSlider';
+import DeferredRatingSlider, { resolveDeferredRatingSliderStyle } from './DeferredRatingSlider';
 
 describe('DeferredRatingSlider', () => {
   it('buffers slider movement locally and commits after completion', () => {
     const onCommit = jest.fn();
-    render(
-      <DeferredRatingSlider
-        value={4}
-        onCommit={onCommit}
-      />
-    );
+    render(<DeferredRatingSlider value={4} onCommit={onCommit} />);
 
     const slider = screen.getByRole('slider');
     expect(screen.getByText('4')).toBeInTheDocument();

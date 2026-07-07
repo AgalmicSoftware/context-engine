@@ -153,9 +153,7 @@ jest.mock('../../variables/appConfig.js', () => {
   };
 });
 
-import SessionWizard, {
-  __test__resetSessionWizardSponsoredBundleCacheKey,
-} from './SessionWizard';
+import SessionWizard, { __test__resetSessionWizardSponsoredBundleCacheKey } from './SessionWizard';
 import { SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY } from '../../utilities/session/sponsoredBootstrapFunding.js';
 import {
   SPONSORED_DEPLOY_NOTICE,
@@ -180,12 +178,13 @@ import {
 import { createIndexedDbMock } from './SessionWizard.sponsoredBundleIndexedDb.testUtils.js';
 
 const renderSessionWizard = (props = {}) => render(<SessionWizard network={{ id: 84532 }} {...props} />);
-const renderLoggedInSessionWizard = (props = {}) => renderSessionWizard({
-  account: TEST_ADMIN_ADDRESS,
-  loginComplete: true,
-  toggleLoginModal: jest.fn(),
-  ...props,
-});
+const renderLoggedInSessionWizard = (props = {}) =>
+  renderSessionWizard({
+    account: TEST_ADMIN_ADDRESS,
+    loginComplete: true,
+    toggleLoginModal: jest.fn(),
+    ...props,
+  });
 
 describe('SessionWizard sponsored bundle flow', () => {
   beforeEach(() => {
@@ -342,7 +341,7 @@ describe('SessionWizard sponsored bundle flow', () => {
     await expectSponsoredStatus('Sponsored resources applied.');
 
     await waitFor(() => {
-      const cachedRaw = sessionStorage.getItem('ce:sessionWizardDraft:v1') || '{}';
+      const cachedRaw = localStorage.getItem('ce:sessionWizardDraft:v1') || '{}';
       expect(JSON.parse(cachedRaw)).toEqual(
         expect.objectContaining({
           deployComplete: false,
@@ -426,6 +425,7 @@ describe('SessionWizard sponsored bundle flow', () => {
     expect(
       await screen.findByText('Session slug already exists on-chain: sponsored-duplicate-session'),
     ).toBeInTheDocument();
+    expect(mockSessionExists).toHaveBeenCalledWith('sponsored-duplicate-session');
     expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/deploy'))).toBe(false);
     expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/sponsored/redeem-deploy'))).toBe(false);
     expect(mockUploadDataToArweave).not.toHaveBeenCalled();
@@ -455,8 +455,8 @@ describe('SessionWizard sponsored bundle flow', () => {
     expect(screen.getAllByText('Use URL').length).toBeGreaterThan(0);
   }, 15000);
 
-  it('keeps an explicitly handed-off bundle key out of the current URL', async () => {
-    window.history.replaceState({}, '', '/session/new?sponsored=sponsor_tx_id#preview=1');
+  it('removes the sponsored bundle hash secret after applying the bundle', async () => {
+    window.history.replaceState({}, '', '/session/new?sponsored=sponsor_tx_id#k=bundle-secret&preview=1');
 
     renderSessionWizard({
       initialSponsoredBundleId: 'sponsor_tx_id',
@@ -908,8 +908,8 @@ describe('SessionWizard sponsored bundle flow', () => {
     expect(getToggleCheckbox('Require users to pay for usage')).toBeChecked();
   });
 
-  it('does not write the explicit bundle key into the URL after a terminal sponsored-bundle failure', async () => {
-    window.history.replaceState({}, '', '/session/new?sponsored=sponsor_tx_id#preview=1');
+  it('removes the sponsored bundle hash secret after a terminal sponsored-bundle failure', async () => {
+    window.history.replaceState({}, '', '/session/new?sponsored=sponsor_tx_id#k=bundle-secret&preview=1');
     mockDecryptWithPassword.mockResolvedValue({
       openaiKey: 'expired-openai',
       meta: {

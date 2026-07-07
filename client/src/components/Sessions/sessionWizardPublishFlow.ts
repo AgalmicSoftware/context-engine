@@ -629,11 +629,9 @@ export const buildSessionWizardPublishProgressSteps = ({
             ? `Deploy ${normalizedSbtLabel}`
             : key === 'upload-metadata'
               ? 'Upload Arweave'
-              : key === 'persist-worker-config'
-                ? 'Verify Worker Config'
-                : key === 'register-session'
-                  ? 'Register On-chain'
-                  : 'Done',
+              : key === 'register-session'
+                ? 'Register On-chain'
+                : 'Done',
       state: isActive ? 'active' : isComplete ? 'complete' : 'pending',
     };
   });

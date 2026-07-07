@@ -97,6 +97,7 @@ const waitFor = async (
   const tick = Math.max(25, Number(tickMs) || 0);
 
   while (true) {
+    // eslint-disable-next-line no-await-in-loop
     const ok = await Promise.resolve()
       .then(fn)
       .catch(() => false);
@@ -186,9 +187,13 @@ const getState = () => {
   };
 };
 
-export const resolvePolisReportSessionSlug = ({ params = {}, state = {} } = {}) => (
-  toStr(params?.sessionSlug || params?.slug || state?.activeSessionSlug).trim()
-);
+export const resolvePolisReportSessionSlug = ({
+  params = {},
+  state = {},
+}: {
+  params?: CeAgentRecord;
+  state?: CeAgentRecord;
+} = {}): string => toStr(params?.sessionSlug || params?.slug || state?.activeSessionSlug).trim();
 
 const perform = async (action) => {
   const a = action && typeof action === 'object' ? action : null;

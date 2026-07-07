@@ -127,9 +127,8 @@ const readUseInfuraRpcFlag = () => {
 
 const readRpcProviderMode = () => {
   try {
-    const g = runtimeGlobal();
-    if (g && typeof g.CE_RPC_PROVIDER_MODE !== 'undefined') {
-      const mode = String(g.CE_RPC_PROVIDER_MODE || '')
+    if (typeof globalThis !== 'undefined' && typeof globalThis.CE_RPC_PROVIDER_MODE !== 'undefined') {
+      const mode = String(globalThis.CE_RPC_PROVIDER_MODE || '')
         .trim()
         .toLowerCase();
       if (mode === 'infura_only' || mode === 'fallback') return mode;
@@ -144,7 +143,7 @@ const readRpcProviderMode = () => {
   return 'fallback';
 };
 
-const isInfuraOnlyForChain = (chainId: unknown) =>
+const isInfuraOnlyForChain = (chainId) =>
   readRpcProviderMode() === 'infura_only' && !!getConfiguredPaidRpcHttpUrl(chainId);
 
 const readPreferPathRpcFlag = (chainId: unknown = null) => {
@@ -756,14 +755,13 @@ const buildExplorerEntityUrl = (chainId: unknown, segment: string, value: unknow
 const CHAINS_WITH_FAUCET_RPC_FALLBACK = new Set<number>([84532, 11155420]);
 
 const LOCAL_CONTRACT_CHAIN_ID = Number(localContracts?.chainId || 0) || 0;
-const normalizeLoopbackHost = (value: unknown): string =>
+const normalizeLoopbackHost = (value) =>
   String(value || '')
     .trim()
     .toLowerCase()
     .replace(/^\[(.*)\]$/, '$1');
 const LOCAL_SESSION_REGISTRY_LIST_HOSTS = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::1']);
-export const isLocalDevLoopbackHost = (value: unknown): boolean =>
-  LOCAL_SESSION_REGISTRY_LIST_HOSTS.has(normalizeLoopbackHost(value));
+export const isLocalDevLoopbackHost = (value) => LOCAL_SESSION_REGISTRY_LIST_HOSTS.has(normalizeLoopbackHost(value));
 const LOCAL_SESSION_REGISTRY_ADDRESSES =
   LOCAL_CONTRACT_CHAIN_ID && normalizeOptionalAddress(localContracts?.SessionRegistry)
     ? { [LOCAL_CONTRACT_CHAIN_ID]: normalizeOptionalAddress(localContracts.SessionRegistry) }
@@ -790,8 +788,8 @@ const readIncludeLocalSessionRegistryFlag = () => {
     void e; /* fallback: runtime override lookup. */
   }
   try {
-    const g = runtimeGlobal();
-    const hostname = g ? normalizeLoopbackHost(g.location?.hostname || '') : '';
+    const hostname =
+      typeof globalThis !== 'undefined' ? normalizeLoopbackHost(globalThis.location?.hostname || '') : '';
     return isLocalDevLoopbackHost(hostname);
   } catch (e) {
     void e; /* fallback: runtime override lookup. */
@@ -810,21 +808,20 @@ export const SESSION_REGISTRY_ADDRESSES: Record<number, string> = Object.fromEnt
   Object.entries({
     ...(contractsConfig.sessionRegistryAddresses || {}),
     ...LOCAL_SESSION_REGISTRY_ADDRESSES,
-  }).map(([k, v]) => [Number(k), normalizeOptionalAddress(v)]),
+  }).map(([k, v]) => [Number(k), v]),
 );
 
 export const SESSION_CONTRACTS_BY_CHAIN: Record<number, UnknownRecord> = Object.fromEntries(
   Object.entries({
     ...(contractsConfig.sessionContractsByChain || {}),
     ...LOCAL_SESSION_CONTRACTS_BY_CHAIN,
-  }).map(([k, v]) => [Number(k), v && typeof v === 'object' ? (v as UnknownRecord) : {}]),
+  }).map(([k, v]) => [Number(k), v]),
 );
 
-export function getChainById(id: unknown): CeChain | null {
-  const normalizedId = normalizeChainIdValue(id);
-  return normalizedId ? chainRegistry[normalizedId] || null : null;
+export function getChainById(id) {
+  return chainRegistry[id] || null;
 }
-export function getDefaultChainId(): number | null {
+export function getDefaultChainId() {
   return normalizeChainIdValue(DEFAULT_CHAIN_ID);
 }
 export function buildExplorerAddressUrl(chainId: unknown, address: unknown): string | null {
@@ -878,9 +875,8 @@ export function getDefaultGasPriceGwei(id: unknown): string {
   }
   return '0.08';
 }
-export function getDefaultHttpRpc(id: unknown, opts: DefaultHttpRpcOptions = {}): string | null {
-  const normalizedId = normalizeChainIdValue(id);
-  const ch = normalizedId ? chainRegistry[normalizedId] : null;
+export function getDefaultHttpRpc(id, opts = {}) {
+  const ch = chainRegistry[id];
   if (!ch) return null;
   const allowPath = opts?.allowPath !== false;
 
@@ -901,18 +897,13 @@ export function getDefaultHttpRpc(id: unknown, opts: DefaultHttpRpcOptions = {})
 }
 
 // --- wagmi Chain adapters (DEFAULT_NETWORK / ch are wagmi Chain objects) ---
-export const chainHexId = (ch: unknown): string => '0x' + Number(readRecord(ch, 'id') ?? 0).toString(16);
+export const chainHexId = (ch) => '0x' + Number(ch?.id ?? 0).toString(16);
 
 export const chainHttpRpc = (ch: unknown): string => {
   const id = Number(readRecord(ch, 'id') ?? 0);
   const pathUrl = resolvePathRpcUrl(id);
   if (pathUrl) return pathUrl;
-  const rpcUrls = asRecord(readRecord(ch, 'rpcUrls'));
-  const publicRpcUrls = asRecord(readRecord(rpcUrls, 'public'));
-  const defaultRpcUrls = asRecord(readRecord(rpcUrls, 'default'));
-  return (
-    readStringList(readRecord(publicRpcUrls, 'http'))[0] || readStringList(readRecord(defaultRpcUrls, 'http'))[0] || ''
-  );
+  return ch?.rpcUrls?.public?.http?.[0] || ch?.rpcUrls?.default?.http?.[0] || '';
 };
 
 export const chainHttpRpcNoPath = (ch: unknown): string => {
@@ -928,16 +919,15 @@ export const chainHttpRpcNoPath = (ch: unknown): string => {
   const filtered = pathUrl ? candidates.filter((url) => url !== pathUrl) : candidates;
   return filtered[0] || '';
 };
-export const chainCurrency = (ch) =>
-  ch?.nativeCurrency ?? { name: 'ETH', symbol: 'ETH', decimals: 18 }
+export const chainCurrency = (ch) => ch?.nativeCurrency ?? { name: 'ETH', symbol: 'ETH', decimals: 18 };
 export const isTestnetChain = (ch) => {
-  if (typeof ch?.testnet === 'boolean') return ch.testnet
+  if (typeof ch?.testnet === 'boolean') return ch.testnet;
   const bag = [
-    chain.name,
-    chain.network,
-    defaultBlockExplorer.url,
-    ...readStringList(readRecord(defaultRpcUrls, 'http')),
-    ...readStringList(readRecord(publicRpcUrls, 'http')),
+    ch?.name,
+    ch?.network,
+    ch?.blockExplorers?.default?.url,
+    ...(ch?.rpcUrls?.default?.http || []),
+    ...(ch?.rpcUrls?.public?.http || []),
   ]
     .join(' ')
     .toLowerCase();

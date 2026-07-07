@@ -97,13 +97,7 @@ export const AUTHORITY_MATRIX = deepFreeze<AuthorityMatrix>({
     ],
   },
   secrets: {
-    fields: [
-      'arweaveJwk',
-      'apiKey',
-      'privateKey',
-      'litAccountApiKey',
-      'litUsageApiKey',
-    ],
+    fields: ['arweaveJwk', 'apiKey', 'privateKey', 'litAccountApiKey', 'litUsageApiKey'],
     authoritativeSource: AUTHORITY_SOURCES.WORKER_SECRETS,
     allowedFallbacks: [AUTHORITY_SOURCES.BROWSER],
     mustNotOverride: [AUTHORITY_SOURCES.ARWEAVE, AUTHORITY_SOURCES.DEMO, AUTHORITY_SOURCES.CACHE],

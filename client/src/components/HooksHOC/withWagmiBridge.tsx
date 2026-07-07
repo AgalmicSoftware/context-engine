@@ -2,7 +2,7 @@
 import React, { useEffect, useRef } from 'react';
 
 import { useAccount, useBalance, useBlockNumber, useNetwork, useProvider, useDisconnect } from 'wagmi';
-import { useConnectModal, useAccountModal, useChainModal } from '../../app/runtime/walletUiRuntime.js';
+import { useConnectModal, useAccountModal, useChainModal } from '@rainbow-me/rainbowkit';
 import { base, baseSepolia } from '../../variables/chains.js';
 import { getSessionNetwork } from '../../utilities/web3/chainGateway.js';
 import { clearUserExplicitlyDisconnected } from '../../utilities/web3/wagmiDisconnectState.js';
@@ -62,21 +62,20 @@ export function WagmiHooksHOC<P extends object>(Component: React.ComponentType<P
       address: address,
     });
 
-        const componentName = String(Component?.displayName || Component?.name || '');
-        const needsBlockNumber = (
-          componentName === 'AppShell' ||
-          componentName === 'AppShellWithWagmiHooks' ||
-          componentName === 'MainSite' ||
-          componentName === 'MainSiteWithWagmiHooks' ||
-          props.__ceRequireWagmiBlockNumber === true
-        );
-        // Only components that consume the value should subscribe/fetch.
-        const { data: blockNumber } = useBlockNumber({
-          watch: false,
-          cacheTime: 30_000,
-          enabled: needsBlockNumber,
-        });
-        const { chain, chains } = useNetwork()
+    const componentName = String(Component?.displayName || Component?.name || '');
+    const needsBlockNumber =
+      componentName === 'AppShell' ||
+      componentName === 'AppShellWithWagmiHooks' ||
+      componentName === 'MainSite' ||
+      componentName === 'MainSiteWithWagmiHooks' ||
+      props.__ceRequireWagmiBlockNumber === true;
+    // Only components that consume the value should subscribe/fetch.
+    const { data: blockNumber } = useBlockNumber({
+      watch: false,
+      cacheTime: 30_000,
+      enabled: needsBlockNumber,
+    });
+    const { chain, chains } = useNetwork();
 
     // Derive desired chain from activeSessionSlug; fall back gently if absent
     const activeSlug = props.activeSessionSlug || '';
@@ -98,7 +97,7 @@ export function WagmiHooksHOC<P extends object>(Component: React.ComponentType<P
 
     // Removed: local JsonRpcProvider + window.defaultProvider anti-pattern.
     // Downstream components should use the centralized, group-aware read provider
-    // from the chain gateway (getReadProviderForGroup).
+    // from contractScripts.js (getReadProviderForGroup).
 
     const { openConnectModal } = useConnectModal();
     const { openAccountModal } = useAccountModal();

@@ -52,7 +52,8 @@ const SessionWizardHeader = ({
   return (
     <header className={`${styles.header} ${sessionModeProfileSelectionStep ? styles.headerProfileSelectionStep : ''}`}>
       <div className={styles.headerTitleBlock}>
-        <h1>Session Setup{sessionModeProfileLabel ? ` (${sessionModeProfileLabel})` : ''}</h1>
+        <h1>Session Setup</h1>
+        {!isNormalMode && <div className={styles.modeHint}>Advanced mode shows the full session configuration.</div>}
       </div>
       <div className={styles.headerActions}>
         <div className={styles.headerControlStack}>
@@ -88,8 +89,40 @@ const SessionWizardHeader = ({
                 })}
               </div>
             </div>
-          ) : null}
-        </div>
+          </div>
+        ) : (
+          wizardModeControls
+        )}
+        {wizardMode === 'advanced' && (
+          <div className={styles.headerChainSelector}>
+            <span className={styles.headerChainLabel}>Network:</span>
+            <Input
+              type="select"
+              value={registryChainId || ''}
+              onChange={(event) => onRegistryChainIdChange(event.target.value)}
+              className={styles.headerChainInput}
+            >
+              {registryChainOptions.length ? (
+                registryChainOptions.map((chain) => (
+                  <option key={chain.id} value={chain.id}>
+                    {chain.name} ({chain.id})
+                  </option>
+                ))
+              ) : (
+                <option value={registryChainId || ''}>
+                  {registryChainName || registryChainId || 'Select a chain'}
+                </option>
+              )}
+            </Input>
+            {renderInfoTooltip({
+              id: 'gw-registry-chain',
+              content: `Chain for session deployment. Registry: ${registryAddress || 'Unavailable'}`,
+              placement: 'bottom',
+              testId: 'ce-wizard-tooltip-gw-registry-chain',
+              ariaLabel: 'Registry chain info',
+            })}
+          </div>
+        )}
       </div>
     </header>
   );

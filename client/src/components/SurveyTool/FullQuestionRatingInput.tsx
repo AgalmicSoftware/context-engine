@@ -1,10 +1,7 @@
 import React from 'react';
 import { FormText } from 'reactstrap';
 import CESlider from '../Shared/CESlider';
-import {
-  RATING_MAX,
-  RATING_MIN,
-} from '../../utilities/survey/ratingValue.js';
+import { RATING_MAX, RATING_MIN } from '../../utilities/survey/ratingValue.js';
 import styles from './SurveyTool.module.scss';
 
 type FullQuestionRatingInputProps = {
@@ -39,9 +36,7 @@ const FullQuestionRatingInput = ({
         disabled={disabled}
       />
     </div>
-    <FormText className={styles.ratingLabelText}>
-      {value}
-    </FormText>
+    <FormText className={styles.ratingLabelText}>{value}</FormText>
   </>
 );
 

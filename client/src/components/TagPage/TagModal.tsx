@@ -69,7 +69,7 @@ const buildSessionScopeLabel = (slugIn = ''): string => {
     : sessionName || slug;
 };
 
-const buildGlobalTagPageScope = (selection: Record<string, unknown> = {}): SessionScopeState => {
+const buildGlobalTagPageScope = (selection: Record<string, any> = {}): SessionScopeState => {
   const scopeMode =
     String(selection?.selectedSessionScope || '')
       .trim()

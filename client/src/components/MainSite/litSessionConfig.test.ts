@@ -1,7 +1,4 @@
-import {
-  resolveMainSiteLitSessionConfig,
-  resolveMainSiteLitSessionConfigSource,
-} from './litSessionConfig.js';
+import { resolveMainSiteLitSessionConfig, resolveMainSiteLitSessionConfigSource } from './litSessionConfig.js';
 
 const VALID_SBT_ADDRESS = '0x0000000000000000000000000000000000000001';
 const LEGACY_SESSION_ID = '0x00112233445566778899aabbccddeeff';
@@ -49,7 +46,7 @@ const buildSessionConfigWithGate = ({
 });
 
 describe('litSessionConfig', () => {
-  it('resolves chainId from a strong legacy gate or config without trusting a missing-profile fallback', () => {
+  it('resolves chainId from gate first, then config, then fallback', () => {
     expect(
       resolveConfig({
         sessionConfig: {
@@ -62,7 +59,7 @@ describe('litSessionConfig', () => {
 
     expect(
       resolveConfig({
-        sessionConfig: buildLegacyRegistryIdentity(2),
+        sessionConfig: { networkChainId: 2 },
         networkChainIdFallback: 3,
       }).chainId,
     ).toBe(2);
@@ -72,7 +69,7 @@ describe('litSessionConfig', () => {
         sessionConfig: {},
         networkChainIdFallback: 3,
       }).chainId,
-    ).toBeNull();
+    ).toBe(3);
 
     expect(
       resolveConfig({
@@ -82,21 +79,23 @@ describe('litSessionConfig', () => {
   });
 
   it('only publishes a litNetwork label when a Chipotle worker runtime is configured', () => {
-    expect(resolveConfig({
-      sessionConfig: {},
-    }).litNetwork).toBe('');
+    expect(
+      resolveConfig({
+        sessionConfig: {},
+      }).litNetwork,
+    ).toBe('');
   });
 
   it('reads optional lit.userMaxPrice deployment defaults without requiring new UI fields', () => {
     expect(
       resolveConfig({
-        sessionConfig: { ...buildLegacyRegistryIdentity(), lit: { userMaxPrice: '123' } },
+        sessionConfig: { lit: { userMaxPrice: '123' } },
       }).userMaxPrice,
     ).toBe('123');
 
     expect(
       resolveConfig({
-        sessionConfig: { ...buildLegacyRegistryIdentity(), litUserMaxPrice: '456' },
+        sessionConfig: { litUserMaxPrice: '456' },
       }).userMaxPrice,
     ).toBe('456');
   });
@@ -211,10 +210,12 @@ describe('litSessionConfig', () => {
 
     const result = resolveConfig({ sessionConfig });
 
-    expect(result.chipotle).toEqual(expect.objectContaining({
-      enabled: true,
-      workerUrl: 'https://worker.example.test',
-    }));
+    expect(result.chipotle).toEqual(
+      expect.objectContaining({
+        enabled: true,
+        workerUrl: 'https://worker.example.test',
+      }),
+    );
     expect(result.gateAddresses).toEqual([VALID_SBT_ADDRESS]);
     expect(result.accessControlConditions).toEqual([
       expect.objectContaining({
@@ -273,10 +274,12 @@ describe('litSessionConfig', () => {
       },
     };
 
-    expect(resolveMainSiteLitSessionConfigSource({
-      slug: 'dynamic-session',
-      resolveRegistryConfigBySlug: (slug) => (slug === 'dynamic-session' ? registryConfig : null),
-      resolveStaticConfigBySlug: () => staticConfig,
-    })).toBe(registryConfig);
+    expect(
+      resolveMainSiteLitSessionConfigSource({
+        slug: 'dynamic-session',
+        resolveRegistryConfigBySlug: (slug) => (slug === 'dynamic-session' ? registryConfig : null),
+        resolveStaticConfigBySlug: () => staticConfig,
+      }),
+    ).toBe(registryConfig);
   });
 });

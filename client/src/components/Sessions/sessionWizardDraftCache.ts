@@ -97,126 +97,8 @@ const getLegacyDraftStorage = (): StorageLike | null => {
   return null;
 };
 
-type NormalizedPublicationIdentity = {
-  workerUrl: string;
-  slug: string;
-  sessionId: string;
-};
-
-const normalizePublicationIdentity = (value: unknown): NormalizedPublicationIdentity | null => {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-  const candidate = value as Record<string, unknown>;
-  const workerSettlement = createSessionWizardWorkerSettlement({ ...candidate, settledAt: 1 });
-  if (workerSettlement) {
-    return {
-      workerUrl: workerSettlement.workerUrl,
-      slug: workerSettlement.slug,
-      sessionId: workerSettlement.sessionId,
-    };
-  }
-  if (toStr(candidate.workerUrl).trim()) return null;
-  const slug = toStr(candidate.slug).trim();
-  const rawSessionId = toStr(candidate.sessionId).trim();
-  const sessionId = normalizeWorkerCanonicalSessionIdHex(rawSessionId) || rawSessionId;
-  return slug && sessionId ? { workerUrl: '', slug, sessionId } : null;
-};
-
-const readCachedPublicationIdentity = (value: unknown): NormalizedPublicationIdentity | null => {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-  const cached = value as Record<string, unknown>;
-  const terminalSettlement = createSessionWizardWorkerSettlement(cached.terminalWorkerSettlement);
-  if (terminalSettlement) return normalizePublicationIdentity(terminalSettlement);
-  const draft =
-    cached.draft && typeof cached.draft === 'object' && !Array.isArray(cached.draft)
-      ? (cached.draft as Record<string, unknown>)
-      : {};
-  return normalizePublicationIdentity({
-    workerUrl: cached.deployWorkerUrl || draft.corsWorkerUrl,
-    slug: draft.slug,
-    sessionId: cached.sessionId,
-  });
-};
-
-const publicationIdentitiesMatch = (
-  cached: NormalizedPublicationIdentity | null,
-  expected: NormalizedPublicationIdentity | null,
-): boolean =>
-  !!(
-    cached &&
-    expected &&
-    cached.slug === expected.slug &&
-    cached.sessionId === expected.sessionId &&
-    (!expected.workerUrl || cached.workerUrl === expected.workerUrl)
-  );
-
-const preserveForeignDraft = (): SessionWizardDraftClearOutcome => ({
-  ok: true,
-  removed: 0,
-  failed: 0,
-  status: 'preserved-foreign-draft',
-});
-
-const canonicalizeJsonValue = (value: unknown): unknown => {
-  if (Array.isArray(value)) return value.map(canonicalizeJsonValue);
-  if (!value || typeof value !== 'object') return value;
-  return Object.keys(value as Record<string, unknown>)
-    .sort()
-    .reduce<Record<string, unknown>>((result, key) => {
-      const entry = (value as Record<string, unknown>)[key];
-      if (entry !== undefined) result[key] = canonicalizeJsonValue(entry);
-      return result;
-    }, {});
-};
-
-const getJsonValueSignature = (value: unknown): string => {
-  try {
-    return JSON.stringify(canonicalizeJsonValue(value));
-  } catch (_) {
-    return '';
-  }
-};
-
-const sanitizeSessionWizardDraftCacheCredentials = (value: unknown): { changed: boolean; value: unknown } => {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return { changed: false, value };
-  const cached = { ...(value as Record<string, unknown>) };
-  if (cached.draft && typeof cached.draft === 'object' && !Array.isArray(cached.draft)) {
-    cached.draft = sanitizeSessionWizardDraftForBrowserCache(cached.draft);
-  }
-
-  if (Object.prototype.hasOwnProperty.call(cached, 'persistWorkerSecrets')) {
-    cached.persistWorkerSecrets = false;
-  }
-  if (Object.prototype.hasOwnProperty.call(cached, 'workerRequirementProof')) {
-    delete cached.workerRequirementProof;
-  }
-  ['initialSponsoredBundleKey', 'sponsoredBundleKey', 'faucetGrantToken', 'deployGrantToken'].forEach((key) => {
-    if (Object.prototype.hasOwnProperty.call(cached, key)) delete cached[key];
-  });
-
-  if (cached.deployForm && typeof cached.deployForm === 'object' && !Array.isArray(cached.deployForm)) {
-    const deployForm = { ...(cached.deployForm as Record<string, unknown>) };
-    delete deployForm.apiToken;
-    delete deployForm.deployGrantToken;
-    cached.deployForm = deployForm;
-  }
-
-  if (cached.workerSecrets && typeof cached.workerSecrets === 'object' && !Array.isArray(cached.workerSecrets)) {
-    const source = cached.workerSecrets as Record<string, unknown>;
-    cached.workerSecrets = WORKER_SECRET_CACHE_SAFE_FIELDS.reduce<Record<string, string>>((result, key) => {
-      const entry = toStr(source[key]).trim();
-      if (entry) result[key] = entry;
-      return result;
-    }, {});
-  }
-
-  return {
-    changed: getJsonValueSignature(cached) !== getJsonValueSignature(value),
-    value: cached,
-  };
-};
-
 export const readSessionWizardDraftCache = ({ storage }: SessionWizardDraftCacheOptions = {}): unknown | null => {
-  const storageRef = getDraftStorage(storage);
+  const storageRef = getLocalStorage(storage);
   if (!storageRef) return null;
   let result = safeJsonRead(storageRef, SESSION_WIZARD_CACHE_KEY, null, { clearInvalid: true });
   if (!result.ok && result.status === 'parse-failed') {
@@ -261,11 +143,9 @@ export const readSessionWizardDraftCache = ({ storage }: SessionWizardDraftCache
 
 export const writeSessionWizardDraftCache = (
   payload: unknown,
-  options: SessionWizardDraftCacheWriteOptions = {},
-): SessionWizardDraftCacheWriteResult => {
-  const { storage, maxBytes } = options;
-  const sanitizedPayload = sanitizeSessionWizardDraftCacheCredentials(payload).value;
-  const storageRef = getDraftStorage(storage);
+  { storage, maxBytes }: SessionWizardDraftCacheWriteOptions = {},
+): SafeJsonWriteResult => {
+  const storageRef = getLocalStorage(storage);
   if (!storageRef) {
     return {
       ok: false,

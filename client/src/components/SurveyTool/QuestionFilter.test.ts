@@ -1,8 +1,4 @@
-import { QuestionFilter as QuestionFilterComponent, shouldEnableQuestionFilterSbt } from './QuestionFilter';
-import { QuestionFilterSbtSection } from './QuestionFilterSections';
-import {
-  QuestionFilter as QuestionFilterComponent,
-} from './QuestionFilter';
+import { QuestionFilter as QuestionFilterComponent } from './QuestionFilter';
 import {
   QUESTION_FILTER_ACTIONS_STYLE,
   QUESTION_FILTER_BOOKMARK_FEEDBACK_STYLE,
@@ -346,7 +342,7 @@ describe('QuestionFilter session resolution', () => {
     const tree = instance.render();
     const sbtFilterNode = findElement(
       tree,
-      (element) => element?.props?.mode === 'creator' && element?.props?.autoExpand === true
+      (element) => element?.props?.mode === 'creator' && element?.props?.autoExpand === true,
     );
 
     expect(sbtFilterNode).toBeTruthy();
@@ -513,7 +509,7 @@ describe('QuestionFilter encrypted count gate tooltip integration', () => {
     const tree = instance.render();
     const sbtHeader = findElement(
       tree,
-      (element) => element?.type === 'h3' && getNodeText(element).includes('Group(s) of Question Creator')
+      (element) => element?.type === 'h3' && getNodeText(element).includes('Group(s) of Question Creator'),
     );
 
     expect(sbtHeader).toBeTruthy();

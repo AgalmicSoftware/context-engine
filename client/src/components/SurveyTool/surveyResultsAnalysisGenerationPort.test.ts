@@ -41,7 +41,7 @@ describe('surveyResultsAnalysisGenerationPort', () => {
         sessionSlug: 'alpha',
       }),
     ).resolves.toBe('first');
-    aiClient.callAI = secondCallAI;
+    aiScripts.callAI = secondCallAI;
     await expect(
       port.generateSection({
         maxTokens: 2,

@@ -32,8 +32,7 @@ describe('SessionWizard deploy cache authority', () => {
   it('does not trust partial deploys until the config reseed actually succeeds', () => {
     expect(
       shouldCacheSessionWorkerConfigAfterDeploy({
-        deployStatusCode: 200,
-        deployPartial: true,
+        deployStatusCode: 207,
         configSyncStatus: { synced: false, warning: 'Config reseed failed' },
         workerUrl: 'https://worker.example',
       }),
@@ -83,21 +82,5 @@ describe('SessionWizard deploy cache authority', () => {
         configuredWorkerUrl: 'https://draft-worker.example',
       }).deployComplete,
     ).toBe(false);
-  });
-
-  it('does not equate a helper-returned URL with public config verification', () => {
-    expect(
-      resolveDeployWorkerState({
-        responseWorkerUrl: 'https://deployed.example',
-        configuredWorkerUrl: '',
-      }).deployComplete,
-    ).toBe(false);
-    expect(
-      resolveDeployWorkerState({
-        responseWorkerUrl: 'https://deployed.example',
-        configuredWorkerUrl: '',
-        publicConfigVerified: true,
-      }).deployComplete,
-    ).toBe(true);
   });
 });

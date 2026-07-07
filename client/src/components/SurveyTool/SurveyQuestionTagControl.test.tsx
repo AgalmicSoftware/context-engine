@@ -67,7 +67,7 @@ describe('SurveyQuestionTagControl', () => {
         useTagModal
         onTagSelect={onTagSelect}
         rowStyle={{ marginTop: '4px' }}
-      />
+      />,
     );
 
     const row = container.firstElementChild as HTMLElement | null;

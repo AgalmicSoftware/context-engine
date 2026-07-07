@@ -73,10 +73,7 @@ import { cryptoUtils } from '../crypto/cryptography.js';
 import { arweaveClient } from '../arweave/arweaveClient.js';
 import { normalizeArweaveUrl, parseArweaveTxId } from '../arweave/arweaveUrls.js';
 import { createArweaveDownloadOps } from '../arweave/arweaveDownload.js';
-import {
-  buildArweaveUploadTags,
-  resolveArweaveUploadOpts,
-} from '../arweave/arweaveUploadHelpers.js';
+import { buildArweaveUploadTags, resolveArweaveUploadOpts } from '../arweave/arweaveUploadHelpers.js';
 import { validateNoLockedPlaintextInPayload } from '../arweave/noLeakPayloads.js';
 import { getGlobalLitHooks } from '../crypto/litProtocol.js';
 import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
@@ -107,7 +104,6 @@ import {
   memoizedResolveSession,
   setTimedMemoValue,
 } from '../cache/contractScriptsCache.js';
-import { resolveWeb3ContextCacheEntry } from '../cache/web3ContextCache.js';
 import { isCallExceptionError, logArweaveMetadataFetchFailure } from '../arweave/arweaveMetadataFailureLog.js';
 import {
   buildHashUnavailableMetadataError,
@@ -126,10 +122,7 @@ import {
   deriveStorageRefFromLegacyArweaveTxId,
   normalizeStorageRef,
 } from '../storage/storageRefs.js';
-import {
-  readSessionStorageBlob,
-  uploadDataToSessionStorage,
-} from '../storage/storageClient.js';
+import { readSessionStorageBlob, uploadDataToSessionStorage } from '../storage/storageClient.js';
 import { resolveSessionStorageBackend } from '../storage/sessionStorageConfig.js';
 import store from '../../store';
 import { sessionRegistryStore, sessionRegistryUtils } from './sessionRegistry.js';
@@ -506,6 +499,55 @@ const isRetryableSurveyResponseReadError = (error: any) => {
   );
 };
 
+const WEB3_CONTEXT_CACHE = new Map();
+let web3ContextCacheClearQueued = false;
+
+const scheduleWeb3ContextCacheClear = () => {
+  if (web3ContextCacheClearQueued) return;
+  web3ContextCacheClearQueued = true;
+  const clearCache = () => {
+    WEB3_CONTEXT_CACHE.clear();
+    web3ContextCacheClearQueued = false;
+  };
+  try {
+    Promise.resolve().then(clearCache);
+  } catch {
+    setTimeout(clearCache, 100);
+  }
+};
+
+const normalizeWeb3ContextCacheValue = (value: any, seen: any = new WeakSet()): any => {
+  if (value === undefined) return '__undefined__';
+  if (value === null) return null;
+  if (typeof value === 'symbol') return value.toString();
+  if (typeof value === 'function') return `__fn:${value.name || 'anonymous'}__`;
+  if (typeof value !== 'object') return value;
+  if (seen.has(value)) return '__circular__';
+  seen.add(value);
+  if (Array.isArray(value)) {
+    return value.map((item: any) => normalizeWeb3ContextCacheValue(item, seen));
+  }
+  const out: any = {};
+  Object.keys(value)
+    .sort()
+    .forEach((key: any) => {
+      out[key] = normalizeWeb3ContextCacheValue(value[key], seen);
+    });
+  return out;
+};
+
+const serializeWeb3ContextCacheKey = (groupKeyOrCfg: any) => {
+  try {
+    return JSON.stringify(normalizeWeb3ContextCacheValue(groupKeyOrCfg));
+  } catch {
+    try {
+      return String(groupKeyOrCfg);
+    } catch {
+      return '__unserializable__';
+    }
+  }
+};
+
 export function getWeb3Context(groupKeyOrCfg: any) {
   if (groupKeyOrCfg && typeof groupKeyOrCfg === 'object' && groupKeyOrCfg._isWeb3Context === true) {
     return groupKeyOrCfg;
@@ -770,14 +812,14 @@ const resolveStorageSessionSlug = (groupKeyOrCfg: any, cfg: any = null) => {
   return normalizeSessionSlug(groupKeyOrCfg?.slug || groupKeyOrCfg?.sessionSlug || '');
 };
 
-const resolveStorageBackendForResource = (cfg, resource, opts = {}) => resolveSessionStorageBackend(cfg, {
-  resource,
-  encrypted: opts.encrypted === true,
-});
+const resolveStorageBackendForResource = (cfg: any, resource: any, opts: any = {}) =>
+  resolveSessionStorageBackend(cfg, {
+    resource,
+    encrypted: opts.encrypted === true,
+  });
 
-const isCloudflareStorageResource = (cfg, resource, opts = {}) => (
-  resolveStorageBackendForResource(cfg, resource, opts) === STORAGE_BACKENDS.CLOUDFLARE
-);
+const isCloudflareStorageResource = (cfg: any, resource: any, opts: any = {}) =>
+  resolveStorageBackendForResource(cfg, resource, opts) === STORAGE_BACKENDS.CLOUDFLARE;
 
 const payloadPointerIdToBytes32 = (id, label = 'storage pointer') => {
   const pointerId = toStr(id).trim();
@@ -837,18 +879,16 @@ const uploadJsonPayloadForContractPointer = async ({
   };
 };
 
-const readCloudflarePointerTextForGroup = async ({
-  pointerId,
-  resource,
-  groupKeyOrCfg,
-  cfg,
-}) => {
-  const storageRef = normalizeStorageRef({
-    backend: STORAGE_BACKENDS.CLOUDFLARE,
-    id: pointerId,
-    resource,
-    contentType: 'application/json',
-  }, { fallbackBackend: STORAGE_BACKENDS.CLOUDFLARE, resource });
+const readCloudflarePointerTextForGroup = async ({ pointerId, resource, groupKeyOrCfg, cfg }: any) => {
+  const storageRef = normalizeStorageRef(
+    {
+      backend: STORAGE_BACKENDS.CLOUDFLARE,
+      id: pointerId,
+      resource,
+      contentType: 'application/json',
+    },
+    { fallbackBackend: STORAGE_BACKENDS.CLOUDFLARE, resource },
+  );
   if (!storageRef) throw new Error(`Invalid Cloudflare ${resource} storage pointer.`);
   const response = await readSessionStorageBlob({
     storageRef,
@@ -862,13 +902,7 @@ const readCloudflarePointerTextForGroup = async ({
   };
 };
 
-const readPayloadPointerTextForGroup = async ({
-  pointerId,
-  resource,
-  groupKeyOrCfg,
-  cfg,
-  arweaveOpts,
-}) => {
+const readPayloadPointerTextForGroup = async ({ pointerId, resource, groupKeyOrCfg, cfg, arweaveOpts }: any) => {
   if (isCloudflareStorageResource(cfg, resource)) {
     try {
       return await readCloudflarePointerTextForGroup({ pointerId, resource, groupKeyOrCfg, cfg });
@@ -888,15 +922,15 @@ const readPayloadPointerTextForGroup = async ({
   };
 };
 
-const attachPayloadPointerFields = (payload, pointerId, resource, storageRef = null) => (
-  attachStorageRefCompatibilityFields({
-    ...(payload || {}),
-    ...(storageRef?.backend === STORAGE_BACKENDS.CLOUDFLARE
-      ? { storageRef }
-      : { arweaveTxId: pointerId }),
-    resource,
-  }, { resource })
-);
+const attachPayloadPointerFields = (payload: any, pointerId: any, resource: any, storageRef: any = null) =>
+  attachStorageRefCompatibilityFields(
+    {
+      ...(payload || {}),
+      ...(storageRef?.backend === STORAGE_BACKENDS.CLOUDFLARE ? { storageRef } : { arweaveTxId: pointerId }),
+      resource,
+    },
+    { resource },
+  );
 
 const recordInFlightStat = (kind = 'miss') => {
   try {
@@ -1155,7 +1189,6 @@ const contractScripts: any = {
   ...createContractScriptsSurveyPayloadReadMethods(contractScriptsRuntimeDeps),
   ...createContractScriptsSbtMintMethods(contractScriptsRuntimeDeps),
   ...createProfileChainReadMethods(contractProfileDeps),
-
 
   // SBT Functionality Ends -----------------------------
 

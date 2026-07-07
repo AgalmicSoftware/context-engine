@@ -45,19 +45,15 @@ describe('DocumentLibraryPanel upload and list race guards', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_BUTTON));
 
     await waitFor(() => {
-      expect(mockUploadDocLibraryFile).toHaveBeenCalledWith(expect.objectContaining({
-        file,
-        sessionSlug: 'edge-a',
-      }));
+      expect(mockUploadDocLibraryFile).toHaveBeenCalledWith(
+        expect.objectContaining({
+          file,
+          sessionSlug: 'edge-a',
+        }),
+      );
     });
 
-    rerender(
-      <DocumentLibraryPanel
-        {...panelProps}
-        sessionSlug="edge-b"
-        sessionIdHex={`0x${'b'.repeat(32)}`}
-      />
-    );
+    rerender(<DocumentLibraryPanel {...panelProps} sessionSlug="edge-b" sessionIdHex={`0x${'b'.repeat(32)}`} />);
 
     await act(async () => {
       slowUpload.resolve({
@@ -103,20 +99,17 @@ describe('DocumentLibraryPanel upload and list race guards', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_BUTTON));
 
     await waitFor(() => {
-      expect(mockUploadDocLibraryFile).toHaveBeenCalledWith(expect.objectContaining({
-        file,
-        tags: expect.arrayContaining([
-          expect.objectContaining({ name: 'CE-SessionId', value: `0x${'1'.repeat(32)}` }),
-        ]),
-      }));
+      expect(mockUploadDocLibraryFile).toHaveBeenCalledWith(
+        expect.objectContaining({
+          file,
+          tags: expect.arrayContaining([
+            expect.objectContaining({ name: 'CE-SessionId', value: `0x${'1'.repeat(32)}` }),
+          ]),
+        }),
+      );
     });
 
-    rerender(
-      <DocumentLibraryPanel
-        {...panelProps}
-        sessionIdHex={`0x${'2'.repeat(32)}`}
-      />
-    );
+    rerender(<DocumentLibraryPanel {...panelProps} sessionIdHex={`0x${'2'.repeat(32)}`} />);
 
     await act(async () => {
       slowUpload.resolve({
@@ -137,9 +130,9 @@ describe('DocumentLibraryPanel upload and list race guards', () => {
   });
 
   it('does not prepend completed uploads after the storage config changes', async () => {
-    mockResolveDocLibraryProvider.mockImplementation((config: any) => (
-      config?.storageProfile?.backend || config?.docLibrary?.provider || 'arweave'
-    ));
+    mockResolveDocLibraryProvider.mockImplementation(
+      (config: any) => config?.storageProfile?.backend || config?.docLibrary?.provider || 'arweave',
+    );
     const slowUpload = createDeferred<any>();
     mockUploadDocLibraryFile.mockReturnValueOnce(slowUpload.promise);
     const panelProps = {
@@ -163,17 +156,19 @@ describe('DocumentLibraryPanel upload and list race guards', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_BUTTON));
 
     await waitFor(() => {
-      expect(mockUploadDocLibraryFile).toHaveBeenCalledWith(expect.objectContaining({
-        file,
-        sessionSlug: 'edge',
-      }));
+      expect(mockUploadDocLibraryFile).toHaveBeenCalledWith(
+        expect.objectContaining({
+          file,
+          sessionSlug: 'edge',
+        }),
+      );
     });
 
     rerender(
       <DocumentLibraryPanel
         {...panelProps}
         sessionConfig={{ storageProfile: { backend: 'cloudflare', namespace: 'next-docs' } }}
-      />
+      />,
     );
 
     await act(async () => {
@@ -210,7 +205,7 @@ describe('DocumentLibraryPanel upload and list race guards', () => {
         sessionConfig={TEST_SESSION_CONFIG}
         mode="session"
         sessionIdHex={`0x${'c'.repeat(32)}`}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -248,9 +243,7 @@ describe('DocumentLibraryPanel upload and list race guards', () => {
   it('does not apply stale Cloudflare list completions after an immediate context rerender', async () => {
     mockResolveDocLibraryProvider.mockReturnValue('cloudflare');
     const slowList = createDeferred<any[]>();
-    mockListSessionStorageRefs
-      .mockReturnValueOnce(slowList.promise)
-      .mockResolvedValueOnce([]);
+    mockListSessionStorageRefs.mockReturnValueOnce(slowList.promise).mockResolvedValueOnce([]);
     const panelProps = {
       provider: {},
       network: { id: 84532 },
@@ -265,18 +258,14 @@ describe('DocumentLibraryPanel upload and list race guards', () => {
 
     const { rerender } = render(<DocumentLibraryPanel {...panelProps} />);
     await waitFor(() => {
-      expect(mockListSessionStorageRefs).toHaveBeenCalledWith(expect.objectContaining({
-        sessionSlug: 'edge-a',
-      }));
+      expect(mockListSessionStorageRefs).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sessionSlug: 'edge-a',
+        }),
+      );
     });
 
-    rerender(
-      <DocumentLibraryPanel
-        {...panelProps}
-        sessionSlug="edge-b"
-        sessionIdHex={`0x${'b'.repeat(32)}`}
-      />
-    );
+    rerender(<DocumentLibraryPanel {...panelProps} sessionSlug="edge-b" sessionIdHex={`0x${'b'.repeat(32)}`} />);
     await act(async () => {
       slowList.resolve([
         {
@@ -317,7 +306,7 @@ describe('DocumentLibraryPanel upload and list race guards', () => {
         sessionConfig={TEST_SESSION_CONFIG}
         mode="session"
         sessionIdHex={`0x${'d'.repeat(32)}`}
-      />
+      />,
     );
 
     const file = new File(['unmounted'], 'unmounted-upload.txt', { type: 'text/plain' });
@@ -327,10 +316,12 @@ describe('DocumentLibraryPanel upload and list race guards', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_BUTTON));
 
     await waitFor(() => {
-      expect(mockUploadDocLibraryFile).toHaveBeenCalledWith(expect.objectContaining({
-        file,
-        sessionSlug: 'edge',
-      }));
+      expect(mockUploadDocLibraryFile).toHaveBeenCalledWith(
+        expect.objectContaining({
+          file,
+          sessionSlug: 'edge',
+        }),
+      );
     });
 
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -370,7 +361,7 @@ describe('DocumentLibraryPanel upload and list race guards', () => {
         sessionConfig={TEST_SESSION_CONFIG}
         mode="session"
         sessionIdHex={`0x${'f'.repeat(32)}`}
-      />
+      />,
     );
 
     const file = new File(['duplicate'], 'duplicate-upload.txt', { type: 'text/plain' });
@@ -408,9 +399,7 @@ describe('DocumentLibraryPanel upload and list race guards', () => {
   it('does not let an older file upload completion unlock a newer context upload', async () => {
     const oldUpload = createDeferred<any>();
     const newUpload = createDeferred<any>();
-    mockUploadDocLibraryFile
-      .mockReturnValueOnce(oldUpload.promise)
-      .mockReturnValueOnce(newUpload.promise);
+    mockUploadDocLibraryFile.mockReturnValueOnce(oldUpload.promise).mockReturnValueOnce(newUpload.promise);
     const panelProps = {
       provider: {},
       network: { id: 84532 },
@@ -431,18 +420,14 @@ describe('DocumentLibraryPanel upload and list race guards', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_BUTTON));
 
     await waitFor(() => {
-      expect(mockUploadDocLibraryFile).toHaveBeenCalledWith(expect.objectContaining({
-        sessionSlug: 'edge-a',
-      }));
+      expect(mockUploadDocLibraryFile).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sessionSlug: 'edge-a',
+        }),
+      );
     });
 
-    rerender(
-      <DocumentLibraryPanel
-        {...panelProps}
-        sessionSlug="edge-b"
-        sessionIdHex={`0x${'b'.repeat(32)}`}
-      />
-    );
+    rerender(<DocumentLibraryPanel {...panelProps} sessionSlug="edge-b" sessionIdHex={`0x${'b'.repeat(32)}`} />);
 
     fireEvent.change(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_INPUT), {
       target: { files: [new File(['new'], 'new-context.txt', { type: 'text/plain' })] },
@@ -452,9 +437,11 @@ describe('DocumentLibraryPanel upload and list race guards', () => {
 
     await waitFor(() => {
       expect(mockUploadDocLibraryFile).toHaveBeenCalledTimes(2);
-      expect(mockUploadDocLibraryFile).toHaveBeenLastCalledWith(expect.objectContaining({
-        sessionSlug: 'edge-b',
-      }));
+      expect(mockUploadDocLibraryFile).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          sessionSlug: 'edge-b',
+        }),
+      );
       expect(uploadButton).toBeDisabled();
       expect(uploadButton).toHaveTextContent('Uploading');
     });
@@ -506,7 +493,7 @@ describe('DocumentLibraryPanel upload and list race guards', () => {
         sessionConfig={TEST_SESSION_CONFIG}
         mode="session"
         sessionIdHex={`0x${'a'.repeat(32)}`}
-      />
+      />,
     );
 
     fireEvent.change(screen.getByTestId(E2E_TESTIDS.DOC_URL_INPUT), {
@@ -546,9 +533,7 @@ describe('DocumentLibraryPanel upload and list race guards', () => {
   it('does not let an older URL upload completion unlock a newer context upload', async () => {
     const oldUpload = createDeferred<any>();
     const newUpload = createDeferred<any>();
-    mockUploadDocLibraryUrlRecord
-      .mockReturnValueOnce(oldUpload.promise)
-      .mockReturnValueOnce(newUpload.promise);
+    mockUploadDocLibraryUrlRecord.mockReturnValueOnce(oldUpload.promise).mockReturnValueOnce(newUpload.promise);
     const panelProps = {
       provider: {},
       network: { id: 84532 },
@@ -568,18 +553,14 @@ describe('DocumentLibraryPanel upload and list race guards', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_URL_ADD_BUTTON));
 
     await waitFor(() => {
-      expect(mockUploadDocLibraryUrlRecord).toHaveBeenCalledWith(expect.objectContaining({
-        sessionSlug: 'edge-a',
-      }));
+      expect(mockUploadDocLibraryUrlRecord).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sessionSlug: 'edge-a',
+        }),
+      );
     });
 
-    rerender(
-      <DocumentLibraryPanel
-        {...panelProps}
-        sessionSlug="edge-b"
-        sessionIdHex={`0x${'d'.repeat(32)}`}
-      />
-    );
+    rerender(<DocumentLibraryPanel {...panelProps} sessionSlug="edge-b" sessionIdHex={`0x${'d'.repeat(32)}`} />);
 
     fireEvent.change(screen.getByTestId(E2E_TESTIDS.DOC_URL_INPUT), {
       target: { value: 'https://docs.example.test/new-context' },
@@ -589,9 +570,11 @@ describe('DocumentLibraryPanel upload and list race guards', () => {
 
     await waitFor(() => {
       expect(mockUploadDocLibraryUrlRecord).toHaveBeenCalledTimes(2);
-      expect(mockUploadDocLibraryUrlRecord).toHaveBeenLastCalledWith(expect.objectContaining({
-        sessionSlug: 'edge-b',
-      }));
+      expect(mockUploadDocLibraryUrlRecord).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          sessionSlug: 'edge-b',
+        }),
+      );
       expect(addButton).toBeDisabled();
       expect(addButton).toHaveTextContent('Adding');
     });
@@ -643,7 +626,7 @@ describe('DocumentLibraryPanel upload and list race guards', () => {
         sessionConfig={TEST_SESSION_CONFIG}
         mode="session"
         sessionIdHex={`0x${'d'.repeat(32)}`}
-      />
+      />,
     );
 
     const firstFile = new File(['first'], 'first-upload.txt', { type: 'text/plain' });
@@ -655,9 +638,11 @@ describe('DocumentLibraryPanel upload and list race guards', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_BUTTON));
 
     await waitFor(() => {
-      expect(mockUploadDocLibraryFile).toHaveBeenCalledWith(expect.objectContaining({
-        file: firstFile,
-      }));
+      expect(mockUploadDocLibraryFile).toHaveBeenCalledWith(
+        expect.objectContaining({
+          file: firstFile,
+        }),
+      );
     });
 
     fireEvent.change(fileInput, {
@@ -695,7 +680,7 @@ describe('DocumentLibraryPanel upload and list race guards', () => {
         sessionConfig={TEST_SESSION_CONFIG}
         mode="session"
         sessionIdHex={`0x${'e'.repeat(32)}`}
-      />
+      />,
     );
 
     fireEvent.change(screen.getByTestId(E2E_TESTIDS.DOC_URL_INPUT), {
@@ -707,10 +692,12 @@ describe('DocumentLibraryPanel upload and list race guards', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_URL_ADD_BUTTON));
 
     await waitFor(() => {
-      expect(mockUploadDocLibraryUrlRecord).toHaveBeenCalledWith(expect.objectContaining({
-        url: 'https://docs.example.test/first',
-        title: 'First link',
-      }));
+      expect(mockUploadDocLibraryUrlRecord).toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: 'https://docs.example.test/first',
+          title: 'First link',
+        }),
+      );
     });
 
     fireEvent.change(screen.getByTestId(E2E_TESTIDS.DOC_URL_INPUT), {

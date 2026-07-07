@@ -23,23 +23,32 @@ describe('agentClientLogin', () => {
     });
     expect(extractAgentClientToken('')).toMatchObject({ ok: false, reason: 'empty' });
     expect(extractAgentClientToken(`${RAW_TOKEN}\nsecond-line`)).toMatchObject({ ok: false, reason: 'multiline' });
-    expect(extractAgentClientToken('https://example.test/no-token')).toMatchObject({ ok: false, reason: 'unsupported_format' });
+    expect(extractAgentClientToken('https://example.test/no-token')).toMatchObject({
+      ok: false,
+      reason: 'unsupported_format',
+    });
   });
 
   it('exchanges a raw token once and persists only the short-lived envelope in sessionStorage', async () => {
-    const fetchImpl = jest.fn(async () => new Response(JSON.stringify({
-      ok: true,
-      tokenType: 'session_worker_jwt',
-      sessionSlug: 'alpha',
-      accountAddress: '0x1111111111111111111111111111111111111111',
-      workerUrl: 'https://session-worker.example',
-      workerToken: 'jwt-session-token',
-      expiresAt: '2027-07-05T00:00:00.000Z',
-      buckets: {
-        categories: [{ categoryId: 'role', label: 'Role', options: [{ optionId: 'builder', label: 'Builder' }] }],
-        selections: { role: ['builder'] },
-      },
-    }), { status: 200, headers: { 'content-type': 'application/json' } })) as jest.Mock;
+    const fetchImpl = jest.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            ok: true,
+            tokenType: 'session_worker_jwt',
+            sessionSlug: 'alpha',
+            accountAddress: '0x1111111111111111111111111111111111111111',
+            workerUrl: 'https://session-worker.example',
+            workerToken: 'jwt-session-token',
+            expiresAt: '2027-07-05T00:00:00.000Z',
+            buckets: {
+              categories: [{ categoryId: 'role', label: 'Role', options: [{ optionId: 'builder', label: 'Builder' }] }],
+              selections: { role: ['builder'] },
+            },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+    ) as jest.Mock;
 
     const envelope = await exchangeAgentClientLogin({
       agentBridgeUrl: 'https://bridge.example/',
@@ -67,37 +76,53 @@ describe('agentClientLogin', () => {
   });
 
   it('rejects responses that echo the source token as the exchanged credential', async () => {
-    const fetchImpl = jest.fn(async () => new Response(JSON.stringify({
-      ok: true,
-      sessionSlug: 'alpha',
-      workerToken: RAW_TOKEN,
-      expiresAt: '2027-07-05T00:00:00.000Z',
-    }), { status: 200, headers: { 'content-type': 'application/json' } }));
+    const fetchImpl = jest.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            ok: true,
+            sessionSlug: 'alpha',
+            workerToken: RAW_TOKEN,
+            expiresAt: '2027-07-05T00:00:00.000Z',
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+    );
 
-    await expect(exchangeAgentClientLogin({
-      agentBridgeUrl: 'https://bridge.example',
-      sessionSlug: 'alpha',
-      tokenOrLink: RAW_TOKEN,
-      fetchImpl,
-    })).rejects.toThrow('telegram_client_login_echoed_source_token');
+    await expect(
+      exchangeAgentClientLogin({
+        agentBridgeUrl: 'https://bridge.example',
+        sessionSlug: 'alpha',
+        tokenOrLink: RAW_TOKEN,
+        fetchImpl,
+      }),
+    ).rejects.toThrow('telegram_client_login_echoed_source_token');
     expect(Object.values(window.sessionStorage).join('\n')).not.toContain(RAW_TOKEN);
   });
 
   it('rejects responses that echo the source token anywhere in the envelope body', async () => {
-    const fetchImpl = jest.fn(async () => new Response(JSON.stringify({
-      ok: true,
-      sessionSlug: 'alpha',
-      workerToken: 'jwt-session-token',
-      expiresAt: '2027-07-05T00:00:00.000Z',
-      buckets: { debugEcho: RAW_TOKEN },
-    }), { status: 200, headers: { 'content-type': 'application/json' } }));
+    const fetchImpl = jest.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            ok: true,
+            sessionSlug: 'alpha',
+            workerToken: 'jwt-session-token',
+            expiresAt: '2027-07-05T00:00:00.000Z',
+            buckets: { debugEcho: RAW_TOKEN },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+    );
 
-    await expect(exchangeAgentClientLogin({
-      agentBridgeUrl: 'https://bridge.example',
-      sessionSlug: 'alpha',
-      tokenOrLink: RAW_TOKEN,
-      fetchImpl,
-    })).rejects.toThrow('telegram_client_login_echoed_source_token');
+    await expect(
+      exchangeAgentClientLogin({
+        agentBridgeUrl: 'https://bridge.example',
+        sessionSlug: 'alpha',
+        tokenOrLink: RAW_TOKEN,
+        fetchImpl,
+      }),
+    ).rejects.toThrow('telegram_client_login_echoed_source_token');
     expect(Object.values(window.sessionStorage).join('\n')).not.toContain(RAW_TOKEN);
   });
 

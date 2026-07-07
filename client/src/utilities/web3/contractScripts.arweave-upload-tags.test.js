@@ -177,12 +177,14 @@ describe('contractScripts Arweave upload tags', () => {
       signer,
     });
 
-    expect(result).toEqual(expect.objectContaining({
-      arweaveJwk: '{"kty":"RSA"}',
-      sessionSlug: 'demo-session',
-      skipAuth: true,
-      forceDirectArweaveUpload: true,
-    }));
+    expect(result).toEqual(
+      expect.objectContaining({
+        arweaveJwk: '{"kty":"RSA"}',
+        sessionSlug: 'demo-session',
+        skipAuth: true,
+        forceDirectArweaveUpload: true,
+      }),
+    );
     expect(result.adminAuth).toBeUndefined();
     expect(getCorsProxyUrlOrThrow).not.toHaveBeenCalled();
   });

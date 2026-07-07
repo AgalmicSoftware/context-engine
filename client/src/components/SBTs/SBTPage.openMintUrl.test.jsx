@@ -4,6 +4,8 @@ import { ethers } from 'ethers';
 import { cryptoUtils } from 'utilities/crypto/cryptography.js';
 
 const mockIsCryptoMode = jest.fn(() => true);
+const RESOLVABLE_TREE_COMPONENTS = new Set([SbtPageAdminSection]);
+const resolvedTreeComponentCache = new WeakMap();
 
 jest.mock('../../utilities/ui/terminology.js', () => {
   const actual = jest.requireActual('../../utilities/ui/terminology.js');
@@ -58,10 +60,7 @@ const flattenText = (node) => {
 };
 
 const renderOpenMintUrlCardTree = (tree) => {
-  const card = findElementInTree(
-    tree,
-    (element) => element?.type === SbtPageOpenMintUrlCard
-  );
+  const card = findElementInTree(tree, (element) => element?.type === SbtPageOpenMintUrlCard);
   return card ? SbtPageOpenMintUrlCard(card.props) : null;
 };
 
@@ -138,7 +137,7 @@ describe('SBTPage admin open-mint URL', () => {
       };
 
       expect(subject.getOpenMintAutoJoinUrl()).toBe(
-        `http://localhost/ce/session/edge?sbt=${encodeURIComponent(sbtAddress)}&auto=1`
+        `http://localhost/ce/session/edge?sbt=${encodeURIComponent(sbtAddress)}&auto=1`,
       );
     } finally {
       if (previousPublicUrl === undefined) delete process.env.PUBLIC_URL;
@@ -153,9 +152,7 @@ describe('SBTPage admin open-mint URL', () => {
     try {
       const account = '0x00000000000000000000000000000000000000a2';
       const sbtAddress = '0x00000000000000000000000000000000000000a1';
-      const encodedPassword = encodeURIComponent(
-        cryptoUtils.encodeGroupPasswordForUrl('claim-code')
-      );
+      const encodedPassword = encodeURIComponent(cryptoUtils.encodeGroupPasswordForUrl('claim-code'));
       const subject = createSubject({
         SBTAddress: sbtAddress,
         account,
@@ -177,7 +174,7 @@ describe('SBTPage admin open-mint URL', () => {
       };
 
       expect(flattenText(subject.renderAdminActions())).toContain(
-        `http://localhost/ce/session/edge?auto=1&sbt=${sbtAddress}&gp=${encodedPassword}`
+        `http://localhost/ce/session/edge?auto=1&sbt=${sbtAddress}&gp=${encodedPassword}`,
       );
     } finally {
       if (previousPublicUrl === undefined) delete process.env.PUBLIC_URL;
@@ -202,9 +199,7 @@ describe('SBTPage admin open-mint URL', () => {
 
     try {
       const sbtAddress = '0x00000000000000000000000000000000000000a1';
-      const encodedPassword = encodeURIComponent(
-        cryptoUtils.encodeGroupPasswordForUrl('claim-code')
-      );
+      const encodedPassword = encodeURIComponent(cryptoUtils.encodeGroupPasswordForUrl('claim-code'));
       const subject = createSubject({
         SBTAddress: sbtAddress,
         sessionSlug: 'edge',
@@ -225,7 +220,7 @@ describe('SBTPage admin open-mint URL', () => {
 
       expect(capturedBlob).not.toBeNull();
       expect(String(capturedBlob.parts.join(''))).toContain(
-        `http://localhost/ce/session/edge?auto=1&sbt=${sbtAddress}&gp=${encodedPassword}`
+        `http://localhost/ce/session/edge?auto=1&sbt=${sbtAddress}&gp=${encodedPassword}`,
       );
     } finally {
       global.Blob = OriginalBlob;
@@ -264,10 +259,10 @@ describe('SBTPage admin open-mint URL', () => {
     };
 
     expect(buildEligibleSubject('general').getOpenMintAutoJoinUrl()).toBe(
-      `http://localhost/session?sbt=${encodeURIComponent(sbtAddress)}&auto=1`
+      `http://localhost/session?sbt=${encodeURIComponent(sbtAddress)}&auto=1`,
     );
     expect(buildEligibleSubject('debate').getOpenMintAutoJoinUrl()).toBe(
-      `http://localhost/session/debate?sbt=${encodeURIComponent(sbtAddress)}&auto=1`
+      `http://localhost/session/debate?sbt=${encodeURIComponent(sbtAddress)}&auto=1`,
     );
   });
 

@@ -134,308 +134,165 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
   } = deps;
 
   return {
-  submitSurveyResponse: async function(providerName: any, surveyId: any, arweaveHash: any, groupKeyOrCfg: any = null) {
-  if (providerName === 'none') throw new Error('submitSurveyResponse requires a signer-capable provider (not read-only).');
-  const providerLocation = this.getProviderLocation(providerName);
-  const ethersProvider = new ethers.providers.Web3Provider(providerLocation as any, 'any');
-  const signer = ethersProvider.getSigner();
+    submitSurveyResponse: async function (
+      providerName: any,
+      surveyId: any,
+      arweaveHash: any,
+      groupKeyOrCfg: any = null,
+    ) {
+      if (providerName === 'none')
+        throw new Error('submitSurveyResponse requires a signer-capable provider (not read-only).');
+      const providerLocation = this.getProviderLocation(providerName);
+      const ethersProvider = new ethers.providers.Web3Provider(providerLocation as any, 'any');
+      const signer = ethersProvider.getSigner();
 
-  // === Address resolution (group-aware; no SURVEYS_ADDRESS fallback)
-  const cfg    = resolveSession(groupKeyOrCfg || '');
-  const gAddrs = getSessionAddresses(cfg);
-  const addr   = gAddrs.surveys?.address;
-  if (!addr) {
-    contractsLog.log('[submitSurveyResponse] Missing surveys address in group config; aborting tx.');
-    return; // early return, no throw
-  }
-  const SurveyContract = new ethers.Contract(addr, SURVEYS, signer as any);
-
-  // 🔐 Normalize & preflight
-  const ensureHash = (v: any) => {
-    try {
-      if (cryptoUtils && typeof cryptoUtils.hashIdentifier === 'function') return cryptoUtils.hashIdentifier(v);
-    } catch {}
-    try { if (utils.isHexString(v, 32)) return String(v).toLowerCase(); } catch {}
-    const s = (v === null || v === undefined) ? '' : String(v);
-    return s.trim() === '' ? ethers.constants.HashZero : utils.id(s);
-  };
-  const hashedSurveyId = ensureHash(surveyId);
-  if (!utils.isHexString(hashedSurveyId, 32)) throw new Error('submitSurveyResponse: surveyId is not a bytes32.');
-
-  rpcLog('RPC Call (Tx):', {
-    function: 'submitSurveyResponse',
-    method:   'SurveyContract.submitResponse',
-    params:   { surveyId: hashedSurveyId, arweaveHash }
-  });
-  const txOverrides = await resolveTxGasOverrides({
-    contract: SurveyContract,
-    method: 'submitResponse',
-    args: [hashedSurveyId, arweaveHash],
-    fallbackGasLimit: String(GAS_FALLBACKS.submitResponse),
-    minEstimate: '50000',
-    logLabel: 'submitSurveyResponse',
-    preferFallbackGasLimit: true,
-  });
-  const { receipt } = await sendContractWriteViaProvider({
-    signingProvider: providerLocation,
-    ethersProvider,
-    signer,
-    contract: SurveyContract,
-    method: 'submitResponse',
-    args: [hashedSurveyId, arweaveHash],
-    txOverrides,
-    rpcFunction: 'submitSurveyResponse',
-    revertMessage: 'submitSurveyResponse transaction reverted on-chain.',
-  });
-  return receipt;
-},
-
-  addSurveyWithQuestions: async function (
-    providerName: any,
-    surveyId: any,
-    surveyData: any,
-    questionIds: any,
-    questionDataArray: any,
-    groupKeyOrCfg: any = null
-  ) {
-    if (providerName === 'none') {
-      throw new Error('addSurveyWithQuestions requires a signer-capable provider (not read-only).');
-    }
-
-    const providerLocation = this.getProviderLocation(providerName);
-    const ethersProvider = new ethers.providers.Web3Provider(providerLocation as any, 'any');
-    const signer = ethersProvider.getSigner();
-
-    // Group-aware address resolution (no hard-coded fallback)
-    const cfg = memoizedResolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
-    const gAddrs = getSessionAddresses(cfg);
-    const addr = gAddrs.surveys?.address;
-    if (!addr) {
-      const slug = normalizeSessionSlug(typeof groupKeyOrCfg === 'string' ? groupKeyOrCfg : cfg?.slug || '');
-      throw new Error(`[addSurveyWithQuestions] Missing surveys contract address for session slug "${slug || 'general'}".`);
-    }
-    const SurveyContract = new ethers.Contract(addr, SURVEYS, signer as any);
-
-    let surveyPayloadUpload = null;
-    let questionPayloadUploads: any[] = [];
-
-    // Normalize IDs to bytes32
-    const ensureHash = (v: any) => {
-      try {
-        if (cryptoUtils && typeof cryptoUtils.hashIdentifier === 'function') return cryptoUtils.hashIdentifier(v);
-      } catch {}
-      try {
-        if (utils.isHexString(v, 32)) return String(v).toLowerCase();
-      } catch {}
-      const s = v == null ? '' : String(v);
-      return s.trim() === '' ? ethers.constants.HashZero : utils.id(s);
-    };
-
-    const sId = ensureHash(surveyId);
-    const qIds32 = (Array.isArray(questionIds) ? questionIds : []).map(ensureHash);
-
-    if (!utils.isHexString(sId, 32)) throw new Error('addSurveyWithQuestions: surveyId is not a bytes32.');
-    qIds32.forEach((id: any, i: any) => {
-      if (!utils.isHexString(id, 32)) throw new Error(`addSurveyWithQuestions: questionIds[${i}] is not bytes32.`);
-    });
-
-    const canUseSessionStorage = isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.SURVEYS)
-      || isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.QUESTIONS);
-    if (ARWEAVE_ACTIVE || canUseSessionStorage) {
-      // Safety net: inject sessionName/sessionSlug if caller omitted it
-      const _sessionName = String((cfg?.sessionName || cfg?.slug || '') || '');
-      const _sessionSlug = resolveStorageSessionSlug(groupKeyOrCfg, cfg);
-      const _sessionMetadataOptions = _sessionSlug ? { sessionSlug: _sessionSlug } : {};
-      const surveyDataToUpload = normalizeSessionNameFields({
-        ...(surveyData || {}),
-      }, _sessionName, _sessionMetadataOptions);
-
-      const qArrayToUpload = (Array.isArray(questionDataArray) ? questionDataArray : []).map((q: any) => (
-        normalizeSessionNameFields({
-          ...(q || {}),
-        }, _sessionName, _sessionMetadataOptions)
-      ));
-
-      validateNoLockedPlaintextInPayload(surveyDataToUpload, {
-        family: 'survey_metadata',
-        path: 'survey metadata',
-      });
-      qArrayToUpload.forEach((questionData: any, index: any) => {
-        validateNoLockedPlaintextInPayload(questionData, {
-          family: 'question_metadata',
-          path: `question metadata[${index}]`,
-        });
-      });
-
-      const arweaveUploadOpts = await resolveArweaveUploadOpts(groupKeyOrCfg, {
-          providerLike: ethersProvider,
-          signer,
-      });
-      surveyPayloadUpload = await uploadJsonPayloadForContractPointer({
-        payload: surveyDataToUpload,
-        resource: STORAGE_RESOURCE_KEYS.SURVEYS,
-        groupKeyOrCfg,
-        cfg,
-        arweaveUploadOpts,
-        storageContext: {
-          account: await signer.getAddress().catch(() => ''),
-          providerLike: ethersProvider,
-        },
-      });
-
-      for (let questionData of qArrayToUpload) {
-        const questionPayloadUpload = await uploadJsonPayloadForContractPointer({
-          payload: questionData,
-          resource: STORAGE_RESOURCE_KEYS.QUESTIONS,
-          groupKeyOrCfg,
-          cfg,
-          arweaveUploadOpts,
-          storageContext: {
-            account: await signer.getAddress().catch(() => ''),
-            providerLike: ethersProvider,
-          },
-        });
-        questionPayloadUploads.push(questionPayloadUpload);
+      // === Address resolution (group-aware; no SURVEYS_ADDRESS fallback)
+      const cfg = resolveSession(groupKeyOrCfg || '');
+      const gAddrs = getSessionAddresses(cfg);
+      const addr = gAddrs.surveys?.address;
+      if (!addr) {
+        contractsLog.log('[submitSurveyResponse] Missing surveys address in group config; aborting tx.');
+        return; // early return, no throw
       }
-    } else {
-      throw new Error('Payload uploads are disabled; cannot create survey/questions.');
-    }
+      const SurveyContract = new ethers.Contract(addr, SURVEYS, signer as any);
 
-    const surveyArweaveHashBytes = surveyPayloadUpload.pointerBytes;
-    const questionArweaveHashesBytes = questionPayloadUploads.map((upload: any) => upload.pointerBytes);
+      // 🔐 Normalize & preflight
+      const ensureHash = (v: any) => {
+        try {
+          if (cryptoUtils && typeof cryptoUtils.hashIdentifier === 'function') return cryptoUtils.hashIdentifier(v);
+        } catch {}
+        try {
+          if (utils.isHexString(v, 32)) return String(v).toLowerCase();
+        } catch {}
+        const s = v === null || v === undefined ? '' : String(v);
+        return s.trim() === '' ? ethers.constants.HashZero : utils.id(s);
+      };
+      const hashedSurveyId = ensureHash(surveyId);
+      if (!utils.isHexString(hashedSurveyId, 32)) throw new Error('submitSurveyResponse: surveyId is not a bytes32.');
 
-    rpcLog('RPC Call (Tx):', {
-      function: 'addSurveyWithQuestions',
-      method: 'SurveyContract.addSurvey',
-      params: {
-        surveyId: sId,
-        surveyArweaveHashBytes,
-        questionIdsCount: qIds32.length,
-        questionArweaveHashesBytesCount: questionArweaveHashesBytes.length,
-      },
-    });
-
-    const txOverrides = await resolveTxGasOverrides({
-      contract: SurveyContract,
-      method: 'addSurvey',
-      args: [sId, surveyArweaveHashBytes, qIds32, questionArweaveHashesBytes],
-      fallbackGasLimit: String(GAS_FALLBACKS.addSurvey(qIds32.length)),
-      minEstimate: '80000',
-      logLabel: 'addSurveyWithQuestions',
-      preferFallbackGasLimit: true,
-    });
-    try {
+      rpcLog('RPC Call (Tx):', {
+        function: 'submitSurveyResponse',
+        method: 'SurveyContract.submitResponse',
+        params: { surveyId: hashedSurveyId, arweaveHash },
+      });
+      const txOverrides = await resolveTxGasOverrides({
+        contract: SurveyContract,
+        method: 'submitResponse',
+        args: [hashedSurveyId, arweaveHash],
+        fallbackGasLimit: String(GAS_FALLBACKS.submitResponse),
+        minEstimate: '50000',
+        logLabel: 'submitSurveyResponse',
+        preferFallbackGasLimit: true,
+      });
       const { receipt } = await sendContractWriteViaProvider({
         signingProvider: providerLocation,
         ethersProvider,
         signer,
         contract: SurveyContract,
-        method: 'addSurvey',
-        args: [sId, surveyArweaveHashBytes, qIds32, questionArweaveHashesBytes],
+        method: 'submitResponse',
+        args: [hashedSurveyId, arweaveHash],
         txOverrides,
-        rpcFunction: 'addSurveyWithQuestions',
-        revertMessage: 'addSurveyWithQuestions transaction reverted on-chain.',
+        rpcFunction: 'submitSurveyResponse',
+        revertMessage: 'submitSurveyResponse transaction reverted on-chain.',
       });
-      clearReadCachesForGroup(groupKeyOrCfg);
-      const surveyStorageRef = surveyPayloadUpload.storageRef;
-      const uploadedQuestions = qIds32.map((id: any, index: any) => (
-        attachStorageRefCompatibilityFields({
-          questionId: id,
-          arweaveTxId: questionPayloadUploads[index]?.arweaveTxId || '',
-          storageRef: questionPayloadUploads[index]?.storageRef || null,
-          resource: STORAGE_RESOURCE_KEYS.QUESTIONS,
-        }, { resource: STORAGE_RESOURCE_KEYS.QUESTIONS })
-      ));
-      return {
-        receipt,
-        ...(surveyPayloadUpload.arweaveTxId ? { surveyArweaveTxId: surveyPayloadUpload.arweaveTxId } : {}),
-        ...(surveyStorageRef ? { surveyStorageRef } : {}),
-        uploadedQuestions,
+      return receipt;
+    },
+
+    addSurveyWithQuestions: async function (
+      providerName: any,
+      surveyId: any,
+      surveyData: any,
+      questionIds: any,
+      questionDataArray: any,
+      groupKeyOrCfg: any = null,
+    ) {
+      if (providerName === 'none') {
+        throw new Error('addSurveyWithQuestions requires a signer-capable provider (not read-only).');
+      }
+
+      const providerLocation = this.getProviderLocation(providerName);
+      const ethersProvider = new ethers.providers.Web3Provider(providerLocation as any, 'any');
+      const signer = ethersProvider.getSigner();
+
+      // Group-aware address resolution (no hard-coded fallback)
+      const cfg = memoizedResolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
+      const gAddrs = getSessionAddresses(cfg);
+      const addr = gAddrs.surveys?.address;
+      if (!addr) {
+        const slug = normalizeSessionSlug(typeof groupKeyOrCfg === 'string' ? groupKeyOrCfg : cfg?.slug || '');
+        throw new Error(
+          `[addSurveyWithQuestions] Missing surveys contract address for session slug "${slug || 'general'}".`,
+        );
+      }
+      const SurveyContract = new ethers.Contract(addr, SURVEYS, signer as any);
+
+      let surveyPayloadUpload = null;
+      let questionPayloadUploads: any[] = [];
+
+      // Normalize IDs to bytes32
+      const ensureHash = (v: any) => {
+        try {
+          if (cryptoUtils && typeof cryptoUtils.hashIdentifier === 'function') return cryptoUtils.hashIdentifier(v);
+        } catch {}
+        try {
+          if (utils.isHexString(v, 32)) return String(v).toLowerCase();
+        } catch {}
+        const s = v == null ? '' : String(v);
+        return s.trim() === '' ? ethers.constants.HashZero : utils.id(s);
       };
-    } catch (error: any) {
-      notifyUserFacingTransactionError(error);
-      throw error;
-    }
-  },
 
+      const sId = ensureHash(surveyId);
+      const qIds32 = (Array.isArray(questionIds) ? questionIds : []).map(ensureHash);
 
-  addQuestions: async function (
-    providerName: any,
-    questionIds: any,
-    questionDataArray: any,
-    surveyIds: any,
-    groupKeyOrCfg: any = null
-  ) {
-    if (providerName === 'none') {
-      throw new Error('addQuestions requires a signer-capable provider (not read-only).');
-    }
+      if (!utils.isHexString(sId, 32)) throw new Error('addSurveyWithQuestions: surveyId is not a bytes32.');
+      qIds32.forEach((id: any, i: any) => {
+        if (!utils.isHexString(id, 32)) throw new Error(`addSurveyWithQuestions: questionIds[${i}] is not bytes32.`);
+      });
 
-    const providerLocation = this.getProviderLocation(providerName);
-    const ethersProvider = new ethers.providers.Web3Provider(providerLocation as any, 'any');
-    const signer = ethersProvider.getSigner();
+      const canUseSessionStorage =
+        isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.SURVEYS) ||
+        isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.QUESTIONS);
+      if (ARWEAVE_ACTIVE || canUseSessionStorage) {
+        // Safety net: inject sessionName/sessionSlug if caller omitted it
+        const _sessionName = String(cfg?.sessionName || cfg?.slug || '' || '');
+        const _sessionSlug = resolveStorageSessionSlug(groupKeyOrCfg, cfg);
+        const _sessionMetadataOptions = _sessionSlug ? { sessionSlug: _sessionSlug } : {};
+        const surveyDataToUpload = normalizeSessionNameFields(
+          {
+            ...(surveyData || {}),
+          },
+          _sessionName,
+          _sessionMetadataOptions,
+        );
 
-    // Group-aware address resolution (no hard-coded fallback)
-    const cfg = memoizedResolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
-    const gAddrs = getSessionAddresses(cfg);
-    const addr = gAddrs.surveys?.address;
-    if (!addr) {
-      const slug = normalizeSessionSlug(typeof groupKeyOrCfg === 'string' ? groupKeyOrCfg : cfg?.slug || '');
-      throw new Error(`[addQuestions] Missing surveys contract address for session slug "${slug || 'general'}".`);
-    }
-    const SurveyContract = new ethers.Contract(addr, SURVEYS, signer as any);
+        const qArrayToUpload = (Array.isArray(questionDataArray) ? questionDataArray : []).map((q: any) =>
+          normalizeSessionNameFields(
+            {
+              ...(q || {}),
+            },
+            _sessionName,
+            _sessionMetadataOptions,
+          ),
+        );
 
-    let questionPayloadUploads: any[] = [];
-
-    // Normalize IDs to bytes32
-    const ensureHash = (v: any) => {
-      try {
-        if (cryptoUtils && typeof cryptoUtils.hashIdentifier === 'function') return cryptoUtils.hashIdentifier(v);
-      } catch {}
-      try {
-        if (utils.isHexString(v, 32)) return String(v).toLowerCase();
-      } catch {}
-      const s = v == null ? '' : String(v);
-      return s.trim() === '' ? ethers.constants.HashZero : utils.id(s);
-    };
-
-    const qIds32 = (Array.isArray(questionIds) ? questionIds : []).map(ensureHash);
-    const sIds32 = (Array.isArray(surveyIds) ? surveyIds : []).map(ensureHash);
-
-    qIds32.forEach((id: any, i: any) => {
-      if (!utils.isHexString(id, 32)) throw new Error(`addQuestions: questionIds[${i}] is not a bytes32.`);
-    });
-    sIds32.forEach((id: any, i: any) => {
-      if (!utils.isHexString(id, 32)) throw new Error(`addQuestions: surveyIds[${i}] is not a bytes32.`);
-    });
-
-    const canUseSessionStorage = isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.QUESTIONS);
-    if (ARWEAVE_ACTIVE || canUseSessionStorage) {
-      // Safety net: inject sessionName/sessionSlug if caller omitted it
-      const _sessionName = String((cfg?.sessionName || cfg?.slug || '') || '');
-      const _sessionSlug = resolveStorageSessionSlug(groupKeyOrCfg, cfg);
-      const _sessionMetadataOptions = _sessionSlug ? { sessionSlug: _sessionSlug } : {};
-      const qArrayToUpload = (Array.isArray(questionDataArray) ? questionDataArray : []).map((q: any) => (
-        normalizeSessionNameFields({
-          ...(q || {}),
-        }, _sessionName, _sessionMetadataOptions)
-      ));
-
-      qArrayToUpload.forEach((questionData: any, index: any) => {
-        validateNoLockedPlaintextInPayload(questionData, {
-          family: 'question_metadata',
-          path: `question metadata[${index}]`,
+        validateNoLockedPlaintextInPayload(surveyDataToUpload, {
+          family: 'survey_metadata',
+          path: 'survey metadata',
         });
-      });
+        qArrayToUpload.forEach((questionData: any, index: any) => {
+          validateNoLockedPlaintextInPayload(questionData, {
+            family: 'question_metadata',
+            path: `question metadata[${index}]`,
+          });
+        });
 
-      const arweaveUploadOpts = await resolveArweaveUploadOpts(groupKeyOrCfg, {
-        providerLike: ethersProvider,
-        signer,
-      });
-
-      for (let questionData of qArrayToUpload) {
-        const questionPayloadUpload = await uploadJsonPayloadForContractPointer({
-          payload: questionData,
-          resource: STORAGE_RESOURCE_KEYS.QUESTIONS,
+        const arweaveUploadOpts = await resolveArweaveUploadOpts(groupKeyOrCfg, {
+          providerLike: ethersProvider,
+          signer,
+        });
+        surveyPayloadUpload = await uploadJsonPayloadForContractPointer({
+          payload: surveyDataToUpload,
+          resource: STORAGE_RESOURCE_KEYS.SURVEYS,
           groupKeyOrCfg,
           cfg,
           arweaveUploadOpts,
@@ -444,222 +301,395 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
             providerLike: ethersProvider,
           },
         });
-        questionPayloadUploads.push(questionPayloadUpload);
+
+        for (let questionData of qArrayToUpload) {
+          const questionPayloadUpload = await uploadJsonPayloadForContractPointer({
+            payload: questionData,
+            resource: STORAGE_RESOURCE_KEYS.QUESTIONS,
+            groupKeyOrCfg,
+            cfg,
+            arweaveUploadOpts,
+            storageContext: {
+              account: await signer.getAddress().catch(() => ''),
+              providerLike: ethersProvider,
+            },
+          });
+          questionPayloadUploads.push(questionPayloadUpload);
+        }
+      } else {
+        throw new Error('Payload uploads are disabled; cannot create survey/questions.');
       }
-    } else {
-      throw new Error('Payload uploads are disabled; cannot add questions.');
-    }
 
-    const questionArweaveHashBytesArray = questionPayloadUploads.map((upload: any) => upload.pointerBytes);
+      const surveyArweaveHashBytes = surveyPayloadUpload.pointerBytes;
+      const questionArweaveHashesBytes = questionPayloadUploads.map((upload: any) => upload.pointerBytes);
 
-    rpcLog('RPC Call (Tx):', {
-      function: 'addQuestions',
-      method: 'SurveyContract.addQuestions',
-      params: {
-        questionIdsCount: qIds32.length,
-        questionArweaveHashBytesArrayCount: questionArweaveHashBytesArray.length,
-        surveyIdsCount: sIds32.length,
-      },
-    });
+      rpcLog('RPC Call (Tx):', {
+        function: 'addSurveyWithQuestions',
+        method: 'SurveyContract.addSurvey',
+        params: {
+          surveyId: sId,
+          surveyArweaveHashBytes,
+          questionIdsCount: qIds32.length,
+          questionArweaveHashesBytesCount: questionArweaveHashesBytes.length,
+        },
+      });
 
-    const txOverrides = await resolveTxGasOverrides({
-      contract: SurveyContract,
-      method: 'addQuestions',
-      args: [qIds32, questionArweaveHashBytesArray, sIds32],
-      fallbackGasLimit: String(GAS_FALLBACKS.addQuestions(qIds32.length)),
-      minEstimate: '80000',
-      logLabel: 'addQuestions',
-      preferFallbackGasLimit: true,
-    });
-    const { receipt } = await sendContractWriteViaProvider({
-      signingProvider: providerLocation,
-      ethersProvider,
-      signer,
-      contract: SurveyContract,
-      method: 'addQuestions',
-      args: [qIds32, questionArweaveHashBytesArray, sIds32],
-      txOverrides,
-      rpcFunction: 'addQuestions',
-      revertMessage: 'addQuestions transaction reverted on-chain.',
-    });
-
-    const uploadedQuestions = qIds32.map((id: any, index: any) => {
-      const upload = questionPayloadUploads[index] || {};
-      return attachStorageRefCompatibilityFields({
-        questionId: id,
-        arweaveTxId: upload.arweaveTxId || '',
-        storageRef: upload.storageRef || null,
-        resource: STORAGE_RESOURCE_KEYS.QUESTIONS,
-      }, { resource: STORAGE_RESOURCE_KEYS.QUESTIONS });
-    });
-
-    clearReadCachesForGroup(groupKeyOrCfg);
-    return { receipt, uploadedQuestions };
-  },
-
-
-  submitResponses: async function (providerName: any, questionIds: any, questionResponses: any, surveyId: any, surveyResponse: any, groupKeyOrCfg: any = null) {
-  if (providerName === 'none') {
-    throw new Error('submitResponses: read-only provider is not allowed here. Connect a wallet first.');
-  }
-  // Resolve the interactive signing provider based on the caller's intent.
-  // Keep all ethers logic here, as requested.
-  let signingProvider = this.getProviderLocation(providerName);
-
-  // Keep Web3Auth override for easy re-enable; it is no-op without a provider.
-  if (providerName === 'web3auth') {
-    if (window.web3authProvider) {
-      signingProvider = window.web3authProvider;
-    } else {
-      throw new Error('Selected wallet provider is not available. Log in or reconnect your wallet first.');
-    }
-  }
-
-  // 🔐 Normalize identifiers to bytes32 at the boundary
-  const ensureHash = (v: any) => {
-    try {
-      if (cryptoUtils && typeof cryptoUtils.hashIdentifier === 'function') {
-        return cryptoUtils.hashIdentifier(v);
+      const txOverrides = await resolveTxGasOverrides({
+        contract: SurveyContract,
+        method: 'addSurvey',
+        args: [sId, surveyArweaveHashBytes, qIds32, questionArweaveHashesBytes],
+        fallbackGasLimit: String(GAS_FALLBACKS.addSurvey(qIds32.length)),
+        minEstimate: '80000',
+        logLabel: 'addSurveyWithQuestions',
+        preferFallbackGasLimit: true,
+      });
+      try {
+        const { receipt } = await sendContractWriteViaProvider({
+          signingProvider: providerLocation,
+          ethersProvider,
+          signer,
+          contract: SurveyContract,
+          method: 'addSurvey',
+          args: [sId, surveyArweaveHashBytes, qIds32, questionArweaveHashesBytes],
+          txOverrides,
+          rpcFunction: 'addSurveyWithQuestions',
+          revertMessage: 'addSurveyWithQuestions transaction reverted on-chain.',
+        });
+        clearReadCachesForGroup(groupKeyOrCfg);
+        const surveyStorageRef = surveyPayloadUpload.storageRef;
+        const uploadedQuestions = qIds32.map((id: any, index: any) =>
+          attachStorageRefCompatibilityFields(
+            {
+              questionId: id,
+              arweaveTxId: questionPayloadUploads[index]?.arweaveTxId || '',
+              storageRef: questionPayloadUploads[index]?.storageRef || null,
+              resource: STORAGE_RESOURCE_KEYS.QUESTIONS,
+            },
+            { resource: STORAGE_RESOURCE_KEYS.QUESTIONS },
+          ),
+        );
+        return {
+          receipt,
+          ...(surveyPayloadUpload.arweaveTxId ? { surveyArweaveTxId: surveyPayloadUpload.arweaveTxId } : {}),
+          ...(surveyStorageRef ? { surveyStorageRef } : {}),
+          uploadedQuestions,
+        };
+      } catch (error: any) {
+        notifyUserFacingTransactionError(error);
+        throw error;
       }
-    } catch {}
-    try { if (utils.isHexString(v, 32)) return String(v).toLowerCase(); } catch {}
-    const s = (v === null || v === undefined) ? '' : String(v);
-    return s.trim() === '' ? ethers.constants.HashZero : utils.id(s);
-  };
+    },
 
-  const hashedQuestionIds = Array.isArray(questionIds) ? questionIds.map(ensureHash) : [];
-  const hashedSurveyId = ensureHash(surveyId);
+    addQuestions: async function (
+      providerName: any,
+      questionIds: any,
+      questionDataArray: any,
+      surveyIds: any,
+      groupKeyOrCfg: any = null,
+    ) {
+      if (providerName === 'none') {
+        throw new Error('addQuestions requires a signer-capable provider (not read-only).');
+      }
 
-  // Optional preflight
-  hashedQuestionIds.forEach((id: any, i: any) => {
-    if (!utils.isHexString(id, 32)) throw new Error(`submitResponses: questionIds[${i}] is not a bytes32.`);
-  });
-  if (!utils.isHexString(hashedSurveyId, 32)) {
-    throw new Error('submitResponses: surveyId is not a bytes32.');
-  }
+      const providerLocation = this.getProviderLocation(providerName);
+      const ethersProvider = new ethers.providers.Web3Provider(providerLocation as any, 'any');
+      const signer = ethersProvider.getSigner();
 
-  // Build ethers provider/signer from the chosen interactive provider.
-  const ethersProvider = new ethers.providers.Web3Provider(signingProvider as any);
-  const signer = ethersProvider.getSigner();
-  const userAddress = await signer.getAddress(); // throws if no account
+      // Group-aware address resolution (no hard-coded fallback)
+      const cfg = memoizedResolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
+      const gAddrs = getSessionAddresses(cfg);
+      const addr = gAddrs.surveys?.address;
+      if (!addr) {
+        const slug = normalizeSessionSlug(typeof groupKeyOrCfg === 'string' ? groupKeyOrCfg : cfg?.slug || '');
+        throw new Error(`[addQuestions] Missing surveys contract address for session slug "${slug || 'general'}".`);
+      }
+      const SurveyContract = new ethers.Contract(addr, SURVEYS, signer as any);
 
-  // Prepare data to upload and on-chain params.
-  let questionResponseUploads: any[] = [];
-  let surveyResponseHashBytes = ethers.constants.HashZero;
+      let questionPayloadUploads: any[] = [];
 
-  const cfg = resolveSession(groupKeyOrCfg || '');
-  const canUseSessionStorage = isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.RESPONSES);
-  if (ARWEAVE_ACTIVE || canUseSessionStorage) {
-    const uploadContext = {
-      account: userAddress,
-      providerLike: ethersProvider,
-      signer,
-      chainId: cfg?.networkChainId || null,
-    };
-    const arweaveOpts = {
-      ...(await resolveArweaveUploadOpts(groupKeyOrCfg, {
-        providerLike: ethersProvider,
+      // Normalize IDs to bytes32
+      const ensureHash = (v: any) => {
+        try {
+          if (cryptoUtils && typeof cryptoUtils.hashIdentifier === 'function') return cryptoUtils.hashIdentifier(v);
+        } catch {}
+        try {
+          if (utils.isHexString(v, 32)) return String(v).toLowerCase();
+        } catch {}
+        const s = v == null ? '' : String(v);
+        return s.trim() === '' ? ethers.constants.HashZero : utils.id(s);
+      };
+
+      const qIds32 = (Array.isArray(questionIds) ? questionIds : []).map(ensureHash);
+      const sIds32 = (Array.isArray(surveyIds) ? surveyIds : []).map(ensureHash);
+
+      qIds32.forEach((id: any, i: any) => {
+        if (!utils.isHexString(id, 32)) throw new Error(`addQuestions: questionIds[${i}] is not a bytes32.`);
+      });
+      sIds32.forEach((id: any, i: any) => {
+        if (!utils.isHexString(id, 32)) throw new Error(`addQuestions: surveyIds[${i}] is not a bytes32.`);
+      });
+
+      const canUseSessionStorage = isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.QUESTIONS);
+      if (ARWEAVE_ACTIVE || canUseSessionStorage) {
+        // Safety net: inject sessionName/sessionSlug if caller omitted it
+        const _sessionName = String(cfg?.sessionName || cfg?.slug || '' || '');
+        const _sessionSlug = resolveStorageSessionSlug(groupKeyOrCfg, cfg);
+        const _sessionMetadataOptions = _sessionSlug ? { sessionSlug: _sessionSlug } : {};
+        const qArrayToUpload = (Array.isArray(questionDataArray) ? questionDataArray : []).map((q: any) =>
+          normalizeSessionNameFields(
+            {
+              ...(q || {}),
+            },
+            _sessionName,
+            _sessionMetadataOptions,
+          ),
+        );
+
+        qArrayToUpload.forEach((questionData: any, index: any) => {
+          validateNoLockedPlaintextInPayload(questionData, {
+            family: 'question_metadata',
+            path: `question metadata[${index}]`,
+          });
+        });
+
+        const arweaveUploadOpts = await resolveArweaveUploadOpts(groupKeyOrCfg, {
+          providerLike: ethersProvider,
+          signer,
+        });
+
+        for (let questionData of qArrayToUpload) {
+          const questionPayloadUpload = await uploadJsonPayloadForContractPointer({
+            payload: questionData,
+            resource: STORAGE_RESOURCE_KEYS.QUESTIONS,
+            groupKeyOrCfg,
+            cfg,
+            arweaveUploadOpts,
+            storageContext: {
+              account: await signer.getAddress().catch(() => ''),
+              providerLike: ethersProvider,
+            },
+          });
+          questionPayloadUploads.push(questionPayloadUpload);
+        }
+      } else {
+        throw new Error('Payload uploads are disabled; cannot add questions.');
+      }
+
+      const questionArweaveHashBytesArray = questionPayloadUploads.map((upload: any) => upload.pointerBytes);
+
+      rpcLog('RPC Call (Tx):', {
+        function: 'addQuestions',
+        method: 'SurveyContract.addQuestions',
+        params: {
+          questionIdsCount: qIds32.length,
+          questionArweaveHashBytesArrayCount: questionArweaveHashBytesArray.length,
+          surveyIdsCount: sIds32.length,
+        },
+      });
+
+      const txOverrides = await resolveTxGasOverrides({
+        contract: SurveyContract,
+        method: 'addQuestions',
+        args: [qIds32, questionArweaveHashBytesArray, sIds32],
+        fallbackGasLimit: String(GAS_FALLBACKS.addQuestions(qIds32.length)),
+        minEstimate: '80000',
+        logLabel: 'addQuestions',
+        preferFallbackGasLimit: true,
+      });
+      const { receipt } = await sendContractWriteViaProvider({
+        signingProvider: providerLocation,
+        ethersProvider,
         signer,
-      })),
-      context: uploadContext,
-    };
-    if (surveyResponse) {
-      validateNoLockedPlaintextInPayload(surveyResponse, {
-        family: 'survey_response_payload',
-        path: 'survey response',
+        contract: SurveyContract,
+        method: 'addQuestions',
+        args: [qIds32, questionArweaveHashBytesArray, sIds32],
+        txOverrides,
+        rpcFunction: 'addQuestions',
+        revertMessage: 'addQuestions transaction reverted on-chain.',
       });
-      const surveyResponseUpload = await uploadJsonPayloadForContractPointer({
-        payload: surveyResponse,
-        resource: STORAGE_RESOURCE_KEYS.RESPONSES,
-        groupKeyOrCfg,
-        cfg,
-        arweaveUploadOpts: arweaveOpts,
-        uploadWithRetry: true,
-        storageContext: uploadContext,
+
+      const uploadedQuestions = qIds32.map((id: any, index: any) => {
+        const upload = questionPayloadUploads[index] || {};
+        return attachStorageRefCompatibilityFields(
+          {
+            questionId: id,
+            arweaveTxId: upload.arweaveTxId || '',
+            storageRef: upload.storageRef || null,
+            resource: STORAGE_RESOURCE_KEYS.QUESTIONS,
+          },
+          { resource: STORAGE_RESOURCE_KEYS.QUESTIONS },
+        );
       });
-      surveyResponseHashBytes = surveyResponseUpload.pointerBytes;
-    }
-    // Upload response objects sequentially to avoid Arweave anchor/signature races
-    // that can appear when multiple uploads are posted in parallel for one wallet.
-    questionResponseUploads = [];
-    for (const response of questionResponses) {
-      validateNoLockedPlaintextInPayload(response, {
-        family: 'question_response_payload',
-        path: 'question response',
+
+      clearReadCachesForGroup(groupKeyOrCfg);
+      return { receipt, uploadedQuestions };
+    },
+
+    submitResponses: async function (
+      providerName: any,
+      questionIds: any,
+      questionResponses: any,
+      surveyId: any,
+      surveyResponse: any,
+      groupKeyOrCfg: any = null,
+    ) {
+      if (providerName === 'none') {
+        throw new Error('submitResponses: read-only provider is not allowed here. Connect a wallet first.');
+      }
+      // Resolve the interactive signing provider based on the caller's intent.
+      // Keep all ethers logic here, as requested.
+      let signingProvider = this.getProviderLocation(providerName);
+
+      // Keep Web3Auth override for easy re-enable; it is no-op without a provider.
+      if (providerName === 'web3auth') {
+        if (window.web3authProvider) {
+          signingProvider = window.web3authProvider;
+        } else {
+          throw new Error('Selected wallet provider is not available. Log in or reconnect your wallet first.');
+        }
+      }
+
+      // 🔐 Normalize identifiers to bytes32 at the boundary
+      const ensureHash = (v: any) => {
+        try {
+          if (cryptoUtils && typeof cryptoUtils.hashIdentifier === 'function') {
+            return cryptoUtils.hashIdentifier(v);
+          }
+        } catch {}
+        try {
+          if (utils.isHexString(v, 32)) return String(v).toLowerCase();
+        } catch {}
+        const s = v === null || v === undefined ? '' : String(v);
+        return s.trim() === '' ? ethers.constants.HashZero : utils.id(s);
+      };
+
+      const hashedQuestionIds = Array.isArray(questionIds) ? questionIds.map(ensureHash) : [];
+      const hashedSurveyId = ensureHash(surveyId);
+
+      // Optional preflight
+      hashedQuestionIds.forEach((id: any, i: any) => {
+        if (!utils.isHexString(id, 32)) throw new Error(`submitResponses: questionIds[${i}] is not a bytes32.`);
       });
-      // eslint-disable-next-line no-await-in-loop
-      const responseUpload = await uploadJsonPayloadForContractPointer({
-        payload: response,
-        resource: STORAGE_RESOURCE_KEYS.RESPONSES,
-        groupKeyOrCfg,
-        cfg,
-        arweaveUploadOpts: arweaveOpts,
-        uploadWithRetry: true,
-        storageContext: uploadContext,
+      if (!utils.isHexString(hashedSurveyId, 32)) {
+        throw new Error('submitResponses: surveyId is not a bytes32.');
+      }
+
+      // Build ethers provider/signer from the chosen interactive provider.
+      const ethersProvider = new ethers.providers.Web3Provider(signingProvider as any);
+      const signer = ethersProvider.getSigner();
+      const userAddress = await signer.getAddress(); // throws if no account
+
+      // Prepare data to upload and on-chain params.
+      let questionResponseUploads: any[] = [];
+      let surveyResponseHashBytes = ethers.constants.HashZero;
+
+      const cfg = resolveSession(groupKeyOrCfg || '');
+      const canUseSessionStorage = isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.RESPONSES);
+      if (ARWEAVE_ACTIVE || canUseSessionStorage) {
+        const uploadContext = {
+          account: userAddress,
+          providerLike: ethersProvider,
+          signer,
+          chainId: cfg?.networkChainId || null,
+        };
+        const arweaveOpts = {
+          ...(await resolveArweaveUploadOpts(groupKeyOrCfg, {
+            providerLike: ethersProvider,
+            signer,
+          })),
+          context: uploadContext,
+        };
+        if (surveyResponse) {
+          validateNoLockedPlaintextInPayload(surveyResponse, {
+            family: 'survey_response_payload',
+            path: 'survey response',
+          });
+          const surveyResponseUpload = await uploadJsonPayloadForContractPointer({
+            payload: surveyResponse,
+            resource: STORAGE_RESOURCE_KEYS.RESPONSES,
+            groupKeyOrCfg,
+            cfg,
+            arweaveUploadOpts: arweaveOpts,
+            uploadWithRetry: true,
+            storageContext: uploadContext,
+          });
+          surveyResponseHashBytes = surveyResponseUpload.pointerBytes;
+        }
+        // Upload response objects sequentially to avoid Arweave anchor/signature races
+        // that can appear when multiple uploads are posted in parallel for one wallet.
+        questionResponseUploads = [];
+        for (const response of questionResponses) {
+          validateNoLockedPlaintextInPayload(response, {
+            family: 'question_response_payload',
+            path: 'question response',
+          });
+          // eslint-disable-next-line no-await-in-loop
+          const responseUpload = await uploadJsonPayloadForContractPointer({
+            payload: response,
+            resource: STORAGE_RESOURCE_KEYS.RESPONSES,
+            groupKeyOrCfg,
+            cfg,
+            arweaveUploadOpts: arweaveOpts,
+            uploadWithRetry: true,
+            storageContext: uploadContext,
+          });
+          questionResponseUploads.push(responseUpload);
+        }
+      } else {
+        return; // no-op when no configured payload storage path is available
+      }
+
+      const questionResponseHashesBytes = questionResponseUploads.map((upload: any) => upload.pointerBytes);
+
+      // === Address resolution (group-aware; no SURVEYS_ADDRESS fallback)
+      const gAddrs = getSessionAddresses(cfg);
+      const addr = gAddrs.surveys?.address;
+      if (!addr) {
+        contractsLog.log('[submitResponses] Missing surveys address in group config; aborting tx.');
+        return; // early return (no throw)
+      }
+
+      const SurveyContract = new ethers.Contract(addr, SURVEYS, signer as any);
+      const txArgs: any[] = [hashedQuestionIds, questionResponseHashesBytes, hashedSurveyId, surveyResponseHashBytes];
+      const txOverrides = await resolveTxGasOverrides({
+        contract: SurveyContract,
+        method: 'submitResponses',
+        args: txArgs,
+        fallbackGasLimit: String(GAS_FALLBACKS.submitResponses(hashedQuestionIds.length)),
+        minEstimate: '80000',
+        logLabel: 'submitResponses',
+        preferFallbackGasLimit: true,
       });
-      questionResponseUploads.push(responseUpload);
-    }
-  } else {
-    return; // no-op when no configured payload storage path is available
-  }
 
-  const questionResponseHashesBytes = questionResponseUploads.map((upload: any) => upload.pointerBytes);
+      rpcLog('RPC Call (Tx):', {
+        function: 'submitResponses',
+        method: 'SurveyContract.submitResponses',
+        params: {
+          userAddress,
+          questionIdsCount: hashedQuestionIds.length,
+          gasLimit: txOverrides?.gasLimit?.toString?.() || null,
+        },
+      });
 
-  // === Address resolution (group-aware; no SURVEYS_ADDRESS fallback)
-  const gAddrs = getSessionAddresses(cfg);
-  const addr   = gAddrs.surveys?.address;
-  if (!addr) {
-    contractsLog.log('[submitResponses] Missing surveys address in group config; aborting tx.');
-    return; // early return (no throw)
-  }
-
-  const SurveyContract = new ethers.Contract(addr, SURVEYS, signer as any);
-  const txArgs: any[] = [
-    hashedQuestionIds,
-    questionResponseHashesBytes,
-    hashedSurveyId,
-    surveyResponseHashBytes,
-  ];
-  const txOverrides = await resolveTxGasOverrides({
-    contract: SurveyContract,
-    method: 'submitResponses',
-    args: txArgs,
-    fallbackGasLimit: String(GAS_FALLBACKS.submitResponses(hashedQuestionIds.length)),
-    minEstimate: '80000',
-    logLabel: 'submitResponses',
-    preferFallbackGasLimit: true,
-  });
-
-  rpcLog('RPC Call (Tx):', {
-    function: 'submitResponses',
-    method: 'SurveyContract.submitResponses',
-    params: {
-      userAddress,
-      questionIdsCount: hashedQuestionIds.length,
-      gasLimit: txOverrides?.gasLimit?.toString?.() || null,
-    }
-  });
-
-  try {
-    const { receipt } = await sendContractWriteViaProvider({
-      signingProvider,
-      ethersProvider,
-      signer,
-      contract: SurveyContract,
-      method: 'submitResponses',
-      args: txArgs,
-      txOverrides,
-      rpcFunction: 'submitResponses',
-      revertMessage: 'submitResponses transaction reverted on-chain.',
-    });
-    clearReadCachesForGroup(groupKeyOrCfg);
-    return receipt;
-  } catch (error: any) {
-    notifyUserFacingTransactionError(error);
-    contractsLog.error('Error sending transaction with provider.request:', error);
-    throw error;
-  }
-  },
-
+      try {
+        const { receipt } = await sendContractWriteViaProvider({
+          signingProvider,
+          ethersProvider,
+          signer,
+          contract: SurveyContract,
+          method: 'submitResponses',
+          args: txArgs,
+          txOverrides,
+          rpcFunction: 'submitResponses',
+          revertMessage: 'submitResponses transaction reverted on-chain.',
+        });
+        clearReadCachesForGroup(groupKeyOrCfg);
+        return receipt;
+      } catch (error: any) {
+        notifyUserFacingTransactionError(error);
+        contractsLog.error('Error sending transaction with provider.request:', error);
+        throw error;
+      }
+    },
   };
 };

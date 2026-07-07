@@ -283,7 +283,9 @@ describe('contractScripts getReadProviderForGroup', () => {
   });
 
   it('uses browser-visible session RPC path mirrors for survey and SBT read providers', () => {
-    try { globalThis.CE_PREFER_PATH_RPC = false; } catch (_) {}
+    try {
+      globalThis.CE_PREFER_PATH_RPC = false;
+    } catch (_) {}
     const cfg = buildGroupCfg({
       provider: 'path',
       providers: {
@@ -300,24 +302,29 @@ describe('contractScripts getReadProviderForGroup', () => {
       const urls = Array.isArray(provider?.providerConfigs)
         ? provider.providerConfigs.map((entry) => entry?.provider?.connection?.url).filter(Boolean)
         : [];
-      expect(provider?.__CE_RPC_META).toEqual(expect.objectContaining({
-        providerLabel: 'path',
-        preferredUrls: expect.arrayContaining([SESSION_RPC_URL]),
-      }));
+      expect(provider?.__CE_RPC_META).toEqual(
+        expect.objectContaining({
+          providerLabel: 'path',
+          preferredUrls: expect.arrayContaining([SESSION_RPC_URL]),
+        }),
+      );
       expect(urls[0]).toBe(SESSION_RPC_URL);
     });
   });
 
   it('skips global PATH defaults for archive-safe survey reads', () => {
-    const cfg = buildGroupCfg({}, {
-      networkChainId: 11155420,
-      contracts: {
-        surveys: {
-          address: '0x00000000000000000000000000000000000000ab',
-          chainId: 11155420,
+    const cfg = buildGroupCfg(
+      {},
+      {
+        networkChainId: 11155420,
+        contracts: {
+          surveys: {
+            address: '0x00000000000000000000000000000000000000ab',
+            chainId: 11155420,
+          },
         },
       },
-    });
+    );
 
     const provider = getReadProviderForGroup(cfg, {
       contractKey: 'surveys',
@@ -328,10 +335,12 @@ describe('contractScripts getReadProviderForGroup', () => {
       ? provider.providerConfigs.map((entry) => entry?.provider?.connection?.url).filter(Boolean)
       : [];
 
-    expect(provider?.__CE_RPC_META).toEqual(expect.objectContaining({
-      providerLabel: 'surveys-archive',
-      skipGlobalPreferred: true,
-    }));
+    expect(provider?.__CE_RPC_META).toEqual(
+      expect.objectContaining({
+        providerLabel: 'surveys-archive',
+        skipGlobalPreferred: true,
+      }),
+    );
     expect(urls[0]).toBe(ARCHIVE_OP_SEPOLIA_RPC);
     expect(urls).not.toContain(PATH_DEFAULT_OP_SEPOLIA);
   });
@@ -354,10 +363,12 @@ describe('contractScripts getReadProviderForGroup', () => {
       ? provider.providerConfigs.map((entry) => entry?.provider?.connection?.url).filter(Boolean)
       : [];
 
-    expect(provider?.__CE_RPC_META).toEqual(expect.objectContaining({
-      providerLabel: 'path',
-      preferredUrls: expect.arrayContaining([SESSION_RPC_URL]),
-    }));
+    expect(provider?.__CE_RPC_META).toEqual(
+      expect.objectContaining({
+        providerLabel: 'path',
+        preferredUrls: expect.arrayContaining([SESSION_RPC_URL]),
+      }),
+    );
     expect(urls[0]).toBe(SESSION_RPC_URL);
   });
 });

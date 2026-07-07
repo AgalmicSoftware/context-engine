@@ -22,14 +22,8 @@ import { faExpand, faCaretDown, faCaretUp, faCopy, faCheck } from '@fortawesome/
 import { deserializeFilterState } from '../../utilities/survey/filterStateUtils.js'; // Added import
 import { notify } from '../../utilities/ui/notify.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import {
-  buildPublicRoute,
-  stripPublicUrlBasePath,
-} from '../../utilities/ui/publicUrl.js';
-import {
-  resolveContractPageActiveSession,
-  resolveContractPageReferrerSlug,
-} from './contractPageSessionResolution.js';
+import { buildPublicRoute, stripPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
+import { resolveContractPageActiveSession, resolveContractPageReferrerSlug } from './contractPageSessionResolution.js';
 import ContractViewer, { type ContractViewerContract } from './ContractViewer';
 import { normalizeContractKeyParam } from './contractMetadata.js';
 import { buildContractViewerContracts } from './contractViewerUtils.js';
@@ -159,22 +153,50 @@ export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }: Cont
   });
   const photoAnalysisPromptDisplay = buildPhotoAnalysisPrompt('<SourceFilename>');
 
-  const promptItems = useMemo(() => ([
-    { id: 'seedGen', title: 'Question Generation', file: 'seedGenPrompt.js', content: seedGenPrompt },
-    { id: 'questionSelection', title: 'Question Selection', file: 'questionSelectionPrompt.js', content: questionSelectionPrompt },
-    { id: 'audioSummary', title: 'Audio Summary', file: 'audioSummaryPrompt.js', content: audioSummaryPrompt },
-    { id: 'photoAnalysis', title: 'Photo Analysis', file: 'photoAnalysisPrompt.js', content: photoAnalysisPromptDisplay },
-    { id: 'compareToolkit', title: 'Compare Toolkit', file: 'compareToolkitPrompt.js', content: compareToolkitPromptDisplay },
-    { id: 'clusterAnalysisSystem', title: 'Cluster Analysis (System)', file: 'clusterAnalysisPrompt.js', content: CLUSTER_ANALYSIS_SYSTEM_PROMPT },
-    { id: 'clusterAnalysis', title: 'Cluster Analysis (User)', file: 'clusterAnalysisPrompt.js', content: clusterAnalysisPromptDisplay },
-    { id: 'userAnalysis', title: 'User Analysis', file: 'userAnalysisPrompt.js', content: userAnalysisPromptDisplay },
-    { id: 'aiRewrite', title: 'AI Rewrite', file: 'aiRewritePrompt.js', content: aiRewritePrompt },
-  ]), [clusterAnalysisPromptDisplay, compareToolkitPromptDisplay, photoAnalysisPromptDisplay, userAnalysisPromptDisplay]);
+  const promptItems = useMemo<PromptItem[]>(
+    () => [
+      { id: 'seedGen', title: 'Question Generation', file: 'seedGenPrompt.js', content: seedGenPrompt },
+      {
+        id: 'questionSelection',
+        title: 'Question Selection',
+        file: 'questionSelectionPrompt.js',
+        content: questionSelectionPrompt,
+      },
+      { id: 'audioSummary', title: 'Audio Summary', file: 'audioSummaryPrompt.js', content: audioSummaryPrompt },
+      {
+        id: 'photoAnalysis',
+        title: 'Photo Analysis',
+        file: 'photoAnalysisPrompt.js',
+        content: photoAnalysisPromptDisplay,
+      },
+      {
+        id: 'compareToolkit',
+        title: 'Compare Toolkit',
+        file: 'compareToolkitPrompt.js',
+        content: compareToolkitPromptDisplay,
+      },
+      {
+        id: 'clusterAnalysisSystem',
+        title: 'Cluster Analysis (System)',
+        file: 'clusterAnalysisPrompt.js',
+        content: CLUSTER_ANALYSIS_SYSTEM_PROMPT,
+      },
+      {
+        id: 'clusterAnalysis',
+        title: 'Cluster Analysis (User)',
+        file: 'clusterAnalysisPrompt.js',
+        content: clusterAnalysisPromptDisplay,
+      },
+      { id: 'userAnalysis', title: 'User Analysis', file: 'userAnalysisPrompt.js', content: userAnalysisPromptDisplay },
+      { id: 'aiRewrite', title: 'AI Rewrite', file: 'aiRewritePrompt.js', content: aiRewritePrompt },
+    ],
+    [clusterAnalysisPromptDisplay, compareToolkitPromptDisplay, photoAnalysisPromptDisplay, userAnalysisPromptDisplay],
+  );
 
   const sessionNetworkChainId = contributesSessionContracts ? activeSession?.networkChainId : undefined;
   const contracts = useMemo(() => {
     const sessionContracts =
-      contributesSessionContracts && activeSession?.contracts && typeof activeSession.contracts === 'object'
+      activeSession?.contracts && typeof activeSession.contracts === 'object'
         ? (activeSession.contracts as SessionContractsMap)
         : {};
     const firstContract = Object.values(sessionContracts)[0] || null;
@@ -189,14 +211,17 @@ export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }: Cont
         ? {
             ...contract,
             extraAction: (
-              <button onClick={() => (window.location.href = buildPublicRoute(sbtsListPath()))} className={styles.backButton}>
+              <button
+                onClick={() => (window.location.href = buildPublicRoute(sbtsListPath()))}
+                className={styles.backButton}
+              >
                 <FontAwesomeIcon icon={faExpand} /> {`${t('sbts')} list`}
               </button>
             ),
           }
         : contract,
     );
-  }, [activeSession?.contracts, contributesSessionContracts, sessionNetworkChainId]);
+  }, [activeSession?.contracts, sessionNetworkChainId]);
 
   const [bytes32Input, setBytes32Input] = useState('');
   const [base64urlInput, setBase64urlInput] = useState('');

@@ -3,12 +3,10 @@ const STALE_CHUNK_RELOAD_PARAM = 'ceChunkReload';
 export const STALE_CHUNK_RELOAD_STORAGE_KEY = 'ce:staleChunkReloadAttempted:v20260618b';
 
 export const isStaleChunkLoadError = (error) => {
-  const message = [
-    error?.name,
-    error?.message,
-    error?.stack,
-    String(error || ''),
-  ].filter(Boolean).join('\n').toLowerCase();
+  const message = [error?.name, error?.message, error?.stack, String(error || '')]
+    .filter(Boolean)
+    .join('\n')
+    .toLowerCase();
 
   return (
     message.includes('not a valid javascript mime type') ||
@@ -131,7 +129,7 @@ const appendButton = (doc, parent, label, onClick) => {
       'cursor:pointer',
       'font:700 16px/1.2 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
       'padding:14px 18px',
-    ].join(';')
+    ].join(';'),
   );
   button.addEventListener('click', onClick);
   parent.appendChild(button);
@@ -150,11 +148,7 @@ export const renderBootFailure = (error, options = {}) => {
   const reloadParam = options.reloadParam || BOOT_RELOAD_PARAM;
   const reload = options.reload || (() => reloadWithCacheBuster(win, reloadParam));
   const clearCaches = options.clearCaches || (() => clearBootCaches(win));
-  const autoReloadDelayMs = (
-    typeof options.autoRefreshDelayMs === 'number'
-      ? options.autoRefreshDelayMs
-      : 3000
-  );
+  const autoReloadDelayMs = typeof options.autoRefreshDelayMs === 'number' ? options.autoRefreshDelayMs : 3000;
   let refreshStarted = false;
   const refresh = async (button) => {
     if (refreshStarted) return;
@@ -188,7 +182,7 @@ export const renderBootFailure = (error, options = {}) => {
       'color:#f6f8ff',
       'padding:32px',
       'font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
-    ].join(';')
+    ].join(';'),
   );
 
   const panel = doc.createElement('section');
@@ -202,7 +196,7 @@ export const renderBootFailure = (error, options = {}) => {
       'background:rgba(33,36,90,0.92)',
       'box-shadow:0 24px 70px rgba(0,0,0,0.28)',
       'padding:32px',
-    ].join(';')
+    ].join(';'),
   );
 
   appendTextNode(
@@ -210,21 +204,21 @@ export const renderBootFailure = (error, options = {}) => {
     panel,
     'h1',
     'A new version of Context Engine is available',
-    'margin:0 0 14px;font-size:28px;line-height:1.15;font-weight:800'
+    'margin:0 0 14px;font-size:28px;line-height:1.15;font-weight:800',
   );
   appendTextNode(
     doc,
     panel,
     'p',
     'Reloading clears cached app data and loads the latest version.',
-    'margin:0 0 20px;color:#d7dbff;font-size:17px;line-height:1.45'
+    'margin:0 0 20px;color:#d7dbff;font-size:17px;line-height:1.45',
   );
   const countdownNode = appendTextNode(
     doc,
     panel,
     'p',
     '',
-    'margin:0 0 20px;color:#f6f8ff;font-size:15px;font-weight:700;line-height:1.35'
+    'margin:0 0 20px;color:#f6f8ff;font-size:15px;font-weight:700;line-height:1.35',
   );
 
   const actions = doc.createElement('div');
@@ -239,9 +233,10 @@ export const renderBootFailure = (error, options = {}) => {
     const delaySeconds = Math.max(0, Math.ceil(autoReloadDelayMs / 1000));
     let remainingSeconds = delaySeconds;
     const updateCountdown = () => {
-      countdownNode.textContent = remainingSeconds > 0
-        ? `Reloading and clearing cached app data in ${remainingSeconds}s...`
-        : 'Reloading and clearing cached app data...';
+      countdownNode.textContent =
+        remainingSeconds > 0
+          ? `Reloading and clearing cached app data in ${remainingSeconds}s...`
+          : 'Reloading and clearing cached app data...';
     };
     const tick = () => {
       remainingSeconds -= 1;

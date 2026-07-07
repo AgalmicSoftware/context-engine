@@ -29,15 +29,7 @@ export const DEFAULT_AUTO_REQUEST_TESTNET_FUNDS = readPublicBoolEnv(
 // Default first-run value of `state.demoSurfaceMode`. If a user has a
 // stored `ce:demoSurfaceMode` preference in localStorage, that wins;
 // fresh installs / no-storage cases honor this env default.
-export const DEFAULT_DEMO_SURFACE_MODE = readPublicBoolEnv(
-  'REACT_APP_CE_DEMO_SURFACE_MODE_DEFAULT',
-  true
-);
-// Passkey EOA soft-session mode (true = routine message/tx signing can reuse the worker-held session).
-export const PASSKEY_WALLET_SOFT_SESSION_ENABLED = readPublicBoolEnv(
-  'REACT_APP_PASSKEY_WALLET_SOFT_SESSION_ENABLED',
-  true
-);
+export const DEFAULT_DEMO_SURFACE_MODE = readPublicBoolEnv('REACT_APP_CE_DEMO_SURFACE_MODE_DEFAULT', true);
 // RainbowKit's MetaMask wallet falls back to WalletConnect when MetaMask is not injected.
 // Keep that external bridge opt-in so local startup does not open WalletConnect sockets.
 export const CE_ENABLE_WALLETCONNECT_FALLBACK = readPublicBoolEnv('REACT_APP_CE_ENABLE_WALLETCONNECT_FALLBACK', false);
@@ -90,14 +82,10 @@ export const CE_GETLOGS_MAX_CONCURRENCY = readPublicIntEnv('REACT_APP_CE_GETLOGS
 export const CE_GETLOGS_MAX_RETRIES = readPublicIntEnv('REACT_APP_CE_GETLOGS_MAX_RETRIES', 2);
 
 // RPC guardrails (defaults). Most are runtime-toggleable via URL/localStorage/globalThis; see docs/path-rpc.md.
-export const CE_SESSION_SCAN_SCOPE = readPublicEnv(
-  'REACT_APP_CE_SESSION_SCAN_SCOPE',
-  DEFAULT_SESSION_SCAN_SCOPE
-); // all|active|general|list
-export const CE_SESSION_SCAN_SLUGS = readPublicListEnv(
-  'REACT_APP_CE_SESSION_SCAN_SLUGS',
-  [...DEFAULT_SESSION_SCAN_SLUGS]
-); // used when CE_SESSION_SCAN_SCOPE="list" (array of session slugs, use "general" or "" for default; can also use demoSession keys/names when demo-alias toggle is enabled)
+export const CE_SESSION_SCAN_SCOPE = readPublicEnv('REACT_APP_CE_SESSION_SCAN_SCOPE', DEFAULT_SESSION_SCAN_SCOPE); // all|active|general|list
+export const CE_SESSION_SCAN_SLUGS = readPublicListEnv('REACT_APP_CE_SESSION_SCAN_SLUGS', [
+  ...DEFAULT_SESSION_SCAN_SLUGS,
+]); // used when CE_SESSION_SCAN_SCOPE="list" (array of session slugs, use "general" or "" for default; can also use demoSession keys/names when demo-alias toggle is enabled)
 // When true, initial "/" loads auto-open About, and cached session document loads can migrate there.
 export const CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED = readPublicBoolEnv(
   'REACT_APP_CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED',
@@ -162,25 +150,17 @@ export const CE_SBT_SELECTOR_AUTO_SEARCH_OTHER_SESSIONS = readPublicBoolEnv(
   true,
 );
 // Show shipped demo sessions from demo_sessions.json in SBT session universe chips.
-export const SHOW_DEMO_SESSIONS = readPublicBoolEnv(
-  'REACT_APP_SHOW_DEMO_SESSIONS',
-  false
-);
+export const SHOW_DEMO_SESSIONS = readPublicBoolEnv('REACT_APP_SHOW_DEMO_SESSIONS', false);
 // Public/demo session slugs that should use demo presentation affordances.
-export const CE_DEMO_SESSION_SLUGS = readPublicListEnv(
-  'REACT_APP_CE_DEMO_SESSION_SLUGS',
-  [...DEFAULT_DEMO_SESSION_SLUGS]
-);
+export const CE_DEMO_SESSION_SLUGS = readPublicListEnv('REACT_APP_CE_DEMO_SESSION_SLUGS', [
+  ...DEFAULT_DEMO_SESSION_SLUGS,
+]);
 // PolisReport auto-enables fixture-backed demo data for these canonical session slugs.
-export const POLIS_DEMO_DATA_AUTOLOAD_SLUGS = readPublicListEnv(
-  'REACT_APP_POLIS_DEMO_DATA_AUTOLOAD_SLUGS',
-  [...CE_DEMO_SESSION_SLUGS]
-);
+export const POLIS_DEMO_DATA_AUTOLOAD_SLUGS = readPublicListEnv('REACT_APP_POLIS_DEMO_DATA_AUTOLOAD_SLUGS', [
+  ...CE_DEMO_SESSION_SLUGS,
+]);
 // One-shot testing flag: clamps cross-session fanout defaults to general/list.
-export const CE_RPC_TESTING_MODE = readPublicBoolEnv(
-  'REACT_APP_CE_RPC_TESTING_MODE',
-  false
-);
+export const CE_RPC_TESTING_MODE = readPublicBoolEnv('REACT_APP_CE_RPC_TESTING_MODE', false);
 // On-chain session registry (kept off by default during the migration).
 export const USE_ONCHAIN_SESSION_REGISTRY = readPublicBoolEnv('REACT_APP_USE_ONCHAIN_SESSION_REGISTRY', true);
 // When true, CE_SESSION_SCAN_SLUGS list entries can resolve through demoSessions aliases

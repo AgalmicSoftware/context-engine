@@ -250,11 +250,10 @@ describe('SurveySelector question toggle', () => {
     const tree = subject.render();
     const questionToggle = findElement(
       tree,
-      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_QUESTIONS_TOGGLE
+      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_QUESTIONS_TOGGLE,
     );
-    const questionToggleCount = findElement(
-      questionToggle,
-      (element) => nodeHasClassName(element, styles.questionSelectorCount)
+    const questionToggleCount = findElement(questionToggle, (element) =>
+      nodeHasClassName(element, styles.questionSelectorCount),
     );
 
     expect(questionToggle).toBeTruthy();

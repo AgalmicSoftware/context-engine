@@ -102,7 +102,7 @@ const handleRequest = async (message: RequestMessage): Promise<unknown> => {
       return wallet._signTypedData(typedData.domain, typedData.types, typedData.message);
     }
     case 'eth_sendTransaction': {
-      const tx = ((message.params?.[0] || {}) as Record<string, unknown>);
+      const tx = (message.params?.[0] || {}) as Record<string, unknown>;
       assertSoftSessionAllowed({ policy, method: 'eth_sendTransaction', tx, chainId: activeChainId });
       const response = await wallet.sendTransaction({
         to: tx.to as string | undefined,
@@ -119,8 +119,8 @@ const handleRequest = async (message: RequestMessage): Promise<unknown> => {
       return response.hash;
     }
     case 'eth_signTransaction': {
-      const tx = ((message.params?.[0] || {}) as Record<string, unknown>);
-      assertSoftSessionAllowed({ policy, method: 'eth_sendTransaction', tx, chainId: activeChainId });
+      const tx = (message.params?.[0] || {}) as Record<string, unknown>;
+      assertSoftSessionAllowed({ policy, method: 'eth_signTransaction', tx, chainId: activeChainId });
       return wallet.signTransaction(tx as ethers.providers.TransactionRequest);
     }
     default:

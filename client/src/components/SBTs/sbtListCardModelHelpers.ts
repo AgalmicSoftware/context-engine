@@ -1,8 +1,4 @@
-import {
-  normalizeSbtListTokenUri,
-  type SbtCardDetails,
-  type SbtListHelperItem,
-} from './sbtListCardDetailsHelpers';
+import { normalizeSbtListTokenUri, type SbtCardDetails, type SbtListHelperItem } from './sbtListCardDetailsHelpers';
 
 export type SbtListRenderItemKeyOptions<T extends SbtListHelperItem = SbtListHelperItem> = {
   allSessionsMode?: unknown;
@@ -78,26 +74,20 @@ type SbtListPointerNavigationLike = {
   shiftKey?: boolean;
 };
 
-const isSbtListCardModelRecord = (value: unknown): value is Record<string, unknown> => (
-  !!value && typeof value === 'object'
-);
+const isSbtListCardModelRecord = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object';
 
-export const normalizeSbtListAddressLower = (value: unknown): string => (
-  String(value || '').trim().toLowerCase()
-);
+export const normalizeSbtListAddressLower = (value: unknown): string =>
+  String(value || '')
+    .trim()
+    .toLowerCase();
 
 export const buildSbtListRenderItemKey = <T extends SbtListHelperItem>(
   sbt: T,
-  {
-    allSessionsMode,
-    listSlug,
-    resolveSbtSessionSlug,
-  }: SbtListRenderItemKeyOptions<T>
+  { allSessionsMode, listSlug, resolveSbtSessionSlug }: SbtListRenderItemKeyOptions<T>,
 ): string => {
   const addrLower = normalizeSbtListAddressLower(sbt.sbtAddress);
-  const slugForKey = allSessionsMode
-    ? String(resolveSbtSessionSlug(sbt) || '')
-    : String(listSlug || '');
+  const slugForKey = allSessionsMode ? String(resolveSbtSessionSlug(sbt) || '') : String(listSlug || '');
   return `${slugForKey}|${addrLower}`;
 };
 
@@ -194,11 +184,8 @@ export const buildSbtListFeaturedCardModel = <T extends SbtListHelperItem>({
   };
 };
 
-export const isModifiedSbtListPointerNavigation = (
-  event: SbtListPointerNavigationLike | null | undefined
-): boolean => (
-  !!(event && (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button === 1))
-);
+export const isModifiedSbtListPointerNavigation = (event: SbtListPointerNavigationLike | null | undefined): boolean =>
+  !!(event && (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button === 1));
 
 export const lowerSbtListAddressSet = (values: unknown = []): Set<string> => {
   const out = new Set<string>();
@@ -209,10 +196,7 @@ export const lowerSbtListAddressSet = (values: unknown = []): Set<string> => {
   return out;
 };
 
-export const buildSbtListExpandedAddressSetToggle = (
-  previous: unknown,
-  sbtAddress: unknown
-): Set<string> => {
+export const buildSbtListExpandedAddressSetToggle = (previous: unknown, sbtAddress: unknown): Set<string> => {
   const normalized = normalizeSbtListAddressLower(sbtAddress);
   const next = new Set<string>(previous instanceof Set ? Array.from(previous) : []);
   if (!normalized) return next;

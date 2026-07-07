@@ -11,15 +11,8 @@ describe('SessionDocumentsPage', () => {
     expect(screen.getByRole('link', { name: 'Back to session' })).toHaveAttribute('href', '/session/rxc');
   });
 
-  it('preserves worker discovery in the back link for an unregistered worker-canonical session', () => {
-    render(
-      <SessionDocumentsPage
-        sessionToken="worker-docs"
-        sessionSlug="worker-docs"
-        sessionConfig={{ slug: 'worker-docs' }}
-        workerOrigin="https://worker-docs.example.workers.dev"
-      />,
-    );
+  it('keeps the general-session back link canonical as /session', () => {
+    render(<SessionDocumentsPage sessionToken="general" sessionSlug="" sessionConfig={{ slug: '' }} />);
 
     expect(screen.getByRole('link', { name: 'Back to session' })).toHaveAttribute(
       'href',

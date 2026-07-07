@@ -46,7 +46,10 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const asDemoCorpus = (value: unknown): DemoCorpus => (isRecord(value) ? value : {});
 const asDemoCorpusEntry = (value: unknown): DemoCorpusEntry => (isRecord(value) ? value : {});
 
-const normalizeDemoText = (value: unknown = ''): string => String(value || '').replace(/\s+/g, ' ').trim();
+const normalizeDemoText = (value: unknown = ''): string =>
+  String(value || '')
+    .replace(/\s+/g, ' ')
+    .trim();
 
 const truncateDemoText = (value: unknown = '', maxLength = 180): string => {
   const normalized = normalizeDemoText(value);

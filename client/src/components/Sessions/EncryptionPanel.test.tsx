@@ -3,9 +3,39 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import EncryptionPanel, { EncryptionPanelProps } from './EncryptionPanel';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
-jest.mock('../SBTs/SBTSelector', () => function MockSBTSelector() {
-  return <div data-testid="mock-sbt-selector" />;
-});
+jest.mock(
+  '../SBTs/SBTSelector',
+  () =>
+    function MockSBTSelector(props: {
+      id?: string;
+      selectedSBTs?: unknown[];
+      additionalSBTOptions?: unknown[];
+      chainId?: number | string | null;
+      sessionSlug?: string;
+      onAddSBT?: (sbt: { address: string; name: string }) => void;
+      onRemoveSBT?: (address: string) => void;
+    }) {
+      return (
+        <div
+          data-testid="mock-sbt-selector"
+          data-selector-id={props.id || ''}
+          data-selected-count={Array.isArray(props.selectedSBTs) ? String(props.selectedSBTs.length) : '0'}
+          data-option-count={
+            Array.isArray(props.additionalSBTOptions) ? String(props.additionalSBTOptions.length) : '0'
+          }
+          data-chain-id={props.chainId == null ? '' : String(props.chainId)}
+          data-session-slug={props.sessionSlug || ''}
+        >
+          <button type="button" onClick={() => props.onAddSBT?.({ address: '0xabc', name: 'Mock SBT' })}>
+            Mock add selector SBT
+          </button>
+          <button type="button" onClick={() => props.onRemoveSBT?.('0xabc')}>
+            Mock remove selector SBT
+          </button>
+        </div>
+      );
+    },
+);
 
 const t = (key: string) => key;
 

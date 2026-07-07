@@ -61,30 +61,15 @@ export const buildArweaveUploadTags = (
 
 export const resolveArweaveUploadOpts = async (
   groupKeyOrCfg?: string | Record<string, unknown> | null,
-  {
-    providerLike = null,
-    signer = null,
-    refreshSessionConfig = null,
-  }: { providerLike?: unknown; signer?: unknown; refreshSessionConfig?: RefreshSessionConfig | null } = {},
+  { providerLike = null, signer = null }: { providerLike?: unknown; signer?: unknown } = {},
 ): Promise<ArweaveUploadOpts> => {
-  let cfg = (
+  const cfg = (
     groupKeyOrCfg && typeof groupKeyOrCfg === 'object'
       ? groupKeyOrCfg
       : getSessionConfigBySlugOrDefault(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg)
   ) as Record<string, unknown> | null;
-  let cfgAny = cfg as LooseRecord | null;
+  const cfgAny = cfg as LooseRecord | null;
   const slug = normalizeSessionSlug(typeof groupKeyOrCfg === 'string' ? groupKeyOrCfg : cfgAny?.slug || '');
-  if (slug && typeof groupKeyOrCfg === 'string' && typeof refreshSessionConfig === 'function') {
-    try {
-      const refreshed = await refreshSessionConfig({ slug, sessionConfig: cfg, providerLike });
-      if (refreshed && typeof refreshed === 'object') {
-        cfg = refreshed;
-        cfgAny = refreshed as LooseRecord;
-      }
-    } catch (_) {
-      // Uploads retain the cached config when a targeted registry refresh is unavailable.
-    }
-  }
   const tags = buildArweaveUploadTags(cfg, slug);
 
   let arweaveJwk = '';
@@ -92,21 +77,24 @@ export const resolveArweaveUploadOpts = async (
   try {
     const result = await getEffectiveArweaveKey({ sessionSlug: slug, sessionConfig: cfg });
     arweaveJwk = result?.arweaveJwk || '';
-    arweaveJwkSource = String(result?.source || '').trim().toLowerCase();
+    arweaveJwkSource = String(result?.source || '')
+      .trim()
+      .toLowerCase();
   } catch (_) {
     arweaveJwk = '';
     arweaveJwkSource = '';
   }
   const forceDirectArweaveUpload = !!arweaveJwk && arweaveJwkSource === 'local';
 
-  const bootstrapAuth = arweaveJwk && !forceDirectArweaveUpload
-    ? await buildArweaveUploadBootstrapAuth({
-        signer: signer as LooseRecord | null,
-        providerLike,
-        sessionSlug: slug,
-        sessionConfig: cfg,
-      })
-    : null;
+  const bootstrapAuth =
+    arweaveJwk && !forceDirectArweaveUpload
+      ? await buildArweaveUploadBootstrapAuth({
+          signer: signer as LooseRecord | null,
+          providerLike,
+          sessionSlug: slug,
+          sessionConfig: cfg,
+        })
+      : null;
 
   return {
     arweaveJwk,

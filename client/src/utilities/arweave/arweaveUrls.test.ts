@@ -107,18 +107,6 @@ describe('arweaveUrls helpers', () => {
 
     const candidates = buildArweaveGatewayUrlCandidates(`${arIoSubdomainGateway}/${txId}?`);
 
-    expect(candidates).toEqual([`${testArIoGateway}/${txId}`]);
-  });
-
-  it('restores gateway fallback candidates when direct AR.IO routing is disabled', () => {
-    (globalThis as Record<string, unknown>).CE_ARWEAVE_DIRECT_TO_AR_IO = false;
-    (globalThis as Record<string, unknown>).CE_ARWEAVE_GATEWAYS = [
-      'https://backup.example.test',
-      canonicalArweaveGateway,
-    ];
-
-    const candidates = buildArweaveGatewayUrlCandidates(`${arIoSubdomainGateway}/${txId}?`);
-
     expect(candidates).toEqual([
       `${defaultArIoGateway}/${txId}`,
       'https://backup.example.test/8_2VRRP5Ka0b5F9yiq_nm2hJto8qnQazZ2EtfLJ0viE',

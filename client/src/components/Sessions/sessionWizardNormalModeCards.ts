@@ -67,26 +67,35 @@ export function buildNormalModeCards(opts: NormalModeCardsInput): NormalModeCard
     uploadBlockedReason,
     t,
   } = opts;
+  const { canPublishNow, uploadBlockedReason } = publishReadiness;
   const normalizedSessionName = normalizeDisplayString(sessionName);
-  const privacyTone: NormalModeCardTone = configuredPrivateGateCount || privateSlugMode
-    ? 'ready'
-    : 'neutral';
+  const privacyTone: NormalModeCardTone = configuredPrivateGateCount || privateSlugMode ? 'ready' : 'neutral';
   const workerTone: NormalModeCardTone = normalModeRequiresCustomWorker
-    ? (resolvedWorkerBaseUrl ? 'ready' : 'pending')
-    : (workerMode === 'default' || deployVerifiedInUi ? 'ready' : 'neutral');
+    ? resolvedWorkerBaseUrl
+      ? 'ready'
+      : 'pending'
+    : workerMode === 'default' || deployVerifiedInUi
+      ? 'ready'
+      : 'neutral';
   const publishTone: NormalModeCardTone = canPublishNow ? 'ready' : 'pending';
-  const workerCards: NormalModeCardWithoutStepNumber[] = showNormalModeWorkerStep ? [{
-    key: 'worker',
-    title: 'Worker',
-    summary: normalModeRequiresCustomWorker
-      ? (resolvedWorkerBaseUrl
-        ? 'Your worker URL is configured.'
-        : 'Deploy or paste your own worker URL.')
-      : workerMode === 'default'
-        ? 'Using the shared default worker.'
-        : (deployVerifiedInUi ? 'Custom worker deployed in this run.' : 'Custom worker setup is available here.'),
-    tone: workerTone,
-  }] : [];
+  const workerCards: NormalModeCardWithoutStepNumber[] = showNormalModeWorkerStep
+    ? [
+        {
+          key: 'worker',
+          title: 'Worker',
+          summary: normalModeRequiresCustomWorker
+            ? resolvedWorkerBaseUrl
+              ? 'Your worker URL is configured.'
+              : 'Deploy or paste your own worker URL.'
+            : workerMode === 'default'
+              ? 'Using the shared default worker.'
+              : deployVerifiedInUi
+                ? 'Custom worker deployed in this run.'
+                : 'Custom worker setup is available here.',
+          tone: workerTone,
+        },
+      ]
+    : [];
 
   const cards: NormalModeCardWithoutStepNumber[] = [
     {
@@ -100,7 +109,9 @@ export function buildNormalModeCards(opts: NormalModeCardsInput): NormalModeCard
       title: 'Privacy',
       summary: configuredPrivateGateCount
         ? `${configuredPrivateGateCount} ${configuredPrivateGateCount === 1 ? `${t('sbt')} ${t('gate')}` : `${t('sbt')} ${t('gates')}`} selected`
-        : (privateSlugMode ? 'Private URL enabled' : 'Open link by default'),
+        : privateSlugMode
+          ? 'Private URL enabled'
+          : 'Open link by default',
       tone: privacyTone,
     },
     ...workerCards,
@@ -108,9 +119,9 @@ export function buildNormalModeCards(opts: NormalModeCardsInput): NormalModeCard
       key: 'publish',
       title: 'Deploy Session',
       summary: canPublishNow
-        ? (canUseSponsoredAutoDeployNow
+        ? canUseSponsoredAutoDeployNow
           ? 'Publish will deploy the sponsored worker before uploading metadata.'
-          : 'Review the setup and deploy when ready.')
+          : 'Review the setup and deploy when ready.'
         : uploadBlockedReason,
       tone: publishTone,
     },
@@ -122,9 +133,7 @@ export function buildNormalModeCards(opts: NormalModeCardsInput): NormalModeCard
   }));
 }
 
-export function buildNormalModePublishSummary(
-  opts: NormalModePublishSummaryInput
-): NormalModePublishSummaryItem[] {
+export function buildNormalModePublishSummary(opts: NormalModePublishSummaryInput): NormalModePublishSummaryItem[] {
   const {
     sessionName,
     configuredPrivateGateCount,
@@ -149,7 +158,9 @@ export function buildNormalModePublishSummary(
       label: 'Privacy',
       value: configuredPrivateGateCount
         ? `${configuredPrivateGateCount} ${configuredPrivateGateCount === 1 ? t('gate') : t('gates')} configured`
-        : (privateSlugMode ? 'Private URL mode' : 'Open access'),
+        : privateSlugMode
+          ? 'Private URL mode'
+          : 'Open access',
     },
     {
       label: 'Worker',
@@ -158,16 +169,18 @@ export function buildNormalModePublishSummary(
         : shouldUseSponsoredAutoDeployFlow
           ? 'Sponsored auto-deploy waiting for the hosted bundle URL'
           : normalModeRequiresCustomWorker
-            ? (resolvedWorkerBaseUrl ? 'Custom worker ready' : 'Bring your own worker')
+            ? resolvedWorkerBaseUrl
+              ? 'Custom worker ready'
+              : 'Bring your own worker'
             : workerMode === 'default'
               ? 'Shared hosted worker'
-              : (deployVerifiedInUi ? 'Custom worker deployed' : 'Custom worker setup'),
+              : deployVerifiedInUi
+                ? 'Custom worker deployed'
+                : 'Custom worker setup',
     },
     {
       label: `Pending ${t('sbts')}`,
-      value: pendingDraftCount
-        ? `${pendingDraftCount} draft${pendingDraftCount === 1 ? '' : 's'} ready`
-        : 'None',
+      value: pendingDraftCount ? `${pendingDraftCount} draft${pendingDraftCount === 1 ? '' : 's'} ready` : 'None',
     },
   ];
 }

@@ -4,6 +4,8 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSpinner, faSyncAlt } from '@fortawesome/free-solid-svg-icons';
 
 import styles from './SurveyResults.module.scss';
+import SurveyResultsSyncDetailsDisplay from './SurveyResultsSyncDetailsDisplay';
+import type { SurveyResultsSyncStatusDisplayPlan } from './surveyResultsSyncStatusController';
 
 type SurveyResultsSyncStatusPanelArgs = {
   isSynced: boolean;
@@ -47,102 +49,50 @@ export const renderSurveyResultsSyncStatusPanel = ({
   responseBarText,
   miniBarSpinnerStyle,
   miniProgressStyle,
-}: SurveyResultsSyncStatusPanelArgs) => (
-  <div className={styles.syncStatusContainer}>
-    <button
-      type="button"
-      className={styles.syncStatus__simple}
-      onClick={onToggleSyncDetails}
-      aria-expanded={!!syncDetailsOpen}
-      aria-label="Toggle sync details"
-    >
-      {isSynced ? (
-        <span className={styles.syncStatus__indicator_synced}></span>
-      ) : (
-        <FontAwesomeIcon icon={faSpinner} spin={isSyncingOrLoading} />
-      )}
-      <span>
-        {syncStatusText}
-        {showLongSyncNotice}
-      </span>
-    </button>
-    {!isSynced && (
+  remainingSpinnerStyle,
+}: SurveyResultsSyncStatusPanelArgs) => {
+  const { isSynced, isSyncingOrLoading, syncStatusText, showLongSyncNotice, showQuickRefresh } = syncStatusDisplay;
+
+  return (
+    <div className={styles.syncStatusContainer}>
       <button
         type="button"
-        className={styles.syncStatus__quickRefresh}
-        onClick={onManualRefresh}
-        title="Refresh Now"
-        aria-label="Refresh sync data"
+        className={styles.syncStatus__simple}
+        onClick={onToggleSyncDetails}
+        aria-expanded={!!syncDetailsOpen}
+        aria-label="Toggle sync details"
       >
-        <FontAwesomeIcon icon={faSyncAlt} />
-      </button>
-    )}
-    <div
-      className={styles.syncStatus__details}
-      style={syncDetailsStyle}
-    >
-      <div className={styles.miniBarContainer}>
-        {viewMode === 'questions' && (
-          <div className={styles.miniBarLine}>
-            <div className={styles.miniBarLabel}>Questions:</div>
-            {showQuestionSpinner ? (
-              <>
-                <FontAwesomeIcon icon={faSpinner} spin style={miniBarSpinnerStyle} />
-                <div className={styles.miniBarFraction}>Loading...</div>
-              </>
-            ) : (
-              <>
-                <Progress
-                  value={questionProgress}
-                  color={questionColor}
-                  style={miniProgressStyle}
-                  className={styles.miniProgress}
-                />
-                <div className={styles.miniBarFraction}>{questionBarText}</div>
-              </>
-            )}
-          </div>
+        {isSynced ? (
+          <span className={styles.syncStatus__indicator_synced}></span>
+        ) : (
+          <FontAwesomeIcon icon={faSpinner} spin={isSyncingOrLoading} />
         )}
-
-        <div className={styles.miniBarLine}>
-          <div className={styles.miniBarLabel}>Responses:</div>
-          {showResponseSpinner ? (
-            <>
-              <FontAwesomeIcon icon={faSpinner} spin style={miniBarSpinnerStyle} />
-              <div className={styles.miniBarFraction}>Loading...</div>
-            </>
-          ) : (
-            <>
-              <Progress
-                value={responseProgress}
-                color={responseColor}
-                style={miniProgressStyle}
-                className={styles.miniProgress}
-              />
-              <div className={styles.miniBarFraction}>{responseBarText}</div>
-            </>
-          )}
-        </div>
-      </div>
-      <div
-        className={styles.syncStatus__refreshAction}
-        onClick={onManualRefresh}
-        title="Refresh Data from Cache/Chain"
-      >
-        <FontAwesomeIcon icon={faSyncAlt} />
-        <span>Refresh Now</span>
-      </div>
+        <span>
+          {syncStatusText}
+          {showLongSyncNotice}
+        </span>
+      </button>
+      {showQuickRefresh && (
+        <button
+          type="button"
+          className={styles.syncStatus__quickRefresh}
+          onClick={onManualRefresh}
+          title="Refresh Now"
+          aria-label="Refresh sync data"
+        >
+          <FontAwesomeIcon icon={faSyncAlt} />
+        </button>
+      )}
+      <SurveyResultsSyncDetailsDisplay
+        miniBarSpinnerStyle={miniBarSpinnerStyle}
+        miniProgressStyle={miniProgressStyle}
+        onManualRefresh={onManualRefresh}
+        remainingSpinnerStyle={remainingSpinnerStyle}
+        syncDetailsStyle={syncDetailsStyle}
+        syncStatusDisplay={syncStatusDisplay}
+      />
     </div>
-  </div>
-);
-
-type SurveyResultsFilterSummaryArgs = {
-  displayedTotalQuestionsCount: number;
-  displayedTotalResponsesCount: number;
-  normalizedFilteredQuestionsCount: number;
-  normalizedFilteredResponsesCount: number;
-  filterLoading: boolean;
-  areSummaryCountsHydrated: boolean;
+  );
 };
 
 export const renderSurveyResultsFilterSummary = ({

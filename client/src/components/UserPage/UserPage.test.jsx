@@ -265,86 +265,6 @@ describe('UserPage username editing', () => {
   });
 });
 
-describe('UserPage clipboard helpers', () => {
-  it('does not mark the address copied when clipboard write rejects', async () => {
-    const instance = makeInstance();
-    const originalClipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
-    const writeText = jest.fn().mockRejectedValue(new Error('clipboard denied'));
-    const errorSpy = jest.spyOn(notify, 'error').mockImplementation(() => undefined);
-    const successSpy = jest.spyOn(notify, 'success').mockImplementation(() => undefined);
-    Object.defineProperty(navigator, 'clipboard', {
-      configurable: true,
-      value: { writeText },
-    });
-
-    try {
-      await instance.copyToClipboard();
-
-      expect(writeText).toHaveBeenCalledWith('0x00000000000000000000000000000000000000aa');
-      expect(errorSpy).toHaveBeenCalledWith('Could not copy address');
-      expect(successSpy).not.toHaveBeenCalled();
-      expect(instance.state.copied).not.toBe(true);
-    } finally {
-      if (originalClipboardDescriptor) {
-        Object.defineProperty(navigator, 'clipboard', originalClipboardDescriptor);
-      } else {
-        delete navigator.clipboard;
-      }
-    }
-  });
-});
-
-describe('UserPage username editing', () => {
-  it('keeps username editing open when local persistence fails', () => {
-    const viewAddress = '0x00000000000000000000000000000000000000aa';
-    const storageError = new Error('quota exceeded');
-    const setItemSpy = jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
-      throw storageError;
-    });
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-    const instance = makeInstance({
-      account: viewAddress,
-      viewAddress,
-      network: { id: 84532 },
-    });
-    instance.state = {
-      ...instance.state,
-      username: 'Unsaved User',
-      usernameError: '',
-      isEditingUsername: true,
-    };
-
-    try {
-      instance.setUsername();
-
-      expect(setItemSpy).toHaveBeenCalledWith(
-        'userPageUsername_84532_0x00000000000000000000000000000000000000aa',
-        'Unsaved User'
-      );
-      expect(instance.state.username).toBe('Unsaved User');
-      expect(instance.state.isEditingUsername).toBe(true);
-      expect(instance.state.usernameError).toBe('Failed to save username locally.');
-      expect(instance.setState.mock.calls.some(([patch]) => patch?.isEditingUsername === false)).toBe(false);
-      const [header] = collectTreeNodes(
-        instance.render(),
-        (node) => getNodeTypeName(node) === 'UserPageHeader'
-      );
-      expect(header.props.usernameErrorDisplayState).toEqual({
-        shouldRenderUsernameError: true,
-        usernameErrorText: 'Failed to save username locally.',
-      });
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[account]',
-        'Error saving username to localStorage:',
-        storageError
-      );
-    } finally {
-      setItemSpy.mockRestore();
-      consoleErrorSpy.mockRestore();
-    }
-  });
-});
-
 describe('UserPage analyze action boundary', () => {
   it('routes header analyze clicks through the parent-owned analyze handler with preserved args', () => {
     const instance = makeInstance();
@@ -753,25 +673,100 @@ describe('UserPage cold-load network fallback', () => {
     const instance = makeInstance({ viewAddress });
 
     const dataByNamespace = {
-      surveysCache: [],
-      questionsCache: [],
-      sbtCache: [{
-        slug: 'edge',
-        data: {
-          [networkID]: {
-            sbtList: {
-              '0x100': {
-                sbtAddress: '0x100',
-                sbtInfo: { name: 'Badge 100', unlisted: false },
-                mintedAddresses: [viewAddress],
-                burnedAddresses: [viewAddress],
-                mintedCountByAddress: { [viewLower]: 2 },
-                burnedCountByAddress: { [viewLower]: 1 },
+      surveysCache: [
+        {
+          slug: 'edge',
+          data: {
+            1: {
+              surveys: {
+                sActive: {
+                  id: 'sActive',
+                  title: 'Active Chain Survey',
+                  creator: '0x00000000000000000000000000000000000000bb',
+                  questionIDs: ['qActive'],
+                },
+              },
+              surveyResponses: {},
+            },
+            84532: {
+              surveys: {
+                sOther: {
+                  id: 'sOther',
+                  title: 'Other Chain Survey',
+                  creator: viewAddress,
+                  questionIDs: ['qOther'],
+                },
+              },
+              surveyResponses: {
+                sOther: {
+                  [viewLower]: JSON.stringify({
+                    responses: [{ questionID: 'qOther', answer: { value: 'yes' } }],
+                  }),
+                },
               },
             },
           },
         },
-      }],
+      ],
+      questionsCache: [
+        {
+          slug: 'edge',
+          data: {
+            1: {
+              questions: {
+                qActive: {
+                  id: 'qActive',
+                  prompt: 'Active Prompt',
+                  type: 'freeform',
+                },
+              },
+              questionResponses: {},
+            },
+            84532: {
+              questions: {
+                qOther: {
+                  id: 'qOther',
+                  prompt: 'Other Prompt',
+                  type: 'freeform',
+                  creator: viewAddress,
+                },
+              },
+              questionResponses: {
+                qOther: {
+                  [viewLower]: JSON.stringify({ answer: { value: 'cross-chain value' } }),
+                },
+              },
+            },
+          },
+        },
+      ],
+      sbtCache: [
+        {
+          slug: 'edge',
+          data: {
+            1: {
+              sbtList: {
+                '0x111': {
+                  sbtAddress: '0x111',
+                  sbtInfo: { name: 'Active Badge', unlisted: false },
+                  mintedAddresses: [],
+                  burnedAddresses: [],
+                },
+              },
+            },
+            84532: {
+              sbtList: {
+                '0x222': {
+                  sbtAddress: '0x222',
+                  sbtInfo: { name: 'Cross Badge', unlisted: false },
+                  mintedAddresses: [viewLower],
+                  burnedAddresses: [],
+                },
+              },
+            },
+          },
+        },
+      ],
       userCache: [],
     };
 

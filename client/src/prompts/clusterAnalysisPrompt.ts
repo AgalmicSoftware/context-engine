@@ -22,12 +22,6 @@ type UnknownRecord = Record<string, unknown>;
 
 const isRecord = (value: unknown): value is UnknownRecord => typeof value === 'object' && value !== null;
 
-type UnknownRecord = Record<string, unknown>;
-
-const isRecord = (value: unknown): value is UnknownRecord => (
-  typeof value === 'object' && value !== null
-);
-
 /**
  * Build a user prompt for the model.
  * @param {object} clusterData - { clusterIndex, clusterSize, totalClusters, topStatements: [ {label, questionIndex, prompt, cluster:{agree,disagree,unsure,responded,agreeRate,disagreeRate,unsureRate}, overall:{...}, differenceScore} ] }

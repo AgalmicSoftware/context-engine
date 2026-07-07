@@ -50,9 +50,7 @@ describe('SessionWizardIntroStatusRail', () => {
     );
 
     expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Cloudflare API token' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'AI provider key' })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'OP Sepolia ETH' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'OP Sepolia ETH' })).toHaveAttribute('href', 'https://faucet.example.test');
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent('Sponsored bundle loaded.');
     expect(screen.getByRole('button', { name: 'Step 1: Session Details' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Step 2: Worker' })).toBeInTheDocument();

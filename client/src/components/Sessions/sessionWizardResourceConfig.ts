@@ -14,9 +14,8 @@ export type SessionWizardSecretField = {
 
 type SessionWizardResourceRecord = Record<string, unknown>;
 
-const isResourceRecord = (value: unknown): value is SessionWizardResourceRecord => (
-  value !== null && typeof value === 'object'
-);
+const isResourceRecord = (value: unknown): value is SessionWizardResourceRecord =>
+  value !== null && typeof value === 'object';
 
 const readAiModelProvider = (ai: unknown, modelKey: string): string => {
   const aiRecord = isResourceRecord(ai) ? ai : {};
@@ -47,7 +46,7 @@ export const RESOURCE_SECTION_TOOLTIPS = Object.freeze({
 });
 
 const RESOURCE_SECRET_FIELDS: Record<string, SessionWizardSecretField[]> = Object.freeze({
-  ai: [],
+  ai: [{ key: 'openaiKey', label: 'OpenAI key', type: 'password', required: true }],
   rpc: [
     { key: 'customRpcUrl', label: 'Custom RPC URL', type: 'text', placeholder: 'https://...' },
     // Intentionally hidden until PATH gateway auth is supported.
@@ -56,12 +55,12 @@ const RESOURCE_SECRET_FIELDS: Record<string, SessionWizardSecretField[]> = Objec
   arweave: [{ key: 'arweaveJwk', label: 'Arweave JWK', type: 'textarea', rows: 3, required: true }],
   txGas: [{ key: 'faucetPrivateKey', label: 'Faucet private key', type: 'password' }],
   default: [],
-  lit: [
-    { key: 'litAccountApiKey', label: 'Lit API key', type: 'password' },
-  ],
+  lit: [{ key: 'litAccountApiKey', label: 'Lit API key', type: 'password' }],
 });
 
-export const resolveSessionWizardAiModelProviders = (ai: unknown): {
+export const resolveSessionWizardAiModelProviders = (
+  ai: unknown,
+): {
   fastProvider: string;
   thinkingProvider: string;
   transcriptionProvider: string;

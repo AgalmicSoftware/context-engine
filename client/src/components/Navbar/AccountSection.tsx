@@ -52,7 +52,7 @@ class AccountSection extends Component<AccountSectionProps> {
     const blockieUrl = this.props.account ? generateBlockieDataUrl(this.props.account, 8, 4) : '';
 
     // Standardized display: use AccountDisplayTorus for all logged-in states (passkey wallet, Wagmi)
-    const relevantAccountDisplay =
+    const relevantAccountDisplay = (
       <AccountDisplayTorus
         account={this.props.account || ''}
         loginComplete={this.props.loginComplete}
@@ -81,7 +81,6 @@ class AccountSection extends Component<AccountSectionProps> {
           sendTestETH={(amountToSend: unknown) => this.props.sendTestETH?.(amountToSend)}
           demoMode={this.props.demoMode}
           toggleDemoMode={(demoModeOn: boolean) => this.props.toggleDemoMode?.(demoModeOn)}
-          sessionConfig={this.props.sessionConfig}
         />
         {topRight}
       </>

@@ -86,10 +86,12 @@ describe('sbtPageStatePatchHelpers', () => {
       showPasswordAlert: false,
       error: null,
     });
-    expect(buildSbtPageNetworkUpdatePatch({
-      network: { id: 10 },
-      resetMintUiState: { mintStep: 0 },
-    })).toEqual({ mintStep: 0, network: { id: 10 } });
+    expect(
+      buildSbtPageNetworkUpdatePatch({
+        network: { id: 10 },
+        resetMintUiState: { mintStep: 0 },
+      }),
+    ).toEqual({ mintStep: 0, network: { id: 10 } });
     expect(buildSbtPageErrorPatch({ error: 'boom' })).toEqual({ error: 'boom' });
     expect(buildSbtPageCachedPasswordsPatch({ cachedPasswords: ['a'] })).toEqual({ cachedPasswords: ['a'] });
     expect(buildSbtPageBookmarkedPatch({ bookmarked: 'yes' })).toEqual({ bookmarked: false });

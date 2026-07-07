@@ -43,7 +43,7 @@ describe('CreateSbtShareableBlock', () => {
         title="URL Where Anyone Can Join"
         tooltipText="Anyone with this link can join."
         url={url}
-      />
+      />,
     );
 
     expect(screen.getByTestId('ce-sbt-create-open-mint-url')).toHaveTextContent('URL Where Anyone Can Join');
@@ -57,9 +57,6 @@ describe('CreateSbtShareableBlock', () => {
     expect(onCopyQrImage).toHaveBeenCalledWith('qr-code-auto-join_high_res', 'img_qr-code-auto-join');
 
     fireEvent.click(screen.getByTitle('Download QR Code'));
-    expect(onDownloadQr).toHaveBeenCalledWith(
-      'qr-code-auto-join_high_res',
-      'ContextEngine_Sbt_0xabc_autojoin.png'
-    );
+    expect(onDownloadQr).toHaveBeenCalledWith('qr-code-auto-join_high_res', 'ContextEngine_Sbt_0xabc_autojoin.png');
   });
 });

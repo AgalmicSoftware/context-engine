@@ -30,15 +30,15 @@ describe('getTemporaryDemoSessionQuestionFixtures', () => {
       },
     });
     expect(questions[0].id).toBe(
-      ethers.utils.id('demo-1:0x6a1ce29ec6002bf93c666cba8c5139766544d55bbeb6317fbf4c970861a2f262')
+      ethers.utils.id('demo-1:0x6a1ce29ec6002bf93c666cba8c5139766544d55bbeb6317fbf4c970861a2f262'),
     );
   });
 
   it('converts poll comments to single-select multichoice questions', () => {
     const questions = getTemporaryDemoSessionQuestionFixtures('demo-1');
-    const pollQuestion = questions.find((question) => (
-      (question.demoFixture as { fixtureType?: unknown } | undefined)?.fixtureType === 'poll'
-    ));
+    const pollQuestion = questions.find(
+      (question) => (question.demoFixture as { fixtureType?: unknown } | undefined)?.fixtureType === 'poll',
+    );
 
     expect(pollQuestion).toMatchObject({
       type: 'multichoice',
@@ -55,9 +55,11 @@ describe('getTemporaryDemoSessionQuestionFixtures', () => {
 
   it('does not seed other slugs or explicitly disabled demo sessions', () => {
     expect(getTemporaryDemoSessionQuestionFixtures('demo')).toEqual([]);
-    expect(getTemporaryDemoSessionQuestionFixtures('demo-1', {
-      demoCompatibilitySeed: { temporary: false },
-    })).toEqual([]);
+    expect(
+      getTemporaryDemoSessionQuestionFixtures('demo-1', {
+        demoCompatibilitySeed: { temporary: false },
+      }),
+    ).toEqual([]);
   });
 
   it('keeps demo-1 fixture data out of worker and faucet authority', () => {

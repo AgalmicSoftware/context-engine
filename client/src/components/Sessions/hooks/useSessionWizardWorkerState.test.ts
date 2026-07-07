@@ -23,6 +23,7 @@ const renderWorkerState = (overrides = {}) =>
       cachedWizard: null,
       deployHelperUrlDefault: 'https://deploy-helper.example',
       workerBundleUrlDefault: 'https://bundle.example/session-worker.js',
+      devPersistWorkerSecrets: true,
       defaultAllowedOrigins: 'http://localhost:3010\nhttp://127.0.0.1:3010',
       buildProvisionedSponsoredContextState,
       ...overrides,

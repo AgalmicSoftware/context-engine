@@ -1,4 +1,4 @@
-import { normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
+import { normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
 import { CE_SBT_SYNC_BAR_RESEARCH_BLOCK_STEP, SHOW_DEMO_SESSIONS } from '../../variables/appConfig.js';
 
 type SbtListRuntimeRecord = Record<string, unknown>;
@@ -94,21 +94,6 @@ export const resolveSbtListCreateGroupInitialVisibility = ({
         clearInvalid: true,
       })
     : false;
-
-export const resolveSbtListInitialActiveSessionSlug = ({
-  globalPrimarySessionSlug,
-  routeSlug,
-  storage,
-}: ResolveSbtListInitialActiveSessionSlugArgs = {}): string => {
-  try {
-    const resolvedStorage = typeof storage === 'undefined' ? getDefaultSbtListStorage() : storage;
-    const stored = resolvedStorage?.getItem?.('dg:lastActiveSbtSession');
-    if (stored != null) return normalizeSessionSlug(stored);
-  } catch (_) {
-    // Fall through to the shared or route selection.
-  }
-  return normalizeSessionSlug(globalPrimarySessionSlug || routeSlug || '');
-};
 
 export const readSbtListUniverseCollapsedState = (storage?: SbtListStorageReader | null): boolean => {
   try {

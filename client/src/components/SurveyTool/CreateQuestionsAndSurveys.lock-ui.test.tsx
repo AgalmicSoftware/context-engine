@@ -176,9 +176,7 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
 
     const callbacks: Array<() => void> = [];
     for (const item of queued.splice(0)) {
-      const patch = typeof item.update === 'function'
-        ? item.update(instance.state, instance.props)
-        : item.update;
+      const patch = typeof item.update === 'function' ? item.update(instance.state, instance.props) : item.update;
       if (patch && typeof patch === 'object') {
         instance.state = { ...instance.state, ...patch };
       }
@@ -186,9 +184,7 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
     }
 
     instance.setState = jest.fn((update: any, cb?: () => void) => {
-      const patch = typeof update === 'function'
-        ? update(instance.state, instance.props)
-        : update;
+      const patch = typeof update === 'function' ? update(instance.state, instance.props) : update;
       if (patch && typeof patch === 'object') {
         instance.state = { ...instance.state, ...patch };
       }
@@ -196,8 +192,11 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
     });
     callbacks.forEach((cb) => cb());
 
-    expect(instance.state.questions.map((question: { type?: string }) => question.type))
-      .toEqual(['binary', 'rating', 'freeform']);
+    expect(instance.state.questions.map((question: { type?: string }) => question.type)).toEqual([
+      'binary',
+      'rating',
+      'freeform',
+    ]);
   });
 
   it('does not schedule a save when the placeholder question type is added', () => {
@@ -310,26 +309,27 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
       gateMap: {
         gate_1: { id: 'gate_1' },
       },
-      gateOptions: [
-        { id: 'gate_1', label: 'Edge Alpha', badgeLabel: 'Edge Alpha', color: '#5affc2' },
-      ],
+      gateOptions: [{ id: 'gate_1', label: 'Edge Alpha', badgeLabel: 'Edge Alpha', color: '#5affc2' }],
       defaultGateId: 'gate_1',
     }));
     instance.state = {
       ...instance.state,
       showAutoTool: false,
       isStandaloneQuestion: true,
-      questions: [{
-        uiKey: 'q1',
-        id: 'q1',
-        type: 'freeform',
-        prompt: 'Question 1',
-        lockGateIds: [],
-        tags: [],
-        currentTagInputValue: '',
-        aiGeneratedTagsFromSource: [],
-        isGeneratingTags: false,
-      }],
+      questions: [
+        {
+          uiKey: 'q1',
+          id: 'q1',
+          type: 'freeform',
+          prompt: 'Question 1',
+          lockGateIds: [],
+          lockGateIdsTouched: true,
+          tags: [],
+          currentTagInputValue: '',
+          aiGeneratedTagsFromSource: [],
+          isGeneratingTags: false,
+        },
+      ],
     };
 
     const { container } = render(instance.render());
@@ -348,9 +348,7 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
       gateMap: {
         gate_1: { id: 'gate_1' },
       },
-      gateOptions: [
-        { id: 'gate_1', label: 'Edge Alpha', badgeLabel: 'Edge Alpha', color: '#5affc2' },
-      ],
+      gateOptions: [{ id: 'gate_1', label: 'Edge Alpha', badgeLabel: 'Edge Alpha', color: '#5affc2' }],
       defaultGateId: 'gate_1',
     }));
     instance.state = {
@@ -359,16 +357,18 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
       isStandaloneQuestion: false,
       title: 'Survey title',
       surveyLockGateIds: [],
-      questions: [{
-        uiKey: 'q1',
-        id: 'q1',
-        type: 'freeform',
-        prompt: 'Question 1',
-        tags: [],
-        currentTagInputValue: '',
-        aiGeneratedTagsFromSource: [],
-        isGeneratingTags: false,
-      }],
+      questions: [
+        {
+          uiKey: 'q1',
+          id: 'q1',
+          type: 'freeform',
+          prompt: 'Question 1',
+          tags: [],
+          currentTagInputValue: '',
+          aiGeneratedTagsFromSource: [],
+          isGeneratingTags: false,
+        },
+      ],
     };
 
     const { container } = render(instance.render());

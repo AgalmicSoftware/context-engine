@@ -24,39 +24,51 @@ const envelope: AgentClientLoginEnvelope = {
 describe('telegramSessionBackend', () => {
   it('gates submit on both envelope capability and session-meta readiness', () => {
     expect(envelopeAllowsSubmit(envelope, { clientSubmitReady: true })).toBe(true);
-    expect(envelopeAllowsSubmit({ ...envelope, capabilities: { submitAnswers: false } }, { clientSubmitReady: true })).toBe(false);
+    expect(
+      envelopeAllowsSubmit({ ...envelope, capabilities: { submitAnswers: false } }, { clientSubmitReady: true }),
+    ).toBe(false);
     expect(envelopeAllowsSubmit(envelope, { clientSubmitReady: false })).toBe(false);
   });
 
   it('normalizes answers by question type', () => {
-    expect(buildTelegramPreferenceAnswer({
-      questionId: 'q1',
-      id: 'q1',
-      questionType: 'binary',
-      type: 'binary',
-      prompt: 'Prompt?',
-      questionText: 'Prompt?',
-      options: [],
-      tags: [],
-      answeredByUser: false,
-      answerable: true,
-    }, { value: 'Yes' })).toEqual({ questionType: 'binary', value: 'agree', comments: '' });
+    expect(
+      buildTelegramPreferenceAnswer(
+        {
+          questionId: 'q1',
+          id: 'q1',
+          questionType: 'binary',
+          type: 'binary',
+          prompt: 'Prompt?',
+          questionText: 'Prompt?',
+          options: [],
+          tags: [],
+          answeredByUser: false,
+          answerable: true,
+        },
+        { value: 'Yes' },
+      ),
+    ).toEqual({ questionType: 'binary', value: 'agree', comments: '' });
   });
 
   it('maps buckets to SBT-card compatible category cards and preserves null restore gap', () => {
-    expect(loadGroups(envelope)).toEqual([{
-      categoryId: 'role',
-      categoryLabel: 'Role',
-      options: [{ optionId: 'builder', label: 'Builder', selected: true }],
-    }]);
+    expect(loadGroups(envelope)).toEqual([
+      {
+        categoryId: 'role',
+        categoryLabel: 'Role',
+        options: [{ optionId: 'builder', label: 'Builder', selected: true }],
+      },
+    ]);
     expect(loadGroups({ ...envelope, buckets: null })).toBeNull();
   });
 
   it('submits answers with the exchanged envelope credential', async () => {
-    const fetchImpl = jest.fn(async () => new Response(JSON.stringify({ ok: true, submittedCount: 1 }), {
-      status: 200,
-      headers: { 'content-type': 'application/json' },
-    })) as jest.Mock;
+    const fetchImpl = jest.fn(
+      async () =>
+        new Response(JSON.stringify({ ok: true, submittedCount: 1 }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+    ) as jest.Mock;
 
     const result = await submitAnswer({
       envelope,
@@ -91,17 +103,28 @@ describe('telegramSessionBackend', () => {
       const parsed = new URL(url);
       const view = parsed.searchParams.get('view');
       if (view === 'consensus') {
-        return new Response(JSON.stringify({
-          ok: true,
-          questions: [{
-            questionId: 'q1',
-            prompt: 'Should we keep the default?',
-            participants: 3,
-            counts: [{ label: 'Agree', count: 2 }, { label: 'Disagree', count: 1 }],
-          }],
-        }), { status: 200, headers: { 'content-type': 'application/json' } });
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            questions: [
+              {
+                questionId: 'q1',
+                prompt: 'Should we keep the default?',
+                participants: 3,
+                counts: [
+                  { label: 'Agree', count: 2 },
+                  { label: 'Disagree', count: 1 },
+                ],
+              },
+            ],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
       }
-      return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'content-type': 'application/json' } });
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
     }) as jest.Mock;
 
     const first = await loadResultsDataset({ envelope, fetchImpl });

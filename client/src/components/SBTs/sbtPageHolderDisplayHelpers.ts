@@ -194,19 +194,14 @@ export const resolveSbtPageHolderFilterItems = ({
   isScanActive = false,
   netHolders = [],
 }: ResolveSbtPageHolderFilterItemsArgs = {}): SbtPageHolderFilterItems => {
-  const keepStaleFilterRowsWhileRefreshing =
-    !!hasFilteredHolders &&
-    !hasComputedHolders &&
-    !!isScanActive;
+  const keepStaleFilterRowsWhileRefreshing = !!hasFilteredHolders && !hasComputedHolders && !!isScanActive;
   const rawHolderItemsForFilter = hasComputedHolders
     ? netHolders
-    : (keepStaleFilterRowsWhileRefreshing ? filteredMintedUsersRaw : []);
-  const holderItemsForFilter = Array.isArray(rawHolderItemsForFilter)
-    ? rawHolderItemsForFilter
-    : [];
-  const filteredMintedUsers = Array.isArray(filteredMintedUsersRaw)
-    ? filteredMintedUsersRaw
-    : [];
+    : keepStaleFilterRowsWhileRefreshing
+      ? filteredMintedUsersRaw
+      : [];
+  const holderItemsForFilter = Array.isArray(rawHolderItemsForFilter) ? rawHolderItemsForFilter : [];
+  const filteredMintedUsers = Array.isArray(filteredMintedUsersRaw) ? filteredMintedUsersRaw : [];
   return {
     filteredMintedUsers,
     holderItemsForFilter,

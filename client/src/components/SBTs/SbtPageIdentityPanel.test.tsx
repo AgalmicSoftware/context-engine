@@ -33,7 +33,11 @@ describe('SbtPageIdentityPanel', () => {
     expect(screen.getByTestId(E2E_TESTIDS.SBT_PAGE_NAME)).toHaveTextContent('Access Badge');
     expect(screen.getByTestId(E2E_TESTIDS.SBT_PAGE_DESCRIPTION)).toHaveTextContent('Credential for the access lane.');
     expect(screen.getByTestId(E2E_TESTIDS.SBT_PAGE_IMAGE)).toHaveAttribute('src', 'https://cdn.example.test/badge.png');
-    expect(screen.getByRole('link', { name: '0x000...00f1' })).toHaveAttribute('href', 'https://explorer.example.test/token');
+    expect(screen.getByRole('link', { name: '0x000...00f1' })).toHaveAttribute(
+      'href',
+      'https://explorer.example.test/token',
+    );
+    expect(screen.getByRole('link', { name: '0x000...00f1' })).toHaveAttribute('rel', 'noopener noreferrer');
     expect(screen.getByTitle('Open token metadata')).toHaveAttribute('href', 'https://arweave.example.test/metadata');
   });
 
@@ -48,7 +52,7 @@ describe('SbtPageIdentityPanel', () => {
           onContractCopy,
           onImageOpen,
         })}
-      />
+      />,
     );
 
     fireEvent.click(screen.getAllByRole('button')[0]);
@@ -67,7 +71,7 @@ describe('SbtPageIdentityPanel', () => {
           descriptionText: '',
           tokenUriHref: '',
         })}
-      />
+      />,
     );
 
     expect(screen.queryByTestId(E2E_TESTIDS.SBT_PAGE_DESCRIPTION)).toBeNull();

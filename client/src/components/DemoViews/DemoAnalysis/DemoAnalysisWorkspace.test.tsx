@@ -6,21 +6,14 @@ import DemoAnalysisWorkspace from './DemoAnalysisWorkspace';
 
 jest.mock('../../Shared/CheckboxMultiSelect', () => ({
   __esModule: true,
-  default: ({
-    inputId,
-    onChange,
-    options = [],
-    value = [],
-  }: any) => (
+  default: ({ inputId, onChange, options = [], value = [] }: any) => (
     <select
       data-testid={inputId}
       id={inputId}
       multiple
       onChange={(event) => {
         const selectedValues = Array.from(event.target.selectedOptions).map((option: any) => option.value);
-        onChange(
-          options.filter((option: any) => selectedValues.includes(String(option.value)))
-        );
+        onChange(options.filter((option: any) => selectedValues.includes(String(option.value))));
       }}
       value={Array.isArray(value) ? value.map((option) => option.value) : []}
     >
@@ -35,18 +28,17 @@ jest.mock('../../Shared/CheckboxMultiSelect', () => ({
 
 jest.mock('react-simple-maps', () => ({
   ComposableMap: ({ children }: any) => <div data-testid="mock-composable-map">{children}</div>,
-  Geographies: ({ children }: any) => children({
-    geographies: [
-      { rsmKey: 'usa', properties: { name: 'United States of America' } },
-      { rsmKey: 'gbr', properties: { name: 'United Kingdom' } },
-      { rsmKey: 'ind', properties: { name: 'India' } },
-      { rsmKey: 'chn', properties: { name: 'China' } },
-    ],
-  }),
+  Geographies: ({ children }: any) =>
+    children({
+      geographies: [
+        { rsmKey: 'usa', properties: { name: 'United States of America' } },
+        { rsmKey: 'gbr', properties: { name: 'United Kingdom' } },
+        { rsmKey: 'ind', properties: { name: 'India' } },
+        { rsmKey: 'chn', properties: { name: 'China' } },
+      ],
+    }),
   Geography: ({ children, geography }: any) => (
-    <div data-testid={`mock-geo-${geography.properties.name}`}>
-      {children}
-    </div>
+    <div data-testid={`mock-geo-${geography.properties.name}`}>{children}</div>
   ),
   Sphere: () => null,
   Graticule: () => null,
@@ -65,7 +57,9 @@ describe('DemoAnalysisWorkspace', () => {
     const scssPath = path.join(__dirname, 'DemoAnalysisWorkspace.module.scss');
     const scss = fs.readFileSync(scssPath, 'utf8');
 
-    expect(scss).toMatch(/\.selectedQuestionFrame\s*{[\s\S]*background:\s*linear-gradient\(145deg,\s*#f8fbff 0%,\s*#edf4ff 100%\);/);
+    expect(scss).toMatch(
+      /\.selectedQuestionFrame\s*{[\s\S]*background:\s*linear-gradient\(145deg,\s*#f8fbff 0%,\s*#edf4ff 100%\);/,
+    );
     expect(scss).toMatch(/\.selectedQuestionFrame\s*{[\s\S]*border:\s*1px solid rgba\(15,\s*94,\s*199,\s*0\.14\);/);
     expect(scss).toMatch(/\.selectedQuestionCard\s*{[\s\S]*background:\s*transparent !important;/);
     expect(scss).toMatch(/\.selectedQuestionCardPrompt\s*{[\s\S]*color:\s*#1f2733 !important;/);

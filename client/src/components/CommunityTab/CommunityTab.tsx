@@ -2019,7 +2019,6 @@ class CommunityTab extends Component<any, any> {
               // this below value is probably not passed-in, but should be
               isSBTCacheReady={this.props.isSBTCacheReady}
               sbtCacheRevision={this.props.sbtCacheRevision}
-
             />
             {loadingFilter ? (
               <div className={styles.loadingContainer}>
@@ -2075,11 +2074,7 @@ class CommunityTab extends Component<any, any> {
                   <span
                     className={styles.responsesCount}
                     onClick={() =>
-                      window.open(
-                        buildPublicRoute(`/survey/${survey.id}/results${sessionQuery}`),
-                        '_blank',
-                        'noopener,noreferrer',
-                      )
+                      window.open(buildPublicRoute(`/survey/${survey.id}/results${sessionQuery}`), '_blank')
                     } // Link to results page
                     style={{ cursor: 'pointer' }} // Add pointer cursor
                   >
@@ -2144,14 +2139,7 @@ class CommunityTab extends Component<any, any> {
           {this.renderQuestionSwarm()}
         </div>
 
-        <Modal
-          isOpen={showModal}
-          toggle={this.toggleModal}
-          className={styles.modal}
-          size="lg"
-          centered
-          scrollable
-        >
+        <Modal isOpen={showModal} toggle={this.toggleModal} className={styles.modal} size="lg" centered scrollable>
           <ModalHeader toggle={this.toggleModal} className={styles.modalHeader}>
             {modalTitle}
           </ModalHeader>

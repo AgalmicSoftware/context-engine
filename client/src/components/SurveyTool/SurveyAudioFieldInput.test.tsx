@@ -33,7 +33,7 @@ describe('SurveyAudioFieldInput', () => {
         disabled
         updateFunction={jest.fn()}
         toggleEncryption={jest.fn()}
-      />
+      />,
     );
 
     const input = screen.getByTestId('mock-audio-input');
@@ -53,11 +53,40 @@ describe('SurveyAudioFieldInput', () => {
         disableEncryption={false}
         updateFunction={jest.fn()}
         toggleEncryption={jest.fn()}
-      />
+      />,
     );
 
     const input = screen.getByTestId('mock-audio-input');
     expect(input).toHaveAttribute('data-enable-downloads', 'true');
     expect(input).toHaveAttribute('data-disable-encryption', 'false');
+  });
+
+  it('preserves audio worker and handler identity for recording-bound fields', () => {
+    const sessionConfig = { worker: 'config' };
+    const context = { chainId: 84532 };
+    const updateFunction = jest.fn();
+    const toggleEncryption = jest.fn();
+
+    render(
+      <SurveyAudioFieldInput
+        placeholder="response (optional)"
+        value="hello"
+        dataCeQuestionId="q3"
+        sessionSlug="edge"
+        sessionConfig={sessionConfig}
+        context={context}
+        workerUrl="https://worker.example/audio"
+        updateFunction={updateFunction}
+        toggleEncryption={toggleEncryption}
+      />,
+    );
+
+    const props = mockAudioInputProps[mockAudioInputProps.length - 1];
+    expect(props.sessionSlug).toBe('edge');
+    expect(props.sessionConfig).toBe(sessionConfig);
+    expect(props.context).toBe(context);
+    expect(props.workerUrl).toBe('https://worker.example/audio');
+    expect(props.updateFunction).toBe(updateFunction);
+    expect(props.toggleEncryption).toBe(toggleEncryption);
   });
 });

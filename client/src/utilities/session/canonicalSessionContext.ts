@@ -147,8 +147,6 @@ export const isReservedSessionSlugKey = (rawSlug: unknown): boolean =>
 // chainId should not suppress the route identity or mark resolution as authoritative.
 const hasIdentityValue = (identity: ParsedSessionIdentity | UnknownRecord | null | undefined): boolean =>
   !!(identity && (identity.slug || identity.sessionId || identity.metadataURI));
-const hasWorkerCanonicalIdentityValue = (identity: ParsedSessionIdentity | UnknownRecord | null | undefined): boolean =>
-  !!(identity?.slug && identity?.sessionId);
 const collectPrefixedErrors = (target: string[], prefix: string, entries: string[] = []): void => {
   entries.forEach((entry) => {
     target.push(`${prefix}: ${entry}`);
@@ -497,7 +495,7 @@ export const resolveCanonicalSessionContext = ({
     errors.push('Missing authoritative session identity source.');
   } else if (identityProvenance !== identityAuthority.authoritativeSource) {
     warnings.push(
-      `Using ${identityProvenance} session identity fallback; ${identityAuthority.authoritativeSource} is authoritative.`,
+      `Using ${identityProvenance} session identity fallback; ${AUTHORITY_MATRIX.identity.authoritativeSource} is authoritative.`,
     );
   }
 
@@ -512,10 +510,7 @@ export const resolveCanonicalSessionContext = ({
   const metadataParsed: ParsedSessionMetadata = metadataProvided
     ? parseSessionMetadata(metadata)
     : { ok: true, metadata: {}, errors: [] };
-  const workerCanonicalMetadataParsed: ParsedSessionMetadata = workerCanonicalAuthorityActive
-    ? parseSessionMetadata(workerCanonicalConfig)
-    : { ok: true, metadata: {}, errors: [] };
-  const demoMetadataAllowed = !workerCanonicalAuthorityActive && isDemoSourceAllowed('textMetadata', normalizedMode);
+  const demoMetadataAllowed = isDemoSourceAllowed('textMetadata', normalizedMode);
   const demoMetadataParsed: ParsedSessionMetadata =
     demoMetadataAllowed && demoSession !== undefined && demoSession !== null
       ? parseSessionMetadata(demoSession)
@@ -556,11 +551,11 @@ export const resolveCanonicalSessionContext = ({
     resolveSessionAuthorityGroup('textMetadata', authorityMode) || AUTHORITY_MATRIX.textMetadata;
   if (metadataProvenance === AUTHORITY_SOURCES.DEMO) {
     warnings.push(
-      `Using ${AUTHORITY_SOURCES.DEMO} session metadata fallback; ${metadataAuthority.authoritativeSource} is authoritative.`,
+      `Using ${AUTHORITY_SOURCES.DEMO} session metadata fallback; ${AUTHORITY_MATRIX.textMetadata.authoritativeSource} is authoritative.`,
     );
   } else if (metadataProvenance === 'cache' && hasOwnKeys(effectiveMetadata)) {
     warnings.push(
-      `Using cached session metadata replica; ${metadataAuthority.authoritativeSource} metadata is authoritative.`,
+      `Using cached session metadata replica; ${AUTHORITY_MATRIX.textMetadata.authoritativeSource} metadata is authoritative.`,
     );
   } else if (!hasOwnKeys(effectiveMetadata)) {
     warnings.push('Session metadata unavailable from authoritative sources.');

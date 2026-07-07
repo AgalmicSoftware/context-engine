@@ -109,10 +109,7 @@ const IDB_PROBE_KEY = '__dg_cache_probe__';
 const IDB_CONSECUTIVE_FAILURE_THRESHOLD = 3;
 const IDB_RECOVERY_RETRY_MS = 30 * 1000;
 const READ_FAILED = Symbol('dg-cache-read-failed');
-const safeClone = <T>(value: T): T => {
-  if (typeof structuredClone === 'function') return structuredClone(value);
-  return JSON.parse(JSON.stringify(value)) as T;
-};
+const safeClone = typeof structuredClone === 'function' ? structuredClone : (v) => JSON.parse(JSON.stringify(v));
 
 const MANAGED_NAMESPACE_LIST = [
   'questionsCache',
@@ -153,9 +150,9 @@ const clientId = (() => {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 })();
 
-const getErrorMessage = (error: unknown): unknown => (error instanceof Error ? error.message : error);
+const isManagedNamespace = (namespace) => MANAGED_NAMESPACES.has(String(namespace || ''));
 
-const isManagedNamespace = (namespace: unknown): boolean => MANAGED_NAMESPACES.has(String(namespace || ''));
+const toStorageKey = (namespace, slug = '') => `dg:${String(namespace || '')}:${String(slug || '')}`;
 
 const toStorageKey = (namespace: unknown, slug: unknown = ''): string =>
   `dg:${String(namespace || '')}:${String(slug || '')}`;
@@ -180,8 +177,7 @@ const cloneValue = <T>(value: T): T => {
   }
 };
 
-const isPlainObject = (value: unknown): value is CacheObject =>
-  value != null && typeof value === 'object' && !Array.isArray(value);
+const isPlainObject = (value) => value != null && typeof value === 'object' && !Array.isArray(value);
 
 const valuesEqual = (a: unknown, b: unknown): boolean => {
   try {
@@ -261,7 +257,11 @@ const restoreActiveOptimisticMirrorEntries = (entries = []) => {
 
 const emitUpdate = (payload = {}) => {
   subscribers.forEach((handler) => {
-    try { handler(payload); } catch (e) { cacheLog.warn('cacheScripts: callback', e); }
+    try {
+      handler(payload);
+    } catch (e) {
+      cacheLog.warn('cacheScripts: callback', e);
+    }
   });
 };
 
@@ -479,9 +479,7 @@ const ensureBackendReady = async (): Promise<void> => {
 };
 
 const hydrateMirrorFromIdb = async ({ preserveOptimistic = false } = {}) => {
-  const optimisticSnapshots = preserveOptimistic
-    ? snapshotActiveOptimisticMirrorEntries()
-    : [];
+  const optimisticSnapshots = preserveOptimistic ? snapshotActiveOptimisticMirrorEntries() : [];
   clearMirror();
   try {
     const all = await idbEntries(IDB_STORE);
@@ -1071,12 +1069,8 @@ export const listNamespaceEntriesSync = <TValue = CacheLegacyNode>(
 };
 
 export const getCacheBackendDiagnostics = () => {
-  const probeState = backendReadyPromise
-    ? (didHydrateMirror ? 'ready' : 'probing')
-    : 'unprobed';
-  const persistentBackend = probeState === 'unprobed'
-    ? 'unknown'
-    : (idbAvailable ? 'indexeddb' : 'localstorage');
+  const probeState = backendReadyPromise ? (didHydrateMirror ? 'ready' : 'probing') : 'unprobed';
+  const persistentBackend = probeState === 'unprobed' ? 'unknown' : idbAvailable ? 'indexeddb' : 'localstorage';
   return {
     persistentBackend,
     probeState,

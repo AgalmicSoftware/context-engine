@@ -63,7 +63,9 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
     checkTxExistsSpy = null;
     jest.useRealTimers();
     global.fetch = originalFetch;
-    try { delete globalThis.CE_ARWEAVE_PREFLIGHT_SBT_METADATA; } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_PREFLIGHT_SBT_METADATA;
+    } catch (_) {}
   });
 
   it('uses extensionless direct-image tokenURI as renderable image when response content-type is image/*', async () => {
@@ -612,7 +614,7 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
     stub.name.mockResolvedValue('Name Only SBT');
     stub.symbol.mockResolvedValue('CE-SBT-38');
     contractSpy = jest.spyOn(ethers, 'Contract').mockImplementation(() => stub);
-    arweaveSpy = jest.spyOn(arweaveClient, 'downloadDataFromArweave').mockImplementation(() => new Promise(() => {}));
+    arweaveSpy = jest.spyOn(arweaveScripts, 'downloadDataFromArweave').mockImplementation(() => new Promise(() => {}));
 
     const metaPromise = contractScripts.getSbtMetadata('none', sbtAddress, {
       slug: 'edge',
@@ -647,7 +649,7 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
       JSON.stringify({
         name: 'Gateway First SBT',
         image: 'https://example.com/assets/gateway-first.png',
-      })
+      }),
     );
 
     const meta = await contractScripts.getSbtMetadata('none', sbtAddress, {
@@ -656,24 +658,25 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
       contracts: {},
     });
 
-    expect(meta).toEqual(expect.objectContaining({
-      name: 'Gateway First SBT',
-      contractName: 'Gateway First SBT',
-    }));
+    expect(meta).toEqual(
+      expect.objectContaining({
+        name: 'Gateway First SBT',
+        contractName: 'Gateway First SBT',
+      }),
+    );
     const [, arweaveOpts] = arweaveSpy.mock.calls[0];
     expect(arweaveSpy).toHaveBeenCalledTimes(1);
     expect(arweaveSpy).toHaveBeenCalledWith(rawTxId, expect.any(Object));
-    expect(arweaveOpts).toEqual(expect.objectContaining({
-      bypassFailureCache: true,
-      directToArIo: false,
-      debugContext: expect.objectContaining({
-        category: 'sbt_metadata',
+    expect(arweaveOpts).toEqual(
+      expect.objectContaining({
+        bypassFailureCache: true,
+        directToArIo: false,
+        debugContext: expect.objectContaining({
+          category: 'sbt_metadata',
+        }),
+        gateways: expect.arrayContaining(['https://ar-io.dev', 'https://arweave.net']),
       }),
-      gateways: expect.arrayContaining([
-        'https://ar-io.dev',
-        'https://arweave.net',
-      ]),
-    }));
+    );
     expect(arweaveOpts).not.toHaveProperty('disableExistencePrecheck');
     expect(arweaveOpts).not.toHaveProperty('preflightTxExistence');
   });
@@ -691,7 +694,7 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
       JSON.stringify({
         name: 'Gateway First Image SBT',
         image: `ar://${imageTxId}`,
-      })
+      }),
     );
 
     const meta = await contractScripts.getSbtMetadata('none', sbtAddress, {
@@ -700,11 +703,13 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
       contracts: {},
     });
 
-    expect(meta).toEqual(expect.objectContaining({
-      name: 'Gateway First Image SBT',
-      contractName: 'Gateway First Image SBT',
-      image: `https://arweave.net/${imageTxId}`,
-    }));
+    expect(meta).toEqual(
+      expect.objectContaining({
+        name: 'Gateway First Image SBT',
+        contractName: 'Gateway First Image SBT',
+        image: `https://arweave.net/${imageTxId}`,
+      }),
+    );
     expect(checkTxExistsSpy).not.toHaveBeenCalled();
     expect(fetchSpy).not.toHaveBeenCalled();
   });

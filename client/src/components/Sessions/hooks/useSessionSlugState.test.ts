@@ -21,62 +21,6 @@ describe('useSessionSlugState', () => {
     expect(result.current.slugAvailability).toEqual({ status: 'idle' });
   });
 
-  it('does not schedule or invoke a slug authority port while disabled', () => {
-    jest.useFakeTimers();
-    const sessionExists = jest.fn();
-    const { result } = renderHook(() =>
-      useSessionSlugState({
-        enabled: false,
-        slug: 'worker-session',
-        privateSlugMode: false,
-        registryChainId: 11155420,
-        sessionExists,
-      }),
-    );
-
-    act(() => {
-      jest.advanceTimersByTime(1000);
-    });
-
-    expect(sessionExists).not.toHaveBeenCalled();
-    expect(result.current.slugAvailability).toEqual({ status: 'idle' });
-  });
-
-  it('invalidates an in-flight authority check when the hook is disabled', async () => {
-    jest.useFakeTimers();
-    let resolveExists: ((exists: boolean) => void) | undefined;
-    const sessionExists = jest.fn(
-      () =>
-        new Promise<boolean>((resolve) => {
-          resolveExists = resolve;
-        }),
-    );
-    const { result, rerender } = renderHook(
-      ({ enabled }) =>
-        useSessionSlugState({
-          enabled,
-          slug: 'worker-session',
-          privateSlugMode: false,
-          registryChainId: 11155420,
-          sessionExists,
-        }),
-      { initialProps: { enabled: true } },
-    );
-
-    act(() => {
-      jest.advanceTimersByTime(300);
-    });
-    expect(sessionExists).toHaveBeenCalledTimes(1);
-
-    rerender({ enabled: false });
-    await act(async () => {
-      resolveExists?.(true);
-      await Promise.resolve();
-    });
-
-    expect(result.current.slugAvailability).toEqual({ status: 'idle' });
-  });
-
   it('cleans up a pending slug timer on unmount', () => {
     jest.useFakeTimers();
     const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout');
@@ -100,9 +44,7 @@ describe('useSessionSlugState', () => {
 
   it('resets checking slug availability back to idle', () => {
     jest.useFakeTimers();
-    const sessionExists = jest.fn(
-      (_args: { registryChainId?: unknown; slug: string }) => new Promise<boolean>(() => {}),
-    );
+    const sessionExists = jest.fn(() => new Promise<boolean>(() => {}));
     const { result } = renderHook(() =>
       useSessionSlugState({
         slug: 'available-session',

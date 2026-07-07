@@ -35,7 +35,7 @@ export const readManagedCacheSnapshot = (namespace: string, slug = ''): ManagedC
 export const selectManagedNetBucketSnapshot = (
   namespace: string,
   slug: string,
-  netKey: string
+  netKey: string,
 ): ManagedCacheSnapshot => {
   const obj = readManagedCacheSnapshot(namespace, slug);
   if (!obj || !netKey) return null;

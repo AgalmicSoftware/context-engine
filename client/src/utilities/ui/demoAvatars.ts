@@ -76,7 +76,10 @@ const normalizeLookupKey = (value = ''): string =>
     .replace(/[^a-zA-Z0-9]+/g, '')
     .toLowerCase();
 
-const normalizeAddress = (value: unknown = '') => String(value || '').trim().toLowerCase();
+const normalizeAddress = (value: unknown = '') =>
+  String(value || '')
+    .trim()
+    .toLowerCase();
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value);

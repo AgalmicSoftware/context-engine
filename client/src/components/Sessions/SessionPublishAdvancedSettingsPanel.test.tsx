@@ -16,10 +16,6 @@ const buildProps = (
   onManualMaxFeePerGasGweiChange: jest.fn(),
   onManualMaxPriorityFeePerGasGweiChange: jest.fn(),
   onManualMetadataUrlChange: jest.fn(),
-  publishSettingsCapabilities: {
-    showArweaveMetadataControls: true,
-    showGasOverrideControls: true,
-  },
   renderInfoTooltip: (options) => <span data-testid={String(options.testId)}>{String(options.ariaLabel)}</span>,
   resolvedWorkerBaseUrl: '',
   workerUrlSource: 'manual',

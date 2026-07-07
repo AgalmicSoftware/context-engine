@@ -22,12 +22,14 @@ describe('sessionWizardResourceConfig', () => {
   });
 
   it('returns only the OpenAI secret field for ai resources', () => {
-    expect(resolveSessionWizardResourceSecretFields('ai', {
-      models: {
-        fast: { provider: 'anthropic' },
-        thinking: { provider: 'openrouter' },
-      },
-    }).map((field) => field.key)).toEqual(['openaiKey']);
+    expect(
+      resolveSessionWizardResourceSecretFields('ai', {
+        models: {
+          fast: { provider: 'anthropic' },
+          thinking: { provider: 'openrouter' },
+        },
+      }).map((field) => field.key),
+    ).toEqual(['openaiKey']);
   });
 
   it('returns non-ai secret fields without mutation', () => {

@@ -99,9 +99,7 @@ describe('rpcProviders PATH fallback logging', () => {
       contractKey: 'sbtFactory',
       skipGlobalPreferred: true,
     });
-    const urls = (provider?.providerConfigs || [])
-      .map((entry) => entry?.provider?.connection?.url)
-      .filter(Boolean);
+    const urls = (provider?.providerConfigs || []).map((entry) => entry?.provider?.connection?.url).filter(Boolean);
 
     expect(urls[0]).not.toBe(PATH_DEFAULT_OP_SEPOLIA);
     expect(urls).not.toContain(PATH_DEFAULT_OP_SEPOLIA);

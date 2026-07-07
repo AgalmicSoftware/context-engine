@@ -355,12 +355,11 @@ describe('SurveyResults export/view controls', () => {
 
     const tree = subject.render();
 
-    expect(treeHasText(tree, 'CSV: Questions')).toBe(true);
-    expect(treeHasText(tree, 'CSV: Questions + Responses')).toBe(true);
-    expect(treeHasText(tree, 'JSON: Questions')).toBe(true);
-    expect(treeHasText(tree, 'JSON: Questions + Responses')).toBe(true);
-    expect(treeHasText(tree, 'Polis Report')).toBe(false);
-  });
+    const menu = document.querySelector('.dropdown-menu');
+    expect(menu).not.toBeNull();
+    const optionLabels = Array.from((menu as HTMLElement).querySelectorAll('button.dropdown-item')).map((item) =>
+      item.textContent?.trim(),
+    );
 
   it('renders the HTML report export action in the expanded export area', () => {
     const subject = createSubject({

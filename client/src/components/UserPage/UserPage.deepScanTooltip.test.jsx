@@ -921,7 +921,8 @@ describe('UserPage deep scan tooltip formatting', () => {
     const explorerHref = `https://optimism-sepolia.blockscout.com/address/${viewAddress}`;
     const addressLinks = collectTreeNodes(
       tree,
-      (node) => node?.type === 'a' && node?.props?.href === explorerHref && node?.props?.className === styles.addressLink
+      (node) =>
+        node?.type === 'a' && node?.props?.href === explorerHref && node?.props?.className === styles.addressLink,
     );
 
     expect(instance.getExplorerUrl()).toBe(explorerHref);

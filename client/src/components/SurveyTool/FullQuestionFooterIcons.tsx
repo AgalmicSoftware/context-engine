@@ -13,6 +13,19 @@ type FullQuestionFooterIconsProps = {
   children?: ReactNode;
 };
 
+export const buildFullQuestionCommentButtonClassName = (
+  styleMap: Record<string, string>,
+  hasAdditionalContent: unknown,
+) =>
+  [styleMap.iconButton, styleMap.commentButton, hasAdditionalContent ? styleMap.iconButtonActive : '']
+    .filter(Boolean)
+    .join(' ');
+
+export const resolveFullQuestionCommentIconClassName = (
+  styleMap: Record<string, string>,
+  hasAdditionalContent: unknown,
+) => (hasAdditionalContent ? styleMap.iconGlow : undefined);
+
 const FullQuestionFooterIcons = ({
   hasAdditionalContent = false,
   commentsOpen = false,
@@ -28,9 +41,14 @@ const FullQuestionFooterIcons = ({
       aria-pressed={commentsOpen}
       title="Additional comments"
       data-testid={E2E_TESTIDS.SURVEY_ADDITIONAL_TOGGLE}
-      data-ce-question-id={String(questionId || '').trim().toLowerCase()}
+      data-ce-question-id={String(questionId || '')
+        .trim()
+        .toLowerCase()}
     >
-      <FontAwesomeIcon icon={faComment} className={hasAdditionalContent ? styles.iconGlow : undefined} />
+      <FontAwesomeIcon
+        icon={faComment}
+        className={resolveFullQuestionCommentIconClassName(styles, hasAdditionalContent)}
+      />
     </button>
     {children}
   </div>

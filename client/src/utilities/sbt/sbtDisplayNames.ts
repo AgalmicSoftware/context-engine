@@ -126,7 +126,7 @@ const normalizeAddress = (value: unknown) => {
   }
 };
 
-const isUnresolvedSessionConfig = (config: unknown) => isRecord(config) && config.__unresolved === true;
+const isUnresolvedSessionConfig = (config) => !!config && typeof config === 'object' && config.__unresolved === true;
 
 const getDisplaySessionConfig = (preferredSlug: unknown = ''): SessionConfigRecord | null => {
   const slug = sanitizeSlug(preferredSlug);
@@ -137,7 +137,7 @@ const getDisplaySessionConfig = (preferredSlug: unknown = ''): SessionConfigReco
   if (!ALLOW_DEMO_SESSION_FALLBACK) {
     return strictLookupConfig || null;
   }
-  const demoLookupConfig = asSessionConfigRecord(getDemoSessionConfigBySlug(slug, { allowDemoFallback: true }));
+  const demoLookupConfig = getDemoSessionConfigBySlug(slug, { allowDemoFallback: true });
   return demoLookupConfig || strictLookupConfig || null;
 };
 
@@ -561,7 +561,7 @@ export const warmSbtDisplayNamesTargeted = async ({
   metadataLookupConfig = null,
   chainId = null,
   writeBack = true,
-}: WarmSbtDisplayNamesArgs = {}) => {
+} = {}) => {
   const unique = Array.from(
     new Set((Array.isArray(addresses) ? addresses : []).map((value) => normalizeAddress(value)).filter(Boolean)),
   );

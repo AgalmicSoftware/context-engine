@@ -67,11 +67,11 @@ export const NotFoundRoute = ({ path = '' }: { path?: string }) => (
 
 export const removeHashQueryParam = (hashValue = '', key = ''): string => {
   const normalizedKey = String(key || '').trim();
+  if (!normalizedKey) return '';
   const rawHash = String(hashValue || '')
     .replace(/^#/, '')
     .trim();
-  if (!normalizedKey || !rawHash) return String(hashValue || '').trim();
-  if (!/[=&]/.test(rawHash)) return String(hashValue || '').trim();
+  if (!rawHash) return '';
   const params = new URLSearchParams(rawHash);
   params.delete(normalizedKey);
   const nextHash = params.toString();

@@ -16,10 +16,7 @@ describe('retryLazyImport', () => {
 
   it('throws the final error after exhausting attempts', async () => {
     const finalError = new Error('still missing');
-    const loader = jest
-      .fn()
-      .mockRejectedValueOnce(new Error('first miss'))
-      .mockRejectedValueOnce(finalError);
+    const loader = jest.fn().mockRejectedValueOnce(new Error('first miss')).mockRejectedValueOnce(finalError);
 
     await expect(retryLazyImport(loader, { attempts: 2, delayMs: 0 })).rejects.toBe(finalError);
     expect(loader).toHaveBeenCalledTimes(2);

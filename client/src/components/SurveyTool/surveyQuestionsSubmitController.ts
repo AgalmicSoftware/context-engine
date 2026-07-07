@@ -5,7 +5,7 @@ import type {
   SurveyQuestionsPrimarySubmitPlan,
 } from './surveyQuestionsTypes.js';
 import { buildSubmitFailureState, buildSubmitStartState, buildSubmitSuccessState } from './surveyQuestionsTypes.js';
-import { updateSubmittedSinceLastEdit } from './surveyToolUtils';
+import { updateSubmittedSinceLastEdit } from './surveyToolUtils.js';
 import { buildQuestionRoutePath } from '../../utilities/survey/questionRouting.js';
 
 export type SurveyQuestionsSubmitNavigationPort = (path: string, plan: SurveyQuestionsPrimarySubmitPlan) => void;
@@ -66,9 +66,8 @@ export const resolveSubmitEffectiveDraftSlug = ({
   routeSlug?: unknown;
   normalizeSlug?: ((value: unknown) => string) | null;
 } = {}): string => {
-  const normalizeValue = typeof normalizeSlug === 'function'
-    ? normalizeSlug
-    : (value: unknown) => String(value ?? '').trim();
+  const normalizeValue =
+    typeof normalizeSlug === 'function' ? normalizeSlug : (value: unknown) => String(value ?? '').trim();
   return normalizeValue(draftSlug) || normalizeValue(routeSlug);
 };
 

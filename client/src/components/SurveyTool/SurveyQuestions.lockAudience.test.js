@@ -1,8 +1,63 @@
-import { SurveyQuestions } from './SurveyQuestions';
-import SurveyQuestionsLockAudienceControl from './SurveyQuestionsLockAudienceControl';
+import { fireEvent, screen } from '@testing-library/react';
+import { renderSurveyQuestions } from './surveyQuestionsTestHarness';
+import { buildLockAudienceButtonAction, buildLockAudienceDisplayState } from './surveyToolViewState';
+import { getResponseGateOptions } from './surveyToolResponseGateController';
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
-const getAdditionalLockIconName = () =>
-  screen.getByTestId(E2E_TESTIDS.SURVEY_ADDITIONAL_LOCK).querySelector('svg')?.getAttribute('data-icon');
+const question = {
+  id: 'q1',
+  type: 'freeform',
+  question: 'How are you?',
+};
+const REGISTRY_CACHE_KEY = 'dg:sessionRegistryCache:v1';
+const responseGateAddress = '0x00000000000000000000000000000000000000aa';
+
+const renderStandaloneQuestion = () =>
+  renderSurveyQuestions({
+    singleQuestionMode: false,
+    isStandalone: true,
+    surveyIndex: 0,
+    account: '0xabc',
+    loginComplete: true,
+    network: { id: 84532 },
+    networkChainId: 84532,
+    questionPool: [question],
+    isQuestionCacheReady: true,
+  });
+
+const getAnswerLockIconName = () =>
+  screen.getByTestId(E2E_TESTIDS.SURVEY_ANSWER_LOCK).querySelector('svg')?.getAttribute('data-icon');
+
+const normalizeQuestionIdKey = (value) =>
+  String(value || '')
+    .trim()
+    .toLowerCase();
+
+const createResponseGateOptionDeps = () => ({
+  normalizeQuestionIdKey,
+  isQuestionLockedForResponse: () => false,
+  getQuestionGateOptions: () => [],
+  getResponseGatePolicy: () => ({
+    gates: [
+      {
+        gateId: 'default_gate',
+        label: 'Registry default gate',
+        sbtAddresses: ['0x1111111111111111111111111111111111111111'],
+      },
+    ],
+    recipients: [{ accessControlConditions: [{ contractAddress: '0x1' }], chain: 'baseSepolia' }],
+  }),
+  buildRecipientsFromGates: () => [],
+  resolveLockAudienceSessionName: () => 'test-12',
+  resolveConfiguredGateLabel: () => 'Registry default gate',
+  resolveGateDisplayLabel: () => 'Registry default gate',
+  buildGateAudienceSbtItems: () => [],
+  resolveSbtGateLabel: () => '',
+  getShortenedAddress: (address) => `${address.slice(0, 6)}...${address.slice(-4)}`,
+  t: (key) => (key === 'gate' ? 'gate' : key),
+  getEffectiveDraftSlug: () => '',
+  resolveEffectiveSlug: () => '',
+});
 
 describe('SurveyQuestions lock audience controls', () => {
   afterEach(() => {

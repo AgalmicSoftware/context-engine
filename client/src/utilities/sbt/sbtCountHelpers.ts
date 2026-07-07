@@ -144,7 +144,6 @@ export const getCurrentHolderAddressesFromCounts = (counts: Partial<SbtCountsPay
   return holders;
 };
 
-
 export const normalizeSbtCountsScanCheckpoint = (
   checkpointIn: SbtCountsScanCheckpointInput | null | undefined,
   {
@@ -153,7 +152,7 @@ export const normalizeSbtCountsScanCheckpoint = (
   }: {
     startBlock: unknown;
     toBlock: unknown;
-  }
+  },
 ): SbtCountsScanCheckpoint | null => {
   if (!checkpointIn || typeof checkpointIn !== 'object') return null;
   const phase = String(checkpointIn.phase || '').trim();
@@ -166,7 +165,7 @@ export const normalizeSbtCountsScanCheckpoint = (
   const checkpointFloor = scanStartBlock - 1;
   const blockNumber = Math.max(
     checkpointFloor,
-    Math.min(scanToBlock, Math.floor(Number(checkpointIn.blockNumber ?? checkpointFloor)))
+    Math.min(scanToBlock, Math.floor(Number(checkpointIn.blockNumber ?? checkpointFloor))),
   );
   const mintedCountByAddress = normalizeSbtCountMap(checkpointIn.mintedCountByAddress);
   const burnedCountByAddress = normalizeSbtCountMap(checkpointIn.burnedCountByAddress);

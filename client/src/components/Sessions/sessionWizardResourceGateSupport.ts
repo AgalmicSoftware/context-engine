@@ -34,9 +34,7 @@ type SessionWizardResolvedResourceGate = {
   registryUnsupportedReason: string;
 };
 
-export const buildSessionWizardGateOptions = (
-  gates: SessionWizardResourceGate[] = []
-): SessionWizardGateOption[] => (
+export const buildSessionWizardGateOptions = (gates: SessionWizardResourceGate[] = []): SessionWizardGateOption[] =>
   gates.map((gate) => ({
     id: gate.id,
     label: gate.label,

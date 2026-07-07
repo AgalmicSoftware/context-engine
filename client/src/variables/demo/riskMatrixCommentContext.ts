@@ -194,7 +194,7 @@ const getSafeExternalCorpusUrl = (value: unknown = '') => {
 };
 
 export const getRiskMatrixCorpusSourceCitationItems = (
-  refs: RiskMatrixCorpusRef[] = []
+  refs: RiskMatrixCorpusRef[] = [],
 ): RiskMatrixCorpusSourceCitation[] => {
   const seen = new Set<string>();
 
@@ -215,9 +215,8 @@ export const getRiskMatrixCorpusSourceCitationItems = (
   }, []);
 };
 
-export const getRiskMatrixCorpusSourceCitations = (refs: RiskMatrixCorpusRef[] = []) => (
-  getRiskMatrixCorpusSourceCitationItems(refs).map((citation) => citation.label)
-);
+export const getRiskMatrixCorpusSourceCitations = (refs: RiskMatrixCorpusRef[] = []) =>
+  getRiskMatrixCorpusSourceCitationItems(refs).map((citation) => citation.label);
 
 export const enrichRiskMatrixCommentRecord = <T extends EnrichableRiskCommentRecord>(
   entry: T,

@@ -110,31 +110,98 @@ const createDeferred = <T,>() => {
   return { promise, resolve, reject };
 };
 
-const attachStateHarness = (subject: any): any => {
-  subject.setState = jest.fn((updater, cb) => {
-    const patch = typeof updater === 'function' ? updater(subject.state, subject.props) : updater;
-    subject.state = { ...subject.state, ...(patch || {}) };
-    if (typeof cb === 'function') cb();
-    return patch;
+const lower = (value: string): string => value.toLowerCase();
+
+const buildQuestionsCache = (questions: QuestionsById = defaultQuestions): Record<string, any> => ({
+  [NETWORK_ID]: {
+    questionsLatestBlock: 1,
+    questionResponsesLatestBlock: 1,
+    questions,
+    questionResponses: {},
+  },
+});
+
+const buildSurveyCache = ({
+  surveyId,
+  title = 'Mounted Survey',
+  questionIDs = ['q1'],
+  documentURLs = [],
+  responsesByResponder = {},
+  surveysLatestBlock = 4,
+  surveyResponsesLatestBlock = 5,
+}: {
+  surveyId: string;
+  title?: string;
+  questionIDs?: string[];
+  documentURLs?: string[];
+  responsesByResponder?: Record<string, any>;
+  surveysLatestBlock?: number;
+  surveyResponsesLatestBlock?: number;
+}): SurveyCache => ({
+  [NETWORK_ID]: {
+    surveys: {
+      [lower(surveyId)]: {
+        title,
+        questionIDs,
+        documentURLs,
+      },
+    },
+    surveyResponses: {
+      [lower(surveyId)]: responsesByResponder,
+    },
+    surveyResponsesLatestBlock: {
+      [lower(surveyId)]: surveyResponsesLatestBlock,
+    },
+    surveysLatestBlock,
+  },
+});
+
+const seedCacheReads = ({
+  surveysCache,
+  questionsCache = buildQuestionsCache(),
+  bookmarksCache = { surveys: [], questions: [] },
+}: {
+  surveysCache: SurveyCache;
+  questionsCache?: Record<string, any>;
+  bookmarksCache?: Record<string, any>;
+}): void => {
+  jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace: any) => {
+    if (namespace === 'surveysCache') return surveysCache;
+    if (namespace === 'questionsCache') return questionsCache;
+    if (namespace === 'bookmarksCache') return bookmarksCache;
+    return null;
   });
   return subject;
 };
 
-const findElement = (node: TreeNode, predicate: TreePredicate): TreeNode | null => {
-  const stack: TreeNode[] = [node];
-  while (stack.length > 0) {
-    const current = stack.pop();
-    if (!current) continue;
-    if (Array.isArray(current)) {
-      for (let i = current.length - 1; i >= 0; i -= 1) {
-        stack.push(current[i]);
-      }
-      continue;
-    }
-    if (typeof current !== 'object') continue;
-    if (predicate(current)) return current;
-    const children = current?.props?.children;
-    if (children !== undefined) stack.push(children);
+const mountSurveyResults = (props: Record<string, any> = {}, options: Record<string, any> = {}) =>
+  renderSurveyResults(
+    {
+      isOpen: true,
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: true,
+      isSBTCacheReady: true,
+      isSurveyCacheReady: true,
+      network: { id: Number(NETWORK_ID) },
+      networkChainId: Number(NETWORK_ID),
+      preventUrlChange: true,
+      provider: {},
+      sessionSlug: SESSION_SLUG,
+      viewMode: 'survey',
+      ...props,
+    },
+    options,
+  );
+
+const waitForSurveyTitle = async (title: string): Promise<void> => {
+  await waitFor(() => {
+    expect(screen.getByRole('heading', { name: title })).toBeInTheDocument();
+  });
+};
+
+const flushAsync = async (cycles = 6): Promise<void> => {
+  for (let index = 0; index < cycles; index += 1) {
+    await Promise.resolve();
   }
   return null;
 };
@@ -154,19 +221,77 @@ const collectTreeNodes = (
   return collectTreeNodes(node?.props?.children, predicate, acc);
 };
 
-const normalizeChildren = (children: TreeNode): TreeNode[] => {
-  if (children == null) return [];
-  if (Array.isArray(children)) return children.filter(Boolean);
-  return [children].filter(Boolean);
+const switchToAggregateView = async (_responder: string = RESPONDER_ONE): Promise<void> => {
+  const viewSwitch = await screen.findByRole('switch', { name: VIEW_MODE_SWITCH_NAME });
+  if (viewSwitch.getAttribute('aria-checked') !== 'true') {
+    fireEvent.click(viewSwitch);
+    await flushAsync();
+  }
+  await waitFor(() => {
+    expect(screen.getByRole('switch', { name: VIEW_MODE_SWITCH_NAME })).toHaveAttribute('aria-checked', 'true');
+  });
 };
 
-const renderSubjectTree = (subject: any) => (
-  render(
-    <MemoryRouter>
-      {subject.render()}
-    </MemoryRouter>
-  )
-);
+const getResponderUserLink = (responder: string): HTMLAnchorElement | null => {
+  const expectedHref = `/u/${encodeURIComponent(lower(responder))}`;
+  return (
+    (Array.from(document.querySelectorAll('a')).find((link) => link.getAttribute('href') === expectedHref) as
+      HTMLAnchorElement | undefined) || null
+  );
+};
+
+const expandResponderCard = async (responder: string = RESPONDER_ONE): Promise<void> => {
+  const responderLink = await waitFor(() => {
+    const link = getResponderUserLink(responder);
+    expect(link).toBeTruthy();
+    return link as HTMLAnchorElement;
+  });
+  const header = responderLink.closest('.card-header');
+  expect(header).toBeTruthy();
+  mockSingleQuestionResponse.mockClear();
+  fireEvent.click(header as HTMLElement);
+  await waitFor(() => {
+    expect(getIndividualResponseProps().length).toBeGreaterThan(0);
+  });
+};
+
+const expandAggregateQuestion = async (prompt: string): Promise<void> => {
+  const promptNodes = await screen.findAllByText(prompt);
+  const promptNode = promptNodes.find((node) => node.closest('.card-header'));
+  expect(promptNode).toBeTruthy();
+  const header = promptNode?.closest('.card-header');
+  expect(header).toBeTruthy();
+  mockSingleQuestionResponse.mockClear();
+  fireEvent.click(header as HTMLElement);
+  await waitFor(() => {
+    expect(getAggregateResponseProps().length).toBeGreaterThan(0);
+  });
+};
+
+const getResponseProps = (): any[] => mockSingleQuestionResponse.mock.calls.map((call) => call[0]);
+
+const getIndividualResponseProps = (): any[] =>
+  getResponseProps().filter((props) => props?.aggregatorResponseMode === false);
+
+const getAggregateResponseProps = (): any[] =>
+  getResponseProps().filter((props) => props?.aggregatorResponseMode === true);
+
+const getLatestAggregateRows = (questionId: string): any[] => {
+  const matchingCalls = getAggregateResponseProps().filter(
+    (props) => String(props?.question?.id || '').toLowerCase() === questionId,
+  );
+  const latest = matchingCalls[matchingCalls.length - 1];
+  return Array.isArray(latest?.allResponses) ? latest.allResponses : [];
+};
+
+const getAnswerValue = (response: any): unknown => response?.answer?.value;
+
+const rerenderWithNonce = async (view: ReturnType<typeof mountSurveyResults>, nonce: number): Promise<void> => {
+  await act(async () => {
+    view.rerenderSurveyResults({ questionResponsesNonce: nonce });
+    await flushAsync(10);
+  });
+};
 
 beforeEach(() => {
   mockSbtFilter.mockClear();
@@ -177,15 +302,14 @@ beforeEach(() => {
   mockRiskMatrix.mockClear();
 });
 
-const treeHasText = (node: TreeNode, text: string): boolean => {
-  if (node == null) return false;
-  if (Array.isArray(node)) return node.some((child) => treeHasText(child, text));
-  if (typeof node === 'string' || typeof node === 'number') {
-    return String(node).includes(text);
+afterEach(() => {
+  jest.restoreAllMocks();
+  try {
+    window.history.replaceState({}, '', '/');
+  } catch (_) {
+    /* noop */
   }
-  if (typeof node !== 'object') return false;
-  return treeHasText(node?.props?.children, text);
-};
+});
 
 describe('SurveyResults survey-mode source signature', () => {
   afterEach(() => {
@@ -250,12 +374,19 @@ describe('SurveyResults survey-mode source signature', () => {
     subject.props = {
       ...subject.props,
       isQuestionCacheReady: true,
-    };
-
-    await subject.fetchSurveyModeResponses();
-    const readySignature = subject._surveyModeSourceCoarseSignature;
-    expect(readySignature.split('::')[3]).toBe('1');
-    expect(readySignature).not.toBe(notReadySignature);
+      questionResponsesNonce: 2,
+    });
+    await waitFor(() => {
+      const latestResponse = getLatestAggregateRows('q1')[0]?.response;
+      expect(latestResponse).toEqual(
+        expect.objectContaining({
+          questionID: 'q1',
+          answer: expect.objectContaining({ value: 'A visible answer' }),
+        }),
+      );
+      expect(latestResponse).not.toBe(firstResponse);
+    });
+    // port note: the literal private coarse-signature string layout is unobservable in RTL; TASK 7 should cover exact signature construction in a helper-level test if that encoding remains public to tests.
   });
 
   it('parses each survey responder payload once while building survey-mode views', async () => {
@@ -495,12 +626,31 @@ describe('SurveyResults survey-mode source signature', () => {
     expect(subject.state.aggregateQuestionResponses.q1[0].response.answer.value).toBe('b2');
   });
 
-  it('invalidates survey source signature when toggling away from survey mode', () => {
-    const subject = createSubject({
-      provider: {},
-      surveyId: '0xabc',
-      viewMode: 'survey',
-      isOpen: false,
+  it('invalidates survey source signature when toggling away from survey mode', async () => {
+    const surveyId = `0x${'a'.repeat(64)}`;
+    const surveysCache = buildSurveyCache({
+      surveyId,
+      title: 'URL Survey',
+      responsesByResponder: {
+        [RESPONDER_ONE]: {
+          timeStamp: 10,
+          responses: [{ questionID: 'q1', answer: { value: 'url answer' } }],
+        },
+      },
+      surveyResponsesLatestBlock: 3,
+    });
+    seedCacheReads({ surveysCache });
+
+    mountSurveyResults({ viewMode: undefined }, { route: `/survey/${surveyId}/results?session=${SESSION_SLUG}` });
+    await waitForSurveyTitle('URL Survey');
+    await switchToAggregateView(RESPONDER_ONE);
+    await expandAggregateQuestion('Question one');
+    const firstResponse = getLatestAggregateRows('q1')[0].response;
+
+    window.history.pushState({}, '', `/questions/results?session=${SESSION_SLUG}`);
+    fireEvent.popState(window);
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Question Results' })).toBeInTheDocument();
     });
 
     subject._isMounted = true;
@@ -514,12 +664,16 @@ describe('SurveyResults survey-mode source signature', () => {
     subject.requestFetchResponses = jest.fn();
     attachStateHarness(subject);
 
-    const prevProps = { ...subject.props };
-    const prevState = { ...subject.state, viewMode: 'survey' };
-
-    subject.componentDidUpdate(prevProps, prevState);
-
-    expect(subject._surveyModeSourceSignature).toBe('');
+    await waitFor(() => {
+      const nextResponse = getLatestAggregateRows('q1')[0]?.response;
+      expect(nextResponse).toEqual(
+        expect.objectContaining({
+          questionID: 'q1',
+          answer: expect.objectContaining({ value: 'url answer' }),
+        }),
+      );
+      expect(nextResponse).not.toBe(firstResponse);
+    });
   });
 });
 
@@ -530,33 +684,14 @@ describe('SurveyResults survey document URLs', () => {
 
   it('stores survey document URLs from cache in survey mode state', async () => {
     const surveyId = 'survey-id-1';
-    const responder = '0x1111111111111111111111111111111111111111';
-    const networkId = '84532';
-    const documentURLs = [
-      'https://example.com/documents/alpha',
-      'https://example.com/documents/beta',
-    ];
-    const surveysCache = {
-      [networkId]: {
-        surveys: {
-          [surveyId]: {
-            title: 'Survey One',
-            questionIDs: ['q1'],
-            documentURLs,
-          },
-        },
-        surveysLatestBlock: 4,
-        surveyResponsesLatestBlock: {
-          [surveyId]: 5,
-        },
-        surveyResponses: {
-          [surveyId]: {
-            [responder]: {
-              responses: [
-                { questionID: 'q1', answer: { value: 'A visible answer' } },
-              ],
-            },
-          },
+    const documentURLs = ['https://example.com/documents/alpha', 'https://example.com/documents/beta'];
+    const surveysCache = buildSurveyCache({
+      surveyId,
+      title: 'Survey One',
+      documentURLs,
+      responsesByResponder: {
+        [RESPONDER_ONE]: {
+          responses: [{ questionID: 'q1', answer: { value: 'A visible answer' } }],
         },
       },
     };
@@ -582,35 +717,39 @@ describe('SurveyResults survey document URLs', () => {
       return patch;
     });
 
-    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace) => {
-      if (namespace === 'surveysCache') return surveysCache;
-      return {};
-    });
-    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({});
-
-    await subject.fetchSurveyModeResponses();
-
-    expect(subject.state.surveyDocumentURLs).toEqual(documentURLs);
+    const documentLinks = Array.from(document.querySelectorAll('a')).filter((link) =>
+      String(link.getAttribute('href') || '').startsWith('https://example.com/documents/'),
+    );
+    expect(documentLinks.map((link) => link.getAttribute('href'))).toEqual(documentURLs);
   });
 
   it('clears stale survey document URLs when no survey is selected', async () => {
-    const networkId = '84532';
-    const subject = createSubject({
-      network: { id: Number(networkId) },
-      isQuestionCacheReady: true,
+    const surveyId = 'survey-doc-clear';
+    const surveysCache = buildSurveyCache({
+      surveyId,
+      title: 'Survey With Docs',
+      documentURLs: ['https://example.com/documents/stale'],
+      responsesByResponder: {
+        [RESPONDER_ONE]: {
+          timeStamp: 10,
+          responses: [{ questionID: 'q1', answer: { value: 'A visible answer' } }],
+        },
+      },
+    });
+    seedCacheReads({ surveysCache });
+
+    const view = mountSurveyResults({ surveyId });
+    await waitForSurveyTitle('Survey With Docs');
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'https://example.com/documents/stale' })).toBeInTheDocument();
     });
 
-    subject.state = {
-      ...subject.state,
-      viewMode: 'survey',
-      surveyId: '',
-      surveyDocumentURLs: ['https://example.com/documents/stale'],
-    };
-    subject.getEffectiveSlug = jest.fn(() => 'session-slug');
-    subject.setState = jest.fn((next) => {
-      const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
-      subject.state = { ...subject.state, ...(patch || {}) };
-      return patch;
+    surveysCache[NETWORK_ID].surveys[surveyId].documentURLs = [];
+    surveysCache[NETWORK_ID].surveyResponsesLatestBlock[surveyId] = 6;
+    await rerenderWithNonce(view, 1);
+
+    await waitFor(() => {
+      expect(screen.queryByRole('link', { name: 'https://example.com/documents/stale' })).not.toBeInTheDocument();
     });
 
     jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace) => {
@@ -634,12 +773,8 @@ describe('SurveyResults survey document URLs', () => {
 
 describe('SurveyResults freeform aggregator summary', () => {
   it('renders the empty freeform state inside the SurveyResults-only aggregator panel', () => {
-    const subject = createSubject();
-
-    const tree = subject.renderFreeformAggregatorSummary([]);
-    const panel = findElement(
-      tree,
-      (element) => typeof element?.props?.className === 'string' && element.props.className.includes('surveyResultsAggregatorPanel')
+    const { container } = render(
+      <SurveyResultsFreeformAggregatorSummary summary={buildSurveyResultsFreeformSummaryModel([])} />,
     );
 
     expect(panel).toBeTruthy();
@@ -799,14 +934,13 @@ describe('SurveyResults survey-mode dedupe', () => {
 
     await subject.fetchSurveyModeResponses();
 
-    expect(subject.state.responses).toHaveLength(1);
-    expect(
-      subject.state.responses[0].response.responses.map((row: any) => row.questionID || row.questionId)
-    ).toEqual(['q1', 'q2']);
-    expect(subject.state.responses[0].response.responses[0]).toEqual(expect.objectContaining({
-      questionID: 'q1',
-      answer: expect.objectContaining({ value: 'Latest first answer' }),
-    }));
+    const individualRows = getIndividualResponseProps();
+    expect(individualRows.map((props) => props.response?.questionID || props.response?.questionId)).toEqual([
+      'q1',
+      'q2',
+    ]);
+    expect(getAnswerValue(individualRows[0].response)).toBe('Latest first answer');
+    expect(getAnswerValue(individualRows[1].response)).toBe('Second question answer');
   });
 
   it('preserves passthrough row order when duplicate question rows are collapsed around them', async () => {
@@ -883,18 +1017,16 @@ describe('SurveyResults survey-mode dedupe', () => {
 
     expect(subject.state.responses).toHaveLength(1);
     expect(
-      subject.state.responses[0].response.responses.map(
-        (row: any) => row.questionID || row.questionId || row.kind
-      )
+      individualRows.map((props) => props.response?.questionID || props.response?.questionId || props.response?.kind),
     ).toEqual(['q1', 'legacyMeta', 'q2']);
-    expect(subject.state.responses[0].response.responses[0]).toEqual(expect.objectContaining({
-      questionID: 'q1',
-      answer: expect.objectContaining({ value: 'Latest first answer' }),
-    }));
-    expect(subject.state.responses[0].response.responses[1]).toEqual(expect.objectContaining({
-      kind: 'legacyMeta',
-      note: 'Keep this row between the deduped answers',
-    }));
+    expect(getAnswerValue(individualRows[0].response)).toBe('Latest first answer');
+    expect(individualRows[1].response).toEqual(
+      expect.objectContaining({
+        kind: 'legacyMeta',
+        note: 'Keep this row between the deduped answers',
+      }),
+    );
+    // port note: the passthrough order seam is observed through the individuals renderer; TASK 7 should keep direct normalizeSurveyResponsePayloadByQuestionId coverage as the durable logic-level guard.
   });
 
   it('prefers a newer payload timestamp when the edited answer row has no timestamp', async () => {

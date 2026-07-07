@@ -533,15 +533,36 @@ const getRpcRateLimitBackoffError = (key: string, meta: ProviderSendMeta): (Erro
   return buildRpcRateLimitBackoffError(meta, state);
 };
 
-const runWithRpcRateLimitGate = async <T>(key: string, meta: ProviderSendMeta, send: () => Promise<T>): Promise<T> => {
-  if (!key) return await send();
-  // Regression guard: release endpoint reads one at a time. Releasing every
-  // waiter after a successful probe lets a later 429 arrive after the burst escaped.
+const waitForActiveRateLimitProbe = async (key: string): Promise<void> => {
+  if (!key) return;
+  const probe = getGlobalCache().rateLimitProbes.get(key);
+  if (!probe?.promise) return;
+  const elapsed = nowMs() - Number(probe.startedAt || 0);
+  const remaining = Math.max(0, RPC_RATE_LIMIT_PROBE_WAIT_MS - elapsed);
+  if (remaining <= 0) return;
+  await Promise.race([
+    probe.promise,
+    new Promise<void>((resolve) => {
+      setTimeout(resolve, remaining);
+    }),
+  ]);
+};
+
+const trackRateLimitProbe = (key: string, run: Promise<unknown>): void => {
+  if (!key) return;
   const cache = getGlobalCache();
-  const previous = cache.rateLimitTails.get(key) || Promise.resolve();
-  let releaseTurn = (): void => {};
-  const turn = new Promise<void>((resolve) => {
-    releaseTurn = resolve;
+  const probe: RpcRateLimitProbe = {
+    promise: run.then(
+      () => undefined,
+      () => undefined,
+    ),
+    startedAt: nowMs(),
+  };
+  cache.rateLimitProbes.set(key, probe);
+  probe.promise.then(() => {
+    if (cache.rateLimitProbes.get(key) === probe) {
+      cache.rateLimitProbes.delete(key);
+    }
   });
   const tail = previous.then(
     () => turn,
@@ -890,7 +911,7 @@ export const __test__resetRpcReadCache = (): void => {
       g.__CE_RPC_READ_CACHE__.inflight = new Map<string, Promise<unknown>>();
       g.__CE_RPC_READ_CACHE__.cacheByMethod = createCacheByMethod();
       g.__CE_RPC_READ_CACHE__.rateLimits = new Map<string, RpcRateLimitState>();
-      g.__CE_RPC_READ_CACHE__.rateLimitTails = new Map<string, Promise<void>>();
+      g.__CE_RPC_READ_CACHE__.rateLimitProbes = new Map<string, RpcRateLimitProbe>();
     } catch (e) {
       log.warn('rpcReadCache: fallback', e);
     }

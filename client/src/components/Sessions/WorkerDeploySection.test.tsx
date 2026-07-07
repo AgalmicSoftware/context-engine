@@ -3,7 +3,9 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import WorkerDeploySection, { type WorkerDeploySectionProps } from './WorkerDeploySection';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
-const buildWorkerDeploySectionProps = (props = {}) => ({
+type RenderInfoTooltipProps = Parameters<NonNullable<WorkerDeploySectionProps['renderInfoTooltip']>>[0];
+
+const buildWorkerDeploySectionProps = (props: Partial<WorkerDeploySectionProps> = {}): WorkerDeploySectionProps => ({
   isNormalMode: false,
   renderInfoTooltip: ({ testId }) => <button type="button" data-testid={testId} />,
   workerMode: 'custom',
@@ -40,17 +42,13 @@ const buildWorkerDeploySectionProps = (props = {}) => ({
   ...props,
 });
 
-const renderWorkerDeploySection = (props = {}) => render(
-  <WorkerDeploySection
-    {...buildWorkerDeploySectionProps(props)}
-  />
-);
+const renderWorkerDeploySection = (props: Partial<WorkerDeploySectionProps> = {}) =>
+  render(<WorkerDeploySection {...buildWorkerDeploySectionProps(props)} />);
 
-const rerenderWorkerDeploySection = (rerender, props = {}) => rerender(
-  <WorkerDeploySection
-    {...buildWorkerDeploySectionProps(props)}
-  />
-);
+const rerenderWorkerDeploySection = (
+  rerender: ReturnType<typeof render>['rerender'],
+  props: Partial<WorkerDeploySectionProps> = {},
+) => rerender(<WorkerDeploySection {...buildWorkerDeploySectionProps(props)} />);
 
 describe('WorkerDeploySection', () => {
   it('offers the Cloudflare-owned full Worker path without a Cloudflare token or deploy helper', () => {
@@ -473,12 +471,14 @@ describe('WorkerDeploySection', () => {
 
     expect(setDeployForm).toHaveBeenCalledWith(expect.any(Function));
     const updater = setDeployForm.mock.calls[0][0];
-    expect(updater({
-      workerName: 'demo-worker',
-      apiToken: '',
-      accountId: 'cf-account-1',
-      adminAddress: '',
-    })).toEqual({
+    expect(
+      updater({
+        workerName: 'demo-worker',
+        apiToken: '',
+        accountId: 'cf-account-1',
+        adminAddress: '',
+      }),
+    ).toEqual({
       workerName: 'demo-worker',
       apiToken: 'new-token',
       accountId: 'cf-account-1',
@@ -506,23 +506,27 @@ describe('WorkerDeploySection', () => {
 
     expect(setDeployForm).toHaveBeenCalledWith(expect.any(Function));
     const updater = setDeployForm.mock.calls[0][0];
-    expect(updater({
-      workerName: 'demo-worker',
-      apiToken: 'old-token',
-      accountId: 'cf-account-1',
-      adminAddress: '',
-    })).toEqual({
+    expect(
+      updater({
+        workerName: 'demo-worker',
+        apiToken: 'old-token',
+        accountId: 'cf-account-1',
+        adminAddress: '',
+      }),
+    ).toEqual({
       workerName: 'demo-worker',
       apiToken: 'new-token',
       accountId: '',
       adminAddress: '',
     });
-    expect(updater({
-      workerName: 'demo-worker',
-      apiToken: 'new-token',
-      accountId: 'cf-account-1',
-      adminAddress: '',
-    })).toEqual({
+    expect(
+      updater({
+        workerName: 'demo-worker',
+        apiToken: 'new-token',
+        accountId: 'cf-account-1',
+        adminAddress: '',
+      }),
+    ).toEqual({
       workerName: 'demo-worker',
       apiToken: 'new-token',
       accountId: 'cf-account-1',
@@ -603,58 +607,6 @@ describe('WorkerDeploySection', () => {
       consoleErrorSpy.mock.calls.some(([message]) =>
         String(message).includes('A component is changing an uncontrolled input to be controlled'),
       ),
-    ).toBe(false);
-
-    consoleErrorSpy.mockRestore();
-  });
-
-  it('keeps bundle and token inputs controlled when partial deployForm state hydrates later', () => {
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-    const { rerender } = renderWorkerDeploySection({
-      deployForm: { workerName: 'demo-worker' },
-    });
-
-    rerenderWorkerDeploySection(rerender, {
-      deployForm: {
-        workerName: 'demo-worker',
-        bundleUrl: 'https://bundle.example/custom.js',
-        apiToken: 'secret-token',
-        adminAddress: '0xabc',
-      },
-    });
-
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL)).toHaveValue('https://bundle.example/custom.js');
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN)).toHaveValue('secret-token');
-    expect(
-      consoleErrorSpy.mock.calls.some(([message]) => (
-        String(message).includes('A component is changing an uncontrolled input to be controlled')
-      )),
-    ).toBe(false);
-
-    consoleErrorSpy.mockRestore();
-  });
-
-  it('remounts cleanly when advanced bundle mode switches from file upload to url input', () => {
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-    const { rerender } = renderWorkerDeploySection({
-      bundleMode: 'upload',
-    });
-
-    rerenderWorkerDeploySection(rerender, {
-      bundleMode: 'url',
-      deployForm: {
-        workerName: 'demo-worker',
-        bundleUrl: 'https://bundle.example/from-url.js',
-        apiToken: '',
-        adminAddress: '',
-      },
-    });
-
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL)).toHaveValue('https://bundle.example/from-url.js');
-    expect(
-      consoleErrorSpy.mock.calls.some(([message]) => (
-        String(message).includes('A component is changing an uncontrolled input to be controlled')
-      )),
     ).toBe(false);
 
     consoleErrorSpy.mockRestore();

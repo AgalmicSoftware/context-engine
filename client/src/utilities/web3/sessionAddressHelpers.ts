@@ -76,9 +76,9 @@ function getSessionAddresses(cfg: AnyRecord | null | undefined): Record<string, 
     if (!address) return;
     out[contractKey] = {
       address,
-      chainId: Number(
-        fromCfg.chainId || fromFallback.chainId || fromChainDefault.chainId || fallbackChainId || 0
-      ) || undefined,
+      chainId:
+        Number(fromCfg.chainId || fromFallback.chainId || fromChainDefault.chainId || fallbackChainId || 0) ||
+        undefined,
     };
   });
 

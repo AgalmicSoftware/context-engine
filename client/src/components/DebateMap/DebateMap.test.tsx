@@ -403,76 +403,6 @@ describe('DebateMap', () => {
     expect(topNodes.map((node: any) => node.id)).toEqual(['comment-heavy', 'nested-high', 'early-tie']);
   });
 
-  it('ignores wrong-shaped bookmark storage before rendering bookmarkable list nodes', async () => {
-    localStorage.setItem('bookmarkedNodes', '{"bad":true}');
-
-    render(
-      <MemoryRouter>
-        <DebateMapComponent
-          account=""
-          provider=""
-          network={{ id: 84532 }}
-          activeSessionSlug=""
-          toggleLoginModal={jest.fn()}
-        />
-      </MemoryRouter>
-    );
-
-    fireEvent.click(getDebateViewModeButton('list'));
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: /^Debate Map$/i })).toBeInTheDocument();
-      expect(screen.getAllByTestId(E2E_TESTIDS.DEBATE_VIEW_MODE).length).toBeGreaterThan(0);
-    });
-  });
-
-  it('builds stable keys for reorderable atlas and list items', () => {
-    expect(getDebateNodeStableKeyAny({ id: 'node-id', name: 'Name' }, 'fallback')).toBe('node-id');
-    expect(getDebateNodeStableKeyAny({ name: 'Name' }, 'fallback')).toBe('Name');
-    expect(getDebateNodeStableKeyAny({}, 'fallback')).toBe('fallback');
-
-    expect(getAtlasLinkStableKeyAny({
-      sourceId: 'source-id',
-      targetId: 'target-id',
-      source: { x: 1, y: 2 },
-      target: { x: 3, y: 4 },
-    }, 0)).toBe('source-id->target-id');
-    expect(getAtlasLinkStableKeyAny({
-      source: { x: 1, y: 2 },
-      target: { x: 3, y: 4 },
-    }, 7)).toBe('coords:1.000:2.000:3.000:4.000:7');
-  });
-
-  it('finds top atlas nodes by heat without changing pre-order tie behavior', () => {
-    const topNodes = getTopAtlasNodesByHeatAny([
-      {
-        id: 'early-tie',
-        votes: { up: 5, down: 0 },
-        children: [
-          {
-            id: 'nested-high',
-            votes: { up: 9, down: 0 },
-          },
-        ],
-      },
-      {
-        id: 'comment-heavy',
-        votes: { up: 3, down: 0 },
-        comments: [{ id: 'c1' }, { id: 'c2' }, { id: 'c3' }],
-      },
-      {
-        id: 'late-tie',
-        votes: { up: 5, down: 0 },
-      },
-    ], 3);
-
-    expect(topNodes.map((node: any) => node.id)).toEqual([
-      'comment-heavy',
-      'nested-high',
-      'early-tie',
-    ]);
-  });
-
   it('switches between circles and atlas from the main mode controls', () => {
     render(
       <MemoryRouter>
@@ -655,7 +585,7 @@ describe('DebateMap', () => {
   it('builds historical case briefs only for the expanded case key', () => {
     const brief = buildHistoricalCaseBriefAny(
       { title: 'Expanded case', summary: 'Expanded summary.' },
-      { name: 'Liability Frameworks' }
+      { name: 'Liability Frameworks' },
     );
     const buildBrief = jest.fn(() => brief);
     const historicalCases = [
@@ -667,7 +597,7 @@ describe('DebateMap', () => {
       historicalCases,
       { id: 'node-a', name: 'Liability Frameworks' },
       '',
-      buildBrief
+      buildBrief,
     );
     expect(collapsedBriefs.size).toBe(0);
     expect(buildBrief).not.toHaveBeenCalled();
@@ -676,14 +606,11 @@ describe('DebateMap', () => {
       historicalCases,
       { id: 'node-a', name: 'Liability Frameworks' },
       'expanded-case',
-      buildBrief
+      buildBrief,
     );
 
     expect(buildBrief).toHaveBeenCalledTimes(1);
-    expect(buildBrief).toHaveBeenCalledWith(
-      historicalCases[1],
-      { id: 'node-a', name: 'Liability Frameworks' }
-    );
+    expect(buildBrief).toHaveBeenCalledWith(historicalCases[1], { id: 'node-a', name: 'Liability Frameworks' });
     expect(expandedBriefs.get('expanded-case')).toBe(brief);
   });
 

@@ -65,9 +65,7 @@ jest.mock('../../Shared/AudioInput/AudioInput', () => (props) => (
   />
 ));
 
-jest.mock('../CreateQuestionsAndSurveys', () => () => (
-  <div data-testid="create-questions-and-surveys" />
-));
+jest.mock('../CreateQuestionsAndSurveys', () => () => <div data-testid="create-questions-and-surveys" />);
 
 jest.mock('../../DocumentLibrary/DocumentLibraryPanel', () => ({
   __esModule: true,
@@ -95,16 +93,15 @@ export const findGenerateQuestionsButton = () =>
   Array.from(container.querySelectorAll('button')).find((node) => node.textContent.includes('Generate Questions'));
 export const getPhotoCards = () =>
   Array.from(container.querySelectorAll(`[data-testid="${E2E_TESTIDS.DATABASE_PHOTO_SOURCE_CARD}"]`));
-export const getPhotoCardByName = (name) =>
-  getPhotoCards().find((node) => node.textContent.includes(name));
+export const getPhotoCardByName = (name) => getPhotoCards().find((node) => node.textContent.includes(name));
 export const getPhotoSourceId = (node) => node?.getAttribute('data-ce-source-id') || '';
 export const getPhotoAnalysisToggleBySourceId = (sourceId) =>
   container.querySelector(
-    `[data-testid="${E2E_TESTIDS.DATABASE_PHOTO_SOURCE_ANALYSIS_TOGGLE}"][data-ce-source-id="${sourceId}"]`
+    `[data-testid="${E2E_TESTIDS.DATABASE_PHOTO_SOURCE_ANALYSIS_TOGGLE}"][data-ce-source-id="${sourceId}"]`,
   );
 export const getPhotoAnalysisBodyBySourceId = (sourceId) =>
   container.querySelector(
-    `[data-testid="${E2E_TESTIDS.DATABASE_PHOTO_SOURCE_ANALYSIS_BODY}"][data-ce-source-id="${sourceId}"]`
+    `[data-testid="${E2E_TESTIDS.DATABASE_PHOTO_SOURCE_ANALYSIS_BODY}"][data-ce-source-id="${sourceId}"]`,
   );
 export const toggleCheckbox = (element) => {
   act(() => {
@@ -113,9 +110,8 @@ export const toggleCheckbox = (element) => {
 };
 export const setInputValue = (selector, value) => {
   const input = container.querySelector(selector);
-  const proto = input instanceof HTMLTextAreaElement
-    ? window.HTMLTextAreaElement.prototype
-    : window.HTMLInputElement.prototype;
+  const proto =
+    input instanceof HTMLTextAreaElement ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
   const setValue = Object.getOwnPropertyDescriptor(proto, 'value').set;
   act(() => {
     setValue.call(input, value);
@@ -186,11 +182,12 @@ export const makeSessionConfig = ({
     },
   },
 });
-export const buildAiQuestions = (count) => Array.from({ length: count }, (_, index) => ({
-  prompt: `Generated question ${index + 1}?`,
-  questionType: 'binary',
-  tags: ['generated'],
-}));
+export const buildAiQuestions = (count) =>
+  Array.from({ length: count }, (_, index) => ({
+    prompt: `Generated question ${index + 1}?`,
+    questionType: 'binary',
+    tags: ['generated'],
+  }));
 
 export const getMockCorpusViewerModuleLoadCount = () => mockCorpusViewerModuleLoadCount;
 

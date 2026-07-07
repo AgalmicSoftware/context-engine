@@ -58,7 +58,7 @@ const RESPONSES_SUBMITTED_IFACE = new ethers.utils.Interface([
   'event ResponsesSubmitted(address indexed responder,bytes32[] questionIds,bytes32 indexed surveyId)',
 ]);
 
-const makeResponsesSubmittedLog = (responder, blockNumber, logIndex = 0, transactionIndex = 0) => {
+const makeResponsesSubmittedLog = (responder, blockNumber, logIndex = 0) => {
   const encoded = RESPONSES_SUBMITTED_IFACE.encodeEventLog(RESPONSES_SUBMITTED_IFACE.getEvent('ResponsesSubmitted'), [
     responder,
     [QUESTION_ID],
@@ -223,20 +223,6 @@ describe('contractScripts.fetchAllSurveyResponses', () => {
       1,
       30,
     );
-
-    expect(mockGetReadProviderForGroup).toHaveBeenCalledWith(
-      expect.objectContaining({ slug: GROUP_CFG.slug }),
-      expect.objectContaining({ contractKey: 'surveys' })
-    );
-    expect(mockGetReadProviderForChain).not.toHaveBeenCalled();
-    expect(mockFetchLogsSmartWithProvider).toHaveBeenCalledWith(
-      mockSessionReadProvider,
-      expect.objectContaining({
-        address: GROUP_CFG.contracts.surveys.address,
-      }),
-      1,
-      30
-    );
     expect(result.hadPartialFailure).toBe(false);
     expect(result.lowestFailedBlock).toBeNull();
     expect(result.responses).toHaveLength(2);
@@ -260,26 +246,50 @@ describe('contractScripts.fetchAllSurveyResponses', () => {
     ]);
   });
 
+  it('batches survey response reads while preserving survey/responder output shape', async () => {
+    const responderA = '0x00000000000000000000000000000000000000aa';
+    const responderB = '0x00000000000000000000000000000000000000bb';
+    const pendingReads = new Map();
+    mockFetchLogsSmartWithProvider.mockResolvedValue([
+      makeResponsesSubmittedLog(responderA, 7, 0),
+      makeResponsesSubmittedLog(responderB, 9, 1),
+    ]);
+
+    jest.spyOn(contractScripts, 'getSurveyResponse').mockImplementation(
+      (_providerName, responder) =>
+        new Promise((resolve) => {
+          pendingReads.set(String(responder).toLowerCase(), resolve);
+        }),
+    );
+
+    const run = contractScripts.getSurveyResponses('none', 1, 30, GROUP_CFG);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(contractScripts.getSurveyResponse).toHaveBeenCalledTimes(2);
+    pendingReads.get(responderB.toLowerCase())({ answer: 'B' });
+    pendingReads.get(responderA.toLowerCase())({ answer: 'A' });
+
+    await expect(run).resolves.toEqual({
+      [SURVEY_ID.toLowerCase()]: {
+        [responderA.toLowerCase()]: { answer: 'A' },
+        [responderB.toLowerCase()]: { answer: 'B' },
+      },
+    });
+  });
+
   it('threads forced Arweave recovery into chunked question response reads', async () => {
     const responder = '0x00000000000000000000000000000000000000aa';
-    mockFetchLogsSmartWithProvider.mockResolvedValue([
-      makeResponsesSubmittedLog(responder, 7, 0),
-    ]);
+    mockFetchLogsSmartWithProvider.mockResolvedValue([makeResponsesSubmittedLog(responder, 7, 0)]);
 
     const getResponseSpy = jest.spyOn(contractScripts, 'getResponse').mockResolvedValue({
       answer: 'recovered',
     });
     const onPartialData = jest.fn();
 
-    await contractScripts.getQuestionResponsesChunkedWithCallback(
-      'none',
-      1,
-      30,
-      null,
-      onPartialData,
-      GROUP_CFG,
-      { forceArweaveFetch: true }
-    );
+    await contractScripts.getQuestionResponsesChunkedWithCallback('none', 1, 30, null, onPartialData, GROUP_CFG, {
+      forceArweaveFetch: true,
+    });
 
     expect(getResponseSpy).toHaveBeenCalledWith(
       'none',
@@ -289,7 +299,7 @@ describe('contractScripts.fetchAllSurveyResponses', () => {
       expect.objectContaining({
         _resolvedCfg: expect.objectContaining({ slug: GROUP_CFG.slug }),
         forceArweaveFetch: true,
-      })
+      }),
     );
     expect(onPartialData).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -301,7 +311,7 @@ describe('contractScripts.fetchAllSurveyResponses', () => {
           }),
         ],
       }),
-      30
+      30,
     );
   });
 

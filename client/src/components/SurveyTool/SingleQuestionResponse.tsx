@@ -16,10 +16,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import styles from './SingleQuestionResponse.module.scss';
 import { createLogger } from 'utilities/logging.js';
-import {
-  buildQuestionRoutePath,
-  resolveQuestionPayloadDisplayState,
-} from '../../utilities/survey/questionRouting.js';
+import { buildQuestionRoutePath, resolveQuestionPayloadDisplayState } from '../../utilities/survey/questionRouting.js';
 import { normalizeSessionSlug, resolveSessionSlugFromPathname } from '../../utilities/session/sessionNaming.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
@@ -1062,7 +1059,7 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
     const isAdditionalEncrypted = additional.encrypted && additional.value === '*';
     const isPromptMasked = String(prompt || '').trim() === '[encrypted]';
     const promptDisplay = resolveQuestionPayloadDisplayState(question, this.props.sessionConfig || null);
-    const promptLabel = isPromptMasked ? (promptDisplay.label || prompt) : prompt;
+    const promptLabel = isPromptMasked ? promptDisplay.label || prompt : prompt;
     const shouldMaskVisibleResponseForMaskedPrompt = isPromptMasked && !isAnswerEncrypted;
     const canReloadPrompt = isPromptMasked && !!id && typeof this.props.onReloadQuestionPrompt === 'function';
     const promptReloading = !!this.props.promptReloading;
@@ -1119,7 +1116,9 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
       <p
         className={styles.encryptedResponseText}
         data-testid={E2E_TESTIDS.ENCRYPTED_ANSWER_NOTICE}
-        data-ce-question-id={String(id || '').trim().toLowerCase()}
+        data-ce-question-id={String(id || '')
+          .trim()
+          .toLowerCase()}
       >
         This response is gated with the question.
       </p>
@@ -1269,13 +1268,11 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
                         </span>
                       ) : (
                         promptLabel
-                      )
+                      ),
                     )}
                   </button>
                 ) : (
-                  wrapMaskedPromptLabel(
-                    <span className={styles.miniPromptAbbrev}>{promptLabel}</span>
-                  )
+                  wrapMaskedPromptLabel(<span className={styles.miniPromptAbbrev}>{promptLabel}</span>)
                 )}
               </div>
               <Button className={styles.miniExpandButton} onClick={this.toggleMiniExpand}>
@@ -1317,8 +1314,8 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
                               <span>{promptDisplay.busyLabel || 'Decrypting...'}</span>
                             </span>
                           ) : (
-                            (promptLabel || 'Question')
-                          )
+                            promptLabel || 'Question'
+                          ),
                         )}
                       </button>
                     ) : (
@@ -1328,13 +1325,11 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
                 </div>
               )}
 
-              {isAnswerEncrypted ? (
-                renderEncryptedAnswer()
-              ) : shouldMaskVisibleResponseForMaskedPrompt ? (
-                renderMaskedPromptResponse()
-              ) : (
-                this.renderAnswerByType(type, answer.value)
-              )}
+              {isAnswerEncrypted
+                ? renderEncryptedAnswer()
+                : shouldMaskVisibleResponseForMaskedPrompt
+                  ? renderMaskedPromptResponse()
+                  : this.renderAnswerByType(type, answer.value)}
 
               {!shouldMaskVisibleResponseForMaskedPrompt && additional && additional.value ? (
                 isAdditionalEncrypted ? (

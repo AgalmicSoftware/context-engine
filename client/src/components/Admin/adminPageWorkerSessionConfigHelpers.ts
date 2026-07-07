@@ -34,31 +34,6 @@ export type WorkerUrlResolutionDisplay = {
 };
 
 const asRecord = (value: unknown): AdminRecord => (value && typeof value === 'object' ? (value as AdminRecord) : {});
-const cloneConfigValue = <T>(value: T): T => {
-  if (value == null || typeof value !== 'object') return value;
-  return JSON.parse(JSON.stringify(value)) as T;
-};
-
-const isWorkerCanonicalConfig = (config: AdminRecord): boolean =>
-  toStr(asRecord(asRecord(config.sessionModeProfile).authority).mode).trim() === 'worker_canonical';
-
-const workerCanonicalUsesOnChainSbt = (config: AdminRecord): boolean => {
-  const profile = asRecord(config.sessionModeProfile);
-  const authorization = asRecord(profile.authorization);
-  if (Array.isArray(authorization.mechanisms) && authorization.mechanisms.includes('sbt_onchain')) {
-    return true;
-  }
-  const storage = asRecord(profile.storage);
-  const payloadAccess = asRecord(storage.payloadAccessControl);
-  const encryption = asRecord(profile.encryption);
-  return [payloadAccess.accessConditions, encryption.accessConditions].some((rawDocument) => {
-    const document = asRecord(rawDocument);
-    return (
-      Array.isArray(document.conditions) &&
-      document.conditions.some((condition) => asRecord(condition).kind === 'sbt_onchain')
-    );
-  });
-};
 
 export const normalizeRpcUrlList = (value: unknown): string[] => {
   if (Array.isArray(value)) {

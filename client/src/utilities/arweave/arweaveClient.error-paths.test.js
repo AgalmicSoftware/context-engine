@@ -70,8 +70,12 @@ describe('error paths', () => {
   afterEach(() => {
     jest.clearAllMocks();
     jest.useRealTimers();
-    try { delete globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO; } catch (_) {}
-    try { delete globalThis.__CE_ARWEAVE_UPLOAD_FALLBACK__; } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO;
+    } catch (_) {}
+    try {
+      delete globalThis.__CE_ARWEAVE_UPLOAD_FALLBACK__;
+    } catch (_) {}
   });
 
   it('throws on upload network failures without returning a partial tx id', async () => {

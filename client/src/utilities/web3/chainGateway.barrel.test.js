@@ -1,4 +1,9 @@
-import chainGateway, { getReadProviderForGroup, getSessionConfigBySlug } from './chainGateway.js';
+import contractScripts, { getReadProviderForGroup, getSessionConfigBySlug } from './contractScripts.js';
+import * as contractScriptsModule from './contractScripts.js';
+import chainGateway, {
+  getReadProviderForGroup as getReadProviderForGroupGateway,
+  getSessionConfigBySlug as getSessionConfigBySlugGateway,
+} from './chainGateway.js';
 import * as chainGatewayModule from './chainGateway.js';
 import chainGatewayImpl, {
   getReadProviderForGroup as getReadProviderForGroupImpl,
@@ -13,6 +18,14 @@ const { execFileSync } = require('child_process');
 describe('contractScripts compatibility barrel', () => {
   afterEach(() => {
     jest.restoreAllMocks();
+  });
+
+  it('keeps the legacy js entrypoint spyable for Jest callers', () => {
+    const mocked = { slug: 'mock-session' };
+    const spy = jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockReturnValue(mocked);
+
+    expect(contractScriptsModule.getSessionConfigBySlug('ignored')).toBe(mocked);
+    expect(spy).toHaveBeenCalledWith('ignored');
   });
 
   it('keeps the canonical chainGateway entrypoint spyable for Jest callers', () => {
@@ -47,7 +60,7 @@ describe('contractScripts compatibility barrel', () => {
     fs.writeFileSync(
       implStubPath,
       `
-      const chainGateway = {
+      const contractScripts = {
         marker: 'stub-default',
         getProviderLocation: () => 'stub-provider',
         getNativeBalance: () => '1',
@@ -80,13 +93,13 @@ describe('contractScripts compatibility barrel', () => {
       export const __test__contractScriptsErrors = {
         isNonexistentTokenError: () => true,
       };
-      export default chainGateway;
+      export default contractScripts;
     `,
     );
     fs.writeFileSync(
       entryPath,
       `
-      import chainGateway, {
+      import contractScripts, {
         __test__contractScriptsErrors,
         getReadProviderForGroup,
         getSessionConfigBySlug,
@@ -98,8 +111,11 @@ describe('contractScripts compatibility barrel', () => {
         provider: getReadProviderForGroup().provider,
         slug: getSessionConfigBySlug('edge').slug,
       };
-    `);
-    fs.writeFileSync(viteConfigPath, `
+    `,
+    );
+    fs.writeFileSync(
+      viteConfigPath,
+      `
       export default {
         logLevel: 'silent',
         resolve: {
@@ -126,19 +142,16 @@ describe('contractScripts compatibility barrel', () => {
           },
         },
       };
-    `);
+    `,
+    );
 
     try {
       try {
-        execFileSync(
-          process.execPath,
-          [viteBinPath, 'build', '--config', viteConfigPath],
-          {
-            cwd: clientRoot,
-            encoding: 'utf8',
-            stdio: ['ignore', 'pipe', 'pipe'],
-          }
-        );
+        execFileSync(process.execPath, [viteBinPath, 'build', '--config', viteConfigPath], {
+          cwd: clientRoot,
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'pipe'],
+        });
       } catch (error) {
         const stdout = error.stdout ? `\nstdout:\n${error.stdout}` : '';
         const stderr = error.stderr ? `\nstderr:\n${error.stderr}` : '';

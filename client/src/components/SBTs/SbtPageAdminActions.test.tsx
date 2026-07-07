@@ -142,7 +142,7 @@ describe('SbtPageAdminActions', () => {
     expect(screen.getByText(/claim-one/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /join\/0xsbt/ })).toHaveAttribute(
       'href',
-      'https://session.example.test/join/0xsbt',
+      'https://session.example.test/join/0xsbt/claim-one',
     );
 
     fireEvent.change(screen.getByPlaceholderText('Number of additional passwords'), {
@@ -310,7 +310,7 @@ describe('SbtPageAdminActions', () => {
     expect(screen.getByText(/claim-one/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /join\/0xsbt/ })).toHaveAttribute(
       'href',
-      'https://session.example.test/join/0xsbt',
+      'https://session.example.test/join/0xsbt/claim-one',
     );
 
     rerender(

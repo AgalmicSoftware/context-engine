@@ -12,14 +12,8 @@ import {
 
 const deepClone = (value) => JSON.parse(JSON.stringify(value));
 
-const buildTimestampedCacheEntries = (count, buildEntry) => (
-  Object.fromEntries(
-    Array.from({ length: count }, (_, index) => [
-      `tx-${index}`,
-      buildEntry(index),
-    ])
-  )
-);
+const buildTimestampedCacheEntries = (count, buildEntry) =>
+  Object.fromEntries(Array.from({ length: count }, (_, index) => [`tx-${index}`, buildEntry(index)]));
 
 const buildSubjectConfig = () => ({
   resolveSession: (groupKeyOrCfg) =>
@@ -242,14 +236,11 @@ describe('contractScriptsCache helpers', () => {
     const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(5000);
     const startingCache = {
       84532: {
-        arweaveTxCache: buildTimestampedCacheEntries(
-          ARWEAVE_TX_CACHE_MAX_ENTRIES,
-          (index) => ({
-            text: `payload-${index}`,
-            contentType: 'text/plain',
-            savedAtMs: index + 1,
-          })
-        ),
+        arweaveTxCache: buildTimestampedCacheEntries(ARWEAVE_TX_CACHE_MAX_ENTRIES, (index) => ({
+          text: `payload-${index}`,
+          contentType: 'text/plain',
+          savedAtMs: index + 1,
+        })),
       },
     };
     let updatedCache = null;
@@ -288,18 +279,15 @@ describe('contractScriptsCache helpers', () => {
   it('keeps the bounded Arweave tx failure cache at max size and prunes the oldest failure row', async () => {
     const startingCache = {
       84532: {
-        arweaveTxFailureCache: buildTimestampedCacheEntries(
-          ARWEAVE_TX_FAILURE_CACHE_MAX_ENTRIES,
-          (index) => ({
-            attempts: 1,
-            firstFailedAtMs: index + 1,
-            lastFailedAtMs: index + 1,
-            nextRetryAtMs: index + 100,
-            lastStatus: 503,
-            state: 'transient',
-            message: `failure-${index}`,
-          })
-        ),
+        arweaveTxFailureCache: buildTimestampedCacheEntries(ARWEAVE_TX_FAILURE_CACHE_MAX_ENTRIES, (index) => ({
+          attempts: 1,
+          firstFailedAtMs: index + 1,
+          lastFailedAtMs: index + 1,
+          nextRetryAtMs: index + 100,
+          lastStatus: 503,
+          state: 'transient',
+          message: `failure-${index}`,
+        })),
       },
     };
     let updatedCache = null;

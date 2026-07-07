@@ -15,8 +15,17 @@ const treeHasText = (node, text) => {
   return treeHasText(node?.props?.children, text);
 };
 
-const getAdditionalCommentsContainer = () =>
-  screen.getByTestId(E2E_TESTIDS.SURVEY_ADDITIONAL_INPUT).closest(`.${styles.fullQuestionComments}`);
+const renderStandaloneQuestion = () =>
+  renderSurveyQuestions({
+    singleQuestionMode: false,
+    isStandalone: true,
+    surveyIndex: 0,
+    account: '0xabc',
+    loginComplete: true,
+    network: { id: 84532 },
+    questionPool: [question],
+    isQuestionCacheReady: true,
+  });
 
 const getAdditionalLockIconName = () =>
   screen.getByTestId(E2E_TESTIDS.SURVEY_ADDITIONAL_LOCK).querySelector('svg')?.getAttribute('data-icon');
@@ -26,6 +35,12 @@ const getFullQuestionLockControl = (fullQuestionCard) => {
   const children = footerIcons?.props?.children;
   return Array.isArray(children) ? children[0] : children;
 };
+
+const getAdditionalCommentsContainer = () =>
+  screen.getByTestId(E2E_TESTIDS.SURVEY_ADDITIONAL_INPUT).closest(`.${styles.fullQuestionComments}`);
+
+const getAdditionalLockIconName = () =>
+  screen.getByTestId(E2E_TESTIDS.SURVEY_ADDITIONAL_LOCK).querySelector('svg')?.getAttribute('data-icon');
 
 describe('SurveyQuestions additional comment locks', () => {
   afterEach(() => {

@@ -22,6 +22,10 @@ import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { createLitHooks } from '../../utilities/crypto/litProtocol.js';
 import { ethers } from 'ethers';
 
+import styles from './OnePageSession.module.scss';
+
+import LazyFallback from '../Shared/LazyFallback';
+
 import {
   getLegacyEthBalance,
   getNativeBalance,
@@ -50,6 +54,7 @@ import {
 } from '../SurveyTool/surveyAuthoritativeQuestionPool';
 import { serializeFilterState, deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
 import { createLogger } from 'utilities/logging.js';
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { listNamespaceEntriesSync, peekCacheSync, writeCache } from '../../utilities/cache/cacheScripts.js';
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
@@ -62,15 +67,7 @@ import { isCryptoMode, sbtsListPath, t } from '../../utilities/ui/terminology.js
 import { PUBLIC_AI_DISCOURSE_CORPUS_URL } from '../../variables/publicRepoMetadata.js';
 import { resolveMainSiteLitSessionConfig } from '../MainSite/litSessionConfig.js';
 import type { RiskMatrixRestoreState } from '../MainContent/RiskMatrix';
-import {
-  resolveSessionBackendKind,
-  type TelegramSessionMeta,
-} from '../../utilities/session/sessionBackendKind';
-import {
-  clearAgentClientLoginEnvelope,
-  readAgentClientLoginEnvelope,
-  type AgentClientLoginEnvelope,
-} from '../../utilities/session/agentClientLogin';
+import { clearAgentClientLoginEnvelope, readAgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
 import {
   envelopeAllowsSubmit,
   loadGroups as loadTelegramGroups,
@@ -90,6 +87,21 @@ import {
   computeAggregatorQuestionMetadataSignature,
   computeAggregatorSourceSnapshotSignature,
 } from './onePageSessionAggregator';
+import OnePageSessionAutoMintAlerts from './OnePageSessionAutoMintAlerts';
+import OnePageSessionTelegramShell from './OnePageSessionTelegramShell';
+import {
+  buildCurrentSessionConfigRequest,
+  isOnePageTelegramBackendMode,
+  normalizeOnePageSessionSlug,
+  resolveCurrentSessionSlugForProps,
+  resolveTelegramAgentBridgeUrl as resolveTelegramAgentBridgeUrlForSession,
+  type OnePageSessionPropsLike,
+} from './onePageSessionTelegramController';
+import {
+  buildInitialTelegramState,
+  createOnePageSessionTelegramActions,
+  type OnePageSessionTelegramState,
+} from './onePageSessionTelegramActions';
 
 const SurveyPage = React.lazy(() => import('../SurveyTool/SurveyPage'));
 const MemoSurveyPage = React.memo((props: any) => <SurveyPage {...props} />);
@@ -157,7 +169,9 @@ const bumpPerfCounter = (key: string, inc: number = 1) => {
     }
     const scope = globalState.__CE_PERF_COUNTERS__[ONE_PAGE_DEMO_PERF_SCOPE];
     scope[key] = Number(scope[key] || 0) + Number(inc || 0);
-  } catch (e) { void e; /* fallback: perf counter update. */ }
+  } catch (e) {
+    void e; /* fallback: perf counter update. */
+  }
 };
 
 const buildOnePageSessionEmptyFilterState = () => ({
@@ -175,22 +189,20 @@ const normalizeOnePageSessionFilterState = (value: unknown = {}) => {
   return Object.keys(normalized).length > 0 ? normalized : buildOnePageSessionEmptyFilterState();
 };
 
-const serializeOnePageSessionFilterState = (value: any = {}) => (
-  serializeFilterState(normalizeOnePageSessionFilterState(value))
-);
+const serializeOnePageSessionFilterState = (value: unknown = {}) =>
+  serializeFilterState(normalizeOnePageSessionFilterState(value));
 
-const normalizeOnePageSessionSlug = (value: any = '') => {
-  const normalized = String(value || '').trim().toLowerCase();
-  return normalized === 'general' ? '' : normalized;
-};
+const hasOwn = (value: unknown, key: string) =>
+  !!value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, key);
 
-const hasOwn = (value: any, key: string) => (
-  !!value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, key)
-);
-
-const resolveOnePageSessionSurveySlug = (props: any = '') => {
-  if (hasOwn(props, 'questionSessionSlug')) {
-    return normalizeOnePageSessionSlug(props.questionSessionSlug);
+const resolveOnePageSessionSurveySlug = (props: Record<string, unknown> | string = '') => {
+  const propsRecord = props && typeof props === 'object' ? props : {};
+  const sessionConfig =
+    propsRecord.sessionConfig && typeof propsRecord.sessionConfig === 'object'
+      ? (propsRecord.sessionConfig as Record<string, unknown>)
+      : {};
+  if (hasOwn(propsRecord, 'questionSessionSlug')) {
+    return normalizeOnePageSessionSlug(propsRecord.questionSessionSlug);
   }
   if (hasOwn(props.sessionConfig, 'slug')) {
     return normalizeOnePageSessionSlug(props.sessionConfig.slug);
@@ -213,14 +225,16 @@ const getUniqueAggregatorCandidateSlugs = (...slugs: any[]) => {
 const shouldUseBuiltInDemoAggregatorFallback = (displaySlug: any = '', questionSourceSlug: any = '') => {
   const normalizedDisplaySlug = normalizeOnePageSessionSlug(displaySlug);
   const normalizedQuestionSourceSlug = normalizeOnePageSessionSlug(questionSourceSlug);
-  return normalizedDisplaySlug === 'demo' && (
-    normalizedQuestionSourceSlug === '' ||
-    normalizedQuestionSourceSlug === 'demo'
+  return (
+    normalizedDisplaySlug === 'demo' && (normalizedQuestionSourceSlug === '' || normalizedQuestionSourceSlug === 'demo')
   );
 };
 
-const buildAggregatorFallbackQuestions = (questionPool: any[] = [], sessionSlug: any = '') => {
-  const out: Record<string, any> = {};
+const buildAggregatorFallbackQuestions = (
+  questionPool: Array<Record<string, unknown>> = [],
+  sessionSlug: unknown = '',
+) => {
+  const out: Record<string, Record<string, unknown>> = {};
   const normalizedSessionSlug = normalizeOnePageSessionSlug(sessionSlug);
   (Array.isArray(questionPool) ? questionPool : []).forEach((entry: any) => {
     const questionId = String(entry?.id || '').trim();
@@ -290,9 +304,7 @@ const mergeAggregatorResultRows = (target: Record<string, any[]> = {}, source: a
       return;
     }
     nextTarget[qid] = Array.isArray(nextTarget[qid]) ? nextTarget[qid] : [];
-    const seenRows = new Set(
-      nextTarget[qid].map((row: any) => `${row?.responder || ''}|${row?.response || ''}`)
-    );
+    const seenRows = new Set(nextTarget[qid].map((row: any) => `${row?.responder || ''}|${row?.response || ''}`));
     rows.forEach((row: any) => {
       const key = `${row?.responder || ''}|${row?.response || ''}`;
       if (seenRows.has(key)) return;
@@ -340,9 +352,7 @@ const buildOnePageSessionCanonicalBaseUrl = (props: any = {}) => {
 
 const buildOnePageSessionRawResultsRoute = (props: any = {}) => {
   const slug = resolveEffectiveSlug(props);
-  const path = slug
-    ? `/session/${slug}/questions/results`
-    : '/questions/results';
+  const path = slug ? `/session/${slug}/questions/results` : '/questions/results';
   return buildOnePageSessionPublicRoute(path);
 };
 
@@ -355,12 +365,6 @@ function hasCachedCreateSbtForm(slug: any = '') {
     clearInvalid: true,
   } as any);
 }
-
-export {
-  buildAggregatorFromLocalCache,
-  computeAggregatorSourceSnapshotSignature,
-  hasCachedCreateSbtForm,
-};
 
 export { buildAggregatorFromLocalCache, computeAggregatorSourceSnapshotSignature, hasCachedCreateSbtForm };
 
@@ -549,10 +553,6 @@ class OnePageSession extends Component<any, any> {
     }
   }
 
-  clearUnsupportedAutoMintState(updateState = true) {
-    clearUnsupportedSbtAutoMintState(this, updateState, (error) => demoLog.warn('OnePageSession: fallback', error));
-  }
-
   componentDidMount() {
     const routeUiState = resolveOnePageSessionRouteUiState(this.props);
     this.recordOriginalURL(routeUiState.showQuestions ? buildOnePageSessionCanonicalBaseUrl(this.props) : null);
@@ -564,6 +564,35 @@ class OnePageSession extends Component<any, any> {
       sessionStorage.setItem(`dg:hasRedirectedToDemo:${slug}`, 'true');
     } catch (e) {
       demoLog.warn('OnePageSession: fallback', e);
+    }
+
+    // Persist any incoming auto-mint params so they survive Web3Auth redirect cycles
+    try {
+      const currentSearch = typeof window !== 'undefined' ? window.location.search || '' : '';
+      const hasAutoFlag = () => {
+        try {
+          const raw = currentSearch.replace(/^\?/, '');
+          const params = new URLSearchParams(raw);
+          if (params.get('auto') === '1') return true;
+          for (const key of params.keys()) {
+            if (/^auto\d+$/.test(key) && params.get(key) === '1') return true;
+          }
+        } catch (e) {
+          demoLog.warn('OnePageSession: fallback', e);
+        }
+        return false;
+      };
+      if (currentSearch && hasAutoFlag()) {
+        sessionStorage.setItem(this.getAutoHashStorageKey(), currentSearch.replace(/^\?/, ''));
+      }
+    } catch (e) {
+      demoLog.warn('OnePageSession: fallback', e);
+    }
+
+    // Fragment-driven auto mint (both limited/unlimited)
+    const targets = this.parseAutoMintFragment();
+    if (targets.length > 0) {
+      this.primeAutoMintTargets(targets);
     }
 
     initializeSbtAutoMintRuntime(this, (error) => demoLog.warn('OnePageSession: fallback', error));
@@ -657,12 +686,10 @@ class OnePageSession extends Component<any, any> {
       return this._resolvedSessionConfigMemoValue;
     }
 
-    const propAutoFeature = autoFeatureSBTsBySessionSlug !== undefined
-      ? autoFeatureSBTsBySessionSlug
-      : autoFeatureSBTsWithFeaturedSbtTags;
-    const resolvedAutoFeature = propAutoFeature !== undefined
-      ? propAutoFeature
-      : resolveAutoFeatureBySessionSlug(baseSessionConfig);
+    const propAutoFeature =
+      autoFeatureSBTsBySessionSlug !== undefined ? autoFeatureSBTsBySessionSlug : autoFeatureSBTsWithFeaturedSbtTags;
+    const resolvedAutoFeature =
+      propAutoFeature !== undefined ? propAutoFeature : resolveAutoFeatureBySessionSlug(baseSessionConfig);
     const resolvedSlug = slug || baseSessionConfig.slug || '';
     const resolved = {
       ...baseSessionConfig,
@@ -692,22 +719,12 @@ class OnePageSession extends Component<any, any> {
     if (this.props.litHooks && typeof this.props.litHooks === 'object') {
       return this.props.litHooks;
     }
-    const {
-      chainId,
-      litNetwork,
-      litChain,
-      accessControlConditions,
-      userMaxPrice,
-      chipotle,
-    } = resolveMainSiteLitSessionConfig({
-      sessionConfig,
-      networkChainIdFallback: (
-        this.props.networkChainId ||
-        this.props.network?.id ||
-        this.props.network?.chainId ||
-        null
-      ),
-    });
+    const { chainId, litNetwork, litChain, accessControlConditions, userMaxPrice, chipotle } =
+      resolveMainSiteLitSessionConfig({
+        sessionConfig,
+        networkChainIdFallback:
+          this.props.networkChainId || this.props.network?.id || this.props.network?.chainId || null,
+      });
     if (!chipotle) return null;
     const sessionSlug = normalizeOnePageSessionSlug(sessionConfig?.slug || this.props.slug || '');
     return createLitHooks({
@@ -1040,7 +1057,7 @@ class OnePageSession extends Component<any, any> {
     const aggregatorInvalidated =
       slugChanged ||
       (this.props.isQuestionCacheReady && !prevProps.isQuestionCacheReady) ||
-      ((this.props.network?.id ?? null) !== (prevProps.network?.id ?? null)) ||
+      (this.props.network?.id ?? null) !== (prevProps.network?.id ?? null) ||
       prevProps.questionResponsesNonce !== this.props.questionResponsesNonce ||
       (prevProps.isResponsesCacheReady !== this.props.isResponsesCacheReady && this.props.isResponsesCacheReady);
 
@@ -1159,15 +1176,6 @@ class OnePageSession extends Component<any, any> {
         if (safeLegacyValue) sessionStorage.setItem(newKey, safeLegacyValue);
         sessionStorage.removeItem(legacy);
       }
-      const currentValue = sessionStorage.getItem(newKey);
-      if (currentValue) {
-        const safeCurrentValue = sanitizeSbtAutoMintQueryForStorage(currentValue);
-        if (safeCurrentValue) {
-          if (safeCurrentValue !== currentValue) sessionStorage.setItem(newKey, safeCurrentValue);
-        } else {
-          sessionStorage.removeItem(newKey);
-        }
-      }
     } catch (e) {
       demoLog.warn('OnePageSession: fallback', e);
     }
@@ -1219,96 +1227,31 @@ class OnePageSession extends Component<any, any> {
     );
   }
 
-
-  buildAggregator = () => measureSync('ce.onePageDemo.buildAggregator', () => {
-    if (!this.state.showResults) return;
-    bumpPerfCounter('aggregatorBuildCount');
-    const applyAggregatorData = (nextMap: any, providedSig: any = '', sourceSigKey: any = '') => {
-      const sig = providedSig || computeAggregatorDataSignature(nextMap);
-      if (sourceSigKey) {
-        this._aggregatorSourceSigKey = sourceSigKey;
-      }
-      if (sig === this._aggregatorDataSig) {
-        bumpPerfCounter('noopSkips');
-        return;
-      }
-      this._aggregatorDataSig = sig;
-      this.setState({ aggregatorData: nextMap });
-    };
-
-    const displaySlug = resolveEffectiveSlug(this.props);
-    const questionSourceSlug = resolveOnePageSessionSurveySlug(this.props);
-    const netIdVal = this.props.network?.id ?? this.props.networkChainId ?? 0;
-    const useBuiltInDemoFallback = shouldUseBuiltInDemoAggregatorFallback(displaySlug, questionSourceSlug);
-    const canBuildFromLocalCache = (
-      netIdVal != null &&
-      (this.props.isQuestionCacheReady || useBuiltInDemoFallback)
-    );
-
-    if (canBuildFromLocalCache) {
-      const netIdStr = String(netIdVal);
-      try {
-        const candidateSlugs = useBuiltInDemoFallback
-          ? getUniqueAggregatorCandidateSlugs(displaySlug)
-          : [normalizeOnePageSessionSlug(questionSourceSlug)];
-        const demoQuestionPool = useBuiltInDemoFallback
-          ? resolvePolisDemoQuestionPool({
-              displaySlug,
-              sourceSlug: questionSourceSlug,
-            })
-          : [];
-        const aggregateMap: Record<string, any[]> = {};
-        const sourceSigParts: string[] = [];
-        let sawCandidateCache = false;
-        let sawNetworkCache = false;
-
-        for (const slug of candidateSlugs) {
-          let qCache = peekCacheSync('questionsCache', slug, { clone: false }) || {};
-          if (!qCache || typeof qCache !== 'object') qCache = {};
-          if (Object.keys(qCache).length === 0) {
-            sourceSigParts.push(`${slug || '__general__'}:empty-cache`);
-            continue;
-          }
-          sawCandidateCache = true;
-
-          if (!qCache[netIdStr]) {
-            sourceSigParts.push(`${slug || '__general__'}:missing-net`);
-            continue;
-          }
-          sawNetworkCache = true;
-
-          const fallbackQuestions = buildAggregatorFallbackQuestions(demoQuestionPool, slug);
-          const networkNode = qCache[netIdStr] || {};
-          const networkNodeForAggregation = useBuiltInDemoFallback
-            ? scopeAggregatorNetworkNodeToQuestionPool(networkNode, fallbackQuestions, slug)
-            : networkNode;
-
-          sourceSigParts.push([
-            slug || '__general__',
-            computeAggregatorSourceSnapshotSignature(networkNodeForAggregation.questionResponses || {}),
-            computeAggregatorQuestionMetadataSignature(networkNodeForAggregation.questions || {}),
-          ].join(':'));
-
-          const { map, dirty } = buildAggregatorFromLocalCache(networkNodeForAggregation, {
-            parseMemo: this._aggregatorResponseParseMemo,
-            sessionSlug: slug,
-          });
-          mergeAggregatorResultRows(aggregateMap, map);
-          if (dirty) { void writeCache('questionsCache', slug, qCache); }
+  buildAggregator = () =>
+    measureSync('ce.onePageDemo.buildAggregator', () => {
+      if (!this.state.showResults) return;
+      bumpPerfCounter('aggregatorBuildCount');
+      const applyAggregatorData = (nextMap: any, providedSig: any = '', sourceSigKey: any = '') => {
+        const sig = providedSig || computeAggregatorDataSignature(nextMap);
+        if (sourceSigKey) {
+          this._aggregatorSourceSigKey = sourceSigKey;
         }
-
-        if (!sawCandidateCache) {
-          applyAggregatorData({}, '0:0:0', `${displaySlug}|${questionSourceSlug}|${netIdStr}|empty-cache`);
+        if (sig === this._aggregatorDataSig) {
+          bumpPerfCounter('noopSkips');
           return;
         }
         this._aggregatorDataSig = sig;
         this.setState({ aggregatorData: nextMap });
       };
 
-        if (!sawNetworkCache) {
-          applyAggregatorData({}, '0:0:0', `${displaySlug}|${questionSourceSlug}|${netIdStr}|missing-net`);
-          return;
-        }
+      const displaySlug = resolveEffectiveSlug(this.props);
+      const questionSourceSlug = resolveOnePageSessionSurveySlug(this.props);
+      const netIdVal = this.props.network?.id ?? this.props.networkChainId ?? 0;
+      const useBuiltInDemoFallback = shouldUseBuiltInDemoAggregatorFallback(displaySlug, questionSourceSlug);
+      const canBuildFromLocalCache = netIdVal != null && (this.props.isQuestionCacheReady || useBuiltInDemoFallback);
+
+      if (canBuildFromLocalCache) {
+        const netIdStr = String(netIdVal);
         try {
           const candidateSlugs = useBuiltInDemoFallback
             ? getUniqueAggregatorCandidateSlugs(displaySlug)
@@ -1324,22 +1267,70 @@ class OnePageSession extends Component<any, any> {
           let sawCandidateCache = false;
           let sawNetworkCache = false;
 
-        const sourceSigKey = `${displaySlug}|${questionSourceSlug}|${netIdStr}|${sourceSigParts.join('|')}`;
-        if (sourceSigKey === this._aggregatorSourceSigKey) {
-          bumpPerfCounter('aggregatorSourceSkips');
-          return;
-        }
-        applyAggregatorData(aggregateMap, computeAggregatorDataSignature(aggregateMap), sourceSigKey);
-      } catch (err) {
-        demoLog.error("Error building aggregator in OnePageSession:", err);
-        applyAggregatorData({}, '0:0:0', `${displaySlug}|${questionSourceSlug}|${netIdStr}|error`);
-      }
-    } else {
-      const netIdStr = String(netIdVal || '');
-      applyAggregatorData({}, '0:0:0', `${displaySlug}|${questionSourceSlug}|${netIdStr}|not-ready`);
-    }
-  });
+          for (const slug of candidateSlugs) {
+            let qCache = peekCacheSync('questionsCache', slug, { clone: false }) || {};
+            if (!qCache || typeof qCache !== 'object') qCache = {};
+            if (Object.keys(qCache).length === 0) {
+              sourceSigParts.push(`${slug || '__general__'}:empty-cache`);
+              continue;
+            }
+            sawCandidateCache = true;
 
+            if (!qCache[netIdStr]) {
+              sourceSigParts.push(`${slug || '__general__'}:missing-net`);
+              continue;
+            }
+            sawNetworkCache = true;
+
+            const fallbackQuestions = buildAggregatorFallbackQuestions(demoQuestionPool, slug);
+            const networkNode = qCache[netIdStr] || {};
+            const networkNodeForAggregation = useBuiltInDemoFallback
+              ? scopeAggregatorNetworkNodeToQuestionPool(networkNode, fallbackQuestions, slug)
+              : networkNode;
+
+            sourceSigParts.push(
+              [
+                slug || '__general__',
+                computeAggregatorSourceSnapshotSignature(networkNodeForAggregation.questionResponses || {}),
+                computeAggregatorQuestionMetadataSignature(networkNodeForAggregation.questions || {}),
+              ].join(':'),
+            );
+
+            const { map, dirty } = buildAggregatorFromLocalCache(networkNodeForAggregation, {
+              parseMemo: this._aggregatorResponseParseMemo,
+              sessionSlug: slug,
+            });
+            mergeAggregatorResultRows(aggregateMap, map);
+            if (dirty) {
+              void writeCache('questionsCache', slug, qCache);
+            }
+          }
+
+          if (!sawCandidateCache) {
+            applyAggregatorData({}, '0:0:0', `${displaySlug}|${questionSourceSlug}|${netIdStr}|empty-cache`);
+            return;
+          }
+
+          if (!sawNetworkCache) {
+            applyAggregatorData({}, '0:0:0', `${displaySlug}|${questionSourceSlug}|${netIdStr}|missing-net`);
+            return;
+          }
+
+          const sourceSigKey = `${displaySlug}|${questionSourceSlug}|${netIdStr}|${sourceSigParts.join('|')}`;
+          if (sourceSigKey === this._aggregatorSourceSigKey) {
+            bumpPerfCounter('aggregatorSourceSkips');
+            return;
+          }
+          applyAggregatorData(aggregateMap, computeAggregatorDataSignature(aggregateMap), sourceSigKey);
+        } catch (err) {
+          demoLog.error('Error building aggregator in OnePageSession:', err);
+          applyAggregatorData({}, '0:0:0', `${displaySlug}|${questionSourceSlug}|${netIdStr}|error`);
+        }
+      } else {
+        const netIdStr = String(netIdVal || '');
+        applyAggregatorData({}, '0:0:0', `${displaySlug}|${questionSourceSlug}|${netIdStr}|not-ready`);
+      }
+    });
 
   onSbtMintSuccess(eventOrSbtAddress: any = null) {
     const successfulSbtAddress =
@@ -1350,26 +1341,6 @@ class OnePageSession extends Component<any, any> {
 
     // Auto-close login modal and surface success state
     if (typeof this.props.toggleLoginModal === 'function') {
-      try { this.props.toggleLoginModal(false); } catch (e) { demoLog.warn('OnePageSession: callback', e); }
-    }
-    this.setState((prevState: Readonly<OnePageSession['state']>) => {
-      const prevTargets = Array.isArray(prevState.autoMintTargets) ? prevState.autoMintTargets : [];
-      const nextTargets = successfulSbtKey
-        ? prevTargets.filter((target: any) => String(target?.sbt || '').trim().toLowerCase() !== successfulSbtKey)
-        : prevTargets;
-      const autoMintComplete = nextTargets.length === 0;
-      return {
-        autoMintingMode: false,
-        mintSuccess: autoMintComplete,
-        autoMintTargets: nextTargets,
-      };
-    }, () => {
-      if ((this.state.autoMintTargets || []).length > 0) return;
-
-      // Clear persisted auto-mint intent to prevent re-trigger on refresh
-      try { sessionStorage.removeItem(this.getAutoHashStorageKey()); } catch (e) { demoLog.warn('OnePageSession: fallback', e); }
-
-      // --- NEW: Clear URL hash to remove the 'intent' from the browser address bar ---
       try {
         this.props.toggleLoginModal(false);
       } catch (e) {
@@ -1403,7 +1374,6 @@ class OnePageSession extends Component<any, any> {
         } catch (e) {
           demoLog.warn('OnePageSession: fallback', e);
         }
-        this._autoMintLegacyCredentialQuery = '';
 
         // --- NEW: Clear URL hash to remove the 'intent' from the browser address bar ---
         try {
@@ -1436,27 +1406,21 @@ class OnePageSession extends Component<any, any> {
   recordOriginalURL(urlIn: any = null) {
     if (this.originalURL || typeof window === 'undefined') return;
     const nextUrl =
-      typeof urlIn === 'string' && urlIn
-        ? urlIn
-        : `${window.location.pathname || ''}${window.location.search || ''}${window.location.hash || ''}`;
-    const cleanCredentialPath = buildSbtAutoMintCredentialCleanPath(
-      new URL(nextUrl || '/', window.location.origin).href,
-    );
-    this.originalURL = cleanCredentialPath || nextUrl || '';
+      typeof urlIn === 'string' && urlIn ? urlIn : `${window.location.pathname || ''}${window.location.search || ''}`;
+    this.originalURL = nextUrl || '';
   }
 
   /* =======================
    * Helpers: prefetch names for banner
    * ======================= */
   async prefetchTargetNames(targets: any) {
-    if (!sessionSupportsOnChainSbt(this.resolveCurrentSessionConfig())) return;
     const slug = resolveEffectiveSlug(this.props);
 
     // 1. Try to read from cache first to save RPC calls
-    let cachedNames: Record<string, string> = {};
-    let cachedImages: Record<string, unknown> = {};
+    let cachedNames: Record<string, any> = {};
+    let cachedImages: Record<string, any> = {};
     try {
-      const parsed = peekCacheSync<OnePageSbtCache>('sbtCache', slug, { clone: false });
+      const parsed = peekCacheSync('sbtCache', slug, { clone: false });
       if (parsed && typeof parsed === 'object') {
         // Determine network key if available, else null
         const netId = this.props.network?.id || this.props.networkChainId;
@@ -1485,8 +1449,55 @@ class OnePageSession extends Component<any, any> {
           getNameFromNet(netKey);
         }
 
-      // Set immediate cache hits to UI
-      if (Object.keys(cachedNames).length > 0 || Object.keys(cachedImages).length > 0) {
+        // B. Iterate ALL keys to find any missing names.
+        // This ensures we find the SBT name even if the wallet isn't connected yet
+        // or if the cached data resides under a different chain ID key.
+        Object.keys(parsed).forEach((k: any) => {
+          if (k !== netKey) getNameFromNet(k);
+        });
+      }
+    } catch (e) {
+      demoLog.warn('OnePageSession: fallback', e);
+    }
+
+    // Set immediate cache hits to UI
+    if (Object.keys(cachedNames).length > 0 || Object.keys(cachedImages).length > 0) {
+      this.setState((prev: Readonly<OnePageSession['state']>) => {
+        const updates: Record<string, any> = {};
+        if (Object.keys(cachedNames).length > 0) {
+          updates.sbtNames = { ...(prev.sbtNames || {}), ...cachedNames };
+        }
+        if (Object.keys(cachedImages).length > 0) {
+          updates.sbtImages = { ...(prev.sbtImages || {}), ...cachedImages };
+        }
+        return updates;
+      });
+    }
+
+    // 2. Fetch missing names via RPC
+    try {
+      const existing = { ...(this.state.sbtNames || {}), ...cachedNames };
+      const fetchedNames: Record<string, any> = {};
+      const fetchedImages: Record<string, any> = {};
+      for (const t of targets) {
+        const addr = (t?.sbt || '').toLowerCase();
+        if (!addr || existing[addr]) continue;
+        let info: any = null;
+        try {
+          // Use internal read provider ('none' resolves to read-only)
+          info = await sbtMetadataReadsPort.getSbtMetadata('none', addr, slug);
+        } catch (e) {
+          demoLog.warn('OnePageSession: fallback', e);
+        }
+        const name = getSbtDisplayName(info) || `Group ${addr.slice(0, 6)}...`;
+        fetchedNames[addr] = name;
+        if (info?.image) {
+          fetchedImages[addr] = info.image;
+        }
+        existing[addr] = name;
+      }
+
+      if (Object.keys(fetchedNames).length > 0 || Object.keys(fetchedImages).length > 0) {
         this.setState((prev: Readonly<OnePageSession['state']>) => {
           const updates: Record<string, any> = {};
           if (Object.keys(fetchedNames).length > 0) {
@@ -1498,41 +1509,8 @@ class OnePageSession extends Component<any, any> {
           return updates;
         });
       }
-
-      // 2. Fetch missing names via RPC
-      try {
-        const existing = { ...(this.state.sbtNames || {}), ...cachedNames };
-        const fetchedNames: Record<string, any> = {};
-        const fetchedImages: Record<string, any> = {};
-        for (const t of targets) {
-          const addr = (t?.sbt || '').toLowerCase();
-          if (!addr || existing[addr]) continue;
-          let info: any = null;
-          try {
-            // Use internal read provider ('none' resolves to read-only)
-            info = await contractScriptsAny.getSbtMetadata('none', addr, slug);
-          } catch (e) { demoLog.warn('OnePageSession: fallback', e); }
-          const name = getSbtDisplayName(info) || `Group ${addr.slice(0,6)}...`;
-          fetchedNames[addr] = name;
-          if (info?.image) {
-            fetchedImages[addr] = info.image;
-          }
-          existing[addr] = name;
-        }
-
-        if (Object.keys(fetchedNames).length > 0 || Object.keys(fetchedImages).length > 0) {
-          this.setState((prev: Readonly<OnePageSession['state']>) => {
-            const updates: Record<string, any> = {};
-            if (Object.keys(fetchedNames).length > 0) {
-              updates.sbtNames = { ...(prev.sbtNames || {}), ...fetchedNames };
-            }
-            if (Object.keys(fetchedImages).length > 0) {
-              updates.sbtImages = { ...(prev.sbtImages || {}), ...fetchedImages };
-            }
-            return updates;
-          });
-        }
-      } catch (e) { demoLog.warn('OnePageSession: fallback', e); }
+    } catch (e) {
+      demoLog.warn('OnePageSession: fallback', e);
     }
   }
 
@@ -1566,19 +1544,13 @@ class OnePageSession extends Component<any, any> {
     let sourceQuery = '';
     try {
       const currentSearch = typeof window !== 'undefined' && window.location.search ? window.location.search : '';
-      const saved = sessionStorage.getItem(this.getAutoHashStorageKey()) || '';
-      const identityQuery = currentSearch || saved;
-      const legacyCredentialQuery = String(this._autoMintLegacyCredentialQuery || '');
-      if (hasSbtAutoMintCredential(currentSearch)) {
-        this._autoMintLegacyCredentialQuery = currentSearch;
-        sourceQuery = currentSearch;
-      } else if (
-        legacyCredentialQuery &&
-        sanitizeSbtAutoMintQueryForStorage(legacyCredentialQuery) === sanitizeSbtAutoMintQueryForStorage(identityQuery)
+      sourceQuery = currentSearch || '';
+      if (
+        !sourceQuery ||
+        (!sourceQuery.includes('gp') && !sourceQuery.includes('inv') && !sourceQuery.includes('sbt'))
       ) {
-        sourceQuery = legacyCredentialQuery;
-      } else {
-        sourceQuery = identityQuery;
+        const saved = sessionStorage.getItem(this.getAutoHashStorageKey()) || '';
+        if (saved) sourceQuery = saved;
       }
     } catch (e) {
       demoLog.warn('OnePageSession: fallback', e);
@@ -1997,7 +1969,7 @@ class OnePageSession extends Component<any, any> {
               return out;
             };
             for (const s of slugsToCheck) {
-              const parsed = peekCacheSync<OnePageSbtCache>('sbtCache', s, { clone: false });
+              const parsed = peekCacheSync('sbtCache', s, { clone: false });
               if (!parsed || typeof parsed !== 'object') continue;
               for (const netKey of Object.keys(parsed)) {
                 const entry = parsed[netKey]?.sbtList?.[sbtKey];
@@ -2157,6 +2129,8 @@ class OnePageSession extends Component<any, any> {
                       password,
                       sbtAddress: walletScopeSbtAddress,
                     });
+              demoLog.log('[INVITE_DEBUG v4] auto-mint local groupPasswordHash:', localHash);
+              demoLog.log('[INVITE_DEBUG v4] auto-mint on-chain groupPasswordHash:', onchainHash);
               if (!localHash || String(localHash).toLowerCase() !== String(onchainHash).toLowerCase()) {
                 throw new Error('Group password mismatch');
               }
@@ -2278,11 +2252,7 @@ class OnePageSession extends Component<any, any> {
         } else if (msg.includes('max tokens') || msg.includes('limit reached')) {
           updateStatus(sbtKey, { status: 'failed', name: `Join Failed`, error: 'Group limit reached' });
         } else {
-          updateStatus(sbtKey, {
-            status: 'failed',
-            name: `Join Failed`,
-            error: 'Join failed. Verify the credential and network, then retry.',
-          });
+          updateStatus(sbtKey, { status: 'failed', name: `Join Failed`, error: getErrorMessage(e, 'Mint failed') });
         }
       }
 
@@ -2497,7 +2467,7 @@ class OnePageSession extends Component<any, any> {
   toggleGroups() {
     this.setState(
       (prevState: Readonly<OnePageSession['state']>) => ({ showGroups: !prevState.showGroups }),
-      () => this.resetDemoURL()
+      () => this.resetDemoURL(),
     );
   }
 
@@ -2559,11 +2529,9 @@ class OnePageSession extends Component<any, any> {
 
   handlePileSubmitRailVisibilityChange(visible: any) {
     const nextVisible = !!visible;
-    this.setState((prevState: Readonly<OnePageSession['state']>) => (
-      prevState.pileSubmitRailVisible === nextVisible
-        ? null
-        : { pileSubmitRailVisible: nextVisible }
-    ));
+    this.setState((prevState: Readonly<OnePageSession['state']>) =>
+      prevState.pileSubmitRailVisible === nextVisible ? null : { pileSubmitRailVisible: nextVisible },
+    );
   }
 
   toggleGroupsAbout() {
@@ -2573,7 +2541,7 @@ class OnePageSession extends Component<any, any> {
   toggleResults() {
     this.setState(
       (prevState: Readonly<OnePageSession['state']>) => ({ showResults: !prevState.showResults }),
-      () => this.resetDemoURL()
+      () => this.resetDemoURL(),
     );
   }
 
@@ -2582,7 +2550,9 @@ class OnePageSession extends Component<any, any> {
   }
 
   toggleResultsAbout() {
-    this.setState((prevState: Readonly<OnePageSession['state']>) => ({ showResultsAbout: !prevState.showResultsAbout }));
+    this.setState((prevState: Readonly<OnePageSession['state']>) => ({
+      showResultsAbout: !prevState.showResultsAbout,
+    }));
   }
 
   /* =======================
@@ -2610,7 +2580,7 @@ class OnePageSession extends Component<any, any> {
   dismissStatusItem(addrKey: any) {
     const key = (addrKey || '').toLowerCase();
     this.setState((prev: Readonly<OnePageSession['state']>) => ({
-      dismissedStatusItems: { ...(prev.dismissedStatusItems || {}), [key]: true }
+      dismissedStatusItems: { ...(prev.dismissedStatusItems || {}), [key]: true },
     }));
   }
 
@@ -2901,13 +2871,14 @@ class OnePageSession extends Component<any, any> {
       displaySlug: displaySessionSlug,
       sourceSlug: surveySessionSlug,
     });
-    const scopedDemoQuestionPool = demoQuestionPool.length > 0
-      ? demoQuestionPool.map((entry: any) => ({
-          ...entry,
-          sessionSlug: displaySessionSlug,
-          sessionSlugExplicit: true,
-        }))
-      : [];
+    const scopedDemoQuestionPool =
+      demoQuestionPool.length > 0
+        ? demoQuestionPool.map((entry: any) => ({
+            ...entry,
+            sessionSlug: displaySessionSlug,
+            sessionSlugExplicit: true,
+          }))
+        : [];
     const sharedQuestionPool = scopedDemoQuestionPool.length > 0 ? scopedDemoQuestionPool : undefined;
     const embeddedQuestionSessionSlug = sharedQuestionPool ? displaySessionSlug : surveySessionSlug;
     const embeddedGroupsSessionSlug = displaySessionSlug || surveySessionSlug;
@@ -2930,52 +2901,87 @@ class OnePageSession extends Component<any, any> {
         : []),
     ];
     const basePath = readPublicUrlBasePath();
-    const sectionsGridClassName = [
-      styles.sectionsGrid,
-      !isDemoSlug ? styles.sectionsGridTwoUp : '',
-    ].filter(Boolean).join(' ');
+    const sectionsGridClassName = [styles.sectionsGrid, !isDemoSlug ? styles.sectionsGridTwoUp : '']
+      .filter(Boolean)
+      .join(' ');
 
-    // Resolve first target group name (spinner if not ready)
-    const firstTargetAddrLower =
-      (this.state.autoMintTargets && this.state.autoMintTargets[0] && this.state.autoMintTargets[0].sbt)
-        ? this.state.autoMintTargets[0].sbt.toLowerCase()
-        : null;
-    const firstTargetName = firstTargetAddrLower ? this.state.sbtNames[firstTargetAddrLower] : null;
-
-    // Ensure close button is visible; prefer module class if present, else use existing global fallback
-    const alertCloseClass = styles.alertCloseButton || 'sbt-alert-close-btn';
-
-    const fallbackSessionLabel = (slug && String(slug).trim()) ? String(slug).trim() : 'Session';
+    const fallbackSessionLabel = slug && String(slug).trim() ? String(slug).trim() : 'Session';
     const titleText = sessionName ? `${sessionName}` : fallbackSessionLabel;
+    const renderSectionHeading = (title: any, subtitle: any) => (
+      <span className={styles.sectionHeaderText}>
+        <span className={styles.sectionHeaderTitle}>{title}</span>
+        <span className={styles.sectionHeaderSubtitle}>{subtitle}</span>
+      </span>
+    );
+    const questionsSectionTitle = renderSectionHeading('Questions', 'Answer or Add');
+    const questionsSectionTooltip =
+      'Survey and question platform allowing detailed responses, advanced question formats, preference weighing, and group filtering.';
+    const documentsSectionTooltip =
+      'Allows the conversation to be enriched by data, and the formats can change per-session';
     const corpusViewerLoadState = this.state.corpusViewerLoadState || DEFAULT_CORPUS_VIEWER_LOAD_STATE;
-    const loadFullCorpusButtonLabel = corpusViewerLoadState.loadButtonLabel || DEFAULT_CORPUS_VIEWER_LOAD_STATE.loadButtonLabel;
+    const loadFullCorpusButtonLabel =
+      corpusViewerLoadState.loadButtonLabel || DEFAULT_CORPUS_VIEWER_LOAD_STATE.loadButtonLabel;
     const disableLoadFullCorpusButton = !!corpusViewerLoadState.disableLoadButton;
     const pileSubmitRailActive = !this.state.showQuestions && this.state.pileSubmitRailVisible;
     const brandingSectionClassName = [
       styles.brandingSection,
       pileSubmitRailActive ? styles.brandingSectionWithPileSubmitRail : '',
-    ].filter(Boolean).join(' ');
+    ]
+      .filter(Boolean)
+      .join(' ');
     const titleContainerClassName = [
       styles.titleContainer,
       pileSubmitRailActive ? styles.titleContainerWithPileSubmitRail : '',
-    ].filter(Boolean).join(' ');
-    const sessionBackendKind = resolveSessionBackendKind({
+    ]
+      .filter(Boolean)
+      .join(' ');
+    const isTelegramSession = isOnePageTelegramBackendMode({
       sessionConfig: resolvedSessionConfig,
       probeResult: this.state.telegramSessionMeta,
     });
 
-    if (sessionBackendKind === 'telegram') {
-      return this.renderTelegramSessionShell({
-        titleText,
-        sessionInfo,
-        sessionName,
-        sessionHeader,
-        defaultTags,
-        displaySessionSlug,
-        contracts,
-        blockLimits,
-        networkChainId,
-      });
+    if (isTelegramSession) {
+      return (
+        <OnePageSessionTelegramShell
+          account={this.props.account}
+          blockLimits={blockLimits}
+          contracts={contracts}
+          defaultTags={defaultTags}
+          disclaimersActive={this.state.disclaimersActive}
+          displaySessionSlug={displaySessionSlug}
+          filterState={this.state.filterState}
+          loginComplete={this.props.loginComplete}
+          network={this.props.network}
+          networkChainId={networkChainId}
+          provider={this.props.provider}
+          questionResponsesNonce={this.props.questionResponsesNonce}
+          questionScanProgress={this.props.questionScanProgress}
+          resultsViewMode={this.state.resultsViewMode}
+          sessionHeader={sessionHeader}
+          sessionInfo={sessionInfo}
+          sessionName={sessionName}
+          telegramAgentQuestions={this.state.telegramAgentQuestions || []}
+          telegramAgentQuestionsStatus={this.state.telegramAgentQuestionsStatus}
+          telegramAgentResults={this.state.telegramAgentResults}
+          telegramAgentResultsStatus={this.state.telegramAgentResultsStatus}
+          telegramClientEnvelope={this.state.telegramClientEnvelope}
+          telegramPolisDataset={this.state.telegramPolisDataset}
+          telegramQuestionPileIndex={this.state.telegramQuestionPileIndex}
+          telegramQuestionSubmitError={this.state.telegramQuestionSubmitError}
+          telegramSessionMeta={this.state.telegramSessionMeta}
+          telegramSubmittedQuestionIds={this.state.telegramSubmittedQuestionIds}
+          telegramSubmittingQuestionId={this.state.telegramSubmittingQuestionId}
+          titleText={titleText}
+          onLogout={this.handleTelegramLogout}
+          onOpenLoginModal={() => this.props.toggleLoginModal?.(true)}
+          onQuestionPileIndexChange={(telegramQuestionPileIndex: number) =>
+            this.setState({ telegramQuestionPileIndex })
+          }
+          onRefresh={() => this.loadTelegramAgentData(true)}
+          onResultsModeChange={(resultsViewMode) => this.setState({ resultsViewMode })}
+          onSubmitAnswer={this.handleTelegramQuestionSubmit}
+        />
+      );
     }
 
     return (
@@ -3155,18 +3161,19 @@ class OnePageSession extends Component<any, any> {
             <div className={styles.tooltip} tabIndex={0} aria-label="Session info">
               <FontAwesomeIcon icon={faQuestionCircle} />
               <span className={styles.tooltiptext}>
-                {sessionInfo
-                  ? <p><em>{sessionInfo}</em></p>
-                  : <p>Share input; your responses help generate a collective intelligence map.</p>}
+                {sessionInfo ? (
+                  <p>
+                    <em>{sessionInfo}</em>
+                  </p>
+                ) : (
+                  <p>Share input; your responses help generate a collective intelligence map.</p>
+                )}
               </span>
             </div>
           </div>
 
           {this.state.showQuestions ? (
-            <div
-              className={styles.pileHeaderRow}
-              data-testid={E2E_TESTIDS.SESSION_QUESTIONS_FULL_HEADER}
-            >
+            <div className={styles.pileHeaderRow} data-testid={E2E_TESTIDS.SESSION_QUESTIONS_FULL_HEADER}>
               <div className={styles.pileBackContainer}>
                 <button
                   type="button"
@@ -3181,11 +3188,13 @@ class OnePageSession extends Component<any, any> {
               </div>
               <div className={styles.pileHeaderTitleWrap}>
                 <h2 className={styles.pileHeaderTitle}>{questionsSectionTitle}</h2>
-                <div className={`${styles.tooltip} ${styles.pileHeaderTooltip}`} tabIndex={0} aria-label="Questions info">
+                <div
+                  className={`${styles.tooltip} ${styles.pileHeaderTooltip}`}
+                  tabIndex={0}
+                  aria-label="Questions info"
+                >
                   <FontAwesomeIcon icon={faQuestionCircle} />
-                  <span className={styles.tooltiptext}>
-                    {questionsSectionTooltip}
-                  </span>
+                  <span className={styles.tooltiptext}>{questionsSectionTooltip}</span>
                 </div>
               </div>
             </div>
@@ -3235,59 +3244,56 @@ class OnePageSession extends Component<any, any> {
               />
             </Suspense>
           )}
-
         </div>
 
         {/* Questions section */}
         {this.state.showQuestions && (
           <div className={styles.sectionContainer} ref={this.questionsSectionRef}>
             <div className={`${styles.miniSectionContent} ${styles.miniSectionContentNoHeader}`}>
-
-            <Suspense fallback={<LazyFallback label="Loading..." minHeight="20vh" />}>
-              <MemoSurveyPage
-                miniMode={true}
-                hideEmbeddedDebugUi={true}
-                account={this.props.account}
-                provider={this.props.provider}
-                network={this.props.network}
-                toggleLoginModal={this.props.toggleLoginModal}
-                loginComplete={this.props.loginComplete}
-                sessionInfo={sessionInfo}
-                sessionName={sessionName}
-                sessionHeader={sessionHeader}
-                defaultTags={defaultTags}
-                defaultFilterState={defaultFilterState}
-                defaultFeaturedSBTs={defaultFeaturedSBTs}
-                autoOpenResults={this.state.autoOpenResults}
-                questionResponsesNonce={this.props.questionResponsesNonce}
-                questionScanProgress={this.props.questionScanProgress}
-                refreshSurveyResponsesByID={this.props.refreshSurveyResponsesByID}
-                refreshQuestionMetadata={this.props.refreshQuestionMetadata}
-                refreshQuestionResponses={this.props.refreshQuestionResponses}
-                isQuestionCacheReady={this.props.isQuestionCacheReady}
-                isSBTCacheReady={this.props.isSBTCacheReady}
-                isSurveyCacheReady={this.props.isSurveyCacheReady}
-                isResponsesCacheReady={this.props.isResponsesCacheReady}
-                cacheHasLoaded={this.props.cacheHasLoaded}
-                onFilterChange={this.handleFilterChange}
-                filterState={this.state.filterState}
-                hideSessionSelector={true}
-                // Same invariant in embedded full mode: start scoped to this session,
-                // then let SurveyResults widen scope explicitly if the user wants to.
-                sessionSlugPinned={true}
-                preventUrlChange={true}
-                onResultsModalClose={this.handleResultsModalClose}
-                /* per-demo passthroughs */
-                sessionSlug={embeddedQuestionSessionSlug}
-                questionPool={sharedQuestionPool}
-                sessionConfig={resolvedSessionConfig}
-                contracts={contracts}
-                blockLimits={blockLimits}
-                networkChainId={networkChainId}
-                litHooks={scopedLitHooks}
-              />
-            </Suspense>
-
+              <Suspense fallback={<LazyFallback label="Loading..." minHeight="20vh" />}>
+                <MemoSurveyPage
+                  miniMode={true}
+                  hideEmbeddedDebugUi={true}
+                  account={this.props.account}
+                  provider={this.props.provider}
+                  network={this.props.network}
+                  toggleLoginModal={this.props.toggleLoginModal}
+                  loginComplete={this.props.loginComplete}
+                  sessionInfo={sessionInfo}
+                  sessionName={sessionName}
+                  sessionHeader={sessionHeader}
+                  defaultTags={defaultTags}
+                  defaultFilterState={defaultFilterState}
+                  defaultFeaturedSBTs={defaultFeaturedSBTs}
+                  autoOpenResults={this.state.autoOpenResults}
+                  questionResponsesNonce={this.props.questionResponsesNonce}
+                  questionScanProgress={this.props.questionScanProgress}
+                  refreshSurveyResponsesByID={this.props.refreshSurveyResponsesByID}
+                  refreshQuestionMetadata={this.props.refreshQuestionMetadata}
+                  refreshQuestionResponses={this.props.refreshQuestionResponses}
+                  isQuestionCacheReady={this.props.isQuestionCacheReady}
+                  isSBTCacheReady={this.props.isSBTCacheReady}
+                  isSurveyCacheReady={this.props.isSurveyCacheReady}
+                  isResponsesCacheReady={this.props.isResponsesCacheReady}
+                  cacheHasLoaded={this.props.cacheHasLoaded}
+                  onFilterChange={this.handleFilterChange}
+                  filterState={this.state.filterState}
+                  hideSessionSelector={true}
+                  // Same invariant in embedded full mode: start scoped to this session,
+                  // then let SurveyResults widen scope explicitly if the user wants to.
+                  sessionSlugPinned={true}
+                  preventUrlChange={true}
+                  onResultsModalClose={this.handleResultsModalClose}
+                  /* per-demo passthroughs */
+                  sessionSlug={embeddedQuestionSessionSlug}
+                  questionPool={sharedQuestionPool}
+                  sessionConfig={resolvedSessionConfig}
+                  contracts={contracts}
+                  blockLimits={blockLimits}
+                  networkChainId={networkChainId}
+                  litHooks={scopedLitHooks}
+                />
+              </Suspense>
             </div>
           </div>
         )}
@@ -3387,62 +3393,57 @@ class OnePageSession extends Component<any, any> {
           {isDemoSlug && (
             <div
               className={`${styles.sectionContainer} ${this.state.showDocuments ? styles.sectionExpanded : ''}`}
-              data-testid='ce-demo-documents-section'
+              data-testid="ce-demo-documents-section"
             >
-            <div className={styles.sectionHeaderRow}>
-              <h2
-                onClick={this.toggleDocuments}
-                className={`${styles.sectionHeader} ${styles.documentsSectionHeader}`.trim()}
-                data-testid='ce-demo-documents-toggle'
-              >
-                <span className={styles.documentsSectionHeaderMain}>
+              <div className={styles.sectionHeaderRow}>
+                <h2
+                  onClick={this.toggleDocuments}
+                  className={`${styles.sectionHeader} ${styles.documentsSectionHeader}`.trim()}
+                  data-testid="ce-demo-documents-toggle"
+                >
                   {this.state.showDocuments ? (
                     <FontAwesomeIcon icon={faCaretUp} className={styles.sectionToggleIcon} />
                   ) : (
                     <FontAwesomeIcon icon={faCaretDown} className={styles.sectionToggleIcon} />
                   )}
-                  <span className={`${styles.sectionHeaderText} ${styles.documentsSectionHeaderText}`.trim()}>
-                    <span className={styles.documentsSectionHeaderTitleRow}>
-                      <span className={styles.sectionHeaderTitle}>Context</span>
-                      {this.state.showDocuments && (
-                        <span className={`${styles.sectionHeaderMeta} ${styles.documentsSectionHeaderMeta}`.trim()}>
-                          <div
-                            className={`${styles.tooltip} ${styles.sectionHeaderTooltip}`}
-                            onClick={(e: any) => e.stopPropagation()}
-                          >
-                            <FontAwesomeIcon icon={faQuestionCircle} />
-                            <span className={styles.tooltiptext}>
-                              {documentsSectionTooltip}
-                            </span>
-                          </div>
-                          <a
-                            href={DEMO_CORPUS_GITHUB_URL}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={styles.sectionHeaderLink}
-                            onClick={(e: any) => e.stopPropagation()}
-                          >
-                            <FontAwesomeIcon icon={faExternalLinkAlt} />
-                            <span>GitHub</span>
-                          </a>
-                          <button
-                            type="button"
-                            className={`${styles.sectionHeaderLink} ${styles.sectionHeaderLinkButton}`.trim()}
-                            onClick={this.handleLoadFullCorpusClick}
-                            disabled={disableLoadFullCorpusButton}
-                            data-testid='ce-demo-documents-load-full-corpus'
-                          >
-                            <FontAwesomeIcon icon={faDownload} />
-                            <span>{loadFullCorpusButtonLabel}</span>
-                          </button>
-                        </span>
-                      )}
-                    </span>
-                    <span className={styles.sectionHeaderSubtitle}>View</span>
-                  </span>
-                </span>
-              </h2>
-            </div>
+                  {renderSectionHeading('Context', 'View')}
+                  {this.state.showDocuments && (
+                    <div
+                      className={`${styles.tooltip} ${styles.sectionHeaderTooltip}`}
+                      onClick={(e: any) => e.stopPropagation()}
+                    >
+                      <FontAwesomeIcon icon={faQuestionCircle} />
+                      <span className={styles.tooltiptext}>{documentsSectionTooltip}</span>
+                    </div>
+                  )}
+                </h2>
+                {this.state.showDocuments && (
+                  <div className={styles.sectionHeaderActionsScroller}>
+                    <div className={styles.sectionHeaderActions}>
+                      <a
+                        href={DEMO_CORPUS_GITHUB_URL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={styles.sectionHeaderActionButton}
+                        onClick={(e: any) => e.stopPropagation()}
+                      >
+                        <FontAwesomeIcon icon={faExternalLinkAlt} />
+                        <span>GitHub</span>
+                      </a>
+                      <button
+                        type="button"
+                        className={styles.sectionHeaderActionButton}
+                        onClick={this.handleLoadFullCorpusClick}
+                        disabled={disableLoadFullCorpusButton}
+                        data-testid="ce-demo-documents-load-full-corpus"
+                      >
+                        <FontAwesomeIcon icon={faDownload} />
+                        <span>{loadFullCorpusButtonLabel}</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
               {this.state.showDocuments && (
                 <div className={styles.miniSectionContent}>
                   <Suspense fallback={<LazyFallback label="Loading Corpus..." minHeight="20vh" />}>
@@ -3479,8 +3480,8 @@ class OnePageSession extends Component<any, any> {
                   >
                     <FontAwesomeIcon icon={faQuestionCircle} />
                     <span className={styles.tooltiptext}>
-                      Click “Raw Results” to explore detailed breakdowns, filter by group membership,
-                      and export a pol.is report.
+                      Click “Raw Results” to explore detailed breakdowns, filter by group membership, and export a
+                      pol.is report.
                     </span>
                   </div>
                 )}
@@ -3503,7 +3504,9 @@ class OnePageSession extends Component<any, any> {
                           title={label}
                           aria-pressed={isSelected}
                         >
-                          <span className={styles.sectionHeaderViewModeIcon} aria-hidden="true">{icon}</span>
+                          <span className={styles.sectionHeaderViewModeIcon} aria-hidden="true">
+                            {icon}
+                          </span>
                           <span className={styles.sectionHeaderViewModeLabel}>{label}</span>
                         </button>
                       );
@@ -3565,17 +3568,17 @@ class OnePageSession extends Component<any, any> {
                   {isDemoSlug && resultsViewMode === 'debateAtlas' && (
                     <Suspense fallback={<LazyFallback label="Loading Debate Atlas..." minHeight="30vh" />}>
                       <div style={{ maxHeight: '80vh', overflowY: 'auto' }}>
-	                        <DebateMapAny
-	                          account={this.props.account}
-	                          provider={this.props.provider}
-	                          network={this.props.network}
+                        <DebateMapAny
+                          account={this.props.account}
+                          provider={this.props.provider}
+                          network={this.props.network}
                           activeSessionSlug={slug}
                           toggleLoginModal={this.props.toggleLoginModal}
                           demoMode={true}
                           embedded={true}
                           requestedModalNodeId={this.state.embeddedAtlasNodeId}
                           onModalClose={this.state.embeddedAtlasReturnState ? this.handleEmbeddedAtlasModalClose : null}
-	                        />
+                        />
                       </div>
                     </Suspense>
                   )}

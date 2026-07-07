@@ -13,7 +13,7 @@ jest.mock('../../utilities/survey/questionRouting.js', () => ({
 }));
 
 const { getSessionCfg, getSessionChainId, getSessionNetwork } = require('./mainSiteSessionConfig.js');
-const contractScriptsModule = require('../../utilities/web3/chainGateway.js');
+const contractScriptsModule = require('../../utilities/web3/contractScripts.js');
 const questionRoutingModule = require('../../utilities/survey/questionRouting.js');
 
 describe('mainSiteSessionConfig', () => {

@@ -274,12 +274,14 @@ describe('contractHelpers sendTestnetFunds', () => {
     const recipientAddress = '0x1111111111111111111111111111111111111111';
     await helper.sendTestnetFunds(recipientAddress, 'demo-1');
 
-    expect(getCorsProxyUrlOrThrow).toHaveBeenCalledWith(expect.objectContaining({
-      sessionSlug: 'demo-1',
-      context: expect.objectContaining({
-        chainId: 11155420,
+    expect(getCorsProxyUrlOrThrow).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionSlug: 'demo-1',
+        context: expect.objectContaining({
+          chainId: 11155420,
+        }),
       }),
-    }));
+    );
     expect(fetchWorkerWithAuth).toHaveBeenCalledWith(
       'https://worker.example.com/base',
       expect.any(Object),
@@ -288,7 +290,7 @@ describe('contractHelpers sendTestnetFunds', () => {
         context: expect.objectContaining({
           chainId: 11155420,
         }),
-      })
+      }),
     );
   });
 
@@ -308,7 +310,8 @@ describe('contractHelpers sendTestnetFunds', () => {
       json: async () => ({ ok: true, txHash: '0xrefreshed123' }),
     }));
     const refreshSessionRegistryFieldsCache = jest.fn(async () => refreshedConfig);
-    const getCorsProxyUrlOrThrow = jest.fn()
+    const getCorsProxyUrlOrThrow = jest
+      .fn()
       .mockRejectedValueOnce(new Error('Worker URL is not configured.'))
       .mockResolvedValueOnce('https://demo-worker.example/');
     const getSessionConfigBySlug = jest.fn(() => staleConfig);
@@ -352,37 +355,48 @@ describe('contractHelpers sendTestnetFunds', () => {
     const result = await helper.sendTestnetFunds(recipientAddress, 'demo-1');
 
     expect(refreshSessionRegistryFieldsCache).toHaveBeenCalledTimes(1);
-    expect(refreshSessionRegistryFieldsCache).toHaveBeenCalledWith(expect.objectContaining({
-      chainId: 11155420,
-      slug: 'demo-1',
-      providerLike: 'wagmi',
-    }));
+    expect(refreshSessionRegistryFieldsCache).toHaveBeenCalledWith(
+      expect.objectContaining({
+        chainId: 11155420,
+        slug: 'demo-1',
+        providerLike: 'wagmi',
+      }),
+    );
     expect(getCorsProxyUrlOrThrow).toHaveBeenCalledTimes(2);
-    expect(getCorsProxyUrlOrThrow).toHaveBeenNthCalledWith(1, expect.objectContaining({
-      sessionSlug: 'demo-1',
-      sessionConfig: staleConfig,
-    }));
-    expect(getCorsProxyUrlOrThrow).toHaveBeenNthCalledWith(2, expect.objectContaining({
-      sessionSlug: 'demo-1',
-      sessionConfig: refreshedConfig,
-    }));
+    expect(getCorsProxyUrlOrThrow).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        sessionSlug: 'demo-1',
+        sessionConfig: staleConfig,
+      }),
+    );
+    expect(getCorsProxyUrlOrThrow).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        sessionSlug: 'demo-1',
+        sessionConfig: refreshedConfig,
+      }),
+    );
     expect(fetchWorkerWithAuth).toHaveBeenCalledWith(
       'https://demo-worker.example',
       expect.any(Object),
       expect.objectContaining({
         sessionSlug: 'demo-1',
         workerUrl: 'https://demo-worker.example',
-      })
+      }),
     );
     expect(result).toEqual({ ok: true, txHash: '0xrefreshed123' });
   });
 
   it('retries testnet funding against the sponsored source session when the requested session is not deployable yet', async () => {
-    writeSponsoredBootstrapFundingContext({
-      sessionSlug: 'source-session',
-      workerUrl: 'https://source-worker.example',
-      targetSessionSlug: '',
-    });
+    sessionStorage.setItem(
+      SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY,
+      JSON.stringify({
+        sessionSlug: 'source-session',
+        workerUrl: 'https://source-worker.example',
+        targetSessionSlug: '',
+      }),
+    );
 
     const fetchWorkerWithAuth = jest.fn(async () => ({
       ok: true,
@@ -445,12 +459,15 @@ describe('contractHelpers sendTestnetFunds', () => {
   });
 
   it('redeems a one-time sponsored faucet grant before falling back to authenticated source-session funding', async () => {
-    writeSponsoredBootstrapFundingContext({
-      sessionSlug: 'source-session',
-      workerUrl: 'https://source-worker.example',
-      targetSessionSlug: '',
-      faucetGrantToken: 'faucet-grant-1',
-    });
+    sessionStorage.setItem(
+      SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY,
+      JSON.stringify({
+        sessionSlug: 'source-session',
+        workerUrl: 'https://source-worker.example',
+        targetSessionSlug: '',
+        faucetGrantToken: 'faucet-grant-1',
+      }),
+    );
 
     const fetchWorkerWithAuth = jest.fn(async () => ({
       ok: true,
@@ -515,11 +532,14 @@ describe('contractHelpers sendTestnetFunds', () => {
   });
 
   it('does not reuse sponsored bootstrap funding context for a different target session', async () => {
-    writeSponsoredBootstrapFundingContext({
-      sessionSlug: 'source-session',
-      workerUrl: 'https://source-worker.example',
-      targetSessionSlug: 'sponsored-target',
-    });
+    sessionStorage.setItem(
+      SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY,
+      JSON.stringify({
+        sessionSlug: 'source-session',
+        workerUrl: 'https://source-worker.example',
+        targetSessionSlug: 'sponsored-target',
+      }),
+    );
 
     const fetchWorkerWithAuth = jest.fn(async () => ({
       ok: true,
@@ -573,11 +593,14 @@ describe('contractHelpers sendTestnetFunds', () => {
   });
 
   it('does not retry sponsored bootstrap funding on non-deployability worker failures', async () => {
-    writeSponsoredBootstrapFundingContext({
-      sessionSlug: 'source-session',
-      workerUrl: 'https://source-worker.example',
-      targetSessionSlug: 'sponsored-target',
-    });
+    sessionStorage.setItem(
+      SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY,
+      JSON.stringify({
+        sessionSlug: 'source-session',
+        workerUrl: 'https://source-worker.example',
+        targetSessionSlug: 'sponsored-target',
+      }),
+    );
 
     const fetchWorkerWithAuth = jest.fn(async () => ({
       ok: false,
@@ -701,12 +724,15 @@ describe('contractHelpers sendTestnetFunds', () => {
   });
 
   it('retries sponsored bootstrap funding when the deployed worker is missing a local faucet key', async () => {
-    writeSponsoredBootstrapFundingContext({
-      sessionSlug: 'source-session',
-      workerUrl: 'https://source-worker.example',
-      targetSessionSlug: 'sponsored-target',
-      faucetGrantToken: 'faucet-grant-1',
-    });
+    sessionStorage.setItem(
+      SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY,
+      JSON.stringify({
+        sessionSlug: 'source-session',
+        workerUrl: 'https://source-worker.example',
+        targetSessionSlug: 'sponsored-target',
+        faucetGrantToken: 'faucet-grant-1',
+      }),
+    );
 
     const fetchWorkerWithAuth = jest.fn(async () => ({
       ok: false,
@@ -788,12 +814,15 @@ describe('contractHelpers sendTestnetFunds', () => {
   });
 
   it('consumes one-time sponsored faucet grants instead of reusing them on later missing-key retries', async () => {
-    writeSponsoredBootstrapFundingContext({
-      sessionSlug: 'source-session',
-      workerUrl: 'https://source-worker.example',
-      targetSessionSlug: 'sponsored-target',
-      faucetGrantToken: 'faucet-grant-1',
-    });
+    sessionStorage.setItem(
+      SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY,
+      JSON.stringify({
+        sessionSlug: 'source-session',
+        workerUrl: 'https://source-worker.example',
+        targetSessionSlug: 'sponsored-target',
+        faucetGrantToken: 'faucet-grant-1',
+      }),
+    );
 
     const fetchWorkerWithAuth = jest
       .fn()

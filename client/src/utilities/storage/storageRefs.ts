@@ -58,7 +58,10 @@ const trim = (value: unknown): string => toStr(value).trim();
  * @param {string} [fallback]
  * @returns {'arweave' | 'lit-arweave' | 'cloudflare'}
  */
-export const normalizeStorageBackend = (value, fallback = STORAGE_BACKENDS.ARWEAVE) => {
+export const normalizeStorageBackend = (
+  value: unknown,
+  fallback: unknown = STORAGE_BACKENDS.ARWEAVE,
+): StorageBackend => {
   const raw = trim(value).toLowerCase();
   if (raw === STORAGE_BACKENDS.CLOUDFLARE || raw === 'cf' || raw === 'r2') {
     return STORAGE_BACKENDS.CLOUDFLARE;

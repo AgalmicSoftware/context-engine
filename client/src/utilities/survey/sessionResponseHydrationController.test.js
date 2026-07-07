@@ -72,8 +72,6 @@ const {
 } = require('../arweave/arweaveRetryHelpers.js');
 const { resolvePersistedQuestionResponsesWatermark } = require('./questionResponsesWatermark.js');
 const { shouldFlushCoalescedRun } = require('../session/mainSiteProgressHelpers.js');
-const { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } = require('../session/sessionModeProfile.js');
-const { resolveWorkerCanonicalCacheIdentity } = require('./workerCanonicalCacheIdentity.js');
 
 const NETWORK_ID = '11155420';
 const SESSION_SLUG = 'alpha';
@@ -82,30 +80,6 @@ const RESPONDER_LOWER = RESPONDER.toLowerCase();
 const QUESTION_ID_A = `0x${'a'.repeat(64)}`;
 const QUESTION_ID_B = `0x${'b'.repeat(64)}`;
 const WORKER_SESSION_ID = `0x${'5'.repeat(32)}`;
-
-const createWorkerCanonicalSessionConfig = ({
-  sessionId = WORKER_SESSION_ID,
-  slug = SESSION_SLUG,
-  workerUrl = 'https://alpha-response-worker.example.test',
-} = {}) => ({
-  slug,
-  sessionId,
-  corsWorkerUrl: workerUrl,
-  sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
-  storageProfile: {
-    backend: 'cloudflare',
-    resources: {
-      questions: 'active',
-      surveys: 'active',
-      responses: 'active',
-    },
-    payloadAccessControl: {
-      gate: 'role_gate',
-      encryption: 'worker_envelope',
-      mode: 'worker_sbt_gate',
-    },
-  },
-});
 
 const deepClone = (value) => (value == null ? value : JSON.parse(JSON.stringify(value)));
 
@@ -217,18 +191,10 @@ const createMockHost = (overrides = {}) => {
     updateQuestionsCacheAtomic: createAtomicUpdater('questionsCache'),
     updateUserCacheAtomic: createAtomicUpdater('userCache'),
     getActiveSessionSlug: jest.fn(() => activeSlug || SESSION_SLUG),
-    getSessionCfg: jest.fn((slug) => ({
-      slug,
-      networkChainId: NETWORK_ID,
-      blockLimits: { start: 10, end: null },
-    })),
     getSessionChainId: jest.fn(() =>
       Object.prototype.hasOwnProperty.call(overrides, 'chainId') ? chainId : NETWORK_ID,
     ),
     getAccount: jest.fn(() => (Object.prototype.hasOwnProperty.call(overrides, 'account') ? account : RESPONDER)),
-    getProviderLike: jest.fn(() =>
-      Object.prototype.hasOwnProperty.call(overrides, 'providerLike') ? providerLike : 'provider-like',
-    ),
     scanScopeNoop: jest.fn(() => false),
     setReadinessStateIfChanged: jest.fn((patch) => {
       if (patch) Object.assign(state, patch);
@@ -716,18 +682,20 @@ describe('createSessionResponseHydrationController', () => {
 
       const stored = host.getStored('questionsCache', SESSION_SLUG);
 
-      expect(stored?.[NETWORK_ID]).toEqual(expect.objectContaining({
-        questionsLatestBlock: 9,
-        questionsDiscoveryCheckpointBlock: 9,
-        questions: {},
-        questionResponses: {},
-        questionResponsesMeta: {},
-        questionResponsesLatestBlock: 12,
-        pendingQuestionMetadata: {},
-        arweaveTxCache: {},
-        arweaveTxFailureCache: {},
-        questionHydrationMeta: {},
-      }));
+      expect(stored?.[NETWORK_ID]).toEqual(
+        expect.objectContaining({
+          questionsLatestBlock: 9,
+          questionsDiscoveryCheckpointBlock: 9,
+          questions: {},
+          questionResponses: {},
+          questionResponsesMeta: {},
+          questionResponsesLatestBlock: 12,
+          pendingQuestionMetadata: {},
+          arweaveTxCache: {},
+          arweaveTxFailureCache: {},
+          questionHydrationMeta: {},
+        }),
+      );
       expect(ensureQuestionArweaveCacheBranches).toHaveBeenCalled();
     });
 
@@ -738,73 +706,79 @@ describe('createSessionResponseHydrationController', () => {
       });
       contractScripts.getQuestionResponsesChunkedWithCallback.mockImplementationOnce(
         async (mode, fromBlock, toBlock, progressCb, dataCb) => {
-          dataCb({
-            [QUESTION_ID_A]: [
-              {
-                responder: RESPONDER,
-                response: {
-                  type: 'binary',
-                  sessionName: 'Alpha Session',
-                  answer: { value: 'Agree', encrypted: false },
+          dataCb(
+            {
+              [QUESTION_ID_A]: [
+                {
+                  responder: RESPONDER,
+                  response: {
+                    type: 'binary',
+                    sessionName: 'Alpha Session',
+                    answer: { value: 'Agree', encrypted: false },
+                  },
+                  blockNumber: 10,
+                  transactionIndex: 0,
+                  logIndex: 0,
                 },
-                blockNumber: 10,
-                transactionIndex: 0,
-                logIndex: 0,
-              },
-              {
-                responder: '0xForeign',
-                response: {
-                  type: 'binary',
-                  sessionName: 'Beta Session',
-                  answer: { value: 'Disagree', encrypted: false },
+                {
+                  responder: '0xForeign',
+                  response: {
+                    type: 'binary',
+                    sessionName: 'Beta Session',
+                    answer: { value: 'Disagree', encrypted: false },
+                  },
+                  blockNumber: 11,
+                  transactionIndex: 0,
+                  logIndex: 0,
                 },
-                blockNumber: 11,
-                transactionIndex: 0,
-                logIndex: 0,
-              },
-              {
-                responder: '0xStringForeign',
-                response: JSON.stringify({
-                  type: 'binary',
-                  sessionSlug: 'beta',
-                  answer: { value: 'Unsure', encrypted: false },
-                }),
-                blockNumber: 11,
-                transactionIndex: 1,
-                logIndex: 0,
-              },
-              {
-                responder: '0xLegacy',
-                response: {
-                  type: 'binary',
-                  answer: { value: 'Agree', encrypted: false },
+                {
+                  responder: '0xStringForeign',
+                  response: JSON.stringify({
+                    type: 'binary',
+                    sessionSlug: 'beta',
+                    answer: { value: 'Unsure', encrypted: false },
+                  }),
+                  blockNumber: 11,
+                  transactionIndex: 1,
+                  logIndex: 0,
                 },
-                blockNumber: 12,
-                transactionIndex: 0,
-                logIndex: 0,
-              },
-            ],
-          }, 12);
-        }
+                {
+                  responder: '0xLegacy',
+                  response: {
+                    type: 'binary',
+                    answer: { value: 'Agree', encrypted: false },
+                  },
+                  blockNumber: 12,
+                  transactionIndex: 0,
+                  logIndex: 0,
+                },
+              ],
+            },
+            12,
+          );
+        },
       );
       const host = createMockHost();
       const controller = createSessionResponseHydrationController(host);
 
       await controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG);
 
-      const questionResponses = (
-        host.getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID]?.questionResponses?.[QUESTION_ID_A] || {}
+      const questionResponses =
+        host.getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID]?.questionResponses?.[QUESTION_ID_A] || {};
+      expect(questionResponses[RESPONDER_LOWER]).toEqual(
+        expect.objectContaining({
+          sessionName: 'Alpha Session',
+        }),
       );
-      expect(questionResponses[RESPONDER_LOWER]).toEqual(expect.objectContaining({
-        sessionName: 'Alpha Session',
-      }));
-      expect(questionResponses['0xlegacy']).toEqual(expect.objectContaining({
-        type: 'binary',
-      }));
+      expect(questionResponses['0xlegacy']).toEqual(
+        expect.objectContaining({
+          type: 'binary',
+        }),
+      );
       expect(questionResponses['0xforeign']).toBeUndefined();
       expect(questionResponses['0xstringforeign']).toBeUndefined();
       expect(
-        host.getStored('userCache', SESSION_SLUG)?.['0xforeign']?.[NETWORK_ID]?.data?.questionResponses
+        host.getStored('userCache', SESSION_SLUG)?.['0xforeign']?.[NETWORK_ID]?.data?.questionResponses,
       ).toBeUndefined();
     });
 
@@ -820,61 +794,63 @@ describe('createSessionResponseHydrationController', () => {
       });
       contractScripts.getQuestionResponsesChunkedWithCallback.mockImplementationOnce(
         async (mode, fromBlock, toBlock, progressCb, dataCb) => {
-          dataCb({
-            [QUESTION_ID_A]: [
-              {
-                responder: '0xContext',
-                response: {
-                  type: 'binary',
-                  sessionName: 'Context Engine',
-                  answer: { value: 'yes', encrypted: false },
+          dataCb(
+            {
+              [QUESTION_ID_A]: [
+                {
+                  responder: '0xContext',
+                  response: {
+                    type: 'binary',
+                    sessionName: 'Context Engine',
+                    answer: { value: 'yes', encrypted: false },
+                  },
+                  blockNumber: 10,
+                  transactionIndex: 0,
+                  logIndex: 0,
                 },
-                blockNumber: 10,
-                transactionIndex: 0,
-                logIndex: 0,
-              },
-              {
-                responder: '0xDemoSlug',
-                response: JSON.stringify({
-                  type: 'binary',
-                  sessionSlug: 'demo',
-                  answer: { value: 'no', encrypted: false },
-                }),
-                blockNumber: 11,
-                transactionIndex: 0,
-                logIndex: 0,
-              },
-              {
-                responder: '0xForeign',
-                response: {
-                  type: 'binary',
-                  sessionName: 'Beta Session',
-                  answer: { value: 'Agree', encrypted: false },
+                {
+                  responder: '0xDemoSlug',
+                  response: JSON.stringify({
+                    type: 'binary',
+                    sessionSlug: 'demo',
+                    answer: { value: 'no', encrypted: false },
+                  }),
+                  blockNumber: 11,
+                  transactionIndex: 0,
+                  logIndex: 0,
                 },
-                blockNumber: 12,
-                transactionIndex: 0,
-                logIndex: 0,
-              },
-            ],
-          }, 12);
-        }
+                {
+                  responder: '0xForeign',
+                  response: {
+                    type: 'binary',
+                    sessionName: 'Beta Session',
+                    answer: { value: 'Agree', encrypted: false },
+                  },
+                  blockNumber: 12,
+                  transactionIndex: 0,
+                  logIndex: 0,
+                },
+              ],
+            },
+            12,
+          );
+        },
       );
       const host = createMockHost();
       const controller = createSessionResponseHydrationController(host);
 
       await controller.fetchQuestionResponsesChunkedForGroup('');
 
-      const questionResponses = (
-        host.getStored('questionsCache', '')?.[NETWORK_ID]?.questionResponses?.[QUESTION_ID_A] || {}
+      const questionResponses =
+        host.getStored('questionsCache', '')?.[NETWORK_ID]?.questionResponses?.[QUESTION_ID_A] || {};
+      expect(questionResponses['0xcontext']).toEqual(
+        expect.objectContaining({
+          sessionName: 'Context Engine',
+        }),
       );
-      expect(questionResponses['0xcontext']).toEqual(expect.objectContaining({
-        sessionName: 'Context Engine',
-      }));
       expect(questionResponses['0xdemoslug']).toEqual(expect.stringContaining('"sessionSlug":"demo"'));
       expect(questionResponses['0xforeign']).toBeUndefined();
-      expect(
-        host.getStored('userCache', '')?.['0xforeign']?.[NETWORK_ID]?.data?.questionResponses
-      ).toBeUndefined();
+      expect(host.getStored('userCache', '')?.['0xforeign']?.[NETWORK_ID]?.data?.questionResponses).toBeUndefined();
     });
 
     it('splits broad response scans into bounded persisted windows', async () => {
@@ -885,7 +861,7 @@ describe('createSessionResponseHydrationController', () => {
       contractScripts.getQuestionResponsesChunkedWithCallback.mockImplementation(
         async (mode, fromBlock, toBlock, progressCb, dataCb) => {
           dataCb({}, toBlock);
-        }
+        },
       );
       const host = createMockHost();
       const controller = createSessionResponseHydrationController(host);
@@ -893,10 +869,9 @@ describe('createSessionResponseHydrationController', () => {
       await controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG);
 
       expect(contractScripts.getQuestionResponsesChunkedWithCallback).toHaveBeenCalledTimes(3);
-      expect(contractScripts.getQuestionResponsesChunkedWithCallback.mock.calls.map((call) => [
-        call[1],
-        call[2],
-      ])).toEqual([
+      expect(
+        contractScripts.getQuestionResponsesChunkedWithCallback.mock.calls.map((call) => [call[1], call[2]]),
+      ).toEqual([
         [10, 10009],
         [10010, 20009],
         [20010, 20015],
@@ -905,9 +880,7 @@ describe('createSessionResponseHydrationController', () => {
         floorBlock: 9,
         processedToBlock: 20015,
       });
-      expect(
-        host.getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID]?.questionResponsesLatestBlock
-      ).toBe(20015);
+      expect(host.getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID]?.questionResponsesLatestBlock).toBe(20015);
     });
 
     it('advances the response watermark when a completed scan emits no partial data callback', async () => {
@@ -915,12 +888,10 @@ describe('createSessionResponseHydrationController', () => {
         fromBlock: 10,
         toBlock: 12,
       });
-      contractScripts.getQuestionResponsesChunkedWithCallback.mockImplementationOnce(
-        async () => {
-          // Some reader implementations resolve an empty window without invoking
-          // the partial-data callback. The controller still owns the scan watermark.
-        }
-      );
+      contractScripts.getQuestionResponsesChunkedWithCallback.mockImplementationOnce(async () => {
+        // Some reader implementations resolve an empty window without invoking
+        // the partial-data callback. The controller still owns the scan watermark.
+      });
       const host = createMockHost();
       const controller = createSessionResponseHydrationController(host);
 
@@ -930,9 +901,7 @@ describe('createSessionResponseHydrationController', () => {
         floorBlock: 9,
         processedToBlock: 12,
       });
-      expect(
-        host.getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID]?.questionResponsesLatestBlock
-      ).toBe(12);
+      expect(host.getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID]?.questionResponsesLatestBlock).toBe(12);
     });
 
     it('scans the first historical response window before recent prefetch', async () => {
@@ -945,51 +914,47 @@ describe('createSessionResponseHydrationController', () => {
         async (mode, fromBlock, toBlock, progressCb, dataCb) => {
           callCount += 1;
           if (callCount === 1) {
-            dataCb({
-              [QUESTION_ID_A]: [{
-                responder: RESPONDER,
-                response: 'early-live-response',
-                blockNumber: toBlock,
-                transactionIndex: 0,
-                logIndex: 0,
-                timestamp: 120,
-              }],
-            }, toBlock);
+            dataCb(
+              {
+                [QUESTION_ID_A]: [
+                  {
+                    responder: RESPONDER,
+                    response: 'early-live-response',
+                    blockNumber: toBlock,
+                    transactionIndex: 0,
+                    logIndex: 0,
+                    timestamp: 120,
+                  },
+                ],
+              },
+              toBlock,
+            );
             return;
           }
           if (callCount === 2) {
             throw new Error('stop recent prefetch after first attempted window');
           }
           throw new Error('stop historical scan after first persisted window');
-        }
+        },
       );
       const host = createMockHost();
       const controller = createSessionResponseHydrationController(host);
 
       await controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG);
 
-      expect(contractScripts.getQuestionResponsesChunkedWithCallback.mock.calls[0].slice(1, 3)).toEqual([
-        10,
-        10009,
-      ]);
-      expect(contractScripts.getQuestionResponsesChunkedWithCallback.mock.calls[1].slice(1, 3)).toEqual([
-        20011,
-        30010,
-      ]);
-      expect(contractScripts.getQuestionResponsesChunkedWithCallback.mock.calls[2].slice(1, 3)).toEqual([
-        10010,
-        20009,
-      ]);
+      expect(contractScripts.getQuestionResponsesChunkedWithCallback.mock.calls[0].slice(1, 3)).toEqual([10, 10009]);
+      expect(contractScripts.getQuestionResponsesChunkedWithCallback.mock.calls[1].slice(1, 3)).toEqual([20011, 30010]);
+      expect(contractScripts.getQuestionResponsesChunkedWithCallback.mock.calls[2].slice(1, 3)).toEqual([10010, 20009]);
       expect(resolvePersistedQuestionResponsesWatermark).toHaveBeenCalledWith({
         floorBlock: 9,
         processedToBlock: 10009,
       });
       expect(
-        host.getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID]?.questionResponses?.[QUESTION_ID_A]?.[RESPONDER_LOWER]
+        host.getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID]?.questionResponses?.[QUESTION_ID_A]?.[
+          RESPONDER_LOWER
+        ],
       ).toBe('early-live-response');
-      expect(
-        host.getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID]?.questionResponsesLatestBlock
-      ).toBe(10009);
+      expect(host.getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID]?.questionResponsesLatestBlock).toBe(10009);
       expect(host.getStateSnapshot()).toMatchObject({
         isResponsesCacheReady: true,
         questionResponsesNonce: 2,
@@ -1070,10 +1035,7 @@ describe('createSessionResponseHydrationController', () => {
             },
             11,
           );
-          intermediateWriteKeys = [
-            ...(host.updateQuestionsCacheAtomic.mock.calls.length ? ['questionsCache'] : []),
-            ...(host.updateUserCacheAtomic.mock.calls.length ? ['userCache'] : []),
-          ];
+          intermediateWriteKeys = host.dgWrite.mock.calls.map(([key]) => key);
           await deferred.promise;
         },
       );
@@ -1130,33 +1092,40 @@ describe('createSessionResponseHydrationController', () => {
 
       contractScripts.getQuestionResponsesChunkedWithCallback.mockImplementationOnce(
         async (mode, fromBlock, toBlock, progressCb, dataCb) => {
-          dataCb({
-            [QUESTION_ID_A]: [{
-              responder: RESPONDER,
-              response: responsePayload,
-              blockNumber: 10,
-              transactionIndex: 0,
-              logIndex: 0,
-              timestamp: 100,
-            }],
-          }, 10);
-        }
+          dataCb(
+            {
+              [QUESTION_ID_A]: [
+                {
+                  responder: RESPONDER,
+                  response: responsePayload,
+                  blockNumber: 10,
+                  transactionIndex: 0,
+                  logIndex: 0,
+                  timestamp: 100,
+                },
+              ],
+            },
+            10,
+          );
+        },
       );
 
       await controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG);
 
       const storedNet = host.getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID];
       expect(storedNet?.questionResponses?.[QUESTION_ID_A]?.[RESPONDER_LOWER]).toEqual(responsePayload);
-      expect(storedNet?.questions?.[QUESTION_ID_A]).toEqual(expect.objectContaining({
-        id: QUESTION_ID_A,
-        prompt: responsePayload.prompt,
-        type: 'binary',
-        questionType: 'binary',
-        sessionSlug: SESSION_SLUG,
-        sessionSlugExplicit: true,
-        source: 'response-payload',
-        __ceQuestionMetadataFromResponse: true,
-      }));
+      expect(storedNet?.questions?.[QUESTION_ID_A]).toEqual(
+        expect.objectContaining({
+          id: QUESTION_ID_A,
+          prompt: responsePayload.prompt,
+          type: 'binary',
+          questionType: 'binary',
+          sessionSlug: SESSION_SLUG,
+          sessionSlugExplicit: true,
+          source: 'response-payload',
+          __ceQuestionMetadataFromResponse: true,
+        }),
+      );
       expect(storedNet?.pendingQuestionMetadata?.[QUESTION_ID_A]).toBeUndefined();
     });
 
@@ -1171,32 +1140,39 @@ describe('createSessionResponseHydrationController', () => {
 
       contractScripts.getQuestionResponsesChunkedWithCallback.mockImplementationOnce(
         async (mode, fromBlock, toBlock, progressCb, dataCb) => {
-          dataCb({
-            [QUESTION_ID_A]: [{
-              responder: RESPONDER,
-              response: responsePayload,
-              blockNumber: 10,
-              transactionIndex: 0,
-              logIndex: 0,
-              timestamp: 100,
-            }],
-          }, 10);
-        }
+          dataCb(
+            {
+              [QUESTION_ID_A]: [
+                {
+                  responder: RESPONDER,
+                  response: responsePayload,
+                  blockNumber: 10,
+                  transactionIndex: 0,
+                  logIndex: 0,
+                  timestamp: 100,
+                },
+              ],
+            },
+            10,
+          );
+        },
       );
 
       await controller.fetchQuestionResponsesChunkedForGroup('');
 
       const storedNet = host.getStored('questionsCache', '')?.[NETWORK_ID];
-      expect(storedNet?.questions?.[QUESTION_ID_A]).toEqual(expect.objectContaining({
-        id: QUESTION_ID_A,
-        prompt: responsePayload.prompt,
-        type: 'binary',
-        questionType: 'binary',
-        sessionSlug: '',
-        sessionSlugExplicit: true,
-        source: 'response-payload',
-        __ceQuestionMetadataFromResponse: true,
-      }));
+      expect(storedNet?.questions?.[QUESTION_ID_A]).toEqual(
+        expect.objectContaining({
+          id: QUESTION_ID_A,
+          prompt: responsePayload.prompt,
+          type: 'binary',
+          questionType: 'binary',
+          sessionSlug: '',
+          sessionSlugExplicit: true,
+          source: 'response-payload',
+          __ceQuestionMetadataFromResponse: true,
+        }),
+      );
       expect(storedNet?.pendingQuestionMetadata?.[QUESTION_ID_A]).toBeUndefined();
     });
 
@@ -1261,7 +1237,10 @@ describe('createSessionResponseHydrationController', () => {
         isResponsesCacheReady: true,
         questionResponsesNonce: 2,
       });
-      expect(resolvePersistedQuestionResponsesWatermark).not.toHaveBeenCalled();
+      expect(resolvePersistedQuestionResponsesWatermark).toHaveBeenCalledWith({
+        floorBlock: 9,
+        processedToBlock: 10,
+      });
       expect(host.getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID]?.questionResponsesLatestBlock).toBe(10);
     });
 
@@ -1422,19 +1401,11 @@ describe('createSessionResponseHydrationController', () => {
           throw new Error('fallback to ethers.utils.id');
         });
 
-      contractScripts.getResponse.mockImplementation(async (mode, responder, qId) => (
-        `response-for:${qId.slice(-4)}`
-      ));
+      contractScripts.getResponse.mockImplementation(async (mode, responder, qId) => `response-for:${qId.slice(-4)}`);
 
       await controller.refreshQuestionResponses(
-        [
-          upperCaseQuestionIdA,
-          QUESTION_ID_A,
-          'ab-topic-1',
-          'bad-id',
-          'ab-topic-1',
-        ],
-        { responder: RESPONDER }
+        [upperCaseQuestionIdA, QUESTION_ID_A, 'ab-topic-1', 'bad-id', 'ab-topic-1'],
+        { responder: RESPONDER },
       );
 
       expect(cryptoUtils.hashIdentifier).toHaveBeenCalledWith('ab-topic-1');
@@ -1467,7 +1438,7 @@ describe('createSessionResponseHydrationController', () => {
         responseValue,
       );
       expect(storedQuestionsCache?.[NETWORK_ID]?.pendingQuestionMetadata?.[QUESTION_ID_A]).toEqual(
-        expect.objectContaining({ state: 'discovered-from-response' })
+        expect.objectContaining({ state: 'discovered-from-response' }),
       );
       expect(storedQuestionsCache?.[NETWORK_ID]?.questions?.[QUESTION_ID_A]).toBeUndefined();
       expect(userResponses).toContainEqual({
@@ -1497,16 +1468,18 @@ describe('createSessionResponseHydrationController', () => {
       });
 
       const storedNet = host.getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID];
-      expect(storedNet?.questions?.[QUESTION_ID_A]).toEqual(expect.objectContaining({
-        id: QUESTION_ID_A,
-        prompt: responseValue.prompt,
-        type: 'binary',
-        questionType: 'binary',
-        sessionSlug: SESSION_SLUG,
-        sessionSlugExplicit: true,
-        source: 'response-payload',
-        __ceQuestionMetadataFromResponse: true,
-      }));
+      expect(storedNet?.questions?.[QUESTION_ID_A]).toEqual(
+        expect.objectContaining({
+          id: QUESTION_ID_A,
+          prompt: responseValue.prompt,
+          type: 'binary',
+          questionType: 'binary',
+          sessionSlug: SESSION_SLUG,
+          sessionSlugExplicit: true,
+          source: 'response-payload',
+          __ceQuestionMetadataFromResponse: true,
+        }),
+      );
       expect(storedNet?.pendingQuestionMetadata?.[QUESTION_ID_A]).toBeUndefined();
       expect(storedNet?.questionResponses?.[QUESTION_ID_A]?.[RESPONDER_LOWER]).toEqual(responseValue);
     });

@@ -6,7 +6,7 @@ import { readSessionScanSlugs } from '../session/sessionScanScope.js';
 import { readSponsoredBootstrapFundingContext } from '../session/sponsoredBootstrapFunding.js';
 import { getSharedFallbackWorkerUrl } from '../session/sessionWorkerAvailability.js';
 import { __mockLogger as mockLogger } from '../logging';
-import { ARWEAVE_CHUNK_UPLOAD_TIMEOUT_MS, arweaveClient } from './arweaveClient.js';
+import { ARWEAVE_CHUNK_UPLOAD_TIMEOUT_MS, arweaveScripts } from './arweaveScripts.js';
 
 jest.mock('arweave', () => ({
   __esModule: true,
@@ -180,7 +180,7 @@ describe('arweaveClient upload/download resilience', () => {
       .mockResolvedValueOnce(textResp(200, '   ', 'application/json'))
       .mockResolvedValueOnce(textResp(200, '{"ok":true}', 'application/json'));
 
-    await expect(arweaveClient.downloadDataFromArweave(txId, readOpts)).rejects.toMatchObject({
+    await expect(arweaveScripts.downloadDataFromArweave(txId, readOpts)).rejects.toMatchObject({
       name: 'ArweaveFetchError',
       kind: 'network',
       retryable: true,

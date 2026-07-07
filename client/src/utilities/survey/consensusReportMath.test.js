@@ -164,3 +164,22 @@ describe('findRepresentativeQuestions', () => {
     );
   });
 });
+
+describe('computeGroupAwareConsensus', () => {
+  it('matches the official per-group probability product', () => {
+    const groupVotes = {
+      0: {
+        votes: {
+          q1: { A: 2, D: 0, S: 2 },
+        },
+      },
+      1: {
+        votes: {
+          q1: { A: 0, D: 2, S: 2 },
+        },
+      },
+    };
+
+    expect(computeGroupAwareConsensus(groupVotes).q1).toBeCloseTo(0.1875);
+  });
+});

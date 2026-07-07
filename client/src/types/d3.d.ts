@@ -31,7 +31,7 @@ declare module 'd3' {
 
   export function hierarchy<Datum>(
     data: Datum,
-    children?: (datum: Datum) => Datum[] | null | undefined
+    children?: (datum: Datum) => Datum[] | null | undefined,
   ): HierarchyNode<Datum>;
 
   export function pack<Datum>(): PackLayout<Datum>;

@@ -31,17 +31,27 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
   });
 
   afterEach(() => {
-    try { delete (globalThis as any).CE_ARWEAVE_GATEWAY_URL; } catch (_) {}
-    try { delete (globalThis as any).CE_ARWEAVE_AR_IO_URL; } catch (_) {}
-    try { delete (globalThis as any).CE_ARWEAVE_DIRECT_TO_AR_IO; } catch (_) {}
+    try {
+      delete (globalThis as any).CE_ARWEAVE_GATEWAY_URL;
+    } catch (_) {}
+    try {
+      delete (globalThis as any).CE_ARWEAVE_AR_IO_URL;
+    } catch (_) {}
+    try {
+      delete (globalThis as any).CE_ARWEAVE_DIRECT_TO_AR_IO;
+    } catch (_) {}
   });
 
   it('uses scoped litHooks props for locked question submits when global hooks are absent', async () => {
     const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const stopAfterLitGuard = new Error('passed lit hook guard');
     try {
-      try { delete (window as any).__litHooks; } catch (_) {}
-      try { delete (window as any).litHooks; } catch (_) {}
+      try {
+        delete (window as any).__litHooks;
+      } catch (_) {}
+      try {
+        delete (window as any).litHooks;
+      } catch (_) {}
       const instance = makeInstance({
         provider: 'web3auth',
         loginComplete: true,
@@ -78,13 +88,15 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       instance.state = {
         ...instance.state,
         isStandaloneQuestion: true,
-        questions: [{
-          id: 'q1',
-          type: 'freeform',
-          prompt: 'Prompt 1',
-          tags: [],
-          lockGateIds: ['default'],
-        }],
+        questions: [
+          {
+            id: 'q1',
+            type: 'freeform',
+            prompt: 'Prompt 1',
+            tags: [],
+            lockGateIds: ['default'],
+          },
+        ],
       };
 
       await instance.createSurvey();
@@ -100,8 +112,12 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const stopAfterLitGuard = new Error('passed derived lit hook guard');
     try {
-      try { delete (window as any).__litHooks; } catch (_) {}
-      try { delete (window as any).litHooks; } catch (_) {}
+      try {
+        delete (window as any).__litHooks;
+      } catch (_) {}
+      try {
+        delete (window as any).litHooks;
+      } catch (_) {}
       const sessionConfig = {
         slug: 'chipotle-session',
         networkChainId: 11155420,
@@ -147,13 +163,15 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       instance.state = {
         ...instance.state,
         isStandaloneQuestion: true,
-        questions: [{
-          id: 'q1',
-          type: 'freeform',
-          prompt: 'Prompt 1',
-          tags: [],
-          lockGateIds: ['default'],
-        }],
+        questions: [
+          {
+            id: 'q1',
+            type: 'freeform',
+            prompt: 'Prompt 1',
+            tags: [],
+            lockGateIds: ['default'],
+          },
+        ],
       };
 
       await instance.createSurvey();
@@ -170,8 +188,12 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     const registryConfigSpy = jest.spyOn(sessionRegistryStore, 'getSessionConfig');
     const stopAfterLitGuard = new Error('passed registry-derived lit hook guard');
     try {
-      try { delete (window as any).__litHooks; } catch (_) {}
-      try { delete (window as any).litHooks; } catch (_) {}
+      try {
+        delete (window as any).__litHooks;
+      } catch (_) {}
+      try {
+        delete (window as any).litHooks;
+      } catch (_) {}
       registryConfigSpy.mockReturnValue({
         slug: 'registry-chipotle',
         networkChainId: 11155420,
@@ -230,13 +252,15 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       instance.state = {
         ...instance.state,
         isStandaloneQuestion: true,
-        questions: [{
-          id: 'q1',
-          type: 'freeform',
-          prompt: 'Prompt 1',
-          tags: [],
-          lockGateIds: ['default'],
-        }],
+        questions: [
+          {
+            id: 'q1',
+            type: 'freeform',
+            prompt: 'Prompt 1',
+            tags: [],
+            lockGateIds: ['default'],
+          },
+        ],
       };
 
       await instance.createSurvey();
@@ -256,7 +280,8 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       ciphertext: 'ciphertext',
       recipients: [{ type: 'lit-sbt-v1' }],
     };
-    const encryptSpy = jest.spyOn(cryptoUtils, 'encryptEnvelopeValue')
+    const encryptSpy = jest
+      .spyOn(cryptoUtils, 'encryptEnvelopeValue')
       .mockResolvedValue(encryptedPromptEnvelope as any);
     const addQuestionsSpy = jest.spyOn(contractScripts, 'addQuestions').mockResolvedValue({
       receipt: { status: 1 },
@@ -291,12 +316,14 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
             mode: 'any',
           },
         },
-        gateOptions: [{
-          id: 'default_gate',
-          label: 'demo 2',
-          badgeLabel: 'demo 2',
-          color: '#5affc2',
-        }],
+        gateOptions: [
+          {
+            id: 'default_gate',
+            label: 'demo 2',
+            badgeLabel: 'demo 2',
+            color: '#5affc2',
+          },
+        ],
         defaultGateId: 'default_gate',
       }));
       instance.clearUnfinishedSurveyDraft = jest.fn();
@@ -306,13 +333,15 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
         ...instance.state,
         isStandaloneQuestion: true,
         title: '',
-        questions: [{
-          id: 'q1',
-          type: 'binary',
-          prompt: 'Test Q Encrypted',
-          tags: [],
-          lockGateIds: [],
-        }],
+        questions: [
+          {
+            id: 'q1',
+            type: 'binary',
+            prompt: 'Test Q Encrypted',
+            tags: [],
+            lockGateIds: [],
+          },
+        ],
         documentURLs: [],
         surveyHash: '',
       };
@@ -321,14 +350,16 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
 
       expect(addQuestionsSpy).toHaveBeenCalledTimes(1);
       const uploadedQuestion = addQuestionsSpy.mock.calls[0][2][0];
-      expect(uploadedQuestion).toEqual(expect.objectContaining({
-        prompt: '[encrypted]',
-        promptEncrypted: encryptedPromptEnvelope,
-        encryption: expect.objectContaining({
-          enabled: true,
-          targets: { questions: true, questionTags: true },
+      expect(uploadedQuestion).toEqual(
+        expect.objectContaining({
+          prompt: '[encrypted]',
+          promptEncrypted: encryptedPromptEnvelope,
+          encryption: expect.objectContaining({
+            enabled: true,
+            targets: { questions: true, questionTags: true },
+          }),
         }),
-      }));
+      );
       expect(uploadedQuestion.prompt).not.toBe('Test Q Encrypted');
       expect(encryptSpy).toHaveBeenCalledWith(
         'Test Q Encrypted',
@@ -341,7 +372,7 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
               }),
             ]),
           }),
-        })
+        }),
       );
     } finally {
       encryptSpy.mockRestore();
@@ -356,8 +387,12 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     });
 
     try {
-      try { delete (window as any).__litHooks; } catch (_) {}
-      try { delete (window as any).litHooks; } catch (_) {}
+      try {
+        delete (window as any).__litHooks;
+      } catch (_) {}
+      try {
+        delete (window as any).litHooks;
+      } catch (_) {}
       const instance = makeInstance({
         provider: 'web3auth',
         loginComplete: true,
@@ -384,25 +419,29 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
             mode: 'any',
           },
         },
-        gateOptions: [{
-          id: 'default_gate',
-          label: 'demo 2',
-          badgeLabel: 'demo 2',
-          color: '#5affc2',
-        }],
+        gateOptions: [
+          {
+            id: 'default_gate',
+            label: 'demo 2',
+            badgeLabel: 'demo 2',
+            color: '#5affc2',
+          },
+        ],
         defaultGateId: 'default_gate',
       }));
       instance.state = {
         ...instance.state,
         isStandaloneQuestion: true,
         title: '',
-        questions: [{
-          id: 'q1',
-          type: 'binary',
-          prompt: 'Test Q Encrypted',
-          tags: [],
-          lockGateIds: [],
-        }],
+        questions: [
+          {
+            id: 'q1',
+            type: 'binary',
+            prompt: 'Test Q Encrypted',
+            tags: [],
+            lockGateIds: [],
+          },
+        ],
         documentURLs: [],
         surveyHash: '',
       };
@@ -438,12 +477,14 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     instance.state = {
       ...instance.state,
       isStandaloneQuestion: true,
-      questions: [{
-        id: 'q1',
-        type: 'freeform',
-        prompt: 'Prompt 1',
-        tags: [],
-      }],
+      questions: [
+        {
+          id: 'q1',
+          type: 'freeform',
+          prompt: 'Prompt 1',
+          tags: [],
+        },
+      ],
     };
 
     await instance.createSurvey();
@@ -485,12 +526,14 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     instance.state = {
       ...instance.state,
       isStandaloneQuestion: true,
-      questions: [{
-        id: 'q1',
-        type: 'freeform',
-        prompt: 'Prompt 1',
-        tags: [],
-      }],
+      questions: [
+        {
+          id: 'q1',
+          type: 'freeform',
+          prompt: 'Prompt 1',
+          tags: [],
+        },
+      ],
     };
 
     try {
@@ -506,9 +549,7 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
 
   it('adds the missing wallet network with a non-PATH RPC URL', async () => {
     const originalEthereum = (window as any).ethereum;
-    const request = jest.fn()
-      .mockRejectedValueOnce({ code: 4902 })
-      .mockResolvedValueOnce(undefined);
+    const request = jest.fn().mockRejectedValueOnce({ code: 4902 }).mockResolvedValueOnce(undefined);
     (window as any).ethereum = { request } as any;
     try {
       const instance = makeInstance({ provider: 'wagmi' });
@@ -523,13 +564,14 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       });
       expect(request).toHaveBeenNthCalledWith(2, {
         method: 'wallet_addEthereumChain',
-        params: [expect.objectContaining({
-          rpcUrls: [getDefaultHttpRpc(84532, { allowPath: false })],
-        })],
+        params: [
+          expect.objectContaining({
+            rpcUrls: [getDefaultHttpRpc(84532, { allowPath: false })],
+          }),
+        ],
       });
     } finally {
       window.ethereum = originalEthereum;
     }
   });
-
 });

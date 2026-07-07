@@ -21,10 +21,7 @@ describe('SurveyQuestionsTopStrip', () => {
 
   it('renders an empty top strip when route and response controls are hidden', () => {
     const { container } = render(
-      <SurveyQuestionsTopStrip
-        {...baseProps}
-        className="top-strip"
-      />
+      <SurveyQuestionsTopStrip {...baseProps} layoutDisplayState={{ topSectionClassName: 'top-strip' }} />,
     );
 
     const strip = container.firstElementChild;
@@ -36,11 +33,7 @@ describe('SurveyQuestionsTopStrip', () => {
     const ref = React.createRef<HTMLDivElement>();
 
     const { container } = render(
-      <SurveyQuestionsTopStrip
-        {...baseProps}
-        ref={ref}
-        className="top-strip"
-      />
+      <SurveyQuestionsTopStrip {...baseProps} ref={ref} layoutDisplayState={{ topSectionClassName: 'top-strip' }} />,
     );
 
     expect(ref.current).toBe(container.firstElementChild);
@@ -50,9 +43,13 @@ describe('SurveyQuestionsTopStrip', () => {
     render(
       <SurveyQuestionsTopStrip
         {...baseProps}
-        showViewAnswersButton
-        viewAnswersButtonText=" View 0xabc answers"
-      />
+        routeViewDisplayState={{
+          isOwnResponse: false,
+          isSingleQuestionView: false,
+          showViewAnswersButton: true,
+          viewAnswersButtonText: ' View 0xabc answers',
+        }}
+      />,
     );
 
     const toggle = screen.getByRole('button', { name: 'View 0xabc answers' });
@@ -72,7 +69,7 @@ describe('SurveyQuestionsTopStrip', () => {
         showUserResponseNotice
         submittedStateActive
         userResponseEncrypted
-      />
+      />,
     );
 
     expect(screen.getByTestId(E2E_TESTIDS.SURVEY_EXISTING_RESPONSE_NOTICE)).toBeInTheDocument();
@@ -85,7 +82,27 @@ describe('SurveyQuestionsTopStrip', () => {
     expect(baseProps.onExitEditing).toHaveBeenCalledTimes(1);
     expect(screen.getByTitle('View submitted response')).toHaveAttribute(
       'href',
-      'https://example.com/submitted-response'
+      'https://example.com/submitted-response',
     );
+  });
+
+  it('hides the existing-response notice when route display state is not own survey answers', () => {
+    render(
+      <SurveyQuestionsTopStrip
+        {...baseProps}
+        displayAnswerMode
+        routeViewDisplayState={{
+          isOwnResponse: true,
+          isSingleQuestionView: true,
+          showViewAnswersButton: false,
+          viewAnswersButtonText: '',
+        }}
+        submitDisplayState={{ submittedStateActive: true }}
+        userHasResponse
+        userResponseEncrypted
+      />,
+    );
+
+    expect(screen.queryByTestId(E2E_TESTIDS.SURVEY_EXISTING_RESPONSE_NOTICE)).not.toBeInTheDocument();
   });
 });

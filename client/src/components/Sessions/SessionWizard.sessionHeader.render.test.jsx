@@ -52,11 +52,14 @@ describe('SessionWizard session header image controls', () => {
     const readText = jest.fn().mockResolvedValue('https://example.example.test/session-header.png');
 
     try {
-      localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
-        draft: {
-          sessionHeader: '',
-        },
-      }));
+      localStorage.setItem(
+        'ce:sessionWizardDraft:v1',
+        JSON.stringify({
+          draft: {
+            sessionHeader: '',
+          },
+        }),
+      );
       Object.defineProperty(navigator, 'clipboard', {
         configurable: true,
         value: { read, readText },
@@ -77,7 +80,7 @@ describe('SessionWizard session header image controls', () => {
         expect(readText).toHaveBeenCalledTimes(1);
       });
       expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_URL)).toHaveValue(
-        'https://example.example.test/session-header.png'
+        'https://example.example.test/session-header.png',
       );
       expect(screen.queryByText('Pasted image from clipboard.')).not.toBeInTheDocument();
       expect(screen.queryByText('Pasted image URL from clipboard.')).not.toBeInTheDocument();
@@ -107,11 +110,14 @@ describe('SessionWizard session header image controls', () => {
     const readText = jest.fn().mockResolvedValue('assets/img/header.webp');
 
     try {
-      localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
-        draft: {
-          sessionHeader: '',
-        },
-      }));
+      localStorage.setItem(
+        'ce:sessionWizardDraft:v1',
+        JSON.stringify({
+          draft: {
+            sessionHeader: '',
+          },
+        }),
+      );
       Object.defineProperty(navigator, 'clipboard', {
         configurable: true,
         value: { read, readText },
@@ -129,9 +135,7 @@ describe('SessionWizard session header image controls', () => {
         expect(read).toHaveBeenCalledTimes(1);
         expect(readText).toHaveBeenCalledTimes(1);
       });
-      expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_URL)).toHaveValue(
-        'assets/img/header.webp'
-      );
+      expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_URL)).toHaveValue('assets/img/header.webp');
       expect(screen.queryByText('Clipboard does not contain a supported image or URL.')).not.toBeInTheDocument();
 
       const previewImage = await screen.findByRole('img', { name: 'Session header preview' });
@@ -149,20 +153,25 @@ describe('SessionWizard session header image controls', () => {
     const originalCreateObjectURL = URL.createObjectURL;
     const originalRevokeObjectURL = URL.revokeObjectURL;
     const clipboardBlob = new Blob(['clipboard-image'], { type: 'image/png' });
-    const read = jest.fn().mockResolvedValue([{
-      types: ['image/png'],
-      getType: jest.fn().mockResolvedValue(clipboardBlob),
-    }]);
+    const read = jest.fn().mockResolvedValue([
+      {
+        types: ['image/png'],
+        getType: jest.fn().mockResolvedValue(clipboardBlob),
+      },
+    ]);
     const readText = jest.fn().mockResolvedValue('');
     URL.createObjectURL = jest.fn(() => 'blob:clipboard-session-header-preview');
     URL.revokeObjectURL = jest.fn();
 
     try {
-      localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
-        draft: {
-          sessionHeader: '',
-        },
-      }));
+      localStorage.setItem(
+        'ce:sessionWizardDraft:v1',
+        JSON.stringify({
+          draft: {
+            sessionHeader: '',
+          },
+        }),
+      );
       Object.defineProperty(navigator, 'clipboard', {
         configurable: true,
         value: { read, readText },
@@ -188,7 +197,7 @@ describe('SessionWizard session header image controls', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Expand session header image' }));
       expect(await screen.findByRole('img', { name: 'Expanded session header preview' })).toHaveAttribute(
         'src',
-        'blob:clipboard-session-header-preview'
+        'blob:clipboard-session-header-preview',
       );
     } finally {
       Object.defineProperty(navigator, 'clipboard', {
@@ -222,7 +231,7 @@ describe('SessionWizard session header image controls', () => {
       await waitFor(() => {
         expect(screen.getByRole('img', { name: 'Session header preview' })).toHaveAttribute(
           'src',
-          'blob:session-header-preview'
+          'blob:session-header-preview',
         );
       });
     } finally {

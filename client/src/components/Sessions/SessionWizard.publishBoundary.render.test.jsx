@@ -35,12 +35,15 @@ const seedVerifiedWorkerCache = (workerUrl = 'https://worker.example.test', over
     corsWorkerUrl: workerUrl,
     ...(overrides.draft || {}),
   };
-  localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
-    ...overrides,
-    draft,
-    deployComplete: true,
-    deployWorkerUrl: workerUrl,
-  }));
+  localStorage.setItem(
+    'ce:sessionWizardDraft:v1',
+    JSON.stringify({
+      ...overrides,
+      draft,
+      deployComplete: true,
+      deployWorkerUrl: workerUrl,
+    }),
+  );
 };
 
 const seedVerifiedWorkerCache = (workerUrl = 'https://worker.example.test', overrides = {}) => {
@@ -752,7 +755,7 @@ describe('SessionWizard publish boundary rendering', () => {
         expect(mockRegisterSessionOnChain).toHaveBeenCalledTimes(1);
       });
 
-      const [metadataPayload, uploadFormat, uploadOptions] = arweaveClient.uploadDataToArweave.mock.calls[0];
+      const [metadataPayload, uploadFormat, uploadOptions] = arweaveScripts.uploadDataToArweave.mock.calls[0];
       expect(metadataPayload).toEqual(
         expect.objectContaining({
           sessionName: 'Uploaded Metadata Register Boundary Session',
@@ -945,9 +948,11 @@ describe('SessionWizard publish boundary rendering', () => {
     fireEvent.click(publishButton);
 
     await waitFor(() => {
-      expect(screen.getByText(
-        'Worker secret fields cannot be locked in public metadata: arweave.jwk. Store secrets in the Worker panel instead.'
-      )).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          'Worker secret fields cannot be locked in public metadata: arweave.jwk. Store secrets in the Worker panel instead.',
+        ),
+      ).toBeInTheDocument();
     });
     expect(arweaveScripts.uploadDataToArweave).not.toHaveBeenCalled();
     expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();

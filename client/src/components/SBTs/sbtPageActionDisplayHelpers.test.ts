@@ -521,29 +521,35 @@ describe('sbtPageActionDisplayHelpers', () => {
       canBurnMini: true,
       canOwnerBurn: true,
     });
-    expect(resolveSbtPageMiniBurnPermission({
-      account: '0xOwner',
-      sbtInfo: { burnAuth: '2' },
-      userIsSbtAdmin: true,
-    })).toEqual({
+    expect(
+      resolveSbtPageMiniBurnPermission({
+        account: '0xOwner',
+        sbtInfo: { burnAuth: '2' },
+        userIsSbtAdmin: true,
+      }),
+    ).toEqual({
       canAdminBurn: true,
       canBurnMini: true,
       canOwnerBurn: true,
     });
-    expect(resolveSbtPageMiniBurnPermission({
-      account: '0xOwner',
-      sbtInfo: { burnAuth: 'not-a-number' },
-      userIsSbtAdmin: true,
-    })).toEqual({
+    expect(
+      resolveSbtPageMiniBurnPermission({
+        account: '0xOwner',
+        sbtInfo: { burnAuth: 'not-a-number' },
+        userIsSbtAdmin: true,
+      }),
+    ).toEqual({
       canAdminBurn: false,
       canBurnMini: false,
       canOwnerBurn: false,
     });
-    expect(resolveSbtPageBurnButtonState({
-      account: '0xOwner',
-      sbtInfo: { burnAuth: '1' },
-      userHasSBT: true,
-    })).toEqual({
+    expect(
+      resolveSbtPageBurnButtonState({
+        account: '0xOwner',
+        sbtInfo: { burnAuth: '1' },
+        userHasSBT: true,
+      }),
+    ).toEqual({
       canOwnerBurn: true,
       shouldRenderBurnButton: true,
     });
@@ -573,68 +579,84 @@ describe('sbtPageActionDisplayHelpers', () => {
   });
 
   it('describes primary action availability without invoking SBT side effects', () => {
-    expect(resolveSbtPageMintActionPlan({
-      burningStatus: 'idle',
-      nowSeconds: 100,
-      sbtInfo: { mintingEndTime: 0 },
-      userHasSBT: true,
-    })).toEqual({
+    expect(
+      resolveSbtPageMintActionPlan({
+        burningStatus: 'idle',
+        nowSeconds: 100,
+        sbtInfo: { mintingEndTime: 0 },
+        userHasSBT: true,
+      }),
+    ).toEqual({
       blockedReason: 'already-has-token',
       shouldRenderMintButton: false,
     });
-    expect(resolveSbtPageMintActionPlan({
-      burningStatus: 'success',
-      nowSeconds: 100,
-      sbtInfo: { mintingEndTime: 0 },
-      userHasSBT: true,
-    })).toEqual({
+    expect(
+      resolveSbtPageMintActionPlan({
+        burningStatus: 'success',
+        nowSeconds: 100,
+        sbtInfo: { mintingEndTime: 0 },
+        userHasSBT: true,
+      }),
+    ).toEqual({
       blockedReason: 'none',
       shouldRenderMintButton: true,
     });
-    expect(resolveSbtPageMintActionPlan({
-      nowSeconds: 100,
-      sbtInfo: { mintingEndTime: 90 },
-    })).toEqual({
+    expect(
+      resolveSbtPageMintActionPlan({
+        nowSeconds: 100,
+        sbtInfo: { mintingEndTime: 90 },
+      }),
+    ).toEqual({
       blockedReason: 'mint-ended',
       shouldRenderMintButton: false,
     });
-    expect(resolveSbtPageMintActionPlan({
-      nowSeconds: 100,
-      sbtInfo: { mintingEndTime: 100 },
-    })).toEqual({
+    expect(
+      resolveSbtPageMintActionPlan({
+        nowSeconds: 100,
+        sbtInfo: { mintingEndTime: 100 },
+      }),
+    ).toEqual({
       blockedReason: 'mint-ended',
       shouldRenderMintButton: false,
     });
-    expect(resolveSbtPageMintActionPlan({
-      nowSeconds: 100,
-      sbtInfo: null,
-    })).toEqual({
+    expect(
+      resolveSbtPageMintActionPlan({
+        nowSeconds: 100,
+        sbtInfo: null,
+      }),
+    ).toEqual({
       blockedReason: 'missing-sbt',
       shouldRenderMintButton: false,
     });
-    expect(resolveSbtPageBurnActionPlan({
-      account: '0xOwner',
-      sbtInfo: { burnAuth: 1 },
-      userHasSBT: true,
-    })).toEqual({
+    expect(
+      resolveSbtPageBurnActionPlan({
+        account: '0xOwner',
+        sbtInfo: { burnAuth: 1 },
+        userHasSBT: true,
+      }),
+    ).toEqual({
       blockedReason: 'none',
       canOwnerBurn: true,
       shouldRenderBurnButton: true,
     });
-    expect(resolveSbtPageBurnActionPlan({
-      account: '0xOwner',
-      sbtInfo: { burnAuth: 0 },
-      userHasSBT: true,
-    })).toEqual({
+    expect(
+      resolveSbtPageBurnActionPlan({
+        account: '0xOwner',
+        sbtInfo: { burnAuth: 0 },
+        userHasSBT: true,
+      }),
+    ).toEqual({
       blockedReason: 'owner-burn-disabled',
       canOwnerBurn: false,
       shouldRenderBurnButton: false,
     });
-    expect(resolveSbtPageBurnActionPlan({
-      account: '0xOwner',
-      sbtInfo: { burnAuth: 1 },
-      userHasSBT: false,
-    })).toEqual({
+    expect(
+      resolveSbtPageBurnActionPlan({
+        account: '0xOwner',
+        sbtInfo: { burnAuth: 1 },
+        userHasSBT: false,
+      }),
+    ).toEqual({
       blockedReason: 'missing-token',
       canOwnerBurn: false,
       shouldRenderBurnButton: false,
@@ -784,15 +806,19 @@ describe('sbtPageActionDisplayHelpers', () => {
       shouldRenderBurnedStatus: false,
       shouldRenderJoinedStatus: false,
     });
-    expect(shouldRenderSbtPageMintButton({
-      nowSeconds: 100,
-      sbtInfo: { mintingEndTime: 200 },
-    })).toBe(true);
-    expect(resolveSbtPageAdminActionState({
-      account: '0xAdmin',
-      hasInviteMint: true,
-      sbtInfo: { admin: '0xadmin', burnAuth: '2', hasPasswordMint: true, maxTokens: '0' },
-    })).toEqual({
+    expect(
+      shouldRenderSbtPageMintButton({
+        nowSeconds: 100,
+        sbtInfo: { mintingEndTime: 200 },
+      }),
+    ).toBe(true);
+    expect(
+      resolveSbtPageAdminActionState({
+        account: '0xAdmin',
+        hasInviteMint: true,
+        sbtInfo: { admin: '0xadmin', burnAuth: '2', hasPasswordMint: true, maxTokens: '0' },
+      }),
+    ).toEqual({
       canAdminBurn: true,
       hasPasswordMint: true,
       isInvite: true,

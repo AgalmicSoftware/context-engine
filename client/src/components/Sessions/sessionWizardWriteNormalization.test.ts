@@ -12,10 +12,6 @@ import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { setSessionFieldsOnChain } from '../../utilities/web3/sessionRegistry.js';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 import {
-  SESSION_MODE_PRESET_IDS,
-  cloneSessionModePreset,
-} from '../../utilities/session/sessionModeProfile';
-import {
   buildSessionWizardRegistrySessionFields,
   buildSessionWizardWorkerConfigPayload,
   sanitizeSessionWizardMetadataPayload,
@@ -99,10 +95,12 @@ describe('sessionWizardWriteNormalization', () => {
     });
 
     expect(metadata.sessionModeProfile).toEqual(profile);
-    expect(metadata.storageProfile).toEqual(expect.objectContaining({
-      backend: 'cloudflare',
-      payloadAccessControl: expect.objectContaining({ mode: 'worker_sbt_gate' }),
-    }));
+    expect(metadata.storageProfile).toEqual(
+      expect.objectContaining({
+        backend: 'cloudflare',
+        payloadAccessControl: expect.objectContaining({ mode: 'worker_sbt_gate' }),
+      }),
+    );
     expect(metadata.telegramOnly).toBeUndefined();
     expect(metadata.sessionMode).toBeUndefined();
     expect(metadata.telegramBridgeEnabled).toBeUndefined();
@@ -117,33 +115,39 @@ describe('sessionWizardWriteNormalization', () => {
       storageProfile: { backend: 'cloudflare' },
     });
 
-    expect(metadata.sessionModeProfile).toEqual(expect.objectContaining({
-      preset: 'custom',
-      authority: { mode: 'worker_canonical' },
-      surfaces: expect.objectContaining({ telegram: true, miniApp: true, web: true }),
-    }));
-    expect(metadata.storageProfile).toEqual(expect.objectContaining({
-      backend: 'cloudflare',
-      payloadAccessControl: expect.objectContaining({ mode: 'worker_sbt_gate' }),
-    }));
+    expect(metadata.sessionModeProfile).toEqual(
+      expect.objectContaining({
+        preset: 'custom',
+        authority: { mode: 'worker_canonical' },
+        surfaces: expect.objectContaining({ telegram: true, miniApp: true, web: true }),
+      }),
+    );
+    expect(metadata.storageProfile).toEqual(
+      expect.objectContaining({
+        backend: 'cloudflare',
+        payloadAccessControl: expect.objectContaining({ mode: 'worker_sbt_gate' }),
+      }),
+    );
     expect(metadata.telegramOnly).toBeUndefined();
     expect(metadata.sessionMode).toBeUndefined();
     expect(metadata.telegramBridgeEnabled).toBeUndefined();
   });
 
   test('buildSessionWizardRegistrySessionFields keeps compatibility mirrors and sponsored flags only', () => {
-    expect(buildSessionWizardRegistrySessionFields({
-      onChainFields: {
-        corsWorkerUrl: ' https://worker.example ',
-        rpcUrl: ' https://rpc.example ',
-        unexpectedField: 'should-not-pass-through',
-      },
-      sponsoredFields: {
-        sponsored_ai: '1',
-        sponsored_rpc: '',
-        sponsored_arweave: '0',
-      },
-    })).toEqual({
+    expect(
+      buildSessionWizardRegistrySessionFields({
+        onChainFields: {
+          corsWorkerUrl: ' https://worker.example ',
+          rpcUrl: ' https://rpc.example ',
+          unexpectedField: 'should-not-pass-through',
+        },
+        sponsoredFields: {
+          sponsored_ai: '1',
+          sponsored_rpc: '',
+          sponsored_arweave: '0',
+        },
+      }),
+    ).toEqual({
       corsWorkerUrl: 'https://worker.example',
       rpcUrl: 'https://rpc.example',
       sponsored_ai: '1',
@@ -152,28 +156,34 @@ describe('sessionWizardWriteNormalization', () => {
   });
 
   test('buildSessionWizardRegistrySessionFields keeps worker-private RPC out of public registry fields', () => {
-    expect(buildSessionWizardRegistrySessionFields({
-      onChainFields: {
-        rpcUrl: 'https://draft-rpc.example',
-      },
-      sponsoredFields: {
-        sponsored_rpc: '1',
-      },
-    })).toEqual({
+    expect(
+      buildSessionWizardRegistrySessionFields({
+        onChainFields: {
+          rpcUrl: 'https://draft-rpc.example',
+        },
+        sponsoredFields: {
+          sponsored_rpc: '1',
+        },
+      }),
+    ).toEqual({
       rpcUrl: 'https://draft-rpc.example',
       sponsored_rpc: '1',
     });
   });
 
   test('buildSessionWizardRegistrySessionFields omits RPC when no public registry field exists', () => {
-    expect(buildSessionWizardRegistrySessionFields({
-      onChainFields: {},
-    })).toEqual({});
-    expect(buildSessionWizardRegistrySessionFields({
-      onChainFields: {
-        rpcUrl: ' https://browser-visible-rpc.example ',
-      },
-    })).toEqual({
+    expect(
+      buildSessionWizardRegistrySessionFields({
+        onChainFields: {},
+      }),
+    ).toEqual({});
+    expect(
+      buildSessionWizardRegistrySessionFields({
+        onChainFields: {
+          rpcUrl: ' https://browser-visible-rpc.example ',
+        },
+      }),
+    ).toEqual({
       rpcUrl: 'https://browser-visible-rpc.example',
     });
   });
@@ -186,12 +196,14 @@ describe('sessionWizardWriteNormalization', () => {
       },
     });
 
-    expect(buildSessionWizardRegistrySessionFields({
-      onChainFields: {},
-      sponsoredFields: {
-        sponsored_rpc: '0',
-      },
-    })).toEqual({
+    expect(
+      buildSessionWizardRegistrySessionFields({
+        onChainFields: {},
+        sponsoredFields: {
+          sponsored_rpc: '0',
+        },
+      }),
+    ).toEqual({
       sponsored_rpc: '0',
     });
     expect(enabledSecrets.customRpcUrl).toBe('https://uploaded-rpc.example');
@@ -332,20 +344,23 @@ describe('sessionWizardWriteNormalization', () => {
     expect(payload.contracts.reputation).toBeUndefined();
   });
   test('session storage profile is session-owned metadata and worker config, with Cloudflare secrets omitted', () => {
-    const metadata = sanitizeSessionWizardMetadataPayload({
-      slug: 'storage-edge',
-      sessionName: 'Storage Edge',
-      storageProfile: {
-        backend: 'cloudflare',
-        cloudflare: {
-          accountId: 'must-not-pass-through',
-          bucketName: 'private-bucket',
-          workerToken: 'cf-secret-token',
+    const metadata = sanitizeSessionWizardMetadataPayload(
+      {
+        slug: 'storage-edge',
+        sessionName: 'Storage Edge',
+        storageProfile: {
+          backend: 'cloudflare',
+          cloudflare: {
+            accountId: 'must-not-pass-through',
+            bucketName: 'private-bucket',
+            workerToken: 'cf-secret-token',
+          },
         },
       },
-    }, {
-      fieldOrder: ['slug', 'sessionName', 'storageProfile'],
-    });
+      {
+        fieldOrder: ['slug', 'sessionName', 'storageProfile'],
+      },
+    );
 
     expect(metadata.storageProfile.backend).toBe('cloudflare');
     expect(metadata.storageProfile.sessionOwned).toBe(true);
@@ -379,20 +394,25 @@ describe('sessionWizardWriteNormalization', () => {
   });
 
   test('legacy Telegram mode is published as profile-only session metadata', () => {
-    const metadata = sanitizeSessionWizardMetadataPayload({
-      slug: 'telegram-native',
-      sessionName: 'Telegram Native',
-      telegramOnly: true,
-      storageProfile: { backend: 'cloudflare', payloadAccessControl: { mode: 'public_read' } },
-    }, {
-      fieldOrder: ['slug', 'sessionName', 'telegramOnly', 'storageProfile'],
-    });
+    const metadata = sanitizeSessionWizardMetadataPayload(
+      {
+        slug: 'telegram-native',
+        sessionName: 'Telegram Native',
+        telegramOnly: true,
+        storageProfile: { backend: 'cloudflare', payloadAccessControl: { mode: 'public_read' } },
+      },
+      {
+        fieldOrder: ['slug', 'sessionName', 'telegramOnly', 'storageProfile'],
+      },
+    );
 
-    expect(metadata.sessionModeProfile).toEqual(expect.objectContaining({
-      preset: 'custom',
-      authority: { mode: 'worker_canonical' },
-      surfaces: expect.objectContaining({ telegram: true, miniApp: true, web: true }),
-    }));
+    expect(metadata.sessionModeProfile).toEqual(
+      expect.objectContaining({
+        preset: 'custom',
+        authority: { mode: 'worker_canonical' },
+        surfaces: expect.objectContaining({ telegram: true, miniApp: true, web: true }),
+      }),
+    );
     expect(metadata.telegramOnly).toBeUndefined();
     expect(metadata.sessionMode).toBeUndefined();
     expect(metadata.telegramBridgeEnabled).toBeUndefined();
@@ -408,18 +428,21 @@ describe('sessionWizardWriteNormalization', () => {
       deployPayload: {},
     });
 
-    expect(workerPayload.sessionModeProfile).toEqual(expect.objectContaining({
-      preset: 'custom',
-      authority: { mode: 'worker_canonical' },
-      surfaces: expect.objectContaining({ telegram: true, miniApp: true, web: true }),
-    }));
-    expect(workerPayload.storageProfile).toEqual(expect.objectContaining({
-      backend: 'cloudflare',
-      payloadAccessControl: expect.objectContaining({ mode: 'worker_sbt_gate' }),
-    }));
+    expect(workerPayload.sessionModeProfile).toEqual(
+      expect.objectContaining({
+        preset: 'custom',
+        authority: { mode: 'worker_canonical' },
+        surfaces: expect.objectContaining({ telegram: true, miniApp: true, web: true }),
+      }),
+    );
+    expect(workerPayload.storageProfile).toEqual(
+      expect.objectContaining({
+        backend: 'cloudflare',
+        payloadAccessControl: expect.objectContaining({ mode: 'worker_sbt_gate' }),
+      }),
+    );
     expect(workerPayload.telegramOnly).toBeUndefined();
     expect(workerPayload.sessionMode).toBeUndefined();
     expect(workerPayload.telegramBridgeEnabled).toBeUndefined();
   });
-
 });

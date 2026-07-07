@@ -23,16 +23,6 @@ const mockPeekQuestionsCache = (questionCachesBySlug: Record<string, any>) =>
 const buildQuestionMapByIdLower = (questions: any[]) =>
   new Map<string, any>(questions.map((q: any) => [String(q.id).toLowerCase(), q] as [string, any]));
 
-const makeLegacySessionConfig = (slug: unknown, extra: Record<string, unknown> = {}) => ({
-  slug: String(slug || ''),
-  networkChainId: 84532,
-  __registry: {
-    registryChainId: 84532,
-    sessionIdHex: '0x00112233445566778899aabbccddeeff',
-  },
-  ...extra,
-});
-
 const findFirstNodeByType = (node: any, targetType: any): any => {
   if (node == null) return null;
   if (Array.isArray(node)) {
@@ -284,7 +274,12 @@ describe('QuestionsDashboard', () => {
       const readScopeSlugsSpy = jest
         .spyOn(sessionScanScope, 'readSessionScanSlugs')
         .mockReturnValue(['edge', 'alpha', 'beta']);
-      const strictLookup = (slug: unknown) => makeLegacySessionConfig(slug, { BLOCKED_QUESTION_IDS: [] });
+      const strictLookup = (slug: unknown) => {
+        if (slug === 'edge') return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
+        if (slug === 'alpha') return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
+        if (slug === 'beta') return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
+        return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
+      };
       jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation(strictLookup as any);
       jest.spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault').mockImplementation(strictLookup as any);
 
@@ -463,9 +458,12 @@ describe('QuestionsDashboard', () => {
       const readScopeSlugsSpy = jest
         .spyOn(sessionScanScope, 'readSessionScanSlugs')
         .mockReturnValue(['edge', 'alpha', 'beta']);
-      const strictLookup = (slug: unknown) => makeLegacySessionConfig(slug, { BLOCKED_QUESTION_IDS: [] });
-      jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation(strictLookup as any);
-      jest.spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault').mockImplementation(strictLookup as any);
+      jest.spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault').mockImplementation((slug: any) => {
+        if (slug === 'edge') return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
+        if (slug === 'alpha') return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
+        if (slug === 'beta') return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
+        return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
+      });
 
       const questionCachesBySlug: Record<string, any> = {
         edge: {

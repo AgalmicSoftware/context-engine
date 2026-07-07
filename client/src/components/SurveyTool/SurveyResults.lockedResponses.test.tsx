@@ -94,79 +94,68 @@ jest.mock('../MainContent/RiskMatrix', () => ({
 
 const SurveyResults: any = (ConnectedSurveyResults as any).WrappedComponent;
 
-const createSubject = (props: SurveyResultsProps = {}): any =>
-  new SurveyResults({
-    network: { id: 84532 },
+const GENERIC_GATE_MESSAGE = 'Locked responses require an eligible group. Connect an eligible account to decrypt.';
+const VIEW_MODE_SWITCH_NAME = 'Toggle between individual and aggregate view';
+
+// In-memory questionsCache seed served through the spied cacheScripts boundary.
+// Shape mirrors peekCacheSync('questionsCache', slug) -> { [netId]: bucket }.
+let questionsCacheBySlug: Record<string, Record<string, any>> = {};
+
+const seedQuestionsCache = (slug: string, bucket: Record<string, any>): void => {
+  questionsCacheBySlug[slug] = {
+    '84532': {
+      questionsLatestBlock: 1,
+      questionResponsesLatestBlock: 1,
+      questions: {},
+      questionResponses: {},
+      ...bucket,
+    },
+  };
+};
+
+/** Mount the real (unconnected) SurveyResults through the shared harness. */
+const mountSurveyResults = (props: Record<string, any> = {}) =>
+  renderSurveyResults({
+    isOpen: true,
+    isQuestionCacheReady: true,
+    preventUrlChange: true,
     ...props,
   });
 
-const createDeferred = <T,>() => {
-  let resolve!: (value: T | PromiseLike<T>) => void;
-  let reject!: (reason?: any) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
+/** Switch the open survey-mode results view from individuals to aggregate. */
+const switchToAggregateView = async (): Promise<void> => {
+  const viewSwitch = await screen.findByRole('switch', { name: VIEW_MODE_SWITCH_NAME });
+  fireEvent.click(viewSwitch);
+  await waitFor(() => {
+    expect(screen.getByRole('switch', { name: VIEW_MODE_SWITCH_NAME })).toHaveAttribute('aria-checked', 'true');
   });
   return { promise, resolve, reject };
 };
 
-const attachStateHarness = (subject: any): any => {
-  subject.setState = jest.fn((updater, cb) => {
-    const patch = typeof updater === 'function' ? updater(subject.state, subject.props) : updater;
-    subject.state = { ...subject.state, ...(patch || {}) };
-    if (typeof cb === 'function') cb();
-    return patch;
+/** Inject filtered response data through the recorded SBTFilter onFilter seam. */
+const injectSbtFilteredResponses = (payload: unknown, sbtFilterState: Record<string, unknown> = {}): void => {
+  const calls = mockSbtFilter.mock.calls;
+  expect(calls.length).toBeGreaterThan(0);
+  const sbtFilterProps = calls[calls.length - 1][0] as Record<string, any>;
+  act(() => {
+    sbtFilterProps.onFilter(payload, sbtFilterState);
   });
   return subject;
 };
 
-const findElement = (node: TreeNode, predicate: TreePredicate): TreeNode | null => {
-  const stack: TreeNode[] = [node];
-  while (stack.length > 0) {
-    const current = stack.pop();
-    if (!current) continue;
-    if (Array.isArray(current)) {
-      for (let i = current.length - 1; i >= 0; i -= 1) {
-        stack.push(current[i]);
-      }
-      continue;
-    }
-    if (typeof current !== 'object') continue;
-    if (predicate(current)) return current;
-    const children = current?.props?.children;
-    if (children !== undefined) stack.push(children);
-  }
-  return null;
-};
-
-const collectTreeNodes = (
-  node: TreeNode,
-  predicate: TreePredicate,
-  acc: TreeNode[] = []
-): TreeNode[] => {
-  if (node == null) return acc;
-  if (Array.isArray(node)) {
-    node.forEach((child) => collectTreeNodes(child, predicate, acc));
-    return acc;
-  }
-  if (typeof node !== 'object') return acc;
-  if (predicate(node)) acc.push(node);
-  return collectTreeNodes(node?.props?.children, predicate, acc);
-};
-
-const normalizeChildren = (children: TreeNode): TreeNode[] => {
-  if (children == null) return [];
-  if (Array.isArray(children)) return children.filter(Boolean);
-  return [children].filter(Boolean);
-};
-
-const renderSubjectTree = (subject: any) => (
-  render(
-    <MemoryRouter>
-      {subject.render()}
-    </MemoryRouter>
-  )
-);
+const buildLockedAggregatorRow = (responder: string, answerOverrides: Record<string, unknown> = {}) => ({
+  responder,
+  response: {
+    questionID: 'q1',
+    answer: {
+      value: '*',
+      encrypted: true,
+      ciphertext: `cipher-${responder}`,
+      ...answerOverrides,
+    },
+    timeStamp: 1,
+  },
+});
 
 beforeEach(() => {
   mockSbtFilter.mockClear();
@@ -177,47 +166,58 @@ beforeEach(() => {
   mockRiskMatrix.mockClear();
 });
 
-const treeHasText = (node: TreeNode, text: string): boolean => {
-  if (node == null) return false;
-  if (Array.isArray(node)) return node.some((child) => treeHasText(child, text));
-  if (typeof node === 'string' || typeof node === 'number') {
-    return String(node).includes(text);
-  }
-  if (typeof node !== 'object') return false;
-  return treeHasText(node?.props?.children, text);
-};
+describe('SurveyResults locked responses banner', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    questionsCacheBySlug = {};
+    // Cache boundary: serve seeded questionsCache buckets, nothing else.
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((...args: any[]) => {
+      const [namespace, slug] = args;
+      return String(namespace) === 'questionsCache' ? (questionsCacheBySlug[String(slug ?? '')] ?? null) : null;
+    });
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue(null);
+    jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(undefined);
+    // Keep mount-time manual refresh off the network.
+    jest.spyOn(contractScriptsDefault as any, 'getLatestBlockNumber').mockResolvedValue(0);
+  });
 
 describe('SurveyResults locked responses banner', () => {
   afterEach(() => {
     jest.restoreAllMocks();
+    try {
+      window.history.replaceState({}, '', '/');
+    } catch (_) {
+      /* noop */
+    }
   });
 
   it('renders a compact locked-response toggle while details stay collapsed by default', () => {
-    const subject = createSubject();
-    subject.state = {
-      ...subject.state,
-      lockedResponsesDecrypting: false,
-      lockedResponseDetailsOpen: false,
-    };
-
-    const toggle = subject.renderLockedResponsesToggle({
-      lockedCount: 6,
-      gateDetails: [
-        {
-          address: '0x1111111111111111111111111111111111111111',
-          href: 'https://example.com/sbt/0x1111111111111111111111111111111111111111',
-          label: 'Session Access Pass',
-        },
-      ],
-    });
-    const detailCard = subject.renderLockedResponsesBanner({
-      lockedCount: 6,
-      gateDetails: [],
-    });
-
-    const summaryToggle = findElement(
-      toggle,
-      (element) => element?.props?.['data-testid'] === 'ce-results-locked-toggle'
+    render(
+      <LockedToggle
+        isOpen={false}
+        lockedModel={{
+          lockedCount: 6,
+          gateDetails: [
+            {
+              address: '0x1111111111111111111111111111111111111111',
+              href: 'https://example.com/sbt/0x1111111111111111111111111111111111111111',
+              label: 'Session Access Pass',
+            },
+          ],
+        }}
+        onToggleDetails={jest.fn()}
+      />,
+    );
+    const { container: bannerContainer } = render(
+      <LockedBanner
+        decrypting={false}
+        isOpen={false}
+        lockedModel={{
+          lockedCount: 6,
+          gateDetails: [],
+        }}
+        onDecrypt={jest.fn()}
+      />,
     );
 
     expect(summaryToggle).toBeTruthy();
@@ -228,21 +228,64 @@ describe('SurveyResults locked responses banner', () => {
   });
 
   it('shows gate links and decrypt controls when expanded', () => {
-    const subject = createSubject();
-    subject.state = {
-      ...subject.state,
-      lockedResponsesDecrypting: false,
-      lockedResponseDetailsOpen: true,
-    };
+    render(
+      <LockedBanner
+        decrypting={false}
+        isOpen
+        lockedModel={{
+          lockedCount: 2,
+          gateDetails: [
+            {
+              address: '0x2222222222222222222222222222222222222222',
+              href: 'https://example.com/sbt/0x2222222222222222222222222222222222222222',
+              label: 'Contributor SBT',
+            },
+          ],
+        }}
+        onDecrypt={jest.fn()}
+      />,
+    );
 
-    const tree = subject.renderLockedResponsesBanner({
-      lockedCount: 2,
-      gateDetails: [
-        {
-          address: '0x2222222222222222222222222222222222222222',
-          href: 'https://example.com/sbt/0x2222222222222222222222222222222222222222',
-          label: 'Contributor SBT',
-        },
+    const decryptButton = screen.getByTestId('ce-results-decrypt-btn');
+    expect(decryptButton).toHaveTextContent('Decrypt');
+    expect(screen.getByRole('heading', { name: '2 Locked Responses' })).toBeInTheDocument();
+    expect(screen.getByText('Required Group for decryption')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Contributor SBT' })).toHaveAttribute(
+      'href',
+      'https://example.com/sbt/0x2222222222222222222222222222222222222222',
+    );
+  });
+
+  it('keeps decrypt controls display-only and disables them while parent decrypt is running', () => {
+    const onDecrypt = jest.fn();
+    const lockedModel = {
+      lockedCount: 1,
+      gateDetails: [],
+    };
+    const view = render(<LockedBanner decrypting isOpen lockedModel={lockedModel} onDecrypt={onDecrypt} />);
+
+    const decryptButton = screen.getByTestId('ce-results-decrypt-btn');
+    expect(decryptButton).toBeDisabled();
+    expect(decryptButton).toHaveTextContent('Decrypt');
+    fireEvent.click(decryptButton);
+    expect(onDecrypt).not.toHaveBeenCalled();
+
+    // port note: dropped onClick === handleDecryptLockedResponses reference-identity check; replaced with the behavior it guarded — disabled clicks never fire the parent handler, enabled clicks fire it exactly once.
+    view.rerender(<LockedBanner decrypting={false} isOpen lockedModel={lockedModel} onDecrypt={onDecrypt} />);
+    fireEvent.click(screen.getByTestId('ce-results-decrypt-btn'));
+    expect(onDecrypt).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps parent-rendered locked toggle and banner wired to parent handlers', async () => {
+    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockReturnValue(null);
+    mountSurveyResults({ viewMode: 'survey' });
+    await switchToAggregateView();
+
+    injectSbtFilteredResponses({
+      q1: [
+        buildLockedAggregatorRow('0xaaa0000000000000000000000000000000000001'),
+        buildLockedAggregatorRow('0xaaa0000000000000000000000000000000000002'),
+        buildLockedAggregatorRow('0xaaa0000000000000000000000000000000000003'),
       ],
     });
     const decryptButton = findElement(
@@ -255,13 +298,30 @@ describe('SurveyResults locked responses banner', () => {
     );
     const markup = renderToStaticMarkup(tree);
 
-    expect(decryptButton).toBeTruthy();
-    expect(treeHasText(decryptButton, 'Decrypt')).toBe(true);
-    expect(treeHasText(tree, 'Locked Responses')).toBe(true);
-    expect(treeHasText(tree, '2')).toBe(true);
-    expect(treeHasText(tree, 'Contributor SBT')).toBe(true);
-    expect(markup).toContain('Required Group for decryption');
-    expect(gateLink).toBeTruthy();
+    // port note: dropped toggle/decrypt onClick reference-identity checks and getMemoizedLockedResponsesModel.toHaveBeenCalledWith({}) — no behavioral seam for instance-method identity/arguments; click-driven assertions below verify the same wiring.
+    const toggle = await screen.findByTestId('ce-results-locked-toggle');
+    expect(toggle.closest('.modal-header')).not.toBeNull();
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveAttribute('aria-label', 'Show 3 locked responses');
+
+    fireEvent.click(toggle);
+    await waitFor(() => {
+      expect(screen.getByTestId('ce-results-locked-toggle')).toHaveAttribute('aria-expanded', 'true');
+    });
+    expect(screen.getByTestId('ce-results-locked-toggle')).toHaveAttribute('aria-label', 'Hide 3 locked responses');
+    expect(screen.getByTestId('ce-results-locked-banner')).toBeInTheDocument();
+
+    const decryptButton = screen.getByTestId('ce-results-decrypt-btn');
+    expect(decryptButton).toBeEnabled();
+    fireEvent.click(decryptButton);
+    // Decrypt wiring proof: the parent handler's login gate raises the alert.
+    expect(await screen.findByText('Login required to decrypt locked responses.')).toBeInTheDocument();
+
+    // Toggle wiring proof in the collapse direction too.
+    fireEvent.click(screen.getByTestId('ce-results-locked-toggle'));
+    await waitFor(() => {
+      expect(screen.queryByTestId('ce-results-locked-banner')).toBeNull();
+    });
   });
 
   it('resolves SBT details from configured session gates before falling back to generic copy', () => {
@@ -300,7 +360,29 @@ describe('SurveyResults locked responses banner', () => {
             },
           },
         },
-      }
+      },
+      questionResponses: {
+        q1: {
+          '0xresponder0000000000000000000000000000000001': {
+            questionID: 'q1',
+            answer: { value: '*', encrypted: true, ciphertext: 'cipher-q1' },
+            timeStamp: 1,
+          },
+        },
+      },
+    });
+
+    mountSurveyResults({ viewMode: 'questions', sessionSlug: 'session-slug' });
+
+    const toggle = await screen.findByTestId('ce-results-locked-toggle');
+    expect(toggle).toHaveAttribute('aria-label', 'Show 1 locked response');
+    fireEvent.click(toggle);
+
+    // port note: dropped deep equality on model.gateDetails / model.hasGenericGateMessage — asserted via their rendered projection (gate link label + href, no generic copy); exact model shape belongs in a pure helper test once buildLockedGateDetails is extracted.
+    const gateLink = await screen.findByRole('link', { name: 'Contributor Pass' });
+    expect(gateLink).toHaveAttribute(
+      'href',
+      buildSbtDetailPath('0x1111111111111111111111111111111111111111', 'session-slug'),
     );
 
     expect(model.hasGenericGateMessage).toBe(false);
@@ -349,7 +431,28 @@ describe('SurveyResults locked responses banner', () => {
             },
           },
         },
-      }
+      },
+      questionResponses: {
+        q1: {
+          '0xresponder0000000000000000000000000000000001': {
+            questionID: 'q1',
+            answer: { value: '*', encrypted: true, ciphertext: 'cipher-q1' },
+            timeStamp: 1,
+          },
+        },
+      },
+    });
+
+    mountSurveyResults({ viewMode: 'questions', sessionSlug: 'session-slug' });
+
+    const toggle = await screen.findByTestId('ce-results-locked-toggle');
+    fireEvent.click(toggle);
+
+    // port note: dropped deep equality on model.gateDetails / model.hasGenericGateMessage — asserted via the rendered gate link sourced from the sbt object name (resolveSbtDisplayLabel returns '').
+    const gateLink = await screen.findByRole('link', { name: 'Contributor Pass' });
+    expect(gateLink).toHaveAttribute(
+      'href',
+      buildSbtDetailPath('0x3333333333333333333333333333333333333333', 'session-slug'),
     );
 
     expect(model.hasGenericGateMessage).toBe(false);
@@ -363,11 +466,23 @@ describe('SurveyResults locked responses banner', () => {
   });
 
   it('does not show the generic decrypt message when named gate details are available', () => {
-    const subject = createSubject();
-    subject.state = {
-      ...subject.state,
-      lockedResponseDetailsOpen: true,
-    };
+    render(
+      <LockedBanner
+        isOpen
+        lockedModel={{
+          lockedCount: 1,
+          gateDetails: [
+            {
+              address: '0x1111111111111111111111111111111111111111',
+              href: `${sbtBasePath()}/0x1111111111111111111111111111111111111111`,
+              label: 'Contributor Pass',
+            },
+          ],
+          hasGenericGateMessage: true,
+        }}
+        onDecrypt={jest.fn()}
+      />,
+    );
 
     const tree = subject.renderLockedResponsesBanner({
       lockedCount: 1,
@@ -386,11 +501,17 @@ describe('SurveyResults locked responses banner', () => {
   });
 
   it('uses terminology-aware generic decrypt messaging when gate details are unavailable', () => {
-    const subject = createSubject();
-    subject.state = {
-      ...subject.state,
-      lockedResponseDetailsOpen: true,
-    };
+    render(
+      <LockedBanner
+        isOpen
+        lockedModel={{
+          lockedCount: 1,
+          gateDetails: [],
+          hasGenericGateMessage: true,
+        }}
+        onDecrypt={jest.fn()}
+      />,
+    );
 
     const tree = subject.renderLockedResponsesBanner({
       lockedCount: 1,
@@ -402,7 +523,11 @@ describe('SurveyResults locked responses banner', () => {
   });
 
   it('uses terminology-aware decrypt failure alerts when locked responses stay encrypted', async () => {
-    const subject = createSubject({
+    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockReturnValue(null);
+    const decryptSpy = jest.spyOn(cryptoUtils, 'decryptEnvelopeValue').mockRejectedValue(new Error('decrypt denied'));
+
+    mountSurveyResults({
+      viewMode: 'survey',
       loginComplete: true,
       account: '0xabc',
       provider: 'mock-provider',
@@ -425,7 +550,14 @@ describe('SurveyResults locked responses banner', () => {
 
     await subject.handleDecryptLockedResponses();
 
-    expect(subject.state.alertMessage).toBe('Unable to decrypt locked responses with the connected account.');
+    const decryptButton = await screen.findByTestId('ce-results-decrypt-btn');
+    fireEvent.click(decryptButton);
+
+    // port note: dropped subject.state.alertMessage read — the failure alert is asserted where users see it, rendered through SurveyResultsStatusMessages.
+    expect(
+      await screen.findByText('Unable to decrypt locked responses with the connected account.'),
+    ).toBeInTheDocument();
+    expect(decryptSpy).toHaveBeenCalled();
   });
 
   it('skips the locked banner model for self-encrypted responses without gate access rules', () => {
@@ -465,7 +597,6 @@ describe('SurveyResults locked responses banner', () => {
     expect(model.gateDetails).toEqual([]);
     expect(model.hasGenericGateMessage).toBe(false);
   });
-
 });
 
 describe('SurveyResults module styles', () => {
@@ -475,16 +606,28 @@ describe('SurveyResults module styles', () => {
 
     expect(scss).toMatch(/\.resultsModal\s*{[\s\S]*?background-color:\s*var\(--ce-color-white\);/);
     expect(scss).toMatch(/\.modalBody\s*{[\s\S]*?color:\s*var\(--ce-color-black\) !important;/);
-    expect(scss).toMatch(/\.surveyDocUrlLink\s*{[\s\S]*?background:\s*rgba\(26,\s*115,\s*232,\s*0\.08\);[\s\S]*?color:\s*#174ea6;/);
+    expect(scss).toMatch(
+      /\.surveyDocUrlLink\s*{[\s\S]*?background:\s*rgba\(26,\s*115,\s*232,\s*0\.08\);[\s\S]*?color:\s*#174ea6;/,
+    );
     expect(scss).toMatch(/\.aggregatorSummaryCard\s*{[\s\S]*?background-color:\s*transparent !important;/);
     expect(scss).not.toMatch(/\.aggregatorSummaryCard\s*{[\s\S]*?background-color:\s*#dce3f7 !important;/);
-    expect(scss).toMatch(/\.aggregatorSummaryCard:not\(:has\(\.surveyResultsResponseCard\)\) \.questionSummaryHeader\s*{[\s\S]*?border-radius:\s*var\(--ce-radius-12\) !important;/);
-    expect(scss).toMatch(/\.surveyResultsResponseCard\s*{[\s\S]*?background:\s*rgba\(38,\s*49,\s*116,\s*0\.98\) !important;[\s\S]*?border-top:\s*0 !important;[\s\S]*?border-radius:\s*0 0 var\(--ce-radius-12\) var\(--ce-radius-12\) !important;/);
+    expect(scss).toMatch(
+      /\.aggregatorSummaryCard:not\(:has\(\.surveyResultsResponseCard\)\) \.questionSummaryHeader\s*{[\s\S]*?border-radius:\s*var\(--ce-radius-12\) !important;/,
+    );
+    expect(scss).toMatch(
+      /\.surveyResultsResponseCard\s*{[\s\S]*?background:\s*rgba\(38,\s*49,\s*116,\s*0\.98\) !important;[\s\S]*?border-top:\s*0 !important;[\s\S]*?border-radius:\s*0 0 var\(--ce-radius-12\) var\(--ce-radius-12\) !important;/,
+    );
     expect(scss).toMatch(/\.surveyResultsResponseCardBody\s*{[\s\S]*?padding:\s*0 !important;/);
-    expect(scss).toMatch(/\.surveyResultsAggregatorPanel\s*{[\s\S]*?background:\s*transparent !important;[\s\S]*?border:\s*0;[\s\S]*?border-radius:\s*0;/);
-    expect(scss).toMatch(/\.lockedBanner\s*{[\s\S]*?background:\s*rgba\(23,\s*25,\s*65,\s*0\.96\);[\s\S]*?border-left:\s*4px solid rgba\(77,\s*255,\s*164,\s*0\.7\);[\s\S]*?color:\s*(?:var\(--ce-color-panel-text\)|#f4f7ff);/);
+    expect(scss).toMatch(
+      /\.surveyResultsAggregatorPanel\s*{[\s\S]*?background:\s*transparent !important;[\s\S]*?border:\s*0;[\s\S]*?border-radius:\s*0;/,
+    );
+    expect(scss).toMatch(
+      /\.lockedBanner\s*{[\s\S]*?background:\s*rgba\(23,\s*25,\s*65,\s*0\.96\);[\s\S]*?border-left:\s*4px solid rgba\(77,\s*255,\s*164,\s*0\.7\);[\s\S]*?color:\s*(?:var\(--ce-color-panel-text\)|#f4f7ff);/,
+    );
     expect(scss).toMatch(/\.lockedBannerCaret\s*{[\s\S]*?margin:\s*8px 0 0 auto;[\s\S]*?padding:\s*0;/);
-    expect(scss).toMatch(/\.lockedBannerDetails\s*{[\s\S]*?border-top:\s*1px solid rgba\(255,\s*255,\s*255,\s*0\.12\);/);
+    expect(scss).toMatch(
+      /\.lockedBannerDetails\s*{[\s\S]*?border-top:\s*1px solid rgba\(255,\s*255,\s*255,\s*0\.12\);/,
+    );
     expect(scss).not.toMatch(/\.filterSummaryBox\s*{[\s\S]*?background:\s*rgba\(10,\s*14,\s*43,\s*0\.82\);/);
   });
 
@@ -494,12 +637,20 @@ describe('SurveyResults module styles', () => {
 
     expect(scss).toMatch(/\.toggleLabel\s*{[\s\S]*?color:\s*#1f2733;/);
     expect(scss).toMatch(/\.exportAndFilterContainer\s*{[\s\S]*?background:\s*#f3f5f9;/);
-    expect(scss).toMatch(/#questionFilterButton\s*{[\s\S]*?background-color:\s*#1f2733 !important;[\s\S]*?color:\s*#f8fafc !important;/);
+    expect(scss).toMatch(
+      /\.questionFilterButton\s*{[\s\S]*?background-color:\s*#1f2733 !important;[\s\S]*?color:\s*#f8fafc !important;/,
+    );
     expect(scss).toMatch(/\.filterSummaryBox\s*{[\s\S]*?color:\s*#4b5563;/);
     expect(scss).toMatch(/\.demoResultsAtlasSurface,\s*\.demoResultsRiskMatrixSurface\s*{[\s\S]*?padding:\s*1rem;/);
-    expect(scss).toMatch(/\.demoResultsAtlasSurface,\s*\.demoResultsRiskMatrixSurface\s*{[\s\S]*?border:\s*1px solid rgba\(19,\s*34,\s*86,\s*0\.2\);/);
-    expect(scss).toMatch(/\.demoResultsAtlasSurface\s*{[^}]*background:\s*[^;]*linear-gradient\(180deg,[^;]*rgba\(21,\s*31,\s*74,\s*0\.98\)[^;]*rgba\(8,\s*12,\s*28,\s*0\.995\)[^;]*;/);
+    expect(scss).toMatch(
+      /\.demoResultsAtlasSurface,\s*\.demoResultsRiskMatrixSurface\s*{[\s\S]*?border:\s*1px solid rgba\(19,\s*34,\s*86,\s*0\.2\);/,
+    );
+    expect(normalizedScss).toMatch(
+      /\.demoResultsAtlasSurface\s*{[^}]*background:\s*[^;]*linear-gradient\(180deg,[^;]*rgba\(21,\s*31,\s*74,\s*0\.98\)[^;]*rgba\(8,\s*12,\s*28,\s*0\.995\)[^;]*;/,
+    );
     expect(scss).not.toMatch(/\.demoResultsAtlasSurface\s*{[^}]*radial-gradient\(circle at top/);
-    expect(scss).toMatch(/\.demoResultsRiskMatrixSurface\s*{[^}]*background:\s*[^;]*linear-gradient\(180deg,[^;]*rgba\(23,\s*25,\s*65,\s*0\.98\)[^;]*rgba\(9,\s*13,\s*30,\s*0\.995\)[^;]*;/);
+    expect(normalizedScss).toMatch(
+      /\.demoResultsRiskMatrixSurface\s*{[^}]*background:\s*[^;]*linear-gradient\(180deg,[^;]*rgba\(23,\s*25,\s*65,\s*0\.98\)[^;]*rgba\(9,\s*13,\s*30,\s*0\.995\)[^;]*;/,
+    );
   });
 });

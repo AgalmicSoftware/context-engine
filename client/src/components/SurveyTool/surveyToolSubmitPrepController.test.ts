@@ -220,9 +220,7 @@ describe('surveyToolSubmitPrepController', () => {
         slice,
         new Set(['q1']),
         makeDeps({
-          resolveFieldEncryptionAudience: (_field, _qid, fieldKey) => (
-            fieldKey === 'answer' ? 'self' : 'gate'
-          ),
+          resolveFieldEncryptionAudience: (_field, _qid, fieldKey) => (fieldKey === 'answer' ? 'self' : 'gate'),
           getEffectiveRecipientsForField: () => [],
         }),
       );

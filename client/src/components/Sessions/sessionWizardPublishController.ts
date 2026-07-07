@@ -389,23 +389,6 @@ export const runSessionWizardPublishController = async ({
       })) || [];
   }
 
-  if (publishExecutionPlan.shouldPersistWorkerConfig) {
-    if (typeof ports.persistWorkerConfig !== 'function') {
-      throw new Error('Worker config persistence port is required.');
-    }
-    callbacks.setPublishStep(getPublishStepNumber(publishExecutionPlan, 'persist-worker-config'));
-    verifiedWorkerConfig =
-      (await ports.persistWorkerConfig({
-        workerUrlOverride,
-        signerAccountOverride: input.signerAccountOverride || '',
-      })) || null;
-    const verifiedWorkerUrl = toStr(verifiedWorkerConfig?.workerUrl).trim();
-    if (!verifiedWorkerUrl) {
-      throw new Error('Worker config persistence did not return a verified worker URL.');
-    }
-    workerUrlOverride = verifiedWorkerUrl;
-  }
-
   return {
     status: 'completed',
     workerUrlOverride,

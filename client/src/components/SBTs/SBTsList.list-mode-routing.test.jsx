@@ -303,7 +303,7 @@ describe('SBTsList list-mode routing and filtering', () => {
         allSessionsMode
         embeddedMode
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     await openSessionSelector();
@@ -338,7 +338,7 @@ describe('SBTsList list-mode routing and filtering', () => {
         allSessionsMode
         embeddedMode
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     await openSessionSelector();
@@ -374,7 +374,7 @@ describe('SBTsList list-mode routing and filtering', () => {
         embeddedMode
         ensureLightSbtDiscovery={jest.fn()}
         ensureLightSbtUniverse={ensureLightSbtUniverse}
-      />
+      />,
     );
 
     await openSessionSelector();
@@ -383,7 +383,7 @@ describe('SBTsList list-mode routing and filtering', () => {
     await waitFor(() => {
       expect(ensureLightSbtUniverse).toHaveBeenCalledWith(
         expect.arrayContaining(['beta']),
-        expect.objectContaining({ force: true })
+        expect.objectContaining({ force: true }),
       );
     });
 
@@ -418,13 +418,13 @@ describe('SBTsList list-mode routing and filtering', () => {
         embeddedMode
         ensureLightSbtDiscovery={ensureLightSbtDiscovery}
         ensureLightSbtUniverse={ensureLightSbtUniverse}
-      />
+      />,
     );
 
     await waitFor(() => {
       expect(ensureLightSbtDiscovery).toHaveBeenCalledWith(
         'alpha',
-        expect.objectContaining({ forceScopeSlug: 'alpha' })
+        expect.objectContaining({ forceScopeSlug: 'alpha' }),
       );
     });
 
@@ -434,7 +434,7 @@ describe('SBTsList list-mode routing and filtering', () => {
     await waitFor(() => {
       expect(ensureLightSbtUniverse).toHaveBeenCalledWith(
         expect.arrayContaining(['beta']),
-        expect.objectContaining({ force: true })
+        expect.objectContaining({ force: true }),
       );
     });
 
@@ -471,7 +471,7 @@ describe('SBTsList list-mode routing and filtering', () => {
         allSessionsMode
         embeddedMode
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     await openSessionSelector();
@@ -509,7 +509,7 @@ describe('SBTsList list-mode routing and filtering', () => {
         allSessionsMode
         embeddedMode
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     await openSessionSelector();
@@ -542,7 +542,7 @@ describe('SBTsList list-mode routing and filtering', () => {
         allSessionsMode
         embeddedMode
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     await openSessionSelector();
@@ -593,7 +593,7 @@ describe('SBTsList list-mode routing and filtering', () => {
         allSessionsMode
         embeddedMode
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     await openSessionSelector();
@@ -608,14 +608,12 @@ describe('SBTsList list-mode routing and filtering', () => {
 
   it('uses demo-only session labels and route tokens for session chips when strict config is missing', async () => {
     mockReadSessionScanScope.mockReturnValue('all');
-    mockGetAllSessionEntries.mockReturnValue([
-      ['edge', { slug: 'edge' }],
-    ]);
-    mockSessionRegistryGetAllSessionEntries.mockReturnValue([
-      ['edge', { slug: 'edge' }],
-    ]);
+    mockGetAllSessionEntries.mockReturnValue([['edge', { slug: 'edge' }]]);
+    mockSessionRegistryGetAllSessionEntries.mockReturnValue([['edge', { slug: 'edge' }]]);
     mockGetSessionConfigBySlug.mockImplementation((slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized === 'edge') return null;
       return {
         sessionName: normalized || 'General',
@@ -623,7 +621,9 @@ describe('SBTsList list-mode routing and filtering', () => {
       };
     });
     mockGetDemoSessionConfigBySlug.mockImplementation((slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized !== 'edge') return null;
       return {
         slug: 'edge',
@@ -650,7 +650,7 @@ describe('SBTsList list-mode routing and filtering', () => {
         allSessionsMode
         embeddedMode
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     await openSessionSelector();
@@ -675,7 +675,7 @@ describe('SBTsList list-mode routing and filtering', () => {
     const alphaAddress = '0x00000000000000000000000000000000000000a1';
     const betaAddress = '0x00000000000000000000000000000000000000b1';
     const alphaCache = {
-      '84532': {
+      84532: {
         sbtList: {
           [alphaAddress.toLowerCase()]: {
             sbtAddress: alphaAddress,
@@ -696,7 +696,7 @@ describe('SBTsList list-mode routing and filtering', () => {
       },
     };
     const betaCache = {
-      '84532': {
+      84532: {
         sbtList: {
           [betaAddress.toLowerCase()]: {
             sbtAddress: betaAddress,
@@ -718,10 +718,12 @@ describe('SBTsList list-mode routing and filtering', () => {
     };
 
     mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized === 'alpha') return alphaCache;
       if (normalized === 'beta') return betaCache;
-      return { '84532': { sbtList: {}, lastBlock: 0 } };
+      return { 84532: { sbtList: {}, lastBlock: 0 } };
     });
 
     const ensureLightSbtDiscovery = jest.fn().mockResolvedValue(undefined);
@@ -743,7 +745,7 @@ describe('SBTsList list-mode routing and filtering', () => {
         allSessionsMode
         embeddedMode
         ensureLightSbtDiscovery={ensureLightSbtDiscovery}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -767,1204 +769,10 @@ describe('SBTsList list-mode routing and filtering', () => {
       expect(screen.getByTestId('session-chip-check-beta')).toBeInTheDocument();
     });
     await waitFor(() => {
-      expect(ensureLightSbtDiscovery).toHaveBeenCalledWith(
-        'beta',
-        expect.objectContaining({ forceScopeSlug: 'beta' })
-      );
+      expect(ensureLightSbtDiscovery).toHaveBeenCalledWith('beta', expect.objectContaining({ forceScopeSlug: 'beta' }));
     });
     await waitFor(() => {
       expect(screen.getByText('Beta Selected Badge')).toBeInTheDocument();
     });
-  });
-
-  it('adds a "No Session" chip when list-mode cache contains unassociated SBT metadata', async () => {
-    mockReadSessionScanScope.mockReturnValue('list');
-    mockReadSessionScanSlugs.mockReturnValue(['alpha']);
-
-    const unassignedAddress = '0x00000000000000000000000000000000000000a9';
-    const alphaCache = {
-      '84532': {
-        sbtList: {
-          [unassignedAddress.toLowerCase()]: {
-            sbtAddress: unassignedAddress,
-            slug: 'alpha',
-            sbtInfo: {
-              name: 'Unassigned Badge',
-              description: 'no session association',
-              sessionSlug: '',
-              sessionSlugExplicit: true,
-              mintingEndTime: 0,
-            },
-            mintedAddresses: [],
-            burnedAddresses: [],
-            countsLoaded: true,
-            blockNumber: 1100,
-          },
-        },
-        lastBlock: 1100,
-      },
-    };
-    mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
-      if (normalized === 'alpha') return alphaCache;
-      return { '84532': { sbtList: {}, lastBlock: 0 } };
-    });
-
-    render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug=""
-        loginComplete
-        miniaturized={false}
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        allSessionsMode
-        embeddedMode
-        ensureLightSbtDiscovery={jest.fn()}
-      />
-    );
-
-    await openSessionSelector();
-    const noSessionChip = await screen.findByTestId('session-chip-__no_session__');
-    expect(noSessionChip).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'No Session' })).toBeInTheDocument();
-    expect(noSessionChip).toHaveAttribute('data-session-selected', 'false');
-  });
-
-  it('keeps unassociated SBTs accessible through No Session selection without querying synthetic slug', async () => {
-    mockReadSessionScanScope.mockReturnValue('list');
-    mockReadSessionScanSlugs.mockReturnValue(['alpha']);
-
-    const alphaAddress = '0x00000000000000000000000000000000000000a1';
-    const unassignedAddress = '0x00000000000000000000000000000000000000a9';
-    const alphaCache = {
-      '84532': {
-        sbtList: {
-          [alphaAddress.toLowerCase()]: {
-            sbtAddress: alphaAddress,
-            slug: 'alpha',
-            sbtInfo: {
-              name: 'Alpha Scoped Badge',
-              description: 'belongs to alpha',
-              sessionSlug: 'alpha',
-              sessionSlugExplicit: true,
-              mintingEndTime: 0,
-            },
-            mintedAddresses: [],
-            burnedAddresses: [],
-            countsLoaded: true,
-            blockNumber: 1100,
-          },
-          [unassignedAddress.toLowerCase()]: {
-            sbtAddress: unassignedAddress,
-            slug: 'alpha',
-            sbtInfo: {
-              name: 'Unassigned Badge',
-              description: 'no session association',
-              sessionSlug: '',
-              sessionSlugExplicit: true,
-              mintingEndTime: 0,
-            },
-            mintedAddresses: [],
-            burnedAddresses: [],
-            countsLoaded: true,
-            blockNumber: 1101,
-          },
-        },
-        lastBlock: 1101,
-      },
-    };
-    mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
-      if (normalized === 'alpha') return alphaCache;
-      return { '84532': { sbtList: {}, lastBlock: 0 } };
-    });
-
-    const ensureLightSbtDiscovery = jest.fn().mockResolvedValue(undefined);
-    render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug=""
-        loginComplete
-        miniaturized={false}
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        allSessionsMode
-        embeddedMode
-        ensureLightSbtDiscovery={ensureLightSbtDiscovery}
-      />
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Alpha Scoped Badge')).toBeInTheDocument();
-    });
-    expect(screen.queryByText('Unassigned Badge')).not.toBeInTheDocument();
-
-    await openSessionSelector();
-    const noSessionChip = await screen.findByTestId('session-chip-__no_session__');
-    fireEvent.click(noSessionChip);
-
-    const alphaChip = await screen.findByTestId('session-chip-alpha');
-    fireEvent.click(alphaChip);
-
-    await waitFor(() => {
-      expect(screen.getByText('Unassigned Badge')).toBeInTheDocument();
-    });
-    expect(screen.queryByText('Alpha Scoped Badge')).not.toBeInTheDocument();
-
-    const calledSlugs = ensureLightSbtDiscovery.mock.calls.map(([slug]) => String(slug || ''));
-    expect(calledSlugs).not.toContain('__no_session__');
-  });
-
-  it('routes list-mode cards with missing sessionSlug metadata into No Session', async () => {
-    mockReadSessionScanScope.mockReturnValue('list');
-    mockReadSessionScanSlugs.mockReturnValue(['alpha']);
-
-    const alphaAddress = '0x00000000000000000000000000000000000000b1';
-    const noSessionAddress = '0x00000000000000000000000000000000000000b9';
-    const alphaCache = {
-      '84532': {
-        sbtList: {
-          [alphaAddress.toLowerCase()]: {
-            sbtAddress: alphaAddress,
-            slug: 'alpha',
-            sbtInfo: {
-              name: 'Alpha Explicit Badge',
-              description: 'belongs to alpha',
-              sessionSlug: 'alpha',
-              sessionSlugExplicit: true,
-              mintingEndTime: 0,
-            },
-            mintedAddresses: [],
-            burnedAddresses: [],
-            countsLoaded: true,
-            blockNumber: 1100,
-          },
-          [noSessionAddress.toLowerCase()]: {
-            sbtAddress: noSessionAddress,
-            slug: 'alpha',
-            sbtInfo: {
-              name: 'No Session Missing Slug Badge',
-              description: 'sessionSlug field missing should map to no-session',
-              mintingEndTime: 0,
-            },
-            mintedAddresses: [],
-            burnedAddresses: [],
-            countsLoaded: true,
-            blockNumber: 1101,
-          },
-        },
-        lastBlock: 1101,
-      },
-    };
-    mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
-      if (normalized === 'alpha') return alphaCache;
-      return { '84532': { sbtList: {}, lastBlock: 0 } };
-    });
-
-    const ensureLightSbtDiscovery = jest.fn().mockResolvedValue(undefined);
-    render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug=""
-        loginComplete
-        miniaturized={false}
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        allSessionsMode
-        embeddedMode
-        ensureLightSbtDiscovery={ensureLightSbtDiscovery}
-      />
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Alpha Explicit Badge')).toBeInTheDocument();
-    });
-    expect(screen.queryByText('No Session Missing Slug Badge')).not.toBeInTheDocument();
-
-    await openSessionSelector();
-    const noSessionChip = await screen.findByTestId('session-chip-__no_session__');
-    fireEvent.click(noSessionChip);
-
-    const alphaChip = await screen.findByTestId('session-chip-alpha');
-    fireEvent.click(alphaChip);
-
-    await waitFor(() => {
-      expect(screen.getByText('No Session Missing Slug Badge')).toBeInTheDocument();
-    });
-    expect(screen.queryByText('Alpha Explicit Badge')).not.toBeInTheDocument();
-
-    const calledSlugs = ensureLightSbtDiscovery.mock.calls.map(([slug]) => String(slug || ''));
-    expect(calledSlugs).not.toContain('__no_session__');
-  });
-
-  it('keeps selected list-mode cards visible during revision refresh even if the next cache read is empty', async () => {
-    mockReadSessionScanScope.mockReturnValue('list');
-    mockReadSessionScanSlugs.mockReturnValue(['alpha']);
-    localStorage.removeItem('dg:sbt:fullScanInProgress:alpha');
-    localStorage.removeItem('dg:sbt:deferredFullScanNeeded:alpha');
-
-    const alphaAddress = '0x00000000000000000000000000000000000000a1';
-    const liveCache = {
-      '84532': {
-        sbtList: {
-          [alphaAddress.toLowerCase()]: {
-            sbtAddress: alphaAddress,
-            slug: 'alpha',
-            sbtInfo: {
-              name: 'Alpha Sticky Badge',
-              description: 'stays visible during refresh',
-              sessionSlug: 'alpha',
-              mintingEndTime: 0,
-            },
-            mintedAddresses: [],
-            burnedAddresses: [],
-            countsLoaded: true,
-            blockNumber: 1100,
-          },
-        },
-        lastBlock: 1100,
-      },
-    };
-    const emptyCache = {
-      '84532': {
-        sbtList: {},
-        lastBlock: 1100,
-      },
-    };
-
-    let alphaReadCount = 0;
-    let resolveSecondRead;
-    const secondRead = new Promise((resolve) => {
-      resolveSecondRead = resolve;
-    });
-
-    mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
-      if (normalized !== 'alpha') return { '84532': { sbtList: {}, lastBlock: 0 } };
-      alphaReadCount += 1;
-      if (alphaReadCount === 1) return liveCache;
-      return secondRead;
-    });
-
-    const { rerender } = render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug=""
-        loginComplete
-        miniaturized={false}
-        embeddedMode
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        allSessionsMode
-        ensureLightSbtDiscovery={jest.fn()}
-      />
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Alpha Sticky Badge')).toBeInTheDocument();
-    });
-
-    rerender(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug=""
-        loginComplete
-        miniaturized={false}
-        embeddedMode
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={1}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        allSessionsMode
-        ensureLightSbtDiscovery={jest.fn()}
-      />
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId('section-spinner-live')).toBeInTheDocument();
-      expect(screen.getByText('Alpha Sticky Badge')).toBeInTheDocument();
-      expect(screen.queryByText('No live groups.')).not.toBeInTheDocument();
-    });
-
-    await act(async () => {
-      resolveSecondRead(emptyCache);
-      await Promise.resolve();
-    });
-
-    await waitFor(() => {
-      expect(screen.getByText('Alpha Sticky Badge')).toBeInTheDocument();
-      expect(screen.queryByText('No live groups.')).not.toBeInTheDocument();
-    });
-  });
-
-  it('shows only SBTs associated with the highlighted sessionSlug in all-sessions mode', async () => {
-    const alphaAddress = '0x00000000000000000000000000000000000000a1';
-    const betaAddress = '0x00000000000000000000000000000000000000b1';
-    mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
-      if (normalized !== 'alpha') {
-        return { '84532': { sbtList: {}, lastBlock: 0 } };
-      }
-      return {
-        '84532': {
-          sbtList: {
-            [alphaAddress.toLowerCase()]: {
-              sbtAddress: alphaAddress,
-              slug: 'alpha',
-              sbtInfo: {
-                name: 'Alpha Session Badge',
-                description: 'belongs to alpha',
-                sessionSlug: 'alpha',
-                mintingEndTime: 0,
-              },
-              mintedAddresses: [],
-              burnedAddresses: [],
-              countsLoaded: true,
-              blockNumber: 1100,
-            },
-            [betaAddress.toLowerCase()]: {
-              sbtAddress: betaAddress,
-              slug: 'alpha',
-              sbtInfo: {
-                name: 'Beta Session Badge',
-                description: 'belongs to beta',
-                sessionSlug: 'beta',
-                mintingEndTime: 0,
-              },
-              mintedAddresses: [],
-              burnedAddresses: [],
-              countsLoaded: true,
-              blockNumber: 1100,
-            },
-          },
-          lastBlock: 1100,
-        },
-      };
-    });
-
-    render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug=""
-        loginComplete
-        miniaturized={false}
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        allSessionsMode
-        ensureLightSbtDiscovery={jest.fn()}
-      />
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Alpha Session Badge')).toBeInTheDocument();
-    });
-    expect(screen.queryByText('Beta Session Badge')).not.toBeInTheDocument();
-  });
-
-  it('falls back to cached entry slug when sessionSlug is inferred (not explicit)', async () => {
-    const alphaAddress = '0x00000000000000000000000000000000000000a1';
-    mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
-      if (normalized !== 'alpha') {
-        return { '84532': { sbtList: {}, lastBlock: 0 } };
-      }
-      return {
-        '84532': {
-          sbtList: {
-            [alphaAddress.toLowerCase()]: {
-              sbtAddress: alphaAddress,
-              slug: 'alpha',
-              sbtInfo: {
-                name: 'Alpha Inferred SessionSlug Badge',
-                description: 'should remain in alpha list',
-                sessionSlug: 'beta',
-                sessionSlugExplicit: false,
-                mintingEndTime: 0,
-              },
-              mintedAddresses: [],
-              burnedAddresses: [],
-              countsLoaded: true,
-              blockNumber: 1100,
-            },
-          },
-          lastBlock: 1100,
-        },
-      };
-    });
-
-    render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug=""
-        loginComplete
-        miniaturized={false}
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        allSessionsMode
-        ensureLightSbtDiscovery={jest.fn()}
-      />
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Alpha Inferred SessionSlug Badge')).toBeInTheDocument();
-    });
-  });
-
-  it('filters concrete session lists to authoritative or supported legacy metadata bindings only', async () => {
-    const explicitAddress = '0x00000000000000000000000000000000000000a1';
-    const legacySlugAddress = '0x00000000000000000000000000000000000000a2';
-    const legacyNameAddress = '0x00000000000000000000000000000000000000a3';
-    const legacyTopLevelGroupSlugAddress = '0x00000000000000000000000000000000000000a4';
-    const inferredAddress = '0x00000000000000000000000000000000000000a5';
-    const bucketOnlyAddress = '0x00000000000000000000000000000000000000a6';
-    const inferredNameAddress = '0x00000000000000000000000000000000000000a7';
-
-    mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
-      if (normalized !== 'alpha') {
-        return { '84532': { sbtList: {}, lastBlock: 0 } };
-      }
-      return {
-        '84532': {
-          sbtList: {
-            [explicitAddress.toLowerCase()]: {
-              sbtAddress: explicitAddress,
-              slug: 'alpha',
-              sbtInfo: {
-                name: 'Alpha Explicit Badge',
-                description: 'authoritative metadata session slug should stay visible',
-                sessionSlug: 'alpha',
-                sessionSlugExplicit: true,
-                mintingEndTime: 0,
-              },
-              mintedAddresses: [],
-              burnedAddresses: [],
-              countsLoaded: true,
-              blockNumber: 1100,
-            },
-            [legacySlugAddress.toLowerCase()]: {
-              sbtAddress: legacySlugAddress,
-              slug: 'alpha',
-              sbtInfo: {
-                name: 'Alpha Legacy Slug Badge',
-                description: 'legacy metadata slug should stay visible',
-                slug: 'alpha',
-                mintingEndTime: 0,
-              },
-              mintedAddresses: [],
-              burnedAddresses: [],
-              countsLoaded: true,
-              blockNumber: 1100,
-            },
-            [legacyNameAddress.toLowerCase()]: {
-              sbtAddress: legacyNameAddress,
-              slug: 'alpha',
-              sbtInfo: {
-                name: 'Alpha Legacy Name Badge',
-                description: 'legacy sessionName mapping should stay visible',
-                sessionName: 'Alpha',
-                mintingEndTime: 0,
-              },
-              mintedAddresses: [],
-              burnedAddresses: [],
-              countsLoaded: true,
-              blockNumber: 1100,
-            },
-            [legacyTopLevelGroupSlugAddress.toLowerCase()]: {
-              sbtAddress: legacyTopLevelGroupSlugAddress,
-              slug: 'beta',
-              sessionSlug: 'alpha',
-              sbtInfo: {
-                name: 'Alpha Top-Level SessionSlug Badge',
-                description: 'top-level sessionSlug should stay visible',
-                mintingEndTime: 0,
-              },
-              mintedAddresses: [],
-              burnedAddresses: [],
-              countsLoaded: true,
-              blockNumber: 1100,
-            },
-            [inferredAddress.toLowerCase()]: {
-              sbtAddress: inferredAddress,
-              slug: 'alpha',
-              sbtInfo: {
-                name: 'Alpha Inferred Badge',
-                description: 'inferred session slug should not keep this in alpha',
-                sessionSlug: 'alpha',
-                sessionSlugExplicit: false,
-                mintingEndTime: 0,
-              },
-              mintedAddresses: [],
-              burnedAddresses: [],
-              countsLoaded: true,
-              blockNumber: 1100,
-            },
-            [bucketOnlyAddress.toLowerCase()]: {
-              sbtAddress: bucketOnlyAddress,
-              slug: 'alpha',
-              sbtInfo: {
-                name: 'Alpha Bucket Only Badge',
-                description: 'bucket slug alone should not keep this in alpha',
-                mintingEndTime: 0,
-              },
-              mintedAddresses: [],
-              burnedAddresses: [],
-              countsLoaded: true,
-              blockNumber: 1100,
-            },
-            [inferredNameAddress.toLowerCase()]: {
-              sbtAddress: inferredNameAddress,
-              slug: 'alpha',
-              sbtInfo: {
-                name: 'Alpha Inferred Name Badge',
-                description: 'sessionName-only fallback should not keep this in alpha',
-                sessionSlug: 'alpha',
-                sessionSlugExplicit: false,
-                sessionName: 'Alpha',
-                mintingEndTime: 0,
-              },
-              mintedAddresses: [],
-              burnedAddresses: [],
-              countsLoaded: true,
-              blockNumber: 1100,
-            },
-          },
-          lastBlock: 1100,
-        },
-      };
-    });
-
-    render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug="alpha"
-        loginComplete
-        miniaturized={false}
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        ensureLightSbtDiscovery={jest.fn()}
-      />
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Alpha Explicit Badge')).toBeInTheDocument();
-    });
-    expect(screen.getByText('Alpha Legacy Slug Badge')).toBeInTheDocument();
-    expect(screen.getByText('Alpha Legacy Name Badge')).toBeInTheDocument();
-    expect(screen.getByText('Alpha Top-Level SessionSlug Badge')).toBeInTheDocument();
-    expect(screen.queryByText('Alpha Inferred Badge')).not.toBeInTheDocument();
-    expect(screen.queryByText('Alpha Bucket Only Badge')).not.toBeInTheDocument();
-    expect(screen.queryByText('Alpha Inferred Name Badge')).not.toBeInTheDocument();
-  });
-
-  it('merges concrete-session slug matches from other known cache buckets', async () => {
-    const linkedAddress = '0x00000000000000000000000000000000000000c1';
-    const otherAddress = '0x00000000000000000000000000000000000000c2';
-
-    mockReadCache.mockResolvedValue({
-      '84532': {
-        sbtList: {},
-        lastBlock: 1100,
-      },
-    });
-    mockListNamespaceEntriesSync.mockReturnValue([
-      {
-        namespace: 'sbtCache',
-        slug: 'archive',
-        key: 'dg:sbtCache:archive',
-        value: {
-          '84532': {
-            sbtList: {
-              [linkedAddress.toLowerCase()]: {
-                sbtAddress: linkedAddress,
-                slug: 'archive',
-                sbtInfo: {
-                  name: 'Archive Alpha Explicit Badge',
-                  description: 'linked from archive but authoritatively belongs to alpha',
-                  sessionSlug: 'alpha',
-                  sessionSlugExplicit: true,
-                  mintingEndTime: 0,
-                },
-                mintedAddresses: [],
-                burnedAddresses: [],
-                countsLoaded: true,
-                blockNumber: 1100,
-              },
-              [otherAddress.toLowerCase()]: {
-                sbtAddress: otherAddress,
-                slug: 'archive',
-                sbtInfo: {
-                  name: 'Archive Beta Explicit Badge',
-                  description: 'should not appear in alpha',
-                  sessionSlug: 'beta',
-                  sessionSlugExplicit: true,
-                  mintingEndTime: 0,
-                },
-                mintedAddresses: [],
-                burnedAddresses: [],
-                countsLoaded: true,
-                blockNumber: 1100,
-              },
-            },
-          },
-        },
-      },
-    ]);
-
-    render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug="alpha"
-        loginComplete
-        miniaturized={false}
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        ensureLightSbtDiscovery={jest.fn()}
-      />
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Archive Alpha Explicit Badge')).toBeInTheDocument();
-    });
-    expect(screen.queryByText('Archive Beta Explicit Badge')).not.toBeInTheDocument();
-  });
-
-  it('retries cold-load live-session fetches when registry hydration later supplies the chain config', async () => {
-    const liveDemoAddress = '0x00000000000000000000000000000000000000c9';
-    let demoRegistryReady = false;
-
-    mockGetSessionChainId.mockImplementation((slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
-      if (normalized === 'demo') return demoRegistryReady ? 84532 : null;
-      return 84532;
-    });
-    mockGetSessionConfigBySlug.mockImplementation((slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
-      if (normalized === 'demo') {
-        return demoRegistryReady
-          ? {
-              slug: 'demo',
-              sessionName: 'Demo',
-              networkChainId: 84532,
-              blockLimits: { start: 1 },
-              corsWorkerUrl: 'https://worker.example',
-            }
-          : null;
-      }
-      return {
-        sessionName: normalized || 'General',
-        blockLimits: { start: 1 },
-        corsWorkerUrl: 'https://worker.example',
-      };
-    });
-    mockGetDemoSessionConfigBySlug.mockReturnValue(null);
-    mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
-      if (normalized !== 'demo') {
-        return { '84532': { sbtList: {}, lastBlock: 0 } };
-      }
-      return {
-        '84532': {
-          sbtList: {
-            [liveDemoAddress.toLowerCase()]: {
-              sbtAddress: liveDemoAddress,
-              slug: 'demo',
-              sbtInfo: {
-                name: 'Live Demo Registry Badge',
-                description: 'appears after the live session registry config lands',
-                sessionSlug: 'demo',
-                sessionSlugExplicit: true,
-                mintingEndTime: 0,
-              },
-              mintedAddresses: [],
-              burnedAddresses: [],
-              countsLoaded: true,
-              blockNumber: 1100,
-            },
-          },
-          lastBlock: 1100,
-        },
-      };
-    });
-
-    render(
-      <SBTsList
-        provider="mock"
-        network={{}}
-        account=""
-        sessionSlug="demo"
-        loginComplete
-        miniaturized={false}
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        ensureLightSbtDiscovery={jest.fn()}
-      />
-    );
-
-    expect(screen.queryByText('Live Demo Registry Badge')).not.toBeInTheDocument();
-
-    await act(async () => {
-      demoRegistryReady = true;
-      window.dispatchEvent(new Event('ce:session-registry-cache-updated'));
-    });
-
-    await waitFor(() => {
-      expect(screen.getByText('Live Demo Registry Badge')).toBeInTheDocument();
-    });
-  });
-
-  it('in list-mode does not keep bucket-only or inferred fallback cards under the selected session', async () => {
-    mockReadSessionScanScope.mockReturnValue('list');
-    mockReadSessionScanSlugs.mockReturnValue(['alpha']);
-
-    const explicitAddress = '0x00000000000000000000000000000000000000b1';
-    const legacySlugAddress = '0x00000000000000000000000000000000000000b2';
-    const legacyTopLevelGroupSlugAddress = '0x00000000000000000000000000000000000000b3';
-    const inferredAddress = '0x00000000000000000000000000000000000000b4';
-    const bucketOnlyAddress = '0x00000000000000000000000000000000000000b5';
-    const inferredNameAddress = '0x00000000000000000000000000000000000000b6';
-
-    mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
-      if (normalized !== 'alpha') {
-        return { '84532': { sbtList: {}, lastBlock: 0 } };
-      }
-      return {
-        '84532': {
-          sbtList: {
-            [explicitAddress.toLowerCase()]: {
-              sbtAddress: explicitAddress,
-              slug: 'alpha',
-              sbtInfo: {
-                name: 'List Alpha Explicit Badge',
-                description: 'authoritative alpha card should stay selected',
-                sessionSlug: 'alpha',
-                sessionSlugExplicit: true,
-                mintingEndTime: 0,
-              },
-              mintedAddresses: [],
-              burnedAddresses: [],
-              countsLoaded: true,
-              blockNumber: 1100,
-            },
-            [legacySlugAddress.toLowerCase()]: {
-              sbtAddress: legacySlugAddress,
-              slug: 'alpha',
-              sbtInfo: {
-                name: 'List Alpha Legacy Slug Badge',
-                description: 'legacy metadata slug should stay selected',
-                slug: 'alpha',
-                mintingEndTime: 0,
-              },
-              mintedAddresses: [],
-              burnedAddresses: [],
-              countsLoaded: true,
-              blockNumber: 1100,
-            },
-            [legacyTopLevelGroupSlugAddress.toLowerCase()]: {
-              sbtAddress: legacyTopLevelGroupSlugAddress,
-              slug: 'beta',
-              sessionSlug: 'alpha',
-              sbtInfo: {
-                name: 'List Alpha Top-Level SessionSlug Badge',
-                description: 'top-level sessionSlug should stay selected',
-                mintingEndTime: 0,
-              },
-              mintedAddresses: [],
-              burnedAddresses: [],
-              countsLoaded: true,
-              blockNumber: 1100,
-            },
-            [inferredAddress.toLowerCase()]: {
-              sbtAddress: inferredAddress,
-              slug: 'alpha',
-              sbtInfo: {
-                name: 'List Alpha Inferred Badge',
-                description: 'inferred alpha metadata should move out of alpha',
-                sessionSlug: 'alpha',
-                sessionSlugExplicit: false,
-                mintingEndTime: 0,
-              },
-              mintedAddresses: [],
-              burnedAddresses: [],
-              countsLoaded: true,
-              blockNumber: 1100,
-            },
-            [bucketOnlyAddress.toLowerCase()]: {
-              sbtAddress: bucketOnlyAddress,
-              slug: 'alpha',
-              sbtInfo: {
-                name: 'List Alpha Bucket Only Badge',
-                description: 'bucket slug alone should not stay selected',
-                mintingEndTime: 0,
-              },
-              mintedAddresses: [],
-              burnedAddresses: [],
-              countsLoaded: true,
-              blockNumber: 1100,
-            },
-            [inferredNameAddress.toLowerCase()]: {
-              sbtAddress: inferredNameAddress,
-              slug: 'alpha',
-              sbtInfo: {
-                name: 'List Alpha Inferred Name Badge',
-                description: 'sessionName-only fallback should not stay selected',
-                sessionSlug: 'alpha',
-                sessionSlugExplicit: false,
-                sessionName: 'Alpha',
-                mintingEndTime: 0,
-              },
-              mintedAddresses: [],
-              burnedAddresses: [],
-              countsLoaded: true,
-              blockNumber: 1100,
-            },
-          },
-          lastBlock: 1100,
-        },
-      };
-    });
-
-    render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug=""
-        loginComplete
-        miniaturized={false}
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        allSessionsMode
-        ensureLightSbtDiscovery={jest.fn()}
-      />
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('List Alpha Explicit Badge')).toBeInTheDocument();
-    });
-    expect(screen.getByText('List Alpha Legacy Slug Badge')).toBeInTheDocument();
-    expect(screen.getByText('List Alpha Top-Level SessionSlug Badge')).toBeInTheDocument();
-    expect(screen.queryByText('List Alpha Inferred Badge')).not.toBeInTheDocument();
-    expect(screen.queryByText('List Alpha Bucket Only Badge')).not.toBeInTheDocument();
-    expect(screen.queryByText('List Alpha Inferred Name Badge')).not.toBeInTheDocument();
-  });
-
-  it('in list-mode includes linked SBTs from other cache buckets when their binding slug is selected', async () => {
-    mockReadSessionScanScope.mockReturnValue('list');
-    mockReadSessionScanSlugs.mockReturnValue(['alpha']);
-
-    const linkedAddress = '0x00000000000000000000000000000000000000d1';
-    const otherAddress = '0x00000000000000000000000000000000000000d2';
-
-    mockReadCache.mockResolvedValue({
-      '84532': {
-        sbtList: {},
-        lastBlock: 1100,
-      },
-    });
-    mockListNamespaceEntriesSync.mockReturnValue([
-      {
-        namespace: 'sbtCache',
-        slug: 'archive',
-        key: 'dg:sbtCache:archive',
-        value: {
-          '84532': {
-            sbtList: {
-              [linkedAddress.toLowerCase()]: {
-                sbtAddress: linkedAddress,
-                slug: 'archive',
-                sbtInfo: {
-                  name: 'List Linked Alpha Badge',
-                  description: 'selected alpha binding should stay visible',
-                  sessionSlug: 'alpha',
-                  sessionSlugExplicit: true,
-                  mintingEndTime: 0,
-                },
-                mintedAddresses: [],
-                burnedAddresses: [],
-                countsLoaded: true,
-                blockNumber: 1100,
-              },
-              [otherAddress.toLowerCase()]: {
-                sbtAddress: otherAddress,
-                slug: 'archive',
-                sbtInfo: {
-                  name: 'List Linked Beta Badge',
-                  description: 'unselected beta binding should stay hidden',
-                  sessionSlug: 'beta',
-                  sessionSlugExplicit: true,
-                  mintingEndTime: 0,
-                },
-                mintedAddresses: [],
-                burnedAddresses: [],
-                countsLoaded: true,
-                blockNumber: 1100,
-              },
-            },
-          },
-        },
-      },
-    ]);
-
-    render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug=""
-        loginComplete
-        miniaturized={false}
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        allSessionsMode
-        ensureLightSbtDiscovery={jest.fn()}
-      />
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('List Linked Alpha Badge')).toBeInTheDocument();
-    });
-    expect(screen.queryByText('List Linked Beta Badge')).not.toBeInTheDocument();
-  });
-
-  it('in list-mode routes cards by authoritative metadata sessionSlug when source slug conflicts', async () => {
-    mockReadSessionScanScope.mockReturnValue('list');
-    mockReadSessionScanSlugs.mockReturnValue(['alpha']);
-    const alphaAddress = '0x00000000000000000000000000000000000000a1';
-    const alphaKeepAddress = '0x00000000000000000000000000000000000000a2';
-    mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
-      if (normalized !== 'alpha') {
-        return { '84532': { sbtList: {}, lastBlock: 0 } };
-      }
-      return {
-        '84532': {
-          sbtList: {
-            [alphaKeepAddress.toLowerCase()]: {
-              sbtAddress: alphaKeepAddress,
-              slug: 'alpha',
-              sbtInfo: {
-                name: 'Alpha Keep Badge',
-                description: 'authoritative alpha card should stay visible',
-                sessionSlug: 'alpha',
-                sessionSlugExplicit: true,
-                mintingEndTime: 0,
-              },
-              mintedAddresses: [],
-              burnedAddresses: [],
-              countsLoaded: true,
-              blockNumber: 1100,
-            },
-            [alphaAddress.toLowerCase()]: {
-              sbtAddress: alphaAddress,
-              slug: 'alpha',
-              sbtInfo: {
-                name: 'Alpha Source-Slug Badge',
-                description: 'metadata slug mismatch should move this card out of alpha',
-                sessionSlug: 'beta',
-                sessionSlugExplicit: true,
-                mintingEndTime: 0,
-              },
-              mintedAddresses: [],
-              burnedAddresses: [],
-              countsLoaded: true,
-              blockNumber: 1100,
-            },
-          },
-          lastBlock: 1100,
-        },
-      };
-    });
-
-    render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug=""
-        loginComplete
-        miniaturized={false}
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        allSessionsMode
-        ensureLightSbtDiscovery={jest.fn()}
-      />
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Alpha Keep Badge')).toBeInTheDocument();
-    });
-    expect(screen.queryByText('Alpha Source-Slug Badge')).not.toBeInTheDocument();
-  });
-
-  it('in list-mode only shows cards whose authoritative metadata sessionSlug is selected', async () => {
-    mockReadSessionScanScope.mockReturnValue('list');
-    mockReadSessionScanSlugs.mockReturnValue(['alpha']);
-    mockGetAllSessionEntries.mockReturnValue([
-      ['alpha', { slug: 'alpha' }],
-      ['beta', { slug: 'beta' }],
-      ['gamma', { slug: 'gamma' }],
-    ]);
-    mockSessionRegistryGetAllSessionEntries.mockReturnValue([
-      ['alpha', { slug: 'alpha' }],
-      ['beta', { slug: 'beta' }],
-      ['gamma', { slug: 'gamma' }],
-    ]);
-
-    const alphaAddress = '0x00000000000000000000000000000000000000a1';
-    const betaAddress = '0x00000000000000000000000000000000000000b1';
-    const gammaAddress = '0x00000000000000000000000000000000000000c1';
-
-    mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
-      if (normalized !== 'alpha') {
-        return { '84532': { sbtList: {}, lastBlock: 0 } };
-      }
-      return {
-        '84532': {
-          sbtList: {
-            [alphaAddress.toLowerCase()]: {
-              sbtAddress: alphaAddress,
-              slug: 'alpha',
-              sbtInfo: {
-                name: 'Alpha Session Badge',
-                sessionSlug: 'alpha',
-                sessionSlugExplicit: true,
-                mintingEndTime: 0,
-              },
-              mintedAddresses: [],
-              burnedAddresses: [],
-              countsLoaded: true,
-              blockNumber: 1100,
-            },
-            [betaAddress.toLowerCase()]: {
-              sbtAddress: betaAddress,
-              slug: 'alpha',
-              sbtInfo: {
-                name: 'Beta Session Badge',
-                sessionSlug: 'beta',
-                sessionSlugExplicit: true,
-                mintingEndTime: 0,
-              },
-              mintedAddresses: [],
-              burnedAddresses: [],
-              countsLoaded: true,
-              blockNumber: 1100,
-            },
-            [gammaAddress.toLowerCase()]: {
-              sbtAddress: gammaAddress,
-              slug: 'alpha',
-              sbtInfo: {
-                name: 'Gamma Session Badge',
-                sessionSlug: 'gamma',
-                sessionSlugExplicit: true,
-                mintingEndTime: 0,
-              },
-              mintedAddresses: [],
-              burnedAddresses: [],
-              countsLoaded: true,
-              blockNumber: 1100,
-            },
-          },
-          lastBlock: 1100,
-        },
-      };
-    });
-
-    render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug=""
-        loginComplete
-        miniaturized={false}
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        allSessionsMode
-        ensureLightSbtDiscovery={jest.fn()}
-      />
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Alpha Session Badge')).toBeInTheDocument();
-    });
-    expect(screen.queryByText('Beta Session Badge')).not.toBeInTheDocument();
-    expect(screen.queryByText('Gamma Session Badge')).not.toBeInTheDocument();
   });
 });

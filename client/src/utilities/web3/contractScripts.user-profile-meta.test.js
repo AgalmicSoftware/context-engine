@@ -42,16 +42,45 @@ const runEmptyProfileScanToResetLatestBlockCache = async (slug = 'edge') => {
 
 describe('contractScripts user profile metadata wrappers', () => {
   afterEach(() => {
-    try { delete contractScripts.getAllSbtAddressesCached._memo; } catch (_) {}
-    try { delete contractScripts.getAllSbtAddressesCached._inflight; } catch (_) {}
-    try { delete contractScripts.getAllSbtAddressesCached._runVersion; } catch (_) {}
-    try { delete contractScripts.getUserSbtNetHoldings._memo; } catch (_) {}
-    try { delete contractScripts.getUserSbtNetHoldings._inflight; } catch (_) {}
-    try { delete contractScripts.getUserSBTsMinimal._memo; } catch (_) {}
-    try { delete contractScripts.getUserSBTsMinimal._inflight; } catch (_) {}
-    try { delete globalThis.CE_E2E_LIT_MOCK; } catch (_) {}
-    try { delete window.__CE_E2E_MOCKED_VIEWED_RESPONSES__; } catch (_) {}
-    try { window.sessionStorage.removeItem('ce:e2e:mockedViewedResponses:v1'); } catch (_) {}
+    try {
+      delete contractScripts.getAllSbtAddressesCached._memo;
+    } catch (_) {}
+    try {
+      delete contractScripts.getAllSbtAddressesCached._inflight;
+    } catch (_) {}
+    try {
+      delete contractScripts.getAllSbtAddressesCached._runVersion;
+    } catch (_) {}
+    try {
+      delete contractScripts.getUserSbtNetHoldings._memo;
+    } catch (_) {}
+    try {
+      delete contractScripts.getUserSbtNetHoldings._inflight;
+    } catch (_) {}
+    try {
+      delete contractScripts.getSbtMintBurnCountsByAddress._sharedAddressMemo;
+    } catch (_) {}
+    try {
+      delete contractScripts.getSbtMintBurnCountsByAddress._sharedAddressInflight;
+    } catch (_) {}
+    try {
+      delete contractScripts.getUserSBTsMinimal._memo;
+    } catch (_) {}
+    try {
+      delete contractScripts.getUserSBTsMinimal._inflight;
+    } catch (_) {}
+    try {
+      __test__contractScriptsReadCaches.clearLatestBlockCache();
+    } catch (_) {}
+    try {
+      delete globalThis.CE_E2E_LIT_MOCK;
+    } catch (_) {}
+    try {
+      delete window.__CE_E2E_MOCKED_VIEWED_RESPONSES__;
+    } catch (_) {}
+    try {
+      window.sessionStorage.removeItem('ce:e2e:mockedViewedResponses:v1');
+    } catch (_) {}
     jest.clearAllMocks();
     jest.restoreAllMocks();
   });
@@ -702,20 +731,17 @@ describe('contractScripts user profile metadata wrappers', () => {
       [`${responderAddress.toLowerCase()}|${questionId.toLowerCase()}`]: mockedPayload,
     };
 
-    const result = await contractScripts.getResponse(
-      'none',
-      responderAddress,
-      questionId,
-      groupCfg
-    );
+    const result = await contractScripts.getResponse('none', responderAddress, questionId, groupCfg);
 
-    expect(result).toEqual(expect.objectContaining({
-      responder: responderAddress,
-      answer: expect.objectContaining({
-        encryptedPortion: 'cipher-answer',
+    expect(result).toEqual(
+      expect.objectContaining({
+        responder: responderAddress,
+        answer: expect.objectContaining({
+          encryptedPortion: 'cipher-answer',
+        }),
+        arweaveTxId: expect.any(String),
       }),
-      arweaveTxId: expect.any(String),
-    }));
+    );
     expect(contractGetResponse).toHaveBeenCalledTimes(1);
     expect(downloadSpy).not.toHaveBeenCalled();
   });
@@ -748,19 +774,16 @@ describe('contractScripts user profile metadata wrappers', () => {
       },
     };
 
-    const result = await contractScripts.getResponse(
-      'none',
-      responderAddress,
-      questionId,
-      groupCfg
-    );
+    const result = await contractScripts.getResponse('none', responderAddress, questionId, groupCfg);
 
-    expect(result).toEqual(expect.objectContaining({
-      responder: responderAddress,
-      answer: expect.objectContaining({
-        value: 'from-arweave',
+    expect(result).toEqual(
+      expect.objectContaining({
+        responder: responderAddress,
+        answer: expect.objectContaining({
+          value: 'from-arweave',
+        }),
       }),
-    }));
+    );
     expect(contractGetResponse).toHaveBeenCalledTimes(1);
     expect(downloadSpy).toHaveBeenCalledWith(
       expect.any(String),
@@ -771,7 +794,7 @@ describe('contractScripts user profile metadata wrappers', () => {
           category: 'question_response_payload',
           fn: 'getResponse',
         }),
-      })
+      }),
     );
   });
 
@@ -795,23 +818,21 @@ describe('contractScripts user profile metadata wrappers', () => {
       .spyOn(arweaveScripts, 'downloadDataFromArweave')
       .mockResolvedValue(JSON.stringify(downloadedPayload));
 
-    const result = await contractScripts.getResponse(
-      'none',
-      responderAddress,
-      questionId,
-      groupCfg,
-      { arweaveGatewayTimeoutMs: 1200 }
-    );
+    const result = await contractScripts.getResponse('none', responderAddress, questionId, groupCfg, {
+      arweaveGatewayTimeoutMs: 1200,
+    });
 
-    expect(result).toEqual(expect.objectContaining({
-      answer: expect.objectContaining({ value: 'Agree' }),
-    }));
+    expect(result).toEqual(
+      expect.objectContaining({
+        answer: expect.objectContaining({ value: 'Agree' }),
+      }),
+    );
     expect(downloadSpy).toHaveBeenCalledWith(
       expect.any(String),
       expect.objectContaining({
         directToArIo: false,
         gatewayTimeoutMs: 1200,
-      })
+      }),
     );
   });
 

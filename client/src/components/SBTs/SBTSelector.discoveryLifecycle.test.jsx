@@ -386,7 +386,16 @@ describe('SBTSelector discovery lifecycle', () => {
     try {
       await instance.ensureSbtUniverse({ force: true });
 
-      expect(discoverSpy).not.toHaveBeenCalled();
+      expect(discoverSpy).toHaveBeenCalledWith(
+        'none',
+        expect.objectContaining({
+          slug: 'rxc',
+          networkChainId: DEFAULT_CHAIN_ID,
+        }),
+        expect.objectContaining({
+          onDiscoveredAddresses: expect.any(Function),
+        }),
+      );
       expect(demoSpy).not.toHaveBeenCalled();
     } finally {
       strictSpy.mockRestore();

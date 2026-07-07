@@ -10,10 +10,7 @@ import {
   createReadCachePayload,
   setupSBTPageTestLifecycle,
 } from './SBTPage.testUtils';
-import {
-  SbtPageBurnActionSurface,
-  SbtPageMintActionSurface,
-} from './SbtPageFullActionButtons';
+import { SbtPageBurnActionSurface, SbtPageMintActionSurface } from './SbtPageFullActionButtons';
 import SbtPageMintInputAction from './SbtPageMintInputAction';
 import SbtPageStatusActionButton from './SbtPageStatusActionButton';
 import { notify } from '../../utilities/ui/notify.js';
@@ -296,12 +293,8 @@ describe('SBTPage session routing and holder loading', () => {
   it('allows owner burn when burnAuth is a numeric string', async () => {
     const account = '0x00000000000000000000000000000000000000a1';
     const sbtAddress = '0x00000000000000000000000000000000000000b1';
-    const tokenIdSpy = jest
-      .spyOn(contractScripts, 'getSBTTokenIdByOwner')
-      .mockResolvedValue('7');
-    const burnSpy = jest
-      .spyOn(contractScripts, 'burnToken')
-      .mockResolvedValue({ transactionHash: '0xburn' });
+    const tokenIdSpy = jest.spyOn(contractScripts, 'getSBTTokenIdByOwner').mockResolvedValue('7');
+    const burnSpy = jest.spyOn(contractScripts, 'burnToken').mockResolvedValue({ transactionHash: '0xburn' });
     const subject = createSubject({
       account,
       provider: 'wagmi',
@@ -330,12 +323,8 @@ describe('SBTPage session routing and holder loading', () => {
   it('uses neutral provider reads for mini burn while burning with the wallet provider', async () => {
     const account = '0x00000000000000000000000000000000000000a1';
     const sbtAddress = '0x00000000000000000000000000000000000000b2';
-    const tokenIdSpy = jest
-      .spyOn(contractScripts, 'getSBTTokenIdByOwner')
-      .mockResolvedValue('8');
-    const burnSpy = jest
-      .spyOn(contractScripts, 'burnToken')
-      .mockResolvedValue({ transactionHash: '0xminiburn' });
+    const tokenIdSpy = jest.spyOn(contractScripts, 'getSBTTokenIdByOwner').mockResolvedValue('8');
+    const burnSpy = jest.spyOn(contractScripts, 'burnToken').mockResolvedValue({ transactionHash: '0xminiburn' });
     const subject = createSubject({
       account,
       provider: 'wagmi',
@@ -356,12 +345,8 @@ describe('SBTPage session routing and holder loading', () => {
   it('uses neutral provider reads for burn target searches', async () => {
     const ownerAddress = '0x00000000000000000000000000000000000000c1';
     const sbtAddress = '0x00000000000000000000000000000000000000b3';
-    const tokenIdSpy = jest
-      .spyOn(contractScripts, 'getSBTTokenIdByOwner')
-      .mockResolvedValue('9');
-    const ownerSpy = jest
-      .spyOn(contractScripts, 'getOwnerByTokenId')
-      .mockResolvedValue(ownerAddress);
+    const tokenIdSpy = jest.spyOn(contractScripts, 'getSBTTokenIdByOwner').mockResolvedValue('9');
+    const ownerSpy = jest.spyOn(contractScripts, 'getOwnerByTokenId').mockResolvedValue(ownerAddress);
     const subject = createSubject({
       provider: 'wagmi',
       SBTAddress: sbtAddress,
@@ -436,7 +421,7 @@ describe('SBTPage session routing and holder loading', () => {
     expect(openSpy).toHaveBeenCalledWith(
       `https://sepolia.etherscan.io/tx/${mintTxHash}`,
       '_blank',
-      'noopener,noreferrer'
+      'noopener,noreferrer',
     );
     expect(subject.handleMint).not.toHaveBeenCalled();
     openSpy.mockRestore();

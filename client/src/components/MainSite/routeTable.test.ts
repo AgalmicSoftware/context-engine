@@ -85,12 +85,6 @@ describe('MainSite route table', () => {
         sbtAddress: ADDRESS,
       }),
     );
-    expect(resolveMainSiteRouteMatch({ fullPath: '/group/public-reviewers', isAddress })).toEqual(
-      expect.objectContaining({
-        key: 'sbtsList',
-        sbtAddress: null,
-      }),
-    );
   });
 
   it('keeps accepted double-slash SBT address paths on the SBT detail route', () => {
@@ -114,47 +108,6 @@ describe('MainSite route table', () => {
       expect.objectContaining({
         isKnownRoutePrefix: true,
         shouldBypassCacheHydrationWait: true,
-      }),
-    );
-    expect(resolveMainSiteRouteMatch({ fullPath: '/posts', isAddress })).toEqual(
-      expect.objectContaining({
-        isKnownRoutePrefix: true,
-        shouldBypassCacheHydrationWait: true,
-      }),
-    );
-    expect(resolveMainSiteRouteMatch({ fullPath: '/posts/first-post', isAddress })).toEqual(
-      expect.objectContaining({
-        key: 'posts',
-        isKnownRoutePrefix: true,
-        shouldBypassCacheHydrationWait: true,
-      }),
-    );
-    expect(resolveMainSiteRouteMatch({ fullPath: '/groups/demo-sh', isAddress })).toEqual(
-      expect.objectContaining({
-        key: 'sbtsList',
-        isKnownRoutePrefix: true,
-        shouldBypassCacheHydrationWait: true,
-      }),
-    );
-    expect(resolveMainSiteRouteMatch({ fullPath: '/group/public-reviewers', isAddress })).toEqual(
-      expect.objectContaining({
-        key: 'sbtsList',
-        isKnownRoutePrefix: true,
-        shouldBypassCacheHydrationWait: true,
-      }),
-    );
-    expect(resolveMainSiteRouteMatch({ fullPath: '/groups/new', isAddress })).toEqual(
-      expect.objectContaining({
-        key: 'sbtCreate',
-        isKnownRoutePrefix: true,
-        shouldBypassCacheHydrationWait: true,
-      }),
-    );
-    expect(resolveMainSiteRouteMatch({ fullPath: '/sbts/demo-sh', isAddress })).toEqual(
-      expect.objectContaining({
-        key: 'sbtsList',
-        isKnownRoutePrefix: true,
-        shouldBypassCacheHydrationWait: false,
       }),
     );
     expect(resolveMainSiteRouteMatch({ fullPath: '/not-a-route', isAddress })).toEqual(

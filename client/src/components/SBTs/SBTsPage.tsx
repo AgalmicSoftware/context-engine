@@ -32,10 +32,7 @@ import { resolveAdminCapabilities } from '../Admin/adminPageHelpers';
 import { GROUP_CREATION_POLICIES, resolveGroupCreationPolicy } from '../../utilities/session/groupCreationPolicy';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import { isCryptoMode, sbtsListPath, t } from '../../utilities/ui/terminology.js';
-import {
-  buildPublicRoute,
-  stripPublicUrlBasePath,
-} from '../../utilities/ui/publicUrl.js';
+import { buildPublicRoute, stripPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 import defaultSbtImage from '../../assets/img/ce_circuit_logo.png';
 import {
   asSBTsPageFeaturedProgress as asFeaturedProgress,
@@ -68,8 +65,7 @@ type CacheBackedFeaturedCard = {
   sbt: FeaturedSbtLike & { sbtInfo: FeaturedSbtMetadataLike };
 };
 type FeaturedRenderEntry =
-  | { kind: 'cache'; entry: CacheBackedFeaturedCard }
-  | { kind: 'fallback'; entry: FeaturedEntry };
+  { kind: 'cache'; entry: CacheBackedFeaturedCard } | { kind: 'fallback'; entry: FeaturedEntry };
 type MemoBucket<T> = {
   key: string;
   result: T[];
@@ -175,29 +171,6 @@ const isDemoAutomationFixtureSbt = (sbt: FeaturedSbtLike | null | undefined, ses
   );
 };
 
-const getFeaturedSbtName = (sbt: FeaturedSbtLike | null | undefined): string => {
-  const info = isRecord(sbt?.sbtInfo) ? sbt.sbtInfo : {};
-  return String(
-    info.name ||
-    info.title ||
-    sbt?.name ||
-    ''
-  ).trim();
-};
-
-const isDemoAutomationFixtureSbt = (
-  sbt: FeaturedSbtLike | null | undefined,
-  sessionSlug: unknown = ''
-): boolean => {
-  if (normalizeSessionSlug(sessionSlug || '') !== 'demo') return false;
-  const name = getFeaturedSbtName(sbt);
-  if (!name) return false;
-  return (
-    /\b(?:AI Gate|AI Gated Decrypt|AI Doc Library|AI Doc Filetypes|BrowserUse) Test SBT\b/i.test(name) ||
-    /\[(?:e2e-|20\d{6}-\d{6}-(?:response-smoke|anyall|gated|survey|doc))/i.test(name)
-  );
-};
-
 export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
   _featuredListMemo: MemoBucket<string>;
 
@@ -271,7 +244,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     }
 
     let next = baseList;
-    if (requireExplicitSessionSlug && sessionSlugTarget && !isAllSessionsMode) {
+    if (requireExplicitSessionSlug && !baseFeaturedListIsConfigured && sessionSlugTarget && !isAllSessionsMode) {
       try {
         const cache = peekCacheSync('sbtCache', String(effectiveSessionSlug || ''), { clone: false });
         const explicitAddressSet = new Set<string>();
@@ -288,15 +261,23 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
                 requireExplicitSessionSlug: true,
               });
               if (sbtSessionSlug !== sessionSlugTarget) return;
-              explicitAddressSet.add(String(sbt.sbtAddress || '').trim().toLowerCase());
+              explicitAddressSet.add(
+                String(sbt.sbtAddress || '')
+                  .trim()
+                  .toLowerCase(),
+              );
             });
           });
         }
-        next = baseList.filter((addr) => (
-          explicitAddressSet.has(String(addr || '').trim().toLowerCase())
-        ));
+        next = baseList.filter((addr) =>
+          explicitAddressSet.has(
+            String(addr || '')
+              .trim()
+              .toLowerCase(),
+          ),
+        );
       } catch (e) {
-        sbtLog.warn("[SBTsPage] Strict featured filter failed:", e);
+        sbtLog.warn('[SBTsPage] Strict featured filter failed:', e);
         next = [];
       }
     }
@@ -459,18 +440,16 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
         } catch (e) {
           sbtLog.warn('[SBTsPage] cache-backed featured lookup failed:', e);
         }
-      } catch (e) {
-        sbtLog.warn('[SBTsPage] cache-backed featured lookup failed:', e);
-      }
-      const resolvedCacheMatch = cacheMatch as CacheBackedFeaturedCard['sbt'] | null;
-      if (!resolvedCacheMatch || !resolvedCacheMatch.sbtInfo) return null;
-      if (!hasCacheFeaturedCardImageMetadata(resolvedCacheMatch.sbtInfo)) return null;
-      return {
-        address: entry.address,
-        sessionSlug: entry.sessionSlug,
-        sbt: resolvedCacheMatch,
-      };
-    }).filter((entry): entry is CacheBackedFeaturedCard => !!entry);
+        const resolvedCacheMatch = cacheMatch as CacheBackedFeaturedCard['sbt'] | null;
+        if (!resolvedCacheMatch || !resolvedCacheMatch.sbtInfo) return null;
+        if (!hasCacheFeaturedCardImageMetadata(resolvedCacheMatch.sbtInfo)) return null;
+        return {
+          address: entry.address,
+          sessionSlug: entry.sessionSlug,
+          sbt: resolvedCacheMatch,
+        };
+      })
+      .filter((entry): entry is CacheBackedFeaturedCard => !!entry);
 
     this._featuredCacheCardsMemo = { key, result: next };
     return next;
@@ -510,69 +489,16 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
       sbtLog.warn('SBTsPage: fallback', e);
     }
 
-    const explicitConfig = isRecord(this.props.sessionConfig) ? this.props.sessionConfig : null;
-    const explicitConfigSlug = normalizeSessionSlug(explicitConfig?.slug || '');
-    const selectedCreateSlug = normalizeSessionSlug(
-      this.props.sessionSlug || explicitConfigSlug || this.props.activeSessionSlug || referrerSlug || '',
-    );
-    const explicitConfigCapabilities = resolveSessionCapabilityProjection(explicitConfig);
-    const explicitConfigIsValidated =
-      explicitConfigCapabilities.profileValid || explicitConfigCapabilities.source === 'legacy_registry';
-    const explicitConfigHasConcreteIdentity = !!(
-      explicitConfigSlug ||
-      selectedCreateSlug ||
-      normalizeSessionSlug(explicitConfig?.sessionId || explicitConfig?.sessionIdHex || '')
-    );
-    const explicitConfigRejected =
-      isCreateRoute &&
-      !!explicitConfig &&
-      (explicitConfigCapabilities.source === 'invalid_profile' ||
-        (explicitConfigCapabilities.source === 'missing' && explicitConfigHasConcreteIdentity) ||
-        (!!explicitConfigSlug && !!selectedCreateSlug && explicitConfigSlug !== selectedCreateSlug) ||
-        (explicitConfigIsValidated && (!explicitConfigSlug || !selectedCreateSlug)));
-
-    if (explicitConfigRejected) {
-      return {
-        activeGroup: null,
-        canonicalSlug: '',
-        urlHasNoSlug: false,
-        onSbtsRoute,
-        isCreateRoute,
-        sessionConfigError: 'The selected session context could not be verified.',
-      };
-    }
-
-    const selectedRouteSlug = normalizeSessionSlug(effectiveUrlSlug || selectedCreateSlug);
-    const useExplicitSessionConfig =
-      explicitConfigIsValidated && !!explicitConfigSlug && explicitConfigSlug === selectedRouteSlug;
-    const exactExplicitGroup = useExplicitSessionConfig ? explicitConfig : null;
-
-    // An exact validated config supplied by the route is the freshest authority
-    // for that slug and must not be shadowed by a same-slug registry cache row.
-    // Otherwise resolve by URL → prop → Redux → referrer → default general.
+    // Resolve by URL → explicit prop → Redux → referrer → default general
     const groupFromUrl = effectiveUrlSlug ? getDisplaySessionConfig(effectiveUrlSlug) : null;
     const propSlugLike = this.props.sessionSlug || this.props.sessionConfig?.slug || '';
-    const groupFromProp = exactExplicitGroup
-      ? exactExplicitGroup
-      : propSlugLike
-        ? getDisplaySessionConfig(propSlugLike)
-        : null;
+    const groupFromProp = propSlugLike ? getDisplaySessionConfig(propSlugLike) : null;
     const groupFromRedux = this.props.activeSessionSlug ? getDisplaySessionConfig(this.props.activeSessionSlug) : null;
     const groupFromRef = referrerSlug ? getDisplaySessionConfig(referrerSlug) : null;
-    const activeGroup =
-      exactExplicitGroup ||
-      groupFromUrl ||
-      groupFromProp ||
-      groupFromRedux ||
-      groupFromRef ||
-      getDisplaySessionConfig('');
+    const activeGroup = groupFromUrl || groupFromProp || groupFromRedux || groupFromRef || getDisplaySessionConfig('');
 
     const explicitSourceSlug = normalizeSessionSlug(
-      effectiveUrlSlug ||
-      propSlugLike ||
-      this.props.activeSessionSlug ||
-      referrerSlug ||
-      ''
+      effectiveUrlSlug || propSlugLike || this.props.activeSessionSlug || referrerSlug || '',
     );
     const explicitSourceMatched = !!(
       (effectiveUrlSlug && groupFromUrl) ||
@@ -581,15 +507,16 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
       (referrerSlug && groupFromRef)
     );
     const canonicalSlugFromConfig = normalizeSessionSlug(activeGroup?.slug || '');
-    const canonicalSlug = (
-      canonicalSlugFromConfig ||
-      (explicitSourceMatched ? explicitSourceSlug : '')
-    ); // '' means general
-    const urlHasNoSlug  = onSbtsRoute && effectiveUrlSlug === undefined && !isCreateRoute;
+    const canonicalSlug = canonicalSlugFromConfig || (explicitSourceMatched ? explicitSourceSlug : ''); // '' means general
+    const urlHasNoSlug = onSbtsRoute && effectiveUrlSlug === undefined && !isCreateRoute;
 
     // Canonicalize (silent) if we are on /sbts and have a non-empty slug to show
     if (!isCreateRoute && urlHasNoSlug && canonicalSlug) {
-      try { window.history.replaceState(null, '', buildPublicRoute(`${sbtsListPath()}/${canonicalSlug}`)); } catch (e) { sbtLog.warn('SBTsPage: fallback', e); }
+      try {
+        window.history.replaceState(null, '', buildPublicRoute(`${sbtsListPath()}/${canonicalSlug}`));
+      } catch (e) {
+        sbtLog.warn('SBTsPage: fallback', e);
+      }
       return { canonicalSlug, urlHasNoSlug: false, onSbtsRoute, isCreateRoute }; // URL is now canonical
     }
 
@@ -616,76 +543,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     const { activeGroup, canonicalSlug, urlHasNoSlug, onSbtsRoute, isCreateRoute, sessionConfigError } =
       this.getResolvedRouting();
     const effectiveSessionSlug = canonicalSlug; // may be '' (general)
-    const activeWorkerSessionSlug = normalizeSessionSlug(
-      effectiveSessionSlug || this.props.sessionSlug || (activeGroup as Record<string, unknown> | null)?.slug || '',
-    );
     const allSessionsMode = urlHasNoSlug && !canonicalSlug; // plain /sbts with no redux/referrer slug => enumerate all groups
-    const sessionCapabilities = resolveSessionCapabilityProjection(activeGroup);
-    const activeGroupClaimsWorkerAuthority =
-      (sessionCapabilities.source === 'profile' &&
-        sessionCapabilities.profileValid &&
-        sessionCapabilities.isWorkerCanonical) ||
-      claimsWorkerCanonicalAuthority(activeGroup);
-    const fallbackWorkerSessionConfig =
-      !activeGroupClaimsWorkerAuthority && activeWorkerSessionSlug
-        ? getDemoSessionConfigBySlug(activeWorkerSessionSlug, { allowDemoFallback: true })
-        : null;
-    const fallbackWorkerCapabilities = resolveSessionCapabilityProjection(fallbackWorkerSessionConfig);
-    const fallbackHasExactWorkerAuthority =
-      fallbackWorkerCapabilities.source === 'profile' &&
-      fallbackWorkerCapabilities.profileValid &&
-      fallbackWorkerCapabilities.isWorkerCanonical &&
-      normalizeSessionSlug(fallbackWorkerSessionConfig?.slug || '') === activeWorkerSessionSlug;
-    const workerSessionConfig = activeGroupClaimsWorkerAuthority
-      ? activeGroup
-      : fallbackHasExactWorkerAuthority
-        ? fallbackWorkerSessionConfig
-        : null;
-    const usesWorkerNativeCreate = !!workerSessionConfig;
-    const groupCreationPolicy = resolveGroupCreationPolicy(
-      activeGroup,
-      sessionCapabilities.isRegistryCanonical
-        ? GROUP_CREATION_POLICIES.PARTICIPANTS
-        : GROUP_CREATION_POLICIES.ADMIN_ONLY,
-    );
-    const sessionAdminCapabilities = resolveAdminCapabilities({ account, sessionConfig: activeGroup });
-    const canCreateForSession =
-      !activeGroup ||
-      (!sessionCapabilities.isWorkerCanonical && !sessionCapabilities.isRegistryCanonical) ||
-      groupCreationPolicy === GROUP_CREATION_POLICIES.PARTICIPANTS ||
-      sessionAdminCapabilities.canAdminRegistry ||
-      sessionAdminCapabilities.canAdminWorker;
-    const renderCreationDenied = () => (
-      <aside
-        className={styles.advancedExternalNotice}
-        role="alert"
-        data-testid={E2E_TESTIDS.SESSION_GROUP_CREATION_POLICY_DENIED}
-      >
-        <strong>Group creation is limited to session admins</strong>
-        <span>This session’s configuration hides the creation form for other participants.</span>
-      </aside>
-    );
-    const renderWorkerGroupsPanel = ({
-      createOnly = false,
-      showCreate = false,
-    }: {
-      createOnly?: boolean;
-      showCreate?: boolean;
-    } = {}) => (
-      <WorkerSessionGroupsPanel
-        account={account}
-        provider={provider}
-        networkChainId={(network as Record<string, unknown> | null)?.chainId || null}
-        sessionConfig={workerSessionConfig}
-        sessionName={String((workerSessionConfig as Record<string, unknown> | null)?.sessionName || sessionName || '')}
-        sessionSlug={activeWorkerSessionSlug}
-        selectedGroupId={routeWorkerGroupId}
-        showCreate={showCreate}
-        createOnly={createOnly}
-        toggleLoginModal={toggleLoginModal as ((open: boolean) => void) | undefined}
-      />
-    );
-    const renderWorkerCreatePanel = () => renderWorkerGroupsPanel({ createOnly: true, showCreate: true });
     if (isCreateRoute) {
       return (
         <div>
@@ -921,9 +779,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
                           <img src={imageUrl} alt={sbtName} className={sbtPageStyles.sbtImage} />
                         </div>
                         <p className={sbtPageStyles.miniSbtName}>{sbtName}</p>
-                        {showMiniSbtAddress ? (
-                          <p className={sbtPageStyles.miniSbtAddress}>{shortenedAddress}</p>
-                        ) : null}
+                        {showMiniSbtAddress ? <p className={sbtPageStyles.miniSbtAddress}>{shortenedAddress}</p> : null}
                       </a>
                     );
                   }
@@ -956,23 +812,22 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
             </div>
           )}
 
-            <div className={styles.container}>
-              {!hideMiniActionRow && (
-                <div className={styles.buttonRow}>
-                  <button
-                    onClick={() => (window.location.href = buildPublicRoute(sbtsListPath()))}
-                    className={styles.backButton}
-                  >
-                    <FontAwesomeIcon icon={faExpand} /> View All
-                  </button>
-                  <button
-                    className={styles.showResultsButton}
-                    onClick={this.toggleCreateGroup}
-                    data-testid={E2E_TESTIDS.SBTS_CREATE_TOGGLE}
-                  >
-                    <FontAwesomeIcon icon={faPlus} /> {effectiveShowCreateGroup ? 'Exit' : 'Create'}
-                  </button>
-                ) : null}
+          <div className={styles.container}>
+            {!hideMiniActionRow && (
+              <div className={styles.buttonRow}>
+                <button
+                  onClick={() => (window.location.href = buildPublicRoute(sbtsListPath()))}
+                  className={styles.backButton}
+                >
+                  <FontAwesomeIcon icon={faExpand} /> View All
+                </button>
+                <button
+                  className={styles.showResultsButton}
+                  onClick={this.toggleCreateGroup}
+                  data-testid={E2E_TESTIDS.SBTS_CREATE_TOGGLE}
+                >
+                  <FontAwesomeIcon icon={faPlus} /> {effectiveShowCreateGroup ? 'Exit' : 'Create'}
+                </button>
               </div>
             )}
           </div>

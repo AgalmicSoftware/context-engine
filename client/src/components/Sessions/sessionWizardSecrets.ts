@@ -1,11 +1,6 @@
 import { toStr } from '../../utilities/shared/primitives.js';
 import { WORKER_SECRET_PERSISTED_FIELDS } from './sessionWizardWorkerSecretSupport';
-import type {
-  AnyRecord,
-  WorkerSecretSyncResult,
-  WorkerSecretsLike,
-  WorkerSecretsRefLike,
-} from '../shellTypes';
+import type { AnyRecord, WorkerSecretSyncResult, WorkerSecretsLike, WorkerSecretsRefLike } from '../shellTypes';
 
 type AsyncShellCallback = (input?: AnyRecord) => Promise<any>;
 
@@ -35,16 +30,16 @@ export const resolveWorkerSecretsSnapshot = ({
   };
 };
 
-export const buildWorkerSecretsPayload = (
-  workerSecrets: WorkerSecretsLike = {}
-): Record<string, string> => (
-  WORKER_SECRET_PERSISTED_FIELDS.reduce((acc, key) => {
-    const trimmed = toStr(workerSecrets?.[key]).trim();
-    if (!trimmed) return acc;
-    acc[key] = trimmed;
-    return acc;
-  }, {} as Record<string, string>)
-);
+export const buildWorkerSecretsPayload = (workerSecrets: WorkerSecretsLike = {}): Record<string, string> =>
+  WORKER_SECRET_PERSISTED_FIELDS.reduce(
+    (acc, key) => {
+      const trimmed = toStr(workerSecrets?.[key]).trim();
+      if (!trimmed) return acc;
+      acc[key] = trimmed;
+      return acc;
+    },
+    {} as Record<string, string>,
+  );
 
 const TRANSIENT_SYNC_ERROR_PATTERNS = [
   'failed to reach worker auth endpoint',
@@ -151,12 +146,13 @@ export const syncWorkerSecretsAfterDeploy = async ({
         sessionSlug: slug,
         secrets,
       };
-      const auth = await signAdminAction?.({
-        action: 'set-secrets',
-        body: requestBody,
-        targetSlug: slug,
-        workerUrl: resolvedWorkerUrl,
-      });
+      const auth =
+        (await signAdminAction?.({
+          action: 'set-secrets',
+          body: requestBody,
+          targetSlug: slug,
+          workerUrl: resolvedWorkerUrl,
+        })) || {};
       await postSecrets?.({ auth, secrets, body: requestBody, workerUrl: resolvedWorkerUrl, slug });
       return { warning: '', note: '', synced: true, attempts: attempt + 1 };
     } catch (err) {
@@ -244,7 +240,7 @@ export const withWorkerConfigSyncWarning = (baseStatus = '', warning = ''): stri
 
 export const withSecretsSyncStatus = (
   baseStatus = '',
-  { warning = '', note = '' }: Partial<WorkerSecretSyncResult> = {}
+  { warning = '', note = '' }: Partial<WorkerSecretSyncResult> = {},
 ): string => {
   const status = toStr(baseStatus).trim();
   const warningText = toStr(warning).trim();

@@ -295,7 +295,7 @@ const buildEncryptedUploadArgs = ({
   providerLike,
   chainId,
   encryption,
-}: EncryptedDocUploadArgs = {}) =>
+} = {}) =>
   litStorage.uploadEncryptedArweaveData({
     data,
     name,
@@ -333,7 +333,7 @@ const buildSelfRecipientUploadArgs = ({
   providerLike,
   chainId,
   encryption,
-}: EncryptedDocUploadArgs = {}) =>
+} = {}) =>
   uploadSelfRecipientEncryptedDocData({
     data,
     name,
@@ -416,9 +416,9 @@ export const uploadDocLibraryFile = async ({
     txId,
     url:
       storage === STORAGE_BACKENDS.CLOUDFLARE
-        ? toStr(readRecord(resultStorageRef, 'uri')).trim()
+        ? toStr(result?.storageRef?.uri).trim()
         : txId
-          ? arweaveClient.buildArweaveGatewayUrl(txId)
+          ? arweaveScripts.buildArweaveGatewayUrl(txId)
           : '',
     storage,
     storageRef: resultStorageRef || null,
@@ -497,9 +497,9 @@ export const uploadDocLibraryUrlRecord = async ({
     txId,
     url:
       storage === STORAGE_BACKENDS.CLOUDFLARE
-        ? toStr(readRecord(resultStorageRef, 'uri')).trim()
+        ? toStr(result?.storageRef?.uri).trim()
         : txId
-          ? arweaveClient.buildArweaveGatewayUrl(txId)
+          ? arweaveScripts.buildArweaveGatewayUrl(txId)
           : '',
     storage,
     storageRef: resultStorageRef || null,

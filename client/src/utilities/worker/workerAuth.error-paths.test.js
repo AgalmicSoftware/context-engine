@@ -136,8 +136,8 @@ describe('error paths', () => {
     localStorage.setItem(
       cacheKey,
       JSON.stringify({
-        token: 'persisted-token',
-        exp: Math.floor(Date.now() / 1000) + 3600,
+        token: 'expired-token',
+        exp: Math.floor(Date.now() / 1000) - 60,
       }),
     );
     global.fetch = jest

@@ -48,22 +48,6 @@ const hasAuthoritativeSessionIdentity = (sessionConfig: unknown): boolean => {
   );
 };
 
-export const hasEncryptedSessionField = (
-  sessionConfig: unknown,
-  field: string
-): boolean => {
-  const cfg = isUnknownRecord(sessionConfig) ? sessionConfig : {};
-  const registry = isUnknownRecord(cfg.__registry) ? cfg.__registry : {};
-  return !!(
-    cfg.sessionId ||
-    cfg.sessionIdHex ||
-    cfg.metadataURI ||
-    registry.sessionId ||
-    registry.sessionIdHex ||
-    registry.metadataURI
-  );
-};
-
 export const hasEncryptedSessionField = (sessionConfig: unknown, field: string): boolean => {
   const cfg = isUnknownRecord(sessionConfig) ? sessionConfig : {};
   const encryptedFields =
@@ -94,8 +78,7 @@ export const getSessionInfoForGroup = (
   const fallbackCfg = hasAuthoritativeSessionIdentity(sessionConfig)
     ? {}
     : getDemoConfig(resolvedSlug, opts.getDemoSessionConfigBySlug);
-  return (
-    cfg.sessionInfo ||
+  return (cfg.sessionInfo ||
     cfg.info ||
     cfg.description ||
     fallbackCfg?.sessionInfo ||
@@ -118,8 +101,7 @@ export const getSessionNameForGroup = (
   const fallbackCfg = hasAuthoritativeSessionIdentity(sessionConfig)
     ? {}
     : getDemoConfig(resolvedSlug, opts.getDemoSessionConfigBySlug);
-  return (
-    cfg.sessionName ||
+  return (cfg.sessionName ||
     cfg.name ||
     cfg.title ||
     fallbackCfg?.sessionName ||

@@ -9,6 +9,8 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { getDisplayImageRenderState } from './sbtPageHelpers';
 
 const mockIsCryptoMode = jest.fn(() => true);
+const RESOLVABLE_TREE_COMPONENTS = new Set([SbtPageMoreDetailsSection]);
+const resolvedTreeComponentCache = new WeakMap();
 
 jest.mock('../../utilities/ui/terminology.js', () => {
   const actual = jest.requireActual('../../utilities/ui/terminology.js');
@@ -69,34 +71,33 @@ const treeIncludesText = (node, text) => {
 };
 
 const renderIdentityPanelTree = (tree) => {
-  const identityPanel = findElementInTree(
-    tree,
-    (element) => element?.type === SbtPageIdentityPanel
-  );
+  const identityPanel = findElementInTree(tree, (element) => element?.type === SbtPageIdentityPanel);
   return identityPanel ? SbtPageIdentityPanel(identityPanel.props) : null;
 };
 
+const findActionsSection = (tree) => findElementInTree(tree, (element) => element?.type === SbtPageActionsSection);
+
 const renderStatsSectionTree = (tree) => {
-  const statsSection = findElementInTree(
-    tree,
-    (element) => element?.type === SbtPageStatsSection
-  );
+  const statsSection = findElementInTree(tree, (element) => element?.type === SbtPageStatsSection);
   return statsSection ? SbtPageStatsSection(statsSection.props) : null;
 };
 
 const renderRelevantInfoTree = (tree) => {
-  const relevantInfo = findElementInTree(
-    tree,
-    (element) => element?.type === SbtPageRelevantInfo
-  );
+  const relevantInfo = findElementInTree(tree, (element) => element?.type === SbtPageRelevantInfo);
   return relevantInfo ? SbtPageRelevantInfo(relevantInfo.props) : null;
 };
 
 describe('SBTPage metadata display', () => {
   afterEach(() => {
-    try { delete globalThis.CE_ARWEAVE_GATEWAY_URL; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_AR_IO_URL; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO; } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_GATEWAY_URL;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_AR_IO_URL;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO;
+    } catch (_) {}
     jest.restoreAllMocks();
   });
 
@@ -161,11 +162,94 @@ describe('SBTPage metadata display', () => {
     expect(treeIncludesText(tree, 'MORE')).toBe(true);
   });
 
+  it('keeps idle action feedback from formatting absent transaction hashes', () => {
+    const subject = createSubject({
+      SBTAddress: '0x00000000000000000000000000000000000000a1',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Badge',
+        tokenURI: 'https://arweave.example.test/example',
+        image: defaultSbtImage,
+        mintingEndTime: 0,
+        burnAuth: 0,
+        maxTokens: '0',
+      },
+      mintedAddresses: [],
+      burnedAddresses: [],
+      countsLoaded: true,
+      loadingMintersBurners: false,
+      showActions: true,
+      transactionHash: null,
+      lastMintTxHash: null,
+      lastBurnTxHash: null,
+    };
+
+    expect(() => subject.render()).not.toThrow();
+    const actionsSection = findActionsSection(subject.render());
+    expect(actionsSection?.props?.actionFeedbackState).toMatchObject({
+      showBurnSuccess: false,
+      showErrorTransactionHash: false,
+      showMintSuccess: false,
+      showTransactionError: false,
+    });
+    expect(actionsSection?.props?.transactionState).toEqual({
+      lastBurnTxHash: null,
+      lastMintTxHash: null,
+      transactionHash: null,
+    });
+  });
+
+  it('wires extracted full-view handlers back to the parent shell methods', () => {
+    const subject = createSubject({
+      SBTAddress: '0x00000000000000000000000000000000000000a1',
+    });
+    subject.copyToClipboard = jest.fn();
+    subject.bookmarkSBT = jest.fn();
+    subject.toggleStats = jest.fn();
+    subject.toggleActions = jest.fn();
+    subject.openMintedModal = jest.fn();
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Badge',
+        tokenURI: 'https://arweave.example.test/example',
+        image: defaultSbtImage,
+        mintingEndTime: 0,
+        burnAuth: 0,
+        maxTokens: '0',
+        admin: '0x00000000000000000000000000000000000000a2',
+      },
+      mintedAddresses: [],
+      burnedAddresses: [],
+      countsLoaded: true,
+      loadingMintersBurners: false,
+      showStats: true,
+      showActions: true,
+    };
+
+    const tree = subject.render();
+    const identityPanel = findElementInTree(tree, (element) => element?.type === SbtPageIdentityPanel);
+    const statsSection = findElementInTree(tree, (element) => element?.type === SbtPageStatsSection);
+    const actionsSection = findActionsSection(tree);
+
+    identityPanel.props.onContractCopy();
+    identityPanel.props.onBookmark();
+    statsSection.props.onToggle();
+    statsSection.props.onOpenMintedModal();
+    actionsSection.props.onToggle();
+
+    expect(subject.copyToClipboard).toHaveBeenCalledWith('0x00000000000000000000000000000000000000a1', 'contract');
+    expect(subject.bookmarkSBT).toHaveBeenCalledTimes(1);
+    expect(subject.toggleStats).toHaveBeenCalledTimes(1);
+    expect(subject.openMintedModal).toHaveBeenCalledTimes(1);
+    expect(subject.toggleActions).toHaveBeenCalledTimes(1);
+  });
+
   it('uses Arweave metadata URL for token link when tokenURI is embedded data JSON', () => {
     const txId = 'Sng0VG2vetgNPITw5mtvt6om-fBCNu3KI5GZAYeEttY';
-    const dataUriPayload = Buffer
-      .from(JSON.stringify({ metadataUri: `ar://${txId}` }), 'utf8')
-      .toString('base64');
+    const dataUriPayload = Buffer.from(JSON.stringify({ metadataUri: `ar://${txId}` }), 'utf8').toString('base64');
     const subject = createSubject({
       SBTAddress: '0x00000000000000000000000000000000000000a1',
     });
@@ -190,12 +274,51 @@ describe('SBTPage metadata display', () => {
     const tree = subject.render();
     const metadataLink = findElementInTree(
       renderIdentityPanelTree(tree),
-      (element) => element?.props?.title === 'Open token metadata'
+      (element) => element?.props?.title === 'Open token metadata',
     );
 
     expect(metadataLink).toBeTruthy();
     expect(metadataLink.props.href).toContain(txId);
     expect(String(metadataLink.props.href || '').startsWith('data:')).toBe(false);
+  });
+
+  it('passes resolved token metadata link display state to the identity panel', () => {
+    const subject = createSubject({
+      SBTAddress: '0x00000000000000000000000000000000000000a1',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Badge',
+        tokenURI: 'https://example.example.test/metadata/sbt.json',
+        image: 'https://example.example.test/badge.png',
+        mintingEndTime: 0,
+        burnAuth: 0,
+        maxTokens: '0',
+        admin: '0x00000000000000000000000000000000000000a2',
+      },
+      mintedAddresses: [],
+      burnedAddresses: [],
+      countsLoaded: true,
+      loadingMintersBurners: false,
+      showStats: true,
+    };
+
+    const identityPanel = findElementInTree(subject.render(), (element) => element?.type === SbtPageIdentityPanel);
+    expect(identityPanel?.props?.tokenUriHref).toBe('https://example.example.test/metadata/sbt.json');
+
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        ...subject.state.sbtInfo,
+        tokenURI: 'https://cdn.example.test/preview.png',
+      },
+    };
+    const imageOnlyIdentityPanel = findElementInTree(
+      subject.render(),
+      (element) => element?.type === SbtPageIdentityPanel,
+    );
+    expect(imageOnlyIdentityPanel?.props?.tokenUriHref).toBe('');
   });
 
   it('normalizes subdomain arweave tokenURI links to the preferred gateway URL', () => {
@@ -229,7 +352,7 @@ describe('SBTPage metadata display', () => {
     const tree = subject.render();
     const metadataLink = findElementInTree(
       renderIdentityPanelTree(tree),
-      (element) => element?.props?.title === 'Open token metadata'
+      (element) => element?.props?.title === 'Open token metadata',
     );
 
     expect(metadataLink).toBeTruthy();
@@ -238,12 +361,15 @@ describe('SBTPage metadata display', () => {
 
   it('prefers canonical metadata pointer over image-like fields in embedded tokenURI JSON', () => {
     const txId = '4kpvO6qf-tN4l0R9vQh-Sz6ekU2xq9j5qM4R1X3vZkA';
-    const dataUriPayload = Buffer.from(JSON.stringify({
-      metadataUri: `ar://${txId}`,
-      external_url: 'https://cdn.example.test/preview.png',
-      tokenURI: 'https://cdn.example.test/also-image.jpg',
-      uri: 'https://cdn.example.test/banner.webp',
-    }), 'utf8').toString('base64');
+    const dataUriPayload = Buffer.from(
+      JSON.stringify({
+        metadataUri: `ar://${txId}`,
+        external_url: 'https://cdn.example.test/preview.png',
+        tokenURI: 'https://cdn.example.test/also-image.jpg',
+        uri: 'https://cdn.example.test/banner.webp',
+      }),
+      'utf8',
+    ).toString('base64');
     const subject = createSubject({
       SBTAddress: '0x00000000000000000000000000000000000000a1',
     });
@@ -268,7 +394,7 @@ describe('SBTPage metadata display', () => {
     const tree = subject.render();
     const metadataLink = findElementInTree(
       renderIdentityPanelTree(tree),
-      (element) => element?.props?.title === 'Open token metadata'
+      (element) => element?.props?.title === 'Open token metadata',
     );
 
     expect(metadataLink).toBeTruthy();
@@ -280,11 +406,14 @@ describe('SBTPage metadata display', () => {
   it('prefers embedded tokenURI over metadataUri when both are present', () => {
     const sbtTxId = 'GfaX7MhJndTePSYdECj8VJmFQ5m2KDtDMU8fHgUTw24';
     const sessionTxId = 'ue3Ek_Mh1ypNvvCaGlfrntt_8HxJ9CDiwDlG06uoTpY';
-    const dataUriPayload = Buffer.from(JSON.stringify({
-      tokenURI: `ar://${sbtTxId}`,
-      metadataUri: `ar://${sessionTxId}`,
-      sessionSlug: 'general3',
-    }), 'utf8').toString('base64');
+    const dataUriPayload = Buffer.from(
+      JSON.stringify({
+        tokenURI: `ar://${sbtTxId}`,
+        metadataUri: `ar://${sessionTxId}`,
+        sessionSlug: 'general3',
+      }),
+      'utf8',
+    ).toString('base64');
     const subject = createSubject({
       SBTAddress: '0x00000000000000000000000000000000000000a1',
     });
@@ -309,7 +438,7 @@ describe('SBTPage metadata display', () => {
     const tree = subject.render();
     const metadataLink = findElementInTree(
       renderIdentityPanelTree(tree),
-      (element) => element?.props?.title === 'Open token metadata'
+      (element) => element?.props?.title === 'Open token metadata',
     );
 
     expect(metadataLink).toBeTruthy();
@@ -318,11 +447,14 @@ describe('SBTPage metadata display', () => {
   });
 
   it('hides metadata icon when embedded tokenURI JSON only contains image-like links', () => {
-    const dataUriPayload = Buffer.from(JSON.stringify({
-      external_url: 'https://cdn.example.test/preview.png',
-      tokenURI: 'https://cdn.example.test/also-image.jpg',
-      uri: 'https://cdn.example.test/banner.webp',
-    }), 'utf8').toString('base64');
+    const dataUriPayload = Buffer.from(
+      JSON.stringify({
+        external_url: 'https://cdn.example.test/preview.png',
+        tokenURI: 'https://cdn.example.test/also-image.jpg',
+        uri: 'https://cdn.example.test/banner.webp',
+      }),
+      'utf8',
+    ).toString('base64');
     const subject = createSubject({
       SBTAddress: '0x00000000000000000000000000000000000000a1',
     });
@@ -347,7 +479,7 @@ describe('SBTPage metadata display', () => {
     const tree = subject.render();
     const metadataLink = findElementInTree(
       renderIdentityPanelTree(tree),
-      (element) => element?.props?.title === 'Open token metadata'
+      (element) => element?.props?.title === 'Open token metadata',
     );
 
     expect(metadataLink).toBeNull();
@@ -377,7 +509,7 @@ describe('SBTPage metadata display', () => {
     const tree = subject.render();
     const sbtImage = findElementInTree(
       renderIdentityPanelTree(tree),
-      (element) => element?.type === 'img' && element?.props?.alt === 'Badge'
+      (element) => element?.type === 'img' && element?.props?.alt === 'Badge',
     );
 
     expect(sbtImage).toBeTruthy();
@@ -421,7 +553,7 @@ describe('SBTPage metadata display', () => {
     const tree = subject.render();
     const sbtImage = findElementInTree(
       renderIdentityPanelTree(tree),
-      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SBT_PAGE_IMAGE
+      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SBT_PAGE_IMAGE,
     );
 
     expect(sbtImage).toBeTruthy();
@@ -444,7 +576,7 @@ describe('SBTPage metadata display', () => {
       const actorTree = subject.renderAddressLink(actorAddress, 'admin');
       const actorLink = findElementInTree(
         actorTree,
-        (element) => element?.type === 'a' && element?.props?.href?.includes('/u/')
+        (element) => element?.type === 'a' && element?.props?.href?.includes('/u/'),
       );
 
       expect(actorLink?.props?.href).toBe(`/ce/u/${actorAddress}`);
@@ -459,11 +591,11 @@ describe('SBTPage metadata display', () => {
       const metadataTree = renderRelevantInfoTree(subject.renderRelevantInfo());
       const docLink = findElementInTree(
         metadataTree,
-        (element) => element?.type === 'a' && element?.props?.href?.includes('/doc/')
+        (element) => element?.type === 'a' && element?.props?.href?.includes('/doc/'),
       );
       const tagLink = findElementInTree(
         metadataTree,
-        (element) => element?.type === 'a' && element?.props?.href?.includes('/tag/')
+        (element) => element?.type === 'a' && element?.props?.href?.includes('/tag/'),
       );
 
       expect(docLink?.props?.href).toBe('/ce/doc/doc%20hash');

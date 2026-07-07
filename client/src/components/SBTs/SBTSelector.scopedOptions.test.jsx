@@ -46,93 +46,6 @@ describe('SBTSelector scoped options', () => {
     } catch (_) {}
   });
 
-  it('keeps SBT options cleared when an old chain cache read resolves after switching to pure Worker mode', async () => {
-    const cachedAddress = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
-    const cachedLower = cachedAddress.toLowerCase();
-    const registryProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
-    const pureWorkerProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
-    const deferredCacheRead = createDeferred();
-    const instance = makeInstance({
-      sessionSlug: 'edge',
-      defaultFeaturedSBTs: [],
-      sessionConfig: {
-        slug: 'edge',
-        sessionModeProfile: registryProfile,
-      },
-    });
-    instance._isMounted = true;
-    instance.readSbtCacheBySlug = jest.fn(() => deferredCacheRead.promise);
-
-    const groupListsSpy = jest
-      .spyOn(contractScriptsUtils, 'getSessionLists')
-      .mockReturnValue({ featured_SBTs_LIST: [], ignored_SBTs_LIST: [] });
-
-    try {
-      const pendingRegistryLoad = instance.loadSBTOptions({ force: true });
-      await flushAsync();
-
-      instance.props = {
-        ...instance.props,
-        sessionConfig: {
-          slug: 'edge',
-          sessionModeProfile: pureWorkerProfile,
-        },
-      };
-      await instance.loadSBTOptions({ force: true });
-
-      expect(instance.state.sbtOptions).toEqual([]);
-      expect(instance.state.loadingOptions).toBe(false);
-
-      deferredCacheRead.resolve({
-        11155420: {
-          sbtList: {
-            [cachedLower]: {
-              sbtAddress: cachedAddress,
-              sbtInfo: { name: 'Registry Badge', unlisted: false },
-              slug: 'edge',
-            },
-          },
-          nameLookupState: {},
-        },
-      });
-      await pendingRegistryLoad;
-      await flushAsync();
-
-      expect(instance.state.sbtOptions).toEqual([]);
-      expect(instance.state.loadingOptions).toBe(false);
-
-      instance.props = {
-        ...instance.props,
-        sessionConfig: {
-          slug: 'edge',
-          sessionModeProfile: registryProfile,
-        },
-      };
-      instance.readSbtCacheBySlug = jest.fn().mockResolvedValue({
-        11155420: {
-          sbtList: {
-            [cachedLower]: {
-              sbtAddress: cachedAddress,
-              sbtInfo: { name: 'Current Registry Badge', unlisted: false },
-              slug: 'edge',
-            },
-          },
-          nameLookupState: {},
-        },
-      });
-      await instance.loadSBTOptions({ force: true });
-
-      expect(instance.state.sbtOptions).toEqual([
-        expect.objectContaining({
-          address: cachedLower,
-          name: 'Current Registry Badge',
-        }),
-      ]);
-    } finally {
-      groupListsSpy.mockRestore();
-    }
-  });
-
   it('aggregates SBT cache entries from all known sessions when scope mode is all', async () => {
     const edgeAddress = '0xaaaa000000000000000000000000000000000001';
     const alphaAddress = '0xaaaa000000000000000000000000000000000002';
@@ -1113,15 +1026,9 @@ describe('SBTSelector scoped options', () => {
     const groupListsSpy = jest
       .spyOn(contractScriptsUtils, 'getSessionLists')
       .mockReturnValue({ featured_SBTs_LIST: [], ignored_SBTs_LIST: [] });
-    const scopeSpy = jest
-      .spyOn(sessionScanScopeUtils, 'readSessionScanScope')
-      .mockReturnValue('list');
-    const slugsSpy = jest
-      .spyOn(sessionScanScopeUtils, 'readSessionScanSlugs')
-      .mockReturnValue(['demo']);
-    const hydrateSpy = jest
-      .spyOn(sbtDisplayNameUtils, 'hydrateSbtDisplayNameTargeted')
-      .mockResolvedValue(null);
+    const scopeSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanScope').mockReturnValue('list');
+    const slugsSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanSlugs').mockReturnValue(['demo']);
+    const hydrateSpy = jest.spyOn(sbtDisplayNameUtils, 'hydrateSbtDisplayNameTargeted').mockResolvedValue(null);
 
     try {
       await instance.loadSBTOptions({ force: true });

@@ -175,21 +175,6 @@ export const resolveSbtSelectorSessionNetworkId = ({
 }: ResolveSbtSelectorSessionNetworkIdArgs = {}): number | null => {
   const sessionConfig =
     shouldUsePropsSessionConfig && isSbtSelectorRuntimeRecord(propsSessionConfig) ? propsSessionConfig : null;
-  const displayLookupCfg = isSbtSelectorRuntimeRecord(displayLookupSessionConfig) ? displayLookupSessionConfig : {};
-  const capabilityConfig = sessionConfig || displayLookupCfg;
-  if (!shouldDiscoverSbtForSessionConfig({ sessionConfig: capabilityConfig, sessionSlug: slug })) return null;
-
-  const projection = resolveSessionCapabilityProjection(capabilityConfig);
-  if (projection.source === 'profile') {
-    const profile =
-      isSbtSelectorRuntimeRecord(capabilityConfig.sessionModeProfile) &&
-      isSbtSelectorRuntimeRecord(capabilityConfig.sessionModeProfile.evm)
-        ? capabilityConfig.sessionModeProfile
-        : capabilityConfig;
-    const evm = isSbtSelectorRuntimeRecord(profile.evm) ? profile.evm : {};
-    return normalizeChainValue(evm.registryChainId);
-  }
-
   const sessionConfigChainId = normalizeChainValue(sessionConfig?.networkChainId);
   if (sessionConfigChainId) return sessionConfigChainId;
 

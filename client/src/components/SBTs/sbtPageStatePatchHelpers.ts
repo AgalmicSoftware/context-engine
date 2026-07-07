@@ -268,7 +268,7 @@ export const buildSbtPageBooleanTogglePatch = ({
 export const buildSbtPageAddressChangeResetMintUiPatch = ({
   forceReset = false,
   sbtAddressChanged = false,
-}: BuildSbtPageAddressChangeResetMintUiPatchArgs = {}): Record<string, unknown> | null => (
+}: BuildSbtPageAddressChangeResetMintUiPatchArgs = {}): Record<string, unknown> | null =>
   sbtAddressChanged || forceReset
     ? {
         showMiniPasswordInput: false,

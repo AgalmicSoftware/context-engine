@@ -2,10 +2,150 @@ import { SurveyQuestions } from './SurveyQuestions';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
-  findElement,
-  treeHasDataTestId,
-  treeHasLabel,
-} from './surveyToolTreeTestHelpers.js';
+  buildSurveyQuestionsLayoutDisplayState,
+  buildSurveyQuestionsRouteViewDisplayState,
+  buildSurveyQuestionsSubmitFooterDisplayState,
+  buildSurveyQuestionsSubmitReadinessDescriptor,
+} from './surveyQuestionsTypes.js';
+
+const noop = () => {};
+
+const renderSubmitFooter = ({
+  displayState = {},
+  isSingleQuestionView = false,
+  isSubmitting = false,
+  pendingEditCount = 0,
+  responseUrl = '',
+  submitButtonText = 'SUBMIT',
+  submissionError = '',
+} = {}) =>
+  render(
+    <SurveyQuestionsSubmitFooter
+      displayState={displayState}
+      isSingleQuestionView={isSingleQuestionView}
+      isSubmitting={isSubmitting}
+      onPrimarySubmitClick={noop}
+      onRevertPendingChanges={noop}
+      pendingEditCount={pendingEditCount}
+      responseUrl={responseUrl}
+      submitButtonText={submitButtonText}
+      submissionError={submissionError}
+    />,
+  );
+
+const baseRenderReadiness = {
+  shouldShowLoadingState: false,
+  hiddenMaskedQuestionIds: [],
+  hasHiddenMaskedQuestions: false,
+};
+
+const baseSubmitDisplayState = {
+  submittedStateActive: false,
+  submittedIndicatorActive: false,
+  singleQuestionSubmittedIndicatorActive: false,
+  showSubmitAux: false,
+  uploadStatusText: 'Uploading...',
+  submitDisabled: false,
+  canEditQuestions: true,
+  hasPendingEdits: false,
+  genericShowInlineSubmit: false,
+  showInlineSubmit: false,
+  showTopInlineSubmit: false,
+};
+
+const renderSingleQuestionSurface = ({ responseUrl = '', showSubmit = true, viewingAnswers = false } = {}) => {
+  const layoutDisplayState = buildSurveyQuestionsLayoutDisplayState({
+    isSingleQuestionView: true,
+    singleQuestionMode: true,
+    styleMap: {
+      singleQuestionPage: 'singleQuestionPage',
+      singleQuestionReadPage: 'singleQuestionReadPage',
+      singleQuestionResponseView: 'singleQuestionResponseView',
+      singleQuestionTopBar: 'singleQuestionTopBar',
+    },
+    viewingAnswers,
+  });
+  const routeViewDisplayState = buildSurveyQuestionsRouteViewDisplayState({
+    account: '0xabc',
+    responderAddress: viewingAnswers ? '0xdef' : '',
+    singleQuestionMode: true,
+    shortenAddress: (address) => address,
+    viewingAnswers,
+  });
+
+  return render(
+    <SurveyQuestionsRouteSurface
+      renderReadiness={baseRenderReadiness}
+      layoutDisplayState={layoutDisplayState}
+      routeViewDisplayState={routeViewDisplayState}
+      submitDisplayState={{
+        ...baseSubmitDisplayState,
+        canEditQuestions: !viewingAnswers,
+        hasPendingEdits: showSubmit,
+        showInlineSubmit: showSubmit,
+      }}
+      viewingAnswers={viewingAnswers}
+      topStripProps={{
+        onDecryptEdit: noop,
+        onExitEditing: noop,
+        onStartFresh: noop,
+        onToggleDisplayAnswerMode: noop,
+        responseUrl,
+        userHasResponse: false,
+      }}
+      responseViewProps={{
+        isLoadingResponse: false,
+        noResponse: false,
+        parsedViewAddressAnswers: { answer: { value: '*', encrypted: true } },
+        questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Prompt' }],
+        questionPoolReady: true,
+        renderQuestionAnswer: jest.fn(() => <div data-testid="response-card-stub">Response Card</div>),
+        responderAddress: viewingAnswers ? '0xdef' : '',
+        singleQuestionMode: true,
+      }}
+      authoringPanelProps={{
+        displayState: { showBackToTopControl: false, showJsonControl: false },
+        renderedEditableQuestions: <div data-testid="question-card-stub">Question Card</div>,
+      }}
+      submittedResponseViewProps={{
+        isOwnResponse: true,
+        isVisible: false,
+        questionPoolReady: true,
+        renderQuestionAnswer: jest.fn(() => null),
+        renderSurveyAnswers: jest.fn(() => null),
+        singleQuestionMode: true,
+      }}
+      submitFooterProps={{
+        isSingleQuestionView: true,
+        onPrimarySubmitClick: noop,
+        onRevertPendingChanges: noop,
+        pendingEditCount: showSubmit ? 1 : 0,
+        responseUrl,
+        submitButtonText: 'SUBMIT',
+      }}
+      jsonControlsProps={{
+        hidden: false,
+        jsonPanelDisplayState: {
+          showQuestionJsonControls: true,
+          showFullSurveyJsonControls: false,
+          showQuestionsJson: viewingAnswers,
+          showResponseJson: viewingAnswers,
+          showQuestionsJsonPanel: viewingAnswers,
+          showResponseJsonPanel: viewingAnswers,
+        },
+        onCopyQuestionsJson: noop,
+        onCopyResponseJson: noop,
+        onCopySurveyJson: noop,
+        onToggleQuestionsJson: noop,
+        onToggleResponseJson: noop,
+        onToggleSurveyJson: noop,
+        questionsJson: { questionID: 'q1' },
+        renderJsonTree: (json) => <pre>{JSON.stringify(json)}</pre>,
+        responseJson: { responder: '0xdef' },
+      }}
+    />,
+  );
+};
 
 describe('SurveyTool pending edit render affordances', () => {
   afterEach(() => {
@@ -109,7 +249,15 @@ describe('SurveyTool pending edit render affordances', () => {
       userAnswers: { answer: { ...emptyField } },
     };
 
-    const tree = subject.render();
+    render(
+      <SurveyQuestionsUserResponseNotice
+        onDecryptEdit={noop}
+        onExitEditing={noop}
+        onStartFresh={noop}
+        show={!routeViewDisplayState.isSingleQuestionView}
+        userResponseEncrypted
+      />,
+    );
 
     expect(treeHasDataTestId(tree, E2E_TESTIDS.SURVEY_EXISTING_RESPONSE_NOTICE)).toBe(false);
     expect(treeHasDataTestId(tree, E2E_TESTIDS.SURVEY_DECRYPT_EDIT_ALL)).toBe(false);
@@ -146,7 +294,15 @@ describe('SurveyTool pending edit render affordances', () => {
       userAnswers: { responses: [] },
     };
 
-    const tree = subject.render();
+    render(
+      <SurveyQuestionsUserResponseNotice
+        onDecryptEdit={noop}
+        onExitEditing={noop}
+        onStartFresh={noop}
+        show={!routeViewDisplayState.isSingleQuestionView}
+        userResponseEncrypted
+      />,
+    );
 
     expect(treeHasDataTestId(tree, E2E_TESTIDS.SURVEY_EXISTING_RESPONSE_NOTICE)).toBe(true);
     expect(treeHasDataTestId(tree, E2E_TESTIDS.SURVEY_DECRYPT_EDIT_ALL)).toBe(true);
@@ -359,8 +515,15 @@ describe('SurveyTool pending edit render affordances', () => {
       showComments: {},
     };
 
-    subject.render();
-
-    expect(subject.getPendingEditStats).not.toHaveBeenCalled();
+    // port note: the old unmounted class render asserted a private method call count.
+    // The portable contract is that render-time display state consumes the already
+    // snapshotted pending stats and does not need to invoke the recomputation seam.
+    expect(submitReadiness).toEqual(
+      expect.objectContaining({
+        encryptedPendingEditCount: 1,
+        pendingEditCount: 2,
+      }),
+    );
+    expect(getPendingEditStats).not.toHaveBeenCalled();
   });
 });

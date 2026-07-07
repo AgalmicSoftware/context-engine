@@ -15,8 +15,12 @@ import {
 } from '../../utilities/survey/questionRouting.js';
 import { isRouteResponderAddress } from '../../utilities/session/mainSiteUtils.js';
 import { sessionRegistryReadsPort } from '../../domains/sessions/registry/sessionRegistryReadPorts.js';
-import { normalizeSessionSlug } from '../../domains/sessions/sessionConfig.js';
-import { DEFAULT_SESSION_SLUG_ALIAS } from '../../variables/appConfig.js';
+import {
+  getDemoSessionConfigBySlug,
+  getSessionConfigBySlug,
+  normalizeSessionSlug,
+} from '../../domains/sessions/sessionConfig.js';
+import { DEFAULT_SESSION_SLUG, DEFAULT_SESSION_SLUG_ALIAS } from '../../variables/appConfig.js';
 import {
   composeMainSiteAuthViewProps,
   composeMainSiteLoginViewProps,
@@ -28,7 +32,8 @@ import {
 import {
   ExperimentalStub as ExperimentalStubRaw,
   NotFoundRoute as NotFoundRouteRaw,
-  removeHashQueryParam,
+  readHashQueryParam,
+  SessionLoadingSkeleton as SessionLoadingSkeletonRaw,
 } from './routeStatusViews';
 import { QUESTION_RESULTS_RE, SURVEY_RESULTS_RE, VALID_SURVEY_ID_RE } from './routeConfig.js';
 import { resolveMainSiteRouteMatch } from './routeTable.js';
@@ -46,33 +51,10 @@ import {
 import { buildPublicRoute, buildPublicUrl, replaceRouteResponderQueryParam } from './urlUtils.js';
 import { hasAutoFlag as hasAutoFlagFn } from './autoHashPersistence';
 import {
-  buildLegacySbtRouteCredentialCleanPath,
-  resolveLegacySbtRouteCredential,
-} from '../SBTs/sbtPageAutoMintHelpers';
-import {
   resolveMainSiteQuestionRouteSessionContext,
+  resolveMainSiteSessionRouteContext,
   resolveMainSiteSessionRouteSourceSlug,
 } from './routeSessionResolution.js';
-import { getWorkerCanonicalRouteController } from './workerCanonicalRouteController.js';
-import {
-  resolveExplicitWorkerSessionConfig,
-  resolveExplicitWorkerSessionNetwork,
-} from './workerCanonicalSessionRouteContext';
-import { readWorkerGroupIdFromPath } from '../../utilities/worker/workerGroupRoutes.js';
-import {
-  renderMainSiteSurveyResolutionStatus,
-  resolveMainSiteRouteCapabilityContext,
-  resolveMainSiteSurveyRouteCapabilityState,
-} from './mainSiteRouteCapabilityRuntime';
-import { MainSiteRouteStatusView } from './mainSiteRouteStatusView';
-import {
-  renderWorkerCanonicalRouteBootstrap,
-  renderWorkerCanonicalRouteError,
-  renderMissingMainSiteSessionConfig,
-  renderUnresolvedMainSiteSessionId,
-  resolveMainSiteAdminWorkerRoute,
-  resolveMainSiteSessionRouteForRender,
-} from './workerCanonicalRouteResolution.js';
 import {
   AboutPage as AboutPageRaw,
   AdminPage as AdminPageRaw,
@@ -153,8 +135,22 @@ const SurveyTool = asMainSiteRouteComponent(SurveyToolRaw);
 const TagPage = asMainSiteRouteComponent(TagPageRaw);
 const UserPage = asMainSiteRouteComponent(UserPageRaw);
 
-export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) => ({
-  workerCanonicalRoutes: getWorkerCanonicalRouteController(host),
+const hasMainSiteRegistryIdentity = (sessionConfig: unknown): boolean => {
+  if (!sessionConfig || typeof sessionConfig !== 'object') return false;
+  const cfg = sessionConfig as Record<string, unknown>;
+  const registry =
+    cfg.__registry && typeof cfg.__registry === 'object' ? (cfg.__registry as Record<string, unknown>) : {};
+  return !!(
+    cfg.sessionId ||
+    cfg.sessionIdHex ||
+    cfg.metadataURI ||
+    registry.sessionId ||
+    registry.sessionIdHex ||
+    registry.metadataURI
+  );
+};
+
+export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost): MainSiteRouteRendererMap => ({
   _renderDebateRoute: (fullPath: string) => <ExperimentalStub featureName="Debate view" path={fullPath} />,
 
   _renderBookmarksRoute: () => (
@@ -537,42 +533,123 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     // 0. LOADING GATE: If caches haven't loaded yet, don't attempt to resolve or scan.
     // This prevents "Survey Not Found" from flashing during initial hydration.
     if (!host.state.cacheHasLoaded && !host.state.isAllCachesReady) {
-      return <MainSiteRouteStatusView heading="Loading..." showSpinner={true} />;
+      return (
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '50vh',
+            color: 'white',
+          }}
+        >
+          <h3>Loading...</h3>
+          <div style={{ marginTop: '1rem' }} className="spinner-border text-light" role="status" />
+        </div>
+      );
     }
 
     // 1. Determine the "Best Guess" Slug
     const effectiveSlug = host.findGroupSlugForSurvey(sidLower);
 
-    const {
-      sessionConfig: cfg,
-      capabilities: surveyCapabilities,
-      allowChainContext: allowSurveyChainContext,
-      allowSbtContext: allowSurveySbtContext,
-      allowLitContext: allowSurveyLitContext,
-      allowRegistryScan: allowSurveyRegistryScan,
-      surveyMissing: surveyMissingFromResolvedSession,
-      isScanning,
-      hasFailed,
-      hasError,
-      workerMetadataStatus,
-    } = resolveMainSiteSurveyRouteCapabilityState({
-      host,
-      sessionSlug: effectiveSlug,
-      surveyId: sidLower,
-    });
-    if (workerMetadataStatus) return workerMetadataStatus;
+    // 2. Check if the data actually exists in this resolved context
+    const cfg = host.getSessionCfg(effectiveSlug);
+    const cache = host.readDgRecord('surveysCache', effectiveSlug, {
+      clone: false,
+    }) as MainSiteSurveyMetadataCache | null;
+    const netKey = String(host.getSessionChainId(effectiveSlug));
 
-    const resolutionStatus = renderMainSiteSurveyResolutionStatus({
-      host,
-      sessionSlug: effectiveSlug,
-      surveyId: sidLower,
-      surveyMissing: surveyMissingFromResolvedSession,
-      allowRegistryScan: allowSurveyRegistryScan,
-      isScanning,
-      hasFailed,
-      hasError,
-    });
-    if (resolutionStatus) return resolutionStatus;
+    const inCache = !!cache?.[netKey]?.surveys?.[sidLower];
+    const inConfig =
+      Array.isArray(cfg?.HIGHLIGHTED_SURVEY_IDS) &&
+      cfg.HIGHLIGHTED_SURVEY_IDS.some((id: string) => id.toLowerCase() === sidLower);
+
+    // 3. Check Scan State
+    const isScanning = host.state.isScanningForGroup === sidLower;
+    const hasFailed = host.state.scanFailedFor === sidLower;
+    const hasError = host.state.scanErrorFor === sidLower;
+
+    // 4. BLOCKING LOGIC: If missing, not scanning, and not failed -> Start Scan
+    if (!inCache && !inConfig && !hasFailed && !hasError && !isScanning) {
+      host.queueSurveyGroupScan(sidLower, { hintedSlug: host.getSurveyRouteSessionSlugHint() });
+    }
+
+    // 5. RENDER SPINNER (Block SurveyPage from mounting if scanning or missing)
+    if ((!inCache && !inConfig && !hasFailed && !hasError) || isScanning) {
+      const routeHintSlug = host.getSurveyRouteSessionSlugHint();
+      const scanTargetLabel = routeHintSlug ? `session "${routeHintSlug}" first, then other sessions` : 'demo sessions';
+      return (
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '50vh',
+            color: 'white',
+          }}
+        >
+          <h3>Resolving Survey Context...</h3>
+          <p>
+            Scanning {scanTargetLabel} for ID: {sidLower.substring(0, 6)}...
+          </p>
+          <div style={{ marginTop: '1rem' }} className="spinner-border text-light" role="status" />
+        </div>
+      );
+    }
+
+    if (hasError) {
+      const loadErrorMessage =
+        String(host.state.scanErrorMessage || '').trim() || 'Survey metadata was found but could not be loaded.';
+      return (
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '50vh',
+            color: 'white',
+          }}
+        >
+          <h3>Survey Load Error</h3>
+          <p>{loadErrorMessage}</p>
+          <button
+            className="btn btn-outline-light"
+            onClick={() =>
+              host.setState({ scanErrorFor: null, scanErrorMessage: '', scanFailedFor: null }, () =>
+                host.queueSurveyGroupScan(sidLower, { hintedSlug: host.getSurveyRouteSessionSlugHint() }),
+              )
+            }
+          >
+            Retry
+          </button>
+        </div>
+      );
+    }
+
+    // 6. If Scan Failed (Survey truly doesn't exist in any known group)
+    if (hasFailed) {
+      return (
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '50vh',
+            color: 'white',
+          }}
+        >
+          <h3>Survey Not Found</h3>
+          <p>This survey ID does not exist in any known session.</p>
+          <button className="btn btn-outline-light" onClick={() => window.history.back()}>
+            Go Back
+          </button>
+        </div>
+      );
+    }
 
     // 7. Success: We have the data (or config) and the correct slug. Render the Page immediately.
     const effectiveNetwork = allowSurveyChainContext ? host.getSessionNetwork(effectiveSlug) : null;
@@ -652,7 +729,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
       ? resolveMainSiteQuestionRouteSessionContext({
           search: searchStr,
           isCacheManagerReady: host.state.isCacheManagerReady,
-          getSessionConfigBySlug: (slug: string) => host.getDisplaySessionCfg(slug) as ShellSessionConfigLike | null,
+          getSessionConfigBySlug: (slug: string) => host.getDisplaySessionCfg(slug) as SessionConfigLike | null,
           formatSessionId: sessionRegistryReadsPort.formatSessionId,
           resolveSessionConfigById: (sessionId: string | number) =>
             sessionRegistryReadsPort.getSessionConfigById(sessionId),
@@ -896,25 +973,14 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
         window.history.replaceState({}, '', withHash);
       }
     }
-    const questionSessionCfg = host.getDisplaySessionCfg(effectiveQuestionSlug);
-    const {
-      capabilities: questionCapabilities,
-      allowChainContext: allowQuestionChainContext,
-      allowSbtContext: allowQuestionSbtContext,
-      allowLitContext: allowQuestionLitContext,
-      allowRegistryScan: allowQuestionRegistryScan,
-    } = resolveMainSiteRouteCapabilityContext({
-      slug: effectiveQuestionSlug,
-      sessionConfig: questionSessionCfg,
-    });
     const walletNetwork = host.props.network && typeof host.props.network === 'object' ? host.props.network : null;
-    const effectiveQuestionNetwork = allowQuestionChainContext
-      ? host.getSessionNetwork(effectiveQuestionSlug) ||
-        defaultSessionNetwork ||
-        walletNetwork ||
-        host.getSessionNetwork('') ||
-        null
-      : null;
+    const effectiveQuestionNetwork =
+      host.getSessionNetwork(effectiveQuestionSlug) ||
+      defaultSessionNetwork ||
+      walletNetwork ||
+      host.getSessionNetwork('') ||
+      null;
+    const questionSessionCfg = host.getSessionCfg(effectiveQuestionSlug);
     const authViewProps = composeMainSiteAuthViewProps(host.props);
     const questionCacheViewProps = composeMainSiteQuestionCacheViewProps(host.state);
     return (
@@ -980,12 +1046,20 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
       (!!parts[2] && !isDocsRoute && !isQuestionsRoute) ||
       (subroute === 'questions' && !!nextSubroute && nextSubroute !== 'results') ||
       (subroute === 'questions' && nextSubroute === 'results' && !!parts[4]);
-    const workerRoute = resolveMainSiteSessionRouteForRender({
+    const sessionRoute = resolveMainSiteSessionRouteContext({
       sessionTokenRaw,
-      searchStr,
-      controller: workerCanonicalRoutes,
-      resolveSessionSlugFromPathToken: (sessionToken) =>
-        host.resolveSessionSlugFromPathToken(sessionToken, { allowAsyncResolve: true }),
+      formatSessionId: sessionRegistryReadsPort.formatSessionId,
+      resolveSessionConfigById: (sessionId: string | number) =>
+        sessionRegistryReadsPort.getSessionConfigById(sessionId),
+      resolveSessionConfigBySlug: (slug: string) =>
+        sessionRegistryReadsPort.getSessionConfig(slug) || getSessionConfigBySlug(slug),
+      resolveDisplaySessionConfigBySlug: (slug: string) =>
+        getDemoSessionConfigBySlug(slug, { allowDemoFallback: true }) ||
+        (normalizeSessionSlug(slug) === 'demo' ? getDemoSessionConfigBySlug('', { allowDemoFallback: true }) : null),
+      resolveSessionSlugFromPathToken: (sessionToken: string) =>
+        sessionToken
+          ? host.resolveSessionSlugFromPathToken(sessionToken, { allowAsyncResolve: true })
+          : DEFAULT_SESSION_SLUG,
     });
     const workerRouteError = renderWorkerCanonicalRouteError(workerRoute);
     if (workerRouteError) return workerRouteError;
@@ -1007,8 +1081,31 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
       }
     }
 
-    const unresolvedSessionIdView = renderUnresolvedMainSiteSessionId(sessionRoute, host);
-    if (unresolvedSessionIdView) return unresolvedSessionIdView;
+    if (sessionRoute.hasUnresolvedSessionId) {
+      const unresolvedSessionId = sessionIdFromPath!;
+      const idStatus = host._sessionPathResolver.getIdStatus(unresolvedSessionId);
+      const recentError = !!(idStatus.lastErrorTs && Date.now() - idStatus.lastErrorTs < 2 * 60 * 1000);
+      const keepResolving = recentError && idStatus.retryCount > 0;
+      host.resolveSessionPathId(unresolvedSessionId);
+      if (!idStatus.hasAttempted || idStatus.isPending || keepResolving) {
+        return <SessionLoadingSkeleton statusTitle={`Resolving ${unresolvedSessionId} Session...`} />;
+      }
+      return (
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '50vh',
+            color: 'rgba(244,247,255,0.65)',
+          }}
+        >
+          <h3>Session Not Found</h3>
+          <p>No session metadata was found for {sessionIdFromPath}.</p>
+        </div>
+      );
+    }
 
     slug = normalizeSessionSlug(slug);
     const canonicalSessionToken = slug || sessionTokenRaw || DEFAULT_SESSION_SLUG_ALIAS;
@@ -1024,13 +1121,31 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     }
     const sessionConfig = sessionRoute.sessionConfig;
     if (!sessionConfig) {
-      return renderMissingMainSiteSessionConfig({
-        sessionConfig,
-        slug,
-        workerRoute,
-        workerController: workerCanonicalRoutes,
-        host,
-      });
+      if (slug) {
+        const slugStatus = host._sessionPathResolver.getSlugStatus(slug);
+        const recentError = !!(slugStatus.lastErrorTs && Date.now() - slugStatus.lastErrorTs < 2 * 60 * 1000);
+        const keepResolving = recentError && slugStatus.retryCount > 0;
+        host.resolveSessionPathSlug(slug);
+        if (!slugStatus.hasAttempted || slugStatus.isPending || keepResolving) {
+          return <SessionLoadingSkeleton statusTitle={`Resolving ${slug} Session...`} />;
+        }
+        return (
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: '50vh',
+              color: 'rgba(244,247,255,0.65)',
+            }}
+          >
+            <h3>Session Not Found</h3>
+            <p>No session metadata was found for {slug}.</p>
+          </div>
+        );
+      }
+      return <div>Session not found.</div>;
     }
     const effectiveSessionConfig = resolveExplicitWorkerSessionConfig({
       workerOrigin,
@@ -1095,7 +1210,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
       sessionSlug: slug,
       sessionConfig: effectiveSessionConfig as ShellSessionConfigLike,
     });
-    const sessionRouteDisplaySlug = normalizeSessionSlug(effectiveSessionConfig.slug || slug);
+    const sessionRouteDisplaySlug = normalizeSessionSlug(sessionConfig.slug || slug);
     const shouldRefreshBuiltInDemoLiveBucket =
       normalizeSessionSlug(sessionTokenRaw) === 'demo' &&
       sessionRouteDisplaySlug === 'demo' &&
@@ -1211,18 +1326,21 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     const requestedSessionId = searchParams.get('sessionId') || searchParams.get('sessionID') || '';
     const requestedChainIdRaw = searchParams.get('chainId') || searchParams.get('chainID') || '';
     const requestedSponsoredBundleId = searchParams.get('sponsored') || '';
-    const requestedSponsoredBundleKey = null;
-    const sanitizedHash = removeHashQueryParam(hashStr, 'k');
-    if (sanitizedHash !== hashStr && typeof window !== 'undefined' && window.location && window.history?.replaceState) {
-      window.history.replaceState({}, '', `${window.location.pathname || ''}${searchStr}${sanitizedHash}`);
-      hashStr = sanitizedHash;
-    }
-    const requestedChainId = resolveRequestedRouteChainId(requestedChainIdRaw);
+    const requestedSponsoredBundleKey = readHashQueryParam(hashStr, 'k');
+    const requestedChainIdTokens = requestedChainIdRaw ? requestedChainIdRaw.match(/\d+/g) : null;
+    const requestedChainId =
+      requestedChainIdTokens && requestedChainIdTokens.length
+        ? Number(requestedChainIdTokens[requestedChainIdTokens.length - 1])
+        : null;
     const sessionFallbackTarget = host.applySessionFallbackRedirect({ pathIn: fullPath });
     if (sessionFallbackTarget) {
       fullPath = sessionFallbackTarget.path;
     }
-    const [pathWithoutQuery, pathSegments, firstPathSegment] = resolveRoutePathParts(fullPath);
+    const pathWithoutQuery = String(fullPath || '').split('?')[0] || '';
+    const pathSegments = pathWithoutQuery.split('/').filter(Boolean);
+    const firstPathSegment = String(pathSegments[0] || '')
+      .trim()
+      .toLowerCase();
 
     // Robust results routing (/survey/:id/results or /questions/results)
     const surveyMatch = fullPath.match(SURVEY_RESULTS_RE);

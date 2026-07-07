@@ -102,27 +102,6 @@ describe('SingleQuestionResponse style contracts', () => {
   });
 });
 
-describe('SingleQuestionResponse render guard', () => {
-  it('skips updates when top-level props and state values are unchanged', () => {
-    const question = { id: 'q1', prompt: 'Question?', type: 'freeform' };
-    const response = { answer: { value: 'Answer' } };
-    const subject = createSubject({ question, response });
-
-    expect(subject.shouldComponentUpdate({ ...subject.props }, { ...subject.state })).toBe(false);
-  });
-
-  it('updates when render-relevant prop or state references change', () => {
-    const question = { id: 'q1', prompt: 'Question?', type: 'freeform' };
-    const response = { answer: { value: 'Answer' } };
-    const subject = createSubject({ question, response });
-
-    expect(
-      subject.shouldComponentUpdate({ ...subject.props, response: { answer: { value: 'Updated' } } }, subject.state),
-    ).toBe(true);
-    expect(subject.shouldComponentUpdate(subject.props, { ...subject.state, miniExpanded: true })).toBe(true);
-  });
-});
-
 describe('SingleQuestionResponse card actions', () => {
   it('omits dead bookmark and page-link controls for synthetic questions without ids', () => {
     const subject = createSubject({
@@ -305,18 +284,9 @@ describe('SingleQuestionResponse masked prompt copy', () => {
     });
 
     const tree = subject.renderSinglePersonView();
-    const notice = findElement(
-      tree,
-      (node) => node?.props?.['data-testid'] === 'ce-encrypted-answer-notice'
-    );
-    const visibleAgree = findElement(
-      tree,
-      (node) => node?.props?.children === 'Agree'
-    );
-    const visibleNote = findElement(
-      tree,
-      (node) => node?.props?.children === 'private note'
-    );
+    const notice = findElement(tree, (node) => node?.props?.['data-testid'] === 'ce-encrypted-answer-notice');
+    const visibleAgree = findElement(tree, (node) => node?.props?.children === 'Agree');
+    const visibleNote = findElement(tree, (node) => node?.props?.children === 'private note');
 
     expect(notice).toBeTruthy();
     expect(notice?.props?.children).toBe('This response is gated with the question.');

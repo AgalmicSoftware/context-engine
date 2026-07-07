@@ -39,7 +39,7 @@ export const writeTagAiCacheEntry = (
   cache: Map<string, string>,
   key: string,
   value: string,
-  limit = TAG_AI_CACHE_LIMIT
+  limit = TAG_AI_CACHE_LIMIT,
 ): void => {
   if (cache.has(key)) cache.delete(key);
   cache.set(key, value);
@@ -217,7 +217,7 @@ const dedupeSessionSlugs = (values: unknown[] | unknown = []): string[] => {
 const buildSessionScopeLabel = (slugIn = '', configsBySlug: Record<string, SessionRegistryConfig> = {}): string => {
   const slug = normalizeSessionSlug(slugIn);
   if (!slug) return 'General';
-  const cfg = configsBySlug[slug] || getDemoSessionConfigBySlug(slug, { allowDemoFallback: true }) || {};
+  const cfg = getStrictSessionConfigBySlug(slug) || getDemoSessionConfigBySlug(slug, { allowDemoFallback: true }) || {};
   const sessionName = String(cfg?.sessionName || '').trim();
   return sessionName && sessionName.toLowerCase() !== slug.toLowerCase()
     ? `${sessionName} (${slug})`
@@ -817,30 +817,6 @@ export const TagPageView = ({
   const effectiveSingleScopeSlug =
     effectiveScopeState.filterMode === 'set' && effectiveScopeSlugs.length === 1 ? effectiveScopeSlugs[0] : '';
   const hasSingleSessionScope = effectiveScopeState.filterMode === 'set' && effectiveScopeSlugs.length === 1;
-  const selectedSessionSelectorSlug = routePinned
-    ? normalizeSessionSlug(queryPinnedScopeSlug)
-    : localSessionOverrideTouched
-      ? normalizedLocalOverrideSlug
-      : null;
-  const registryRequestedSlugs = useMemo(
-    () =>
-      dedupeSessionSlugs([
-        globalSessionSelection.primarySessionSlug || '',
-        ...effectiveScopeSlugs,
-        selectedSessionSelectorSlug || '',
-      ]),
-    [effectiveScopeSlugs, globalSessionSelection.primarySessionSlug, selectedSessionSelectorSlug],
-  );
-  const registryChainId = network?.chainId ?? network?.id ?? null;
-  const { snapshotQuery: sessionRegistrySnapshotQuery } = useSessionRegistryReads({
-    chainId: registryChainId,
-    includeRegistryList: !isDemoCorpusContext,
-    sessionSlugs: registryRequestedSlugs,
-  });
-  const sessionRegistrySnapshot = sessionRegistrySnapshotQuery.data || {
-    slugs: [],
-    configsBySlug: {},
-  };
   const aiCacheKey = useMemo(
     () =>
       [
@@ -858,14 +834,14 @@ export const TagPageView = ({
         scopeSlugs: effectiveScopeSlugs,
         routePinned,
         localOverrideTouched: localSessionOverrideTouched,
-        sessionConfigsBySlug: sessionRegistrySnapshot.configsBySlug,
+        sessionRegistryRevision,
       }),
     [
       effectiveScopeState.filterMode,
       effectiveScopeSlugs,
       localSessionOverrideTouched,
       routePinned,
-      sessionRegistrySnapshot.configsBySlug,
+      sessionRegistryRevision,
     ],
   );
   const sessionSelectorHint = useMemo(
@@ -877,6 +853,11 @@ export const TagPageView = ({
       }),
     [globalSessionSelection, isDemoCorpusContext, localSessionOverrideTouched, routePinned],
   );
+  const selectedSessionSelectorSlug = routePinned
+    ? normalizeSessionSlug(queryPinnedScopeSlug)
+    : localSessionOverrideTouched
+      ? normalizedLocalOverrideSlug
+      : null;
   const sessionSelectorOptions = useMemo<SessionSelectorOption[]>(
     () =>
       isDemoCorpusContext
@@ -885,16 +866,14 @@ export const TagPageView = ({
             selectedSlug: selectedSessionSelectorSlug,
             primarySlug: globalSessionSelection.primarySessionSlug || '',
             scopedSlugs: effectiveScopeSlugs,
-            registrySlugs: sessionRegistrySnapshot.slugs,
-            sessionConfigsBySlug: sessionRegistrySnapshot.configsBySlug,
+            sessionRegistryRevision,
           }),
     [
       effectiveScopeSlugs,
       globalSessionSelection.primarySessionSlug,
       isDemoCorpusContext,
+      sessionRegistryRevision,
       selectedSessionSelectorSlug,
-      sessionRegistrySnapshot.configsBySlug,
-      sessionRegistrySnapshot.slugs,
     ],
   );
 

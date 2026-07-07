@@ -16,7 +16,7 @@ describe('DeferredConvictionImportanceSlider', () => {
         importanceValue={8}
         onSelectMode={onSelectMode}
         onCommit={onCommit}
-      />
+      />,
     );
 
     const slider = screen.getByRole('slider');
@@ -47,7 +47,7 @@ describe('DeferredConvictionImportanceSlider', () => {
         convictionValue={2}
         importanceValue={5}
         onSelectMode={jest.fn()}
-      />
+      />,
     );
 
     expect(screen.getByRole('button', { name: /conviction/i })).toBeInTheDocument();

@@ -212,33 +212,6 @@ describe('ToolExplorer session propagation', () => {
     expect(screen.queryByRole('button', { name: /^Exit$/i })).not.toBeInTheDocument();
   });
 
-  it('keeps the embedded Groups create panel closed after draft cache has been cleared', async () => {
-    const cachedDraft = {
-      sbtName: 'Cached Group',
-      documentUrl: 'https://doc.test/pending',
-      _sessionSlug: 'edge',
-    };
-    sessionStorage.setItem(
-      'createSbtFormCache',
-      JSON.stringify(cachedDraft)
-    );
-
-    const { unmount } = renderToolExplorer({ activeSessionSlug: 'edge' });
-
-    fireEvent.click(screen.getByText('Groups'));
-
-    expect(await screen.findByTestId('mock-sbts-page')).toHaveAttribute('data-create-open', 'true');
-    unmount();
-    sessionStorage.clear();
-
-    renderToolExplorer({ activeSessionSlug: 'edge' });
-
-    fireEvent.click(screen.getByText('Groups'));
-
-    expect(await screen.findByTestId('mock-sbts-page')).toHaveAttribute('data-create-open', 'false');
-    expect(screen.queryByRole('button', { name: /^Exit$/i })).not.toBeInTheDocument();
-  });
-
   it('builds expanded header links against PUBLIC_URL for subpath deploys', async () => {
     mutableEnv.PUBLIC_URL = '/ce/';
 

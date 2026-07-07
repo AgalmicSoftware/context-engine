@@ -1,9 +1,4 @@
-import {
-  hasAutoFlag,
-  manageAutoHashPersistence,
-  sanitizeAutoQueryForPersistence,
-  type AutoHashPersistenceDeps,
-} from './autoHashPersistence';
+import { hasAutoFlag, manageAutoHashPersistence, type AutoHashPersistenceDeps } from './autoHashPersistence';
 
 const createDeps = (overrides: Partial<AutoHashPersistenceDeps> = {}): AutoHashPersistenceDeps => ({
   getActiveSlug: () => 'alpha',

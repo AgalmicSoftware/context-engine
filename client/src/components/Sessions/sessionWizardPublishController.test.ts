@@ -78,7 +78,6 @@ describe('runSessionWizardPublishController', () => {
     await expect(
       runSessionWizardPublishController({
         input: {
-          publishAllowed: true,
           publishExecutionPlan: buildPlan({
             stepNumbers: {
               'deploy-worker': 3,
@@ -110,7 +109,6 @@ describe('runSessionWizardPublishController', () => {
     await expect(
       runSessionWizardPublishController({
         input: {
-          publishAllowed: true,
           publishExecutionPlan: buildPlan({
             shouldAutoDeployWorker: false,
             stepNumbers: {
@@ -158,7 +156,6 @@ describe('runSessionWizardPublishController', () => {
     await expect(
       runSessionWizardPublishController({
         input: {
-          publishAllowed: true,
           publishExecutionPlan: buildPlan({
             shouldDeployPendingSbts: true,
             stepNumbers: {
@@ -199,7 +196,6 @@ describe('runSessionWizardPublishController', () => {
     await expect(
       runSessionWizardPublishController({
         input: {
-          publishAllowed: true,
           publishExecutionPlan: buildPlan({
             shouldAutoDeployWorker: false,
             shouldDeployPendingSbts: true,
@@ -306,7 +302,6 @@ describe('runSessionWizardPublishController', () => {
     await expect(
       runSessionWizardPublishController({
         input: {
-          publishAllowed: true,
           publishExecutionPlan: buildPlan(),
         },
         ports: {
@@ -322,45 +317,12 @@ describe('runSessionWizardPublishController', () => {
     ).rejects.toThrow('Worker deploy failed upstream.');
   });
 
-  it('stops forced publication when required worker secrets were not confirmed remotely', async () => {
-    const persistWorkerConfig = jest.fn();
-
-    await expect(
-      runSessionWizardPublishController({
-        input: {
-          publishAllowed: true,
-          publishExecutionPlan: buildPlan({
-            shouldPersistWorkerConfig: true,
-          }),
-        },
-        ports: {
-          deployWorker: jest.fn().mockResolvedValue({
-            ok: true,
-            deployComplete: false,
-            workerUrl: 'https://deployed-worker.example',
-            requiredWorkerSecretsReady: false,
-            requiredWorkerSecretFields: ['openaiKey'],
-          }),
-          persistWorkerConfig,
-        },
-        callbacks: {
-          setPublishStep: jest.fn(),
-        },
-      }),
-    ).rejects.toThrow(
-      'Required worker secrets were not confirmed after deploy. Retry session creation to resume secret sync.',
-    );
-
-    expect(persistWorkerConfig).not.toHaveBeenCalled();
-  });
-
   it('preserves thrown deploy errors', async () => {
     const error = new Error('network refused deploy request');
 
     await expect(
       runSessionWizardPublishController({
         input: {
-          publishAllowed: true,
           publishExecutionPlan: buildPlan(),
         },
         ports: {
@@ -379,7 +341,6 @@ describe('runSessionWizardPublishController', () => {
     await expect(
       runSessionWizardPublishController({
         input: {
-          publishAllowed: true,
           publishExecutionPlan: buildPlan({
             shouldAutoDeployWorker: false,
             shouldDeployPendingSbts: true,
@@ -1147,26 +1108,6 @@ describe('resolveSessionWizardRegisterSuccessSettlementDescriptor', () => {
   });
 });
 
-describe('resolveSessionWizardWorkerPublishSuccessSettlementDescriptor', () => {
-  it('builds reload-safe session and admin links with the verified worker origin', () => {
-    expect(
-      resolveSessionWizardWorkerPublishSuccessSettlementDescriptor({
-        slug: 'worker-session',
-        sessionId: '0x00000000000000000000000000000001',
-        workerOrigin: 'https://worker.example/',
-        origin: 'https://context.example',
-      }),
-    ).toEqual({
-      formattedSessionId: '00000000-0000-0000-0000-000000000001',
-      sessionUrl: 'https://context.example/session/worker-session?worker=https%3A%2F%2Fworker.example',
-      adminUrl:
-        'https://context.example/admin?sessionId=00000000-0000-0000-0000-000000000001&sessionSlug=worker-session&worker=https%3A%2F%2Fworker.example',
-      adminUrlStatus: '',
-      nextSessionIdStatus: 'Generated a new session ID for your next session.',
-    });
-  });
-});
-
 describe('resolveSessionWizardRegisterFailureSettlementDescriptor', () => {
   it('describes transaction hash recovery and status text for register failures', () => {
     expect(
@@ -1407,7 +1348,6 @@ describe('runSessionWizardPublishCompletionController', () => {
       runSessionWizardPublishCompletionController({
         input: {
           publishExecutionPlan: buildPlan({
-            shouldDeployPendingSbts: true,
             stepNumbers: {
               done: 5,
             },
@@ -1423,7 +1363,7 @@ describe('runSessionWizardPublishCompletionController', () => {
         callbacks: {
           promoteDeployedPendingSbtSelections,
           setPublishedPendingSbtLinks,
-          replacePendingSbtDrafts,
+          clearPendingSbtDrafts,
           setPublishStep,
         },
       }),
@@ -1503,7 +1443,7 @@ describe('runSessionWizardPublishCompletionController', () => {
             throw error;
           }),
           setPublishedPendingSbtLinks,
-          replacePendingSbtDrafts,
+          clearPendingSbtDrafts,
           setPublishStep,
         },
       }),

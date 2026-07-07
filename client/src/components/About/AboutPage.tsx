@@ -17,7 +17,6 @@ import styles from './AboutPage.module.scss';
 import cipPhoto from '../../assets/img/cip_photo.png';
 import polisLogo from '../../assets/img/polis_logo.png';
 import rxcLogo from '../../assets/img/rxc_logo.png';
-import { CE_ABOUT_POSTS_ENABLED } from '../../variables/appConfig.js';
 import { PUBLIC_REPO_URL, PUBLIC_WHITEPAPER_URL } from '../../variables/publicRepoMetadata.js';
 import {
   derivePrimarySessionSlugFromList,
@@ -27,14 +26,41 @@ import {
 import { getPrimaryDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
 import { buildPublicRoute } from '../MainSite/urlUtils.js';
 
-const HEADER_LINKS = [
-  { url: PUBLIC_WHITEPAPER_URL, text: 'Whitepaper', testId: 'ce-about-link-whitepaper', external: true },
-];
+type RecognitionLink = {
+  url: string;
+  text: string;
+};
+
+type RecognitionGroup = {
+  name: string;
+  description: string;
+  links: RecognitionLink[];
+  logo?: string;
+  itemClassName?: string;
+  logoClassName?: string;
+  image?: string;
+};
+
+type RecognitionIndividual = {
+  name: string;
+  url?: string;
+};
+
+type RoadmapSection = {
+  category: string;
+  items: {
+    status: 'complete' | 'planned';
+    text: string;
+  }[];
+};
+
+const HEADER_LINKS = [{ url: PUBLIC_WHITEPAPER_URL, text: 'Whitepaper', testId: 'ce-about-link-whitepaper' }];
 
 const ABOUT_DEMO_VIDEO_VIEW_URL = 'https://drive.google.com/file/d/1nss6RZnF4yFwMFE6kjSW3ESi3ImpMcnf/view';
 const ABOUT_DEMO_VIDEO_EMBED_URL = 'https://drive.google.com/file/d/1nss6RZnF4yFwMFE6kjSW3ESi3ImpMcnf/preview';
 const ABOUT_DEMO_VIDEO_MEDIA_URL = buildPublicRoute('/about-demo.mp4');
-const ABOUT_DEMO_VIDEO_THUMBNAIL_URL = 'https://drive.google.com/thumbnail?id=1nss6RZnF4yFwMFE6kjSW3ESi3ImpMcnf&sz=w1000';
+const ABOUT_DEMO_VIDEO_THUMBNAIL_URL =
+  'https://drive.google.com/thumbnail?id=1nss6RZnF4yFwMFE6kjSW3ESi3ImpMcnf&sz=w1000';
 
 const RECOGNITION_GROUPS: RecognitionGroup[] = [
   {
@@ -67,10 +93,8 @@ const RECOGNITION_GROUPS: RecognitionGroup[] = [
     itemClassName: 'recognitionItemPolis',
     logoClassName: 'recognitionLogoPolis',
     description:
-      'Pol.is is the current SOTA for large-group discourse software, especially its vTaiwan demonstration that simple Agree / Unsure / Disagree inputs can clarify both consensus and persistent difference. Context Engine builds on that pioneering approach with more question types, optional privacy, AI-native workflows, and permanent public storage.',
-    links: [
-      { url: 'https://pol.is/', text: 'Official Website' },
-    ],
+      'Pol.is showed how large-group discourse software can clarify both consensus and persistent difference, especially in vTaiwan where simple Agree / Unsure / Disagree inputs helped structure public reasoning. Context Engine builds on that approach with more question types, optional privacy, AI-native workflows, and permanent public storage.',
+    links: [{ url: 'https://pol.is/', text: 'Official Website' }],
   },
   {
     name: 'Collective Intelligence Project',
@@ -88,10 +112,8 @@ const RECOGNITION_GROUPS: RecognitionGroup[] = [
     itemClassName: 'recognitionItemEdgePatagonia',
     logoClassName: 'recognitionLogoEdge',
     description:
-      'Residencies like the d/acc residency at Edge Patagonia (sponsored by Protocol Labs) created room to prototype tools for resilient technology, coordination, and governance in live community settings.',
-    links: [
-      { url: 'https://www.edgecity.live/patagonia', text: 'Edge City' },
-    ],
+      'Residencies like the d/acc residency at Edge Patagonia, sponsored by Protocol Labs, created space to prototype tools for resilient technology, coordination, and governance in live community settings.',
+    links: [{ url: 'https://www.edgecity.live/patagonia', text: 'Edge City' }],
   },
 ];
 

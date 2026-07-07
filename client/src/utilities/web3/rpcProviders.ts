@@ -538,9 +538,7 @@ function resolveGroupPathRpcPreference(cfg: SessionConfigLike = {}, chainId: unk
   const providerName = toLower(rpc.provider || rpc.mode || cfg?.rpcProvider || '');
   const providerIsDefault = !providerName || providerName === 'default';
   const providerIsPath = PATH_PROVIDER_KEYS.has(providerName);
-  const preferGlobal = cfg?.__CE_skipGlobalPathDefaults === true
-    ? false
-    : readPreferPathRpcFlag(id);
+  const preferGlobal = cfg?.__CE_skipGlobalPathDefaults === true ? false : readPreferPathRpcFlag(id);
   const pathDefaultUrls = dedupeRpcUrls(getPathRpcUrl(id));
   const pathOverrideUrls = resolvePathOverrideUrls(cfg, id);
   const usingCustomPathOverrides = hasCustomPathOverrides(pathOverrideUrls, pathDefaultUrls);
@@ -1003,10 +1001,8 @@ export function getReadProviderForGroup(
   }
 
   let rpcPref = resolveGroupPathRpcPreference(
-    options?.skipGlobalPathDefaults === true
-      ? { ...cfg, __CE_skipGlobalPathDefaults: true }
-      : cfg,
-    chId
+    options?.skipGlobalPathDefaults === true ? { ...cfg, __CE_skipGlobalPathDefaults: true } : cfg,
+    chId,
   );
   if (options?.skipGlobalPathDefaults === true && !rpcPref) {
     rpcPref = {
@@ -1015,15 +1011,16 @@ export function getReadProviderForGroup(
     };
   }
   if (options?.skipGlobalPreferred === true) {
-    rpcPref = rpcPref?.sessionRpcSource === 'root'
-      ? {
-        ...rpcPref,
-        skipGlobalPreferred: true,
-      }
-      : {
-        skipGlobalPreferred: true,
-        providerLabel: toStr(options.providerLabel || '') || 'default',
-      };
+    rpcPref =
+      rpcPref?.sessionRpcSource === 'root'
+        ? {
+            ...rpcPref,
+            skipGlobalPreferred: true,
+          }
+        : {
+            skipGlobalPreferred: true,
+            providerLabel: toStr(options.providerLabel || '') || 'default',
+          };
   }
   if (shouldLog('rpc', 'log')) {
     rpcLog('PROVIDER_SELECT', {

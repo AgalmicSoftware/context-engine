@@ -22,9 +22,13 @@ const renderWorkerPanel = (props: Partial<WorkerPanelProps> = {}) =>
       draft={{ corsWorkerUrl: '', slug: 'demo-session' }}
       deployWorkerUrl=""
       deployComplete={false}
+      devPersistWorkerSecrets={false}
+      persistWorkerSecrets={false}
+      setPersistWorkerSecrets={() => {}}
       workerSecretsEnabled
       setWorkerSecretsEnabled={() => {}}
       clearWorkerSecretFields={() => {}}
+      effectivePersistWorkerSecrets={false}
       workerResourceKeys={[]}
       renderResourceCard={() => null}
       workerAllowOrigins="https://app.example"

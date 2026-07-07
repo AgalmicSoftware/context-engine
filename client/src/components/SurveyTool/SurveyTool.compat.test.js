@@ -18,23 +18,23 @@ const findFirstNode = (node, predicate) => {
   return findFirstNode(node?.props?.children, predicate);
 };
 
-const findFirstNodeByType = (node, targetType) => (
-  findFirstNode(node, (candidate) => candidate?.type === targetType)
-);
+const findFirstNodeByType = (node, targetType) => findFirstNode(node, (candidate) => candidate?.type === targetType);
 
-const findLazySurveyResultsNode = (node) => (
-  findFirstNode(node, (candidate) => (
-    candidate?.type?.$$typeof === REACT_LAZY_TYPE &&
-    Object.prototype.hasOwnProperty.call(candidate.props || {}, 'isOpen')
-  ))
-);
+const findLazySurveyResultsNode = (node) =>
+  findFirstNode(
+    node,
+    (candidate) =>
+      candidate?.type?.$$typeof === REACT_LAZY_TYPE &&
+      Object.prototype.hasOwnProperty.call(candidate.props || {}, 'isOpen'),
+  );
 
-const findLazySurveyQuestionsNode = (node) => (
-  findFirstNode(node, (candidate) => (
-    candidate?.type?.$$typeof === REACT_LAZY_TYPE &&
-    Object.prototype.hasOwnProperty.call(candidate.props || {}, 'singleQuestionMode')
-  ))
-);
+const findLazySurveyQuestionsNode = (node) =>
+  findFirstNode(
+    node,
+    (candidate) =>
+      candidate?.type?.$$typeof === REACT_LAZY_TYPE &&
+      Object.prototype.hasOwnProperty.call(candidate.props || {}, 'singleQuestionMode'),
+  );
 
 describe('SurveyTool compatibility wiring', () => {
   afterEach(() => {

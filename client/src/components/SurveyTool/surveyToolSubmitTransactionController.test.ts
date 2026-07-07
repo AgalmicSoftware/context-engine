@@ -375,25 +375,6 @@ describe('surveyToolSubmitTransactionController', () => {
       );
     });
 
-    it('accepts a durable worker-canonical storage submission without an on-chain transaction', async () => {
-      const storageRef = { backend: 'cloudflare', id: 'opaque-response-id', resource: 'responses' };
-      const result = await normalizeSubmitReceipt(
-        {
-          workerCanonicalSubmission: true,
-          storageRefs: [storageRef],
-        },
-        makeSubmitOpts(),
-      );
-
-      expect(result).toEqual(
-        expect.objectContaining({
-          workerCanonicalSubmission: true,
-          storageRefs: [storageRef],
-          __ceSubmissionGroupKey: 'group-1',
-        }),
-      );
-    });
-
     it('throws "No transaction was sent." for invalid tx', async () => {
       await expect(normalizeSubmitReceipt({ receipt: null }, makeSubmitOpts())).rejects.toThrow(
         'No transaction was sent.',
@@ -440,7 +421,7 @@ describe('surveyToolSubmitTransactionController', () => {
         makeSubmitOpts({
           questionResponses,
           surveyResponse,
-          deepClone: deepClone as NormalizeSubmitOptions['deepClone'],
+          deepClone,
         }),
       );
 

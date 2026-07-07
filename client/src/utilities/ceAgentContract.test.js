@@ -26,9 +26,6 @@ describe('ceAgentContract', () => {
       'assertVisible',
       'invokeAi',
     ]);
-    expect(contract.tools.map((tool) => tool.name)).toEqual([
-      'CompareAddresses',
-      'PolisReport',
-    ]);
+    expect(contract.tools.map((tool) => tool.name)).toEqual(['CompareAddresses', 'PolisReport']);
   });
 });

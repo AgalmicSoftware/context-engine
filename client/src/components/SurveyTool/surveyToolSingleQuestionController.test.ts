@@ -17,16 +17,6 @@ const createDeferred = <T>() => {
   return { promise, resolve, reject };
 };
 
-const createDeferred = <T,>() => {
-  let resolve!: (value: T | PromiseLike<T>) => void;
-  let reject!: (reason?: unknown) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  return { promise, resolve, reject };
-};
-
 const applyStateUpdate = (stateRef: { current: Record<string, unknown> }, update: unknown) => {
   const patch =
     typeof update === 'function'

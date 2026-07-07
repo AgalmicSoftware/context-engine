@@ -105,9 +105,15 @@ describe('SurveyTool styles', () => {
 
     expect(scss).toMatch(/\.pileWrapper\s*{[\s\S]*?margin-bottom:\s*38px;/);
     expect(scss).toMatch(/\.pileSubmitButton\s*{[\s\S]*?@include finalSubmitCta\.final-submit-cta-shell\(/);
-    expect(scss).toMatch(/\.pileSubmitButtonContent\s*{[\s\S]*?@include finalSubmitCta\.final-submit-cta-content\(\$gap:\s*12px\);[\s\S]*?text-transform:\s*uppercase;/);
-    expect(scss).toMatch(/\.pileInteractionUnit\s*{[\s\S]*?--pile-desktop-submit-rail-offset:\s*42px;[\s\S]*?--pile-desktop-rail-gap:\s*24px;[\s\S]*?--pile-card-width:\s*min\(550px,\s*90vw\);[\s\S]*?display:\s*flex;[\s\S]*?position:\s*relative;[\s\S]*?width:\s*var\(--pile-card-width\);[\s\S]*?max-width:\s*90vw;/);
-    expect(scss).toMatch(/\.pileCardContainer\s*{[\s\S]*?width:\s*100%;[\s\S]*?max-width:\s*100%;[\s\S]*?position:\s*relative;/);
+    expect(scss).toMatch(
+      /\.pileSubmitButtonContent\s*{[\s\S]*?@include finalSubmitCta\.final-submit-cta-content\(\$gap:\s*12px\);[\s\S]*?text-transform:\s*uppercase;/,
+    );
+    expect(scss).toMatch(
+      /\.pileInteractionUnit\s*{[\s\S]*?--pile-desktop-submit-rail-offset:\s*42px;[\s\S]*?--pile-desktop-rail-gap:\s*24px;[\s\S]*?--pile-card-width:\s*min\(550px,\s*90vw\);[\s\S]*?display:\s*flex;[\s\S]*?position:\s*relative;[\s\S]*?width:\s*var\(--pile-card-width\);[\s\S]*?max-width:\s*90vw;/,
+    );
+    expect(scss).toMatch(
+      /\.pileCardContainer\s*{[\s\S]*?width:\s*100%;[\s\S]*?max-width:\s*100%;[\s\S]*?position:\s*relative;/,
+    );
     expect(scss).not.toMatch(/\.pileInteractionUnitWithSubmitRail\s*{/);
     expect(scss).toMatch(
       /\.pileControls\s*{[\s\S]*?position:\s*absolute;[\s\S]*?top:\s*0;[\s\S]*?right:\s*0;[\s\S]*?bottom:\s*0;[\s\S]*?left:\s*0;[\s\S]*?width:\s*100%;/,
@@ -143,28 +149,66 @@ describe('SurveyTool styles', () => {
       /@media \(min-width: 1367px\)\s*{[\s\S]*?\.pileFooter\s*{[\s\S]*?top:\s*-50px;[\s\S]*?right:\s*32px;[\s\S]*?left:\s*0;[\s\S]*?width:\s*auto;[\s\S]*?transform:\s*none;/,
     );
     expect(scss).toMatch(/@media \(max-width: 768px\)\s*{[\s\S]*?\.pileWrapper\s*{[\s\S]*?margin-bottom:\s*0;/);
-    expect(scss).toMatch(/@media \(max-width: 768px\)\s*{[\s\S]*?\.pileInteractionUnit\s*{[\s\S]*?width:\s*var\(--pile-card-width\);[\s\S]*?max-width:\s*90vw;/);
-    expect(scss).toMatch(/@media \(max-width: 768px\)\s*{[\s\S]*?\.pileControls\s*{[\s\S]*?position:\s*static;[\s\S]*?transform:\s*none;[\s\S]*?display:\s*flex;[\s\S]*?justify-content:\s*space-between;/);
-    expect(scss).toMatch(/@media \(max-width: 768px\)\s*{[\s\S]*?\.pileControls > \.pileActions,\s*\.pileControls > \.pileNav\s*{[\s\S]*?position:\s*static;[\s\S]*?transform:\s*none;/);
-    expect(scss).toMatch(/@media \(max-width: 768px\)\s*{[\s\S]*?\.pileFooter\s*{[\s\S]*?position:\s*static;[\s\S]*?transform:\s*none;[\s\S]*?justify-content:\s*center;/);
-    expect(scss).toMatch(/@media \(min-width: 481px\) and \(max-width: 768px\)\s*{[\s\S]*?\.pileControls\s*{[\s\S]*?align-items:\s*center;[\s\S]*?width:\s*100%;[\s\S]*?margin-top:\s*35px;[\s\S]*?gap:\s*20px;/);
-    expect(scss).toMatch(/@media \(min-width: 481px\) and \(max-width: 768px\)\s*{[\s\S]*?\.pileActions\s*{[\s\S]*?order:\s*1;/);
-    expect(scss).toMatch(/@media \(min-width: 481px\) and \(max-width: 768px\)\s*{[\s\S]*?\.pileActionButtonGroup\s*{[\s\S]*?flex-direction:\s*row;[\s\S]*?gap:\s*16px;/);
-    expect(scss).toMatch(/@media \(min-width: 481px\) and \(max-width: 768px\)\s*{[\s\S]*?\.pileActionsMenuEligible\s*{[\s\S]*?position:\s*relative;[\s\S]*?flex:\s*0 0 auto;[\s\S]*?overflow:\s*visible;/);
-    expect(scss).toMatch(/@media \(min-width: 481px\) and \(max-width: 768px\)\s*{[\s\S]*?\.pileActionsMenuEligible \.pileActionMenuToggle\s*{[\s\S]*?display:\s*flex;[\s\S]*?background:\s*transparent;[\s\S]*?border:\s*none;[\s\S]*?box-shadow:\s*none;/);
-    expect(scss).toMatch(/@media \(min-width: 481px\) and \(max-width: 768px\)\s*{[\s\S]*?\.pileActionsMenuEligible \.pileActionButtonGroup\s*{[\s\S]*?position:\s*absolute;[\s\S]*?top:\s*calc\(100% \+ 10px\);[\s\S]*?display:\s*none;[\s\S]*?flex-direction:\s*column;/);
-    expect(scss).toMatch(/\.pileActionsMenuEligible:focus-within \.pileActionButtonGroup,\s*[\s\S]*?\.pileActionsMenuEligible:hover \.pileActionButtonGroup\s*{[\s\S]*?display:\s*flex;/);
-    expect(scss).toMatch(/@media \(min-width: 481px\) and \(max-width: 768px\)\s*{[\s\S]*?\.pileFooter\s*{[\s\S]*?order:\s*2;[\s\S]*?flex:\s*1 1 auto;[\s\S]*?min-width:\s*0;[\s\S]*?width:\s*auto;[\s\S]*?max-width:\s*none;[\s\S]*?margin-right:\s*8px;[\s\S]*?gap:\s*12px;/);
-    expect(scss).toMatch(/@media \(min-width: 481px\) and \(max-width: 768px\)\s*{[\s\S]*?\.pileNav\s*{[\s\S]*?order:\s*3;/);
-    expect(scss).toMatch(/@media \(min-width: 481px\) and \(max-width: 768px\)\s*{[\s\S]*?\.pileFooter\s+\.pileSubmitButton\s*{[\s\S]*?flex:\s*1 1 auto;[\s\S]*?width:\s*100%;[\s\S]*?max-width:\s*none;[\s\S]*?min-width:\s*0;[\s\S]*?font-size:\s*1rem;/);
-    expect(scss).toMatch(/@media \(max-width: 480px\)\s*{[\s\S]*?\.pileControls\s*{[\s\S]*?flex-wrap:\s*wrap;[\s\S]*?justify-content:\s*space-between;/);
-    expect(scss).toMatch(/@media \(max-width: 480px\)\s*{[\s\S]*?\.pileFooter\s*{[\s\S]*?position:\s*absolute;[\s\S]*?top:\s*-52px;[\s\S]*?right:\s*20px;[\s\S]*?left:\s*10px;[\s\S]*?width:\s*auto;[\s\S]*?transform:\s*none;/);
-    expect(scss).toMatch(/@media \(max-width: 480px\)\s*{[\s\S]*?\.pileFooter\s*{[\s\S]*?gap:\s*10px;/);
-    expect(scss).toMatch(/@media \(max-width: 480px\)\s*{[\s\S]*?\.pileFooter\s+\.pileSubmitButton\s*{[\s\S]*?flex:\s*1 1 auto;[\s\S]*?width:\s*auto;/);
-    expect(scss).toMatch(/@media \(max-width: 480px\)\s*{[\s\S]*?\.pileFooter\s+\.pileSubmitButton\s*{[\s\S]*?width:\s*100%;[\s\S]*?max-width:\s*none;[\s\S]*?min-height:\s*54px;[\s\S]*?font-size:\s*1rem;[\s\S]*?border-radius:\s*var\(--ce-radius-16\);/);
-    expect(scss).toMatch(/@media \(max-width: 480px\)\s*{[\s\S]*?\.pileFooter\s+\.pileIconButton,\s*[\s\S]*?\.pileFooter\s+\.pileSubmitLink\s*{[\s\S]*?position:\s*static;[\s\S]*?transform:\s*none;[\s\S]*?flex:\s*0 0 auto;/);
-    expect(scss).toMatch(/@media \(max-width: 480px\)\s*{[\s\S]*?\.pileSubmitSuccessBadge\s*{[\s\S]*?width:\s*54px;[\s\S]*?height:\s*54px;/);
-    expect(scss).toMatch(/@media \(min-width: 769px\), \(max-width: 480px\)\s*{[\s\S]*?\.pileSubmitButtonTrail\s*{[\s\S]*?display:\s*inline-flex;/);
+    expect(scss).toMatch(
+      /@media \(max-width: 768px\)\s*{[\s\S]*?\.pileInteractionUnit\s*{[\s\S]*?width:\s*var\(--pile-card-width\);[\s\S]*?max-width:\s*90vw;/,
+    );
+    expect(scss).toMatch(
+      /@media \(max-width: 768px\)\s*{[\s\S]*?\.pileControls\s*{[\s\S]*?position:\s*static;[\s\S]*?transform:\s*none;[\s\S]*?display:\s*flex;[\s\S]*?justify-content:\s*space-between;/,
+    );
+    expect(scss).toMatch(
+      /@media \(max-width: 768px\)\s*{[\s\S]*?\.pileControls > \.pileActions,\s*\.pileControls > \.pileNav\s*{[\s\S]*?position:\s*static;[\s\S]*?transform:\s*none;/,
+    );
+    expect(scss).toMatch(
+      /@media \(max-width: 768px\)\s*{[\s\S]*?\.pileFooter\s*{[\s\S]*?position:\s*static;[\s\S]*?transform:\s*none;[\s\S]*?justify-content:\s*center;/,
+    );
+    expect(scss).toMatch(
+      /@media \(max-width: 768px\)\s*{[\s\S]*?\.pileControls\s*{[\s\S]*?align-items:\s*center;[\s\S]*?width:\s*100%;[\s\S]*?margin-top:\s*35px;[\s\S]*?gap:\s*20px;/,
+    );
+    expect(scss).toMatch(/@media \(max-width: 768px\)\s*{[\s\S]*?\.pileActions\s*{[\s\S]*?order:\s*1;/);
+    expect(scss).toMatch(
+      /@media \(max-width: 768px\)\s*{[\s\S]*?\.pileActionButtonGroup\s*{[\s\S]*?flex-direction:\s*row;[\s\S]*?gap:\s*16px;/,
+    );
+    expect(scss).toMatch(
+      /@media \(max-width: 768px\)\s*{[\s\S]*?\.pileActionsMenuEligible\s*{[\s\S]*?position:\s*relative;[\s\S]*?flex:\s*0 0 auto;[\s\S]*?overflow:\s*visible;/,
+    );
+    expect(scss).toMatch(
+      /@media \(max-width: 768px\)\s*{[\s\S]*?\.pileActionsMenuEligible \.pileActionMenuToggle\s*{[\s\S]*?display:\s*flex;[\s\S]*?background:\s*transparent;[\s\S]*?border:\s*none;[\s\S]*?box-shadow:\s*none;/,
+    );
+    expect(scss).toMatch(
+      /@media \(max-width: 768px\)\s*{[\s\S]*?\.pileActionsMenuEligible \.pileActionButtonGroup\s*{[\s\S]*?position:\s*absolute;[\s\S]*?top:\s*calc\(100% \+ 10px\);[\s\S]*?display:\s*none;[\s\S]*?flex-direction:\s*column;/,
+    );
+    expect(scss).toMatch(
+      /\.pileActionsMenuEligible:focus-within \.pileActionButtonGroup,\s*[\s\S]*?\.pileActionsMenuEligible:hover \.pileActionButtonGroup\s*{[\s\S]*?display:\s*flex;/,
+    );
+    expect(scss).toMatch(
+      /@media \(max-width: 768px\)\s*{[\s\S]*?\.pileFooter\s*{[\s\S]*?order:\s*2;[\s\S]*?flex:\s*1 1 auto;[\s\S]*?min-width:\s*0;[\s\S]*?width:\s*auto;[\s\S]*?max-width:\s*none;[\s\S]*?margin-right:\s*8px;[\s\S]*?gap:\s*12px;/,
+    );
+    expect(scss).toMatch(/@media \(max-width: 768px\)\s*{[\s\S]*?\.pileNav\s*{[\s\S]*?order:\s*3;/);
+    expect(scss).toMatch(
+      /@media \(max-width: 768px\)\s*{[\s\S]*?\.pileFooter\s+\.pileSubmitButton\s*{[\s\S]*?flex:\s*1 1 auto;[\s\S]*?width:\s*100%;[\s\S]*?max-width:\s*none;[\s\S]*?min-width:\s*0;[\s\S]*?font-size:\s*1rem;/,
+    );
+    expect(scss).not.toContain('gap: 18px 12px;');
+    expect(scss).not.toContain('top: -52px;');
+    expect(scss).not.toContain('min-height: 54px;');
+    expect(scss).toMatch(
+      /@media \(max-width: 480px\)\s*{[\s\S]*?\.pileControls\s*{[\s\S]*?gap:\s*10px;[\s\S]*?padding:\s*0 6px;/,
+    );
+    expect(scss).toMatch(
+      /@media \(max-width: 480px\)\s*{[\s\S]*?\.pileFooter\s*{[\s\S]*?flex:\s*1 1 190px;[\s\S]*?gap:\s*8px;[\s\S]*?margin-right:\s*0;/,
+    );
+    expect(scss).toMatch(
+      /@media \(max-width: 480px\)\s*{[\s\S]*?\.pileNav\s*{[\s\S]*?gap:\s*8px;[\s\S]*?padding:\s*6px 4px;/,
+    );
+    expect(scss).toMatch(
+      /@media \(max-width: 480px\)\s*{[\s\S]*?\.pileFooter\s+\.pileSubmitButton\s*{[\s\S]*?width:\s*100%;[\s\S]*?max-width:\s*none;[\s\S]*?min-width:\s*150px;[\s\S]*?min-height:\s*0;[\s\S]*?padding:\s*12px 18px;[\s\S]*?font-size:\s*1rem;[\s\S]*?border-radius:\s*var\(--ce-radius-8\);/,
+    );
+    expect(scss).toMatch(
+      /@media \(max-width: 480px\)\s*{[\s\S]*?\.pileSubmitSuccessBadge\s*{[\s\S]*?width:\s*54px;[\s\S]*?height:\s*54px;/,
+    );
+    expect(scss).toMatch(
+      /@media \(min-width: 769px\)\s*{[\s\S]*?\.pileSubmitButtonTrail\s*{[\s\S]*?display:\s*inline-flex;/,
+    );
+    expect(scss).not.toMatch(/@media \(min-width: 769px\), \(max-width: 480px\)/);
   });
 
   it('ports the recovered animLine border motion onto pile submit rails at every size', () => {

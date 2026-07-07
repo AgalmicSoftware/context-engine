@@ -12,7 +12,7 @@ import {
   getSessionConfigBySlugOrDefault,
   getSessionNetwork,
   getProviderLocation,
-} from '../../utilities/web3/chainGateway.js';
+} from '../../utilities/web3/contractScripts.js';
 import { getWorkerSessionToken, clearAllWorkerSessionTokens } from '../../utilities/worker/workerAuth.js';
 import { notify } from '../../utilities/ui/notify.js';
 import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
@@ -214,7 +214,10 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
   it('does not update local state after unmount while session restore is pending', async () => {
     let resolveRestore!: (value: string | null) => void;
     mockedPasskeyWallet.restorePasskeyWalletSession.mockImplementationOnce(
-      () => new Promise<string | null>((resolve) => { resolveRestore = resolve; })
+      () =>
+        new Promise<string | null>((resolve) => {
+          resolveRestore = resolve;
+        }),
     );
 
     const subject = new LoginAndSettingsModalSubject(buildProps());
@@ -242,10 +245,12 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     await subject.componentDidMount();
 
     expect(mockedPasskeyWallet.restorePasskeyWalletSession).toHaveBeenCalledWith({ requireSigner: false });
-    expect(props.changeAccount).toHaveBeenCalledWith(expect.objectContaining({
-      account: PASSKEY_ADDRESS,
-      provider: 'passkey_eoa',
-    }));
+    expect(props.changeAccount).toHaveBeenCalledWith(
+      expect.objectContaining({
+        account: PASSKEY_ADDRESS,
+        provider: 'passkey_eoa',
+      }),
+    );
     expect(props.updateLoginInfo).toHaveBeenCalledWith({
       loginInProgress: false,
       loginComplete: true,
@@ -256,7 +261,10 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
   it('does not let pending passkey wallet restore overwrite explicit sign-in', async () => {
     let resolveRestore!: (value: string | null) => void;
     mockedPasskeyWallet.restorePasskeyWalletSession.mockImplementationOnce(
-      () => new Promise<string | null>((resolve) => { resolveRestore = resolve; })
+      () =>
+        new Promise<string | null>((resolve) => {
+          resolveRestore = resolve;
+        }),
     );
     mockedPasskeyWallet.unlockPasskeyWallet.mockResolvedValueOnce(ALT_PASSKEY_ADDRESS);
     const props = buildProps({
@@ -271,19 +279,26 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
 
     expect(mockedPasskeyWallet.unlockPasskeyWallet).toHaveBeenCalledTimes(1);
     expect(props.changeAccount).toHaveBeenCalledTimes(1);
-    expect(props.changeAccount).toHaveBeenCalledWith(expect.objectContaining({
-      account: ALT_PASSKEY_ADDRESS,
-      provider: 'passkey_eoa',
-    }));
-    expect(props.changeAccount).not.toHaveBeenCalledWith(expect.objectContaining({
-      account: PASSKEY_ADDRESS,
-    }));
+    expect(props.changeAccount).toHaveBeenCalledWith(
+      expect.objectContaining({
+        account: ALT_PASSKEY_ADDRESS,
+        provider: 'passkey_eoa',
+      }),
+    );
+    expect(props.changeAccount).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        account: PASSKEY_ADDRESS,
+      }),
+    );
   });
 
   it('does not let stale passkey wallet sign-in completion overwrite logout', async () => {
     let resolveLogin!: (value: string) => void;
     mockedPasskeyWallet.unlockPasskeyWallet.mockImplementationOnce(
-      () => new Promise<string>((resolve) => { resolveLogin = resolve; })
+      () =>
+        new Promise<string>((resolve) => {
+          resolveLogin = resolve;
+        }),
     );
     const props = buildProps({
       provider: 'none',
@@ -313,7 +328,10 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
   it('does not let stale passkey wallet sign-in completion overwrite a Wagmi login', async () => {
     let resolveLogin!: (value: string) => void;
     mockedPasskeyWallet.unlockPasskeyWallet.mockImplementationOnce(
-      () => new Promise<string>((resolve) => { resolveLogin = resolve; })
+      () =>
+        new Promise<string>((resolve) => {
+          resolveLogin = resolve;
+        }),
     );
     const props = buildProps({
       account: '',
@@ -334,14 +352,18 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
 
     expect(mockedPasskeyWallet.unlockPasskeyWallet).toHaveBeenCalledTimes(1);
     expect(props.changeAccount).toHaveBeenCalledTimes(1);
-    expect(props.changeAccount).toHaveBeenCalledWith(expect.objectContaining({
-      account: WAGMI_ADDRESS,
-      provider: 'wagmi',
-    }));
-    expect(props.changeAccount).not.toHaveBeenCalledWith(expect.objectContaining({
-      account: ALT_PASSKEY_ADDRESS,
-      provider: 'passkey_eoa',
-    }));
+    expect(props.changeAccount).toHaveBeenCalledWith(
+      expect.objectContaining({
+        account: WAGMI_ADDRESS,
+        provider: 'wagmi',
+      }),
+    );
+    expect(props.changeAccount).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        account: ALT_PASSKEY_ADDRESS,
+        provider: 'passkey_eoa',
+      }),
+    );
     expect(props.updateLoginInfo).toHaveBeenLastCalledWith({
       loginInProgress: false,
       loginComplete: true,
@@ -681,10 +703,12 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
   });
 
   it('does not set wagmi disconnect flag when logging out passkey wallet', async () => {
-    const subject = new LoginAndSettingsModalSubject(buildProps({
-      provider: 'passkey_eoa',
-      wagmiDisconnect: jest.fn(),
-    }));
+    const subject = new LoginAndSettingsModalSubject(
+      buildProps({
+        provider: 'passkey_eoa',
+        wagmiDisconnect: jest.fn(),
+      }),
+    );
 
     await subject.handleLogout();
 
@@ -703,10 +727,12 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
 
     expect(clearAllWorkerSessionTokens).toHaveBeenCalledTimes(1);
     expect(mockedNotify.info).toHaveBeenCalledWith('Passkey account switched.');
-    expect(props.changeAccount).toHaveBeenCalledWith(expect.objectContaining({
-      account: ALT_PASSKEY_ADDRESS,
-      provider: 'passkey_eoa',
-    }));
+    expect(props.changeAccount).toHaveBeenCalledWith(
+      expect.objectContaining({
+        account: ALT_PASSKEY_ADDRESS,
+        provider: 'passkey_eoa',
+      }),
+    );
     expect(props.updateLoginInfo).toHaveBeenCalledWith({
       loginInProgress: false,
       loginComplete: true,
@@ -715,7 +741,6 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
   });
 
   it('uses wagmi balance props for faucet checks without Redux balance state', async () => {
-    enableRegistryFundingForAllSessions();
     const subject = mountClassSubject(
       new LoginAndSettingsModalSubject(
         buildProps({
@@ -737,13 +762,17 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
   });
 
   it('does not repeat automatic faucet sends for the same low-balance context', async () => {
-    const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps({
-      account: WAGMI_ADDRESS,
-      activeSessionSlug: 'edge',
-      loginComplete: true,
-      provider: 'wagmi',
-      wagmiBalance: { data: { value: 0n } },
-    })));
+    const subject = mountClassSubject(
+      new LoginAndSettingsModalSubject(
+        buildProps({
+          account: WAGMI_ADDRESS,
+          activeSessionSlug: 'edge',
+          loginComplete: true,
+          provider: 'wagmi',
+          wagmiBalance: { data: { value: 0n } },
+        }),
+      ),
+    );
     subject.autoSendTestFunds = jest.fn();
     subject.loadAiSettings = jest.fn();
     subject.loadResourceKeys = jest.fn();
@@ -836,20 +865,24 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
   });
 
   it('uses the active session chain for faucet requests even when the wallet is on another chain', async () => {
-    mockedGetSessionNetwork.mockImplementation((slug: string) => (
+    mockedGetSessionNetwork.mockImplementation((slug: string) =>
       slug === 'demo-1'
         ? { id: 11155420, chainId: 11155420, name: 'OP Sepolia' }
-        : { id: 84532, chainId: 84532, name: 'Base Sepolia' }
-    ));
-    const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps({
-      account: WAGMI_ADDRESS,
-      loginComplete: true,
-      provider: 'wagmi',
-      activeSessionSlug: 'demo-1',
-      network: { id: 84532, chainId: 84532, name: 'Base Sepolia' },
-      wagmiNetwork: { id: 84532, chainId: 84532, name: 'Base Sepolia' },
-      wagmiBalance: { data: { value: 0n } },
-    })));
+        : { id: 84532, chainId: 84532, name: 'Base Sepolia' },
+    );
+    const subject = mountClassSubject(
+      new LoginAndSettingsModalSubject(
+        buildProps({
+          account: WAGMI_ADDRESS,
+          loginComplete: true,
+          provider: 'wagmi',
+          activeSessionSlug: 'demo-1',
+          network: { id: 84532, chainId: 84532, name: 'Base Sepolia' },
+          wagmiNetwork: { id: 84532, chainId: 84532, name: 'Base Sepolia' },
+          wagmiBalance: { data: { value: 0n } },
+        }),
+      ),
+    );
 
     await subject.checkAndSendTestFundsIfNeeded();
 
@@ -863,12 +896,11 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
           chainId: 11155420,
           walletChainId: 84532,
         }),
-      })
+      }),
     );
   });
 
   it('preserves the zero-balance state when auto-funding is disabled', async () => {
-    enableRegistryFundingForAllSessions();
     const subject = mountClassSubject(
       new LoginAndSettingsModalSubject(
         buildProps({
@@ -912,11 +944,15 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
       this.getBalance = getBalance;
     } as any);
 
-    const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps({
-      account: PASSKEY_ADDRESS,
-      loginComplete: true,
-      provider: 'passkey_eoa',
-    })));
+    const subject = mountClassSubject(
+      new LoginAndSettingsModalSubject(
+        buildProps({
+          account: PASSKEY_ADDRESS,
+          loginComplete: true,
+          provider: 'passkey_eoa',
+        }),
+      ),
+    );
     subject.autoSendTestFunds = jest.fn();
 
     await subject.checkAndSendTestFundsIfNeeded();
@@ -928,11 +964,15 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
   });
 
   it('triggers passkey faucet checks after a successful balance sync', async () => {
-    const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps({
-      account: PASSKEY_ADDRESS,
-      loginComplete: true,
-      provider: 'passkey_eoa',
-    })));
+    const subject = mountClassSubject(
+      new LoginAndSettingsModalSubject(
+        buildProps({
+          account: PASSKEY_ADDRESS,
+          loginComplete: true,
+          provider: 'passkey_eoa',
+        }),
+      ),
+    );
     subject.autoSendTestFunds = jest.fn();
     subject.syncWalletBalance = jest.fn(async () => ({
       balance: ethers.BigNumber.from(0),
@@ -1098,11 +1138,15 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
   it('ignores stale balance reads after the active wallet changes', async () => {
     enableRegistryFundingForAllSessions();
     let resolveBalance!: (value: any) => void;
-    const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps({
-      account: PASSKEY_ADDRESS,
-      loginComplete: true,
-      provider: 'passkey_eoa',
-    })));
+    const subject = mountClassSubject(
+      new LoginAndSettingsModalSubject(
+        buildProps({
+          account: PASSKEY_ADDRESS,
+          loginComplete: true,
+          provider: 'passkey_eoa',
+        }),
+      ),
+    );
     subject.autoSendTestFunds = jest.fn();
     subject.readWalletBalance = jest.fn(
       () =>
@@ -1331,79 +1375,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     let sponsoredKeys: any = {
       ai: { encrypted: true },
     };
-    mockedGetSessionConfigBySlugOrDefault.mockImplementation((slug: any) => (
-      String(slug || '') === 'edge'
-        ? {
-          slug: 'edge',
-          sessionName: 'Edge 2025',
-          sponsoredKeys,
-        }
-        : {}
-    ));
-
-    const subject = new LoginAndSettingsModalSubject(buildProps({
-      activeSessionSlug: 'edge',
-    }));
-
-    expect(subject.getSponsoredSessionSources({ activeSlug: 'edge' }).byResource.rpc).toEqual([]);
-
-    sponsoredKeys = {
-      ...sponsoredKeys,
-      rpc: { encrypted: true },
-    };
-
-    expect(subject.getSponsoredSessionSources({ activeSlug: 'edge' }).byResource.rpc).toEqual([
-      expect.objectContaining({
-        slug: 'edge',
-        sponsoredKeys: expect.objectContaining({
-          rpc: expect.objectContaining({ encrypted: true }),
-        }),
-      }),
-    ]);
-  });
-
-  it('refreshes settings overview sponsorship cards when sponsored keys change without slug churn', () => {
-    mockedGetAllSessionSlugs.mockReturnValue(['edge']);
-    let sponsoredKeys: any = {
-      ai: { encrypted: true },
-    };
-    mockedGetSessionConfigBySlugOrDefault.mockImplementation((slug: any) => (
-      String(slug || '') === 'edge'
-        ? {
-          slug: 'edge',
-          sessionName: 'Edge 2025',
-          sponsoredKeys,
-        }
-        : {}
-    ));
-
-    const subject = new LoginAndSettingsModalSubject(buildProps({
-      activeSessionSlug: 'edge',
-      loginComplete: true,
-    }));
-
-    expect(subject.getSettingsOverviewContext().sponsorSessions.byResource.rpc).toEqual([]);
-
-    sponsoredKeys = {
-      ...sponsoredKeys,
-      rpc: { encrypted: true },
-    };
-
-    expect(subject.getSettingsOverviewContext().sponsorSessions.byResource.rpc).toEqual([
-      expect.objectContaining({
-        slug: 'edge',
-        sponsoredKeys: expect.objectContaining({
-          rpc: expect.objectContaining({ encrypted: true }),
-        }),
-      }),
-    ]);
-  });
-
-  it('uses demo-session sponsored keys for display-only active-session config when strict config is missing', () => {
-    mockedGetSessionConfigBySlugOrDefault.mockImplementation((slug: any) => (
-      String(slug || '') === '' ? {} : null
-    ));
-    mockedGetDemoSessionConfigBySlug.mockImplementation((slug: any) => (
+    mockedGetSessionConfigBySlugOrDefault.mockImplementation((slug: any) =>
       String(slug || '') === 'edge'
         ? {
             slug: 'edge',
@@ -1434,37 +1406,6 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
         }),
       }),
     ]);
-  });
-
-  it('uses active worker presence when registry sponsorship flags are stale', () => {
-    mockedGetAllSessionSlugs.mockReturnValue(['demo-1']);
-    mockedGetSessionConfigBySlugOrDefault.mockImplementation((slug: any) =>
-      String(slug || '') === 'demo-1'
-        ? {
-            slug: 'demo-1',
-            sessionName: 'demo 1',
-            sponsoredKeys: { faucet: true },
-          }
-        : {},
-    );
-
-    const subject = new LoginAndSettingsModalSubject(
-      buildProps({
-        activeSessionSlug: 'demo-1',
-      }),
-    );
-    subject.state.workerResourcePresence = {
-      ai: true,
-      arweave: true,
-      rpc: true,
-      txGas: true,
-    };
-
-    const sources = subject.getSponsoredSessionSources({ activeSlug: 'demo-1' });
-    expect(sources.byResource.ai[0]).toEqual(expect.objectContaining({ slug: 'demo-1', isActive: true }));
-    expect(sources.byResource.arweave[0]).toEqual(expect.objectContaining({ slug: 'demo-1', isActive: true }));
-    expect(sources.byResource.rpc[0]).toEqual(expect.objectContaining({ slug: 'demo-1', isActive: true }));
-    expect(sources.byResource.txGas[0]).toEqual(expect.objectContaining({ slug: 'demo-1', isActive: true }));
   });
 
   it('refreshes settings overview sponsorship cards when sponsored keys change without slug churn', () => {

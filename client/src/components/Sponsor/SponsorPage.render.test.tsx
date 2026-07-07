@@ -386,13 +386,12 @@ describe('SponsorPage', () => {
   });
 
   it('uploads an encrypted sponsored bundle and renders a share URL with tx query plus hash key', async () => {
-    getFetchMock().mockImplementation((url: any) => Promise.resolve(
-      String(url).endsWith('/auth/nonce')
-        ? { ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) }
-        : String(url).endsWith('/admin/issue-sponsored-grants')
-          ? {
-              ok: true,
-              json: async () => ({
+    getFetchMock().mockImplementation((url: any) =>
+      Promise.resolve(
+        String(url).endsWith('/auth/nonce')
+          ? { ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) }
+          : String(url).endsWith('/admin/issue-sponsored-grants')
+            ? {
                 ok: true,
                 json: async () => ({
                   ok: true,
@@ -463,31 +462,18 @@ describe('SponsorPage', () => {
     expect(JSON.stringify(envelope)).not.toContain('https://rpc.example.test');
     expect(JSON.stringify(envelope)).not.toContain('cf-live-token');
     expect(JSON.stringify(envelope)).not.toContain('0xsponsoredfaucet');
-    expect(mockEncryptWithPassword).toHaveBeenCalledWith(expect.objectContaining({
-      openaiKey: 'sk-live-openai',
-      arweaveJwk: '{"kty":"RSA"}',
-      faucetPrivateKey: '0xsponsoredfaucet',
-      customRpcUrl: 'https://rpc.example.test',
-      litApiBase: 'https://api.chipotle.litprotocol.com',
-      litGroupId: 'group_123',
-      litPkpId: 'pkp_123',
-      litActionCid: 'bafy123',
-      litAccountApiKey: 'lit-account-secret',
-      litUsageApiKey: 'lit-secret',
-      bootstrapWorkerUrl: 'https://worker.example.test',
-      deployGrantToken: 'deploy-grant-token',
-      faucetGrantToken: 'faucet-grant-token',
-      meta: expect.objectContaining({
-        sourceSessionSlug: 'edge',
-        sourceWorkerUrl: 'https://worker.example.test',
-      }),
-    }), expect.any(String));
-    expect(mockEncryptWithPassword.mock.calls[0][0]).not.toHaveProperty('cloudflareApiToken');
-    const grantCall = getFetchMock().mock.calls.find(([url]: any[]) => String(url).endsWith('/admin/issue-sponsored-grants'));
-    expect(grantCall).toBeTruthy();
-    expect(JSON.parse(grantCall[1].body)).toEqual(expect.objectContaining({
-      sessionSlug: 'edge',
-      grantRequest: {
+    expect(mockEncryptWithPassword).toHaveBeenCalledWith(
+      expect.objectContaining({
+        openaiKey: 'sk-live-openai',
+        arweaveJwk: '{"kty":"RSA"}',
+        faucetPrivateKey: '0xsponsoredfaucet',
+        customRpcUrl: 'https://rpc.example.test',
+        litApiBase: 'https://api.chipotle.litprotocol.com',
+        litGroupId: 'group_123',
+        litPkpId: 'pkp_123',
+        litActionCid: 'bafy123',
+        litAccountApiKey: 'lit-account-secret',
+        litUsageApiKey: 'lit-secret',
         bootstrapWorkerUrl: 'https://worker.example.test',
         deployGrantToken: 'deploy-grant-token',
         faucetGrantToken: 'faucet-grant-token',
@@ -623,16 +609,19 @@ describe('SponsorPage', () => {
   it('does not apply stale create completions after the selected session changes', async () => {
     sessionEntries = [
       ['edge', buildSessionConfig()],
-      ['other', buildSessionConfig({
-        slug: 'other',
-        sessionName: 'Other Session',
-        __registry: {
-          sessionIdHex: '0xother-session-id',
-          adminAddress: ADMIN_ADDRESS,
-          registryChainId: 84532,
-          chainId: 84532,
-        },
-      })],
+      [
+        'other',
+        buildSessionConfig({
+          slug: 'other',
+          sessionName: 'Other Session',
+          __registry: {
+            sessionIdHex: '0xother-session-id',
+            adminAddress: ADMIN_ADDRESS,
+            registryChainId: 84532,
+            chainId: 84532,
+          },
+        }),
+      ],
     ];
     const uploadDeferred = createDeferred<string>();
     mockUploadDataToArweave.mockReturnValueOnce(uploadDeferred.promise);
@@ -686,15 +675,17 @@ describe('SponsorPage', () => {
       expect(mockUploadDataToArweave).toHaveBeenCalledTimes(1);
     });
 
-    sessionEntries = [[
-      'edge',
-      buildSessionConfig({
-        sessionName: 'Edge Session Refresh',
-        __registry: {
-          sessionIdHex: '0xedge-session-id-refreshed',
-        },
-      }),
-    ]];
+    sessionEntries = [
+      [
+        'edge',
+        buildSessionConfig({
+          sessionName: 'Edge Session Refresh',
+          __registry: {
+            sessionIdHex: '0xedge-session-id-refreshed',
+          },
+        }),
+      ],
+    ];
     await act(async () => {
       window.dispatchEvent(new Event(SESSION_REGISTRY_CACHE_UPDATED_EVENT));
       await Promise.resolve();
@@ -729,13 +720,15 @@ describe('SponsorPage', () => {
     });
 
     const cached = JSON.parse(localStorage.getItem('ce:sponsorPageDraft:v1') || '{}');
-    expect(cached).toEqual(expect.objectContaining({
-      persistBundleDraft: true,
-      persistBundleSecrets: false,
-      bundleForm: expect.objectContaining({
-        label: 'Repeatable sponsor bundle',
+    expect(cached).toEqual(
+      expect.objectContaining({
+        persistBundleDraft: true,
+        persistBundleSecrets: false,
+        bundleForm: expect.objectContaining({
+          label: 'Repeatable sponsor bundle',
+        }),
       }),
-    }));
+    );
     expect(JSON.stringify(cached)).not.toContain('sk-repeat-openai');
     expect(JSON.stringify(cached)).not.toContain('cf-repeat-token');
 
@@ -749,19 +742,42 @@ describe('SponsorPage', () => {
     expect(getFieldInputByLabel('Cloudflare API token')).toHaveValue('');
   });
 
+  it('drops expired sponsor draft expiry values during restore', async () => {
+    localStorage.setItem(
+      'ce:sponsorPageDraft:v1',
+      JSON.stringify({
+        v: 1,
+        persistBundleDraft: true,
+        bundleForm: {
+          label: 'Expired sponsor bundle',
+        },
+        expiresAt: '2000-01-01T00:00:00.000Z',
+      }),
+    );
+
+    await renderSponsorPage();
+
+    expect(await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('edge');
+    expect(getFieldInputByLabel('Label')).toHaveValue('Expired sponsor bundle');
+    expect(screen.getByTestId('ce-sponsor-expiry-input')).toHaveValue('');
+  });
+
   it('redacts legacy sponsor draft caches that contain raw secrets', async () => {
-    localStorage.setItem('ce:sponsorPageDraft:v1', JSON.stringify({
-      v: 1,
-      persistBundleSecrets: true,
-      bundleForm: {
-        label: 'Legacy cached bundle',
-        openaiKey: 'sk-legacy-openai',
-        cloudflareApiToken: 'cf-legacy-token',
-        customRpcUrl: 'https://rpc.example.test/secret',
-        arweaveJwk: '{"kty":"RSA","d":"secret"}',
-        faucetPrivateKey: '0xlegacyfaucet',
-      },
-    }));
+    localStorage.setItem(
+      'ce:sponsorPageDraft:v1',
+      JSON.stringify({
+        v: 1,
+        persistBundleSecrets: true,
+        bundleForm: {
+          label: 'Legacy cached bundle',
+          openaiKey: 'sk-legacy-openai',
+          cloudflareApiToken: 'cf-legacy-token',
+          customRpcUrl: 'https://rpc.example.test/secret',
+          arweaveJwk: '{"kty":"RSA","d":"secret"}',
+          faucetPrivateKey: '0xlegacyfaucet',
+        },
+      }),
+    );
 
     await renderSponsorPage();
 

@@ -1,6 +1,6 @@
-@use "sass:color";
-@use "scss/finalSubmitCta" as finalSubmitCta;
-@use "scss/variables" as tokens;
+@use 'sass:color';
+@use 'scss/finalSubmitCta' as finalSubmitCta;
+@use 'scss/variables' as tokens;
 
 /* --- Variables (Ported from SBTPage/UserPage) --- */
 $user-page-background: tokens.$ce-panel-bg;
@@ -1770,7 +1770,6 @@ $placeholder-color: rgba(255, 255, 255, 0.5);
   @include tokenInfoNarrowLayout;
 
   .createGroupExpanded {
-
     .fieldSectionHeader,
     .settingRow,
     .distributionCheckboxRow,

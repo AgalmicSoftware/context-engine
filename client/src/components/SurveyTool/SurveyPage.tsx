@@ -2,7 +2,7 @@
 
 import React, { Component } from 'react';
 
-import SurveyTool from "components/SurveyTool/SurveyTool";
+import SurveyTool from 'components/SurveyTool/SurveyTool';
 
 import styles from './SurveyPage.module.scss';
 
@@ -113,10 +113,13 @@ class SurveyComponent extends Component<SurveyPageProps> {
             refreshQuestionMetadata={this.props.refreshQuestionMetadata}
             refreshQuestionResponses={this.props.refreshQuestionResponses}
 
-              /* ---- reactivity nonce ---- */
-              questionResponsesNonce={this.props.questionResponsesNonce}
-              questionScanProgress={this.props.questionScanProgress}
-              questionPool={this.props.questionPool}
+            /* ---- org/session customisation ---- */
+            defaultTags={this.props.defaultTags}
+            defaultFilterState={this.props.defaultFilterState}
+            sessionInfo={this.props.sessionInfo}
+            sessionName={this.props.sessionName}
+            defaultFeaturedSBTs={this.props.defaultFeaturedSBTs}
+            onViewAllClick={this.props.onViewAllClick}
 
             hideEmbeddedDebugUi={this.props.hideEmbeddedDebugUi}
             onResultsModalClose={this.props.onResultsModalClose}

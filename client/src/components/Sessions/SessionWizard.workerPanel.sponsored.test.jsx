@@ -107,8 +107,8 @@ describe('SessionWizard worker panel rendering', () => {
     });
 
     try {
-      window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id');
-      sessionStorage.setItem(
+      window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id#k=sponsor-secret');
+      localStorage.setItem(
         'ce:sessionWizardDraft:v1',
         JSON.stringify({
           draft: {
@@ -285,8 +285,8 @@ describe('SessionWizard worker panel rendering', () => {
     });
 
     try {
-      window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id');
-      sessionStorage.setItem(
+      window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id#k=sponsor-secret');
+      localStorage.setItem(
         'ce:sessionWizardDraft:v1',
         JSON.stringify({
           draft: {
@@ -447,8 +447,8 @@ describe('SessionWizard worker panel rendering', () => {
     });
 
     try {
-      window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id');
-      sessionStorage.setItem(
+      window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id#k=sponsor-secret');
+      localStorage.setItem(
         'ce:sessionWizardDraft:v1',
         JSON.stringify({
           draft: {

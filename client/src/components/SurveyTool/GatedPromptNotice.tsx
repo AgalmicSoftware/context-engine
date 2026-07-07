@@ -14,6 +14,18 @@ type GatedPromptNoticeProps = {
   suffix?: string;
 };
 
+export const resolveGatedPromptLockIconStyle = (): React.CSSProperties => ({
+  marginRight: 8,
+});
+
+export const buildGatedPromptTooltipIconClassName = ({
+  baseClassName = '',
+  tooltipClassName = '',
+}: {
+  baseClassName?: unknown;
+  tooltipClassName?: unknown;
+} = {}): string => [String(baseClassName || ''), String(tooltipClassName || '')].filter(Boolean).join(' ');
+
 const GatedPromptNotice = ({
   questionId = '',
   tooltipId,
@@ -26,7 +38,9 @@ const GatedPromptNotice = ({
     className={styles.gatedPromptNotice}
     role="note"
     data-testid={E2E_TESTIDS.SURVEY_GATED_PROMPT_NOTICE}
-    data-ce-question-id={String(questionId || '').trim().toLowerCase()}
+    data-ce-question-id={String(questionId || '')
+      .trim()
+      .toLowerCase()}
   >
     <FontAwesomeIcon icon={faLock} style={resolveGatedPromptLockIconStyle()} />
     <span className={styles.gatedPromptNoticeText}>
@@ -45,6 +59,32 @@ const GatedPromptNotice = ({
       </span>
       {`. ${suffix}`}
     </span>
+    {typeof onAction === 'function' && (
+      <button
+        type="button"
+        className={styles.gatedPromptNoticeActionButton}
+        data-testid={actionTestId}
+        data-ce-question-id={String(questionId || '')
+          .trim()
+          .toLowerCase()}
+        disabled={actionDisabled}
+        aria-busy={actionBusy}
+        title={actionTitle}
+        onClick={(event) => {
+          event.stopPropagation();
+          onAction();
+        }}
+      >
+        {actionBusy ? (
+          <span className={styles.maskedPromptLoading}>
+            <FontAwesomeIcon icon={faSpinner} spin className={styles.maskedPromptLoadingSpinner} />
+            <span>Decrypting...</span>
+          </span>
+        ) : (
+          actionLabel
+        )}
+      </button>
+    )}
     <CETooltip
       placement="right"
       trigger="hover focus click"

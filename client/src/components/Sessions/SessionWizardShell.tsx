@@ -412,7 +412,7 @@ const SessionWizardShell = ({
   );
 
   if (showSessionModeProfileGate) {
-    return <div className={styles.groupWizard}>{header}</div>;
+    return <div className={styles.groupWizard}>{sessionModeProfileControl}</div>;
   }
 
     {sessionModeProfileControl}
@@ -464,8 +464,6 @@ const SessionWizardShell = ({
             addEncryptionGate={addEncryptionGate}
             pendingSbtDrafts={pendingSbtDrafts}
             removePendingSbtDraft={removePendingSbtDraft}
-            isWorkerCanonical={isWorkerCanonical}
-            showOnChainGateControls={showOnChainGateControls}
           />
         )}
 
@@ -505,9 +503,13 @@ const SessionWizardShell = ({
             draft={draft}
             deployWorkerUrl={deployWorkerUrl}
             deployComplete={deployComplete}
+            devPersistWorkerSecrets={devPersistWorkerSecrets}
+            persistWorkerSecrets={persistWorkerSecrets}
+            setPersistWorkerSecrets={setPersistWorkerSecrets}
             workerSecretsEnabled={workerSecretsEnabled}
             setWorkerSecretsEnabled={setWorkerSecretsEnabled}
             clearWorkerSecretFields={clearWorkerSecretFields}
+            effectivePersistWorkerSecrets={effectivePersistWorkerSecrets}
             workerResourceKeys={visibleWorkerResourceKeys}
             renderResourceCard={renderResourceCard}
             workerAllowOrigins={workerAllowOrigins}
@@ -551,9 +553,6 @@ const SessionWizardShell = ({
             displayedWorkerUrl={displayedWorkerUrl}
             renderField={renderField}
             workerUrlAutoFilled={workerUrlAutoFilled}
-            sessionModeProfileWorkerControl={isNormalMode ? null : sessionModeProfileWorkerControl}
-            onNativeWorkerVerified={onNativeWorkerVerified}
-            verifyNativeWorker={verifyNativeWorker}
           />
         )}
 
@@ -562,7 +561,6 @@ const SessionWizardShell = ({
           isNormalMode={isNormalMode}
           onToggleCollapsed={() => toggleSection('publish')}
           normalModePublishSummary={normalModePublishSummary}
-          onCreateAnotherSession={onCreateAnotherSession}
           onPublish={onPublish}
           onTogglePublishAdvanced={() => onTogglePublishAdvanced()}
           showSponsoredBundleFallbackInput={showSponsoredBundleFallbackInput}
@@ -577,7 +575,6 @@ const SessionWizardShell = ({
           localWorkerBundleFallbackFilePath={localWorkerBundleFallbackFilePath}
           sponsoredManualBundleRetryMessage={sponsoredManualBundleRetryMessage}
           publishUiPlan={publishUiPlan}
-          publishSettingsCapabilities={publishSettingsCapabilities}
           renderInfoTooltip={renderSessionWizardInfoTooltip}
           resolvedWorkerBaseUrl={resolvedWorkerBaseUrl}
           workerUrlSource={workerUrlSource}
@@ -599,7 +596,6 @@ const SessionWizardShell = ({
           onCopyAdminUrl={handleCopyAdminUrl}
           adminUrlStatus={adminUrlStatus}
           status={status}
-          sessionModeProfilePublishControl={isNormalMode ? null : sessionModeProfilePublishControl}
         />
 
         <SessionWizardModals

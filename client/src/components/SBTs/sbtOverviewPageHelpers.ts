@@ -195,10 +195,7 @@ export const hasSBTsPageCacheFeaturedCardImageMetadata = (infoInput: unknown): b
     info.imageLocked === true ||
     !!info.imageEncrypted ||
     !!info.encryptedImage ||
-    !!(
-      isSBTsPageRecord(info.encryptedFields) &&
-      info.encryptedFields.image
-    )
+    !!(isSBTsPageRecord(info.encryptedFields) && info.encryptedFields.image)
   );
 };
 
@@ -353,16 +350,12 @@ export const hasSBTsPageAuthoritativeSessionSlug = (obj: unknown): boolean => {
   return obj.sessionSlugExplicit === true || !hasExplicitFlag;
 };
 
-export const hasSBTsPageExplicitSessionSlug = (obj: unknown): boolean => (
-  hasSBTsPageOwn(obj, 'sessionSlug') &&
-  (obj as SBTsPageUnknownRecord).sessionSlugExplicit === true
-);
+export const hasSBTsPageExplicitSessionSlug = (obj: unknown): boolean =>
+  hasSBTsPageOwn(obj, 'sessionSlug') && (obj as SBTsPageUnknownRecord).sessionSlugExplicit === true;
 
 export const resolveSBTsPageFeaturedSbtSessionSlug = (
   sbt: unknown,
-  {
-    requireExplicitSessionSlug = false,
-  }: ResolveSBTsPageFeaturedSbtSessionSlugOptions = {}
+  { requireExplicitSessionSlug = false }: ResolveSBTsPageFeaturedSbtSessionSlugOptions = {},
 ): string | null => {
   const sbtRecord = asSBTsPageFeaturedSbt(sbt);
   if (!sbtRecord) return null;

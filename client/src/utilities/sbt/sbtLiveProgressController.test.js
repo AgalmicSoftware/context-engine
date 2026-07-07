@@ -3,10 +3,7 @@ jest.mock('../web3/chainGateway.js', () => ({
   normalizeSessionSlug: jest.fn((s) => String(s || '')),
 }));
 
-const {
-  buildSbtCountsInitialProgress,
-  createSbtLiveProgressController,
-} = require('./sbtLiveProgressController.js');
+const { buildSbtCountsInitialProgress, createSbtLiveProgressController } = require('./sbtLiveProgressController.js');
 const { normalizeSessionSlug } = require('../web3/contractScripts.js');
 
 const createStateHost = () => {
@@ -134,19 +131,23 @@ describe('createSbtLiveProgressController', () => {
 
 describe('buildSbtCountsInitialProgress', () => {
   it('returns null when the resumed scan already covers the target block', () => {
-    expect(buildSbtCountsInitialProgress({
-      startBlock: 10,
-      toBlock: 12,
-      seedBlock: 12,
-    })).toBeNull();
+    expect(
+      buildSbtCountsInitialProgress({
+        startBlock: 10,
+        toBlock: 12,
+        seedBlock: 12,
+      }),
+    ).toBeNull();
   });
 
   it('builds a pre-scan progress payload when no blocks have been scanned', () => {
-    expect(buildSbtCountsInitialProgress({
-      startBlock: 10,
-      toBlock: 12,
-      seedBlock: 9,
-    })).toEqual({
+    expect(
+      buildSbtCountsInitialProgress({
+        startBlock: 10,
+        toBlock: 12,
+        seedBlock: 9,
+      }),
+    ).toEqual({
       phase: 'activity',
       fromBlock: 10,
       toBlock: 12,
@@ -161,11 +162,13 @@ describe('buildSbtCountsInitialProgress', () => {
   });
 
   it('builds a partial progress payload from a checkpoint seed block', () => {
-    expect(buildSbtCountsInitialProgress({
-      startBlock: 10,
-      toBlock: 14,
-      seedBlock: 12,
-    })).toEqual({
+    expect(
+      buildSbtCountsInitialProgress({
+        startBlock: 10,
+        toBlock: 14,
+        seedBlock: 12,
+      }),
+    ).toEqual({
       phase: 'activity',
       fromBlock: 10,
       toBlock: 14,
@@ -180,10 +183,12 @@ describe('buildSbtCountsInitialProgress', () => {
   });
 
   it('rejects non-finite block inputs', () => {
-    expect(buildSbtCountsInitialProgress({
-      startBlock: 'bad',
-      toBlock: 14,
-      seedBlock: 12,
-    })).toBeNull();
+    expect(
+      buildSbtCountsInitialProgress({
+        startBlock: 'bad',
+        toBlock: 14,
+        seedBlock: 12,
+      }),
+    ).toBeNull();
   });
 });

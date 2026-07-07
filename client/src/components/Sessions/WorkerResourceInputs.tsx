@@ -73,41 +73,6 @@ const WorkerResourceInputs = ({
     );
   };
 
-  const renderGenericField = (field: ResourceSecretField) => {
-    const value = toStr(workerSecrets[field.key]);
-    const label = `${field.label}${field.required ? ' *' : ''}`;
-    const isTextarea = field.type === 'textarea';
-    const placeholder = (
-      resourceKey === 'rpc' &&
-      field.key === 'customRpcUrl' &&
-      !toStr(value).trim()
-    )
-      ? (effectiveDefaultWorkerRpcUrl || field.placeholder || '')
-      : (field.placeholder || '');
-
-    return (
-      <FormGroup key={field.key} className={`${styles.resourceInput} ${!isTextarea ? styles.inlineLabelInput : ''}`}>
-        <Label>{label}</Label>
-        <Input
-          type={isTextarea ? 'textarea' : field.type}
-          rows={isTextarea ? field.rows || 3 : undefined}
-          value={value}
-          placeholder={placeholder}
-          onChange={(e) => onUpdateSecret(field.key, e.target.value)}
-          disabled={!workerSecretsEnabled}
-          required={workerSecretsEnabled && field.required}
-          readOnly={field.readOnly}
-          data-testid={buildSecretFieldTestId(field.key)}
-        />
-        {!isNormalMode && field.key === 'faucetPrivateKey' && showSponsoredFaucetNotice && (
-          <div className={styles.helperText}>
-            Faucet funding is currently provided by the sponsored bundle. Enter a private key here to override it.
-          </div>
-        )}
-      </FormGroup>
-    );
-  };
-
   if (!fields.length) {
     return null;
   }
@@ -122,9 +87,7 @@ const WorkerResourceInputs = ({
 
     return (
       <div className={styles.resourceFields}>
-        <div className={styles.resourceInputGrid}>
-          {renderGenericField(litAccountField)}
-        </div>
+        <div className={styles.resourceInputGrid}>{renderGenericField(litAccountField)}</div>
         <div className={styles.helperText}>
           {/* Worker deploy derives the Lit group, PKP, and CE action from this key when needed. */}
         </div>
@@ -132,11 +95,7 @@ const WorkerResourceInputs = ({
     );
   }
 
-  return (
-    <div className={styles.resourceInputGrid}>
-      {fields.map(renderGenericField)}
-    </div>
-  );
+  return <div className={styles.resourceInputGrid}>{fields.map(renderGenericField)}</div>;
 };
 
 export default WorkerResourceInputs;

@@ -151,9 +151,11 @@ describe('riskMatrixCommentContext', () => {
 
     expect(citations).toHaveLength(1);
     expect(citations[0]).toMatch(/^@PalisadeAI — .*o3 model sabotaged a shutdown mechanism/i);
-    expect(citationItems).toEqual([{
-      label: expect.stringMatching(/^@PalisadeAI — .*o3 model sabotaged a shutdown mechanism/i),
-      url: 'https://x.com/PalisadeAI/status/1926084635903025621',
-    }]);
+    expect(citationItems).toEqual([
+      {
+        label: expect.stringMatching(/^@PalisadeAI — .*o3 model sabotaged a shutdown mechanism/i),
+        url: 'https://x.com/PalisadeAI/status/1926084635903025621',
+      },
+    ]);
   });
 });

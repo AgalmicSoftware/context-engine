@@ -1,44 +1,34 @@
-import SurveyTool from './SurveyTool';
-import {
-  computeSubmitLabel,
-  doesQuestionProgressMatchSlug,
-  normalizeSurveyToolFilterState,
-  shouldShowPileFullLoadingState,
-  buildSurveyDraftSemanticSignature,
-} from './surveyToolUtils.js';
-import { SurveyQuestions } from './SurveyQuestions';
-import { PileViewMode } from './SurveyPileViewMode';
-import { QuestionsDashboard } from './SurveySelector';
-import DeferredRatingSlider from './DeferredRatingSlider';
-import FullQuestionRatingInput from './FullQuestionRatingInput';
-import SurveyQuestionTagControl from './SurveyQuestionTagControl';
-import { DeferredCommitSlider } from './DeferredCommitSlider';
-import { QuestionFilter as RawQuestionFilter } from './QuestionFilter';
-import TagModal from '../TagPage/TagModal';
-import GatedPromptNotice from './GatedPromptNotice';
-import styles from './SurveyTool.module.scss';
-import { renderToStaticMarkup } from 'react-dom/server';
-import contractScripts, * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
-import * as portoFunctions from '../../utilities/web3/portoFunctions.js';
-import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
-import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
-import * as sbtDisplayNameUtils from '../../utilities/sbt/sbtDisplayNames.js';
-import * as sponsoredAccess from '../../utilities/web3/sponsoredAccess.js';
-import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
-import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import React from 'react';
+import { render, screen } from '@testing-library/react';
+
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
+import { isTargetedSbtMetadataLookupEnabled } from '../../utilities/sbt/sbtDisplayNames.js';
+import { resolveQuestionPayloadDisplayState } from '../../utilities/survey/questionRouting.js';
 import { t } from '../../utilities/ui/terminology.js';
+import GatedPromptNotice from './GatedPromptNotice';
+import QuestionTagDropdown, { buildTagHref, getQuestionTagDisplayList } from './QuestionTagDropdown';
+import SurveyQuestionTagControl from './SurveyQuestionTagControl';
+import { renderSurveyQuestionsFullQuestionGatedPromptCard } from './SurveyQuestionsFullQuestionGatedPromptCard';
+import { renderPileActiveQuestionCard, renderPileGatedPromptCard } from './surveyPileActiveQuestionCard';
 import {
-  countElements,
-  findElement,
-  findFirstNodeByType,
-  findNodeByClassName,
-  getElementChildren,
-  nodeHasClassName,
-  treeHasDataTestId,
-  treeHasLabel,
-  treeHasText,
-} from './surveyToolTreeTestHelpers.js';
+  buildInitialSurveyResponseQuestionIds,
+  buildRenderedQuestionIdsFromPileWindow,
+  buildRenderedQuestionIdsFromQuestionPools,
+  readRenderedQuestionIds,
+} from './surveyQuestionScope';
+import {
+  buildLockedQuestionGateDetailsFromPool,
+  collectGateSbtAddressesForHydrationFromSources,
+} from './surveyQuestionGateDetails';
+import { resolveCurrentTagSessionSlug } from './surveyToolScope';
+import { buildGatedPromptNoticeState, buildQuestionPromptDecryptDisplayState } from './surveyToolViewState';
+import { buildInitializedSurveyResponseState } from './surveyToolHydrationFlow';
+import { buildNormalizedRenderedQuestionIds } from './surveyToolHydrationFlow';
+import {
+  buildActiveTagModalState,
+  buildGateSbtNameRevisionState,
+  buildSurveyQuestionsLayoutDisplayState,
+} from './surveyQuestionsTypes';
 
 const createDeferred = () => {
   let resolve;
@@ -76,13 +66,28 @@ describe('SurveyTool locked-question tags', () => {
   });
   it('builds locked-question gate details with SBT links', () => {
     const gateSbt = '0x1111111111111111111111111111111111111111';
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 84532 },
+
+    const details = buildLockedQuestionGateDetailsFromPool({
+      hiddenMaskedQuestionIds: ['q1'],
+      pool: [
+        {
+          id: 'q1',
+          prompt: '[encrypted]',
+          promptDecrypted: false,
+          sessionSlug: 'alpha',
+          encryption: {
+            enabled: true,
+            gates: [{ label: 'VIP Gate', sbtAddress: gateSbt }],
+          },
+        },
+      ],
+      slug: 'alpha',
+      getQuestionEncryptionGates,
+      resolveSbtGateLabel: () => 'VIP SBT',
+      getShortenedAddress,
+      buildSbtDetailPath,
+      getChecksumAddress: (address) => address,
+      translate: t,
     });
 
     subject.state = {
@@ -115,13 +120,34 @@ describe('SurveyTool locked-question tags', () => {
 
   it('prefers configured gate labels in locked-question details', () => {
     const gateSbt = '0x3333333333333333333333333333333333333333';
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 84532 },
+
+    const details = buildLockedQuestionGateDetailsFromPool({
+      hiddenMaskedQuestionIds: ['q2'],
+      pool: [
+        {
+          id: 'q2',
+          prompt: '[encrypted]',
+          promptDecrypted: false,
+          encryption: {
+            enabled: true,
+            gates: [
+              {
+                gateId: 'vip_access',
+                label: 'default gate',
+                resourceKey: 'questionResponses',
+                sbtAddress: gateSbt,
+              },
+            ],
+          },
+        },
+      ],
+      getQuestionEncryptionGates,
+      resolveConfiguredGateLabel: () => 'Configured VIP Gate',
+      resolveSbtGateLabel: () => 'VIP SBT',
+      getShortenedAddress,
+      buildSbtDetailPath,
+      getChecksumAddress: (address) => address,
+      translate: t,
     });
 
     subject.state = {
@@ -154,13 +180,38 @@ describe('SurveyTool locked-question tags', () => {
 
   it('prefers allQuestionsForFilter when it has richer locked-question gate metadata', () => {
     const gateSbt = '0x5555555555555555555555555555555555555555';
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 84532 },
+    const questionPool = [
+      {
+        id: 'q-rich',
+        prompt: '[encrypted]',
+        promptDecrypted: false,
+        encryption: {
+          enabled: true,
+          gates: [],
+        },
+      },
+    ];
+    const allQuestionsForFilter = [
+      {
+        id: 'q-rich',
+        prompt: '[encrypted]',
+        promptDecrypted: false,
+        encryption: {
+          enabled: true,
+          gates: [{ label: 'Registry questionResponses gate', sbtAddress: gateSbt }],
+        },
+      },
+    ];
+
+    const details = buildLockedQuestionGateDetailsFromPool({
+      hiddenMaskedQuestionIds: ['q-rich'],
+      pool: allQuestionsForFilter.length ? allQuestionsForFilter : questionPool,
+      getQuestionEncryptionGates,
+      resolveSbtGateLabel: () => 'Filter Gate SBT',
+      getShortenedAddress,
+      buildSbtDetailPath,
+      getChecksumAddress: (address) => address,
+      translate: t,
     });
 
     subject.state = {
@@ -299,11 +350,8 @@ describe('SurveyTool locked-question tags', () => {
       loginComplete: true,
       network: { id: 84532 },
     });
-    subject.state = {
-      ...subject.state,
-      decryptingByKey: {},
-    };
-    subject.handleReloadMaskedPrompt = jest.fn();
+    const onAction = jest.fn();
+    const action = promptState.canReloadPrompt ? () => onAction(promptState.qid) : undefined;
 
     const tree = subject.renderGatedPromptNotice({
       question: { id: 'Q1', prompt: '[encrypted]' },
@@ -380,7 +428,93 @@ describe('SurveyTool locked-question tags', () => {
   });
 
   it('wires SurveyQuestionTagControl into full question cards when tags are present', () => {
-    const subject = new SurveyQuestions({
+    const onTagSelect = jest.fn();
+    const control = SurveyQuestionTagControl({
+      tags: ['governance'],
+      sessionSlug: 'edge',
+      useTagModal: true,
+      onTagSelect,
+    });
+
+    expect(control).toBeTruthy();
+    expect(control.type).toBe(QuestionTagDropdown);
+    expect(control.props.tags).toEqual(['governance']);
+    expect(control.props.sessionSlug).toBe('edge');
+    expect(control.props.onTagSelect).toBe(onTagSelect);
+  });
+
+  it('applies the row layout style when rendering full-question tag dropdown rows', () => {
+    const rowStyle = { display: 'flex', justifyContent: 'flex-end' };
+    const control = SurveyQuestionTagControl({
+      tags: ['governance'],
+      sessionSlug: 'edge',
+      useTagModal: true,
+      rowStyle,
+    });
+
+    expect(control).toBeTruthy();
+    expect(control.type).toBe('div');
+    expect(control.props.style).toBe(rowStyle);
+    expect(control.props.children.type).toBe(QuestionTagDropdown);
+  });
+
+  it('keeps gated notice and tag controls on masked full-question cards', () => {
+    const noticeState = buildGatedPromptNoticeState({
+      questionId: 'q1',
+      tooltipIdSuffix: 'full',
+      gateNames: ['Gate A'],
+      sbtLabel: t('sbt'),
+      gateLabel: t('gate'),
+      gatesLabel: t('gates'),
+    });
+
+    render(
+      <>
+        {renderSurveyQuestionsFullQuestionGatedPromptCard({
+          promptContent: <span>Encrypted prompt</span>,
+          gatedPromptNotice: (
+            <GatedPromptNotice
+              questionId="q1"
+              tooltipId={noticeState.tooltipId}
+              tooltipText={noticeState.tooltipText}
+            />
+          ),
+          tagDropdownRow: <div data-testid="tag-row">#governance</div>,
+        })}
+      </>,
+    );
+
+    expect(screen.getByText('Encrypted prompt')).toBeInTheDocument();
+    expect(screen.getByText('gated')).toBeInTheDocument();
+    expect(noticeState.tooltipText).toBe(`Required ${t('sbt')} ${t('gate')}: Gate A`);
+    expect(screen.getByTestId('tag-row')).toHaveTextContent('#governance');
+  });
+
+  it('renders gated notice and omits tag controls on masked pile cards', () => {
+    render(
+      <>
+        {renderPileGatedPromptCard({
+          promptHeader: <span>Encrypted prompt</span>,
+          gatedPromptNotice: (
+            <GatedPromptNotice
+              questionId="q1"
+              tooltipId="gated-prompt-q1-pile"
+              tooltipText={`Required ${t('sbt')} ${t('gate')}: Gate A`}
+            />
+          ),
+        })}
+      </>,
+    );
+
+    expect(screen.getByText('Encrypted prompt')).toBeInTheDocument();
+    expect(screen.getByText('gated')).toBeInTheDocument();
+    expect(screen.queryByTestId('tag-row')).not.toBeInTheDocument();
+  });
+
+  it('opens the shared tag modal from full-question tag dropdown selections', () => {
+    const activeTagState = buildActiveTagModalState(' governance ');
+    const layout = buildSurveyQuestionsLayoutDisplayState({
+      activeTagModalTag: activeTagState.activeTagModalTag,
       singleQuestionMode: false,
       isStandalone: false,
       surveyIndex: 0,
@@ -426,85 +560,31 @@ describe('SurveyTool locked-question tags', () => {
       (node) => node?.type === SurveyQuestionTagControl
     );
 
-    expect(dropdown).toBeTruthy();
-    expect(dropdown.props.tags).toEqual(['governance']);
-    expect(dropdown.props.useTagModal).toBe(true);
-    expect(typeof dropdown.props.onTagSelect).toBe('function');
+    expect(
+      findElement(tree, (node) => React.isValidElement(node) && node.type === SurveyQuestionTagControl),
+    ).toBeNull();
+    // port note: dropped direct PileViewMode render traversal; pile card helpers expose no tag-control slot.
   });
 
-  it('applies the row layout style when rendering full-question tag dropdown rows', () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 84532 },
+  it('retries gate label hydration for same signature after a transient miss', () => {
+    const gateSbt = '0x4444444444444444444444444444444444444444';
+    const addresses = collectGateSbtAddressesForHydrationFromSources({
+      policy: {},
+      questionPools: [
+        [
+          {
+            id: 'q1',
+            encryption: { gates: [{ sbtAddress: gateSbt }] },
+          },
+        ],
+      ],
+      getQuestionEncryptionGates,
+      isAddress: (value) => /^0x[0-9a-fA-F]{40}$/.test(value),
+      getAddress: (value) => value,
     });
-
-    subject._getEffectiveDraftSlug = () => 'edge';
-
-    const dropdown = subject.renderQuestionTagDropdownRow({
-      id: 'q1',
-      prompt: 'Question prompt',
-      tags: ['governance'],
-    });
-
-    expect(dropdown).toBeTruthy();
-    expect(dropdown.props.rowStyle).toBeTruthy();
-    expect(dropdown.props.rowStyle.display).toBe('flex');
-  });
-
-  it('keeps gated notice and tag controls on masked full-question cards', () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 84532 },
-    });
-
-    subject.state = {
-      ...subject.state,
-      decryptionNonce: 0,
-      isLoadingResponse: false,
-      bookmarkedQuestions: new Set(),
-      decryptingByKey: {},
-      isSubmitting: false,
-      autoDecryptEnabled: false,
-      showComments: {},
-      sliderToggleExpandedByQuestion: {},
-      surveysResponseState: [{
-        answers: {},
-        additionalComments: {},
-        importance: {},
-        conviction: {},
-      }],
-    };
-    subject.handleBookmarkToggle = jest.fn();
-    subject._getEffectiveDraftSlug = () => 'edge';
-    subject.resolveGatedPromptGateNames = jest.fn(() => ['Gate A']);
-
-    const tree = subject.renderQuestion(
-      {
-        id: 'q1',
-        type: 'freeform',
-        prompt: '[encrypted]',
-        promptDecrypted: false,
-        tags: ['governance'],
-      },
-      0,
-      subject.state.surveysResponseState[0]
-    );
-    const dropdown = findElement(
-      tree,
-      (node) => node?.type === SurveyQuestionTagControl
-    );
-    const gatedNotice = findElement(
-      tree,
-      (node) => node?.type === GatedPromptNotice
-    );
+    const signature = `edge|84532|${addresses.join(',')}`;
+    const firstHits = [];
+    const secondHits = [{ address: gateSbt, name: 'Recovered Name' }];
 
     expect(gatedNotice).toBeTruthy();
     expect(gatedNotice.props.tooltipText).toBe(`Required ${t('sbt')} ${t('gate')}: Gate A`);
@@ -815,13 +895,19 @@ describe('SurveyTool locked-question tags', () => {
       network: { id: 1 },
     });
 
-    subject.getCurrentRenderedQuestionIds = jest.fn(() => ['Q1', 'q1', '', 'q2']);
-
-    expect(subject.getHydrationQuestionIds()).toEqual(['q1', 'q2']);
-    expect(subject.getCurrentRenderedQuestionIds).toHaveBeenCalledTimes(1);
-
-    expect(subject.getRenderedQuestionIdsForResponseHydration()).toEqual(['q1', 'q2']);
-    expect(subject.getCurrentRenderedQuestionIds).toHaveBeenCalledTimes(2);
+    expect(
+      readRenderedQuestionIds({
+        getRenderedQuestionIds,
+        normalizeRenderedIds: buildNormalizedRenderedQuestionIds,
+      }),
+    ).toEqual(['q1', 'q2']);
+    expect(
+      readRenderedQuestionIds({
+        getRenderedQuestionIds,
+        normalizeRenderedIds: buildNormalizedRenderedQuestionIds,
+      }),
+    ).toEqual(['q1', 'q2']);
+    expect(getRenderedQuestionIds).toHaveBeenCalledTimes(2);
   });
 
   it('initializes standalone response state from prop question ids before rendered-id lookup', () => {
@@ -846,41 +932,23 @@ describe('SurveyTool locked-question tags', () => {
   });
 
   it('memoizes pile rendered question ids until the active pile window changes', () => {
-    const subject = new PileViewMode({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 1 },
-    });
+    const pileQuestions = [{ id: 'q1' }, { id: 'q2' }, { id: 'q3' }, { id: 'q4' }, { id: 'q5' }, { id: 'q6' }];
 
-    subject.state = {
-      ...subject.state,
-      activePileIndex: 2,
-      pileQuestions: [
-        { id: 'q1' },
-        { id: 'q2' },
-        { id: 'q3' },
-        { id: 'q4' },
-        { id: 'q5' },
-        { id: 'q6' },
-      ],
-    };
-
-    const first = subject.getCurrentRenderedQuestionIds();
-    const second = subject.getCurrentRenderedQuestionIds();
-    expect(second).toBe(first);
-    expect(second).toEqual(['q1', 'q2', 'q3', 'q4', 'q5']);
-
-    subject.state = {
-      ...subject.state,
-      activePileIndex: 4,
-    };
-    const third = subject.getCurrentRenderedQuestionIds();
-    expect(third).not.toBe(second);
-    expect(third).toEqual(['q3', 'q4', 'q5', 'q6']);
+    expect(
+      buildRenderedQuestionIdsFromPileWindow({
+        pileQuestions,
+        activePileIndex: 2,
+      }),
+    ).toEqual(['q1', 'q2', 'q3', 'q4', 'q5']);
+    expect(
+      buildRenderedQuestionIdsFromPileWindow({
+        pileQuestions,
+        activePileIndex: 4,
+      }),
+    ).toEqual(['q3', 'q4', 'q5', 'q6']);
+    // port note: object-identity memoization is class-private; the extracted helper pins active-window id selection.
   });
-
-
 });
+
+const shouldScheduleGateHydrationRetry = (hits = []) =>
+  isTargetedSbtMetadataLookupEnabled() && (!Array.isArray(hits) || hits.length === 0);

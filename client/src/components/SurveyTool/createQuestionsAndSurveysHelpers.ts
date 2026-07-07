@@ -1,7 +1,4 @@
-import {
-  resolveSponsoredGateStateForResource,
-  SPONSORED_GATE_STATES,
-} from '../../utilities/web3/sponsoredAccess.js';
+import { resolveSponsoredGateStateForResource, SPONSORED_GATE_STATES } from '../../utilities/web3/sponsoredAccess.js';
 
 type UnknownRecord = Record<string, unknown>;
 type QuestionSelectionInput = {
@@ -201,11 +198,8 @@ const AUTHORING_GATE_RESOURCE_LABELS: Record<string, string> = Object.freeze({
   surveyResponses: 'survey',
 });
 
-const isPlainRecord = (value: unknown): value is UnknownRecord => (
-  !!value &&
-  typeof value === 'object' &&
-  !Array.isArray(value)
-);
+const isPlainRecord = (value: unknown): value is UnknownRecord =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
 const normalizeCreateSurveyUploadedQuestions = (
   uploadedQuestions: unknown,
@@ -448,7 +442,7 @@ export const buildCreateSurveyGateObjectsAndRecipients = ({
   normalizeKnownGateIds = normalizeGateIds,
   resolveLitChain = ({ litChain }) => litChain || null,
 }: BuildCreateSurveyGateObjectsAndRecipientsArgs = {}) => {
-  const safeGateMap = (gateMap && typeof gateMap === 'object') ? gateMap : {};
+  const safeGateMap = gateMap && typeof gateMap === 'object' ? gateMap : {};
   const gateIds = normalizeKnownGateIds(gateIdsIn);
   const gates: UnknownRecord[] = [];
   const recipients: CreateSurveyGateRecipient[] = [];
@@ -462,12 +456,9 @@ export const buildCreateSurveyGateObjectsAndRecipients = ({
     const fallbackChainId = Number(chainIdFallback || 0) || null;
     const chainId = Number(gate.chainId || fallbackChainId || 0) || fallbackChainId;
     const litChain = resolveLitChain({ chainId, litChain: gate.litChain });
-    const sbtAddresses = Array.from(new Set(
-      [
-        ...(Array.isArray(gate.sbtAddresses) ? gate.sbtAddresses : []),
-        gate.sbtAddress,
-      ].filter(Boolean)
-    )) as string[];
+    const sbtAddresses = Array.from(
+      new Set([...(Array.isArray(gate.sbtAddresses) ? gate.sbtAddresses : []), gate.sbtAddress].filter(Boolean)),
+    ) as string[];
     if (!sbtAddresses.length) return;
 
     const mode = gate.mode || 'any';
@@ -505,7 +496,7 @@ export const buildCreateSurveyGateObjectsAndRecipients = ({
   return { gates, recipients };
 };
 
-export const findFirstBlankQuestionPromptIndex = (questions: unknown = []): number => (
+export const findFirstBlankQuestionPromptIndex = (questions: unknown = []): number =>
   (Array.isArray(questions) ? questions : []).findIndex((question) => {
     const questionRecord = question && typeof question === 'object' ? (question as QuestionPromptInput) : null;
     return String(questionRecord?.prompt || '').trim() === '';
@@ -854,13 +845,12 @@ export const buildCreateSurveySubmitGatePlan = ({
   questions = [],
   surveyLockGateIds = [],
 }: CreateSurveySubmitGatePlanArgs = {}) => {
-  const safeGateMap = (gateMap && typeof gateMap === 'object') ? gateMap : {};
+  const safeGateMap = gateMap && typeof gateMap === 'object' ? gateMap : {};
   const knownGateIds = new Set(Object.keys(safeGateMap));
-  const normalizeKnownGateIds = (value: unknown): string[] => (
-    normalizeGateIds(value).filter((gateId): gateId is string => (
-      typeof gateId === 'string' && knownGateIds.has(gateId)
-    ))
-  );
+  const normalizeKnownGateIds = (value: unknown): string[] =>
+    normalizeGateIds(value).filter(
+      (gateId): gateId is string => typeof gateId === 'string' && knownGateIds.has(gateId),
+    );
 
   const defaultSubmitGateIds = defaultGateId ? normalizeKnownGateIds([defaultGateId]) : [];
   const applyDefaultSubmitGateIds = (value: unknown): string[] => {
@@ -874,28 +864,21 @@ export const buildCreateSurveySubmitGatePlan = ({
     return defaultSubmitGateIds;
   };
 
-  const resolvedSurveyLockGateIds = !isStandaloneQuestion
-    ? applyDefaultSubmitGateIds(surveyLockGateIds)
-    : [];
+  const resolvedSurveyLockGateIds = !isStandaloneQuestion ? applyDefaultSubmitGateIds(surveyLockGateIds) : [];
 
-  const resolveQuestionSubmitGateIds = (
-    question?: CreateSurveySubmitGatePlanQuestion | null
-  ): string[] => {
+  const resolveQuestionSubmitGateIds = (question?: CreateSurveySubmitGatePlanQuestion | null): string[] => {
     if (!question) return [];
-    if (isStandaloneQuestion) return applyStandaloneQuestionGateIds(question.lockGateIds);
+    if (isStandaloneQuestion) return applyStandaloneQuestionGateIds(question.lockGateIds, question.lockGateIdsTouched);
     const hasOwnLock = Object.prototype.hasOwnProperty.call(question || {}, 'lockGateIds');
     if (!hasOwnLock || question.lockGateIds === null) return resolvedSurveyLockGateIds;
     return applyDefaultSubmitGateIds(question.lockGateIds);
   };
 
-  const questionNeedsEncryption = (
-    question?: CreateSurveySubmitGatePlanQuestion | null
-  ): boolean => resolveQuestionSubmitGateIds(question).length > 0;
+  const questionNeedsEncryption = (question?: CreateSurveySubmitGatePlanQuestion | null): boolean =>
+    resolveQuestionSubmitGateIds(question).length > 0;
 
-  const needsLit = (
-    resolvedSurveyLockGateIds.length > 0 ||
-    (Array.isArray(questions) ? questions : []).some(questionNeedsEncryption)
-  );
+  const needsLit =
+    resolvedSurveyLockGateIds.length > 0 || (Array.isArray(questions) ? questions : []).some(questionNeedsEncryption);
 
   return {
     knownGateIds,
@@ -919,37 +902,36 @@ export const buildCreateSurveyGateOptions = ({
   const sponsored = isPlainRecord(cfg.sponsored) ? cfg.sponsored : {};
   const fullEncryptionGateMap = isPlainRecord(encryption.gates) ? encryption.gates : null;
   const fullSponsoredGateMap = isPlainRecord(sponsored.gates) ? sponsored.gates : null;
-  const fullGateMap: CreateSurveyGateMap = ((fullEncryptionGateMap && Object.keys(fullEncryptionGateMap).length)
-    ? fullEncryptionGateMap
-    : (fullSponsoredGateMap && Object.keys(fullSponsoredGateMap).length ? fullSponsoredGateMap : {})) as CreateSurveyGateMap;
+  const fullGateMap: CreateSurveyGateMap = (
+    fullEncryptionGateMap && Object.keys(fullEncryptionGateMap).length
+      ? fullEncryptionGateMap
+      : fullSponsoredGateMap && Object.keys(fullSponsoredGateMap).length
+        ? fullSponsoredGateMap
+        : {}
+  ) as CreateSurveyGateMap;
   const primaryResource = isStandaloneQuestion ? 'questionResponses' : 'surveyResponses';
   const sessionLabel = normalizeGateText(sessionLabelIn) || 'session';
   const relevantGates: CreateSurveyGateDefinition[] = [];
   const seenGateIds = new Set<string>();
   const seenGateKeys = new Set<string>();
 
-  const pushRelevantGate = (
-    seedGate: CreateSurveyGateDefinition | null = null,
-    resourceKey: unknown = ''
-  ) => {
+  const pushRelevantGate = (seedGate: CreateSurveyGateDefinition | null = null, resourceKey: unknown = '') => {
     if (!seedGate || typeof seedGate !== 'object') return;
 
-    const candidateIds = [
-      seedGate.gateId,
-      seedGate.id,
-    ]
+    const candidateIds = [seedGate.gateId, seedGate.id]
       .map((value: unknown) => normalizeGateText(value))
       .filter((gateId): gateId is string => Boolean(gateId));
     const seedAddresses = normalizeAddressList([
       ...(Array.isArray(seedGate.sbtAddresses) ? seedGate.sbtAddresses : []),
       seedGate.sbtAddress,
     ]);
-    const seedAddressKey = seedAddresses.map((address: string) => address.toLowerCase()).sort().join('|');
+    const seedAddressKey = seedAddresses
+      .map((address: string) => address.toLowerCase())
+      .sort()
+      .join('|');
 
     let resolvedGateId = candidateIds[0] || '';
-    let resolvedGate: CreateSurveyGateDefinition | null = resolvedGateId
-      ? fullGateMap?.[resolvedGateId] || null
-      : null;
+    let resolvedGate: CreateSurveyGateDefinition | null = resolvedGateId ? fullGateMap?.[resolvedGateId] || null : null;
 
     if (!resolvedGate && seedAddressKey) {
       Object.entries(fullGateMap || {}).some(([gateId, gate]) => {
@@ -957,7 +939,10 @@ export const buildCreateSurveyGateOptions = ({
           ...(Array.isArray(gate?.sbtAddresses) ? gate.sbtAddresses : []),
           gate?.sbtAddress,
         ]);
-        const gateAddressKey = gateAddresses.map((address: string) => address.toLowerCase()).sort().join('|');
+        const gateAddressKey = gateAddresses
+          .map((address: string) => address.toLowerCase())
+          .sort()
+          .join('|');
         if (!gateAddressKey || gateAddressKey !== seedAddressKey) return false;
         resolvedGateId = normalizeGateText(gateId);
         resolvedGate = gate;
@@ -1006,22 +991,18 @@ export const buildCreateSurveyGateOptions = ({
 
   if (!relevantGates.length) {
     const resources = isPlainRecord(sponsored.resources)
-      ? sponsored.resources as Record<string, UnknownRecord | undefined>
+      ? (sponsored.resources as Record<string, UnknownRecord | undefined>)
       : {};
-    const primaryResourceCfg = (
+    const primaryResourceCfg =
       resources?.[primaryResource] &&
       typeof resources[primaryResource] === 'object' &&
       !Array.isArray(resources[primaryResource])
-    )
-      ? resources[primaryResource]
-      : {};
-    const defaultResourceCfg = (
-      resources?.default &&
-      typeof resources.default === 'object' &&
-      !Array.isArray(resources.default)
-    )
-      ? resources.default
-      : {};
+        ? resources[primaryResource]
+        : {};
+    const defaultResourceCfg =
+      resources?.default && typeof resources.default === 'object' && !Array.isArray(resources.default)
+        ? resources.default
+        : {};
     const fallbackIds = [
       ...(Array.isArray(primaryResourceCfg?.gateIds) ? primaryResourceCfg.gateIds : []),
       primaryResourceCfg?.gateId,
@@ -1043,7 +1024,9 @@ export const buildCreateSurveyGateOptions = ({
     if (!gateId) return;
     gateMap[gateId] = gate;
   });
-  const gateIds = Object.keys(gateMap || {}).filter(Boolean).sort();
+  const gateIds = Object.keys(gateMap || {})
+    .filter(Boolean)
+    .sort();
   const multipleGateOptions = gateIds.length > 1;
   const gateOptions = gateIds.map((gateId: string): CreateSurveyGateOption => {
     const gate: CreateSurveyGateDefinition = gateMap[gateId] || {};
@@ -1052,17 +1035,10 @@ export const buildCreateSurveyGateOptions = ({
       ...(Array.isArray(gate.sbtAddresses) ? gate.sbtAddresses : []),
       gate.sbtAddress,
     ]);
-    const mode = String(
-      gate.mode ||
-      gate.operator ||
-      gate.gateMode ||
-      (gate.requireAll === true ? 'all' : '')
-    ).trim();
+    const mode = String(gate.mode || gate.operator || gate.gateMode || (gate.requireAll === true ? 'all' : '')).trim();
     const resourceKey = normalizeGateText(gate.resourceKey) || primaryResource;
     const resourceLabel = AUTHORING_GATE_RESOURCE_LABELS[resourceKey] || resourceKey;
-    const displayLabel = multipleGateOptions
-      ? `${sessionLabel} (${resourceLabel})`
-      : sessionLabel;
+    const displayLabel = multipleGateOptions ? `${sessionLabel} (${resourceLabel})` : sessionLabel;
     return {
       id: gateId,
       label: displayLabel,
@@ -1083,15 +1059,16 @@ export const buildCreateSurveyGateOptions = ({
       : '',
     !primaryExplicitOpen
       ? normalizeGateText(
-        resolveSponsoredGateStateForResource(cfg, 'default')?.gate?.gateId ||
-        resolveSponsoredGateStateForResource(cfg, 'default')?.gate?.id
-      )
+          resolveSponsoredGateStateForResource(cfg, 'default')?.gate?.gateId ||
+            resolveSponsoredGateStateForResource(cfg, 'default')?.gate?.id,
+        )
       : '',
     gateOptions[0]?.id,
   ]
     .map((val: unknown) => normalizeGateText(val))
     .filter((gateId): gateId is string => Boolean(gateId));
-  const defaultGateId = candidateDefaults.find((gateId: string) => gateIds.includes(gateId)) || (gateOptions[0]?.id || '');
+  const defaultGateId =
+    candidateDefaults.find((gateId: string) => gateIds.includes(gateId)) || gateOptions[0]?.id || '';
 
   return { gateMap, gateOptions, defaultGateId };
 };
@@ -1120,53 +1097,10 @@ export const normalizeAddressList = (values: unknown[] = []) => {
 const getCreateSurveySbtAddressKey = (value: unknown): string => {
   if (!value || typeof value !== 'object') return '';
   const record = value as UnknownRecord;
-  return String(record.address || record.sbtAddress || '').trim().toLowerCase();
+  return String(record.address || record.sbtAddress || '')
+    .trim()
+    .toLowerCase();
 };
-
-export const addCreateSurveyEncryptionGateSbt = <
-  TSbt extends UnknownRecord = UnknownRecord
->(
-  selectedSbts: unknown = [],
-  sbt: unknown = null
-): TSbt[] => {
-  const current = Array.isArray(selectedSbts) ? selectedSbts as TSbt[] : [];
-  if (!sbt || typeof sbt !== 'object' || Array.isArray(sbt)) return [...current];
-  const nextSbt = sbt as TSbt;
-  const nextAddress = getCreateSurveySbtAddressKey(nextSbt);
-  if (
-    nextAddress &&
-    current.some((entry) => getCreateSurveySbtAddressKey(entry) === nextAddress)
-  ) {
-    return [...current];
-  }
-  return [...current, nextSbt];
-};
-
-export const removeCreateSurveyEncryptionGateSbt = <
-  TSbt extends UnknownRecord = UnknownRecord
->(
-  selectedSbts: unknown = [],
-  address: unknown = ''
-): TSbt[] => {
-  const current = Array.isArray(selectedSbts) ? selectedSbts as TSbt[] : [];
-  const addressKey = String(address || '').trim().toLowerCase();
-  if (!addressKey) return [...current];
-  return current.filter((entry) => getCreateSurveySbtAddressKey(entry) !== addressKey);
-};
-
-export const normalizeTagList = (values: unknown = []) => (
-  (Array.isArray(values) ? values : [])
-    .filter((tag) => (
-      tag != null &&
-      (
-        typeof tag === 'string' ||
-        typeof tag === 'number' ||
-        typeof tag === 'boolean'
-      )
-    ))
-    .map((tag) => String(tag).trim())
-    .filter((tag) => tag && tag !== '[object Object]')
-);
 
 export const addCreateSurveyEncryptionGateSbt = <TSbt extends UnknownRecord = UnknownRecord>(
   selectedSbts: unknown = [],

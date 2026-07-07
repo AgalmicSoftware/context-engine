@@ -128,8 +128,14 @@ describe('CreateSBTGroup cache helpers', () => {
       codesToStore: ['code-one', 'code-two'],
     });
 
-    expect(localStorage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY)).toBeNull();
-    expect(localStorage.getItem('createdSBTs')).toBeNull();
+    const recoveryStore = JSON.parse(localStorage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY));
+    expect(recoveryStore.entries[`84532:${sbtAddress.toLowerCase()}`]).toEqual(
+      expect.objectContaining({
+        chainId: 84532,
+        sbtAddress: sbtAddress.toLowerCase(),
+        passwords: ['code-one', 'code-two'],
+      }),
+    );
   });
 
   it('skips recovery-code persistence when the SBT has no password mint path', () => {

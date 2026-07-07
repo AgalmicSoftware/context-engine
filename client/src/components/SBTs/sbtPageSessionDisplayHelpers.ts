@@ -1,4 +1,4 @@
-import { getSessionSlugByName, normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
+import { getSessionSlugByName, normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
 
 type SessionSlugPropsLike = Record<string, unknown> & {
   sessionSlug?: unknown;

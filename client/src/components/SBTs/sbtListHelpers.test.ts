@@ -105,78 +105,59 @@ describe('sbtListHelpers', () => {
       fontSize: '0.85rem',
       opacity: 0.85,
     });
-    expect(buildSbtListExpandedCardShellClassName({
-      baseClassName: 'card',
-      expandedClassName: 'card-expanded',
-      isExpanded: true,
-    })).toBe('card card-expanded');
-    expect(buildSbtListExpandedCardShellClassName({
-      baseClassName: 'card',
-      expandedClassName: 'card-expanded',
-      isExpanded: false,
-    })).toBe('card');
-    expect(buildSbtListRootClassName({
-      baseClassName: 'base',
-      rootClassName: 'root',
-    })).toBe('base root');
-    expect(buildSbtListSessionUniversePanelClassName({
-      baseClassName: 'panel',
-      closedClassName: 'panel-closed',
-      isClosed: true,
-    })).toBe('panel panel-closed');
-    expect(buildSbtListMiniSettingsButtonClassName({
-      activeClassName: 'settings-active',
-      baseClassName: 'settings',
-      isActive: true,
-    })).toBe('settings settings-active');
-    expect(buildSbtListFilterContainerClassName({
-      baseClassName: 'filters',
-      panelClassName: 'filters-panel',
-    })).toBe('filters filters-panel');
-    expect(buildSbtListFilterLabelClassName({
-      activeClassName: 'filter-active',
-      baseClassName: 'filter',
-      isActive: true,
-      toggleClassName: 'filter-toggle',
-    })).toBe('filter filter-toggle filter-active');
+    expect(
+      buildSbtListExpandedCardShellClassName({
+        baseClassName: 'card',
+        expandedClassName: 'card-expanded',
+        isExpanded: true,
+      }),
+    ).toBe('card card-expanded');
+    expect(
+      buildSbtListExpandedCardShellClassName({
+        baseClassName: 'card',
+        expandedClassName: 'card-expanded',
+        isExpanded: false,
+      }),
+    ).toBe('card');
+    expect(
+      buildSbtListRootClassName({
+        baseClassName: 'base',
+        rootClassName: 'root',
+      }),
+    ).toBe('base root');
+    expect(
+      buildSbtListSessionUniversePanelClassName({
+        baseClassName: 'panel',
+        closedClassName: 'panel-closed',
+        isClosed: true,
+      }),
+    ).toBe('panel panel-closed');
+    expect(
+      buildSbtListMiniSettingsButtonClassName({
+        activeClassName: 'settings-active',
+        baseClassName: 'settings',
+        isActive: true,
+      }),
+    ).toBe('settings settings-active');
+    expect(
+      buildSbtListFilterContainerClassName({
+        baseClassName: 'filters',
+        panelClassName: 'filters-panel',
+      }),
+    ).toBe('filters filters-panel');
+    expect(
+      buildSbtListFilterLabelClassName({
+        activeClassName: 'filter-active',
+        baseClassName: 'filter',
+        isActive: true,
+        toggleClassName: 'filter-toggle',
+      }),
+    ).toBe('filter filter-toggle filter-active');
   });
 
   it('builds SBT detail hrefs', () => {
-    expect(buildSbtListDetailHref('0xABC', 'alpha')).toMatch(
-      /^\/(?:group|sbt)\/0xABC\?session=alpha$/
-    );
-    expect(buildSbtListDetailHref('0xABC', SBT_LIST_NO_SESSION_UNIVERSE_SLUG)).toMatch(
-      /^\/(?:group|sbt)\/0xABC$/
-    );
+    expect(buildSbtListDetailHref('0xABC', 'alpha')).toMatch(/^\/(?:group|sbt)\/0xABC\?session=alpha$/);
+    expect(buildSbtListDetailHref('0xABC', SBT_LIST_NO_SESSION_UNIVERSE_SLUG)).toMatch(/^\/(?:group|sbt)\/0xABC$/);
     expect(buildSbtListDetailHref('', 'alpha')).toBe('#');
   });
-
-  it('builds render buckets with featured, ignored, and synthetic no-session handling', () => {
-    const featuredAddress = '0x00000000000000000000000000000000000000f1';
-    const ignoredAddress = '0x00000000000000000000000000000000000000d1';
-    const hiddenAddress = '0x00000000000000000000000000000000000000b1';
-    const getSessionListsForSlug = jest.fn(() => ({
-      featured_SBTs_LIST: [featuredAddress],
-      ignored_SBTs_LIST: [ignoredAddress],
-    }));
-
-    expect(buildSbtListRenderBuckets({
-      allSessionsMode: true,
-      excludePasswordLocked: false,
-      getSessionListsForSlug,
-      isListModeScopeEnabled: true,
-      isMintingLive: (sbt) => sbt.sbtInfo?.mintingEndTime === 0,
-      isPasswordLocked: () => false,
-      listSlug: 'alpha',
-      resolveSbtSessionSlug: (sbt) => String(sbt.slug || ''),
-      sbtList: [
-        { sbtAddress: featuredAddress, slug: 'alpha', sbtInfo: { name: 'Featured', mintingEndTime: 0 } },
-        { sbtAddress: ignoredAddress, slug: 'alpha', sbtInfo: { name: 'Ignored', mintingEndTime: 0 } },
-        { sbtAddress: hiddenAddress, slug: SBT_LIST_NO_SESSION_UNIVERSE_SLUG, sbtInfo: { name: 'Hidden', mintingEndTime: 1 } },
-      ],
-      sectionSessionSlugs: ['alpha', SBT_LIST_NO_SESSION_UNIVERSE_SLUG],
-    }).displayedFeatured.map((sbt) => sbt.sbtAddress)).toEqual([featuredAddress]);
-    expect(getSessionListsForSlug).not.toHaveBeenCalledWith(SBT_LIST_NO_SESSION_UNIVERSE_SLUG);
-  });
-
 });

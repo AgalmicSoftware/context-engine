@@ -126,8 +126,7 @@ export const resolveEffectiveSlug = (props: SurveyToolScopeProps = {}): string =
     activeSessionSlug: props.activeSessionSlug as string | null | undefined,
     sessionSlug: props.sessionSlug as string | null | undefined,
     sessionSlugPinned: props.sessionSlugPinned === true,
-  })
-);
+  });
 
 export const resolveCurrentTagSessionSlug = ({
   props = {},
@@ -160,7 +159,7 @@ export const resolveDraftSessionContext = (props: SurveyToolScopeProps = {}, eff
     activeSessionSlug: props.activeSessionSlug as string | null | undefined,
     sessionSlug: props.sessionSlug as string | null | undefined,
     effectiveDraftSlug,
-    resolveBySlug: resolveSessionConfigBySlugForProps(props),
+    resolveBySlug: getStrictSessionConfigBySlug,
   });
 
 export const resolveExplicitSessionContext = (sessionSlug = '') =>
@@ -174,7 +173,7 @@ export const resolveDraftStorageContext = (props: SurveyToolScopeProps = {}, ses
     sessionSlug,
     network: props.network,
     networkChainId: props.networkChainId as string | number | null | undefined,
-    resolveBySlug: resolveSessionConfigBySlugForProps(props),
+    resolveBySlug: getStrictSessionConfigBySlug,
   });
 
 export const resolveResponseHydrationContext = (props: SurveyToolScopeProps = {}, sessionSlug = '') =>
@@ -182,7 +181,7 @@ export const resolveResponseHydrationContext = (props: SurveyToolScopeProps = {}
     sessionSlug,
     network: props.network,
     networkChainId: props.networkChainId as string | number | null | undefined,
-    resolveBySlug: resolveSessionConfigBySlugForProps(props),
+    resolveBySlug: getStrictSessionConfigBySlug,
   });
 
 export const resolveQuestionBootstrapContext = (props: SurveyToolScopeProps = {}, sessionSlug = '') =>
@@ -190,7 +189,7 @@ export const resolveQuestionBootstrapContext = (props: SurveyToolScopeProps = {}
     sessionSlug,
     network: props.network,
     networkChainId: props.networkChainId as string | number | null | undefined,
-    resolveBySlug: resolveSessionConfigBySlugForProps(props),
+    resolveBySlug: getStrictSessionConfigBySlug,
   });
 
 export const resolveDecryptHydrationContext = (props: SurveyToolScopeProps = {}, sessionSlug = '') =>
@@ -198,7 +197,7 @@ export const resolveDecryptHydrationContext = (props: SurveyToolScopeProps = {},
     sessionSlug,
     network: props.network,
     networkChainId: props.networkChainId as string | number | null | undefined,
-    resolveBySlug: resolveSessionConfigBySlugForProps(props),
+    resolveBySlug: getStrictSessionConfigBySlug,
   });
 
 export const resolveResponseJsonContext = (props: SurveyToolScopeProps = {}, sessionSlug = '') =>
@@ -206,7 +205,7 @@ export const resolveResponseJsonContext = (props: SurveyToolScopeProps = {}, ses
     sessionSlug,
     network: props.network,
     networkChainId: props.networkChainId as string | number | null | undefined,
-    resolveBySlug: resolveSessionConfigBySlugForProps(props),
+    resolveBySlug: getStrictSessionConfigBySlug,
   });
 
 export const resolveQuestionReadCacheContext = (props: SurveyToolScopeProps = {}, sessionSlug = '') =>
@@ -214,7 +213,7 @@ export const resolveQuestionReadCacheContext = (props: SurveyToolScopeProps = {}
     sessionSlug,
     network: props.network,
     networkChainId: props.networkChainId as string | number | null | undefined,
-    resolveBySlug: resolveSessionConfigBySlugForProps(props),
+    resolveBySlug: getStrictSessionConfigBySlug,
   });
 
 export const dedupeQuestionReadSlugs = (values: unknown[] = []): string[] => {
@@ -290,7 +289,7 @@ export const resolveQuestionPayloadCacheWriteContext = (props: SurveyToolScopePr
     sessionSlug,
     network: props.network,
     networkChainId: props.networkChainId as string | number | null | undefined,
-    resolveBySlug: resolveSessionConfigBySlugForProps(props),
+    resolveBySlug: getStrictSessionConfigBySlug,
   });
 
 export const resolveEnsureQuestionCachedContext = (props: SurveyToolScopeProps = {}, sessionSlug = '') =>
@@ -298,7 +297,7 @@ export const resolveEnsureQuestionCachedContext = (props: SurveyToolScopeProps =
     sessionSlug,
     network: props.network,
     networkChainId: props.networkChainId as string | number | null | undefined,
-    resolveBySlug: resolveSessionConfigBySlugForProps(props),
+    resolveBySlug: getStrictSessionConfigBySlug,
   });
 
 export const resolveQuestionCountContext = (props: SurveyToolScopeProps = {}, sessionSlug = '') =>
@@ -331,7 +330,7 @@ export const resolveSurveyReadContext = (props: SurveyToolScopeProps = {}, sessi
     sessionSlug,
     network: props.network,
     networkChainId: props.networkChainId as string | number | null | undefined,
-    resolveBySlug: resolveSessionConfigBySlugForProps(props),
+    resolveBySlug: getStrictSessionConfigBySlug,
   });
 
 export const resolveUpdateCacheContext = (props: SurveyToolScopeProps = {}, sessionSlug = '') =>
@@ -339,7 +338,7 @@ export const resolveUpdateCacheContext = (props: SurveyToolScopeProps = {}, sess
     sessionSlug,
     network: props.network,
     networkChainId: props.networkChainId as string | number | null | undefined,
-    resolveBySlug: resolveSessionConfigBySlugForProps(props),
+    resolveBySlug: getStrictSessionConfigBySlug,
   });
 
 export const resolveSubmittedCacheWriteContext = (props: SurveyToolScopeProps = {}, sessionSlug = '') =>
@@ -347,7 +346,7 @@ export const resolveSubmittedCacheWriteContext = (props: SurveyToolScopeProps = 
     sessionSlug,
     network: props.network,
     networkChainId: props.networkChainId as string | number | null | undefined,
-    resolveBySlug: resolveSessionConfigBySlugForProps(props),
+    resolveBySlug: getStrictSessionConfigBySlug,
   });
 
 export const resolvePileWarmSeedContext = (props: SurveyToolScopeProps = {}, sessionSlug = '') =>
@@ -355,7 +354,7 @@ export const resolvePileWarmSeedContext = (props: SurveyToolScopeProps = {}, ses
     sessionSlug,
     network: props.network,
     networkChainId: props.networkChainId as string | number | null | undefined,
-    resolveBySlug: resolveSessionConfigBySlugForProps(props),
+    resolveBySlug: getStrictSessionConfigBySlug,
   });
 
 export const resolvePileLoadContext = (props: SurveyToolScopeProps = {}, sessionSlug = '') =>
@@ -363,7 +362,7 @@ export const resolvePileLoadContext = (props: SurveyToolScopeProps = {}, session
     sessionSlug,
     network: props.network,
     networkChainId: props.networkChainId as string | number | null | undefined,
-    resolveBySlug: resolveSessionConfigBySlugForProps(props),
+    resolveBySlug: getStrictSessionConfigBySlug,
   });
 
 export const resolvePileResponseReadContext = (props: SurveyToolScopeProps = {}, sessionSlug = '') =>
@@ -371,7 +370,7 @@ export const resolvePileResponseReadContext = (props: SurveyToolScopeProps = {},
     sessionSlug,
     network: props.network,
     networkChainId: props.networkChainId as string | number | null | undefined,
-    resolveBySlug: resolveSessionConfigBySlugForProps(props),
+    resolveBySlug: getStrictSessionConfigBySlug,
   });
 
 export const resolvePileFilterContext = (props: SurveyToolScopeProps = {}, sessionSlug = '') =>
@@ -379,7 +378,7 @@ export const resolvePileFilterContext = (props: SurveyToolScopeProps = {}, sessi
     sessionSlug,
     network: props.network,
     networkChainId: props.networkChainId as string | number | null | undefined,
-    resolveBySlug: resolveSessionConfigBySlugForProps(props),
+    resolveBySlug: getStrictSessionConfigBySlug,
   });
 
 const encodeQuestionFilterScopeStorageToken = (slug = ''): string => {

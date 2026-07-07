@@ -1,4 +1,4 @@
-import { normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
+import { normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
 
 export type SbtSelectorDiscoverySlugOptions = {
   allowEmpty?: boolean;

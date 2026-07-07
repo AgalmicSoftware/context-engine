@@ -60,7 +60,11 @@ describe('SurveyResultsQuestionListCard', () => {
     const scssPath = path.join(__dirname, 'SurveyResults.module.scss');
     const scss = fs.readFileSync(scssPath, 'utf8');
 
-    expect(scss).toMatch(/\.questionListCard\s*{[\s\S]*?padding:\s*0;[\s\S]*?background:\s*transparent !important;[\s\S]*?border:\s*0;[\s\S]*?overflow:\s*hidden;/);
-    expect(scss).toMatch(/\.questionListCard \.questionSummaryHeader\s*{[\s\S]*?border-radius:\s*var\(--ce-radius-12\) !important;/);
+    expect(scss).toMatch(
+      /\.questionListCard\s*{[\s\S]*?padding:\s*0;[\s\S]*?background:\s*transparent !important;[\s\S]*?border:\s*0;[\s\S]*?overflow:\s*hidden;/,
+    );
+    expect(scss).toMatch(
+      /\.questionListCard \.questionSummaryHeader\s*{[\s\S]*?border-radius:\s*var\(--ce-radius-12\) !important;/,
+    );
   });
 });

@@ -1,8 +1,7 @@
 import { SurveyQuestions } from './SurveyQuestions';
 import SurveyQuestionsLockAudienceControl from './SurveyQuestionsLockAudienceControl';
-import styles from './SurveyTool.module.scss';
-import { renderToStaticMarkup } from 'react-dom/server';
-import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
+import { buildGateAudienceSbtItems, resolveLockAudienceSessionName } from './surveyToolResponseGateController';
+import { buildResponseGatePolicy } from '../../utilities/crypto/litGatePolicy.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 
@@ -40,11 +39,6 @@ const renderAudienceControl = (overrides = {}) =>
       {...overrides}
     />,
   );
-
-const renderLockAudienceControl = (lockControl) => {
-  expect(lockControl.type).toBe(SurveyQuestionsLockAudienceControl);
-  return SurveyQuestionsLockAudienceControl(lockControl.props);
-};
 
 describe('SurveyQuestions lock audience details', () => {
   afterEach(() => {
@@ -129,12 +123,31 @@ describe('SurveyQuestions lock audience details', () => {
     expect(screen.queryByText('AI Gate Test SBT')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /show test-12/i })).toBeInTheDocument();
 
-    const collapsedTree = renderLockAudienceControl(collapsedControl);
-    expect(treeHasText(collapsedTree, 'only me')).toBe(true);
-    expect(treeHasText(collapsedTree, 'test-12')).toBe(true);
-    expect(treeHasText(collapsedTree, 'for test-12')).toBe(false);
-    expect(treeHasText(collapsedTree, 'AI Gate Test SBT')).toBe(false);
-    expect(findNodeByClassName(collapsedTree, styles.lockAudienceCaretButton)).toBeTruthy();
+    rerender(
+      <SurveyQuestionsLockAudienceControl
+        qid="q1"
+        effectiveFieldKey="answer"
+        buttonTitle="Choose encryption audience"
+        hasAudienceMenu
+        menuOpen
+        normalizedSelfAudienceLabel="only me"
+        expandedGateId="default_gate"
+        gateOptions={[
+          {
+            gateId: 'default_gate',
+            label: 'test-12',
+            sbtItems: [
+              {
+                address,
+                label: 'AI Gate Test SBT',
+                meta: '0x1111...1111',
+                href: buildSbtDetailPath(address, 'edge'),
+              },
+            ],
+          },
+        ]}
+      />,
+    );
 
     subject.state = {
       ...subject.state,
@@ -159,70 +172,26 @@ describe('SurveyQuestions lock audience details', () => {
   });
 
   it('wires shared lock-audience gate helper callbacks for select and details toggle', () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: true,
-      surveyIndex: 0,
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 84532 },
-    });
-    subject.toggleLockAudienceGateDetails = jest.fn();
-    subject.applyLockAudienceSelection = jest.fn();
-    subject.state = {
-      ...subject.state,
-      lockAudienceMenuByQuestion: { q1: true },
-      lockAudienceGateDetailsByQuestion: {},
-    };
-    subject.isQuestionLockedForResponse = jest.fn(() => false);
-    subject.resolveQuestionGateOption = jest.fn(() => ({
-      gateDetails: [{
-        gateId: 'vip_gate',
-        label: 'VIP gate',
-        sbtItems: [{
-          address: '0x1111111111111111111111111111111111111111',
-          label: 'AI Gate Test SBT',
-          meta: '0x1111...1111',
-          href: '/sbt/0x1111111111111111111111111111111111111111',
-        }],
-      }],
-    }));
-    subject.resolveFieldEncryptionAudience = jest.fn(() => 'self');
-    subject.resolveFieldEncryptionGateId = jest.fn(() => null);
+    const onSelectAudience = jest.fn();
+    const onToggleGateDetails = jest.fn();
 
-    const lockControl = subject.renderAnswerLockControl({
-      surveyIndex: 0,
-      questionId: 'q1',
-      answer: { encrypted: false, encryptionAudience: 'self' },
-      lockDisabled: false,
-      lockTitle: 'Not encrypted',
-      glowAnswer: false,
-      forceAudienceMenu: true,
-      selfAudienceLabel: 'only me',
-    });
-    const gateOption = lockControl.props.gateOptions[0];
-    expect(gateOption).toEqual(expect.objectContaining({
-      gateId: 'vip_gate',
-      label: 'VIP gate',
-    }));
-
-    const gateButton = findElement(
-      renderLockAudienceControl(lockControl),
-      (candidate) => candidate?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_GATE
-        && candidate?.props?.['data-ce-gate-id'] === 'vip_gate'
-    );
-    const caretButton = findNodeByClassName(renderLockAudienceControl(lockControl), styles.lockAudienceCaretButton);
-
-    expect(gateButton).toBeTruthy();
-    expect(caretButton).toBeTruthy();
-
-    gateButton.props.onClick();
-    expect(subject.applyLockAudienceSelection).toHaveBeenCalledWith({
-      surveyIndex: 0,
-      qid: 'q1',
-      effectiveFieldKey: 'answer',
-      audience: 'gate',
-      gateId: 'vip_gate',
+    renderAudienceControl({
+      gateOptions: [
+        {
+          gateId: 'vip_gate',
+          label: 'VIP gate',
+          sbtItems: [
+            {
+              address,
+              label: 'AI Gate Test SBT',
+              meta: '0x1111...1111',
+              href: buildSbtDetailPath(address, 'edge'),
+            },
+          ],
+        },
+      ],
+      onSelectAudience,
+      onToggleGateDetails,
     });
 
     const preventDefault = jest.fn();

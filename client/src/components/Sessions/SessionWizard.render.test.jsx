@@ -37,12 +37,13 @@ const TEST_ADMIN_ADDRESS = mockTestAdminAddress;
 const ORIGINAL_PUBLIC_URL = process.env.PUBLIC_URL;
 const mockSelectorSourceFactory = '0x538A48BC439A36D2A86e63114DCD9c429d2ddEcA';
 const mockSelectorSourceStartBlock = 30297069;
-const buildMockSponsoredBundleEnvelope = () => JSON.stringify({
-  type: 'contextengine-sponsored-bundle',
-  version: 1,
-  cipher: 'password-aes-gcm',
-  encryptedData: 'encrypted-base64',
-});
+const buildMockSponsoredBundleEnvelope = () =>
+  JSON.stringify({
+    type: 'contextengine-sponsored-bundle',
+    version: 1,
+    cipher: 'password-aes-gcm',
+    encryptedData: 'encrypted-base64',
+  });
 const buildMockSponsoredBundle = () => ({
   openaiKey: 'sponsored-openai',
   arweaveJwk: '{"kty":"RSA","n":"sponsored"}',
@@ -297,10 +298,7 @@ jest.mock('../../variables/appConfig.js', () => {
   return { ...actual };
 });
 
-import SessionWizard, {
-  REQUIRED_SESSION_SLUG_ERROR,
-  RESERVED_SESSION_SLUG_ERROR,
-} from './SessionWizard';
+import SessionWizard, { REQUIRED_SESSION_SLUG_ERROR, RESERVED_SESSION_SLUG_ERROR } from './SessionWizard';
 
 const renderSessionWizard = (props = {}) => render(<SessionWizard network={{ id: 84532 }} {...props} />);
 const createTooltipStore = (tooltipsEnabled = true) =>
@@ -323,12 +321,13 @@ const renderSessionWizardWithTooltipStore = ({ tooltipsEnabled = true, props = {
   );
   return { store, ...view };
 };
-const renderLoggedInSessionWizard = (props = {}) => renderSessionWizard({
-  account: TEST_ADMIN_ADDRESS,
-  loginComplete: true,
-  toggleLoginModal: jest.fn(),
-  ...props,
-});
+const renderLoggedInSessionWizard = (props = {}) =>
+  renderSessionWizard({
+    account: TEST_ADMIN_ADDRESS,
+    loginComplete: true,
+    toggleLoginModal: jest.fn(),
+    ...props,
+  });
 const enableAdvancedMode = () => {
   const customizeButton = screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED);
   if (customizeButton.getAttribute('aria-pressed') !== 'true') {
@@ -341,10 +340,10 @@ const selectNormalModeCard = (label) => {
 const selectCloudflarePreset = () => {
   fireEvent.click(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare'));
 };
-const getMockSelectorById = (selectorId) => (
-  screen.queryAllByTestId('mock-wizard-sbt-selector')
-    .find((node) => node.getAttribute('data-selector-id') === selectorId)
-);
+const getMockSelectorById = (selectorId) =>
+  screen
+    .queryAllByTestId('mock-wizard-sbt-selector')
+    .find((node) => node.getAttribute('data-selector-id') === selectorId);
 const expectSelectorAddresses = async (selectorId, expectedAddresses) => {
   await waitFor(() => {
     const selector = getMockSelectorById(selectorId);
@@ -527,9 +526,12 @@ describe('SessionWizard rendered validation', () => {
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
 
-    await waitFor(() =>
-      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED)).toHaveAttribute('aria-pressed', 'true'),
-    );
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Session wizard display settings' })).toHaveAttribute(
+        'aria-expanded',
+        'false',
+      );
+    });
 
     fireEvent.click(screen.getByRole('button', { name: /more options/i }));
 
@@ -625,7 +627,7 @@ describe('SessionWizard rendered validation', () => {
   });
 
   it('keeps block limits inside optional details in normal mode when the draft contains them', async () => {
-    sessionStorage.setItem(
+    localStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
         draft: {
@@ -654,7 +656,7 @@ describe('SessionWizard rendered validation', () => {
 
   it('keeps legacy sponsoredSbtAddress inside optional details in normal mode', async () => {
     const sponsoredSbtAddress = '0x00000000000000000000000000000000000000f1';
-    sessionStorage.setItem(
+    localStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
         draft: {
@@ -813,9 +815,11 @@ describe('SessionWizard rendered validation', () => {
     await waitFor(() => {
       expect(slugInput).toHaveValue('queued-session');
     });
-    expect(screen.getByText(
-      'Queued Group drafts pinned this slug so their uploaded metadata stays aligned with the final session URL.'
-    )).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Queued Group drafts pinned this slug so their uploaded metadata stays aligned with the final session URL.',
+      ),
+    ).toBeInTheDocument();
   });
 
   it('renders non-worker session wizard tooltips through the same explainer toggle path', async () => {
@@ -866,16 +870,56 @@ describe('SessionWizard rendered validation', () => {
     expect(await screen.findByText(REQUIRED_SESSION_SLUG_ERROR)).toBeInTheDocument();
   });
 
-  it('gates the first screen until a session mode preset is chosen', () => {
-    renderSessionWizard();
+  it.each(['/new', '/session/new'])(
+    'shows only session mode on %s until Continue reveals the prefilled setup',
+    async (pathname) => {
+      localStorage.setItem(
+        'ce:sessionWizardDraft:v1',
+        JSON.stringify({
+          draft: {
+            sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+            storageProfile: { backend: 'cloudflare' },
+          },
+        }),
+      );
+      window.history.replaceState({}, '', pathname);
+      renderSessionWizard();
 
-    expect(screen.getByTestId('ce-new-preset-continue')).toBeDisabled();
-    expect(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare')).toHaveAttribute('aria-checked', 'false');
-    expect(screen.getByTestId('ce-new-preset-trustless_public_decentralized')).toHaveAttribute('aria-checked', 'false');
+      expect(screen.getByTestId('ce-new-preset-continue')).toBeDisabled();
+      expect(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare')).toHaveAttribute('aria-checked', 'false');
+      expect(screen.getByTestId('ce-new-preset-trustless_public_decentralized')).toHaveAttribute(
+        'aria-checked',
+        'false',
+      );
+      expect(screen.queryByText('Custom')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /advanced options/i })).not.toBeInTheDocument();
+      expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED)).not.toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: /to create a session you'll need:/i })).not.toBeInTheDocument();
+      expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).not.toBeInTheDocument();
+      expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_PUBLISH)).not.toBeInTheDocument();
+      expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
 
-    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_PUBLISH)).not.toBeInTheDocument();
-    expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
-  });
+      fireEvent.click(screen.getByTestId('ce-new-preset-trustless_public_decentralized'));
+      expect(screen.getByTestId('ce-new-preset-continue')).not.toBeDisabled();
+      expect(screen.getByTestId('ce-new-preset-trustless_public_decentralized')).toHaveAttribute(
+        'aria-checked',
+        'true',
+      );
+      expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId('ce-new-preset-continue'));
+      expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).toBeInTheDocument();
+      expect(screen.queryByTestId('ce-new-preset-continue')).not.toBeInTheDocument();
+      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /advanced options/i })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();
+
+      enableAdvancedMode();
+      fireEvent.click(screen.getByRole('button', { name: 'Session Storage expand' }));
+      expect(screen.getByRole('radio', { name: 'Arweave' })).toHaveAttribute('aria-checked', 'true');
+      expect(screen.getByRole('radio', { name: 'Cloudflare' })).toHaveAttribute('aria-checked', 'false');
+    },
+  );
 
   it('checks session slug collisions before publish upload or register side effects', async () => {
     const { arweaveScripts } = require('../../utilities/arweave/arweaveScripts.js');
@@ -926,4 +970,5 @@ describe('SessionWizard rendered validation', () => {
 
     fireEvent.change(slugInput, { target: { value: 'edge-custom' } });
     expect(screen.queryByText(RESERVED_SESSION_SLUG_ERROR)).not.toBeInTheDocument();
-  });});
+  });
+});

@@ -85,30 +85,6 @@ describe('publicDeploymentConfig', () => {
 
       expect(config.WORKER_BUNDLE_URL).toContain('.js');
       expect(config.WORKER_BUNDLE_URL).toBe(buildPublicRepoLatestReleaseAssetUrl('sessionCorsWorker.bundle.js'));
-      expect(config.AGENT_BRIDGE_WORKER_BUNDLE_URL).toBe(
-        buildPublicRepoLatestReleaseAssetUrl('agentBridgeWorker.bundle.js'),
-      );
-      expect(config.WORKER_RELEASE_MANIFEST_URL).toBe(
-        buildPublicRepoLatestReleaseAssetUrl('worker-release-manifest.json'),
-      );
-    });
-  });
-
-  it('enables Cloudflare-native deploy only for a full immutable public replay commit', () => {
-    process.env.REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT = '0123456789abcdef0123456789abcdef01234567';
-    jest.isolateModules(() => {
-      const config = require('./publicDeploymentConfig.js');
-      expect(config.CLOUDFLARE_NATIVE_DEPLOY_URL).toContain('https://deploy.workers.cloudflare.com/');
-      expect(decodeURIComponent(config.CLOUDFLARE_NATIVE_DEPLOY_URL)).toContain(
-        '/tree/0123456789abcdef0123456789abcdef01234567/deploy/cloudflare/session-worker',
-      );
-    });
-
-    jest.resetModules();
-    process.env.REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT = 'main';
-    jest.isolateModules(() => {
-      const config = require('./publicDeploymentConfig.js');
-      expect(config.CLOUDFLARE_NATIVE_DEPLOY_URL).toBe('');
     });
   });
 

@@ -33,7 +33,11 @@ describe('SBTPage auto-mint routing', () => {
   it('routes public auto-mint URLs to the dedicated public mint helper', async () => {
     const sbtAddress = '0x0000000000000000000000000000000000000101';
     const previousHref = window.location.href;
-    window.history.replaceState({}, '', `${buildSbtDetailPath(sbtAddress)}?sbt=${encodeURIComponent(sbtAddress)}&auto=1`);
+    window.history.replaceState(
+      {},
+      '',
+      `${buildSbtDetailPath(sbtAddress)}?sbt=${encodeURIComponent(sbtAddress)}&auto=1`,
+    );
 
     try {
       const subject = createSubject({
@@ -50,14 +54,21 @@ describe('SBTPage auto-mint routing', () => {
       await subject.handleUrlAutoMintIntent();
       await flushPromises();
 
-      expect(publicMintSpy).toHaveBeenCalledWith(sbtAddress, expect.objectContaining({
-        sessionSlugOverride: '',
-      }));
-      expect(window.sessionStorage.getItem(buildSbtPageAutoMintStorageKey({
-        chainId: 84532,
-        sessionSlug: 'general',
+      expect(publicMintSpy).toHaveBeenCalledWith(
         sbtAddress,
-      }))).toBe('done');
+        expect.objectContaining({
+          sessionSlugOverride: '',
+        }),
+      );
+      expect(
+        window.sessionStorage.getItem(
+          buildSbtPageAutoMintStorageKey({
+            chainId: 84532,
+            sessionSlug: 'general',
+            sbtAddress,
+          }),
+        ),
+      ).toBe('done');
     } finally {
       window.history.replaceState({}, '', previousHref);
     }
@@ -71,7 +82,11 @@ describe('SBTPage auto-mint routing', () => {
       sessionSlug: 'edge',
       sbtAddress,
     });
-    window.history.replaceState({}, '', `${buildSbtDetailPath(sbtAddress, { sessionSlug: 'edge' })}?sbt=${encodeURIComponent(sbtAddress)}&auto=1`);
+    window.history.replaceState(
+      {},
+      '',
+      `${buildSbtDetailPath(sbtAddress, { sessionSlug: 'edge' })}?sbt=${encodeURIComponent(sbtAddress)}&auto=1`,
+    );
 
     try {
       const subject = createSubject({
@@ -109,7 +124,11 @@ describe('SBTPage auto-mint routing', () => {
       sessionSlug: 'edge',
       sbtAddress,
     });
-    window.history.replaceState({}, '', `${buildSbtDetailPath(sbtAddress, { sessionSlug: 'edge' })}?sbt=${encodeURIComponent(sbtAddress)}&auto=1`);
+    window.history.replaceState(
+      {},
+      '',
+      `${buildSbtDetailPath(sbtAddress, { sessionSlug: 'edge' })}?sbt=${encodeURIComponent(sbtAddress)}&auto=1`,
+    );
 
     try {
       const subject = createSubject({
@@ -134,6 +153,7 @@ describe('SBTPage auto-mint routing', () => {
 
       expect(result).toBe(false);
       expect(contractScripts.claim).toHaveBeenCalledWith('mock', sbtAddress);
+      expect(consoleErrorSpy).toHaveBeenCalledWith('[sbt]', 'Minting failed in handleMint:', walletError);
       expect(window.sessionStorage.getItem(successKey)).toBeNull();
     } finally {
       window.history.replaceState({}, '', previousHref);
@@ -149,7 +169,11 @@ describe('SBTPage auto-mint routing', () => {
       sessionSlug: 'edge',
       sbtAddress,
     });
-    window.history.replaceState({}, '', `${buildSbtDetailPath(sbtAddress, { sessionSlug: 'edge' })}?sbt=${encodeURIComponent(sbtAddress)}&auto=1`);
+    window.history.replaceState(
+      {},
+      '',
+      `${buildSbtDetailPath(sbtAddress, { sessionSlug: 'edge' })}?sbt=${encodeURIComponent(sbtAddress)}&auto=1`,
+    );
 
     try {
       const subject = createSubject({
@@ -164,12 +188,10 @@ describe('SBTPage auto-mint routing', () => {
         userHasSBT: false,
         mintingStatus: 'idle',
       };
-      jest
-        .spyOn(contractScripts, 'getGroupPasswordHash')
-        .mockImplementation(async () => {
-          subject.props = { ...subject.props, SBTAddress: nextSbtAddress, sessionSlug: 'next' };
-          return '0x0000000000000000000000000000000000000000000000000000000000000000';
-        });
+      jest.spyOn(contractScripts, 'getGroupPasswordHash').mockImplementation(async () => {
+        subject.props = { ...subject.props, SBTAddress: nextSbtAddress, sessionSlug: 'next' };
+        return '0x0000000000000000000000000000000000000000000000000000000000000000';
+      });
       jest.spyOn(contractScripts, 'claim').mockResolvedValue({ transactionHash: '0xpublicmint' });
       const loadSpy = jest.spyOn(subject, 'loadSBTInfo').mockResolvedValue(undefined);
       const localSuccessSpy = jest.spyOn(subject, 'applyLocalMintSuccess');
@@ -209,9 +231,9 @@ describe('SBTPage auto-mint routing', () => {
       subject.props = { ...subject.props, SBTAddress: nextSbtAddress, sessionSlug: 'next' };
       return { hasPasswordMint: false };
     });
-    jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(
-      '0x0000000000000000000000000000000000000000000000000000000000000000',
-    );
+    jest
+      .spyOn(contractScripts, 'getGroupPasswordHash')
+      .mockResolvedValue('0x0000000000000000000000000000000000000000000000000000000000000000');
     const claimSpy = jest.spyOn(contractScripts, 'claim').mockResolvedValue({ transactionHash: '0xpublicmint' });
 
     const result = await subject.autoMintPublicIfAllowed(sbtAddress, {
@@ -229,7 +251,11 @@ describe('SBTPage auto-mint routing', () => {
     const sbtAddress = '0x0000000000000000000000000000000000000118';
     const nextSbtAddress = '0x0000000000000000000000000000000000000119';
     const previousHref = window.location.href;
-    window.history.replaceState({}, '', `${buildSbtDetailPath(sbtAddress, { sessionSlug: 'edge' })}?sbt=${encodeURIComponent(sbtAddress)}&gp=claim-code&auto=1`);
+    window.history.replaceState(
+      {},
+      '',
+      `${buildSbtDetailPath(sbtAddress, { sessionSlug: 'edge' })}?sbt=${encodeURIComponent(sbtAddress)}&gp=claim-code&auto=1`,
+    );
 
     try {
       const subject = createSubject({
@@ -265,7 +291,11 @@ describe('SBTPage auto-mint routing', () => {
     const sbtAddress = '0x0000000000000000000000000000000000000120';
     const nextSbtAddress = '0x0000000000000000000000000000000000000121';
     const previousHref = window.location.href;
-    window.history.replaceState({}, '', `${buildSbtDetailPath(sbtAddress, { sessionSlug: 'edge' })}?sbt=${encodeURIComponent(sbtAddress)}&gp=claim-code&auto=1`);
+    window.history.replaceState(
+      {},
+      '',
+      `${buildSbtDetailPath(sbtAddress, { sessionSlug: 'edge' })}?sbt=${encodeURIComponent(sbtAddress)}&gp=claim-code&auto=1`,
+    );
 
     try {
       const subject = createSubject({
@@ -306,7 +336,11 @@ describe('SBTPage auto-mint routing', () => {
       sessionSlug: 'edge',
       sbtAddress,
     });
-    window.history.replaceState({}, '', `${buildSbtDetailPath(sbtAddress, { sessionSlug: 'edge' })}?sbt=${encodeURIComponent(sbtAddress)}&gp=claim-code&auto=1`);
+    window.history.replaceState(
+      {},
+      '',
+      `${buildSbtDetailPath(sbtAddress, { sessionSlug: 'edge' })}?sbt=${encodeURIComponent(sbtAddress)}&gp=claim-code&auto=1`,
+    );
 
     try {
       const subject = createSubject({
@@ -412,11 +446,9 @@ describe('SBTPage auto-mint routing', () => {
     const localSuccessSpy = jest.spyOn(subject, 'applyLocalMintSuccess');
     const refreshSpy = jest.spyOn(subject, 'refreshSbtDataWithSlug').mockReturnValue(undefined);
 
-    const result = await subject.claimWithInvitePayload(
-      { nonce: '1', signature: '0xsig' },
-      sbtAddress,
-      { sessionSlugOverride: 'edge' },
-    );
+    const result = await subject.claimWithInvitePayload({ nonce: '1', signature: '0xsig' }, sbtAddress, {
+      sessionSlugOverride: 'edge',
+    });
 
     expect(result.ok).toBe(true);
     expect(contractScripts.claimWithInvite).toHaveBeenCalledWith('mock', sbtAddress, '1', '0xsig');
@@ -708,7 +740,11 @@ describe('SBTPage auto-mint routing', () => {
   it('does not run URL auto-mints before the wallet chain is known', async () => {
     const sbtAddress = '0x0000000000000000000000000000000000000130';
     const previousHref = window.location.href;
-    window.history.replaceState({}, '', `${buildSbtDetailPath(sbtAddress)}?sbt=${encodeURIComponent(sbtAddress)}&auto=1`);
+    window.history.replaceState(
+      {},
+      '',
+      `${buildSbtDetailPath(sbtAddress)}?sbt=${encodeURIComponent(sbtAddress)}&auto=1`,
+    );
 
     try {
       const subject = createSubject({
@@ -751,19 +787,23 @@ describe('SBTPage auto-mint routing', () => {
       groupPasswordInput: '',
       mintingStatus: 'idle',
     };
-    jest.spyOn(subject, 'decodeInviteInput').mockImplementation((token) => (
-      token === 'invite-payload' ? { nonce: '1', signature: '0xsig' } : null
-    ));
+    jest
+      .spyOn(subject, 'decodeInviteInput')
+      .mockImplementation((token) => (token === 'invite-payload' ? { nonce: '1', signature: '0xsig' } : null));
     const inviteSpy = jest.spyOn(subject, 'claimWithInviteCode').mockResolvedValue(true);
 
     await subject.attemptMintWithPasswordList(['invite-payload']);
 
     expect(subject.state.groupPasswordInput).toBe('invite-payload');
-    expect(inviteSpy).toHaveBeenCalledWith('invite-payload', sbtAddress, expect.objectContaining({
-      accountLowerOverride: account,
-      chainIdOverride: '84532',
-      sessionSlugOverride: 'edge',
-    }));
+    expect(inviteSpy).toHaveBeenCalledWith(
+      'invite-payload',
+      sbtAddress,
+      expect.objectContaining({
+        accountLowerOverride: account,
+        chainIdOverride: '84532',
+        sessionSlugOverride: 'edge',
+      }),
+    );
   });
 
   it('does not continue password-list mints after network props disappear during validation', async () => {
@@ -808,7 +848,7 @@ describe('SBTPage auto-mint routing', () => {
     window.history.replaceState(
       {},
       '',
-      `${buildSbtDetailPath(sbtAddress)}?sbt=${encodeURIComponent(sbtAddress)}&auto=1&inv=invite-token`
+      `${buildSbtDetailPath(sbtAddress)}?sbt=${encodeURIComponent(sbtAddress)}&auto=1&inv=invite-token`,
     );
 
     try {
@@ -827,9 +867,13 @@ describe('SBTPage auto-mint routing', () => {
       await flushPromises();
 
       expect(subject.state.groupPasswordInput).toBe('invite-token');
-      expect(inviteSpy).toHaveBeenCalledWith('invite-token', sbtAddress, expect.objectContaining({
-        sessionSlugOverride: '',
-      }));
+      expect(inviteSpy).toHaveBeenCalledWith(
+        'invite-token',
+        sbtAddress,
+        expect.objectContaining({
+          sessionSlugOverride: '',
+        }),
+      );
     } finally {
       window.history.replaceState({}, '', previousHref);
     }
@@ -841,7 +885,7 @@ describe('SBTPage auto-mint routing', () => {
     window.history.replaceState(
       {},
       '',
-      `${buildSbtDetailPath(sbtAddress)}?sbt=${encodeURIComponent(sbtAddress)}&auto=1&gp=claim-code`
+      `${buildSbtDetailPath(sbtAddress)}?sbt=${encodeURIComponent(sbtAddress)}&auto=1&gp=claim-code`,
     );
 
     try {
@@ -861,9 +905,13 @@ describe('SBTPage auto-mint routing', () => {
       await flushPromises();
 
       expect(subject.state.groupPasswordInput).toBe('claim-code');
-      expect(claimSpy).toHaveBeenCalledWith('claim-code', sbtAddress, expect.objectContaining({
-        sessionSlugOverride: '',
-      }));
+      expect(claimSpy).toHaveBeenCalledWith(
+        'claim-code',
+        sbtAddress,
+        expect.objectContaining({
+          sessionSlugOverride: '',
+        }),
+      );
     } finally {
       window.history.replaceState({}, '', previousHref);
     }
@@ -875,7 +923,7 @@ describe('SBTPage auto-mint routing', () => {
     window.history.replaceState(
       {},
       '',
-      `${buildSbtDetailPath(sbtAddress)}?sbt=${encodeURIComponent(sbtAddress)}&auto=1&gp=shared-secret`
+      `${buildSbtDetailPath(sbtAddress)}?sbt=${encodeURIComponent(sbtAddress)}&auto=1&gp=shared-secret`,
     );
 
     try {

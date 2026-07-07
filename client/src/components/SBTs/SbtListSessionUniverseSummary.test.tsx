@@ -20,7 +20,7 @@ describe('SbtListSessionUniverseSummary', () => {
         labelForSessionSlug={(slug) => slug || 'General'}
         buildSessionRouteHref={(slug) => (slug ? `/session/${slug}` : '/session')}
         onOpenSessionChip={onOpenSessionChip}
-      />
+      />,
     );
 
     expect(screen.getByTestId('summary')).toHaveTextContent('Selected (5)');

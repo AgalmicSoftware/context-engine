@@ -1,8 +1,4 @@
-import {
-  UserPage,
-  makeInstance,
-  setupUserPageCacheRefreshTestLifecycle,
-} from './UserPage.cacheRefresh.testUtils';
+import { UserPage, makeInstance, setupUserPageCacheRefreshTestLifecycle } from './UserPage.cacheRefresh.testUtils';
 
 describe('UserPage cache refresh aggregation and scheduling', () => {
   setupUserPageCacheRefreshTestLifecycle();

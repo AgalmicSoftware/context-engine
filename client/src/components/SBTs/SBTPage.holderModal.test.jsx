@@ -105,7 +105,7 @@ describe('SBTPage holder modal rendering', () => {
     const tree = subject.render();
     const sbtFilterNode = findElementInTree(
       tree,
-      (element) => element?.props?.mode === 'addresses' && Array.isArray(element?.props?.items)
+      (element) => element?.props?.mode === 'addresses' && Array.isArray(element?.props?.items),
     );
 
     expect(sbtFilterNode).toBeTruthy();
@@ -140,7 +140,7 @@ describe('SBTPage holder modal rendering', () => {
     const tree = subject.render();
     const sbtFilterNode = findElementInTree(
       tree,
-      (element) => element?.props?.mode === 'addresses' && Array.isArray(element?.props?.items)
+      (element) => element?.props?.mode === 'addresses' && Array.isArray(element?.props?.items),
     );
 
     expect(sbtFilterNode).toBeTruthy();
@@ -179,21 +179,15 @@ describe('SBTPage holder modal rendering', () => {
       copyToClipboard: jest.fn(),
       getExplorerUrl: () => 'https://explorer.example/address',
     });
-    const modalHeader = findElementInTree(
-      tree,
-      (element) => element?.props?.className === styles.modalHeader
-    );
-    const modalBody = findElementInTree(
-      tree,
-      (element) => element?.props?.className === styles.modalBody
-    );
+    const modalHeader = findElementInTree(tree, (element) => element?.props?.className === styles.modalHeader);
+    const modalBody = findElementInTree(tree, (element) => element?.props?.className === styles.modalBody);
     const headerFilter = findElementInTree(
       modalHeader,
-      (element) => element?.props?.mode === 'addresses' && Array.isArray(element?.props?.items)
+      (element) => element?.props?.mode === 'addresses' && Array.isArray(element?.props?.items),
     );
     const bodyFilter = findElementInTree(
       modalBody,
-      (element) => element?.props?.mode === 'addresses' && Array.isArray(element?.props?.items)
+      (element) => element?.props?.mode === 'addresses' && Array.isArray(element?.props?.items),
     );
 
     expect(headerFilter).toBeTruthy();
@@ -207,39 +201,43 @@ describe('SBTPage holder modal rendering', () => {
 
     try {
       const holderAddress = '0x00000000000000000000000000000000000000b1';
-      render(renderSbtPageHolderModal({
-        isOpen: true,
-        onClose: jest.fn(),
-        showHeaderCount: true,
-        holdersDisplayCount: '1',
-        showCornerSpinner: false,
-        holderItemsForFilter: [holderAddress],
-        provider: 'mock',
-        network: { id: 84532 },
-        sessionSlug: 'rxc',
-        defaultFeaturedSBTs: [],
-        onFilter: jest.fn(),
-        isSBTCacheReady: true,
-        sbtCacheRevision: 1,
-        loadingMintedFilter: false,
-        hasFilteredHolders: true,
-        hasComputedHolders: true,
-        showScanProgressInModal: false,
-        scanProgressText: '',
-        scanProgressSessionText: '',
-        scanProgressPct: 0,
-        scanProgressFillStyle: {},
-        showEmptyStateInModal: false,
-        showApproximateCountHint: false,
-        showSpinnerInModalBody: false,
-        filteredMintedUsers: [holderAddress],
-        copiedAddress: '',
-        copyToClipboard: jest.fn(),
-        getExplorerUrl: () => 'https://explorer.example/address',
-      }));
+      render(
+        renderSbtPageHolderModal({
+          isOpen: true,
+          onClose: jest.fn(),
+          showHeaderCount: true,
+          holdersDisplayCount: '1',
+          showCornerSpinner: false,
+          holderItemsForFilter: [holderAddress],
+          provider: 'mock',
+          network: { id: 84532 },
+          sessionSlug: 'rxc',
+          defaultFeaturedSBTs: [],
+          onFilter: jest.fn(),
+          isSBTCacheReady: true,
+          sbtCacheRevision: 1,
+          loadingMintedFilter: false,
+          hasFilteredHolders: true,
+          hasComputedHolders: true,
+          showScanProgressInModal: false,
+          scanProgressText: '',
+          scanProgressSessionText: '',
+          scanProgressPct: 0,
+          scanProgressFillStyle: {},
+          showEmptyStateInModal: false,
+          showApproximateCountHint: false,
+          showSpinnerInModalBody: false,
+          filteredMintedUsers: [holderAddress],
+          copiedAddress: '',
+          copyToClipboard: jest.fn(),
+          getExplorerUrl: () => 'https://explorer.example/address',
+        }),
+      );
 
-      expect(screen.getByRole('link', { name: getShortenedAddress(holderAddress, false) }))
-        .toHaveAttribute('href', `/ce/u/${holderAddress}`);
+      expect(screen.getByRole('link', { name: getShortenedAddress(holderAddress, false) })).toHaveAttribute(
+        'href',
+        `/ce/u/${holderAddress}`,
+      );
     } finally {
       if (previousPublicUrl === undefined) delete process.env.PUBLIC_URL;
       else process.env.PUBLIC_URL = previousPublicUrl;
@@ -306,7 +304,7 @@ describe('SBTPage holder modal rendering', () => {
     const tree = subject.render();
     const sbtFilterNode = findElementInTree(
       tree,
-      (element) => element?.props?.mode === 'addresses' && Array.isArray(element?.props?.items)
+      (element) => element?.props?.mode === 'addresses' && Array.isArray(element?.props?.items),
     );
 
     expect(sbtFilterNode).toBeTruthy();
@@ -341,7 +339,7 @@ describe('SBTPage holder modal rendering', () => {
     const tree = subject.render();
     const modalSpinner = findElementInTree(
       tree,
-      (element) => element?.props?.spin === true && element?.props?.size === '2x'
+      (element) => element?.props?.spin === true && element?.props?.size === '2x',
     );
 
     expect(modalSpinner).toBeNull();
@@ -380,10 +378,9 @@ describe('SBTPage holder modal rendering', () => {
 
     expect(treeIncludesText(tree, 'Holder addresses not available yet. Showing approximate count only.')).toBe(false);
     expect(treeIncludesText(tree, '~25')).toBe(true);
-    expect(findElementInTree(
-      tree,
-      (element) => element?.props?.spin === true && element?.props?.size === '2x'
-    )).toBeTruthy();
+    expect(
+      findElementInTree(tree, (element) => element?.props?.spin === true && element?.props?.size === '2x'),
+    ).toBeTruthy();
   });
 
   it('shows holders modal scan progress during initial loading', () => {
@@ -427,13 +424,10 @@ describe('SBTPage holder modal rendering', () => {
     };
 
     const tree = subject.render();
-    const progressBar = findElementInTree(
-      tree,
-      (element) => element?.props?.role === 'progressbar'
-    );
+    const progressBar = findElementInTree(tree, (element) => element?.props?.role === 'progressbar');
     const modalSpinner = findElementInTree(
       tree,
-      (element) => element?.props?.spin === true && element?.props?.size === '2x'
+      (element) => element?.props?.spin === true && element?.props?.size === '2x',
     );
 
     expect(progressBar).toBeTruthy();
@@ -483,10 +477,7 @@ describe('SBTPage holder modal rendering', () => {
     };
 
     const tree = subject.render();
-    const progressBar = findElementInTree(
-      tree,
-      (element) => element?.props?.role === 'progressbar'
-    );
+    const progressBar = findElementInTree(tree, (element) => element?.props?.role === 'progressbar');
 
     expect(progressBar).toBeTruthy();
     expect(treeIncludesText(tree, 'Scanning mint/burn history: 400 blocks remaining')).toBe(true);
@@ -531,14 +522,8 @@ describe('SBTPage holder modal rendering', () => {
     };
 
     const tree = subject.render();
-    const progressBar = findElementInTree(
-      tree,
-      (element) => element?.props?.role === 'progressbar'
-    );
-    const headerSpinner = findElementInTree(
-      tree,
-      (element) => element?.props?.className === styles.cornerSpinner
-    );
+    const progressBar = findElementInTree(tree, (element) => element?.props?.role === 'progressbar');
+    const headerSpinner = findElementInTree(tree, (element) => element?.props?.className === styles.cornerSpinner);
 
     expect(treeIncludesText(tree, 'Scanning mint/burn history:')).toBe(false);
     expect(progressBar).toBeNull();
@@ -579,17 +564,11 @@ describe('SBTPage holder modal rendering', () => {
     };
 
     const tree = subject.render();
-    const titleStack = findElementInTree(
-      tree,
-      (element) => element?.props?.className === styles.modalTitleStack
-    );
-    const spinnerRow = findElementInTree(
-      tree,
-      (element) => element?.props?.className === styles.modalTitleSpinnerRow
-    );
+    const titleStack = findElementInTree(tree, (element) => element?.props?.className === styles.modalTitleStack);
+    const spinnerRow = findElementInTree(tree, (element) => element?.props?.className === styles.modalTitleSpinnerRow);
     const headerSpinner = findElementInTree(
       titleStack,
-      (element) => element?.props?.className === styles.cornerSpinner
+      (element) => element?.props?.className === styles.cornerSpinner,
     );
 
     expect(titleStack).toBeTruthy();
@@ -631,10 +610,7 @@ describe('SBTPage holder modal rendering', () => {
     };
 
     const tree = subject.render();
-    const progressBar = findElementInTree(
-      tree,
-      (element) => element?.props?.role === 'progressbar'
-    );
+    const progressBar = findElementInTree(tree, (element) => element?.props?.role === 'progressbar');
     expect(progressBar).toBeTruthy();
     expect(treeIncludesText(tree, 'Scanning mint/burn history: 40 blocks remaining')).toBe(true);
     expect(treeIncludesText(tree, '(blocks 2,000-2,079)')).toBe(false);
@@ -673,10 +649,7 @@ describe('SBTPage holder modal rendering', () => {
     };
 
     const tree = subject.render();
-    const progressBar = findElementInTree(
-      tree,
-      (element) => element?.props?.role === 'progressbar'
-    );
+    const progressBar = findElementInTree(tree, (element) => element?.props?.role === 'progressbar');
 
     expect(progressBar).toBeTruthy();
     expect(treeIncludesText(tree, 'Scanning mint/burn history: 10 blocks remaining')).toBe(true);
@@ -734,10 +707,7 @@ describe('SBTPage holder modal rendering', () => {
     };
 
     const tree = subject.render();
-    const spinner = findElementInTree(
-      tree,
-      (element) => element?.props?.spin === true
-    );
+    const spinner = findElementInTree(tree, (element) => element?.props?.spin === true);
 
     expect(treeIncludesText(tree, 'No holders found.')).toBe(true);
     expect(treeIncludesText(tree, 'Scanning mint/burn history:')).toBe(false);
@@ -772,10 +742,7 @@ describe('SBTPage holder modal rendering', () => {
     };
 
     const tree = subject.render();
-    const spinner = findElementInTree(
-      tree,
-      (element) => element?.props?.spin === true
-    );
+    const spinner = findElementInTree(tree, (element) => element?.props?.spin === true);
 
     expect(treeIncludesText(tree, '0 / ∞')).toBe(true);
     expect(spinner).toBeNull();

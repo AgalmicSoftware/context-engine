@@ -5,13 +5,7 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import SessionWizardShell, { type SessionWizardShellProps } from './SessionWizardShell';
 
 jest.mock('./SessionWizardHeader', () => (props: any) => (
-  <div
-    data-testid="shell-header"
-    data-mode={props.wizardMode}
-    data-profile-label={props.sessionModeProfileLabel || ''}
-    data-profile-selection-step={String(!!props.sessionModeProfileSelectionStep)}
-  >
-    {props.sessionModeProfileControl}
+  <div data-testid="shell-header" data-mode={props.wizardMode}>
     <button type="button" onClick={props.onEnterAdvancedMode}>
       advanced
     </button>
@@ -114,7 +108,6 @@ jest.mock('./SessionPublishSummary', () => (props: any) => (
     data-publish-advanced-open={String(props.publishUiPlan?.publishActionDisplayState?.publishAdvancedOpen || false)}
     data-worker-source={props.workerUrlSource || ''}
   >
-    {props.sessionModeProfilePublishControl}
     <button type="button" onClick={props.onToggleCollapsed}>
       toggle publish
     </button>

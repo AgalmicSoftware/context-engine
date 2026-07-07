@@ -179,6 +179,93 @@ $muted-text: tokens.$ce-muted-text;
   min-width: 200px;
 }
 
+.wizardModeToggle {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 4px;
+  border-radius: var(--ce-radius-pill);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.wizardModeBtn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: inherit;
+  font-size: 0.75rem;
+  opacity: 0.72;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: var(--ce-radius-pill);
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    opacity 0.2s ease;
+}
+
+.wizardModeBtnActive {
+  opacity: 1;
+  border-color: rgba(77, 255, 164, 0.35);
+  background: rgba(77, 255, 164, 0.12);
+}
+
+.wizardSettingsMenu {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.wizardSettingsBackdrop {
+  position: fixed;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  z-index: 30;
+}
+
+.wizardSettingsButton {
+  position: relative;
+  z-index: 32;
+}
+
+.wizardSettingsPanel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  min-width: 220px;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(18, 22, 50, 0.96);
+  box-shadow:
+    0 16px 32px rgba(0, 0, 0, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  z-index: 31;
+}
+
+.wizardSettingsLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: $muted-text;
+}
+
+.wizardSettingsPanel .wizardModeToggle {
+  width: 100%;
+}
+
+.wizardSettingsPanel .wizardModeBtn {
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .normalModeRail {
   display: grid;
   grid-template-columns: repeat(var(--session-wizard-card-count, 4), minmax(0, 1fr));
@@ -2221,9 +2308,7 @@ $muted-text: tokens.$ce-muted-text;
   padding: 14px 16px;
   border: 1px solid rgba(77, 255, 164, 0.24);
   border-radius: 14px;
-  background:
-    linear-gradient(180deg, rgba(77, 255, 164, 0.08), rgba(255, 255, 255, 0.04)),
-    rgba(255, 255, 255, 0.03);
+  background: linear-gradient(180deg, rgba(77, 255, 164, 0.08), rgba(255, 255, 255, 0.04)), rgba(255, 255, 255, 0.03);
   color: rgba(244, 247, 255, 0.92);
   box-shadow: $card-shadow;
 }

@@ -194,7 +194,9 @@ export const buildSbtPagePasswordInviteLink = ({
   const routePath = String(demoPath || '');
   const address = String(sbtAddr || '');
   if (isInvite) {
-    return `${origin}${routePath}?auto=1&sbt=${encodeURIComponent(address)}`;
+    const encodePassword =
+      typeof encodeGroupPassword === 'function' ? encodeGroupPassword : (password: string) => password;
+    return `${origin}${routePath}?auto=1&sbt=${encodeURIComponent(address)}&gp=${encodeURIComponent(encodePassword(codeText))}`;
   }
   return `${origin}${String(sbtBasePathValue || '')}/${address}`;
 };
@@ -233,12 +235,7 @@ export const buildSbtPagePasswordExportFile = ({
     format === 'json' || format === 'csv' ? format : null;
   if (!passwordExportFormat) return null;
 
-  const exportRows: SbtPagePasswordExportRow[] = Array.isArray(rows)
-    ? (rows as SbtPagePasswordExportRow[]).map((row): SbtPagePasswordExportRow => ({
-        ...row,
-        inviteLink: sanitizeSbtClaimIdentityUrl(row?.inviteLink),
-      }))
-    : [];
+  const exportRows = Array.isArray(rows) ? (rows as SbtPagePasswordExportRow[]) : [];
   const label = String(codeLabel || 'password');
   const fileNameBase = String(sbtSymbolOrName || 'SBT');
   const fileSuffix = String(fileLabel || 'passwords');

@@ -1,11 +1,7 @@
 import type { SbtAdminOpsPort, SbtProviderRef } from './sbtPorts.js';
 import { bindSbtAdminOpsPort } from './contractScriptsSbtAdminOpsPort.js';
 
-const executeSbtAdminOps = async (
-  port: SbtAdminOpsPort,
-  providerName: SbtProviderRef,
-  sbtAddress: string,
-) => {
+const executeSbtAdminOps = async (port: SbtAdminOpsPort, providerName: SbtProviderRef, sbtAddress: string) => {
   const [addTx, burnTx, passwordTx, isValid, startTx] = await Promise.all([
     port.addHashedPasswords(providerName, sbtAddress, ['0xhash1', '0xhash2']),
     port.burnToken(providerName, sbtAddress, '4'),
@@ -64,19 +60,24 @@ describe('SbtAdminOpsPort', () => {
       contractScripts: () => currentContractScripts,
     });
 
-    await expect(port.addHashedPasswords('injected', '0x0000000000000000000000000000000000000001', ['0xfirst']))
-      .resolves.toEqual({ transactionHash: '0xfirstAdd' });
+    await expect(
+      port.addHashedPasswords('injected', '0x0000000000000000000000000000000000000001', ['0xfirst']),
+    ).resolves.toEqual({ transactionHash: '0xfirstAdd' });
 
     currentContractScripts = secondContractScripts;
 
-    await expect(port.burnToken('injected', '0x0000000000000000000000000000000000000002', '5'))
-      .resolves.toEqual({ transactionHash: '0xsecondBurn' });
-    await expect(port.claimWithPassword('injected', '0x0000000000000000000000000000000000000002', 'pw'))
-      .resolves.toEqual({ transactionHash: '0xsecondPassword' });
-    await expect(port.isPasswordValid('none', '0x0000000000000000000000000000000000000002', '0xhash', 'beta'))
-      .resolves.toBe(true);
-    await expect(port.startClaim('injected', '0x0000000000000000000000000000000000000002', '0xcommit'))
-      .resolves.toEqual({ transactionHash: '0xsecondStart' });
+    await expect(port.burnToken('injected', '0x0000000000000000000000000000000000000002', '5')).resolves.toEqual({
+      transactionHash: '0xsecondBurn',
+    });
+    await expect(
+      port.claimWithPassword('injected', '0x0000000000000000000000000000000000000002', 'pw'),
+    ).resolves.toEqual({ transactionHash: '0xsecondPassword' });
+    await expect(
+      port.isPasswordValid('none', '0x0000000000000000000000000000000000000002', '0xhash', 'beta'),
+    ).resolves.toBe(true);
+    await expect(
+      port.startClaim('injected', '0x0000000000000000000000000000000000000002', '0xcommit'),
+    ).resolves.toEqual({ transactionHash: '0xsecondStart' });
 
     expect(firstContractScripts.addHashedPasswords).toHaveBeenCalledWith(
       'injected',

@@ -67,7 +67,7 @@ describe('prompt builders', () => {
         clusterSize: 5,
         topStatements: [{ prompt: 'Regulate frontier systems' }],
       },
-      { clusterCount: 4 }
+      { clusterCount: 4 },
     );
     const fallbackPrompt = buildClusterAnalysisPrompt(null, null);
 

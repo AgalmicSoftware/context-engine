@@ -1,6 +1,6 @@
 import { DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
 import { sessionRegistryUtils } from '../../utilities/web3/sessionRegistry.js';
-import { getDemoSessionConfigBySlug, getSessionConfigBySlugOrDefault } from '../../utilities/web3/chainGateway.js';
+import { getDemoSessionConfigBySlug, getSessionConfigBySlugOrDefault } from '../../utilities/web3/contractScripts.js';
 import { normalizeSessionNaming } from '../../utilities/session/sessionMetadata.js';
 import { normalizeSponsoredFieldSnapshot } from '../../utilities/session/sponsoredFlags.js';
 import { t } from '../../utilities/ui/terminology.js';

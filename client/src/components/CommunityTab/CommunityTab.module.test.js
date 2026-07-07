@@ -41,12 +41,4 @@ describe('CommunityTab module styles', () => {
     );
     expect(scss).not.toMatch(/:global\(\.modal-header\)\s*{[\s\S]*?:global\(\.close\)/);
   });
-
-  it('keeps the modal viewport-bounded and scrollable without losing centered margins on narrow screens', () => {
-    const scss = fs.readFileSync(path.join(__dirname, 'CommunityTab.module.scss'), 'utf8');
-
-    expect(scss).toMatch(/\.modal\s*{[\s\S]*?:global\(\.modal-content\)\s*{[\s\S]*?display:\s*flex;[\s\S]*?flex-direction:\s*column;[\s\S]*?max-height:\s*calc\(100vh - 2rem\);[\s\S]*?overflow:\s*hidden;/);
-    expect(scss).toMatch(/\.modal\s*{[\s\S]*?:global\(\.modal-body\)\s*{[\s\S]*?flex:\s*1 1 auto;[\s\S]*?min-height:\s*0;[\s\S]*?overflow-y:\s*auto;/);
-    expect(scss).toMatch(/@media \(max-width: 768px\)\s*{[\s\S]*?\.modal\s*{[\s\S]*?width:\s*calc\(100vw - 1\.5rem\);[\s\S]*?max-width:\s*calc\(100vw - 1\.5rem\);[\s\S]*?margin:\s*0\.75rem auto;/);
-  });
 });

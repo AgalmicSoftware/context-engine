@@ -36,7 +36,7 @@ export const resolveSessionWizardFundingRequirement = ({
   const chainName = toStr(chain?.name).trim();
   const chainSymbol = toStr(chain?.nativeCurrency?.symbol).trim() || 'ETH';
   return {
-    label: `${chainName || 'Selected network'} ${chainSymbol} for on-chain ${purpose}`,
+    label: `${chainName || 'Selected network'} ${chainSymbol} for on-chain registration`,
     href: Number(chain?.id || 0) === 11155420 ? SESSION_WIZARD_REQUIREMENT_LINKS.optimismSepoliaFaucet : '',
   };
 };

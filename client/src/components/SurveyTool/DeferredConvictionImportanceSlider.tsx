@@ -4,10 +4,7 @@ import ConvictionImportanceLabel from './ConvictionImportanceLabel';
 import CESlider from '../Shared/CESlider';
 import styles from './SurveyTool.module.scss';
 import type { SliderMode } from './surveyToolSliderState.js';
-import {
-  RATING_MAX,
-  RATING_MIN,
-} from '../../utilities/survey/ratingValue.js';
+import { RATING_MAX, RATING_MIN } from '../../utilities/survey/ratingValue.js';
 
 type DeferredConvictionImportanceSliderProps = {
   value: number;

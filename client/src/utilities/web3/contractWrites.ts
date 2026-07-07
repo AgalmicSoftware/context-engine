@@ -274,15 +274,7 @@ const sendContractWriteViaProvider = async ({
   if (!ethersProvider || typeof ethersProvider.waitForTransaction !== 'function') {
     throw new Error('Connected wallet provider does not support waiting for transaction receipts.');
   }
-  let receipt: AnyRecord;
-  try {
-    receipt = (await ethersProvider.waitForTransaction(txHash)) as AnyRecord;
-  } catch (error) {
-    if (sensitiveArgs) {
-      throw buildSensitiveWriteError(error);
-    }
-    throw error;
-  }
+  const receipt = (await ethersProvider.waitForTransaction(txHash)) as AnyRecord;
   if (!receipt || (receipt.status !== undefined && receipt.status !== 1)) {
     const resolvedRevertMessage = sensitiveArgs
       ? revertMessage

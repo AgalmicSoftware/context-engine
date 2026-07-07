@@ -16,7 +16,7 @@ export const decryptPrivateKey = async ({
   const plaintext = await crypto.subtle.decrypt(
     { name: 'AES-GCM', iv: base64URLToBuffer(record.iv) },
     aesKey,
-    base64URLToBuffer(record.encryptedPrivateKey)
+    base64URLToBuffer(record.encryptedPrivateKey),
   );
   const privateKey = textDecoder.decode(plaintext).trim();
   if (!/^0x[0-9a-f]{64}$/i.test(privateKey)) {

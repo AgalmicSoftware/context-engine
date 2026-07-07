@@ -67,8 +67,7 @@ export class Navbar extends Component<NavbarProps, NavbarState> {
   constructor(props: NavbarProps) {
     super(props);
     const hasWindow = typeof window !== 'undefined';
-    const runtimeWindow = hasWindow ? (window as NavbarRuntimeWindow) : null;
-    const shouldAnimate = ENABLE_CE_LOGO_ANIMATION && !!runtimeWindow && !runtimeWindow.__ceLogoAnimationPlayed;
+    const shouldAnimate = ENABLE_CE_LOGO_ANIMATION && hasWindow && !(window as any).__ceLogoAnimationPlayed;
     this.state = {
       showAnimatedLogo: shouldAnimate,
     };
@@ -153,7 +152,6 @@ export class Navbar extends Component<NavbarProps, NavbarState> {
               loginComplete={this.props.loginComplete}
               loginInProgress={this.props.loginInProgress}
               provider={this.props.provider}
-              sessionConfig={this.props.sessionConfig}
             />
           </div>
         </div>
@@ -182,7 +180,6 @@ export class Navbar extends Component<NavbarProps, NavbarState> {
               sendTestETH={(amountToSend: unknown) => this.props.sendTestETH?.(amountToSend)}
               demoMode={this.props.demoMode}
               toggleDemoMode={(demoModeOn: boolean) => this.props.toggleDemoMode?.(demoModeOn)}
-              sessionConfig={this.props.sessionConfig}
             />
           </div>
         </div>

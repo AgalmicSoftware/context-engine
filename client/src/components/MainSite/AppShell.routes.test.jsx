@@ -548,15 +548,17 @@ const createSubject = ({
     return slug === sessionConfig.slug ? sessionConfig : null;
   });
 
-  const subject = new AppShell(buildProps({
-    path,
-    firstVisit,
-    demoSurfaceMode,
-    sessionState: {
-      primarySessionSlug: activeSessionSlug,
-      primarySessionExplicit: true,
-    },
-  }));
+  const subject = new AppShell(
+    buildProps({
+      path,
+      firstVisit,
+      demoSurfaceMode,
+      sessionState: {
+        primarySessionSlug: activeSessionSlug,
+        primarySessionExplicit: true,
+      },
+    }),
+  );
   subject.state = {
     ...subject.state,
     isCacheManagerReady: true,
@@ -667,10 +669,12 @@ const attachDgStore = (subject, initial = {}) => {
 
 describe('AppShell connected export wiring', () => {
   it('wires changeAccount into the connected AppShell export for wagmi hydration', () => {
-    expect(appShellDispatchActions).toEqual(expect.objectContaining({
-      changeAccount: expect.any(Function),
-      updateLoginInfo: expect.any(Function),
-    }));
+    expect(appShellDispatchActions).toEqual(
+      expect.objectContaining({
+        changeAccount: expect.any(Function),
+        updateLoginInfo: expect.any(Function),
+      }),
+    );
   });
 });
 
@@ -819,7 +823,10 @@ describe('AppShell route render smoke', () => {
       'data-initial-sponsored-bundle-id',
       'sponsor-tx-id',
     );
-    expect(screen.getByTestId('mock-session-wizard')).toHaveAttribute('data-initial-sponsored-bundle-key', '');
+    expect(screen.getByTestId('mock-session-wizard')).toHaveAttribute(
+      'data-initial-sponsored-bundle-key',
+      'sponsor-secret',
+    );
     expect(screen.getByTestId('mock-session-wizard')).toHaveAttribute('data-network-id', '84532');
     expect(mockSessionWizard.mock.calls[mockSessionWizard.mock.calls.length - 1][0]?.ensureLightSbtUniverse).toBe(
       subject.ensureLightSbtUniverse,
@@ -827,7 +834,7 @@ describe('AppShell route render smoke', () => {
     expect(replaceStateSpy).toHaveBeenCalledWith(
       {},
       '',
-      '/session/new?sessionId=edge-session-id&chainId=chain-84532&sponsored=sponsor-tx-id',
+      '/session/new?sessionId=edge-session-id&chainId=chain-84532&sponsored=sponsor-tx-id#k=sponsor-secret',
     );
     expect(window.location.hash).toBe('');
   });
@@ -860,72 +867,6 @@ describe('AppShell route render smoke', () => {
     expect(mockAdminPage.mock.calls[mockAdminPage.mock.calls.length - 1][0]?.ensureLightSbtUniverse).toBe(
       subject.ensureLightSbtUniverse,
     );
-  });
-
-  it('fresh-loads a worker-canonical admin link without registry lookup', async () => {
-    const workerOrigin = 'https://admin-worker.example.com';
-    const sessionId = '0xabcdefabcdefabcdefabcdefabcdefab';
-    const workerConfig = {
-      slug: 'admin-worker',
-      sessionId,
-      configRevision: 'admin-revision-1',
-      corsWorkerUrl: workerOrigin,
-      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
-    };
-    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          ok: true,
-          sessionSlug: workerConfig.slug,
-          config: workerConfig,
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } },
-      ),
-    );
-    const subject = createSubject({
-      path: '/admin',
-      search:
-        `?sessionId=${sessionId}&sessionSlug=${workerConfig.slug}` + `&worker=${encodeURIComponent(workerOrigin)}`,
-      sessionConfig: null,
-    });
-
-    const view = render(subject.render());
-
-    expect(await screen.findByTestId('ce-worker-canonical-bootstrap-status')).toBeInTheDocument();
-    await waitFor(() => expect(subject.state.sessionPathResolutionNonce).toBeGreaterThan(0));
-    view.rerender(subject.render());
-
-    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_ADMIN_ROOT)).toBeInTheDocument();
-    expect(mockAdminPage.mock.calls.at(-1)?.[0]?.initialSessionConfig).toEqual(workerConfig);
-    expect(mockAdminPage.mock.calls.at(-1)?.[0]?.initialRegistryChainId).toBeNull();
-  });
-
-  it('renders the posts root without waiting for cache hydration', async () => {
-    const subject = createSubject({ path: '/posts' });
-    subject.state = {
-      ...subject.state,
-      isCacheManagerReady: false,
-    };
-
-    render(subject.render());
-
-    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_POSTS_ROOT)).toBeInTheDocument();
-    expect(await screen.findByTestId('mock-posts-page')).toBeInTheDocument();
-    expect(mockPostsPage).toHaveBeenCalled();
-  });
-
-  it('renders post detail URLs without waiting for cache hydration', async () => {
-    const subject = createSubject({ path: '/posts/first-post' });
-    subject.state = {
-      ...subject.state,
-      isCacheManagerReady: false,
-    };
-
-    render(subject.render());
-
-    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_POSTS_ROOT)).toBeInTheDocument();
-    expect(await screen.findByTestId('mock-posts-page')).toBeInTheDocument();
-    expect(mockPostsPage).toHaveBeenCalled();
   });
 
   it('prefers the live browser pathname when the path prop is stale after a direct history rewrite', async () => {
@@ -1491,7 +1432,7 @@ describe('AppShell route render smoke', () => {
     render(subject.render());
 
     expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_WIZARD_ROOT)).toBeInTheDocument();
-    expect(replaceStateSpy).toHaveBeenCalledWith({}, '', '/ce/session/new?sessionId=edge-session-id#preview=1');
+    expect(replaceStateSpy).toHaveBeenCalledWith({}, '', '/ce/session/new?sessionId=edge-session-id#k=sponsor-secret');
   });
 
   it('renders the sponsor root and forwards session query params to SponsorPage', async () => {
@@ -2180,7 +2121,7 @@ describe('AppShell route render smoke', () => {
       activeSessionSlug: '',
       sessionConfig: null,
     });
-    getDemoSessionConfigBySlug.mockImplementation((slug) => (slug === 'demo-sh' ? demoConfig : null));
+    getDemoSessionConfigBySlug.mockImplementation((slug) => (slug === 'demo-1' ? demoConfig : null));
     subject.applySessionFallbackRedirect = jest.fn(() => null);
     subject.syncSessionFallbackRedirectConsumption = jest.fn();
     subject.manageAutoHashPersistence = jest.fn();
@@ -2193,7 +2134,7 @@ describe('AppShell route render smoke', () => {
     subject.syncCacheHasLoadedFlagFromPersistent = jest.fn(async () => undefined);
     subject.syncCacheHasLoadedFlagOnTransition = jest.fn(async () => undefined);
     subject.getSessionNetwork = jest.fn(() => null);
-    subject.getDisplaySessionNetwork = jest.fn((slug) => (slug === 'demo-sh' ? DEFAULT_NETWORK : null));
+    subject.getDisplaySessionNetwork = jest.fn((slug) => (slug === 'demo-1' ? DEFAULT_NETWORK : null));
     subject.initializeQuestionCacheForGroup = jest.fn(async () => undefined);
     subject.fetchQuestionResponsesChunkedForGroup = jest.fn(async () => undefined);
     subject.initializeSurveyCacheForGroup = jest.fn(async () => undefined);
@@ -2560,11 +2501,13 @@ describe('AppShell route render smoke', () => {
   });
 
   it('wires registry bootstrap promise state through AppShell and clears failures', async () => {
-    const subject = stubMainSiteMountSideEffects(createSubject({
-      path: '/session/edge',
-      activeSessionSlug: 'edge',
-      sessionConfig: buildSessionConfig(),
-    }));
+    const subject = stubMainSiteMountSideEffects(
+      createSubject({
+        path: '/session/edge',
+        activeSessionSlug: 'edge',
+        sessionConfig: buildSessionConfig(),
+      }),
+    );
     const mountBootstrap = createDeferred();
     loadGroupRegistryCache.mockReturnValueOnce(mountBootstrap.promise);
 

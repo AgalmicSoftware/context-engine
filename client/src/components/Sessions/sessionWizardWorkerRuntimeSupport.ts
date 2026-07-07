@@ -72,10 +72,7 @@ export const resolveSessionWizardWorkerUrlSourceState = ({
   workerMode = '',
 }: ResolveSessionWizardWorkerUrlSourceStateArgs = {}): SessionWizardWorkerUrlSourceState => {
   const usesDefaultWorkerUrl =
-    workerMode === 'default' &&
-    !!visibleConfiguredWorkerUrl &&
-    !!defaultWorkerUrl &&
-    visibleConfiguredWorkerUrl === defaultWorkerUrl;
+    !!visibleConfiguredWorkerUrl && !!defaultWorkerUrl && visibleConfiguredWorkerUrl === defaultWorkerUrl;
   const deployWorkerMatchesConfiguredUrl =
     !!visibleConfiguredWorkerUrl && !!deployedWorkerUrl && visibleConfiguredWorkerUrl === deployedWorkerUrl;
   const workerUrlSource = !resolvedWorkerBaseUrl
@@ -181,9 +178,10 @@ export const resolveSessionWizardWorkerFaucetConfigFromDraft = ({
     return cleaned ? cleaned : toStr(fallback).trim();
   };
   const chainId = resolveSessionWizardWorkerRuntimeChainId({ draft, registryChainId, networkId });
-  const defaultRpcUrl = resolveSessionWizardWorkerRpcUrlFromDraft({ draft, registryChainId, networkId, workerSecrets })
-    || getDefaultHttpRpc(chainId)
-    || resolveFallbackRpcUrl(chainId);
+  const defaultRpcUrl =
+    resolveSessionWizardWorkerRpcUrlFromDraft({ draft, registryChainId, networkId, workerSecrets }) ||
+    getDefaultHttpRpc(chainId) ||
+    resolveFallbackRpcUrl(chainId);
   return {
     rpcUrl: fallbackIfUnset(faucetCfg.rpcUrl, defaultRpcUrl),
     amountEth: fallbackIfUnset(faucetCfg.amountEth, '0.0002'),

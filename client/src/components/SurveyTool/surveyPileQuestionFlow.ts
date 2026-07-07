@@ -42,18 +42,10 @@ export const sortPileQuestionsByPriority = ({
   highlightedQuestionIds?: Set<string> | null;
   account?: string | null;
 } = {}): PileQuestionLike[] => {
-  const normalizedQuestions = filterPendingQuestionMetadataPlaceholders(
-    Array.isArray(questions) ? questions : []
-  );
-  const normalizedResponses = questionResponses && typeof questionResponses === 'object'
-    ? questionResponses
-    : {};
-  const normalizedResponseCounts = responseCounts && typeof responseCounts === 'object'
-    ? responseCounts
-    : {};
-  const normalizedHighlightedIds = highlightedQuestionIds instanceof Set
-    ? highlightedQuestionIds
-    : new Set<string>();
+  const normalizedQuestions = filterPendingQuestionMetadataPlaceholders(Array.isArray(questions) ? questions : []);
+  const normalizedResponses = questionResponses && typeof questionResponses === 'object' ? questionResponses : {};
+  const normalizedResponseCounts = responseCounts && typeof responseCounts === 'object' ? responseCounts : {};
+  const normalizedHighlightedIds = highlightedQuestionIds instanceof Set ? highlightedQuestionIds : new Set<string>();
   const accountLower = String(account || '').toLowerCase();
   const isLoggedIn = !!accountLower;
 
@@ -92,9 +84,7 @@ export const splitPileMaskedQuestions = ({
 }: {
   questions?: PileQuestionLike[] | null;
 } = {}) => {
-  const normalizedQuestions = filterPendingQuestionMetadataPlaceholders(
-    Array.isArray(questions) ? questions : []
-  );
+  const normalizedQuestions = filterPendingQuestionMetadataPlaceholders(Array.isArray(questions) ? questions : []);
   const hiddenQuestions = normalizedQuestions.filter((question) => isQuestionPromptMasked(question));
   const visibleQuestions = normalizedQuestions.filter((question) => !isQuestionPromptMasked(question));
 

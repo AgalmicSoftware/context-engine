@@ -45,57 +45,6 @@ const { normalizeSessionSlug } = contractScriptsModule;
 const { normalizeArweaveFailureMeta, shouldStopPendingMetadataRetry } = require('../arweave/arweaveRetryHelpers.js');
 const { prepareSurveyMetadataCacheEntry } = require('./metadataCacheEntryBuilders.js');
 const { resolveScopedMetadataSessionSlug } = require('../session/metadataSessionBinding.js');
-const { resolveWorkerCanonicalCacheIdentity } = require('./workerCanonicalCacheIdentity.js');
-
-const WORKER_SESSION_ID = `0x${'4'.repeat(32)}`;
-
-const createWorkerCanonicalSessionConfig = ({
-  sessionId = WORKER_SESSION_ID,
-  workerUrl = 'https://alpha-worker.example.test',
-} = {}) => ({
-  slug: 'alpha',
-  sessionId,
-  corsWorkerUrl: workerUrl,
-  sessionModeProfile: {
-    profileVersion: 1,
-    preset: 'custom',
-    authority: { mode: 'worker_canonical' },
-    evm: { registryChainId: null },
-    storage: {
-      backend: 'cloudflare',
-      payloadAccessControl: { gate: 'none', encryption: 'none' },
-    },
-    identity: { default: 'passkey', enabled: ['passkey'] },
-    authorization: { mechanisms: ['worker_roles'] },
-    encryption: { mode: 'none' },
-    surfaces: {
-      web: true,
-      telegram: false,
-      miniApp: false,
-      agentHttp: false,
-      mcp: false,
-      ceCc: false,
-    },
-    results: {
-      visibility: 'public_full_if_storage_public',
-      exposure: {
-        aggregateResultsEnabled: true,
-        anonymizedGroupsEnabled: false,
-        minGroupSize: 2,
-      },
-    },
-    export: { scope: 'all_session' },
-  },
-  storageProfile: {
-    backend: 'cloudflare',
-    resources: { questions: 'active', surveys: 'active' },
-    payloadAccessControl: {
-      gate: 'none',
-      encryption: 'none',
-      mode: 'public_read',
-    },
-  },
-});
 
 const deepClone = (value) => (value == null ? value : JSON.parse(JSON.stringify(value)));
 
@@ -163,11 +112,6 @@ const createMockHost = (overrides = {}) => {
     updateSurveysCacheAtomic,
     updateUserCacheAtomic,
     getActiveSessionSlug: jest.fn(() => activeSlug || 'test-slug'),
-    getSessionCfg: jest.fn((slug) => ({
-      slug,
-      networkChainId: 11155420,
-      blockLimits: { start: 10, end: null },
-    })),
     getSessionChainId: jest.fn(() =>
       Object.prototype.hasOwnProperty.call(overrides, 'chainId') ? chainId : '11155420',
     ),
@@ -244,14 +188,32 @@ describe('createSessionSurveyCacheController', () => {
       expect(controller.startSurveyAndQuestionEventListenerForGroup('alpha')).toBe(true);
 
       expect(contractScripts.removeSurveyEventsListener).toHaveBeenCalledWith('none', 'alpha');
-      expect(contractScripts.listenForSurveyEvents).toHaveBeenCalledWith(
-        'none',
-        expect.any(Function),
-        'alpha'
-      );
+      expect(contractScripts.listenForSurveyEvents).toHaveBeenCalledWith('none', expect.any(Function), 'alpha');
 
       const handler = contractScripts.listenForSurveyEvents.mock.calls[0][1];
       const event = { type: 'SurveyAdded', surveyId: '0xsurvey' };
+      handler(event);
+
+      expect(host.onSurveyEventDetectedForGroup).toHaveBeenCalledWith('alpha', event);
+    });
+
+    it('uses an injected event stream port for survey listeners', () => {
+      const surveyEventStreamsPort = {
+        removeSurveyEventsListener: jest.fn(),
+        listenForSurveyEvents: jest.fn(),
+      };
+      const host = createMockHost({ surveyEventStreamsPort });
+      const controller = createSessionSurveyCacheController(host);
+
+      expect(controller.startSurveyAndQuestionEventListenerForGroup('alpha')).toBe(true);
+
+      expect(surveyEventStreamsPort.removeSurveyEventsListener).toHaveBeenCalledWith('none', 'alpha');
+      expect(surveyEventStreamsPort.listenForSurveyEvents).toHaveBeenCalledWith('none', expect.any(Function), 'alpha');
+      expect(contractScripts.removeSurveyEventsListener).not.toHaveBeenCalled();
+      expect(contractScripts.listenForSurveyEvents).not.toHaveBeenCalled();
+
+      const handler = surveyEventStreamsPort.listenForSurveyEvents.mock.calls[0][1];
+      const event = { type: 'SurveyAdded', surveyId: '0xinjected' };
       handler(event);
 
       expect(host.onSurveyEventDetectedForGroup).toHaveBeenCalledWith('alpha', event);
@@ -264,11 +226,7 @@ describe('createSessionSurveyCacheController', () => {
       expect(controller.startSurveyAndQuestionEventListener()).toBe(true);
 
       expect(contractScripts.removeSurveyEventsListener).toHaveBeenCalledWith('none', 'active-slug');
-      expect(contractScripts.listenForSurveyEvents).toHaveBeenCalledWith(
-        'none',
-        expect.any(Function),
-        'active-slug'
-      );
+      expect(contractScripts.listenForSurveyEvents).toHaveBeenCalledWith('none', expect.any(Function), 'active-slug');
     });
 
     it('does not attach a listener when scan policy skips the slug', () => {
@@ -740,7 +698,7 @@ describe('createSessionSurveyCacheController', () => {
         initialStorage: {
           surveysCache: {
             alpha: {
-              '11155420': {
+              11155420: {
                 surveysLatestBlock: 6,
                 surveys: {
                   surv1: { creationBlock: 5 },
@@ -769,9 +727,7 @@ describe('createSessionSurveyCacheController', () => {
       contractScripts.fetchUserSubmittedSurveyIDs.mockResolvedValue([]);
       contractScripts.fetchAllSurveyResponses
         .mockRejectedValueOnce(new Error('survey rpc down'))
-        .mockResolvedValueOnce([
-          { responder: '0xBEEF', response: secondResponse },
-        ]);
+        .mockResolvedValueOnce([{ responder: '0xBEEF', response: secondResponse }]);
 
       await controller.initializeSurveyCacheForGroup('alpha');
 
@@ -779,22 +735,8 @@ describe('createSessionSurveyCacheController', () => {
       const storedUserCache = host.getStored('userCache', 'alpha');
 
       expect(contractScripts.fetchAllSurveyResponses).toHaveBeenCalledTimes(2);
-      expect(contractScripts.fetchAllSurveyResponses).toHaveBeenNthCalledWith(
-        1,
-        'none',
-        'surv1',
-        5,
-        12,
-        'alpha'
-      );
-      expect(contractScripts.fetchAllSurveyResponses).toHaveBeenNthCalledWith(
-        2,
-        'none',
-        'surv2',
-        7,
-        12,
-        'alpha'
-      );
+      expect(contractScripts.fetchAllSurveyResponses).toHaveBeenNthCalledWith(1, 'none', 'surv1', 5, 12, 'alpha');
+      expect(contractScripts.fetchAllSurveyResponses).toHaveBeenNthCalledWith(2, 'none', 'surv2', 7, 12, 'alpha');
       expect(storedSurveyCache['11155420'].surveyResponses.surv1).toEqual({
         '0xold': { choice: 'old' },
       });

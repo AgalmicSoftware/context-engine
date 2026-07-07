@@ -31,7 +31,7 @@ export const buildPublicUrlPath = (
 
 export const stripPublicUrlBasePath = (
   pathname = '',
-  proc: ProcWithEnv = (typeof process !== 'undefined' ? process : undefined) as ProcWithEnv
+  proc: ProcWithEnv = (typeof process !== 'undefined' ? process : undefined) as ProcWithEnv,
 ): string => {
   const rawPath = toStr(pathname).trim();
   const basePath = readPublicUrlBasePath(proc);

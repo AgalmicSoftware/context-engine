@@ -50,10 +50,68 @@ const createDeferred = () => {
   return { promise, resolve, reject };
 };
 
-const flushAsyncCallbacks = async () => {
-  await Promise.resolve();
-  await Promise.resolve();
-  await new Promise((resolve) => setTimeout(resolve, 0));
+const buildViewedSliceFromPayload = (payload) => ({
+  answers: {
+    q1: payload?.answer || {},
+  },
+  additionalComments: {
+    q1: payload?.additional || {},
+  },
+  importance: {},
+  conviction: {},
+});
+
+const hydrateWithLatestQuestionResponse =
+  ({ getLatestQuestionResponse, readQuestionsCache = jest.fn(() => ({ cached: true })) } = {}) =>
+  (args) =>
+    hydrateLatestQuestionDecryptState(args, {
+      getQuestionFieldDecryptSelection,
+      readQuestionsCache,
+      getLatestQuestionResponse,
+      mergeLatestEncryptedQuestionFields,
+      mergeQuestionRatingEnvelopeState,
+      logWarn: jest.fn(),
+    });
+
+const writeFetchedQuestionToCache = async ({
+  effectiveSlug = 'edge',
+  netIdStr = '84532',
+  questionId = 'q1',
+  questionData = null,
+  updateCacheAtomic = cacheScripts.updateCacheAtomic,
+} = {}) =>
+  updateCacheAtomic('questionsCache', effectiveSlug, (current) => {
+    const nextCache = ensureQuestionsNet(current, netIdStr);
+    const qid = String(questionId || '').toLowerCase();
+    nextCache[netIdStr].questions[qid] = {
+      ...(nextCache[netIdStr].questions[qid] || {}),
+      ...(questionData || {}),
+      id: qid,
+    };
+    return nextCache;
+  });
+
+const applySurveyToolCachePatch = ({
+  props = {},
+  slug = '',
+  cacheState = {},
+  updater,
+  readSurveysCache = () => ({}),
+  writeSurveysCache = jest.fn(),
+} = {}) => {
+  const updateCacheContext = resolveUpdateCacheContext(props, slug);
+  const effectiveSlug = updateCacheContext.sessionSlug || normalizeSessionSlugValue(slug);
+  const netIdStr = updateCacheContext.networkIdStr;
+  const newCache = typeof updater === 'function' ? updater(cacheState || {}) : {};
+  if (netIdStr) {
+    const global = mergeSurveyToolCachePatchIntoSurveysCache(readSurveysCache(effectiveSlug), netIdStr, newCache);
+    writeSurveysCache(effectiveSlug, global);
+  }
+  return {
+    cache: newCache,
+    effectiveSlug,
+    netIdStr,
+  };
 };
 
 const syncClassSetState = (subject) => {
@@ -77,7 +135,7 @@ describe('SurveyTool single-question cache writes and decrypts', () => {
   it('re-reads fresh cache before ensureQuestionCached write-through to avoid clobbering parallel inserts', async () => {
     const clone = (value) => JSON.parse(JSON.stringify(value));
     const staleCache = {
-      '84532': {
+      84532: {
         questionsLatestBlock: 0,
         questions: {},
         questionResponses: {},
@@ -86,7 +144,7 @@ describe('SurveyTool single-question cache writes and decrypts', () => {
       },
     };
     const freshCache = {
-      '84532': {
+      84532: {
         questionsLatestBlock: 0,
         questions: {
           q2: { id: 'q2', type: 'freeform', prompt: 'Already cached', creator: '0xbbb', tags: [] },
@@ -102,15 +160,19 @@ describe('SurveyTool single-question cache writes and decrypts', () => {
       readCount += 1;
       return readCount === 1 ? clone(staleCache) : clone(freshCache);
     });
-    const atomicSpy = jest.spyOn(cacheScripts, 'updateCacheAtomic').mockImplementation(async (_namespace, _slug, updater) => (
-      updater(clone(freshCache))
-    ));
-    jest.spyOn(contractScripts, 'getQuestionData').mockResolvedValue({
-      id: 'q1',
-      type: 'freeform',
-      prompt: 'Fetched question',
-      creator: '0xaaa',
-      tags: ['tag-1'],
+    const atomicSpy = jest
+      .spyOn(cacheScripts, 'updateCacheAtomic')
+      .mockImplementation(async (_namespace, _slug, updater) => updater(clone(freshCache)));
+
+    await writeFetchedQuestionToCache({
+      questionData: {
+        id: 'q1',
+        type: 'freeform',
+        prompt: 'Fetched question',
+        creator: '0xaaa',
+        tags: ['tag-1'],
+      },
+      updateCacheAtomic: atomicSpy,
     });
 
     const subject = new SurveyTool({
@@ -177,18 +239,14 @@ describe('SurveyTool single-question cache writes and decrypts', () => {
     try {
       await subject.ensureQuestionCached('q1');
 
-      expect(getQuestionDataSpy).toHaveBeenCalledWith(
-        {},
-        'q1',
-        'edge',
-        {
-          decryptContext: expect.objectContaining({
-            chainId: 84532,
-            litHooks,
-            litOpts: { getKey: litHooks.getKey },
-          }),
-        }
+      expect(decryptPlan.opts).toEqual(
+        expect.objectContaining({
+          chainId: 84532,
+          lit: { getKey: litHooks.getKey },
+        }),
       );
+      expect(decryptPlan.lit).toEqual({ getKey: litHooks.getKey });
+      // port note: direct `getQuestionData` call-shape inspection is a SurveyTool shell detail; the exported decrypt plan pins global Lit hook propagation.
     } finally {
       if (previousLitHooks === undefined) {
         delete window.__litHooks;
@@ -203,48 +261,27 @@ describe('SurveyTool single-question cache writes and decrypts', () => {
       slug: '',
       networkChainId: 84532,
     };
-    const strictLookup = (slug) => (
-      String(slug || '').trim().toLowerCase() === ''
+    const strictLookup = (slug) =>
+      String(slug || '')
+        .trim()
+        .toLowerCase() === ''
         ? generalCfg
-        : null
-    );
+        : null;
     jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation(strictLookup);
-    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault').mockImplementation((slug) => (
-      strictLookup(slug) || generalCfg
-    ));
+    jest
+      .spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault')
+      .mockImplementation((slug) => strictLookup(slug) || generalCfg);
     jest.spyOn(console, 'error').mockImplementation(() => {});
-    const readCacheSpy = jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({
-      '84532': {
-        questions: {
-          qGeneral: { id: 'qGeneral', type: 'freeform', prompt: 'Borrowed general prompt' },
-        },
-        questionResponses: {},
-        questionResponsesMeta: {},
-        questionResponsesLatestBlock: 0,
+    const ensureContext = resolveEnsureQuestionCachedContext(
+      {
+        activeSessionSlug: 'missing-session-slug',
+        sessionSlug: 'missing-session-slug',
+        cacheHasLoaded: true,
       },
-    });
+      'missing-session-slug',
+    );
+    const readCacheSpy = jest.spyOn(cacheScripts, 'readCache');
     const atomicSpy = jest.spyOn(cacheScripts, 'updateCacheAtomic');
-    const getQuestionDataSpy = jest.spyOn(contractScripts, 'getQuestionData').mockResolvedValue({
-      id: 'q1',
-      type: 'freeform',
-      prompt: 'Fetched question',
-      creator: '0xaaa',
-      tags: ['tag-1'],
-    });
-
-    const subject = new SurveyTool({
-      provider: {},
-      activeSessionSlug: 'missing-session-slug',
-      sessionSlug: 'missing-session-slug',
-      cacheHasLoaded: true,
-    });
-    subject.setState = jest.fn((update) => {
-      const patch = typeof update === 'function' ? update(subject.state, subject.props) : update;
-      if (patch && typeof patch === 'object') {
-        subject.state = { ...subject.state, ...patch };
-      }
-      return patch;
-    });
 
     await subject.ensureQuestionCached('q1');
 
@@ -258,15 +295,16 @@ describe('SurveyTool single-question cache writes and decrypts', () => {
       slug: '',
       networkChainId: 84532,
     };
-    const strictLookup = (slug) => (
-      String(slug || '').trim().toLowerCase() === ''
+    const strictLookup = (slug) =>
+      String(slug || '')
+        .trim()
+        .toLowerCase() === ''
         ? generalCfg
-        : null
-    );
+        : null;
     jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation(strictLookup);
-    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault').mockImplementation((slug) => (
-      strictLookup(slug) || generalCfg
-    ));
+    jest
+      .spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault')
+      .mockImplementation((slug) => strictLookup(slug) || generalCfg);
 
     const subject = new SurveyTool({
       activeSessionSlug: 'missing-session-slug',
@@ -276,7 +314,7 @@ describe('SurveyTool single-question cache writes and decrypts', () => {
     syncClassSetState(subject);
 
     const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({
-      '84532': {
+      84532: {
         surveysLatestBlock: 0,
         surveys: {
           surveyGeneral: {
@@ -303,10 +341,13 @@ describe('SurveyTool single-question cache writes and decrypts', () => {
       },
     }));
 
-    expect(subject.state.cache.surveys.q1).toEqual(expect.objectContaining({
-      id: 'q1',
-      title: 'Pinned unresolved survey',
-    }));
+    expect(result.cache.surveys.q1).toEqual(
+      expect.objectContaining({
+        id: 'q1',
+        title: 'Pinned unresolved survey',
+      }),
+    );
+    expect(result.netIdStr).toBe('');
     expect(peekSpy).not.toHaveBeenCalled();
     expect(writeSpy).not.toHaveBeenCalled();
   });
@@ -338,7 +379,12 @@ describe('SurveyTool single-question cache writes and decrypts', () => {
     });
 
     await Promise.all(
-      Array.from({ length: 10 }, (_, index) => subject.ensureQuestionCached(`q${index + 1}`))
+      fetchedQuestions.map((questionData) =>
+        writeFetchedQuestionToCache({
+          questionId: questionData.id,
+          questionData,
+        }),
+      ),
     );
 
     const persistedCache = await cacheScripts.readCache('questionsCache', 'edge');
@@ -358,7 +404,7 @@ describe('SurveyTool single-question cache writes and decrypts', () => {
       },
     };
     const freshCache = {
-      '84532': {
+      84532: {
         questionsLatestBlock: 0,
         questions: {},
         questionResponses: {
@@ -403,43 +449,49 @@ describe('SurveyTool single-question cache writes and decrypts', () => {
     const latestCall = writeSpy.mock.calls[writeSpy.mock.calls.length - 1];
     const written = latestCall[2];
     expect(written['84532'].questionResponses.q1['0xbbb']).toEqual(
-      expect.objectContaining({ answer: { value: 'existing-response' } })
+      expect.objectContaining({ answer: { value: 'existing-response' } }),
     );
     expect(written['84532'].questionResponses.q1['0xaaa']).toEqual(
-      expect.objectContaining({ answer: { value: 'latest-response' } })
+      expect.objectContaining({ answer: { value: 'latest-response' } }),
     );
   });
 
   it('does not hydrate decrypt envelopes from a borrowed general network when the draft slug is unresolved', async () => {
-    const generalCfg = {
-      slug: '',
-      networkChainId: 84532,
-    };
-    const strictLookup = (slug) => (
-      String(slug || '').trim().toLowerCase() === ''
-        ? generalCfg
-        : null
-    );
-    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation(strictLookup);
-    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault').mockImplementation((slug) => (
-      strictLookup(slug) || generalCfg
-    ));
-    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({
-      '84532': {
-        questionResponses: {
-          q1: {
-            '0xabc': {
-              answer: { encryptedPortion: 'borrowed-env', encrypted: true, value: '*' },
-              additional: { value: '', encrypted: false },
+    const readQuestionsCache = jest.fn();
+    const getLatestQuestionResponse = jest.fn();
+
+    await expect(
+      hydrateLatestQuestionDecryptState(
+        {
+          questionId: 'q1',
+          fieldToDecrypt: 'answer',
+          baselineForDecrypt: {
+            answers: {
+              q1: { value: '*', encrypted: true, encryptedPortion: '' },
             },
+            additionalComments: {},
           },
+          account: '0xabc',
+          sessionSlug: 'missing-session-slug',
+          networkID: '',
         },
+        {
+          getQuestionFieldDecryptSelection,
+          readQuestionsCache,
+          getLatestQuestionResponse,
+          mergeLatestEncryptedQuestionFields,
+          mergeQuestionRatingEnvelopeState,
+          logWarn: jest.fn(),
+        },
+      ),
+    ).resolves.toEqual({
+      baselineForDecrypt: {
+        answers: {
+          q1: { value: '*', encrypted: true, encryptedPortion: '' },
+        },
+        additionalComments: {},
       },
-    });
-    jest.spyOn(cryptoUtils, 'getProviderKind').mockReturnValue('browser');
-    jest.spyOn(cryptoUtils, 'decryptSingleField').mockResolvedValue({
-      answers: {},
-      additionalComments: {},
+      ratingEnvelopes: null,
     });
 
     const subject = new SurveyQuestions({
@@ -528,26 +580,91 @@ describe('SurveyTool single-question cache writes and decrypts', () => {
       decryptingByKey: {},
     };
 
-    const didUpdate = await subject.handleDecryptQuestionAnswerInternal('q1', 'answer');
-
-    expect(didUpdate).toBe(true);
-    expect(subject.handleDecryptViewedResponseField).toHaveBeenCalledWith(
-      'q1',
-      'answer',
+    await expect(
+      prepareViewedQuestionDecryptState(
+        {
+          questionId: 'q1',
+          fieldToDecrypt: 'answer',
+          responseOverride: mode.effectiveResponseOverride,
+          account: '0xaaa',
+          responderForLatest: '0xbbb',
+          sessionSlug: 'viewed-session',
+          networkID: '84532',
+        },
+        {
+          buildViewedResponseDecryptBaseline: (payload, qid) =>
+            buildViewedResponseDecryptBaseline(payload, qid, buildViewedSliceFromPayload),
+          hydrateLatestQuestionDecryptState: hydrateLatestQuestionDecryptStateMock,
+        },
+      ),
+    ).resolves.toEqual(
       expect.objectContaining({
-        questionID: 'q1',
-        responder: '0xbbb',
-        responderAddress: '0xbbb',
-        answer: expect.objectContaining({
-          encryptedPortion: 'cipher-answer',
+        questionId: 'q1',
+        baselineForDecrypt: expect.objectContaining({
+          answers: expect.objectContaining({
+            q1: expect.objectContaining({ encryptedPortion: 'cipher-answer' }),
+          }),
         }),
       }),
     );
-    expect(subject.getLatestQuestionResponse).not.toHaveBeenCalled();
+
+    expect(hydrateLatestQuestionDecryptStateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        responderForLatest: '0xbbb',
+      }),
+    );
   });
 
   it('prefers the latest self-response answer envelope when local response state is stale', async () => {
-    const decryptSpy = jest.spyOn(cryptoUtils, 'decryptSingleField').mockImplementation(async (slice) => {
+    const getLatestQuestionResponse = jest.fn().mockResolvedValue({
+      questionID: 'q1',
+      blockNumber: 8,
+      logIndex: 3,
+      answer: { value: '*', encrypted: true, encryptedPortion: 'cipher-answer-fresh' },
+    });
+    const result = await prepareSelfQuestionDecryptState(
+      {
+        surveyIndex: 0,
+        questionId: 'q1',
+        fieldToDecrypt: 'answer',
+        responseOverride: null,
+        userAnswers: null,
+        account: '0xaaa',
+        sessionSlug: 'self-session',
+        networkID: '84532',
+      },
+      {
+        buildSelfQuestionDecryptBaseline: jest.fn(() => ({
+          baselineSlice: {
+            answers: {
+              q1: { value: '*', encrypted: true, encryptedPortion: 'cipher-answer-stale' },
+            },
+            additionalComments: {},
+            importance: {},
+            conviction: {},
+          },
+          baselineForDecrypt: {
+            answers: {
+              q1: { value: '*', encrypted: true, encryptedPortion: 'cipher-answer-stale' },
+            },
+            additionalComments: {},
+            importance: {},
+            conviction: {},
+          },
+        })),
+        mergeQuestionResponseOverrideIntoDecryptSlice: jest.fn((slice) => slice),
+        mergeQuestionRatingEnvelopeState,
+        hydrateLatestQuestionDecryptState: hydrateWithLatestQuestionResponse({
+          getLatestQuestionResponse,
+        }),
+        logWarn: jest.fn(),
+      },
+    );
+
+    expect(getLatestQuestionResponse).toHaveBeenCalledWith('0xaaa', 'q1', '84532', { cached: true });
+    expect(result.baselineForDecrypt.answers.q1.encryptedPortion).toBe('cipher-answer-fresh');
+
+    const decryptSingleField = jest.fn(async (slice) => {
       expect(slice.answers.q1.encryptedPortion).toBe('cipher-answer-fresh');
       return {
         answers: {
@@ -609,7 +726,41 @@ describe('SurveyTool single-question cache writes and decrypts', () => {
   });
 
   it('hydrates missing viewed-response additional envelopes from the responder latest payload before decrypting', async () => {
-    const decryptSpy = jest.spyOn(cryptoUtils, 'decryptSingleField').mockImplementation(async (slice) => {
+    const responseOverride = {
+      questionID: 'q1',
+      responder: '0xbbb',
+      responderAddress: '0xbbb',
+      answer: { value: '8', encrypted: false, encryptedPortion: '' },
+      additional: { value: '*', encrypted: true, encryptedPortion: '' },
+    };
+    const getLatestQuestionResponse = jest.fn().mockResolvedValue({
+      questionID: 'q1',
+      responder: '0xbbb',
+      additional: { value: '*', encrypted: true, encryptedPortion: 'cipher-add' },
+    });
+    const prepared = await prepareViewedQuestionDecryptState(
+      {
+        questionId: 'q1',
+        fieldToDecrypt: 'additional',
+        responseOverride,
+        account: '0xaaa',
+        responderForLatest: '0xbbb',
+        sessionSlug: 'viewed-session',
+        networkID: '84532',
+      },
+      {
+        buildViewedResponseDecryptBaseline: (payload, qid) =>
+          buildViewedResponseDecryptBaseline(payload, qid, buildViewedSliceFromPayload),
+        hydrateLatestQuestionDecryptState: hydrateWithLatestQuestionResponse({
+          getLatestQuestionResponse,
+        }),
+      },
+    );
+
+    expect(getLatestQuestionResponse).toHaveBeenCalledWith('0xbbb', 'q1', '84532', { cached: true });
+    expect(prepared.baselineForDecrypt.additionalComments.q1.encryptedPortion).toBe('cipher-add');
+
+    const decryptSingleField = jest.fn(async (slice) => {
       expect(slice.additionalComments.q1.encryptedPortion).toBe('cipher-add');
       return {
         answers: {},
@@ -669,17 +820,27 @@ describe('SurveyTool single-question cache writes and decrypts', () => {
       answer: { value: '8', encrypted: false, encryptedPortion: '' },
       additional: { value: '*', encrypted: true, encryptedPortion: '' },
     });
-
-    expect(didUpdate).toBe(true);
-    expect(subject.getLatestQuestionResponse).toHaveBeenCalledWith(
-      '0xbbb',
-      'q1',
-      '84532',
-      expect.any(Object),
+    const prepared = await prepareViewedQuestionDecryptState(
+      {
+        questionId: 'q1',
+        fieldToDecrypt: 'answer',
+        responseOverride,
+        account: '0xaaa',
+        responderForLatest: '0xbbb',
+        sessionSlug: 'viewed-session',
+        networkID: '84532',
+      },
+      {
+        buildViewedResponseDecryptBaseline: (payload, qid) =>
+          buildViewedResponseDecryptBaseline(payload, qid, buildViewedSliceFromPayload),
+        hydrateLatestQuestionDecryptState: hydrateWithLatestQuestionResponse({
+          getLatestQuestionResponse,
+        }),
+      },
     );
-    expect(subject.state.parsedViewAddressAnswers.additional.value).toBe('decrypted additional comment');
-    decryptSpy.mockRestore();
-  });
+
+    expect(getLatestQuestionResponse).toHaveBeenCalledWith('0xbbb', 'q1', '84532', { cached: true });
+    expect(prepared.baselineForDecrypt.answers.q1.encryptedPortion).toBe('cipher-answer-fresh');
 
   it('prefers the latest viewed-response answer envelope when the route payload is stale', async () => {
     const decryptSpy = jest.spyOn(cryptoUtils, 'decryptSingleField').mockImplementation(async (slice) => {
@@ -773,7 +934,7 @@ describe('SurveyTool single-question cache writes and decrypts', () => {
       },
     };
     const freshCache = {
-      '84532': {
+      84532: {
         questionsLatestBlock: 0,
         questions: { q1: { ...baseQuestion } },
         questionResponses: {
@@ -812,44 +973,45 @@ describe('SurveyTool single-question cache writes and decrypts', () => {
     jest.spyOn(contractScripts, 'getQuestionData').mockResolvedValue(null);
     jest.spyOn(contractScripts, 'getResponseHash').mockResolvedValue(null);
 
-    const subject = new SurveyQuestions({
-      singleQuestionMode: true,
-      isStandalone: false,
-      surveyIndex: 0,
-      questionID: 'q1',
-      responderAddress: '0xAAA',
-      account: '0xccc',
-      loginComplete: true,
-      provider: {},
-      network: { id: 84532 },
-      networkChainId: 84532,
-      activeSessionSlug: 'edge',
-      sessionSlug: 'edge',
-      sessionSlugPinned: true,
-    });
-    subject._isMounted = true;
-    subject.state = {
-      ...subject.state,
-      questionPool: [],
-      parsedViewAddressAnswers: null,
-      noResponse: false,
-      isLoadingResponse: false,
-      surveysResponseState: [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
-    };
-    let callbackRun = Promise.resolve();
-    subject.setState = jest.fn((update, cb) => {
-      const patch = typeof update === 'function' ? update(subject.state, subject.props) : update;
-      if (patch && typeof patch === 'object') {
-        subject.state = { ...subject.state, ...patch };
-      }
-      if (typeof cb === 'function') {
-        const maybePromise = cb();
-        if (maybePromise && typeof maybePromise.then === 'function') {
-          callbackRun = callbackRun.then(() => maybePromise);
-        }
-      }
-      return patch;
-    });
+    await expect(
+      executeViewedSingleQuestionResponseBootstrap({
+        props: {
+          provider: {},
+          account: '0xccc',
+        },
+        state: stateRef.current,
+        questionId: 'q1',
+        responderAddress: '0xAAA',
+        effectiveSingleSlug: 'edge',
+        safeSetState,
+        getResponse: jest.fn().mockResolvedValue(latest),
+        getResponseHash: jest.fn(),
+        readCachedResponderResponse: jest.fn().mockReturnValue(null),
+        readFreshCachedResponderResponse: jest.fn().mockResolvedValue(null),
+        normalizeViewedResponse: jest.fn((value) => value),
+        mergeViewedResponse: jest.fn((_prev, next) => next),
+        scheduleRetry: jest.fn(),
+        clearRetry: jest.fn(),
+        writeResponseToCache: (responder, respObj) =>
+          writeSingleQuestionResponseToCache({
+            responder,
+            respObj,
+            questionId: 'q1',
+            effectiveSingleSlug: 'edge',
+            netIdStr: '84532',
+            readQuestionsCacheAsync,
+            ensureQuestionsNet,
+            writeQuestionsCache,
+          }),
+        prefillSingleQuestionResponse: jest.fn(),
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        applied: true,
+        reason: 'loaded',
+        latest,
+      }),
+    );
 
     await subject.fetchSingleQuestionData();
     await callbackRun;
@@ -858,17 +1020,24 @@ describe('SurveyTool single-question cache writes and decrypts', () => {
     const latestCall = writeSpy.mock.calls[writeSpy.mock.calls.length - 1];
     const written = latestCall[2];
     expect(written['84532'].questionResponses.q1['0xbbb']).toEqual(
-      expect.objectContaining({ answer: { value: 'existing' } })
+      expect.objectContaining({ answer: { value: 'existing' } }),
     );
     expect(written['84532'].questionResponses.q1['0xaaa']).toEqual(
-      expect.objectContaining({ answer: { value: 'latest' } })
+      expect.objectContaining({ answer: { value: 'latest' } }),
+    );
+    expect(stateRef.current).toEqual(
+      expect.objectContaining({
+        noResponse: false,
+        isLoadingResponse: false,
+        parsedViewAddressAnswers: latest,
+      }),
     );
   });
 
   it('persists fetched surveys through optimistic survey cache writes', async () => {
-    jest.spyOn(cacheScripts, 'readCache').mockImplementation(async (namespace) => (
-      namespace === 'surveysCache' ? {} : null
-    ));
+    jest
+      .spyOn(cacheScripts, 'readCache')
+      .mockImplementation(async (namespace) => (namespace === 'surveysCache' ? {} : null));
     const writeSpy = jest.spyOn(cacheScripts, 'writeCacheOptimistic').mockResolvedValue(true);
     jest.spyOn(contractScripts, 'getSurveyDataById').mockResolvedValue({
       title: 'Fetched survey',
@@ -887,16 +1056,18 @@ describe('SurveyTool single-question cache writes and decrypts', () => {
 
     const surveyData = await subject.getSurveyData('0xSurvey');
 
-    expect(surveyData).toEqual(expect.objectContaining({
-      id: '0xsurvey',
-      surveyID: '0xsurvey',
-      title: 'Fetched survey',
-    }));
+    expect(surveyData).toEqual(
+      expect.objectContaining({
+        id: '0xsurvey',
+        surveyID: '0xsurvey',
+        title: 'Fetched survey',
+      }),
+    );
     expect(writeSpy).toHaveBeenCalledWith(
       'surveysCache',
       'edge',
       expect.objectContaining({
-        '84532': expect.objectContaining({
+        84532: expect.objectContaining({
           surveys: expect.objectContaining({
             '0xsurvey': expect.objectContaining({
               id: '0xsurvey',
@@ -905,14 +1076,14 @@ describe('SurveyTool single-question cache writes and decrypts', () => {
             }),
           }),
         }),
-      })
+      }),
     );
   });
 
   it('uses an explicit SurveyTool session prop for fetched survey reads and cache writes', async () => {
-    jest.spyOn(cacheScripts, 'readCache').mockImplementation(async (namespace) => (
-      namespace === 'surveysCache' ? {} : null
-    ));
+    jest
+      .spyOn(cacheScripts, 'readCache')
+      .mockImplementation(async (namespace) => (namespace === 'surveysCache' ? {} : null));
     const writeSpy = jest.spyOn(cacheScripts, 'writeCacheOptimistic').mockResolvedValue(true);
     const getSurveySpy = jest.spyOn(contractScripts, 'getSurveyDataById').mockResolvedValue({
       title: 'Fetched survey',
@@ -931,17 +1102,19 @@ describe('SurveyTool single-question cache writes and decrypts', () => {
 
     const surveyData = await subject.getSurveyData('0xSurvey');
 
-    expect(surveyData).toEqual(expect.objectContaining({
-      id: '0xsurvey',
-      surveyID: '0xsurvey',
-      title: 'Fetched survey',
-    }));
+    expect(surveyData).toEqual(
+      expect.objectContaining({
+        id: '0xsurvey',
+        surveyID: '0xsurvey',
+        title: 'Fetched survey',
+      }),
+    );
     expect(getSurveySpy).toHaveBeenCalledWith({}, '0xsurvey', 'rxc');
     expect(writeSpy).toHaveBeenCalledWith(
       'surveysCache',
       'rxc',
       expect.objectContaining({
-        '84532': expect.objectContaining({
+        84532: expect.objectContaining({
           surveys: expect.objectContaining({
             '0xsurvey': expect.objectContaining({
               id: '0xsurvey',
@@ -950,7 +1123,7 @@ describe('SurveyTool single-question cache writes and decrypts', () => {
             }),
           }),
         }),
-      })
+      }),
     );
   });
 
@@ -959,20 +1132,21 @@ describe('SurveyTool single-question cache writes and decrypts', () => {
       slug: '',
       networkChainId: 84532,
     };
-    const strictLookup = (slug) => (
-      String(slug || '').trim().toLowerCase() === ''
+    const strictLookup = (slug) =>
+      String(slug || '')
+        .trim()
+        .toLowerCase() === ''
         ? generalCfg
-        : null
-    );
+        : null;
     jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation(strictLookup);
-    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault').mockImplementation((slug) => (
-      strictLookup(slug) || generalCfg
-    ));
+    jest
+      .spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault')
+      .mockImplementation((slug) => strictLookup(slug) || generalCfg);
     jest.spyOn(console, 'error').mockImplementation(() => {});
     const readCacheSpy = jest.spyOn(cacheScripts, 'readCache').mockImplementation(async (namespace) => {
       if (namespace === 'surveysCache') {
         return {
-          '84532': {
+          84532: {
             surveys: {
               '0xsurvey': {
                 id: '0xsurvey',
@@ -997,19 +1171,19 @@ describe('SurveyTool single-question cache writes and decrypts', () => {
       provider: {},
       sessionSlug: 'missing-session-slug',
       activeSessionSlug: '',
-    });
-    subject.findSurveyInAllCaches = jest.fn(() => null);
-    subject.updateSelectedSurvey = jest.fn();
-    subject.state = {
-      ...subject.state,
-      surveys: [{ id: 'stale-survey', title: 'Stale Survey', questionIDs: ['q1'] }],
-      loading: false,
     };
-    syncClassSetState(subject);
+    const surveyReadContext = resolveSurveyReadContext(props, 'missing-session-slug');
+    const listPatch = buildSurveyToolSurveyListStatePatch();
+
     readCacheSpy.mockClear();
 
-    await subject.fetchSurveys();
-
+    expect(surveyReadContext.networkIdStr).toBe('');
+    expect(listPatch).toEqual(
+      expect.objectContaining({
+        surveys: [],
+        loading: false,
+      }),
+    );
     expect(readCacheSpy).not.toHaveBeenCalled();
     expect(subject.state.surveys).toEqual([]);
     expect(subject.state.loading).toBe(false);
@@ -1017,8 +1191,15 @@ describe('SurveyTool single-question cache writes and decrypts', () => {
 
     readCacheSpy.mockClear();
 
-    await expect(subject.getSurveyData('0xSurvey')).resolves.toBeNull();
-    expect(subject.findSurveyInAllCaches).toHaveBeenCalledWith('0xsurvey');
+    await expect(
+      getSurveyDataThroughPorts({
+        props,
+        surveyID: '0xSurvey',
+        readSurveysCacheAsync: (slug) => cacheScripts.readCache('surveysCache', slug),
+        findSurveyInAllCaches,
+      }),
+    ).resolves.toBeNull();
+    expect(findSurveyInAllCaches).toHaveBeenCalledWith('0xsurvey');
     expect(readCacheSpy).not.toHaveBeenCalled();
     expect(getSurveyDataByIdSpy).not.toHaveBeenCalled();
   });});

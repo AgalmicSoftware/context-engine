@@ -321,7 +321,7 @@ describe('cryptoUtils Lit multi-gate envelopes', () => {
     };
 
     await expect(cryptoUtils.decryptEnvelopeValue(JSON.stringify(litEnvelope))).rejects.toThrow(
-      'Lit recipient missing ciphertext or encryptedSymmetricKey.'
+      'Lit recipient missing ciphertext or encryptedSymmetricKey.',
     );
 
     const selfEnvelope = {

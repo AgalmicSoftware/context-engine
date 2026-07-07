@@ -53,16 +53,8 @@ export const getSessionWizardContractTooltipTestId = (contractKey = ''): string 
 export const getSessionWizardContractModalTriggerTestId = (contractKey = ''): string =>
   `ce-wizard-contract-modal-trigger-${contractKey}`;
 
-type ContractsPageHrefOptions = {
-  contractKey?: unknown;
-  sessionSlug?: unknown;
-};
-
-export const buildContractsPageHref = ({
-  contractKey = '',
-  sessionSlug = '',
-}: ContractsPageHrefOptions = {}): string => {
-  const normalizedContractKey = normalizeContractKeyParam(toStr(contractKey));
+export const buildContractsPageHref = ({ contractKey = '', sessionSlug = '' }: any = {}): string => {
+  const normalizedContractKey = normalizeContractKeyParam(contractKey);
   const normalizedSessionSlug = toStr(sessionSlug).trim();
   const searchParams = new URLSearchParams();
 

@@ -70,25 +70,33 @@ describe('CreateSBTGroup scoped lock routing', () => {
 
     expect(gateOptions).toHaveLength(2);
     expect(new Set(gateOptions.map((gate) => gate.id)).size).toBe(2);
-    expect(alphaGate).toEqual(expect.objectContaining({
-      id: expect.stringMatching(/^session:alpha::default_gate$/),
-      sourceGateId: 'default_gate',
-      sourceSessionSlug: 'alpha',
-      sbtAddress: '0x1111111111111111111111111111111111111111',
-    }));
-    expect(betaGate).toEqual(expect.objectContaining({
-      id: expect.stringMatching(/^session:beta::default_gate$/),
-      sourceGateId: 'default_gate',
-      sourceSessionSlug: 'beta',
-      sbtAddress: '0x2222222222222222222222222222222222222222',
-    }));
+    expect(alphaGate).toEqual(
+      expect.objectContaining({
+        id: expect.stringMatching(/^session:alpha::default_gate$/),
+        sourceGateId: 'default_gate',
+        sourceSessionSlug: 'alpha',
+        sbtAddress: '0x1111111111111111111111111111111111111111',
+      }),
+    );
+    expect(betaGate).toEqual(
+      expect.objectContaining({
+        id: expect.stringMatching(/^session:beta::default_gate$/),
+        sourceGateId: 'default_gate',
+        sourceSessionSlug: 'beta',
+        sbtAddress: '0x2222222222222222222222222222222222222222',
+      }),
+    );
     expect(defaultGateId).toBe(betaGate.id);
-    expect(gateMap[alphaGate.id]).toEqual(expect.objectContaining({
-      sourceSessionSlug: 'alpha',
-    }));
-    expect(gateMap[betaGate.id]).toEqual(expect.objectContaining({
-      sourceSessionSlug: 'beta',
-    }));
+    expect(gateMap[alphaGate.id]).toEqual(
+      expect.objectContaining({
+        sourceSessionSlug: 'alpha',
+      }),
+    );
+    expect(gateMap[betaGate.id]).toEqual(
+      expect.objectContaining({
+        sourceSessionSlug: 'beta',
+      }),
+    );
 
     instance.state = {
       ...instance.state,
@@ -101,58 +109,65 @@ describe('CreateSBTGroup scoped lock routing', () => {
 
     const preview = instance.buildMetadataPreview();
 
-    expect(preview.encryptedFieldGates).toEqual(expect.objectContaining({
-      description: betaGate.id,
-    }));
-    expect(preview.encryption).toEqual(expect.objectContaining({
-      enabled: true,
-      defaultGateId: betaGate.id,
-      gateIds: [betaGate.id],
-      gates: [
-        expect.objectContaining({
-          gateId: betaGate.id,
-          sbtAddress: '0x2222222222222222222222222222222222222222',
-        }),
-      ],
-    }));
+    expect(preview.encryptedFieldGates).toEqual(
+      expect.objectContaining({
+        description: betaGate.id,
+      }),
+    );
+    expect(preview.encryption).toEqual(
+      expect.objectContaining({
+        enabled: true,
+        defaultGateId: betaGate.id,
+        gateIds: [betaGate.id],
+        gates: [
+          expect.objectContaining({
+            gateId: betaGate.id,
+            sbtAddress: '0x2222222222222222222222222222222222222222',
+          }),
+        ],
+      }),
+    );
   });
 
   it('keeps unresolved non-general lock readers strict even when the general session is authoritative', () => {
     const priorRegistryCache = localStorage.getItem(REGISTRY_CACHE_KEY);
-    localStorage.setItem(REGISTRY_CACHE_KEY, JSON.stringify({
-      sessions: {
-        '': {
-          slug: '',
-          sessionName: 'Registry General',
-          networkChainId: 84532,
-          sponsored: {
-            defaultGateId: 'general_gate',
-            gates: {
-              general_gate: {
-                label: 'General Gate',
-                sbtAddresses: ['0x1111111111111111111111111111111111111111'],
-                chainId: 84532,
-                litChain: 'baseSepolia',
+    localStorage.setItem(
+      REGISTRY_CACHE_KEY,
+      JSON.stringify({
+        sessions: {
+          '': {
+            slug: '',
+            sessionName: 'Registry General',
+            networkChainId: 84532,
+            sponsored: {
+              defaultGateId: 'general_gate',
+              gates: {
+                general_gate: {
+                  label: 'General Gate',
+                  sbtAddresses: ['0x1111111111111111111111111111111111111111'],
+                  chainId: 84532,
+                  litChain: 'baseSepolia',
+                },
               },
             },
-          },
-          lit: {
-            defaultGateId: 'general_gate',
-          },
-          __registry: {
-            gateAuthority: 'onchain',
-            gatesByResource: {
-              default: {
-                gateId: 'general_gate',
-                sbtAddresses: ['0x1111111111111111111111111111111111111111'],
-                lookupStatus: 'ok',
-                chainId: 84532,
+            lit: {
+              defaultGateId: 'general_gate',
+            },
+            __registry: {
+              gateAuthority: 'onchain',
+              gatesByResource: {
+                default: {
+                  gateId: 'general_gate',
+                  sbtAddresses: ['0x1111111111111111111111111111111111111111'],
+                  lookupStatus: 'ok',
+                  chainId: 84532,
+                },
               },
             },
           },
         },
-      },
-    }));
+      }),
+    );
 
     try {
       const instance = makeInstance({
@@ -177,21 +192,24 @@ describe('CreateSBTGroup scoped lock routing', () => {
 
   it('passes unresolved non-general slugs through mint routing instead of inheriting general', async () => {
     const priorRegistryCache = localStorage.getItem(REGISTRY_CACHE_KEY);
-    localStorage.setItem(REGISTRY_CACHE_KEY, JSON.stringify({
-      sessions: {
-        '': {
-          slug: '',
-          sessionName: 'Registry General',
-          networkChainId: 84532,
-          contracts: {
-            sbtFactory: {
-              address: '0x9999999999999999999999999999999999999999',
-              chainId: 84532,
+    localStorage.setItem(
+      REGISTRY_CACHE_KEY,
+      JSON.stringify({
+        sessions: {
+          '': {
+            slug: '',
+            sessionName: 'Registry General',
+            networkChainId: 84532,
+            contracts: {
+              sbtFactory: {
+                address: '0x9999999999999999999999999999999999999999',
+                chainId: 84532,
+              },
             },
           },
         },
-      },
-    }));
+      }),
+    );
 
     const instance = makeInstance({
       provider: 'mock-provider',
@@ -231,11 +249,11 @@ describe('CreateSBTGroup scoped lock routing', () => {
         false,
         0,
         [],
-      'ar://metadata',
-      expect.anything(),
-      'missing-session',
-      '',
-      {}
+        'ar://metadata',
+        expect.anything(),
+        'missing-session',
+        '',
+        {},
       );
       expect(instance.state.mintingFailed).toBe(true);
       expect(instance.state.error).toContain('missing-session');

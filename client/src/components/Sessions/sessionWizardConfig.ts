@@ -9,11 +9,23 @@ export const LOCAL_WORKER_BUNDLE_OPTIONAL_FALLBACK_HELP = `Optional fallback: ${
 export const MANUAL_BUNDLE_URL_OVERRIDE_HELP =
   'Paste a direct worker bundle URL here if the GitHub-hosted asset is temporarily unavailable.';
 export const LOCAL_WORKER_BUNDLE_FALLBACK_PICKER_HELP = `Automatic hosted bundle fetch failed. ${LOCAL_WORKER_BUNDLE_OPTIONAL_FALLBACK_HELP}`;
-export const NORMAL_MODE_MISSING_HOSTED_BUNDLE_MESSAGE = `No default hosted worker bundle URL is configured for guided setup. Provide a manual bundle URL or upload a bundle file below. ${LOCAL_WORKER_BUNDLE_OPTIONAL_FALLBACK_HELP}`;
-export const NORMAL_MODE_MANUAL_BUNDLE_RETRY_MESSAGE = `Guided setup still defaults to the GitHub-hosted bundle. Retry with a manual bundle URL or upload a bundle file. ${LOCAL_WORKER_BUNDLE_OPTIONAL_FALLBACK_HELP}`;
+export const NORMAL_MODE_MISSING_HOSTED_BUNDLE_MESSAGE = `No default hosted worker bundle URL is configured for normal mode. Provide a manual bundle URL or upload a bundle file below. ${LOCAL_WORKER_BUNDLE_OPTIONAL_FALLBACK_HELP}`;
+export const NORMAL_MODE_MANUAL_BUNDLE_RETRY_MESSAGE = `Normal mode still defaults to the GitHub-hosted bundle. Retry with a manual bundle URL or upload a bundle file. ${LOCAL_WORKER_BUNDLE_OPTIONAL_FALLBACK_HELP}`;
 export const SPONSORED_MANUAL_BUNDLE_RETRY_MESSAGE = `Sponsored publish still defaults to the GitHub-hosted bundle. Retry with a manual bundle URL or upload a bundle file. ${LOCAL_WORKER_BUNDLE_OPTIONAL_FALLBACK_HELP}`;
 
 export const NORMAL_MODE_SHARED_HOSTED_WORKER_ENABLED = false;
+
+type SessionWizardProcessLike = {
+  env?: {
+    NODE_ENV?: unknown;
+  };
+};
+
+export const __test__isSessionWizardDevMode = (
+  proc: SessionWizardProcessLike | undefined = typeof process !== 'undefined' ? process : undefined,
+): boolean => toStr(proc?.env?.NODE_ENV).trim().toLowerCase() !== 'production';
+
+export const DEV_PERSIST_WORKER_SECRETS = __test__isSessionWizardDevMode();
 
 export const METADATA_FIELD_ORDER = [
   'networkChainId',

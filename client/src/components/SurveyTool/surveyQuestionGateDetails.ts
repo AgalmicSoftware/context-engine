@@ -4,9 +4,7 @@ type GateDetailSbt = {
   label?: unknown;
 };
 
-const isGateDetailRecord = (value: unknown): value is GateDetailRecord => (
-  !!value && typeof value === 'object'
-);
+const isGateDetailRecord = (value: unknown): value is GateDetailRecord => !!value && typeof value === 'object';
 
 type BuildLockedQuestionGateDetailsArgs = {
   hiddenMaskedQuestionIds?: unknown;
@@ -36,16 +34,20 @@ type LockedQuestionGateDetailDraft = {
 };
 
 const normalizeLabelDefault = (value: unknown): string => String(value || '').trim();
-const normalizeSessionSlugDefault = (value: unknown): string => String(value || '').trim().toLowerCase();
+const normalizeSessionSlugDefault = (value: unknown): string =>
+  String(value || '')
+    .trim()
+    .toLowerCase();
 const identityChecksum = (address: string): string => address;
 const fallbackShortAddress = (address: string): string => address;
-const fallbackDetailPath = (address: string, sessionSlug: string): string => (
-  sessionSlug ? `/sbt/${sessionSlug}/${address}` : `/sbt/${address}`
-);
+const fallbackDetailPath = (address: string, sessionSlug: string): string =>
+  sessionSlug ? `/sbt/${sessionSlug}/${address}` : `/sbt/${address}`;
 const fallbackTranslate = (key: string): string => key;
 
 export const isGenericResourceGateLabel = (value: unknown): boolean => {
-  const normalized = String(value || '').trim().toLowerCase();
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase();
   if (!normalized) return true;
   return [
     'questionresponses',
@@ -58,16 +60,14 @@ export const isGenericResourceGateLabel = (value: unknown): boolean => {
   ].includes(normalized);
 };
 
-const collectUniqueGateSbtAddresses = (gate: GateDetailRecord = {}): string[] => (
-  Array.from(new Set(
-    [
-      ...(Array.isArray(gate?.sbtAddresses) ? gate.sbtAddresses : []),
-      gate?.sbtAddress,
-    ]
-      .map((addr) => String(addr || '').trim())
-      .filter(Boolean)
-  ))
-);
+const collectUniqueGateSbtAddresses = (gate: GateDetailRecord = {}): string[] =>
+  Array.from(
+    new Set(
+      [...(Array.isArray(gate?.sbtAddresses) ? gate.sbtAddresses : []), gate?.sbtAddress]
+        .map((addr) => String(addr || '').trim())
+        .filter(Boolean),
+    ),
+  );
 
 export const collectGateSbtAddressesForHydrationFromSources = ({
   policy = {},
@@ -84,10 +84,9 @@ export const collectGateSbtAddressesForHydrationFromSources = ({
   };
   const addGateAddresses = (gate: unknown): void => {
     const gateRecord = isGateDetailRecord(gate) ? gate : {};
-    [
-      ...(Array.isArray(gateRecord.sbtAddresses) ? gateRecord.sbtAddresses : []),
-      gateRecord.sbtAddress,
-    ].forEach(addAddress);
+    [...(Array.isArray(gateRecord.sbtAddresses) ? gateRecord.sbtAddresses : []), gateRecord.sbtAddress].forEach(
+      addAddress,
+    );
   };
 
   const policyRecord = isGateDetailRecord(policy) ? policy : {};
@@ -119,17 +118,25 @@ export const buildLockedQuestionGateDetailsFromPool = ({
 }: BuildLockedQuestionGateDetailsArgs = {}) => {
   const hiddenIds = new Set(
     (Array.isArray(hiddenMaskedQuestionIds) ? hiddenMaskedQuestionIds : [])
-      .map((qid) => String(qid || '').trim().toLowerCase())
-      .filter(Boolean)
+      .map((qid) =>
+        String(qid || '')
+          .trim()
+          .toLowerCase(),
+      )
+      .filter(Boolean),
   );
   if (hiddenIds.size === 0) return [];
 
-  const normalizedSlug = String(slug || '').trim().toLowerCase();
+  const normalizedSlug = String(slug || '')
+    .trim()
+    .toLowerCase();
   const detailsByKey = new Map<string, LockedQuestionGateDetailDraft>();
 
   (Array.isArray(pool) ? pool : []).forEach((question) => {
     const questionRecord = isGateDetailRecord(question) ? question : {};
-    const questionId = String(questionRecord?.id || '').trim().toLowerCase();
+    const questionId = String(questionRecord?.id || '')
+      .trim()
+      .toLowerCase();
     if (!hiddenIds.has(questionId)) return;
     const gates = getQuestionEncryptionGates(questionRecord);
     const questionSessionSlug = normalizeSessionSlug(questionRecord?.sessionSlug || normalizedSlug);
@@ -142,20 +149,21 @@ export const buildLockedQuestionGateDetailsFromPool = ({
           gate: gateRecord,
           resourceKey: String(gateRecord?.resourceKey || ''),
           sbtAddresses,
-        })
+        }),
       );
-      const explicitLabel = normalizeGateLabelText(
-        gateRecord?.label || gateRecord?.name || gateRecord?.title || ''
-      );
+      const explicitLabel = normalizeGateLabelText(gateRecord?.label || gateRecord?.name || gateRecord?.title || '');
       const maybeGateId = normalizeGateLabelText(gateRecord?.gateId || gateRecord?.id || '');
-      const sbtLabelFallback = sbtAddresses.length > 0
-        ? `${resolveSbtGateLabel(sbtAddresses[0], normalizedSlug) || getShortenedAddress(sbtAddresses[0], false)} gate`
-        : 'Question gate';
+      const sbtLabelFallback =
+        sbtAddresses.length > 0
+          ? `${resolveSbtGateLabel(sbtAddresses[0], normalizedSlug) || getShortenedAddress(sbtAddresses[0], false)} gate`
+          : 'Question gate';
       const label = !isGenericResourceGateLabel(configuredLabel)
         ? configuredLabel
         : !isGenericResourceGateLabel(explicitLabel)
           ? explicitLabel
-          : (!isGenericResourceGateLabel(maybeGateId) ? maybeGateId : sbtLabelFallback);
+          : !isGenericResourceGateLabel(maybeGateId)
+            ? maybeGateId
+            : sbtLabelFallback;
       const key = `${String(label || `gate-${gateIndex}`).toLowerCase()}|${sbtAddresses
         .map((addr) => String(addr).toLowerCase())
         .sort()
@@ -201,18 +209,20 @@ export const buildLockedGateRequirementSentence = (
     translate?: (key: string) => string;
   } = {},
 ): string => {
-  const labels = Array.from(new Set(
-    (Array.isArray(lockedGateDetails) ? lockedGateDetails : [])
-      .flatMap((gate) => {
-        const record = isGateDetailRecord(gate) ? gate : {};
-        return Array.isArray(record?.sbts) ? record.sbts : [];
-      })
-      .map((sbt) => {
-        const record = isGateDetailRecord(sbt) ? sbt as GateDetailSbt : {};
-        return String(record.label || record.address || '').trim();
-      })
-      .filter(Boolean)
-  ));
+  const labels = Array.from(
+    new Set(
+      (Array.isArray(lockedGateDetails) ? lockedGateDetails : [])
+        .flatMap((gate) => {
+          const record = isGateDetailRecord(gate) ? gate : {};
+          return Array.isArray(record?.sbts) ? record.sbts : [];
+        })
+        .map((sbt) => {
+          const record = isGateDetailRecord(sbt) ? (sbt as GateDetailSbt) : {};
+          return String(record.label || record.address || '').trim();
+        })
+        .filter(Boolean),
+    ),
+  );
   if (!labels.length) return '';
   const shown = labels.slice(0, 3);
   const extra = labels.length > shown.length ? ` +${labels.length - shown.length} more` : '';

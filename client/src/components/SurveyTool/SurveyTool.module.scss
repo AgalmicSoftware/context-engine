@@ -1,4 +1,4 @@
-@use "scss/finalSubmitCta" as finalSubmitCta;
+@use 'scss/finalSubmitCta' as finalSubmitCta;
 
 /* NEW - Color variables for dropdown items */
 $questions-item-bg: var(--ce-color-success-soft); // Light green
@@ -951,7 +951,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   font-weight: 700;
   text-decoration: underline;
   text-underline-offset: 2px;
-  transition: color 0.18s ease, text-decoration-color 0.18s ease;
+  transition:
+    color 0.18s ease,
+    text-decoration-color 0.18s ease;
 
   &:hover,
   &:focus {
@@ -2339,8 +2341,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 //
 
-
-
 .cardLinksContainer {
   display: flex;
   justify-content: flex-end;
@@ -3400,15 +3400,15 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .miniSpinnerWrapper {
-    opacity: 0.5;
-    position: absolute;
-    top: calc(var(--pile-current-submit-rail-offset) - 30px);
-    right: -75px;
-    z-index: 2;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 3em;
+  opacity: 0.5;
+  position: absolute;
+  top: -30px;
+  right: -75px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3em;
 }
 
 .miniLoaderIcon {
@@ -3768,7 +3768,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   .pileFooter .pileSubmitLink {
     left: calc(100% + 8px);
   }
-
 }
 
 /* ------------------------------------------- */

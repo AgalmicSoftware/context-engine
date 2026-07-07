@@ -95,12 +95,7 @@ jest.mock('../SBTs/SBTSelector', () => () => <div data-testid="mock-admin-sbt-se
 
 const AdminPage = require('./AdminPage').default;
 
-const renderAdminPage = async ({
-  account = ADMIN_ADDRESS,
-  initialSessionId,
-  initialRegistryChainId,
-  initialSessionConfig,
-} = {}) => {
+const renderAdminPage = async ({ account = ADMIN_ADDRESS, initialSessionId, initialRegistryChainId } = {}) => {
   let utils;
   await act(async () => {
     utils = render(
@@ -111,7 +106,6 @@ const renderAdminPage = async ({
         toggleLoginModal={jest.fn()}
         initialSessionId={initialSessionId}
         initialRegistryChainId={initialRegistryChainId}
-        initialSessionConfig={initialSessionConfig}
       />,
     );
     await Promise.resolve();
@@ -280,41 +274,6 @@ describe('AdminPage allowlist controls', () => {
     );
   });
 
-  it('saves a registry-free worker-canonical allowlist without an on-chain write', async () => {
-    sessionEntries = [];
-    const initialSessionConfig = {
-      slug: 'worker-allowlist',
-      sessionId: '0x1234567890abcdef1234567890abcdef',
-      configRevision: 'worker-allowlist-revision',
-      corsWorkerUrl: 'https://worker-allowlist.example.test',
-      adminAddress: ADMIN_ADDRESS,
-      sessionModeProfile: cloneSessionModePreset('fast_cheap_cloudflare'),
-    };
-    mockResolveCorsProxyUrl.mockResolvedValue({
-      url: initialSessionConfig.corsWorkerUrl,
-      source: 'session-config',
-      status: 'ok',
-    });
-
-    await renderAdminPage({ initialSessionConfig });
-    expect(await screen.findByDisplayValue(initialSessionConfig.corsWorkerUrl)).toBeInTheDocument();
-    fireEvent.change(await openAllowlistEditor(), {
-      target: { value: 'https://participant.example.test' },
-    });
-    await clickAndSettle(screen.getByRole('button', { name: 'Save allowlist' }));
-
-    await waitFor(() => {
-      expect(screen.getByText(/allowOrigins saved \(1 origins\)/)).toBeInTheDocument();
-    });
-    const adminCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/admin/set-config'));
-    expect(JSON.parse(adminCall[1].body).config).toEqual({
-      allowOrigins: ['https://participant.example.test'],
-    });
-    expect(mockSetSessionFieldsOnChain).not.toHaveBeenCalled();
-    expect(mockUploadSessionMetadata).not.toHaveBeenCalled();
-    expect(mockUpdateSessionMetadataOnChain).not.toHaveBeenCalled();
-  });
-
   it('normalizes mixed delimiter allowOrigins input before saving', async () => {
     await renderAdminPage();
     await waitForResolvedWorkerUrl();
@@ -467,8 +426,7 @@ describe('AdminPage allowlist controls', () => {
       expect.arrayContaining([
         'https://existing.example.test',
         'http://localhost:7391',
-        'https://contextengine.sh', // canonical production recommended origin
-        'https://contextengine.xyz', // redirect compatibility origin
+        'https://contextengine.xyz', // intentional: production recommended origin assertion
         window.location.origin,
       ]),
     );

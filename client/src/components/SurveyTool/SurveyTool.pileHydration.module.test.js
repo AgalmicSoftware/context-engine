@@ -14,12 +14,23 @@ import FullQuestionRatingInput from './FullQuestionRatingInput';
 import SurveyQuestionTagControl from './SurveyQuestionTagControl';
 import { DeferredCommitSlider } from './DeferredCommitSlider';
 import { QuestionFilter as RawQuestionFilter } from './QuestionFilter';
-import TagModal from '../TagPage/TagModal';
-import GatedPromptNotice from './GatedPromptNotice';
-import styles from './SurveyTool.module.scss';
-import { renderToStaticMarkup } from 'react-dom/server';
-import contractScripts, * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
-import * as portoFunctions from '../../utilities/web3/portoFunctions.js';
+import { readQuestionsCacheRef } from './surveyToolCacheState';
+import {
+  buildPileEmptyProbePlan,
+  buildPileLoadFailureState,
+  buildPileLoadProgressState,
+} from './surveyPileLoadPlanner';
+import { buildPileEmptyProbeStatePlan, buildPileResponseCountsCachePlan } from './surveyPileLoadController';
+import { buildPileQuestionSetHydrationPlan } from './surveyPileHydrationPlan';
+import {
+  buildPileFilterResultPlan,
+  buildPileLoadResultPlan,
+  buildPileQuestionPipelineState,
+  splitPileMaskedQuestions,
+} from './surveyPileQuestionFlow';
+import { executePileQuestionSetHydration } from './surveyPileResponseController';
+import { buildPileWorkspaceViewState } from './surveyPileViewState';
+import { createPileViewRuntimeStrategy } from './SurveyPileViewMode';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
 import * as sbtDisplayNameUtils from '../../utilities/sbt/sbtDisplayNames.js';
@@ -40,33 +51,63 @@ import {
   treeHasText,
 } from './surveyToolTreeTestHelpers.js';
 
-const createDeferred = () => {
-  let resolve;
-  let reject;
-  const promise = new Promise((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  return { promise, resolve, reject };
+const ACCOUNT = '0xabc';
+
+const sameQuestionIds = (left, right) =>
+  JSON.stringify((left || []).map((question) => String(question.id))) ===
+  JSON.stringify((right || []).map((question) => String(question.id)));
+
+const buildQuestionListSignature = (questions = []) =>
+  Array.isArray(questions) && questions.length > 0
+    ? questions.map((question) => String(question.id || '').toLowerCase()).join('|')
+    : 'empty';
+
+const getPileVisibleQuestionIds = (questions = []) =>
+  Array.isArray(questions) ? questions.map((question) => String(question.id || '').toLowerCase()).filter(Boolean) : [];
+
+const buildVisibleResponseSignature = (questionResponses = {}, visibleIds = [], account = '') => {
+  const accountLower = String(account || '').toLowerCase();
+  return visibleIds
+    .map((questionId) => {
+      const raw = questionResponses?.[questionId]?.[accountLower];
+      if (!raw) return `${questionId}:none`;
+      return `${questionId}:${JSON.stringify(raw)}`;
+    })
+    .join('|');
 };
 
-const flushAsyncCallbacks = async () => {
-  await Promise.resolve();
-  await Promise.resolve();
-  await new Promise((resolve) => setTimeout(resolve, 0));
-};
-
-const syncClassSetState = (subject) => {
-  subject.setState = jest.fn((next, cb) => {
-    const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
-    if (patch && typeof patch === 'object') {
-      subject.state = { ...subject.state, ...patch };
-    }
-    if (typeof cb === 'function') cb();
-    return patch;
+const buildLoadResult = ({
+  previousAllQuestionsForFilter = [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
+  previousPileQuestions = [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
+  sortedQuestions = [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
+  sortedVisibleQuestions = [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
+  questionResponses = { q1: {} },
+  account = ACCOUNT,
+  isFilterActive = false,
+  filterSig = '',
+} = {}) =>
+  buildPileLoadResultPlan({
+    previousAllQuestionsForFilter,
+    previousPileQuestions,
+    previousActivePileIndex: 0,
+    previousHasHiddenGatedQuestions: false,
+    previousLoading: false,
+    sortedQuestions,
+    sortedVisibleQuestions,
+    hiddenQuestions: [],
+    hasHiddenGatedQuestions: false,
+    isFilterActive,
+    filterSig,
+    questionResponses,
+    account,
+    settleUnreadyEmpty: false,
+    isQuestionCacheReady: true,
+    recentRateLimit: false,
+    areQuestionListsEquivalent: sameQuestionIds,
+    buildQuestionListSignature,
+    getPileVisibleQuestionIds,
+    buildPileVisibleResponseSignature: buildVisibleResponseSignature,
   });
-  return subject.setState;
-};
 
 describe('SurveyTool pile hydration and loading', () => {
   afterEach(() => {
@@ -75,15 +116,11 @@ describe('SurveyTool pile hydration and loading', () => {
     jest.useRealTimers();
   });
   it('uses clone-free questions cache reads in SurveyQuestions.handleFilter', () => {
-    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace) => {
-      if (namespace === 'questionsCache') {
-        return {
-          '84532': {
-            questionResponses: {
-              q1: {
-                '0xaa': '{"type":"binary","answer":{"value":"yes"}}',
-              },
-            },
+    const cacheValue = {
+      84532: {
+        questionResponses: {
+          q1: {
+            '0xaa': '{"type":"binary","answer":{"value":"yes"}}',
           },
         };
       }
@@ -313,59 +350,11 @@ describe('SurveyTool pile hydration and loading', () => {
       };
     });
 
-    const shell = new SurveyTool({
-      minifiedMode: 'pile',
-      account: '0xabc',
-      sessionSlug: 'missing-session-slug',
-      activeSessionSlug: '',
-      questionResponsesNonce: 2,
-      onFilterChange: jest.fn(),
-    });
-    const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
-    const visibleQuestions = [
-      { id: 'q2', type: 'binary', prompt: 'Q2' },
-      { id: 'q1', type: 'binary', prompt: 'Q1' },
-      { id: 'q_blocked', type: 'binary', prompt: 'Blocked Q' },
-    ];
-
-    subject.state = {
-      ...subject.state,
-      allQuestionsForFilter: visibleQuestions,
-      pileQuestions: visibleQuestions,
-      activePileIndex: 0,
-      filterModalOpen: true,
-      loading: false,
-      showHologramAssistant: false,
-      filterState: {},
-      hasHiddenGatedQuestions: false,
-    };
-    subject.initializeResponseState = jest.fn((cb) => {
-      if (typeof cb === 'function') cb();
-    });
-    subject.rehydrateLocalCacheAnswersForRenderedIds = jest.fn((cb) => {
-      if (typeof cb === 'function') cb();
-    });
-    subject.rehydrateDraftForRenderedIds = jest.fn();
-    syncClassSetState(subject);
-    peekSpy.mockClear();
-
-    const tree = subject.render();
-    const questionFilterNode = findElement(
-      tree,
-      (node) =>
-        node?.props?.onFilter === subject.handleFilter &&
-        node?.props?.currentViewModeForUrl === 'questions'
-    );
-
-    expect(questionFilterNode).toBeTruthy();
-    expect(questionFilterNode.props.questionResponses).toEqual({});
-    expect(peekSpy).not.toHaveBeenCalled();
-
-    subject.handleFilter(visibleQuestions, {});
-
-    expect(subject.state.pileQuestions.map((question) => question.id)).toEqual(['q2', 'q1', 'q_blocked']);
-    expect(peekSpy).not.toHaveBeenCalled();
+    expect(plan.nextState.pileQuestions.map((question) => question.id)).toEqual(['q2', 'q1', 'q_blocked']);
+    expect(plan.shouldSkipStateUpdate).toBe(true);
+    // port note: unresolved session slug cache reads are covered in
+    // `SurveyTool.pileSessionScope.module.test.js`; this keeps the pile filter
+    // result independent from general-session response/filter config.
   });
 
   it('keeps masked visibility memo hot when alternating stable pool references', () => {
@@ -541,9 +530,14 @@ describe('SurveyTool pile hydration and loading', () => {
     const pileElement = shell.render();
     const subject = new PileViewMode(pileElement.props);
 
-    subject.state = {
-      ...subject.state,
-      loading: false,
+    expect(probe).toEqual(
+      expect.objectContaining({
+        action: 'continue-loading-immediately',
+        nextProbeStartedAtMs: 0,
+        nextProbeDelayMs: 0,
+      }),
+    );
+    expect(statePlan.nextState).toEqual({
       pileQuestions: [],
       allQuestionsForFilter: [],
       activePileIndex: 0,
@@ -585,32 +579,70 @@ describe('SurveyTool pile hydration and loading', () => {
     expect(subject.scheduleLoadAndSortQuestions).not.toHaveBeenCalled();
   });
 
-  it('keeps empty piles in loading mode during recent rate limits instead of settling or probing', async () => {
-    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({
-      '84532': {
-        questions: {},
-        questionResponses: {},
-      },
-    });
+  it('keeps pile loading active after load failures while recent rate-limit warming is active', () => {
+    expect(
+      buildPileLoadFailureState({
+        isQuestionCacheReady: true,
+        recentRateLimit: true,
+      }),
+    ).toEqual({ loading: true });
+  });
 
-    const shell = new SurveyTool({
-      minifiedMode: 'pile',
-      network: { id: 84532 },
-      networkChainId: 84532,
+  it('keeps unanswered questions visible in pile mode when response map is empty', () => {
+    const pipeline = buildPileQuestionPipelineState({
+      questions: [{ id: 'q1', type: 'freeform', prompt: 'Unanswered prompt' }],
+      questionResponses: {},
+      responseCounts: {},
+      highlightedQuestionIds: new Set(),
       account: '',
-      sessionSlug: 'edge',
-      cacheHasLoaded: true,
-      isQuestionCacheReady: true,
-      questionResponsesNonce: 1,
-      questionsCacheNonce: 1,
-      onFilterChange: jest.fn(),
+    });
+    const loadResult = buildLoadResult({
+      previousAllQuestionsForFilter: [],
+      previousPileQuestions: [],
+      sortedQuestions: pipeline.sortedQuestions,
+      sortedVisibleQuestions: pipeline.visibleQuestions,
+      questionResponses: {},
+      account: '',
     });
     const pileElement = shell.render();
     const subject = new PileViewMode(pileElement.props);
 
-    subject.state = {
-      ...subject.state,
-      loading: false,
+    expect(pipeline.visibleQuestions.map((question) => question.id)).toEqual(['q1']);
+    expect(loadResult.nextState).toEqual(
+      expect.objectContaining({
+        allQuestionsForFilter: [expect.objectContaining({ id: 'q1' })],
+        pileQuestions: [expect.objectContaining({ id: 'q1' })],
+        loading: false,
+      }),
+    );
+  });
+
+  it('settles stuck hydrate 0/0 empty piles into deterministic no-questions state', () => {
+    const progress = buildPileLoadProgressState({
+      scopedProgress: {
+        phase: 'hydrate',
+        discoveredQuestions: 0,
+        hydratedQuestions: 0,
+        remainingBlocks: 0,
+      },
+      cacheHasLoaded: true,
+      isQuestionCacheReady: false,
+      recentRateLimit: false,
+    });
+    const probe = buildPileEmptyProbePlan({
+      ...progress,
+      cacheHasLoaded: true,
+      isQuestionCacheReady: false,
+      recentRateLimit: false,
+      scopedProgress: {
+        phase: 'hydrate',
+        discoveredQuestions: 0,
+        hydratedQuestions: 0,
+        remainingBlocks: 0,
+      },
+      nowMs: 1000,
+    });
+    const viewState = buildPileWorkspaceViewState({
       pileQuestions: [],
       allQuestionsForFilter: [],
       activePileIndex: 0,
@@ -1148,69 +1180,15 @@ describe('SurveyTool pile hydration and loading', () => {
     };
     jest.spyOn(cacheScripts, 'readCache').mockImplementation(async () => cacheState);
 
-    const shell = new SurveyTool({
-      minifiedMode: 'pile',
-      network: { id: 84532 },
-      networkChainId: 84532,
-      account: '0xabc',
-      sessionSlug: 'edge',
-      sessionSlug: 'edge',
-      isQuestionCacheReady: true,
-      questionResponsesNonce: 5,
-      questionsCacheNonce: 1,
-      onFilterChange: jest.fn(),
-    });
-    const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
-
-    subject.state = {
-      ...subject.state,
-      loading: false,
-      pileQuestions: [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
-      allQuestionsForFilter: [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
-      activePileIndex: 0,
-      filterState: {},
-      isFilterActive: false,
-      submissionComplete: false,
-      autoDecryptEnabled: false,
-      autoDecryptAttempted: {},
-      decryptingByKey: {},
-    };
-    subject.setState = jest.fn((update, cb) => {
-      const patch = typeof update === 'function' ? update(subject.state, subject.props) : update;
-      if (patch && typeof patch === 'object') {
-        subject.state = { ...subject.state, ...patch };
-      }
-      if (typeof cb === 'function') cb();
-      return patch;
-    });
-    subject.initializeResponseState = jest.fn((cb) => {
-      if (typeof cb === 'function') cb();
-    });
-    subject.rehydrateLocalCacheAnswersForRenderedIds = jest.fn((cb) => {
-      if (typeof cb === 'function') cb();
-    });
-    subject.rehydrateDraftForRenderedIds = jest.fn();
-
-    await subject.loadAndSortQuestions();
-    expect(subject.initializeResponseState).toHaveBeenCalledTimes(1);
-    expect(subject.rehydrateLocalCacheAnswersForRenderedIds).toHaveBeenCalledTimes(1);
-
-    cacheState['84532'].questionResponses.q2 = {
-      '0xabc': {
-        answer: { value: 'Off-screen', encrypted: false },
-        additional: { value: '', encrypted: false },
-      },
-    };
-    subject.props = {
-      ...subject.props,
-      questionResponsesNonce: subject.props.questionResponsesNonce + 1,
-      questionsCacheNonce: subject.props.questionsCacheNonce + 1,
-    };
-    await subject.loadAndSortQuestions();
-
-    expect(subject.initializeResponseState).toHaveBeenCalledTimes(1);
-    expect(subject.rehydrateLocalCacheAnswersForRenderedIds).toHaveBeenCalledTimes(1);
-    expect(subject.rehydrateDraftForRenderedIds).toHaveBeenCalledTimes(1);
+    expect(secondLoad.resultSignature).toBe(firstLoad.resultSignature);
+    expect(
+      buildPileQuestionSetHydrationPlan({
+        requestEpoch: 5,
+        resultSignature: secondLoad.resultSignature,
+        lastResultSignature: firstLoad.resultSignature,
+        initializeResponses: true,
+      }).shouldSkipDuplicateSignature,
+    ).toBe(true);
+    expect(countsPlan.responseCounts).toEqual({ q1: 0, q2: 1 });
   });
 });

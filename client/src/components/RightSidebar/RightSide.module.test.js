@@ -10,7 +10,7 @@ describe('RightSide desktop shell styles', () => {
       /@media \(min-width:\s*769px\) and \(max-width:\s*1366px\)\s*{[\s\S]*?\.main\s*{[\s\S]*?flex-direction:\s*row;[\s\S]*?align-items:\s*stretch;/,
     );
     expect(mainContentScss).toMatch(
-      /@media \(min-width:\s*769px\) and \(max-width:\s*1366px\)\s*{[\s\S]*?\.mainAreaTabsAlt\s*{[\s\S]*?flex:\s*1 1 100%;[\s\S]*?width:\s*100%;[\s\S]*?margin-right:\s*0;/,
+      /@media \(min-width:\s*769px\) and \(max-width:\s*1366px\)\s*{[\s\S]*?\.mainAreaTabsAlt\s*{[\s\S]*?width:\s*75%;[\s\S]*?margin-right:\s*2%;/,
     );
   });
 
@@ -19,7 +19,7 @@ describe('RightSide desktop shell styles', () => {
 
     expect(scss).toMatch(/\.rightSideContainer\s*{\s*display:\s*none;\s*}/);
     expect(scss).toMatch(
-      /@media \(min-width:\s*769px\) and \(max-width:\s*1366px\)\s*{\s*\.rightSideContainer\s*{\s*display:\s*none;\s*}\s*}/,
+      /@media \(min-width:\s*769px\) and \(max-width:\s*1366px\)\s*{[\s\S]*?\.rightSideContainer\s*{[\s\S]*?flex:\s*0 0 23%;[\s\S]*?display:\s*flex;/,
     );
     expect(scss).toMatch(
       /@media \(min-width:\s*1367px\)\s*{[\s\S]*?\.rightSideContainer\s*{[\s\S]*?flex:\s*0 0 23%;[\s\S]*?display:\s*flex;/,

@@ -1300,7 +1300,7 @@ class UserPage extends Component<any, any> {
       // Phase 2 Task: Trigger global light discovery to populate caches for all groups
       // This ensures the "universe" of known SBT addresses is populated, which is
       // a prerequisite for the deep scan to find what the user owns.
-      if (this.props.onChainProfileEnabled !== false && this.props.ensureLightSbtUniverse) {
+      if (this.props.ensureLightSbtUniverse) {
         accountLog.log('[UserPage] Triggering ensureLightSbtUniverse...');
         this.props.ensureLightSbtUniverse();
       }
@@ -1495,7 +1495,7 @@ class UserPage extends Component<any, any> {
 
   getOnchainUsername = (_address: unknown, _network: unknown): string | null => {
     return null;
-    // should go in the chain gateway when enabled
+    // should go in contractScripts.js when enabled
   };
 
   saveNickname = (): void => {
@@ -2741,7 +2741,7 @@ class UserPage extends Component<any, any> {
       accountLog.warn('UserPage address clipboard write failed:', error);
       notify.error('Could not copy address');
     }
-  }
+  };
 
   toggleCollapse = (): void => {
     if (this._isMounted) {
@@ -2804,7 +2804,9 @@ class UserPage extends Component<any, any> {
       if (!this._isMounted) return;
       if (!network?.id) {
         this.setState({
-          ...buildUserPageUsernameErrorStatePatch({ usernameError: "Cannot persist username: network information is missing." }),
+          ...buildUserPageUsernameErrorStatePatch({
+            usernameError: 'Cannot persist username: network information is missing.',
+          }),
           isEditingUsername: true,
         });
         return;
@@ -2813,7 +2815,7 @@ class UserPage extends Component<any, any> {
       try {
         localStorage.setItem(`userPageUsername_${networkID}_${viewAddress.toLowerCase()}`, newUsernameToSet);
       } catch (error) {
-        accountLog.error("Error saving username to localStorage:", error);
+        accountLog.error('Error saving username to localStorage:', error);
         if (this._isMounted) {
           this.setState({
             ...buildUserPageUsernameErrorStatePatch({ usernameError: 'Failed to save username locally.' }),
@@ -3262,38 +3264,14 @@ class UserPage extends Component<any, any> {
         : null;
     const rawSessionSlug = this.props.sessionSlug ?? this.props.activeSessionSlug ?? '';
     const sessionSlug = normalizeSessionSlug(rawSessionSlug || '');
-    const hasSessionContext = !!sessionSlug || !!(sessionConfigProp && Object.keys(sessionConfigProp).length);
+    const hasSessionContext = !!sessionConfigProp || !!sessionSlug;
     const sessionConfig =
       sessionConfigProp || (hasSessionContext ? this._getSessionConfigForSlugExact(sessionSlug) : null);
-    if (hasSessionContext) {
-      const capabilities = resolveSessionCapabilityProjection(sessionConfig);
-      return capabilities.showNetworkControls && capabilities.chainId ? Number(capabilities.chainId) : null;
-    }
-    return Number(network?.chainId ?? network?.id ?? this.props.networkChainId ?? 0) || null;
-  };
-
-  getExplorerChainId = (): number | null => {
-    const network = this.props.network;
-    const sessionConfigProp = (
-      this.props.sessionConfig &&
-      typeof this.props.sessionConfig === 'object' &&
-      !Array.isArray(this.props.sessionConfig)
-    )
-      ? this.props.sessionConfig as UnknownRecord
-      : null;
-    const rawSessionSlug = this.props.sessionSlug ?? this.props.activeSessionSlug ?? '';
-    const sessionSlug = normalizeSessionSlug(rawSessionSlug || '');
-    const hasSessionContext = !!sessionConfigProp || !!sessionSlug;
-    const sessionConfig = sessionConfigProp || (
-      hasSessionContext
-        ? this._getSessionConfigForSlugExact(sessionSlug)
-        : null
-    );
     const sessionChainId = hasSessionContext
       ? Number(sessionConfig?.networkChainId ?? this.props.networkChainId ?? 0) || null
       : null;
     return sessionChainId || Number(network?.chainId ?? network?.id ?? 0) || null;
-  }
+  };
 
   getExplorerUrl = (): string | null => {
     const address = String(this.props.viewAddress || '').trim();

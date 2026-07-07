@@ -6,21 +6,13 @@ import styles from './SurveyTool.module.scss';
 
 type SurveyQuestionsResponseViewProps = {
   isLoadingResponse?: boolean;
-  isOwnResponse?: unknown;
+  layoutDisplayState?: Pick<SurveyQuestionsLayoutDisplayState, 'responseViewClassName'>;
   noResponse?: boolean;
   parsedViewAddressAnswers?: any;
   questionPool?: any[];
   questionPoolReady?: unknown;
-  renderQuestionAnswer: (
-    question: any,
-    answers: any,
-    index: number,
-    isOwnResponse: unknown
-  ) => React.ReactNode;
-  renderSurveyAnswers: (
-    responses: any[],
-    isOwnResponse: unknown
-  ) => React.ReactNode;
+  renderQuestionAnswer: (question: any, answers: any, index: number, isOwnResponse: unknown) => React.ReactNode;
+  renderSurveyAnswers: (responses: any[], isOwnResponse: unknown) => React.ReactNode;
   responderAddress?: string;
   responseLookupWarning?: React.ReactNode;
   responseViewClassName?: string;
@@ -64,8 +56,7 @@ const SurveyQuestionsResponseView = ({
       <div>
         {responseLookupWarning || (
           <>
-            No response for this{' '}
-            {singleQuestionMode ? 'question' : 'survey'} from address:{' '}
+            No response for this {singleQuestionMode ? 'question' : 'survey'} from address:{' '}
             {viewAddress || responderAddress}
           </>
         )}
@@ -89,29 +80,23 @@ const SurveyQuestionsResponseView = ({
           <span className={styles.viewAddressHeadingSuffix}>Response:</span>
         </h2>
       )}
-      {hasAnswerData ? (
-        singleQuestionMode ? (
-          renderQuestionAnswer(
-            firstQuestion,
-            isOwnResponse ? (userAnswers || {}) : (parsedViewAddressAnswers || {}),
-            0,
-            isOwnResponse
-          )
-        ) : (
-          renderSurveyAnswers(
-            isOwnResponse
-              ? (userAnswers?.responses || [])
-              : (parsedViewAddressAnswers?.responses || []),
-            isOwnResponse
-          )
-        )
-      ) : (
-        !noResponse && (
-          <div className={styles.loadingContainer}>
-            <FontAwesomeIcon icon={faSpinner} spin /> Loading answer data...
-          </div>
-        )
-      )}
+      {hasAnswerData
+        ? singleQuestionMode
+          ? renderQuestionAnswer(
+              firstQuestion,
+              isOwnResponse ? userAnswers || {} : parsedViewAddressAnswers || {},
+              0,
+              isOwnResponse,
+            )
+          : renderSurveyAnswers(
+              isOwnResponse ? userAnswers?.responses || [] : parsedViewAddressAnswers?.responses || [],
+              isOwnResponse,
+            )
+        : !noResponse && (
+            <div className={styles.loadingContainer}>
+              <FontAwesomeIcon icon={faSpinner} spin /> Loading answer data...
+            </div>
+          )}
     </div>
   );
 };

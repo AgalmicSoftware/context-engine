@@ -52,14 +52,12 @@ describe('Error boundaries', () => {
   });
 
   it('asks route-level fallback to recover stale deployed chunks', () => {
-    const recoverSpy = jest
-      .spyOn(bootRecovery, 'recoverFromStaleChunkLoadError')
-      .mockReturnValue(true);
+    const recoverSpy = jest.spyOn(bootRecovery, 'recoverFromStaleChunkLoadError').mockReturnValue(true);
 
     render(
       <RouteErrorBoundary>
         <StaleChunkThrower />
-      </RouteErrorBoundary>
+      </RouteErrorBoundary>,
     );
 
     expect(recoverSpy).toHaveBeenCalledWith(expect.any(TypeError));

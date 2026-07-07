@@ -17,7 +17,7 @@ export type AdminNormalizeArweaveUrlOptions = {
   contextLabel?: unknown;
 };
 
-export type AdminArweaveClientModule = {
+export type AdminArweaveScriptsModule = {
   readArweaveWalletBalance: (jwk: unknown, opts?: AdminArweaveRecord) => Promise<AdminArweaveWalletBalance>;
   formatWinstonToAr: (winston: unknown, decimals?: number) => string;
   uploadDataToArweave: (data: unknown, format: string, opts?: AdminArweaveUploadOptions) => Promise<string | undefined>;

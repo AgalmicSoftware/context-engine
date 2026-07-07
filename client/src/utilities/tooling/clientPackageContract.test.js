@@ -62,11 +62,32 @@ describe('client package modernization contract', () => {
     expect(pkg.scripts.start).not.toContain('vite');
     expect(eslintConfig).not.toContain('react-app');
     expect(eslintConfig).toContain("const typedGateComponentFiles = ['src/components/Gates/**/*.{ts,tsx}']");
-    expect(eslintConfig).toContain("const typedCommunityTabComponentFiles = ['src/components/CommunityTab/**/*.{ts,tsx}']");
-    expect(eslintConfig).toContain("const typedPolisReportComponentFiles = ['src/components/PolisReport/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain(
+      "const typedCommunityTabComponentFiles = ['src/components/CommunityTab/**/*.{ts,tsx}']",
+    );
+    expect(eslintConfig).toContain(
+      "const typedPolisReportComponentFiles = ['src/components/PolisReport/**/*.{ts,tsx}']",
+    );
     expect(eslintConfig).toContain("const typedDebateMapComponentFiles = ['src/components/DebateMap/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedNavbarComponentFiles = ['src/components/Navbar/**/*.{ts,tsx}']");
-    expect(eslintConfig).toContain("const typedContractPageComponentFiles = ['src/components/ContractPage/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain(
+      "const typedContractPageComponentFiles = ['src/components/ContractPage/**/*.{ts,tsx}']",
+    );
+    expect(eslintConfig).toContain(
+      "const typedOnePageSessionComponentFiles = ['src/components/OnePageSession/**/*.{ts,tsx}']",
+    );
+    expect(eslintConfig).toContain("const typedTagPageComponentFiles = ['src/components/TagPage/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain(
+      "const typedDocumentLibraryComponentFiles = ['src/components/DocumentLibrary/**/*.{ts,tsx}']",
+    );
+    expect(eslintConfig).toContain("const typedDemoViewsComponentFiles = ['src/components/DemoViews/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedAccountComponentFiles = ['src/components/Account/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedAdminComponentFiles = ['src/components/Admin/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedMainSiteComponentFiles = ['src/components/MainSite/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedUserPageComponentFiles = ['src/components/UserPage/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedSessionsComponentFiles = ['src/components/Sessions/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedSbtComponentFiles = ['src/components/SBTs/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedSurveyToolComponentFiles = ['src/components/SurveyTool/**/*.{ts,tsx}']");
   });
 
   it('keeps web3-sensitive dependencies pinned during modernization', () => {
@@ -95,10 +116,7 @@ describe('client package modernization contract', () => {
 
   it('keeps Vite tooling scoped to development dependencies', () => {
     const pkg = readClientPackageJson();
-    const vitePackages = [
-      '@vitejs/plugin-react',
-      'vite',
-    ];
+    const vitePackages = ['@vitejs/plugin-react', 'vite'];
 
     vitePackages.forEach((name) => {
       expect(pkg.dependencies[name]).toBeUndefined();
@@ -159,10 +177,7 @@ describe('client package modernization contract', () => {
   it('keeps Vite browser polyfill dependencies limited to imported runtime shims', () => {
     const pkg = readClientPackageJson();
     const viteConfig = readClientFile('vite.config.mjs');
-    const retainedBrowserShims = [
-      'buffer',
-      'process',
-    ];
+    const retainedBrowserShims = ['buffer', 'process'];
     const staleBrowserPolyfills = [
       'assert',
       'crypto-browserify',
@@ -285,12 +300,45 @@ describe('client package modernization contract', () => {
     expect(pkg.devDependencies['eslint-plugin-prettier']).toBeUndefined();
     expect(pkg.devDependencies['@typescript-eslint/eslint-plugin']).toBeUndefined();
     expect(pkg.devDependencies['eslint-plugin-import']).toBeUndefined();
-    expect(eslintConfig.plugins).not.toContain('import');
-    expect(eslintConfig.plugins).toContain('react-hooks');
-    expect(eslintConfig.plugins).not.toContain('prettier');
-    expect(eslintConfig.parser).toBe('@typescript-eslint/parser');
-    expect(eslintConfig.rules['@typescript-eslint/no-unused-vars']).toBeUndefined();
-    expect(eslintConfig.rules['prettier/prettier']).toBeUndefined();
+    expect(eslintConfig).toContain("import js from '@eslint/js'");
+    expect(eslintConfig).toContain("import tsParser from '@typescript-eslint/parser'");
+    expect(eslintConfig).toContain("import reactHooksPlugin from 'eslint-plugin-react-hooks'");
+    expect(eslintConfig).toContain("const javascriptFiles = ['src/**/*.{js,jsx,mjs,cjs}']");
+    expect(eslintConfig).toContain("const typedUiUtilityFiles = ['src/utilities/ui/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedSharedComponentFiles = ['src/components/Shared/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain('const typedInformationalComponentFiles = [');
+    expect(eslintConfig).toContain("'src/components/About/**/*.{ts,tsx}'");
+    expect(eslintConfig).toContain("'src/components/Footer/**/*.{ts,tsx}'");
+    expect(eslintConfig).toContain("'src/components/InformationModals/**/*.{ts,tsx}'");
+    expect(eslintConfig).toContain("'src/components/Onboarding/**/*.{ts,tsx}'");
+    expect(eslintConfig).toContain(
+      "const typedMainContentComponentFiles = ['src/components/MainContent/**/*.{ts,tsx}']",
+    );
+    expect(eslintConfig).toContain('const typedAuxiliaryPageComponentFiles = [');
+    expect(eslintConfig).toContain("'src/components/Agent/**/*.{ts,tsx}'");
+    expect(eslintConfig).toContain("'src/components/Bookmarks/**/*.{ts,tsx}'");
+    expect(eslintConfig).toContain("'src/components/Sponsor/**/*.{ts,tsx}'");
+    expect(eslintConfig).toContain('const typedShellSupportComponentFiles = [');
+    expect(eslintConfig).toContain("'src/components/ErrorBoundary/**/*.{ts,tsx}'");
+    expect(eslintConfig).toContain("'src/components/RightSidebar/**/*.{ts,tsx}'");
+    expect(eslintConfig).toContain("const typedDevSupportComponentFiles = ['src/components/E2E/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedGateComponentFiles = ['src/components/Gates/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain(
+      "const typedCommunityTabComponentFiles = ['src/components/CommunityTab/**/*.{ts,tsx}']",
+    );
+    expect(eslintConfig).toContain(
+      "const typedPolisReportComponentFiles = ['src/components/PolisReport/**/*.{ts,tsx}']",
+    );
+    expect(eslintConfig).toContain("const typedDebateMapComponentFiles = ['src/components/DebateMap/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedNavbarComponentFiles = ['src/components/Navbar/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain(
+      "const typedContractPageComponentFiles = ['src/components/ContractPage/**/*.{ts,tsx}']",
+    );
+    expect(eslintConfig).toContain("'react-hooks': reactHooksPlugin");
+    expect(eslintConfig).not.toContain("import importPlugin from 'eslint-plugin-import'");
+    expect(eslintConfig).not.toContain("import prettierPlugin from 'eslint-plugin-prettier'");
+    expect(eslintConfig).not.toContain('@typescript-eslint/no-unused-vars');
+    expect(eslintConfig).not.toContain('prettier/prettier');
   });
 
   it('keeps stale webpack and CRA packages out of the client package contract', () => {

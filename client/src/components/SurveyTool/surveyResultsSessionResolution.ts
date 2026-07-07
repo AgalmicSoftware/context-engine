@@ -166,7 +166,7 @@ export const resolveSurveyResultsQuestionReadScope = ({
       routeSlug ??
       '',
   );
-  const shouldFanOut = (
+  const shouldFanOut =
     sessionSlugPinned !== true &&
     !hasRouteSessionPin &&
     !hasExplicitSessionQueryPin(search) &&
@@ -191,10 +191,10 @@ export const resolveSurveyResultsQuestionReadScope = ({
     }
   }
 
-  const includeBuiltInDemoCanonicalSource = (
-    String(viewMode || '').trim().toLowerCase() === 'questions' &&
-    baseSlug === 'demo'
-  );
+  const includeBuiltInDemoCanonicalSource =
+    String(viewMode || '')
+      .trim()
+      .toLowerCase() === 'questions' && baseSlug === 'demo';
   const questionReadSlugs = dedupeSessionSlugs([
     baseSlug,
     ...(includeBuiltInDemoCanonicalSource ? [''] : []),

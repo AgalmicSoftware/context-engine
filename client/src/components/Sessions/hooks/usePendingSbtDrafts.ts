@@ -105,56 +105,25 @@ export const purgeLegacySessionWizardPendingSbtDrafts = ({
     } catch (_) {
       failed += 1;
     }
-  });
-  return {
-    ok: failed === 0,
-    removed,
-    failed,
-    status: failed === 0 ? 'ok' : 'partial-failure',
-  };
+    sessionStorage.setItem(SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY, JSON.stringify(normalized));
+  } catch (e) {
+    log.warn('SessionWizard: fallback', e);
+  }
 };
 
-export const readSessionWizardPendingSbtDraftsCache = (): PendingSbtDraft[] => {
-  purgeLegacySessionWizardPendingSbtDrafts();
-  return normalizePendingSbtDrafts(tabMemoryPendingSbtDrafts);
-};
-
-export const writeSessionWizardPendingSbtDraftsCache = (
-  payload: PendingSbtDraft[] = [],
-  { storage }: { storage?: SessionStorageLike | null } = {},
-): PendingSbtDraftStorageResult => {
-  const purgeResult = purgeLegacySessionWizardPendingSbtDrafts({ storage });
-  tabMemoryPendingSbtDrafts = normalizePendingSbtDrafts(payload);
-  emitPendingSbtDraftChange();
-  return {
-    ...purgeResult,
-    status: purgeResult.ok ? 'memory-only' : 'partial-failure',
-  };
-};
-
-export const clearSessionWizardPendingSbtDraftsCache = ({
-  storage,
-}: {
-  storage?: SessionStorageLike | null;
-} = {}): PendingSbtDraftClearResult => {
-  tabMemoryPendingSbtDrafts = [];
-  const purgeResult = purgeLegacySessionWizardPendingSbtDrafts({ storage });
-  emitPendingSbtDraftChange();
-  return purgeResult;
+export const clearSessionWizardPendingSbtDraftsCache = (): void => {
+  if (typeof window === 'undefined' || !window.sessionStorage) return;
+  try {
+    sessionStorage.removeItem(SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY);
+  } catch (e) {
+    log.warn('SessionWizard: fallback', e);
+  }
 };
 
 const usePendingSbtDrafts = () => {
-  purgeLegacySessionWizardPendingSbtDrafts();
-  const pendingSbtDrafts = useSyncExternalStore(
-    subscribeToPendingSbtDrafts,
-    getPendingSbtDraftSnapshot,
-    getPendingSbtDraftServerSnapshot,
+  const [pendingSbtDrafts, setPendingSbtDrafts] = useState<PendingSbtDraft[]>(() =>
+    readSessionWizardPendingSbtDraftsCache(),
   );
-  const setPendingSbtDrafts = useCallback<Dispatch<SetStateAction<PendingSbtDraft[]>>>((nextValue) => {
-    const resolved = typeof nextValue === 'function' ? nextValue(tabMemoryPendingSbtDrafts) : nextValue;
-    const normalized = normalizePendingSbtDrafts(resolved);
-    writeSessionWizardPendingSbtDraftsCache(normalized);
-  }, []);
   const normalizedPendingSbtDrafts = useMemo(() => normalizePendingSbtDrafts(pendingSbtDrafts), [pendingSbtDrafts]);
   const hasUndeployedPendingSbtDrafts = normalizedPendingSbtDrafts.some((entry) => entry.deployed !== true);
 

@@ -201,7 +201,7 @@ const ToolExplorer = (props: ToolExplorerProps) => {
       sessionSlug: toStr(props.activeSessionSlug),
       migrateLegacyToSessionKey: true,
       clearInvalid: true,
-    });
+    } as any);
 
   const handleClick = (Component: ToolComponent, data: ToolData) => {
     if (!data.disabled) {
@@ -249,23 +249,44 @@ const ToolExplorer = (props: ToolExplorerProps) => {
     }
   }, [expandedDemoCard, props.demoSurfaceMode]);
 
-  const expandedChildProps = expandedComponent ? {
-    ...expandedComponent.data,
-    account: props.account,
-    provider: props.provider,
-    litHooks: props.litHooks,
-    activeSessionSlug: props.activeSessionSlug,
-    sessionConfig: getSessionConfigBySlug(props.activeSessionSlug || '') || null,
-    ensureLightSbtUniverse: props.ensureLightSbtUniverse,
-    loginComplete: props.loginComplete,
-    toggleLoginModal: props.toggleLoginModal,
-    network: props.network,
-    isSBTCacheReady: props.isSBTCacheReady,
-    isSurveyCacheReady: props.isSurveyCacheReady,
-    isQuestionCacheReady: props.isQuestionCacheReady,
-    ...(expandedToolName === 'Questions'
-      ? {
-        preventUrlChange: true,
+  const expandedChildProps = expandedComponent
+    ? {
+        ...expandedComponent.data,
+        account: props.account,
+        provider: props.provider,
+        litHooks: props.litHooks,
+        activeSessionSlug: props.activeSessionSlug,
+        sessionConfig: getSessionConfigBySlug(props.activeSessionSlug || '') || null,
+        ensureLightSbtUniverse: props.ensureLightSbtUniverse,
+        loginComplete: props.loginComplete,
+        toggleLoginModal: props.toggleLoginModal,
+        network: props.network,
+        isSBTCacheReady: props.isSBTCacheReady,
+        isSurveyCacheReady: props.isSurveyCacheReady,
+        isQuestionCacheReady: props.isQuestionCacheReady,
+        ...(expandedToolName === 'Questions'
+          ? {
+              preventUrlChange: true,
+            }
+          : {}),
+        ...(expandedToolName === 'Debate Tree' ? { demoMode: demoSurfaceEnabled } : {}),
+        ...(showGroupsHeaderActions
+          ? {
+              hideMiniActionRow: true,
+              showCreateGroupAboveFeatured: true,
+              showCreateGroupExternal: showEmbeddedCreateGroup,
+              onCreateGroupToggleExternal: toggleEmbeddedCreateGroup,
+            }
+          : {}),
+        ...(showDataHeaderActions
+          ? {
+              explorerMode: dataToolMode,
+              demoSurfaceMode: props.demoSurfaceMode,
+              sessionOverrideSlug: dataSessionOverrideSlug,
+              sessionOverrideTouched: dataSessionOverrideTouched,
+              hideInternalSessionSelector: true,
+            }
+          : {}),
       }
     : null;
 
@@ -412,7 +433,7 @@ const ToolExplorer = (props: ToolExplorerProps) => {
                 xs="12"
                 sm="6"
                 md="4"
-                className={`${styles.explorerCol} ${useSparseGrid ? styles.explorerColSparse : ''} ${props.disabled ? styles.disabled : ''} ${styles[props.status]} ${demoSurfaceEnabled ? styles.statusBorderEnabled : ''}`}
+                className={`${styles.explorerCol} ${useSparseGrid ? styles.explorerColSparse : ''} ${props.disabled ? styles.disabled : ''} ${styles[props.status]}`}
                 onClick={() => handleClick(Component, data)}
               >
                 <div className={styles.square}>

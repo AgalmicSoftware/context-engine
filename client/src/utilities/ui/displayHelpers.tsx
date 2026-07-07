@@ -28,7 +28,7 @@ export const getShortenedAddress = (
     const link = customLink ? customLink : '/u/' + source.toString();
     const displayStringURL = (
       <React.Fragment>
-        <NavLink href={link} target="_blank" rel="noopener noreferrer" style={{ padding: '0px' }}>
+        <NavLink href={link} target="_blank" style={{ padding: '0px' }}>
           {displayString}
         </NavLink>
       </React.Fragment>
@@ -60,12 +60,7 @@ export const getShortenedSurveyID = (
   } else if (surveyIdClickable) {
     const link = customLink ? customLink : '/survey/' + source.toString();
     const displayStringURL = (
-      <NavLink
-        href={link}
-        target="_blank"
-        rel="noopener noreferrer"
-        style={{ padding: '0px', color: 'blue', marginLeft: '5px' }}
-      >
+      <NavLink href={link} target="_blank" style={{ padding: '0px', color: 'blue', marginLeft: '5px' }}>
         {displayString}
       </NavLink>
     );
@@ -90,7 +85,7 @@ export const getShortenedQuestionID = (
   if (clickable) {
     const link = customLink ? customLink : '/question/' + source.toString();
     return (
-      <NavLink href={link} target="_blank" rel="noopener noreferrer" style={{ padding: '0px' }}>
+      <NavLink href={link} target="_blank" style={{ padding: '0px' }}>
         {displayString}
       </NavLink>
     );
@@ -110,7 +105,7 @@ export const getShortenedTransactionHash = (
   if (clickable) {
     const link = customLink ? customLink : '/tx/' + source.toString();
     return (
-      <NavLink href={link} target="_blank" rel="noopener noreferrer" style={{ padding: '0px' }}>
+      <NavLink href={link} target="_blank" style={{ padding: '0px' }}>
         {displayString}
       </NavLink>
     );

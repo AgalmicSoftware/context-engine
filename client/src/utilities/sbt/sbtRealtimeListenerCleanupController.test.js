@@ -4,7 +4,7 @@ jest.mock('../web3/chainGateway.js', () => ({
 }));
 
 const { createSbtRealtimeListenerCleanupController } = require('./sbtRealtimeListenerCleanupController.js');
-const { normalizeSessionSlug } = require('../web3/chainGateway.js');
+const { normalizeSessionSlug } = require('../web3/contractScripts.js');
 
 describe('createSbtRealtimeListenerCleanupController', () => {
   beforeEach(() => {

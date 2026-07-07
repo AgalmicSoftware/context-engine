@@ -42,16 +42,18 @@ describe('sessionWizardSecrets', () => {
   });
 
   test('buildWorkerSecretsPayload trims values and drops empty keys', () => {
-    expect(buildWorkerSecretsPayload({
-      openaiKey: ' sk-123 ',
-      anthropicKey: '',
-      arweaveJwk: '   {"kty":"RSA"}   ',
-      customRpcUrl: '   ',
-      litApiBase: 'https://api.chipotle.litprotocol.com',
-      litGroupId: 'group_123',
-      litAccountApiKey: ' account-secret ',
-      litUsageApiKey: ' lit-secret ',
-    })).toEqual({
+    expect(
+      buildWorkerSecretsPayload({
+        openaiKey: ' sk-123 ',
+        anthropicKey: '',
+        arweaveJwk: '   {"kty":"RSA"}   ',
+        customRpcUrl: '   ',
+        litApiBase: 'https://api.chipotle.litprotocol.com',
+        litGroupId: 'group_123',
+        litAccountApiKey: ' account-secret ',
+        litUsageApiKey: ' lit-secret ',
+      }),
+    ).toEqual({
       openaiKey: 'sk-123',
       arweaveJwk: '{"kty":"RSA"}',
       litAccountApiKey: 'account-secret',

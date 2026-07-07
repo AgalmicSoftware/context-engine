@@ -90,6 +90,8 @@ type EffectiveFaucetConfigResult = {
   encryptedAvailable: boolean;
 };
 
+const log = createLogger('resourceKeys');
+
 const STORAGE_KEY = 'ce:resourceKeys:v1';
 const RESERVED_KEYS = new Set<string>(['__proto__', 'constructor', 'prototype']);
 const isObj = (value: unknown): value is UnknownRecord => !!value && typeof value === 'object' && !Array.isArray(value);
@@ -172,8 +174,12 @@ const readStore = (): ResourceKeyStore => {
 };
 
 const writeStore = (payload: ResourceKeyStore): void => {
-  purgeLegacyStore();
-  memoryStore = normalizeStore(payload);
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  } catch (e) {
+    log.warn('resourceKeys: fallback', e);
+  }
 };
 
 export const getLocalResourceKeys = (slugIn = ''): ResourceKeys => {
@@ -236,10 +242,9 @@ const getWalletContext = (
 } => {
   try {
     const state = store?.getState?.();
-    const profile: UnknownRecord = isObj(state?.profile) ? state.profile : {};
-    const network: UnknownRecord = isObj(profile.network) ? profile.network : {};
+    const profile = state?.profile || {};
+    const network = profile.network || {};
     const chainId = override.chainId || network.id || network.chainId || null;
-    const providerLike = typeof profile.provider === 'string' || isObj(profile.provider) ? profile.provider : 'wagmi';
     return {
       account: override.account || toStr(profile.account),
       providerLike: override.providerLike || providerLike,

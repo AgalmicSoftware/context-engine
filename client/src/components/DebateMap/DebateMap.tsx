@@ -94,7 +94,7 @@ import type {
   VoteDirection,
 } from './debateMapTypes';
 
-const StandalonePoliticalCompass = React.lazy(() => (
+const StandalonePoliticalCompass = React.lazy(() =>
   import('../DemoViews/DebateHUD/PoliticalCompassView').then((module) => ({
     default: module.StandalonePoliticalCompass,
   })),
@@ -235,10 +235,7 @@ interface HistoricalCaseBrief {
   precedentPressure: HistoricalFieldRow[];
 }
 
-type HistoricalCaseBriefBuilder = (
-  historicalCase: HistoricalCase,
-  content?: DebateNode,
-) => HistoricalCaseBrief;
+type HistoricalCaseBriefBuilder = (historicalCase: HistoricalCase, content?: DebateNode) => HistoricalCaseBrief;
 
 interface HistoricalCase {
   id?: string;
@@ -336,14 +333,62 @@ interface AtlasLink {
 }
 
 export const getDebateNodeStableKey = (
-  node: Pick<DebateNode, 'id' | 'name'> | null | undefined,
-  fallback: string
+  node: Pick<DebateNode, 'id' | 'name' | 'parentPath'> | null | undefined,
+  fallback: string,
 ): string => {
   const nodeId = String(node?.id || '').trim();
   if (nodeId) return nodeId;
   const nodeName = String(node?.name || '').trim();
   if (nodeName) return nodeName;
   return fallback;
+};
+
+export const getDebateNodeListStableKeys = (
+  nodes: Array<Pick<DebateNode, 'id' | 'name' | 'parentPath'> | null | undefined> = [],
+  fallback: string,
+): string[] => {
+  const counts = new Map<string, number>();
+  return (Array.isArray(nodes) ? nodes : []).map((node) => {
+    const baseKey = getDebateNodeStableKey(node, fallback);
+    const occurrence = (counts.get(baseKey) || 0) + 1;
+    counts.set(baseKey, occurrence);
+    return occurrence === 1 ? baseKey : `${baseKey}:${occurrence}`;
+  });
+};
+
+export const getDebateQuestionStableKey = (
+  question: Pick<DebateQuestion, 'id' | 'question' | 'prompt'> | null | undefined,
+  fallback: string,
+): string => {
+  const questionId = String(question?.id || '').trim();
+  if (questionId) return questionId;
+  const questionText = String(question?.question || question?.prompt || '').trim();
+  if (questionText) return `${fallback}:${questionText}`;
+  return fallback;
+};
+
+export const getDebateQuestionListStableKeys = (
+  questions: Array<Pick<DebateQuestion, 'id' | 'question' | 'prompt'> | null | undefined> = [],
+  fallback: string,
+): string[] => {
+  const counts = new Map<string, number>();
+  return (Array.isArray(questions) ? questions : []).map((question) => {
+    const baseKey = getDebateQuestionStableKey(question, fallback);
+    const occurrence = (counts.get(baseKey) || 0) + 1;
+    counts.set(baseKey, occurrence);
+    return occurrence === 1 ? baseKey : `${baseKey}:${occurrence}`;
+  });
+};
+
+export const getDebateTagStableKeys = (tags: unknown[] = []): string[] => {
+  const counts = new Map<string, number>();
+  return (Array.isArray(tags) ? tags : []).map((tag) => {
+    const label = String(tag ?? '').trim() || 'tag';
+    const normalized = label.toLowerCase();
+    const occurrence = (counts.get(normalized) || 0) + 1;
+    counts.set(normalized, occurrence);
+    return occurrence === 1 ? `tag:${label}` : `tag:${label}:${occurrence}`;
+  });
 };
 
 const formatAtlasLinkCoordinate = (value: unknown): string => {
@@ -477,11 +522,17 @@ const historicalFigurePrincipleMap = loopholeHistoricalFigurePrinciples as Recor
 const cleanAtlasCategoryName = (name: unknown): string => String(name || '').replace(/^\d+\.\s*/, '');
 
 const findAtlasNodeById = (nodes: DebateNode[] | undefined, targetId: unknown): DebateNode | null => {
-  const normalizedTargetId = String(targetId || '').trim().toLowerCase();
+  const normalizedTargetId = String(targetId || '')
+    .trim()
+    .toLowerCase();
   if (!normalizedTargetId || !Array.isArray(nodes)) return null;
 
   for (const node of nodes) {
-    if (String(node?.id || '').trim().toLowerCase() === normalizedTargetId) {
+    if (
+      String(node?.id || '')
+        .trim()
+        .toLowerCase() === normalizedTargetId
+    ) {
       return node;
     }
     if (Array.isArray(node?.children) && node.children.length > 0) {
@@ -508,9 +559,8 @@ const normalizeCompassVote = (value: unknown): number => {
   return Math.max(0, Math.min(1, (numericValue + 8) / 16));
 };
 
-const getNameHash = (value: unknown): number => (
-  Array.from(String(value || '')).reduce((sum, char) => sum + char.charCodeAt(0), 0)
-);
+const getNameHash = (value: unknown): number =>
+  Array.from(String(value || '')).reduce((sum, char) => sum + char.charCodeAt(0), 0);
 
 const hslToHex = (h: number, s: number, l: number): string => {
   s /= 100;
@@ -520,7 +570,9 @@ const hslToHex = (h: number, s: number, l: number): string => {
   const f = (n: number) => {
     const k = (n + h / 30) % 12;
     const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
-    return Math.round(255 * color).toString(16).padStart(2, '0');
+    return Math.round(255 * color)
+      .toString(16)
+      .padStart(2, '0');
   };
 
   return `#${f(0)}${f(8)}${f(4)}`;
@@ -531,7 +583,9 @@ const getHistoricalCompassColor = (name: unknown): string => {
   return hslToHex(hue, 72, 58);
 };
 
-const historicalFigureVoteMap = Object.entries(historicalFigureData || {}).reduce<Record<string, HistoricalVoteEntry[]>>((acc, [username, figure]) => {
+const historicalFigureVoteMap = Object.entries(historicalFigureData || {}).reduce<
+  Record<string, HistoricalVoteEntry[]>
+>((acc, [username, figure]) => {
   acc[username] = Object.entries(figure?.votes || {}).reduce<HistoricalVoteEntry[]>((votes, [nodeId, vote]) => {
     const parsedVote = parseHistoricalVoteValue(vote);
     if (parsedVote !== null) {
@@ -542,14 +596,16 @@ const historicalFigureVoteMap = Object.entries(historicalFigureData || {}).reduc
   return acc;
 }, {});
 
-const historicalFigureCommentMap = Object.entries(historicalFigureData || {}).reduce<Record<string, Record<string, string>>>((acc, [username, figure]) => {
+const historicalFigureCommentMap = Object.entries(historicalFigureData || {}).reduce<
+  Record<string, Record<string, string>>
+>((acc, [username, figure]) => {
   acc[username] = Array.isArray(figure?.comments)
     ? figure.comments.reduce<Record<string, string>>((comments, entry) => {
-      if (entry?.id && typeof entry.comment === 'string') {
-        comments[entry.id] = entry.comment;
-      }
-      return comments;
-    }, {})
+        if (entry?.id && typeof entry.comment === 'string') {
+          comments[entry.id] = entry.comment;
+        }
+        return comments;
+      }, {})
     : {};
   return acc;
 }, {});
@@ -586,17 +642,12 @@ const normalizeHistoricalCaseText = (value: unknown): string => {
   return '';
 };
 
-const normalizeHistoricalCaseTextList = (values: unknown): string[] => (
-  Array.isArray(values)
-    ? values
-      .map((value: unknown) => normalizeHistoricalCaseText(value))
-      .filter(Boolean)
-    : []
-);
+const normalizeHistoricalCaseTextList = (values: unknown): string[] =>
+  Array.isArray(values) ? values.map((value: unknown) => normalizeHistoricalCaseText(value)).filter(Boolean) : [];
 
 const buildHistoricalCaseFieldRows = (
   source: Record<string, unknown> | null | undefined,
-  fields: HistoricalFieldDefinition[]
+  fields: HistoricalFieldDefinition[],
 ): HistoricalFieldRow[] => {
   if (!source || typeof source !== 'object') return [];
 
@@ -608,11 +659,9 @@ const buildHistoricalCaseFieldRows = (
 };
 
 const normalizeHistoricalDraftArticles = (
-  draftLegalCode: { articles?: unknown[] } | null | undefined
+  draftLegalCode: { articles?: unknown[] } | null | undefined,
 ): HistoricalDraftArticle[] => {
-  const rawArticles = Array.isArray(draftLegalCode?.articles)
-    ? draftLegalCode.articles
-    : [];
+  const rawArticles = Array.isArray(draftLegalCode?.articles) ? draftLegalCode.articles : [];
 
   return rawArticles.reduce<HistoricalDraftArticle[]>((articles, article, articleIndex) => {
     const fallbackLabel = `Article ${articleIndex + 1}`;
@@ -621,11 +670,9 @@ const normalizeHistoricalDraftArticles = (
 
     if (article && typeof article === 'object' && !Array.isArray(article)) {
       const articleRecord = article as Record<string, unknown>;
-      label = normalizeHistoricalCaseText(
-        articleRecord.label || articleRecord.title || articleRecord.article
-      );
+      label = normalizeHistoricalCaseText(articleRecord.label || articleRecord.title || articleRecord.article);
       body = normalizeHistoricalCaseText(
-        articleRecord.body || articleRecord.text || articleRecord.content || articleRecord.summary
+        articleRecord.body || articleRecord.text || articleRecord.content || articleRecord.summary,
       );
     } else {
       body = normalizeHistoricalCaseText(article);
@@ -667,55 +714,49 @@ const resolveHistoricalPatchFigureLabel = (rawValue: unknown, authors: string[])
 };
 
 const normalizeHistoricalPatchFavoredBy = (favoredBy: unknown, authors: string[]): string[] => {
-  const favoredValues = Array.isArray(favoredBy)
-    ? favoredBy
-    : [favoredBy];
+  const favoredValues = Array.isArray(favoredBy) ? favoredBy : [favoredBy];
 
-  const rawTokens = favoredValues
-    .flatMap((value: unknown) => {
-      const normalizedValue = normalizeHistoricalCaseText(value);
-      if (!normalizedValue) return [];
-      if (/^\s*(figure a|figure b|both)\s*$/i.test(normalizedValue)) {
-        return [normalizedValue];
-      }
-      return normalizedValue.split(/\s*(?:,|\/|&|\band\b)\s*/i).filter(Boolean);
-    });
+  const rawTokens = favoredValues.flatMap((value: unknown) => {
+    const normalizedValue = normalizeHistoricalCaseText(value);
+    if (!normalizedValue) return [];
+    if (/^\s*(figure a|figure b|both)\s*$/i.test(normalizedValue)) {
+      return [normalizedValue];
+    }
+    return normalizedValue.split(/\s*(?:,|\/|&|\band\b)\s*/i).filter(Boolean);
+  });
 
-  return Array.from(new Set(
-    rawTokens
-      .flatMap((token) => resolveHistoricalPatchFigureLabel(token, authors))
-      .filter(Boolean)
-  ));
+  return Array.from(
+    new Set(rawTokens.flatMap((token) => resolveHistoricalPatchFigureLabel(token, authors)).filter(Boolean)),
+  );
 };
 
-const normalizeHistoricalPatchOptions = (patchOptions: unknown, authors: string[]): HistoricalPatchOption[] => (
+const normalizeHistoricalPatchOptions = (patchOptions: unknown, authors: string[]): HistoricalPatchOption[] =>
   Array.isArray(patchOptions)
     ? patchOptions.reduce<HistoricalPatchOption[]>((normalizedPatches, patch, patchIndex) => {
-      if (!patch || typeof patch !== 'object') return normalizedPatches;
+        if (!patch || typeof patch !== 'object') return normalizedPatches;
 
-      const name = normalizeHistoricalCaseText(patch.name);
-      const summary = normalizeHistoricalCaseText(patch.summary);
-      const favoredBy = normalizeHistoricalPatchFavoredBy(patch.favored_by, authors);
+        const name = normalizeHistoricalCaseText(patch.name);
+        const summary = normalizeHistoricalCaseText(patch.summary);
+        const favoredBy = normalizeHistoricalPatchFavoredBy(patch.favored_by, authors);
 
-      if (!name && !summary && favoredBy.length === 0) {
-        return normalizedPatches;
-      }
+        if (!name && !summary && favoredBy.length === 0) {
+          return normalizedPatches;
+        }
 
-      return normalizedPatches.concat({
-        id: name || `patch-${patchIndex}`,
-        name: name || `Patch option ${patchIndex + 1}`,
-        summary,
-        favoredBy,
-      });
-    }, [])
-    : []
-);
+        return normalizedPatches.concat({
+          id: name || `patch-${patchIndex}`,
+          name: name || `Patch option ${patchIndex + 1}`,
+          summary,
+          favoredBy,
+        });
+      }, [])
+    : [];
 
 const buildHistoricalCasePanel = (
   title: string,
   tone: 'primary' | 'secondary',
   source: Record<string, unknown> | null | undefined,
-  fields: HistoricalFieldDefinition[]
+  fields: HistoricalFieldDefinition[],
 ): HistoricalCasePanel | null => {
   const rows = buildHistoricalCaseFieldRows(source, fields);
   if (rows.length === 0) return null;
@@ -729,7 +770,7 @@ const buildHistoricalCasePanel = (
 
 export const buildHistoricalCaseBrief = (
   historicalCase: HistoricalCase,
-  content: DebateNode = {}
+  content: DebateNode = {},
 ): HistoricalCaseBrief => {
   const nodeName = String(content?.name || 'this issue').trim();
   const xAxisLabel = String(content?.compass?.xAxis?.label || '').trim();
@@ -742,47 +783,38 @@ export const buildHistoricalCaseBrief = (
     const inlinePrinciplesList = normalizeHistoricalCaseTextList(inlinePrinciples?.[authorName]);
     return {
       name: authorName,
-      principles: inlinePrinciplesList.length > 0
-        ? inlinePrinciplesList
-        : normalizeHistoricalCaseTextList(getHistoricalFigurePrinciples(authorName)),
+      principles:
+        inlinePrinciplesList.length > 0
+          ? inlinePrinciplesList
+          : normalizeHistoricalCaseTextList(getHistoricalFigurePrinciples(authorName)),
     };
   });
 
   const authorText = authors.length > 0 ? authors.join(' and ') : 'the paired historical figures';
-  const normalizedCategory = String(historicalCase?.category || '').trim().toLowerCase();
+  const normalizedCategory = String(historicalCase?.category || '')
+    .trim()
+    .toLowerCase();
   const axisFragments = [xAxisLabel, yAxisLabel].filter(Boolean);
-  const axisText = axisFragments.length > 0
-    ? axisFragments.join(' and ')
-    : nodeName;
+  const axisText = axisFragments.length > 0 ? axisFragments.join(' and ') : nodeName;
 
   const draftArticles = normalizeHistoricalDraftArticles(historicalCase?.draft_legal_code);
   const attackPanels = [
-    buildHistoricalCasePanel(
-      'Loophole exploit',
-      'primary',
-      historicalCase?.loophole_exploit,
-      [
-        { key: 'institution', label: 'Institution' },
-        { key: 'actor', label: 'Actor' },
-        { key: 'action', label: 'Action' },
-        { key: 'victims', label: 'Victims' },
-        { key: 'why_legal', label: 'Why legal' },
-        { key: 'why_immoral', label: 'Why immoral' },
-      ]
-    ),
-    buildHistoricalCasePanel(
-      'Overreach variant',
-      'secondary',
-      historicalCase?.overreach_variant,
-      [
-        { key: 'institution', label: 'Institution' },
-        { key: 'actor', label: 'Actor' },
-        { key: 'blocked_action', label: 'Blocked action' },
-        { key: 'who_gets_harmed', label: 'Who gets harmed' },
-        { key: 'why_illegal', label: 'Why illegal' },
-        { key: 'why_moral', label: 'Why moral' },
-      ]
-    ),
+    buildHistoricalCasePanel('Loophole exploit', 'primary', historicalCase?.loophole_exploit, [
+      { key: 'institution', label: 'Institution' },
+      { key: 'actor', label: 'Actor' },
+      { key: 'action', label: 'Action' },
+      { key: 'victims', label: 'Victims' },
+      { key: 'why_legal', label: 'Why legal' },
+      { key: 'why_immoral', label: 'Why immoral' },
+    ]),
+    buildHistoricalCasePanel('Overreach variant', 'secondary', historicalCase?.overreach_variant, [
+      { key: 'institution', label: 'Institution' },
+      { key: 'actor', label: 'Actor' },
+      { key: 'blocked_action', label: 'Blocked action' },
+      { key: 'who_gets_harmed', label: 'Who gets harmed' },
+      { key: 'why_illegal', label: 'Why illegal' },
+      { key: 'why_moral', label: 'Why moral' },
+    ]),
   ].filter((panel): panel is HistoricalCasePanel => Boolean(panel));
 
   const richJudgeTension = normalizeHistoricalCaseText(historicalCase?.judge_tension);
@@ -820,12 +852,11 @@ export const buildHistoricalCaseBrief = (
 
   return {
     figurePrinciples,
-    draftLegalCode: draftArticles.length > 0
-      ? { articles: draftArticles }
-      : draftLegalCodeText,
-    adversarialAttack: attackPanels.length > 0
-      ? { panels: attackPanels, fallbackText: null }
-      : { panels: [], fallbackText: adversarialAttackText },
+    draftLegalCode: draftArticles.length > 0 ? { articles: draftArticles } : draftLegalCodeText,
+    adversarialAttack:
+      attackPanels.length > 0
+        ? { panels: attackPanels, fallbackText: null }
+        : { panels: [], fallbackText: adversarialAttackText },
     judgeTension: richJudgeTension || judgeTensionText,
     whyHard: richWhyHard || null,
     decisionPrompt: richOpenQuestion || decisionPromptText,
@@ -869,14 +900,11 @@ export const buildExpandedHistoricalCaseBriefMap = (
   return briefMap;
 };
 
-const getHistoricalCompassSpreadY = (name: string): number => (
-  ((getNameHash(name) * 37) % 1000) / 999
-);
+const getHistoricalCompassSpreadY = (name: string): number => ((getNameHash(name) * 37) % 1000) / 999;
 
 const getHistoricalCompassY = (name: string, currentNodeId: string | null | undefined): number => {
   const voteSeries = historicalFigureVoteMap[name] || [];
-  const alternateVote = voteSeries
-    .filter(({ nodeId }) => nodeId !== currentNodeId)[1];
+  const alternateVote = voteSeries.filter(({ nodeId }) => nodeId !== currentNodeId)[1];
 
   if (alternateVote && Number.isFinite(alternateVote.value)) {
     return normalizeCompassVote(alternateVote.value);
@@ -893,7 +921,7 @@ const getCompassQuadrantKey = ({ x, y }: Pick<HistoricalCompassPoint, 'x' | 'y'>
 
 const selectBalancedHistoricalCompassPoints = (
   points: HistoricalCompassPoint[],
-  limit = 20
+  limit = 20,
 ): HistoricalCompassPoint[] => {
   const normalizedLimit = Math.max(0, Number(limit) || 0);
   if (normalizedLimit === 0 || !Array.isArray(points) || points.length === 0) {
@@ -943,33 +971,158 @@ export const getDebateQuestionStableKey = (
   return fallback;
 };
 
-export const getDebateQuestionListStableKeys = (
-  questions: Array<Pick<DebateQuestion, 'id' | 'question' | 'prompt'> | null | undefined> = [],
-  fallback: string,
-): string[] => {
-  const counts = new Map<string, number>();
-  return (Array.isArray(questions) ? questions : []).map((question) => {
-    const baseKey = getDebateQuestionStableKey(question, fallback);
-    const occurrence = (counts.get(baseKey) || 0) + 1;
-    counts.set(baseKey, occurrence);
-    return occurrence === 1 ? baseKey : `${baseKey}:${occurrence}`;
+  const selected: HistoricalCompassPoint[] = [];
+  const selectedKeys = new Set();
+  const pushPoint = (point: HistoricalCompassPoint) => {
+    const pointKey = `${point.name}:${point.x}:${point.y}`;
+    if (selectedKeys.has(pointKey)) return false;
+    selected.push(point);
+    selectedKeys.add(pointKey);
+    return true;
+  };
+
+  const targetPerQuadrant = Math.max(1, Math.floor(normalizedLimit / populatedQuadrants.length));
+
+  // Reserve space across populated quadrants so heavily one-sided charts still show
+  // the historical figures occupying the opposing quadrants when the data exists.
+  populatedQuadrants.forEach((quadrantKey) => {
+    quadrantBuckets[quadrantKey].slice(0, targetPerQuadrant).forEach((point) => {
+      if (selected.length < normalizedLimit) pushPoint(point);
+    });
   });
 };
 
-export const getDebateTagStableKeys = (tags: unknown[] = []): string[] => {
-  const counts = new Map<string, number>();
-  return (Array.isArray(tags) ? tags : []).map((tag) => {
-    const label = String(tag ?? '').trim() || 'tag';
-    const normalized = label.toLowerCase();
-    const occurrence = (counts.get(normalized) || 0) + 1;
-    counts.set(normalized, occurrence);
-    return occurrence === 1 ? `tag:${label}` : `tag:${label}:${occurrence}`;
-  });
+export const buildHistoricalCompassPoints = (
+  voteEntries: HistoricalVoteEntry[] | null | undefined,
+  fallbackPoints: HistoricalCompassPoint[] = [],
+  currentNodeId: string | null | undefined,
+  limit = 20,
+): HistoricalCompassPoint[] => {
+  if (!Array.isArray(voteEntries) || voteEntries.length === 0) {
+    return Array.isArray(fallbackPoints) ? fallbackPoints : [];
+  }
+
+  const sortedPoints = voteEntries
+    .filter((entry) => Number.isFinite(entry?.value))
+    .sort(
+      (left, right) =>
+        Math.abs(right.value) - Math.abs(left.value) ||
+        String(left.username || '').localeCompare(String(right.username || '')),
+    )
+    .map((entry) => ({
+      name: entry.username,
+      x: normalizeCompassVote(entry.value),
+      y: getHistoricalCompassY(entry.username, currentNodeId),
+      type: 'historical',
+      color: getHistoricalCompassColor(entry.username),
+      comment:
+        typeof entry?.comment === 'string'
+          ? entry.comment
+          : currentNodeId
+            ? historicalFigureCommentMap[entry.username]?.[currentNodeId] || ''
+            : '',
+    }));
+
+  return selectBalancedHistoricalCompassPoints(sortedPoints, limit);
 };
 
-const formatAtlasLinkCoordinate = (value: unknown): string => {
-  const numericValue = Number(value);
-  return Number.isFinite(numericValue) ? numericValue.toFixed(3) : '0.000';
+const buildAtlasTreeData = (demoMode: boolean): DebateNode[] => {
+  const updateNodeWithHistoricalData = (node: DebateNode): DebateNode => {
+    const nodeId = String(node.id || '').trim();
+    let demoUp = 0;
+    let demoDown = 0;
+    let demoQuestions: DebateQuestion[] = [];
+    let demoComments: DebateComment[] = [];
+    let demoHistoricalVotes: HistoricalVoteEntry[] = [];
+    let demoHistoricalCases: HistoricalCase[] = [];
+    let demoScenarioVisualizations: unknown[] = [];
+
+    if (demoMode) {
+      Object.entries(historicalFigureData || {}).forEach(([username, figure]) => {
+        const voteValue = parseHistoricalVoteValue(nodeId ? figure?.votes?.[nodeId] : null);
+        if (voteValue !== null) {
+          demoHistoricalVotes = demoHistoricalVotes.concat({
+            username,
+            value: voteValue,
+            comment: nodeId ? historicalFigureCommentMap[username]?.[nodeId] || '' : '',
+          });
+          if (voteValue > 0) demoUp += voteValue;
+          else if (voteValue < 0) demoDown += Math.abs(voteValue);
+        }
+
+        if (Array.isArray(figure?.questions)) {
+          const matchedQuestions = figure.questions
+            .filter((question) => question.id === nodeId)
+            .map((question) => ({ ...question, username }));
+          demoQuestions = demoQuestions.concat(matchedQuestions);
+        }
+
+        if (Array.isArray(figure?.comments)) {
+          const matchedComments = figure.comments
+            .filter((comment) => comment.id === nodeId)
+            .map((comment) => ({ ...comment, username }));
+          demoComments = demoComments.concat(matchedComments);
+        }
+      });
+
+      demoHistoricalCases = nodeId && Array.isArray(historicalCaseMap[nodeId]) ? historicalCaseMap[nodeId] : [];
+      demoScenarioVisualizations = nodeId ? getRiskMatrixAtlasScenariosForAtlasNode(nodeId) : [];
+    }
+
+    const currentUp = parseInt(String(node?.votes?.up || 0), 10) || 0;
+    const currentDown = parseInt(String(node?.votes?.down || 0), 10) || 0;
+    const mergedQuestions = [...(node.questions || []), ...demoQuestions];
+    const mergedComments = [...(node.comments || []), ...demoComments];
+    const mergedHistoricalVotes = [
+      ...(Array.isArray(node.historicalVotes) ? node.historicalVotes : []),
+      ...demoHistoricalVotes,
+    ];
+    const mergedHistoricalCases = [
+      ...(Array.isArray(node.historicalCases) ? node.historicalCases : []),
+      ...demoHistoricalCases,
+    ];
+    const mergedScenarioVisualizations = [
+      ...(Array.isArray(node.scenarioVisualizations) ? node.scenarioVisualizations : []),
+      ...demoScenarioVisualizations,
+    ];
+    const children = Array.isArray(node.children) ? node.children.map(updateNodeWithHistoricalData) : undefined;
+
+    const nextNode = {
+      ...node,
+      children,
+    };
+
+    if (node.votes || demoUp > 0 || demoDown > 0) {
+      nextNode.votes = {
+        up: currentUp + demoUp,
+        down: currentDown + demoDown,
+      };
+    } else {
+      delete nextNode.votes;
+    }
+
+    if (mergedQuestions.length > 0) nextNode.questions = mergedQuestions;
+    else delete nextNode.questions;
+
+    if (mergedComments.length > 0) nextNode.comments = mergedComments;
+    else delete nextNode.comments;
+
+    if (mergedHistoricalVotes.length > 0) nextNode.historicalVotes = mergedHistoricalVotes;
+    else delete nextNode.historicalVotes;
+
+    if (mergedHistoricalCases.length > 0) nextNode.historicalCases = mergedHistoricalCases;
+    else delete nextNode.historicalCases;
+
+    if (mergedScenarioVisualizations.length > 0) nextNode.scenarioVisualizations = mergedScenarioVisualizations;
+    else delete nextNode.scenarioVisualizations;
+
+    return nextNode;
+  };
+
+  return atlasTreeData.map((category) => ({
+    ...updateNodeWithHistoricalData(category),
+    name: cleanAtlasCategoryName(category.name),
+  }));
 };
 
 export const getAtlasLinkStableKey = (link: AtlasLink, fallbackIndex: number): string => {
@@ -986,10 +1139,7 @@ export const getAtlasLinkStableKey = (link: AtlasLink, fallbackIndex: number): s
   ].join(':');
 };
 
-const applyLocalVoteDeltasToTree = (
-  nodes: DebateNode[],
-  deltas: LocalVoteDeltas,
-): DebateNode[] => {
+const applyLocalVoteDeltasToTree = (nodes: DebateNode[], deltas: LocalVoteDeltas): DebateNode[] => {
   if (!deltas || Object.keys(deltas).length === 0) return nodes;
 
   return nodes.map((node) => {
@@ -1174,7 +1324,7 @@ export const getTopAtlasNodesByHeat = (nodes: DebateNode[] = [], limit = 3): Deb
       heat: calculateHeat(node),
       order: visitOrder,
     });
-    topCandidates.sort((a, b) => (b.heat - a.heat) || (a.order - b.order));
+    topCandidates.sort((a, b) => b.heat - a.heat || a.order - b.order);
     if (topCandidates.length > maxNodes) {
       topCandidates.length = maxNodes;
     }
@@ -1561,19 +1711,10 @@ const OrbitalAtlasView = ({
           });
         }
 
-          if (parent.id !== 'virtual-root') {
-              links.push({
-                  source: { x: parentX, y: parentY },
-                  target: { x: nodeX, y: nodeY },
-                  sourceId: String(parent.id || '').trim(),
-                  targetId: String(child.id || '').trim(),
-              });
-          }
-
-          if (level < 3) {
-             processRing(child, nodeX, nodeY, 0, 0, level + 1);
-          }
-       });
+        if (level < 3) {
+          processRing(child, nodeX, nodeY, 0, 0, level + 1);
+        }
+      });
     };
 
     processRing(centerNode, 0, 0, 0, Math.PI * 2, 1);
@@ -1645,7 +1786,13 @@ const OrbitalAtlasView = ({
 
       <svg className={styles.atlasSvgLayer}>
         {layout.links.map((link, i) => (
-          <line key={getAtlasLinkStableKey(link, i)} x1={cx + link.source.x} y1={cy + link.source.y} x2={cx + link.target.x} y2={cy + link.target.y} />
+          <line
+            key={getAtlasLinkStableKey(link, i)}
+            x1={cx + link.source.x}
+            y1={cy + link.source.y}
+            x2={cx + link.target.x}
+            y2={cy + link.target.y}
+          />
         ))}
       </svg>
 
@@ -2123,19 +2270,19 @@ const Modal = ({ isOpen, onClose, content, onVote, copied, onCopy, onTagClick }:
     };
   }, [content]);
 
-  const historicalCases = Array.isArray(content?.historicalCases)
-    ? content.historicalCases
-    : EMPTY_HISTORICAL_CASES;
-  const historicalCaseBriefContent = useMemo<DebateNode>(() => ({
-    id: content?.id,
-    name: content?.name,
-    compass: content?.compass,
-  }), [content?.id, content?.name, content?.compass]);
-  const expandedHistoricalCaseBriefs = useMemo(() => buildExpandedHistoricalCaseBriefMap(
-    historicalCases,
-    historicalCaseBriefContent,
-    expandedHistoricalCaseId,
-  ), [expandedHistoricalCaseId, historicalCaseBriefContent, historicalCases]);
+  const historicalCases = Array.isArray(content?.historicalCases) ? content.historicalCases : EMPTY_HISTORICAL_CASES;
+  const historicalCaseBriefContent = useMemo<DebateNode>(
+    () => ({
+      id: content?.id,
+      name: content?.name,
+      compass: content?.compass,
+    }),
+    [content?.id, content?.name, content?.compass],
+  );
+  const expandedHistoricalCaseBriefs = useMemo(
+    () => buildExpandedHistoricalCaseBriefMap(historicalCases, historicalCaseBriefContent, expandedHistoricalCaseId),
+    [expandedHistoricalCaseId, historicalCaseBriefContent, historicalCases],
+  );
 
   if (!isOpen || !content) return null;
 
@@ -2251,9 +2398,7 @@ const Modal = ({ isOpen, onClose, content, onVote, copied, onCopy, onTagClick }:
     if (!title) return null;
 
     const authors = normalizeHistoricalCaseTextList(historicalCase.authors);
-    const tagsList = Array.isArray(historicalCase.tags)
-      ? historicalCase.tags.filter(Boolean)
-      : [];
+    const tagsList = Array.isArray(historicalCase.tags) ? historicalCase.tags.filter(Boolean) : [];
     const caseKey = getHistoricalCaseCardKey(historicalCase, caseIndex);
     const isExpanded = expandedHistoricalCaseId === caseKey;
     const detailPanelId = `historical-case-${caseKey}`;
@@ -2264,9 +2409,21 @@ const Modal = ({ isOpen, onClose, content, onVote, copied, onCopy, onTagClick }:
       historicalCase.venue,
       historicalCase.year,
     ].filter(Boolean);
-    const normalizedBestPatch = brief ? String(brief.bestPatch || '').trim().toLowerCase() : '';
-    const hasBestPatchCard = Boolean(normalizedBestPatch)
-      && Boolean(brief?.patchOptions.some((patch) => String(patch?.name || '').trim().toLowerCase() === normalizedBestPatch));
+    const normalizedBestPatch = brief
+      ? String(brief.bestPatch || '')
+          .trim()
+          .toLowerCase()
+      : '';
+    const hasBestPatchCard =
+      Boolean(normalizedBestPatch) &&
+      Boolean(
+        brief?.patchOptions.some(
+          (patch) =>
+            String(patch?.name || '')
+              .trim()
+              .toLowerCase() === normalizedBestPatch,
+        ),
+      );
 
     return (
       <div
@@ -2304,11 +2461,7 @@ const Modal = ({ isOpen, onClose, content, onVote, copied, onCopy, onTagClick }:
             ) : null}
           </div>
         </div>
-        {historicalCase.summary ? (
-          <div className={styles.historicalCaseSummary}>
-            {historicalCase.summary}
-          </div>
-        ) : null}
+        {historicalCase.summary ? <div className={styles.historicalCaseSummary}>{historicalCase.summary}</div> : null}
         {isExpanded && brief && (
           <div
             id={detailPanelId}
@@ -2888,26 +3041,26 @@ const TreeNode = ({
 
       {hasChildren && !isCollapsed && (
         <div className={styles.orgChildrenContainer}>
-           <div
-             className={styles.orgChildrenRow}
-             style={childrenRowStyle}
-             data-ce-org-total-columns={totalChildColumns || 1}
-           >
-              {sortedChildren.map((child: DebateNode, i: number) => (
-                <TreeNode
-                  key={getDebateNodeStableKey(child, `tree-child-${i}`)}
-                  node={child}
-                  depth={depth + 1}
-                  parentPath={[...parentPath, node]}
-                  onNodeClick={onNodeClick}
-                  onBookmark={onBookmark}
-                  bookmarkedNodes={bookmarkedNodes}
-                  onSuggestNode={onSuggestNode}
-                  staggerOffsetPx={getTreeChildStaggerPx(depth + 1, i, childColumns)}
-                  branchSpan={childBranchSpans[i] || 1}
-                />
-              ))}
-           </div>
+          <div
+            className={styles.orgChildrenRow}
+            style={childrenRowStyle}
+            data-ce-org-total-columns={totalChildColumns || 1}
+          >
+            {sortedChildren.map((child: DebateNode, i: number) => (
+              <TreeNode
+                key={getDebateNodeStableKey(child, `tree-child-${i}`)}
+                node={child}
+                depth={depth + 1}
+                parentPath={[...parentPath, node]}
+                onNodeClick={onNodeClick}
+                onBookmark={onBookmark}
+                bookmarkedNodes={bookmarkedNodes}
+                onSuggestNode={onSuggestNode}
+                staggerOffsetPx={getTreeChildStaggerPx(depth + 1, i, childColumns)}
+                branchSpan={childBranchSpans[i] || 1}
+              />
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -3002,10 +3155,7 @@ const DebateMap = ({
   }, []);
 
   useEffect(() => {
-    setTreeDataState(applyLocalVoteDeltasToTree(
-      buildAtlasTreeData(demoMode),
-      localVoteDeltasRef.current,
-    ));
+    setTreeDataState(applyLocalVoteDeltasToTree(buildAtlasTreeData(demoMode), localVoteDeltasRef.current));
   }, [demoMode]);
 
   useEffect(() => {
@@ -3112,7 +3262,7 @@ const DebateMap = ({
     const normalizedNodeId = String(nodeId || '').trim();
     if (!normalizedNodeId) return;
 
-    setLocalVoteDeltas(prev => {
+    setLocalVoteDeltas((prev) => {
       const existing = prev[normalizedNodeId] || { up: 0, down: 0 };
       const next = {
         ...prev,
@@ -3125,16 +3275,17 @@ const DebateMap = ({
       return next;
     });
 
-    setTreeDataState(prev => {
-      const update = (nodes: DebateNode[]): DebateNode[] => nodes.map((node) => {
-         if (String(node.id || '').trim() === normalizedNodeId) {
-           const current = node.votes || {};
-           const val = parseInt(String(current[voteType] || 0), 10);
-           return { ...node, votes: { ...current, [voteType]: val + count }};
-         }
-         if (node.children) return { ...node, children: update(node.children) };
-         return node;
-      });
+    setTreeDataState((prev) => {
+      const update = (nodes: DebateNode[]): DebateNode[] =>
+        nodes.map((node) => {
+          if (String(node.id || '').trim() === normalizedNodeId) {
+            const current = node.votes || {};
+            const val = parseInt(String(current[voteType] || 0), 10);
+            return { ...node, votes: { ...current, [voteType]: val + count } };
+          }
+          if (node.children) return { ...node, children: update(node.children) };
+          return node;
+        });
       return update(prev);
     });
   }, []);
@@ -3348,57 +3499,60 @@ const DebateMap = ({
 
         {visualMode === DEBATE_VISUAL_MODES.TREE && (
           <div className={styles.categorySelector}>
-             {treeDataState.map((cat, i) => (
-               <button key={getDebateNodeStableKey(cat, `category-${i}`)} className={`${styles.categoryButton} ${selectedCategory?.id === cat.id ? styles.active : ''}`} onClick={() => handleCategoryClick(cat)}>{cat.name}</button>
-             ))}
+            {treeDataState.map((cat, i) => (
+              <button
+                key={getDebateNodeStableKey(cat, `category-${i}`)}
+                className={`${styles.categoryButton} ${selectedCategory?.id === cat.id ? styles.active : ''}`}
+                onClick={() => handleCategoryClick(cat)}
+              >
+                {cat.name}
+              </button>
+            ))}
           </div>
         )}
 
         <div className={styles.nodesContainer}>
-           {visualMode === DEBATE_VISUAL_MODES.LIST ? (
-             <div className={styles.flatListContainer}>
-                {sortedNodes.map((node, i) => (
-                  <FlatNode key={getDebateNodeStableKey(node, `list-node-${i}`)} node={node} parentPath={node.parentPath} onNodeClick={handleNodeClick} onBookmark={handleBookmark} bookmarkedNodes={bookmarkedNodes} />
-                ))}
-             </div>
-           ) : isAtlasVisualMode ? (
-             <AtlasView
-               data={treeDataState}
-               onNodeClick={handleNodeClick}
-               atlasLayoutMode={atlasViewLayoutMode}
-             />
-           ) : (
-             <div
-               className={styles.orgChartContainer}
-               ref={treeContainerRef}
-             >
-                {selectedCategory ? (
-                   <div
-                     className={styles.orgChartFitStage}
-                     style={treeFitHeight ? { height: treeFitHeight } : undefined}
-                   >
-                     <div
-                       ref={treeContentRef}
-                       className={treeRootClassName}
-                       style={treeRootStyle}
-                       data-ce-tree-scale={treeFitScale.toFixed(3)}
-                     >
-                       <TreeNode
-                          node={selectedCategory}
-                          depth={0}
-                          parentPath={[]}
-                          onNodeClick={handleNodeClick}
-                          onBookmark={handleBookmark}
-                          bookmarkedNodes={bookmarkedNodes}
-                          onSuggestNode={handleSuggestNode}
-                       />
-                     </div>
-                   </div>
-                ) : (
-                   <div className={styles.emptyState}>Select a category above to view the Policy Org Chart</div>
-                )}
-             </div>
-           )}
+          {visualMode === DEBATE_VISUAL_MODES.LIST ? (
+            <div className={styles.flatListContainer}>
+              {sortedNodes.map((node, i) => (
+                <FlatNode
+                  key={getDebateNodeStableKey(node, `list-node-${i}`)}
+                  node={node}
+                  parentPath={node.parentPath}
+                  onNodeClick={handleNodeClick}
+                  onBookmark={handleBookmark}
+                  bookmarkedNodes={bookmarkedNodes}
+                />
+              ))}
+            </div>
+          ) : isAtlasVisualMode ? (
+            <AtlasView data={treeDataState} onNodeClick={handleNodeClick} atlasLayoutMode={atlasViewLayoutMode} />
+          ) : (
+            <div className={styles.orgChartContainer} ref={treeContainerRef}>
+              {selectedCategory ? (
+                <div className={styles.orgChartFitStage} style={treeFitHeight ? { height: treeFitHeight } : undefined}>
+                  <div
+                    ref={treeContentRef}
+                    className={treeRootClassName}
+                    style={treeRootStyle}
+                    data-ce-tree-scale={treeFitScale.toFixed(3)}
+                  >
+                    <TreeNode
+                      node={selectedCategory}
+                      depth={0}
+                      parentPath={[]}
+                      onNodeClick={handleNodeClick}
+                      onBookmark={handleBookmark}
+                      bookmarkedNodes={bookmarkedNodes}
+                      onSuggestNode={handleSuggestNode}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className={styles.emptyState}>Select a category above to view the Policy Org Chart</div>
+              )}
+            </div>
+          )}
         </div>
 
         <Modal

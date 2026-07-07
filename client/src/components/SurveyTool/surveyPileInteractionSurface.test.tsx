@@ -104,9 +104,7 @@ const collectTreeText = (node: TestTreeNode): string => {
   return collectTreeText(node.props.children);
 };
 
-const treeTextIncludes = (node: TestTreeNode, text: string): boolean => (
-  collectTreeText(node).includes(text)
-);
+const treeTextIncludes = (node: TestTreeNode, text: string): boolean => collectTreeText(node).includes(text);
 
 const getElementChildren = (node: TestTreeNode): TestElementNode[] => {
   if (!isElementNode(node)) return [];
@@ -187,16 +185,10 @@ describe('surveyPileInteractionSurface', () => {
     expect(resolvePileFilterButtonStyle(false)).toEqual({});
     expect(resolvePileFilterIconStyle(true)).toEqual({ color: '#4cd964' });
     expect(resolvePileFilterIconStyle(false)).toEqual({});
-    expect(buildPileFilterButtonClassName(styles, true)).toBe(
-      `${styles.actionButton} ${styles.actionButtonActive}`
-    );
-    expect(buildPileActionsClassName(styles, true)).toBe(
-      `${styles.pileActions} ${styles.pileActionsMenuEligible}`
-    );
+    expect(buildPileFilterButtonClassName(styles, true)).toBe(`${styles.actionButton} ${styles.actionButtonActive}`);
+    expect(buildPileActionsClassName(styles, true)).toBe(`${styles.pileActions} ${styles.pileActionsMenuEligible}`);
     expect(buildPileActionsClassName(styles, false)).toBe(styles.pileActions);
-    expect(buildPileFooterClassName(styles, false)).toBe(
-      `${styles.pileFooter} ${styles.pileFooterHidden}`
-    );
+    expect(buildPileFooterClassName(styles, false)).toBe(`${styles.pileFooter} ${styles.pileFooterHidden}`);
     expect(buildPileSubmitButtonClassName(styles, true, true)).toBe(
       `${styles.pileSubmitButton} ${styles.submitGlow} ${styles.pileSubmitButtonInactive}`,
     );
@@ -227,20 +219,24 @@ describe('surveyPileInteractionSurface', () => {
     );
     expect(resolvePileMiniLoaderStyle(true)).toEqual({ opacity: 0.5 });
     expect(resolvePileMiniLoaderStyle(false)).toEqual({ opacity: 1 });
-    expect(shouldCollapsePileActionsIntoMenu({
-      pileTopRailVisible: true,
-      showSubmitButton: true,
-      hasPendingPileChanges: true,
-      isSubmitting: false,
-      shouldHidePileSubmitButton: false,
-    })).toBe(true);
-    expect(shouldCollapsePileActionsIntoMenu({
-      pileTopRailVisible: true,
-      showSubmitButton: true,
-      hasPendingPileChanges: false,
-      isSubmitting: false,
-      shouldHidePileSubmitButton: true,
-    })).toBe(false);
+    expect(
+      shouldCollapsePileActionsIntoMenu({
+        pileTopRailVisible: true,
+        showSubmitButton: true,
+        hasPendingPileChanges: true,
+        isSubmitting: false,
+        shouldHidePileSubmitButton: false,
+      }),
+    ).toBe(true);
+    expect(
+      shouldCollapsePileActionsIntoMenu({
+        pileTopRailVisible: true,
+        showSubmitButton: true,
+        hasPendingPileChanges: false,
+        isSubmitting: false,
+        shouldHidePileSubmitButton: true,
+      }),
+    ).toBe(false);
   });
 
   it('renders the gated empty panel before the generic empty copy when gating is active', () => {
@@ -278,17 +274,19 @@ describe('surveyPileInteractionSurface', () => {
     const loadingSubhead = findNodeByClassName(tree, 'pileLoadingSubhead');
     const progressList = findNodeByClassName(tree, 'pileLoadingProgressList');
     const progressFillCount = countElements(tree, (node) => nodeHasClassName(node, 'pileLoadingProgressFill'));
-    const progressFill = findElement(tree, (node) => (
-      nodeHasClassName(node, 'pileLoadingProgressFill')
-    )) as TestElementNode | null;
+    const progressFill = findElement(tree, (node) =>
+      nodeHasClassName(node, 'pileLoadingProgressFill'),
+    ) as TestElementNode | null;
 
     expect(treeTextIncludes(loadingHeadline, 'Loading... 12s')).toBe(true);
     expect(treeHasText(loadingSubhead, 'Loading Metadata (3 / 5)')).toBe(true);
     expect(progressList).toBeNull();
     expect(progressFillCount).toBe(1);
-    expect(progressFill?.props?.style).toEqual(expect.objectContaining({
-      width: '60%',
-    }));
+    expect(progressFill?.props?.style).toEqual(
+      expect.objectContaining({
+        width: '60%',
+      }),
+    );
     expect(treeHasText(tree, 'Session')).toBe(false);
     expect(treeHasText(tree, 'Groups')).toBe(false);
     expect(treeHasText(tree, 'Questions')).toBe(false);
@@ -314,9 +312,10 @@ describe('surveyPileInteractionSurface', () => {
 
     const progressList = findNodeByClassName(tree, 'pileLoadingProgressList');
     const progressFillCount = countElements(tree, (node) => nodeHasClassName(node, 'pileLoadingProgressFill'));
-    const activeRowCount = countElements(tree, (node) => (
-      isElementNode(node) && node.props['data-progress-status'] === 'active'
-    ));
+    const activeRowCount = countElements(
+      tree,
+      (node) => isElementNode(node) && node.props['data-progress-status'] === 'active',
+    );
 
     expect(treeTextIncludes(tree, 'Loading... 101s')).toBe(true);
     expect(progressList).toBeNull();

@@ -307,10 +307,10 @@ describe('createQuestionsAndSurveysHelpers question options', () => {
 
     expect(surveyPlan.defaultSubmitGateIds).toEqual(['default-gate']);
     expect(surveyPlan.resolvedSurveyLockGateIds).toEqual(['default-gate']);
-    expect(surveyPlan.resolveQuestionSubmitGateIds({ id: 'q1', lockGateIds: null }))
-      .toEqual(['default-gate']);
-    expect(surveyPlan.resolveQuestionSubmitGateIds({ id: 'q2', lockGateIds: [' question-gate ', 'missing-gate'] }))
-      .toEqual(['question-gate']);
+    expect(surveyPlan.resolveQuestionSubmitGateIds({ id: 'q1', lockGateIds: null })).toEqual(['default-gate']);
+    expect(
+      surveyPlan.resolveQuestionSubmitGateIds({ id: 'q2', lockGateIds: [' question-gate ', 'missing-gate'] }),
+    ).toEqual(['question-gate']);
     expect(surveyPlan.needsLit).toBe(true);
 
     const standalonePlan = buildCreateSurveySubmitGatePlan({
@@ -328,12 +328,14 @@ describe('createQuestionsAndSurveysHelpers question options', () => {
     });
 
     expect(standalonePlan.resolvedSurveyLockGateIds).toEqual([]);
-    expect(standalonePlan.resolveQuestionSubmitGateIds({ id: 'q1', lockGateIds: [] }))
-      .toEqual([]);
-    expect(standalonePlan.resolveQuestionSubmitGateIds({ id: 'q-missing-lock' }))
-      .toEqual(['default-gate']);
-    expect(standalonePlan.resolveQuestionSubmitGateIds({ id: 'q2', lockGateIds: ['question-gate'] }))
-      .toEqual(['question-gate']);
+    expect(standalonePlan.resolveQuestionSubmitGateIds({ id: 'q1', lockGateIds: [] })).toEqual(['default-gate']);
+    expect(
+      standalonePlan.resolveQuestionSubmitGateIds({ id: 'q1-public', lockGateIds: [], lockGateIdsTouched: true }),
+    ).toEqual([]);
+    expect(standalonePlan.resolveQuestionSubmitGateIds({ id: 'q-missing-lock' })).toEqual(['default-gate']);
+    expect(standalonePlan.resolveQuestionSubmitGateIds({ id: 'q2', lockGateIds: ['question-gate'] })).toEqual([
+      'question-gate',
+    ]);
     expect(standalonePlan.needsLit).toBe(true);
   });
 
@@ -393,20 +395,16 @@ describe('createQuestionsAndSurveysHelpers question options', () => {
       sessionLabel: 'FOR TEST 12',
     });
     expect(surveyOptions.defaultGateId).toBe('survey_gate');
-    expect(surveyOptions.gateOptions.map((option) => option.id)).toEqual([
-      'default_gate',
-      'survey_gate',
-    ]);
+    expect(surveyOptions.gateOptions.map((option) => option.id)).toEqual(['default_gate', 'survey_gate']);
     expect(surveyOptions.gateOptions.map((option) => option.displayLabel)).toEqual([
       'FOR TEST 12 (default)',
       'FOR TEST 12 (survey)',
     ]);
-    expect(surveyOptions.gateOptions.find((option) => option.id === 'survey_gate'))
-      .toMatchObject({
-        mode: 'all',
-        resourceKey: 'surveyResponses',
-        sbtAddress: '0x1111111111111111111111111111111111111111',
-      });
+    expect(surveyOptions.gateOptions.find((option) => option.id === 'survey_gate')).toMatchObject({
+      mode: 'all',
+      resourceKey: 'surveyResponses',
+      sbtAddress: '0x1111111111111111111111111111111111111111',
+    });
 
     const standaloneOptions = buildCreateSurveyGateOptions({
       cfg,
@@ -414,10 +412,7 @@ describe('createQuestionsAndSurveysHelpers question options', () => {
       sessionLabel: 'FOR TEST 12',
     });
     expect(standaloneOptions.defaultGateId).toBe('question_gate');
-    expect(standaloneOptions.gateOptions.map((option) => option.id)).toEqual([
-      'default_gate',
-      'question_gate',
-    ]);
+    expect(standaloneOptions.gateOptions.map((option) => option.id)).toEqual(['default_gate', 'question_gate']);
     expect(standaloneOptions.gateOptions.map((option) => option.displayLabel)).toEqual([
       'FOR TEST 12 (default)',
       'FOR TEST 12 (questions)',

@@ -247,7 +247,7 @@ describe('contractScripts arweave tx cache + failure cache', () => {
   });
 
   it('coalesces concurrent tx downloads to a single network fetch', async () => {
-    arweaveClient.downloadDataFromArweave.mockImplementation(
+    arweaveScripts.downloadDataFromArweave.mockImplementation(
       async () => new Promise((resolve) => setTimeout(() => resolve('{"ok":true}'), 20)),
     );
 
@@ -268,7 +268,7 @@ describe('contractScripts arweave tx cache + failure cache', () => {
   });
 
   it('coalesces concurrent tx downloads across slugs on the same chain', async () => {
-    arweaveClient.downloadDataFromArweave.mockImplementation(
+    arweaveScripts.downloadDataFromArweave.mockImplementation(
       async () => new Promise((resolve) => setTimeout(() => resolve('{"ok":true}'), 20)),
     );
 
@@ -438,7 +438,7 @@ describe('contractScripts arweave tx cache + failure cache', () => {
     const surveyId = '0x5555555555555555555555555555555555555555555555555555555555555555';
     const surveyTxId = 'force_inflight_survey_tx';
     const hashSpy = jest.spyOn(contractScripts, 'getSurveyHash').mockResolvedValue(surveyTxId);
-    arweaveClient.downloadDataFromArweave.mockImplementation(
+    arweaveScripts.downloadDataFromArweave.mockImplementation(
       (_txId, opts = {}) =>
         new Promise((resolve) => {
           setTimeout(() => {
@@ -476,63 +476,6 @@ describe('contractScripts arweave tx cache + failure cache', () => {
         }),
       );
       expect(hashSpy).toHaveBeenCalledTimes(2);
-      expect(arweaveClient.downloadDataFromArweave).toHaveBeenCalledTimes(2);
-      expect(arweaveClient.downloadDataFromArweave).toHaveBeenCalledWith(
-        surveyTxId,
-        expect.objectContaining({
-          forceRetry: false,
-          cacheBypass: false,
-          bypassFailureCache: false,
-        }),
-      );
-      expect(arweaveClient.downloadDataFromArweave).toHaveBeenCalledWith(
-        surveyTxId,
-        expect.objectContaining({
-          forceRetry: true,
-          cacheBypass: true,
-          bypassFailureCache: true,
-        }),
-      );
-    } finally {
-      hashSpy.mockRestore();
-    }
-  });
-
-  it('isolates concurrent forced and non-forced survey metadata reads', async () => {
-    const surveyId = '0x5555555555555555555555555555555555555555555555555555555555555555';
-    const surveyTxId = 'force_inflight_survey_tx';
-    const hashSpy = jest.spyOn(contractScripts, 'getSurveyHash').mockResolvedValue(surveyTxId);
-    arweaveScripts.downloadDataFromArweave.mockImplementation(
-      (_txId, opts = {}) => new Promise((resolve) => {
-        setTimeout(() => {
-          resolve(JSON.stringify({
-            title: opts?.forceRetry ? 'Forced survey' : 'Normal survey',
-            questionIDs: [],
-          }));
-        }, 20);
-      })
-    );
-
-    try {
-      const [normalRead, forcedRead] = await Promise.all([
-        contractScripts.getSurveyDataById('none', surveyId, groupCtx, {
-          throwOnFailure: true,
-        }),
-        contractScripts.getSurveyDataById('none', surveyId, groupCtx, {
-          throwOnFailure: true,
-          forceArweaveFetch: true,
-        }),
-      ]);
-
-      expect(normalRead).toEqual(expect.objectContaining({
-        title: 'Normal survey',
-        questionIDs: [],
-      }));
-      expect(forcedRead).toEqual(expect.objectContaining({
-        title: 'Forced survey',
-        questionIDs: [],
-      }));
-      expect(hashSpy).toHaveBeenCalledTimes(2);
       expect(arweaveScripts.downloadDataFromArweave).toHaveBeenCalledTimes(2);
       expect(arweaveScripts.downloadDataFromArweave).toHaveBeenCalledWith(
         surveyTxId,
@@ -540,7 +483,7 @@ describe('contractScripts arweave tx cache + failure cache', () => {
           forceRetry: false,
           cacheBypass: false,
           bypassFailureCache: false,
-        })
+        }),
       );
       expect(arweaveScripts.downloadDataFromArweave).toHaveBeenCalledWith(
         surveyTxId,
@@ -548,7 +491,7 @@ describe('contractScripts arweave tx cache + failure cache', () => {
           forceRetry: true,
           cacheBypass: true,
           bypassFailureCache: true,
-        })
+        }),
       );
     } finally {
       hashSpy.mockRestore();

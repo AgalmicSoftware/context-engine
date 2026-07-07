@@ -1,8 +1,5 @@
 import { LazyCreateQuestionsAndSurveys, LazySurveyResults, SurveySelector } from './SurveySelector';
-import {
-  normalizeSurveyToolFilterState,
-  serializeSurveyToolFilterState,
-} from './surveyToolUtils.js';
+import { normalizeSurveyToolFilterState, serializeSurveyToolFilterState } from './surveyToolUtils.js';
 import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
@@ -260,7 +257,7 @@ describe('SurveySelector', () => {
     window.history.replaceState(
       {},
       '',
-      '/questions?session=edge&sessionSlug=alias&sessionId=0xabc&sid=short&chainId=84532&view=list#question-list'
+      '/questions?session=edge&sessionSlug=alias&sessionId=0xabc&sid=short&chainId=84532&view=list#question-list',
     );
     try {
       const subject = new SurveySelector({
@@ -309,7 +306,7 @@ describe('SurveySelector', () => {
     window.history.replaceState(
       {},
       '',
-      `/questions?session=edge&sessionSlug=alias&sessionId=0xabc&sid=short&chainId=84532&filter=${activeFilter}#question-list`
+      `/questions?session=edge&sessionSlug=alias&sessionId=0xabc&sid=short&chainId=84532&filter=${activeFilter}#question-list`,
     );
     try {
       const subject = new SurveySelector({
@@ -475,5 +472,4 @@ describe('SurveySelector', () => {
     expect(authoringNode.props.sessionName).toBe('Edge Session');
     expect(authoringNode.props.surveyIndex).toBe(0);
   });
-
 });

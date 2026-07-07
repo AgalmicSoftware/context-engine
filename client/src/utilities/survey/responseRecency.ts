@@ -8,30 +8,6 @@ export type ResponseRecencyPair = Record<string, unknown> & {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value);
 
-const RESPONSE_RECENCY_KEYS = [
-  ['bn', 'blockNumber'],
-  ['txi', 'transactionIndex', 'txIndex'],
-  ['li', 'logIndex'],
-  ['ts', 'timestamp'],
-] as const;
-
-const readResponseRecencyField = (value: unknown, keys: readonly string[]): number => {
-  const source = isRecord(value) ? value : {};
-  const raw = keys.reduce<unknown>((resolved, key) => resolved ?? source[key], undefined);
-  return Number(raw ?? 0);
-};
-
-const compareResponseRecencyValues = (incomingRecency: unknown, existingRecency: unknown): number | null => {
-  for (const keys of RESPONSE_RECENCY_KEYS) {
-    const incoming = readResponseRecencyField(incomingRecency, keys);
-    const existing = readResponseRecencyField(existingRecency, keys);
-    if (!Number.isFinite(incoming) || !Number.isFinite(existing)) return null;
-    if (incoming > existing) return 1;
-    if (incoming < existing) return -1;
-  }
-  return 0;
-};
-
 export const toResponseRecencyPair = (value: unknown, responseValue: unknown = null): ResponseRecencyPair => {
   const src = isRecord(value) ? value : {};
   const responseObj = isRecord(responseValue) ? responseValue : {};
@@ -46,10 +22,17 @@ export const toResponseRecencyPair = (value: unknown, responseValue: unknown = n
   };
 };
 
-export const isResponseRecencyNewer = (incomingRecency: unknown, existingRecency: unknown): boolean =>
-  compareResponseRecencyValues(incomingRecency, existingRecency) === 1;
-
-export const isResponseRecencyAtLeast = (incomingRecency: unknown, existingRecency: unknown): boolean => {
-  const comparison = compareResponseRecencyValues(incomingRecency, existingRecency);
-  return comparison !== null && comparison >= 0;
+export const compareResponseRecency = (
+  incomingRecency: ResponseRecencyPair,
+  existingRecency: ResponseRecencyPair,
+): number => {
+  if (incomingRecency.bn > existingRecency.bn) return 1;
+  if (incomingRecency.bn < existingRecency.bn) return -1;
+  if (incomingRecency.txi > existingRecency.txi) return 1;
+  if (incomingRecency.txi < existingRecency.txi) return -1;
+  if (incomingRecency.li > existingRecency.li) return 1;
+  if (incomingRecency.li < existingRecency.li) return -1;
+  if (incomingRecency.ts > existingRecency.ts) return 1;
+  if (incomingRecency.ts < existingRecency.ts) return -1;
+  return 0;
 };

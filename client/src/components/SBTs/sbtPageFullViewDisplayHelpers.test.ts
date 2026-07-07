@@ -16,17 +16,19 @@ import {
 
 describe('sbtPageFullViewDisplayHelpers', () => {
   it('resolves identity panel display descriptors without handlers', () => {
-    expect(resolveSbtPageIdentityPanelDisplayState({
-      defaultImage: '/default.png',
-      fallbackState: {},
-      sbtInfo: {
-        name: 'Access Badge',
-        description: '',
-        image: 'https://example.test/badge.png',
-        descriptionLocked: true,
-      },
-      unnamedLabel: 'Unnamed Group',
-    })).toEqual({
+    expect(
+      resolveSbtPageIdentityPanelDisplayState({
+        defaultImage: '/default.png',
+        fallbackState: {},
+        sbtInfo: {
+          name: 'Access Badge',
+          description: '',
+          image: 'https://example.test/badge.png',
+          descriptionLocked: true,
+        },
+        unnamedLabel: 'Unnamed Group',
+      }),
+    ).toEqual({
       descriptionText: '[encrypted]',
       displayImageState: {
         sourceKey: 'https://example.test/badge.png',
@@ -41,14 +43,16 @@ describe('sbtPageFullViewDisplayHelpers', () => {
       showDescriptionLockIcon: true,
     });
 
-    expect(resolveSbtPageIdentityPanelDisplayState({
-      defaultImage: '/default.png',
-      sbtInfo: {
-        description: 'Visible copy',
-        image: '',
-      },
-      unnamedLabel: 'Unnamed Group',
-    })).toEqual({
+    expect(
+      resolveSbtPageIdentityPanelDisplayState({
+        defaultImage: '/default.png',
+        sbtInfo: {
+          description: 'Visible copy',
+          image: '',
+        },
+        unnamedLabel: 'Unnamed Group',
+      }),
+    ).toEqual({
       descriptionText: 'Visible copy',
       displayImageState: {
         sourceKey: '',

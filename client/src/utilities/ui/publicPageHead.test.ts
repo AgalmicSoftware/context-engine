@@ -11,6 +11,30 @@ import {
   PUBLIC_REPO_URL,
 } from '../../variables/publicRepoMetadata.js';
 
+type StructuredDataNode = {
+  '@type'?: unknown;
+  significantLink?: unknown;
+  url?: unknown;
+};
+
+type StructuredData = {
+  '@graph'?: unknown;
+};
+
+const structuredDataSelector = 'script[type="application/ld+json"][data-ce-structured-data="public-page"]';
+
+const isStructuredDataNode = (entry: unknown): entry is StructuredDataNode =>
+  typeof entry === 'object' && entry !== null;
+
+const parseStructuredData = (): StructuredData =>
+  JSON.parse(document.head.querySelector(structuredDataSelector)?.textContent || '{}') as StructuredData;
+
+const getStructuredDataGraph = (structuredData: StructuredData): StructuredDataNode[] =>
+  Array.isArray(structuredData['@graph']) ? structuredData['@graph'].filter(isStructuredDataNode) : [];
+
+const findStructuredDataNode = (structuredData: StructuredData, nodeType: string): StructuredDataNode | undefined =>
+  getStructuredDataGraph(structuredData).find((entry) => entry['@type'] === nodeType);
+
 describe('publicPageHead', () => {
   const env = process.env as Record<string, string | undefined>;
   beforeEach(() => {
@@ -22,67 +46,63 @@ describe('publicPageHead', () => {
   it('falls back to the live browser origin for router-style locations', () => {
     window.history.replaceState({}, '', '/session/current');
 
-    expect(
-      buildCanonicalPublicUrl({ pathname: '/session/demo', search: '?session=edge' })
-    ).toBe(`${window.location.origin}/session/demo?session=edge`);
+    expect(buildCanonicalPublicUrl({ pathname: '/session/demo', search: '?session=edge' })).toBe(
+      `${window.location.origin}/session/demo?session=edge`,
+    );
   });
 
   it('keeps route-defining query strings in canonical URLs', () => {
-    expect(
-      buildCanonicalPublicUrl(new URL('https://contextengine.xyz/group/0xabc?session=edge#details'))
-    ).toBe('https://contextengine.xyz/group/0xabc?session=edge');
+    expect(buildCanonicalPublicUrl(new URL('https://contextengine.xyz/group/0xabc?session=edge#details'))).toBe(
+      'https://contextengine.xyz/group/0xabc?session=edge',
+    );
   });
 
   it('drops UI-only query params from canonical URLs', () => {
     expect(
       buildCanonicalPublicUrl(
-        new URL('https://contextengine.xyz/surveys?results=true&ref=welcome&ceSessionScanScope=list')
-      )
+        new URL('https://contextengine.xyz/surveys?results=true&ref=welcome&ceSessionScanScope=list'),
+      ),
     ).toBe('https://contextengine.xyz/surveys');
   });
 
   it('normalizes trailing-slash aliases to one canonical URL', () => {
-    expect(
-      buildCanonicalPublicUrl(
-        new URL('https://contextengine.xyz/compare/?ref=welcome')
-      )
-    ).toBe('https://contextengine.xyz/compare');
+    expect(buildCanonicalPublicUrl(new URL('https://contextengine.xyz/compare/?ref=welcome'))).toBe(
+      'https://contextengine.xyz/compare',
+    );
   });
 
   it('normalizes route-defining query aliases in canonical URLs', () => {
     expect(
       buildCanonicalPublicUrl(
-        new URL('https://contextengine.xyz/question/0xabc?sid=0xsessionid&responder=0xdeadbeef&results=true')
-      )
+        new URL('https://contextengine.xyz/question/0xabc?sid=0xsessionid&responder=0xdeadbeef&results=true'),
+      ),
     ).toBe('https://contextengine.xyz/question/0xabc?sessionId=0xsessionid&responder=0xdeadbeef');
   });
 
   it('preserves contract deep-link params while dropping unrelated query strings', () => {
     expect(
-      buildCanonicalPublicUrl(
-        new URL('https://contextengine.xyz/contracts?session=edge&contract=surveys&ref=welcome')
-      )
+      buildCanonicalPublicUrl(new URL('https://contextengine.xyz/contracts?session=edge&contract=surveys&ref=welcome')),
     ).toBe('https://contextengine.xyz/contracts?session=edge&contract=surveys');
   });
 
   it('preserves session wizard deep-link params while dropping referral query strings', () => {
     expect(
       buildCanonicalPublicUrl(
-        new URL('https://contextengine.xyz/session/new?chainID=registry-84532&sponsored=bundle-1&ref=welcome')
-      )
+        new URL('https://contextengine.xyz/session/new?chainID=registry-84532&sponsored=bundle-1&ref=welcome'),
+      ),
     ).toBe('https://contextengine.xyz/session/new?chainId=registry-84532&sponsored=bundle-1');
   });
 
   it('preserves chain-scoped admin and sponsor deep links in canonical URLs', () => {
     expect(
       buildCanonicalPublicUrl(
-        new URL('https://contextengine.xyz/admin?sessionId=edge-session-id&chainID=registry-84532&ref=welcome')
-      )
+        new URL('https://contextengine.xyz/admin?sessionId=edge-session-id&chainID=registry-84532&ref=welcome'),
+      ),
     ).toBe('https://contextengine.xyz/admin?sessionId=edge-session-id&chainId=registry-84532');
     expect(
       buildCanonicalPublicUrl(
-        new URL('https://contextengine.xyz/sponsor?sessionId=edge-session-id&chainID=registry-11155420&ref=welcome')
-      )
+        new URL('https://contextengine.xyz/sponsor?sessionId=edge-session-id&chainID=registry-11155420&ref=welcome'),
+      ),
     ).toBe('https://contextengine.xyz/sponsor?sessionId=edge-session-id&chainId=registry-11155420');
   });
 
@@ -93,13 +113,15 @@ describe('publicPageHead', () => {
     try {
       expect(
         buildCanonicalPublicUrl(
-          new URL('https://contextengine.xyz/ce/contracts?session=edge&contract=surveys&ref=welcome')
-        )
+          new URL('https://contextengine.xyz/ce/contracts?session=edge&contract=surveys&ref=welcome'),
+        ),
       ).toBe('https://contextengine.xyz/ce/contracts?session=edge&contract=surveys');
       expect(
         buildCanonicalPublicUrl(
-          new URL('https://contextengine.xyz/ce/session/new?sessionId=edge-session-id&chainId=84532&sponsored=bundle-1&ref=welcome')
-        )
+          new URL(
+            'https://contextengine.xyz/ce/session/new?sessionId=edge-session-id&chainId=84532&sponsored=bundle-1&ref=welcome',
+          ),
+        ),
       ).toBe('https://contextengine.xyz/ce/session/new?sessionId=edge-session-id&chainId=84532&sponsored=bundle-1');
     } finally {
       if (typeof priorPublicUrl === 'undefined') {
@@ -121,14 +143,14 @@ describe('publicPageHead', () => {
         description: DEFAULT_PUBLIC_PAGE_DESCRIPTION,
         canonicalUrl: 'https://contextengine.xyz/session/demo?session=edge',
         ogUrl: 'https://contextengine.xyz/session/demo?session=edge',
-      })
+      }),
     );
     expect(document.title).toBe(DEFAULT_PUBLIC_PAGE_TITLE);
     expect(document.head.querySelector('link[rel="canonical"]')?.getAttribute('href')).toBe(
-      'https://contextengine.xyz/session/demo?session=edge'
+      'https://contextengine.xyz/session/demo?session=edge',
     );
     expect(document.head.querySelector('meta[property="og:url"]')?.getAttribute('content')).toBe(
-      'https://contextengine.xyz/session/demo?session=edge'
+      'https://contextengine.xyz/session/demo?session=edge',
     );
   });
 
@@ -145,10 +167,7 @@ describe('publicPageHead', () => {
     const webPage = structuredData['@graph']?.find?.((entry: any) => entry?.['@type'] === 'WebPage');
 
     expect(webPage?.significantLink).toEqual(
-      expect.arrayContaining([
-        `${window.location.origin}/discoverability.html`,
-        `${window.location.origin}/llms.txt`,
-      ])
+      expect.arrayContaining([`${window.location.origin}/discoverability.html`, `${window.location.origin}/llms.txt`]),
     );
   });
 
@@ -168,7 +187,7 @@ describe('publicPageHead', () => {
       expect.arrayContaining([
         'https://preview.example.test/discoverability.html',
         'https://preview.example.test/llms.txt',
-      ])
+      ]),
     );
   });
 
@@ -192,7 +211,7 @@ describe('publicPageHead', () => {
         expect.arrayContaining([
           'https://preview.example.test/ce/discoverability.html',
           'https://preview.example.test/ce/llms.txt',
-        ])
+        ]),
       );
     } finally {
       if (typeof priorPublicUrl === 'undefined') {
@@ -208,9 +227,7 @@ describe('publicPageHead', () => {
       location: new URL('https://contextengine.xyz/about?ref=welcome'),
     });
 
-    const structuredDataNode = document.head.querySelector(
-      'script[type="application/ld+json"][data-ce-structured-data="public-page"]'
-    );
+    const structuredDataNode = document.head.querySelector(structuredDataSelector);
     expect(structuredDataNode).not.toBeNull();
 
     const structuredData = JSON.parse(structuredDataNode?.textContent || '{}');
@@ -224,27 +241,22 @@ describe('publicPageHead', () => {
         '@id': `${DEFAULT_PUBLIC_SITE_URL}#organization`,
         url: DEFAULT_PUBLIC_SITE_URL,
         sameAs: [PUBLIC_REPO_URL],
-      })
+      }),
     );
     expect(sourceCode).toEqual(
       expect.objectContaining({
         '@id': `${DEFAULT_PUBLIC_SITE_URL}#source`,
         codeRepository: PUBLIC_REPO_URL,
         url: PUBLIC_REPO_SOURCE_URL,
-      })
+      }),
     );
     expect(webPage).toEqual(
       expect.objectContaining({
         url: 'https://contextengine.xyz/about',
         name: DEFAULT_PUBLIC_PAGE_TITLE,
         description: DEFAULT_PUBLIC_PAGE_DESCRIPTION,
-        significantLink: [
-          PUBLIC_REPO_URL,
-          PUBLIC_REPO_SOURCE_URL,
-          PUBLIC_DISCOVERABILITY_URL,
-          PUBLIC_LLMS_URL,
-        ],
-      })
+        significantLink: [PUBLIC_REPO_URL, PUBLIC_REPO_SOURCE_URL, PUBLIC_DISCOVERABILITY_URL, PUBLIC_LLMS_URL],
+      }),
     );
   });
 
@@ -263,11 +275,14 @@ describe('publicPageHead', () => {
 
     expect(document.head.querySelectorAll('link[rel="canonical"]')).toHaveLength(1);
     expect(document.head.querySelectorAll('meta[property="og:url"]')).toHaveLength(1);
+    expect(
+      document.head.querySelectorAll('script[type="application/ld+json"][data-ce-structured-data="public-page"]'),
+    ).toHaveLength(1);
     expect(document.head.querySelector('link[rel="canonical"]')?.getAttribute('href')).toBe(
-      'https://contextengine.xyz/session/demo'
+      'https://contextengine.xyz/session/demo',
     );
     expect(document.head.querySelector('meta[property="og:url"]')?.getAttribute('content')).toBe(
-      'https://contextengine.xyz/session/demo'
+      'https://contextengine.xyz/session/demo',
     );
     const structuredData = JSON.parse(
       document.head.querySelector(

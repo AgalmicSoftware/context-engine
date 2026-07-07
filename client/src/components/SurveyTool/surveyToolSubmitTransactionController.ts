@@ -19,30 +19,6 @@ type SubmitTransaction = UnknownRecord & {
 const isObjectRecord = (value: unknown): value is UnknownRecord =>
   !!value && typeof value === 'object' && !Array.isArray(value);
 
-export function resolveSurveySubmitSessionTarget({
-  sessionSlug,
-  sessionConfig,
-}: {
-  sessionSlug: unknown;
-  sessionConfig: unknown;
-}): string | UnknownRecord {
-  const slug = String(sessionSlug || '')
-    .trim()
-    .toLowerCase();
-  const config = isObjectRecord(sessionConfig) ? sessionConfig : {};
-  const projection = resolveSessionCapabilityProjection(config);
-  if (projection.source === 'invalid_profile' || projection.source === 'missing') {
-    throw new Error('The session mode profile is missing, invalid, or unsupported.');
-  }
-  if (!projection.isWorkerCanonical) return slug;
-  return {
-    ...config,
-    slug: String(config.slug || slug)
-      .trim()
-      .toLowerCase(),
-  };
-}
-
 export interface FilteredSubmitPayload {
   questionIds: string[];
   questionResponses: SubmittedQuestionResponse[];

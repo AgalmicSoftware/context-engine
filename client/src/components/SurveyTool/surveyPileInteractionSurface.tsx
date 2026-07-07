@@ -177,14 +177,6 @@ export const buildPileFooterClassName = (styleMap: Record<string, string>, pileT
 export const buildPileActionsClassName = (styleMap: Record<string, string>, collapseActionsIntoMenu: unknown) =>
   [styleMap.pileActions, collapseActionsIntoMenu ? styleMap.pileActionsMenuEligible : ''].filter(Boolean).join(' ');
 
-export const buildPileActionsClassName = (
-  styleMap: Record<string, string>,
-  collapseActionsIntoMenu: unknown
-) => [
-  styleMap.pileActions,
-  collapseActionsIntoMenu ? styleMap.pileActionsMenuEligible : '',
-].filter(Boolean).join(' ');
-
 export const buildPileSubmitButtonClassName = (
   styleMap: Record<string, string>,
   hasPendingPileChanges: unknown,
@@ -204,17 +196,13 @@ export const shouldCollapsePileActionsIntoMenu = ({
   hasPendingPileChanges: unknown;
   isSubmitting: unknown;
   shouldHidePileSubmitButton: unknown;
-}): boolean => (
+}): boolean =>
   !!pileTopRailVisible &&
   !!showSubmitButton &&
   (!!hasPendingPileChanges || !!isSubmitting) &&
-  !shouldHidePileSubmitButton
-);
+  !shouldHidePileSubmitButton;
 
-export const resolvePileCardStatusClassName = (
-  styleMap: Record<string, string>,
-  offset: number
-) => {
+export const resolvePileCardStatusClassName = (styleMap: Record<string, string>, offset: number) => {
   if (offset === 0) return styleMap.pileCardActive;
   if (offset === 1) return styleMap.pileCardNext;
   if (offset === -1) return styleMap.pileCardPrev;

@@ -1,8 +1,4 @@
-import {
-  listSessionStorageRefs,
-  readSessionStorageBlob,
-  uploadDataToSessionStorage,
-} from './storageClient.js';
+import { listSessionStorageRefs, readSessionStorageBlob, uploadDataToSessionStorage } from './storageClient.js';
 
 jest.mock('../arweave/arweaveClient.js', () => ({
   arweaveClient: {
@@ -102,24 +98,28 @@ describe('storageClient', () => {
   });
 
   test('rejects plaintext uploads when Cloudflare lit_encrypted mode is selected', async () => {
-    await expect(uploadDataToSessionStorage({ ok: true }, 'json', {
-      sessionSlug: 'alpha',
-      sessionConfig: {
-        storageProfile: {
-          backend: 'cloudflare',
-          payloadAccessControl: { mode: 'lit_encrypted' },
+    await expect(
+      uploadDataToSessionStorage({ ok: true }, 'json', {
+        sessionSlug: 'alpha',
+        sessionConfig: {
+          storageProfile: {
+            backend: 'cloudflare',
+            payloadAccessControl: { mode: 'lit_encrypted' },
+          },
         },
-      },
-    })).rejects.toThrow(/pre-encrypted payload/i);
+      }),
+    ).rejects.toThrow(/pre-encrypted payload/i);
 
     expect(fetchWorkerWithAuth).not.toHaveBeenCalled();
   });
 
   test('tries anonymous-first Cloudflare reads so public sessions do not prompt for wallet auth', async () => {
-    fetchWorkerWithAuth.mockResolvedValueOnce(new Response('payload', {
-      status: 200,
-      headers: { 'Content-Type': 'text/plain' },
-    }));
+    fetchWorkerWithAuth.mockResolvedValueOnce(
+      new Response('payload', {
+        status: 200,
+        headers: { 'Content-Type': 'text/plain' },
+      }),
+    );
 
     const response = await readSessionStorageBlob({
       storageRef: { backend: 'cloudflare', id: 'cf_01j7safeopaqueid' },
@@ -131,14 +131,19 @@ describe('storageClient', () => {
     expect(fetchWorkerWithAuth).toHaveBeenCalledWith(
       'https://worker.example/storage/read?id=cf_01j7safeopaqueid',
       { method: 'GET' },
-      expect.objectContaining({ preferAnonymous: true })
+      expect.objectContaining({ preferAnonymous: true }),
     );
   });
 
   test('tries anonymous-first Cloudflare lists and leaves gated fallback to worker auth', async () => {
-    fetchWorkerWithAuth.mockResolvedValueOnce(new Response(JSON.stringify({
-      items: [{ storageRef: { backend: 'cloudflare', id: 'cf_ref' } }],
-    }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    fetchWorkerWithAuth.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          items: [{ storageRef: { backend: 'cloudflare', id: 'cf_ref' } }],
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
 
     const items = await listSessionStorageRefs({
       sessionSlug: 'alpha',
@@ -150,7 +155,7 @@ describe('storageClient', () => {
     expect(fetchWorkerWithAuth).toHaveBeenCalledWith(
       'https://worker.example/storage/list?resource=questions',
       { method: 'GET' },
-      expect.objectContaining({ preferAnonymous: true })
+      expect.objectContaining({ preferAnonymous: true }),
     );
   });
 });

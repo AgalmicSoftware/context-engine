@@ -28,15 +28,8 @@ import {
 } from '../../utilities/docLibrary/tags.js';
 import { resolveArweaveGraphqlUrl, resolveArweaveGraphqlUrls } from '../../utilities/docLibrary/config.js';
 import { listArweaveTransactionsByTags } from '../../utilities/docLibrary/arweaveGraphql.js';
-import {
-  listSessionStorageRefs,
-  readSessionStorageBlob,
-} from '../../utilities/storage/storageClient.js';
-import {
-  STORAGE_BACKENDS,
-  normalizeStorageBackend,
-  normalizeStorageRef,
-} from '../../utilities/storage/storageRefs.js';
+import { listSessionStorageRefs, readSessionStorageBlob } from '../../utilities/storage/storageClient.js';
+import { STORAGE_BACKENDS, normalizeStorageBackend, normalizeStorageRef } from '../../utilities/storage/storageRefs.js';
 import {
   resolveDocUploadsGate,
   uploadDocLibraryFile,
@@ -151,8 +144,7 @@ type EncryptAudience =
     };
 
 type FetchArweaveBlobResult =
-  | { ok: true; blob: Blob; contentType: string }
-  | { ok: false; error: string; stale?: boolean };
+  { ok: true; blob: Blob; contentType: string } | { ok: false; error: string; stale?: boolean };
 
 type UploadResult = {
   txId?: string;
@@ -321,24 +313,30 @@ const isValidStorageDocRef = (storageRef: StorageRef | null): storageRef is Stor
   return storageRef.backend === STORAGE_BACKENDS.CLOUDFLARE || isArweaveTxId(storageRef.id);
 };
 
-const buildSessionListFilters = (sessionIdHex: string): ListFilter[] => ([
-  { name: 'CE-DocLibrary', values: ['1'] },
-  { name: 'CE-SessionId', values: [normalizeSessionIdHex(sessionIdHex)] },
-].filter((f) => f.values && f.values[0]));
+const buildSessionListFilters = (sessionIdHex: string): ListFilter[] =>
+  [
+    { name: 'CE-DocLibrary', values: ['1'] },
+    { name: 'CE-SessionId', values: [normalizeSessionIdHex(sessionIdHex)] },
+  ].filter((f) => f.values && f.values[0]);
 
-const buildSbtListFilters = ({ chainId, sbtAddress }: { chainId?: number | string | null; sbtAddress?: string }): ListFilter[] => ([
-  { name: 'CE-DocLibrary', values: ['1'] },
-  { name: 'CE-SbtChainId', values: [String(Number(chainId || 0) || '')] },
-  { name: 'CE-SbtAddress', values: [normalizeSbtAddress(sbtAddress)] },
-].filter((f) => f.values && f.values[0]));
+const buildSbtListFilters = ({
+  chainId,
+  sbtAddress,
+}: {
+  chainId?: number | string | null;
+  sbtAddress?: string;
+}): ListFilter[] =>
+  [
+    { name: 'CE-DocLibrary', values: ['1'] },
+    { name: 'CE-SbtChainId', values: [String(Number(chainId || 0) || '')] },
+    { name: 'CE-SbtAddress', values: [normalizeSbtAddress(sbtAddress)] },
+  ].filter((f) => f.values && f.values[0]);
 
 const fetchArweaveBlobWithFallback = async (
   txId: string,
   opts: { gateways?: string[]; isCurrent?: () => boolean } = {},
 ): Promise<FetchArweaveBlobResult> => {
-  const gateways = Array.isArray(opts.gateways) && opts.gateways.length
-      ? opts.gateways
-      : DOC_LIBRARY_ARWEAVE_GATEWAYS;
+  const gateways = Array.isArray(opts.gateways) && opts.gateways.length ? opts.gateways : DOC_LIBRARY_ARWEAVE_GATEWAYS;
   const isCurrent = typeof opts.isCurrent === 'function' ? opts.isCurrent : null;
 
   let lastErr: unknown = null;
@@ -382,27 +380,11 @@ export default function DocumentLibraryPanel({
   pageSize = 25,
   showUploadControls = true,
 }: DocumentLibraryPanelProps = {}) {
-  const capabilityRoute = useMemo(
-    () => resolveDocumentLibraryCapabilityRoute({ mode, sessionConfig, network }),
-    [mode, network, sessionConfig],
-  );
-  const {
-    usesWorkerCanonicalDocumentStorage,
-    allowsLitDocumentControls,
-    allowsSbtDocumentControls,
-    documentUploadBlockedMessage,
-    documentCapabilityNotice,
-    documentNetwork,
-    docProvider,
-  } = capabilityRoute;
   const getActiveLitHooks = useCallback(
     () =>
-      resolveDocumentLibraryLitHooks({
-        allowsLitDocumentControls,
-        scopedLitHooks,
-        globalLitHooks: getGlobalLitHooks() as LitHooks,
-      }),
-    [allowsLitDocumentControls, scopedLitHooks],
+      ((scopedLitHooks && typeof scopedLitHooks === 'object' ? scopedLitHooks : null) ||
+        getGlobalLitHooks()) as LitHooks,
+    [scopedLitHooks],
   );
   const normalizedSessionIdHex = useMemo(() => normalizeSessionIdHex(sessionIdHex), [sessionIdHex]);
   const normalizedSbtAddress = useMemo(() => normalizeSbtAddress(sbtAddress), [sbtAddress]);
@@ -410,16 +392,13 @@ export default function DocumentLibraryPanel({
     () => normalizeSessionIdHex(secondarySessionIdHex),
     [secondarySessionIdHex],
   );
-  const resolvedSbtChainId = useMemo(
-    () => Number(sbtChainId || documentNetwork?.id || 0) || null,
-    [documentNetwork?.id, sbtChainId],
-  );
+  const resolvedSbtChainId = useMemo(() => Number(sbtChainId || network?.id || 0) || null, [sbtChainId, network?.id]);
 
   const panelContextKey = useMemo(() => {
     const slug = toStr(sessionSlug).trim().toLowerCase();
     if (mode === 'session') {
       const id = normalizedSessionIdHex || '';
-      return (slug || id) ? `session:${slug}:${id}` : '';
+      return slug || id ? `session:${slug}:${id}` : '';
     }
     if (mode === 'sbt') {
       const chain = resolvedSbtChainId ? String(resolvedSbtChainId) : '';
@@ -430,6 +409,10 @@ export default function DocumentLibraryPanel({
     return '';
   }, [mode, sessionSlug, normalizedSessionIdHex, resolvedSbtChainId, normalizedSbtAddress]);
 
+  const docProvider = useMemo(
+    () => toStr(resolveDocLibraryProvider(sessionConfig)).trim().toLowerCase(),
+    [sessionConfig],
+  );
   const isArweaveBackedDocProvider =
     docProvider === STORAGE_BACKENDS.ARWEAVE || docProvider === STORAGE_BACKENDS.LIT_ARWEAVE;
   const isUploadableDocProvider = isArweaveBackedDocProvider || docProvider === STORAGE_BACKENDS.CLOUDFLARE;
@@ -452,38 +435,60 @@ export default function DocumentLibraryPanel({
     };
   }, [sessionConfig]);
   const sessionHasLitChipotle = useMemo(() => {
-    const litCredentials = (
+    const litCredentials =
       sessionConfig &&
       typeof sessionConfig === 'object' &&
       sessionConfig.litCredentials &&
       typeof sessionConfig.litCredentials === 'object' &&
       !Array.isArray(sessionConfig.litCredentials)
-    ) ? sessionConfig.litCredentials as Record<string, unknown> : null;
-    return !!(
-      toStr(sessionConfig?.corsWorkerUrl).trim() &&
+        ? (sessionConfig.litCredentials as Record<string, unknown>)
+        : null;
+    const hasCompleteLitCredentials = !!(
+      litCredentials &&
       toStr(litCredentials?.litApiBase).trim() &&
       toStr(litCredentials?.litActionCid).trim() &&
       toStr(litCredentials?.litPkpId).trim()
     );
-  }, [sessionConfig]);
-  const sessionGateUnsupportedMessage = useMemo(() => (
-    docUploadsGate.hasRecipients && !sessionHasLitChipotle
-      ? getUnsupportedLitContractAccessControlErrorUntyped({
-        chainId: Number(docUploadsGate.chainId || network?.id || 0) || null,
-      })
-      : ''
-  ), [docUploadsGate.chainId, docUploadsGate.hasRecipients, network?.id, sessionHasLitChipotle]);
-  const docAsyncConfigKey = useMemo(() => buildAsyncContextKeyPart({
-    corsWorkerUrl: toStr(sessionConfig?.corsWorkerUrl).trim(),
-    docLibrary: sessionConfig?.docLibrary || null,
-    docProvider,
-    docUploadsGate,
-    graphqlUrl,
-    graphqlUrls,
-    lit: sessionConfig?.lit || null,
-    litNetwork: toStr(sessionConfig?.litNetwork).trim(),
-    storageProfile: sessionConfig?.storageProfile || null,
-  }), [docProvider, docUploadsGate, graphqlUrl, graphqlUrls, sessionConfig]);
+    const litConfig =
+      sessionConfig &&
+      typeof sessionConfig === 'object' &&
+      sessionConfig.lit &&
+      typeof sessionConfig.lit === 'object' &&
+      !Array.isArray(sessionConfig.lit)
+        ? (sessionConfig.lit as Record<string, unknown>)
+        : null;
+    const litNetworkHint = toStr(litConfig?.network || sessionConfig?.litNetwork)
+      .trim()
+      .toLowerCase();
+    return !!(
+      toStr(sessionConfig?.corsWorkerUrl).trim() &&
+      (hasCompleteLitCredentials || litNetworkHint === 'chipotle' || docUploadsGate.hasRecipients)
+    );
+  }, [docUploadsGate.hasRecipients, sessionConfig]);
+  const sessionGateUnsupportedMessage = useMemo(
+    () =>
+      docUploadsGate.hasRecipients && !sessionHasLitChipotle
+        ? getUnsupportedLitContractAccessControlErrorUntyped({
+            chainId: Number(docUploadsGate.chainId || network?.id || 0) || null,
+          })
+        : '',
+    [docUploadsGate.chainId, docUploadsGate.hasRecipients, network?.id, sessionHasLitChipotle],
+  );
+  const docAsyncConfigKey = useMemo(
+    () =>
+      buildAsyncContextKeyPart({
+        corsWorkerUrl: toStr(sessionConfig?.corsWorkerUrl).trim(),
+        docLibrary: sessionConfig?.docLibrary || null,
+        docProvider,
+        docUploadsGate,
+        graphqlUrl,
+        graphqlUrls,
+        lit: sessionConfig?.lit || null,
+        litNetwork: toStr(sessionConfig?.litNetwork).trim(),
+        storageProfile: sessionConfig?.storageProfile || null,
+      }),
+    [docProvider, docUploadsGate, graphqlUrl, graphqlUrls, sessionConfig],
+  );
 
   const locationSearch = typeof window !== 'undefined' ? window.location.search || '' : '';
 
@@ -491,15 +496,9 @@ export default function DocumentLibraryPanel({
     if (typeof window === 'undefined') return null;
     try {
       const qp = new URLSearchParams(locationSearch);
-      const storage = normalizeStorageBackend(
-        qp.get('__ceDocStorage') || '',
-        STORAGE_BACKENDS.LIT_ARWEAVE
-      );
+      const storage = normalizeStorageBackend(qp.get('__ceDocStorage') || '', STORAGE_BACKENDS.LIT_ARWEAVE);
       const refId = toStr(qp.get('__ceDocRef') || qp.get('__ceDocTx') || '').trim();
-      const storageRef = normalizeDocStorageRef(
-        { backend: storage, id: refId },
-        { fallbackBackend: storage }
-      );
+      const storageRef = normalizeDocStorageRef({ backend: storage, id: refId }, { fallbackBackend: storage });
       if (!isValidStorageDocRef(storageRef)) return null;
 
       const kind = toStr(qp.get('__ceDocKind') || '').trim() || 'file';
@@ -580,13 +579,19 @@ export default function DocumentLibraryPanel({
   const autoOpenedRef = useRef('');
   const autoOpeningRef = useRef('');
   const viewerRequestSeqRef = useRef(0);
-  const viewerContextKey = useMemo(() => ([
-    panelContextKey,
-    toStr(account).trim().toLowerCase(),
-    String(network?.id || ''),
-    loginComplete ? '1' : '0',
-    docAsyncConfigKey,
-  ].join('|')), [account, docAsyncConfigKey, loginComplete, network?.id, panelContextKey]);
+  const viewerContextKey = useMemo(
+    () =>
+      [
+        panelContextKey,
+        toStr(account).trim().toLowerCase(),
+        String(network?.id || ''),
+        loginComplete ? '1' : '0',
+        docAsyncConfigKey,
+      ].join('|'),
+    [account, docAsyncConfigKey, loginComplete, network?.id, panelContextKey],
+  );
+  const activeViewerContextKeyRef = useRef(viewerContextKey);
+  activeViewerContextKeyRef.current = viewerContextKey;
   const activeUploadContextKeyRef = useRef(viewerContextKey);
   activeUploadContextKeyRef.current = viewerContextKey;
   const activeFileRef = useRef<File | null>(file);
@@ -600,17 +605,21 @@ export default function DocumentLibraryPanel({
   const fileUploadAttemptSeqRef = useRef(0);
   const urlUploadAttemptSeqRef = useRef(0);
 
-  useEffect(() => () => {
-    viewerRequestSeqRef.current += 1;
-    listRequestSeqRef.current += 1;
-    fileUploadAttemptSeqRef.current += 1;
-    urlUploadAttemptSeqRef.current += 1;
-    activeListQueryKeyRef.current = '__unmounted__';
-    activeUploadContextKeyRef.current = '__unmounted__';
-    loadingRef.current = false;
-    fileUploadInFlightRef.current = false;
-    urlUploadInFlightRef.current = false;
-  }, []);
+  useEffect(
+    () => () => {
+      viewerRequestSeqRef.current += 1;
+      listRequestSeqRef.current += 1;
+      fileUploadAttemptSeqRef.current += 1;
+      urlUploadAttemptSeqRef.current += 1;
+      activeListQueryKeyRef.current = '__unmounted__';
+      activeViewerContextKeyRef.current = '__unmounted__';
+      activeUploadContextKeyRef.current = '__unmounted__';
+      loadingRef.current = false;
+      fileUploadInFlightRef.current = false;
+      urlUploadInFlightRef.current = false;
+    },
+    [],
+  );
 
   useEffect(() => {
     viewerRequestSeqRef.current += 1;
@@ -662,17 +671,13 @@ export default function DocumentLibraryPanel({
   useEffect(() => {
     const shouldLock =
       requiresLitDocumentStorage ||
-      (allowsSbtDocumentControls &&
-        docProvider !== STORAGE_BACKENDS.CLOUDFLARE &&
-        !!docUploadsGate.hasRecipients &&
-        !sessionGateUnsupportedMessage);
+      (docProvider !== STORAGE_BACKENDS.CLOUDFLARE && !!docUploadsGate.hasRecipients && !sessionGateUnsupportedMessage);
     if (userEncryptionOverrideRef.current) return;
     setLocked(shouldLock);
     setAudienceMode(shouldLock && docUploadsGate.hasRecipients ? 'sessionGate' : 'custom');
   }, [
     docProvider,
     docUploadsGate.hasRecipients,
-    allowsSbtDocumentControls,
     panelContextKey,
     requiresLitDocumentStorage,
     sessionGateUnsupportedMessage,
@@ -725,35 +730,53 @@ export default function DocumentLibraryPanel({
     if (mode === 'session') return !!normalizedSessionIdHex;
     if (mode === 'sbt') return !!normalizedSbtAddress && !!Number(sbtChainId || documentNetwork?.id || 0);
     return false;
-  }, [docProvider, isArweaveBackedDocProvider, mode, normalizedSessionIdHex, normalizedSbtAddress, network?.id, sbtChainId, sessionSlug]);
-  const listRunKey = useMemo(() => `${canList ? '1' : '0'}|${listQueryKey}`, [canList, listQueryKey]);
+  }, [
+    docProvider,
+    isArweaveBackedDocProvider,
+    mode,
+    normalizedSessionIdHex,
+    normalizedSbtAddress,
+    network?.id,
+    sbtChainId,
+    sessionSlug,
+  ]);
+  const listRunKey = useMemo(
+    () => `${viewerContextKey}|${canList ? '1' : '0'}|${listQueryKey}`,
+    [canList, listQueryKey, viewerContextKey],
+  );
   activeListQueryKeyRef.current = listRunKey;
 
-  const loadDocs = useCallback(async ({ reset }: { reset?: boolean } = {}) => {
-    if (!canList) return;
-    if (loadingRef.current && !reset) return;
-    if (!reset && !cursorRef.current) return;
-    setError('');
-    const requestSeq = (listRequestSeqRef.current += 1);
-    const expectedQueryKey = listRunKey;
-    loadingRef.current = true;
-    setLoading(true);
-    try {
-      const after = reset ? null : cursorRef.current;
-      const edges = docProvider === STORAGE_BACKENDS.CLOUDFLARE
-        ? ((await listSessionStorageRefsForDocs({
-          sessionSlug,
-          sessionConfig,
-          context: { account, providerLike: provider, chainId: network?.id || null },
-          resource: 'docsContext',
-        })).map((item: Record<string, unknown>) => buildDocRecordFromStorageItem(item)).filter(Boolean) as DocRecord[])
-        : (await listArweaveTransactionsByTags({
-          graphqlUrl,
-          graphqlUrls,
-          tags: listFilters,
-          first: pageSize,
-          after,
-        })) as DocRecord[];
+  const loadDocs = useCallback(
+    async ({ reset }: { reset?: boolean } = {}) => {
+      if (!canList) return;
+      if (loadingRef.current && !reset) return;
+      if (!reset && !cursorRef.current) return;
+      setError('');
+      const requestSeq = (listRequestSeqRef.current += 1);
+      const expectedQueryKey = listRunKey;
+      loadingRef.current = true;
+      setLoading(true);
+      try {
+        const after = reset ? null : cursorRef.current;
+        const edges =
+          docProvider === STORAGE_BACKENDS.CLOUDFLARE
+            ? ((
+                await listSessionStorageRefsForDocs({
+                  sessionSlug,
+                  sessionConfig,
+                  context: { account, providerLike: provider, chainId: network?.id || null },
+                  resource: 'docsContext',
+                })
+              )
+                .map((item: Record<string, unknown>) => buildDocRecordFromStorageItem(item))
+                .filter(Boolean) as DocRecord[])
+            : ((await listArweaveTransactionsByTags({
+                graphqlUrl,
+                graphqlUrls,
+                tags: listFilters,
+                first: pageSize,
+                after,
+              })) as DocRecord[]);
 
         if (listRequestSeqRef.current !== requestSeq || activeListQueryKeyRef.current !== expectedQueryKey) return;
 
@@ -789,39 +812,35 @@ export default function DocumentLibraryPanel({
           });
           return next;
         });
-        edges.forEach((edge) => {
-          const id = toStr(edge?.txId).trim();
-          if (!id) return;
-          const existingIdx = idxById.get(id);
-          if (existingIdx == null) {
-            idxById.set(id, next.length);
-            next.push(edge);
-            return;
-          }
-          const prevDoc = next[existingIdx] || {};
-          next[existingIdx] = {
-            ...prevDoc,
-            ...edge,
-            tags: Array.isArray(edge.tags) ? edge.tags : (Array.isArray(prevDoc.tags) ? prevDoc.tags : []),
-            tagMap: edge.tagMap && typeof edge.tagMap === 'object'
-              ? normalizeDocTagMap(edge.tagMap)
-              : (prevDoc.tagMap && typeof prevDoc.tagMap === 'object' ? prevDoc.tagMap : {}),
-          };
-        });
-        return next;
-      });
-      const nextCursor = docProvider === STORAGE_BACKENDS.CLOUDFLARE ? null : (edges.length ? edges[edges.length - 1].cursor : null);
-      cursorRef.current = nextCursor;
-      setCursor(nextCursor);
-    } catch (err) {
-      if (listRequestSeqRef.current !== requestSeq || activeListQueryKeyRef.current !== expectedQueryKey) return;
-      setError(getErrorMessage(err, 'Failed to load docs.'));
-    } finally {
-      if (listRequestSeqRef.current !== requestSeq || activeListQueryKeyRef.current !== expectedQueryKey) return;
-      loadingRef.current = false;
-      setLoading(false);
-    }
-  }, [account, canList, docProvider, graphqlUrl, graphqlUrls, listFilters, network?.id, pageSize, provider, sessionConfig, sessionSlug, listRunKey]);
+        const nextCursor =
+          docProvider === STORAGE_BACKENDS.CLOUDFLARE ? null : edges.length ? edges[edges.length - 1].cursor : null;
+        cursorRef.current = nextCursor;
+        setCursor(nextCursor);
+      } catch (err) {
+        if (listRequestSeqRef.current !== requestSeq || activeListQueryKeyRef.current !== expectedQueryKey) return;
+        setError(getErrorMessage(err, 'Failed to load docs.'));
+      } finally {
+        if (listRequestSeqRef.current === requestSeq && activeListQueryKeyRef.current === expectedQueryKey) {
+          loadingRef.current = false;
+          setLoading(false);
+        }
+      }
+    },
+    [
+      account,
+      canList,
+      docProvider,
+      graphqlUrl,
+      graphqlUrls,
+      listFilters,
+      network?.id,
+      pageSize,
+      provider,
+      sessionConfig,
+      sessionSlug,
+      listRunKey,
+    ],
+  );
 
   useEffect(() => {
     // Cancel in-flight requests for the previous query to avoid stale updates.
@@ -847,81 +866,42 @@ export default function DocumentLibraryPanel({
     setViewerMime('');
   }, []);
 
-  const openDoc = useCallback(async (doc: OpenableDoc): Promise<boolean> => {
-    const txId = toStr(doc?.txId).trim();
-    if (!txId) return false;
-    const requestSeq = viewerRequestSeqRef.current + 1;
-    viewerRequestSeqRef.current = requestSeq;
-    const isCurrentViewerRequest = () => viewerRequestSeqRef.current === requestSeq;
-    const revokeStaleBlobUrl = (blobUrl: string) => {
-      if (!blobUrl || typeof URL === 'undefined' || typeof URL.revokeObjectURL !== 'function') return;
-      try { URL.revokeObjectURL(blobUrl); } catch (e) { log.warn('DocumentLibraryPanel: stale blob cleanup', e); }
-    };
-    const applyTextViewerState = ({ title, mime, text }: { title: string; mime: string; text: string }) => {
-      if (!isCurrentViewerRequest()) return false;
-      setViewerTitle(title);
-      setViewerMime(mime);
-      setViewerText(text);
-      setViewerLoading(false);
-      return true;
-    };
-    const applyBlobViewerState = ({ title, mime, blobUrl }: { title: string; mime: string; blobUrl: string }) => {
-      if (!isCurrentViewerRequest()) {
-        revokeStaleBlobUrl(blobUrl);
-        return false;
-      }
-      setViewerTitle(title);
-      setViewerMime(mime);
-      setViewerBlobUrl(blobUrl);
-      setViewerLoading(false);
-      return true;
-    };
-
-    const tagMap = doc?.tagMap || {};
-    const storage = toStr(tagMap['CE-DocStorage']).trim().toLowerCase();
-    const kind = toStr(tagMap['CE-DocKind']).trim().toLowerCase();
-    const isEncrypted = storage === 'lit-arweave' || storage === 'lit';
-    const storageRef = normalizeDocStorageRef(doc?.storageRef || { backend: storage, id: txId }, { fallbackBackend: storage || STORAGE_BACKENDS.ARWEAVE });
-    const isCloudflareStorage = storageRef?.backend === STORAGE_BACKENDS.CLOUDFLARE;
-
-    setViewerOpen(true);
-    setViewerLoading(true);
-    setViewerError('');
-    setViewerText('');
-    setViewerMime('');
-    setViewerBlobUrl('');
-    setViewerTitle(isEncrypted ? 'Decrypting…' : 'Loading…');
-
-    try {
-      if (isCloudflareStorage) {
-        if (isEncrypted) {
-          throw new Error('Lit-encrypted Cloudflare document reads are not implemented yet.');
+  const openDoc = useCallback(
+    async (doc: OpenableDoc): Promise<boolean> => {
+      const txId = toStr(doc?.txId).trim();
+      if (!txId) return false;
+      const requestSeq = viewerRequestSeqRef.current + 1;
+      viewerRequestSeqRef.current = requestSeq;
+      const viewerContextAtStart = activeViewerContextKeyRef.current;
+      const isCurrentViewerRequest = () =>
+        viewerRequestSeqRef.current === requestSeq && activeViewerContextKeyRef.current === viewerContextAtStart;
+      const revokeStaleBlobUrl = (blobUrl: string) => {
+        if (!blobUrl || typeof URL === 'undefined' || typeof URL.revokeObjectURL !== 'function') return;
+        try {
+          URL.revokeObjectURL(blobUrl);
+        } catch (e) {
+          log.warn('DocumentLibraryPanel: stale blob cleanup', e);
         }
-        const response = await readSessionStorageBlobForDocs({
-          storageRef,
-          sessionSlug,
-          sessionConfig,
-          context: { account, providerLike: provider, chainId: network?.id || null },
-        });
+      };
+      const applyTextViewerState = ({ title, mime, text }: { title: string; mime: string; text: string }) => {
         if (!isCurrentViewerRequest()) return false;
-        const blob = await response.blob();
-        if (!isCurrentViewerRequest()) return false;
-        const mime = toStr(response.headers.get('content-type') || blob.type || storageRef?.contentType || '').trim();
-        if (kind === 'link' || isTextLikeMime(mime)) {
-          const text = await blob.text();
-          return applyTextViewerState({
-            title: toStr(tagMap['CE-DocName']).trim() || (kind === 'link' ? 'Link record' : 'Document'),
-            mime: mime || (kind === 'link' ? 'application/json' : 'text/plain'),
-            text: text || '',
-          });
+        setViewerTitle(title);
+        setViewerMime(mime);
+        setViewerText(text);
+        setViewerLoading(false);
+        return true;
+      };
+      const applyBlobViewerState = ({ title, mime, blobUrl }: { title: string; mime: string; blobUrl: string }) => {
+        if (!isCurrentViewerRequest()) {
+          revokeStaleBlobUrl(blobUrl);
+          return false;
         }
-        const blobUrl = typeof URL !== 'undefined' ? URL.createObjectURL(blob) : '';
-        return applyBlobViewerState({
-          title: toStr(tagMap['CE-DocName']).trim() || 'Document',
-          mime,
-          blobUrl,
-        });
-      }
+        setViewerTitle(title);
+        setViewerMime(mime);
+        setViewerBlobUrl(blobUrl);
+        setViewerLoading(false);
+        return true;
+      };
 
       const tagMap = doc?.tagMap || {};
       const storage = toStr(tagMap['CE-DocStorage']).trim().toLowerCase();
@@ -949,7 +929,7 @@ export default function DocumentLibraryPanel({
             storageRef,
             sessionSlug,
             sessionConfig,
-            context: { account, providerLike: provider, chainId: documentNetwork?.id || null },
+            context: { account, providerLike: provider, chainId: network?.id || null },
           });
           if (!isCurrentViewerRequest()) return false;
           const blob = await response.blob();
@@ -980,38 +960,48 @@ export default function DocumentLibraryPanel({
             url: litStorage.buildLitArweaveUrl(txId),
             providerLike: provider,
             account,
-            chainId: documentNetwork?.id || null,
+            chainId: network?.id || null,
             ...(litHooks && typeof litHooks.getKey === 'function' ? { lit: { getKey: litHooks.getKey } } : {}),
             arweave: {
               debugContext: {
                 category: 'doc_lit_payload',
                 caller: 'DocumentLibraryPanel.openDoc.encrypted',
                 slug: panelContextKey || '',
-                chainId: Number(documentNetwork?.id || 0) || null,
+                chainId: Number(network?.id || 0) || null,
               },
             },
-          },
-        });
-        if (!isCurrentViewerRequest()) return false;
+          });
+          if (!isCurrentViewerRequest()) return false;
 
-        const name = toStr(payload?.name || '').trim() || (kind === 'link' ? 'Encrypted link' : 'Encrypted document');
-        const mime = toStr(payload?.mime || '').trim();
-        const text = litStorage.decodeLitPayloadToText(payload);
-        if (text) {
-          return applyTextViewerState({
+          const name = toStr(payload?.name || '').trim() || (kind === 'link' ? 'Encrypted link' : 'Encrypted document');
+          const mime = toStr(payload?.mime || '').trim();
+          const text = litStorage.decodeLitPayloadToText(payload);
+          if (text) {
+            return applyTextViewerState({
+              title: name,
+              mime: mime || 'text/plain',
+              text,
+            });
+          }
+          const blob = litStorage.decodeLitPayloadToBlob(payload);
+          if (!blob) {
+            throw new Error('Unable to decode encrypted document.');
+          }
+          const blobUrl = typeof URL !== 'undefined' ? URL.createObjectURL(blob) : '';
+          return applyBlobViewerState({
             title: name,
-            mime: mime || 'text/plain',
-            text,
+            mime: blob.type || mime || '',
+            blobUrl,
           });
         }
 
         if (kind === 'link') {
-          const text = await arweaveClient.downloadDataFromArweave(txId, {
+          const text = await arweaveScripts.downloadDataFromArweave(txId, {
             debugContext: {
               category: 'doc_link_payload',
               caller: 'DocumentLibraryPanel.openDoc.link',
               slug: panelContextKey || '',
-              chainId: Number(documentNetwork?.id || 0) || null,
+              chainId: Number(network?.id || 0) || null,
             },
           });
           return applyTextViewerState({
@@ -1037,56 +1027,20 @@ export default function DocumentLibraryPanel({
         }
         const blobUrl = typeof URL !== 'undefined' ? URL.createObjectURL(blob) : '';
         return applyBlobViewerState({
-          title: name,
-          mime: blob.type || mime || '',
+          title: toStr(tagMap['CE-DocName']).trim() || 'Document',
+          mime,
           blobUrl,
         });
+      } catch (err) {
+        if (!isCurrentViewerRequest()) return false;
+        setViewerLoading(false);
+        setViewerError(getErrorMessage(err, 'Failed to open document.'));
+        setViewerTitle('Error');
+        return false;
       }
-
-      if (kind === 'link') {
-        const text = await arweaveScripts.downloadDataFromArweave(txId, {
-          debugContext: {
-            category: 'doc_link_payload',
-            caller: 'DocumentLibraryPanel.openDoc.link',
-            slug: panelContextKey || '',
-            chainId: Number(network?.id || 0) || null,
-          },
-        });
-        return applyTextViewerState({
-          title: toStr(tagMap['CE-DocName']).trim() || 'Link record',
-          mime: 'application/json',
-          text: text || '',
-        });
-      }
-
-      const res = await fetchArweaveBlobWithFallback(txId, { isCurrent: isCurrentViewerRequest });
-      if (!isCurrentViewerRequest()) return false;
-      if (!res.ok && res.stale) return false;
-      if (!res.ok) throw new Error(res.error || 'Failed to fetch document.');
-      const blob = res.blob;
-      const mime = toStr(res.contentType || blob.type || '').trim();
-      if (isTextLikeMime(mime)) {
-        const text = await blob.text();
-        return applyTextViewerState({
-          title: toStr(tagMap['CE-DocName']).trim() || 'Document',
-          mime: mime || 'text/plain',
-          text: text || '',
-        });
-      }
-      const blobUrl = typeof URL !== 'undefined' ? URL.createObjectURL(blob) : '';
-      return applyBlobViewerState({
-        title: toStr(tagMap['CE-DocName']).trim() || 'Document',
-        mime,
-        blobUrl,
-      });
-    } catch (err) {
-      if (!isCurrentViewerRequest()) return false;
-      setViewerLoading(false);
-      setViewerError(getErrorMessage(err, 'Failed to open document.'));
-      setViewerTitle('Error');
-      return false;
-    }
-  }, [provider, account, network?.id, panelContextKey, getActiveLitHooks, sessionConfig, sessionSlug]);
+    },
+    [provider, account, network?.id, panelContextKey, getActiveLitHooks, sessionConfig, sessionSlug],
+  );
 
   useEffect(() => {
     if (!autoOpenDoc || !autoOpenDoc.txId) return;
@@ -1118,7 +1072,9 @@ export default function DocumentLibraryPanel({
             url.searchParams.delete(param);
           });
           window.history.replaceState({}, '', url.toString());
-        } catch (e) { log.warn('DocumentLibraryPanel: fallback', e); }
+        } catch (e) {
+          log.warn('DocumentLibraryPanel: fallback', e);
+        }
       })
       .catch((error) => {
         if (autoOpeningRef.current === key) autoOpeningRef.current = '';
@@ -1171,14 +1127,11 @@ export default function DocumentLibraryPanel({
         mode === 'session' ? buildDocLibrarySessionTags({ sessionIdHex: normalizedSessionIdHex }) : [];
       const primarySbt =
         mode === 'sbt'
-          ? buildDocLibrarySbtTags({
-              chainId: sbtChainId || documentNetwork?.id || null,
-              sbtAddress: normalizedSbtAddress,
-            })
+          ? buildDocLibrarySbtTags({ chainId: sbtChainId || network?.id || null, sbtAddress: normalizedSbtAddress })
           : [];
 
       const secondarySbt =
-        allowsSbtDocumentControls && secondaryAssociationType === 'sbt' && alsoAssociateSbt
+        secondaryAssociationType === 'sbt' && alsoAssociateSbt
           ? buildDocLibrarySbtTags({ chainId: assocSbtChainId, sbtAddress: assocSbtAddress })
           : [];
       const secondarySession =
@@ -1192,9 +1145,8 @@ export default function DocumentLibraryPanel({
       mode,
       normalizedSessionIdHex,
       sbtChainId,
-      documentNetwork?.id,
+      network?.id,
       normalizedSbtAddress,
-      allowsSbtDocumentControls,
       secondaryAssociationType,
       alsoAssociateSbt,
       assocSbtChainId,
@@ -1296,7 +1248,7 @@ export default function DocumentLibraryPanel({
       setError('Lit-Arweave session document storage requires encrypted uploads.');
       return;
     }
-    if (effectiveLocked && docProvider === STORAGE_BACKENDS.CLOUDFLARE) {
+    if (locked && docProvider === STORAGE_BACKENDS.CLOUDFLARE) {
       setError(
         'Lit-encrypted Cloudflare document uploads are not implemented yet. Upload plaintext to use worker-enforced storage access.',
       );
@@ -1305,10 +1257,10 @@ export default function DocumentLibraryPanel({
     const storage =
       docProvider === STORAGE_BACKENDS.CLOUDFLARE
         ? STORAGE_BACKENDS.CLOUDFLARE
-        : effectiveLocked
+        : locked
           ? STORAGE_BACKENDS.LIT_ARWEAVE
           : STORAGE_BACKENDS.ARWEAVE;
-    const plaintextMeta = effectiveLocked
+    const plaintextMeta = locked
       ? []
       : buildDocLibraryPlaintextFileMetaTags({ name: file.name, mime: file.type, size: file.size });
     const tags = resolveAssociationTags({ kind: 'file', storage, plaintextMeta });
@@ -1477,7 +1429,7 @@ export default function DocumentLibraryPanel({
       setError('Lit-Arweave session document storage requires encrypted uploads.');
       return;
     }
-    if (effectiveLocked && docProvider === STORAGE_BACKENDS.CLOUDFLARE) {
+    if (locked && docProvider === STORAGE_BACKENDS.CLOUDFLARE) {
       setError(
         'Lit-encrypted Cloudflare document uploads are not implemented yet. Upload plaintext to use worker-enforced storage access.',
       );
@@ -1486,10 +1438,10 @@ export default function DocumentLibraryPanel({
     const storage =
       docProvider === STORAGE_BACKENDS.CLOUDFLARE
         ? STORAGE_BACKENDS.CLOUDFLARE
-        : effectiveLocked
+        : locked
           ? STORAGE_BACKENDS.LIT_ARWEAVE
           : STORAGE_BACKENDS.ARWEAVE;
-    const plaintextMeta = effectiveLocked
+    const plaintextMeta = locked
       ? []
       : buildDocLibraryPlaintextFileMetaTags({ name: record.title || record.url, mime: 'application/json', size: '' });
     const tags = resolveAssociationTags({ kind: 'link', storage, plaintextMeta });
@@ -1509,11 +1461,10 @@ export default function DocumentLibraryPanel({
     const submittedUrlTitle = urlTitle;
     const isCurrentUploadContext = () => activeUploadContextKeyRef.current === uploadContextKey;
     const isCurrentUploadAttemptSeq = () => urlUploadAttemptSeqRef.current === uploadAttemptSeq;
-    const isCurrentUrlUploadAttempt = () => (
+    const isCurrentUrlUploadAttempt = () =>
       isCurrentUploadContext() &&
       activeUrlInputRef.current === submittedUrlInput &&
-      activeUrlTitleRef.current === submittedUrlTitle
-    );
+      activeUrlTitleRef.current === submittedUrlTitle;
     urlUploadInFlightRef.current = true;
     setUrlUploadPending(true);
 
@@ -1673,7 +1624,7 @@ export default function DocumentLibraryPanel({
 
       {isArweaveBackedDocProvider &&
         mode === 'sbt' &&
-        (!normalizedSbtAddress || !Number(sbtChainId || documentNetwork?.id || 0)) && (
+        (!normalizedSbtAddress || !Number(sbtChainId || network?.id || 0)) && (
           <div className={styles.notice}>
             Missing SBT association (chainId + address). Group docs listing/upload is disabled.
           </div>

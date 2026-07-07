@@ -63,21 +63,43 @@ describe('arweaveScripts.downloadDataFromArweave direct routing', () => {
     });
     readSessionScanSlugs.mockReturnValue([]);
     fetchWorkerWithAuth.mockResolvedValue(jsonResp(200, { id: 'tx-default' }));
-    try { delete globalThis.__CE_ARWEAVE_UPLOAD_FALLBACK__; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_GATEWAYS; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_GATEWAY_URL; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_AR_IO_URL; } catch (_) {}
+    try {
+      delete globalThis.__CE_ARWEAVE_UPLOAD_FALLBACK__;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_GATEWAYS;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_GATEWAY_URL;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_AR_IO_URL;
+    } catch (_) {}
   });
 
   afterEach(() => {
     jest.clearAllMocks();
-    try { delete globalThis.CE_ARWEAVE_GATEWAYS; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_GATEWAY_URL; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_AR_IO_URL; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_PREFLIGHT_SESSION_METADATA; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_PREFLIGHT_SBT_METADATA; } catch (_) {}
-    try { delete globalThis.CE_ARWEAVE_PREFLIGHT_RESPONSE_PAYLOADS; } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_GATEWAYS;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_GATEWAY_URL;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_AR_IO_URL;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_PREFLIGHT_SESSION_METADATA;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_PREFLIGHT_SBT_METADATA;
+    } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_PREFLIGHT_RESPONSE_PAYLOADS;
+    } catch (_) {}
   });
 
   it('prefers AR.IO direct hits without probing legacy gateways when direct-to-AR.IO mode is enabled', async () => {
@@ -111,9 +133,7 @@ describe('arweaveScripts.downloadDataFromArweave direct routing', () => {
   it('keeps display-critical metadata on AR.IO when direct-to-AR.IO mode is enabled', async () => {
     globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
     globalThis.CE_ARWEAVE_AR_IO_URL = TEST_AR_IO_GATEWAY;
-    global.fetch.mockResolvedValueOnce(
-      textResp(200, '{"ok":"metadata-ar-io-hit"}', 'application/json')
-    );
+    global.fetch.mockResolvedValueOnce(textResp(200, '{"ok":"metadata-ar-io-hit"}', 'application/json'));
 
     const text = await arweaveScripts.downloadDataFromArweave('session-meta-ar-io', {
       gateways: [TEST_ARWEAVE_GATEWAY],
@@ -133,9 +153,7 @@ describe('arweaveScripts.downloadDataFromArweave direct routing', () => {
   it('does not fall back to legacy gateways after an AR.IO html miss', async () => {
     globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
     globalThis.CE_ARWEAVE_AR_IO_URL = TEST_AR_IO_GATEWAY;
-    global.fetch.mockResolvedValueOnce(
-      textResp(200, '<html><title>404 - Page not found.</title></html>', 'text/html')
-    );
+    global.fetch.mockResolvedValueOnce(textResp(200, '<html><title>404 - Page not found.</title></html>', 'text/html'));
 
     await expect(
       arweaveScripts.downloadDataFromArweave('ar-io-html-fallback', {
@@ -144,7 +162,7 @@ describe('arweaveScripts.downloadDataFromArweave direct routing', () => {
         bypassCache: true,
         disableExistencePrecheck: true,
         debugContext: { category: 'question_response_payload' },
-      })
+      }),
     ).rejects.toMatchObject({
       name: 'ArweaveFetchError',
       status: 404,
@@ -213,7 +231,7 @@ describe('arweaveScripts.downloadDataFromArweave direct routing', () => {
         retries: 0,
         bypassCache: true,
         disableExistencePrecheck: true,
-      })
+      }),
     ).rejects.toMatchObject({
       name: 'ArweaveFetchError',
       status: 404,
@@ -281,7 +299,7 @@ describe('arweaveScripts.downloadDataFromArweave direct routing', () => {
         bypassCache: true,
         disableExistencePrecheck: true,
         debugContext: { category: 'question_response_payload' },
-      })
+      }),
     ).rejects.toMatchObject({
       name: 'ArweaveFetchError',
       status: 404,

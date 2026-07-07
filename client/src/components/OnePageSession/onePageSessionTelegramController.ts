@@ -1,11 +1,5 @@
 import { resolveSessionBackendKind, type TelegramSessionMeta } from '../../utilities/session/sessionBackendKind';
-import {
-  agentClientLoginEnvelopeMatchesIdentity,
-  type AgentClientLoginEnvelope,
-  type AgentClientLoginIdentityTarget,
-} from '../../utilities/session/agentClientLogin';
-import { resolveWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery.js';
-import { normalizeWorkerUrl } from '../../utilities/worker/workerUrl.js';
+import type { AgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
 import type { TelegramResultsDataset } from '../../utilities/session/telegramSessionBackend';
 
 export const DEFAULT_AGENT_BRIDGE_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev';
@@ -162,15 +156,8 @@ export const buildTelegramDataResetState = (): OnePageSessionTelegramDataResetSt
   telegramPolisDataset: null,
 });
 
-export const getAgentClientLoginEnvelopeMemoryKey = (target: unknown | AgentClientLoginIdentityTarget): string => {
-  const source = isRecord(target) ? target : { sessionSlug: target };
-  return [
-    normalizeOnePageSessionSlug(source.sessionSlug) || 'general',
-    resolveWorkerCanonicalSessionIdHex({ sessionId: source.sessionId }) || 'no-session-id',
-    normalizeWorkerUrl(toTrimmedString(source.workerUrl)) || 'no-worker-origin',
-    normalizeWorkerUrl(toTrimmedString(source.agentBridgeUrl)) || 'no-bridge-origin',
-  ].join('\n');
-};
+export const getAgentClientLoginEnvelopeMemoryKey = (sessionSlug: unknown): string =>
+  normalizeOnePageSessionSlug(sessionSlug) || 'general';
 
 export const clearTelegramEnvelopeMemoryCache = (
   sessionSlug: unknown,
@@ -193,12 +180,7 @@ export const cacheAgentClientLoginEnvelope = (
   envelope: AgentClientLoginEnvelope,
   globalTarget: AgentClientLoginEnvelopeMemoryGlobal = globalThis as AgentClientLoginEnvelopeMemoryGlobal,
 ): string => {
-  const key = getAgentClientLoginEnvelopeMemoryKey({
-    sessionSlug: envelope.sessionSlug,
-    sessionId: envelope.sessionId,
-    workerUrl: envelope.workerUrl,
-    agentBridgeUrl: envelope.agentBridgeUrl,
-  });
+  const key = getAgentClientLoginEnvelopeMemoryKey(envelope.sessionSlug);
   if (
     !globalTarget.__CE_AGENT_CLIENT_LOGIN_ENVELOPES__ ||
     typeof globalTarget.__CE_AGENT_CLIENT_LOGIN_ENVELOPES__ !== 'object'
@@ -232,6 +214,7 @@ export const resolveAgentClientLoginEnvelopeFromEvent = (
   const detail = toRecord(event?.detail);
   const envelope = detail.envelope;
   if (!isAgentClientLoginEnvelope(envelope)) return null;
-  if (!agentClientLoginEnvelopeMatchesIdentity(envelope, target)) return null;
+  if (normalizeOnePageSessionSlug(envelope.sessionSlug) !== normalizeOnePageSessionSlug(currentSessionSlug))
+    return null;
   return envelope;
 };

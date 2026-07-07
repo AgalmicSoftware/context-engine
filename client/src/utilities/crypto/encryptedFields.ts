@@ -62,21 +62,17 @@ const pathKey = (path: string | string[]): string => (Array.isArray(path) ? path
 
 const hasOverrideValue = (obj: UnknownRecord | null | undefined, key: string): boolean =>
   !!obj && typeof obj === 'object' && Object.prototype.hasOwnProperty.call(obj, key) && obj[key] !== undefined;
-const asRecord = (value: unknown): UnknownRecord =>
-  value && typeof value === 'object' ? (value as UnknownRecord) : {};
 
 const getWalletContext = (override: EncryptionContext = {}): WalletContext => {
   try {
     const state = store?.getState?.();
-    const profile = asRecord(state?.profile);
-    const network = asRecord(profile.network);
-    const chainId = hasOverrideValue(override, 'chainId')
-      ? (override.chainId ?? null)
-      : network.id || network.chainId || null;
+    const profile = state?.profile || {};
+    const network = profile.network || {};
+    const chainId = hasOverrideValue(override, 'chainId') ? override.chainId : network.id || network.chainId || null;
     return {
-      account: hasOverrideValue(override, 'account') ? toStr(override.account) : toStr(profile.account),
+      account: hasOverrideValue(override, 'account') ? toStr(override.account) : profile.account || '',
       providerLike: hasOverrideValue(override, 'providerLike') ? override.providerLike : profile.provider || 'wagmi',
-      chainId: typeof chainId === 'string' || typeof chainId === 'number' ? chainId : null,
+      chainId,
     };
   } catch {
     return {

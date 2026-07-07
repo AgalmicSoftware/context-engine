@@ -153,10 +153,7 @@ describe('sbtPageMediaHelpers', () => {
     expect(firstState.activeIndex).toBe(0);
     expect(firstState.src).toBe(`https://arweave.net/${txId}`);
     expect(firstState.canRetry).toBe(true);
-    expect(firstState.candidates).toEqual([
-      `https://arweave.net/${txId}`,
-      `https://gateway.irys.xyz/${txId}`,
-    ]);
+    expect(firstState.candidates).toEqual([`https://arweave.net/${txId}`, `https://gateway.irys.xyz/${txId}`]);
 
     const fallbackState = getDisplayImageRenderState(
       { image },
@@ -175,7 +172,7 @@ describe('sbtPageMediaHelpers', () => {
         displayImageFallbackKey: image,
         displayImageFallbackIndex: 2,
       },
-      '/default.png'
+      '/default.png',
     );
     expect(defaultFallbackState.activeIndex).toBe(2);
     expect(defaultFallbackState.src).toBe('/default.png');

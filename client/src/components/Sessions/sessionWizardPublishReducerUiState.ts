@@ -6,10 +6,7 @@ import {
 } from './sessionWizardPublishReadiness';
 
 export type SessionWizardPublishStepNumbers = Partial<
-  Record<
-    'deploy-worker' | 'deploy-sbts' | 'persist-worker-config' | 'upload-metadata' | 'register-session' | 'done',
-    number
-  >
+  Record<'deploy-worker' | 'deploy-sbts' | 'upload-metadata' | 'register-session' | 'done', number>
 >;
 
 export type SessionWizardPublishReducerUiState = {

@@ -6,11 +6,8 @@ jest.mock('../../variables/appConfig.js', () => {
   };
 });
 
-const mockBase64urlToHex = (value) => (
-  String(value || '').startsWith('A')
-    ? `0x${'11'.repeat(32)}`
-    : `0x${'22'.repeat(32)}`
-);
+const mockBase64urlToHex = (value) =>
+  String(value || '').startsWith('A') ? `0x${'11'.repeat(32)}` : `0x${'22'.repeat(32)}`;
 
 jest.mock('../arweave/arweaveScripts.js', () => {
   return {
@@ -579,7 +576,7 @@ describe('error paths', () => {
       return mockSurveyContract;
     });
 
-    arweaveClient.uploadDataToArweave.mockResolvedValueOnce(SURVEY_TX_ID).mockResolvedValueOnce(QUESTION_TX_ID);
+    arweaveScripts.uploadDataToArweave.mockResolvedValueOnce(SURVEY_TX_ID).mockResolvedValueOnce(QUESTION_TX_ID);
 
     const submitSpy = jest.spyOn(contractScripts, 'submitResponses');
 
@@ -590,19 +587,21 @@ describe('error paths', () => {
     expect(submitSpy).toHaveBeenCalledTimes(1);
     expect(arweaveScripts.uploadDataToArweave).toHaveBeenCalledTimes(2);
     const uploadOpts = arweaveScripts.uploadDataToArweave.mock.calls[0][2];
-    expect(uploadOpts).toEqual(expect.objectContaining({
-      sessionSlug: 'error-path-session',
-      sessionConfig: expect.objectContaining({
-        slug: 'error-path-session',
-        networkChainId: 84532,
+    expect(uploadOpts).toEqual(
+      expect.objectContaining({
+        sessionSlug: 'error-path-session',
+        sessionConfig: expect.objectContaining({
+          slug: 'error-path-session',
+          networkChainId: 84532,
+        }),
+        context: expect.objectContaining({
+          account: TEST_ADDRESS,
+          chainId: 84532,
+          providerLike: expect.any(Object),
+          signer: expect.any(Object),
+        }),
       }),
-      context: expect.objectContaining({
-        account: TEST_ADDRESS,
-        chainId: 84532,
-        providerLike: expect.any(Object),
-        signer: expect.any(Object),
-      }),
-    }));
+    );
   });
 
   it('propagates wallet rejection errors from createSBT cleanly', async () => {
@@ -646,7 +645,7 @@ describe('error paths', () => {
         ethers.constants.HashZero,
         GROUP_CFG,
       ),
-    ).rejects.toThrow('SBT creation transaction failed. Verify the network and deployment settings, then retry.');
+    ).rejects.toMatchObject({ code: 4001, message: 'User denied transaction signature.' });
 
     expect(createSpy).toHaveBeenCalledTimes(1);
     expect(mockFactory.estimateGas.createSBT).not.toHaveBeenCalled();
@@ -704,7 +703,7 @@ describe('error paths', () => {
         ethers.constants.HashZero,
         GROUP_CFG,
       ),
-    ).rejects.toThrow('SBT creation transaction failed. Verify the network and deployment settings, then retry.');
+    ).rejects.toMatchObject({ code: 4001, message: 'User denied transaction signature.' });
 
     expect(mockFactory.estimateGas.createSBT).not.toHaveBeenCalled();
     expect(mockFactory.createSBT).not.toHaveBeenCalled();
@@ -748,46 +747,6 @@ describe('error paths', () => {
         },
       ),
     ).rejects.toThrow('Configured deterministic SBT deployment cannot preinitialize a group password hash.');
-
-    expect(mockFactory.estimateGas.createSBTDeterministicConfigured).not.toHaveBeenCalled();
-    expect(mockFactory.createSBTDeterministicConfigured).not.toHaveBeenCalled();
-  });
-
-  it('fails before broadcasting configured deterministic deploys from a non-admin signer', async () => {
-    window.ethereum = makeRpcProvider();
-
-    const mockFactory = {
-      estimateGas: {
-        createSBTDeterministicConfigured: jest.fn(),
-      },
-      createSBTDeterministicConfigured: jest.fn(),
-    };
-
-    jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract() {
-      return mockFactory;
-    });
-
-    await expect(
-      createSBT(
-        'wagmi',
-        'Error Path Group',
-        'EPG',
-        0,
-        '0x00000000000000000000000000000000000000bb',
-        0,
-        false,
-        0,
-        [],
-        'ipfs://token-uri',
-        ethers.constants.HashZero,
-        GROUP_CFG,
-        'predictable-salt',
-        {
-          useConfiguredDeterministic: true,
-          initializeGroupPasswordHash: true,
-        },
-      ),
-    ).rejects.toThrow('Configured deterministic SBT deployment must be submitted by the SBT admin wallet.');
 
     expect(mockFactory.estimateGas.createSBTDeterministicConfigured).not.toHaveBeenCalled();
     expect(mockFactory.createSBTDeterministicConfigured).not.toHaveBeenCalled();
@@ -890,7 +849,7 @@ describe('error paths', () => {
     jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract() {
       return mockSurveyContract;
     });
-    arweaveClient.uploadDataToArweave.mockResolvedValueOnce(SURVEY_TX_ID).mockResolvedValueOnce(QUESTION_TX_ID);
+    arweaveScripts.uploadDataToArweave.mockResolvedValueOnce(SURVEY_TX_ID).mockResolvedValueOnce(QUESTION_TX_ID);
     const addSurveySpy = jest.spyOn(contractScripts, 'addSurveyWithQuestions');
 
     await expect(
@@ -1045,17 +1004,21 @@ describe('error paths', () => {
       [`0x${'22'.repeat(32)}`],
     ]);
     expect(result.surveyArweaveTxId).toBeUndefined();
-    expect(result.surveyStorageRef).toEqual(expect.objectContaining({
-      backend: 'cloudflare',
-      id: CF_SURVEY_ID,
-      resource: 'surveys',
-    }));
+    expect(result.surveyStorageRef).toEqual(
+      expect.objectContaining({
+        backend: 'cloudflare',
+        id: CF_SURVEY_ID,
+        resource: 'surveys',
+      }),
+    );
     expect(result.uploadedQuestions[0].arweaveTxId).toBe('');
-    expect(result.uploadedQuestions[0].storageRef).toEqual(expect.objectContaining({
-      backend: 'cloudflare',
-      id: CF_QUESTION_ID,
-      resource: 'questions',
-    }));
+    expect(result.uploadedQuestions[0].storageRef).toEqual(
+      expect.objectContaining({
+        backend: 'cloudflare',
+        id: CF_QUESTION_ID,
+        resource: 'questions',
+      }),
+    );
   });
 
   it('routes Cloudflare response payload writes through session storage before submitResponses', async () => {
@@ -1088,12 +1051,14 @@ describe('error paths', () => {
     expect(arweaveScripts.uploadDataToArweave).not.toHaveBeenCalled();
     expect(uploadDataToSessionStorage).toHaveBeenCalledTimes(2);
     expect(uploadDataToSessionStorage.mock.calls.every((call) => call[2].resource === 'responses')).toBe(true);
-    expect(uploadDataToSessionStorage.mock.calls[0][2].context).toEqual(expect.objectContaining({
-      account: TEST_ADDRESS,
-      chainId: 84532,
-      providerLike: expect.any(Object),
-      signer: expect.any(Object),
-    }));
+    expect(uploadDataToSessionStorage.mock.calls[0][2].context).toEqual(
+      expect.objectContaining({
+        account: TEST_ADDRESS,
+        chainId: 84532,
+        providerLike: expect.any(Object),
+        signer: expect.any(Object),
+      }),
+    );
     expect(mockSurveyContract.interface.encodeFunctionData).toHaveBeenCalledWith('submitResponses', [
       [expect.any(String)],
       [`0x${'22'.repeat(32)}`],
@@ -1104,11 +1069,16 @@ describe('error paths', () => {
 
   it('resolves Cloudflare question pointers through session storage before Arweave fallback', async () => {
     arweaveScripts.hexToBase64url.mockReturnValue(CF_QUESTION_ID);
-    readSessionStorageBlob.mockResolvedValue(new Response(JSON.stringify({
-      id: QUESTION_ID,
-      prompt: 'Loaded from Cloudflare storage',
-      questionType: 'freeform',
-    }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    readSessionStorageBlob.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: QUESTION_ID,
+          prompt: 'Loaded from Cloudflare storage',
+          questionType: 'freeform',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
     const mockSurveyContract = {
       getQuestionHash: jest.fn(async () => `0x${'22'.repeat(32)}`),
     };
@@ -1116,25 +1086,26 @@ describe('error paths', () => {
       return mockSurveyContract;
     });
 
-    const result = await contractScripts.getQuestionData(
-      'none',
-      QUESTION_ID,
-      CLOUDFLARE_GROUP_CFG,
-      { skipDecrypt: true },
-    );
+    const result = await contractScripts.getQuestionData('none', QUESTION_ID, CLOUDFLARE_GROUP_CFG, {
+      skipDecrypt: true,
+    });
 
     expect(readSessionStorageBlob).toHaveBeenCalledTimes(1);
-    expect(readSessionStorageBlob.mock.calls[0][0].storageRef).toEqual(expect.objectContaining({
-      backend: 'cloudflare',
-      id: CF_QUESTION_ID,
-      resource: 'questions',
-    }));
+    expect(readSessionStorageBlob.mock.calls[0][0].storageRef).toEqual(
+      expect.objectContaining({
+        backend: 'cloudflare',
+        id: CF_QUESTION_ID,
+        resource: 'questions',
+      }),
+    );
     expect(result.prompt).toBe('Loaded from Cloudflare storage');
-    expect(result.storageRef).toEqual(expect.objectContaining({
-      backend: 'cloudflare',
-      id: CF_QUESTION_ID,
-      resource: 'questions',
-    }));
+    expect(result.storageRef).toEqual(
+      expect.objectContaining({
+        backend: 'cloudflare',
+        id: CF_QUESTION_ID,
+        resource: 'questions',
+      }),
+    );
     expect(result.arweaveTxId).toBeUndefined();
   });
 

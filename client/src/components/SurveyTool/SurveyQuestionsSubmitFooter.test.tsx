@@ -28,13 +28,7 @@ describe('SurveyQuestionsSubmitFooter', () => {
   });
 
   it('renders pending clear changes while preserving its handler', () => {
-    render(
-      <SurveyQuestionsSubmitFooter
-        {...baseProps}
-        pendingEditCount={2}
-        showSubmitAux
-      />
-    );
+    render(<SurveyQuestionsSubmitFooter {...baseProps} displayState={{ showSubmitAux: true }} pendingEditCount={2} />);
 
     const submitButton = screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT);
     expect(submitButton).toHaveClass('submitGlow');
@@ -49,9 +43,7 @@ describe('SurveyQuestionsSubmitFooter', () => {
       <SurveyQuestionsSubmitFooter
         {...baseProps}
         isSubmitting
-        submitDisabled
-        uploadStatusText="Encrypting..."
-      />
+      />,
     );
 
     const submitButton = screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT);
@@ -62,9 +54,7 @@ describe('SurveyQuestionsSubmitFooter', () => {
       <SurveyQuestionsSubmitFooter
         {...baseProps}
         responseUrl="https://example.test/response"
-        showSubmitAux
-        submittedIndicatorActive
-      />
+      />,
     );
 
     expect(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR)).toHaveTextContent('Submitted');
@@ -75,20 +65,56 @@ describe('SurveyQuestionsSubmitFooter', () => {
       <SurveyQuestionsSubmitFooter
         {...baseProps}
         submissionError="This failure message is intentionally long enough to require truncation in the footer"
-      />
+      />,
     );
 
     expect(screen.getByText('This failure message is intentionally long enou...')).toBeInTheDocument();
 
-    rerender(
-      <SurveyQuestionsSubmitFooter
-        {...baseProps}
-        isSingleQuestionView
-        submitButtonText="SUBMIT"
-      />
-    );
+    rerender(<SurveyQuestionsSubmitFooter {...baseProps} isSingleQuestionView submitButtonText="SUBMIT" />);
 
     expect(screen.getByText('SUBMIT')).toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT)).toHaveClass('singleQuestionSubmitButton');
+  });
+
+  it('keeps submit aux inert while uploading pending survey edits', () => {
+    render(
+      <SurveyQuestionsSubmitFooter
+        {...baseProps}
+        displayState={{
+          showSubmitAux: true,
+          uploadStatusText: 'Uploading...',
+        }}
+        isSubmitting
+        pendingEditCount={3}
+      />,
+    );
+
+    expect(screen.getByText('Uploading...')).toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT)).toHaveClass('submitGlow');
+    expect(screen.queryByRole('button', { name: 'Clear pending changes' })).toBeNull();
+    expect(baseProps.onRevertPendingChanges).not.toHaveBeenCalled();
+  });
+
+  it('does not render submitted route affordances in single-question mode', () => {
+    render(
+      <SurveyQuestionsSubmitFooter
+        {...baseProps}
+        displayState={{
+          showSubmitAux: true,
+          submittedIndicatorActive: true,
+        }}
+        isSingleQuestionView
+        pendingEditCount={1}
+        responseUrl="https://example.test/question-response"
+        submitButtonText="SUBMIT"
+      />,
+    );
+
+    const submitButton = screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT);
+    expect(submitButton).toHaveClass('singleQuestionSubmitButton');
+    expect(submitButton).toHaveTextContent('SUBMIT');
+    expect(screen.queryByTestId(E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR)).toBeNull();
+    expect(screen.queryByTitle('View submitted response')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Clear pending changes' })).toBeInTheDocument();
   });
 });

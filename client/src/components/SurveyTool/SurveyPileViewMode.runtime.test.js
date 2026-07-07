@@ -220,15 +220,14 @@ describe('SurveyPileViewMode runtime surface', () => {
 
   it('renders option-bearing poll aliases as pile multichoice inputs', async () => {
     renderPile({
-      questionPool: [{
-        id: 'poll-q1',
-        type: 'poll',
-        prompt: 'Which capability matters most?',
-        choices: [
-          { label: 'Cross-site graph' },
-          { text: 'Session memory' },
-        ],
-      }],
+      questionPool: [
+        {
+          id: 'poll-q1',
+          type: 'poll',
+          prompt: 'Which capability matters most?',
+          choices: [{ label: 'Cross-site graph' }, { text: 'Session memory' }],
+        },
+      ],
       cacheHasLoaded: false,
       isQuestionCacheReady: true,
       isResponsesCacheReady: false,
@@ -549,42 +548,13 @@ describe('SurveyPileViewMode runtime surface', () => {
   });
 
   it('renders the pile clear-pending button only while pending changes are actionable', () => {
-    const shell = new SurveyTool({
-      minifiedMode: 'pile',
-      network: { id: 84532 },
-      networkChainId: 84532,
-      account: '0xabc',
-      questionResponsesNonce: 5,
-      onFilterChange: jest.fn(),
-    });
-    const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
-    const visibleList = [{ id: 'q1', type: 'freeform', prompt: 'Q1' }];
-
-    syncClassSetState(subject);
-    subject.isMaskedPromptText = jest.fn(() => false);
-    subject.getPendingStatsSnapshot = jest.fn(() => ({ total: 2, encrypted: 0 }));
-    subject.handleRevertPendingChanges = jest.fn();
-    subject.state = {
-      ...subject.state,
-      loading: false,
-      pileQuestions: visibleList,
-      allQuestionsForFilter: visibleList,
-      activePileIndex: 0,
-      filterState: {},
-      isFilterActive: false,
-      showCreate: false,
-      filterModalOpen: false,
-      submissionComplete: false,
-      submittedSinceLastEdit: false,
-      isSubmitting: false,
-      autoDecryptEnabled: false,
-      autoDecryptAttempted: {},
-      decryptingByKey: {},
-      isHydratingPriorResponses: false,
-    };
-
-    const tree = subject.render();
+    const handleRevertPendingChanges = jest.fn();
+    const actionableTree = renderPileInteractionSurface(
+      buildSurfaceProps({
+        rail: baseRail({ pendingStats: { total: 2 } }),
+        handleRevertPendingChanges,
+      }),
+    );
     const clearButton = findElement(
       actionableTree,
       (node) => isElementNode(node) && node.props.title === 'Clear changes',
@@ -607,80 +577,22 @@ describe('SurveyPileViewMode runtime surface', () => {
   });
 
   it('hides the pile submit rail when no rail is visible', () => {
-    const shell = new SurveyTool({
-      minifiedMode: 'pile',
-      network: { id: 84532 },
-      networkChainId: 84532,
-      account: '',
-      questionResponsesNonce: 5,
-      onFilterChange: jest.fn(),
-    });
-    const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
-    const visibleList = [{ id: 'q1', type: 'freeform', prompt: 'Q1' }];
-
-    subject.isMaskedPromptText = jest.fn(() => false);
-    subject.getPendingStatsSnapshot = jest.fn(() => ({ total: 0, encrypted: 0 }));
-    subject.state = {
-      ...subject.state,
-      loading: false,
-      pileQuestions: visibleList,
-      allQuestionsForFilter: visibleList,
-      activePileIndex: 0,
-      filterState: {},
-      isFilterActive: false,
-      showCreate: false,
-      filterModalOpen: false,
-      submissionComplete: false,
-      submittedSinceLastEdit: false,
-      isSubmitting: false,
-      autoDecryptEnabled: false,
-      autoDecryptAttempted: {},
-      decryptingByKey: {},
-      isHydratingPriorResponses: false,
-    };
-
-    const tree = subject.render();
+    const tree = renderPileInteractionSurface(
+      buildSurfaceProps({
+        rail: baseRail({ pendingStats: { total: 0 } }),
+      }),
+    );
     const hiddenFooter = findNodeByClassName(tree, 'pileFooterHidden');
 
     expect(hiddenFooter).not.toBeNull();
   });
 
   it('keeps the pile interaction geometry stable when the top rail becomes visible', () => {
-    const shell = new SurveyTool({
-      minifiedMode: 'pile',
-      network: { id: 84532 },
-      networkChainId: 84532,
-      account: '',
-      questionResponsesNonce: 5,
-      onFilterChange: jest.fn(),
-    });
-    const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
-    const visibleList = [{ id: 'q1', type: 'freeform', prompt: 'Q1' }];
-
-    subject.isMaskedPromptText = jest.fn(() => false);
-    subject.getPendingStatsSnapshot = jest.fn(() => ({ total: 0, encrypted: 0 }));
-    subject.state = {
-      ...subject.state,
-      loading: false,
-      pileQuestions: visibleList,
-      allQuestionsForFilter: visibleList,
-      activePileIndex: 0,
-      filterState: {},
-      isFilterActive: false,
-      showCreate: false,
-      filterModalOpen: false,
-      submissionComplete: false,
-      submittedSinceLastEdit: false,
-      isSubmitting: false,
-      autoDecryptEnabled: false,
-      autoDecryptAttempted: {},
-      decryptingByKey: {},
-      isHydratingPriorResponses: false,
-    };
-
-    let tree = subject.render();
+    let tree = renderPileInteractionSurface(
+      buildSurfaceProps({
+        rail: baseRail({ pendingStats: { total: 0 } }),
+      }),
+    );
     let interactionUnit = findNodeByClassName(tree, 'pileInteractionUnit');
     let hiddenFooter = findNodeByClassName(tree, 'pileFooterHidden');
 
@@ -703,40 +615,16 @@ describe('SurveyPileViewMode runtime surface', () => {
 
   it('links the pile success checkmark to the submitted responder user page after submit', () => {
     const responderAddress = '0xABCDEFABCDEFABCDEFABCDEFABCDEFABCDEFABCD';
-    const shell = new SurveyTool({
-      minifiedMode: 'pile',
-      network: { id: 84532 },
-      networkChainId: 84532,
-      account: responderAddress,
-      questionResponsesNonce: 5,
-      onFilterChange: jest.fn(),
-    });
-    const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
-    const visibleList = [{ id: 'q1', type: 'freeform', prompt: 'Q1' }];
-
-    subject.isMaskedPromptText = jest.fn(() => false);
-    subject.getPendingStatsSnapshot = jest.fn(() => ({ total: 0, encrypted: 0 }));
-    subject.state = {
-      ...subject.state,
-      loading: false,
-      pileQuestions: visibleList,
-      allQuestionsForFilter: visibleList,
-      activePileIndex: 0,
-      filterState: {},
-      isFilterActive: false,
-      showCreate: false,
-      filterModalOpen: false,
-      submissionComplete: true,
-      submittedSinceLastEdit: true,
-      isSubmitting: false,
-      autoDecryptEnabled: false,
-      autoDecryptAttempted: {},
-      decryptingByKey: {},
-      isHydratingPriorResponses: false,
-    };
-
-    const tree = subject.render();
+    const tree = renderPileInteractionSurface(
+      buildSurfaceProps({
+        rail: baseRail({
+          pendingStats: { total: 0 },
+          submittedSinceLastEdit: true,
+          account: responderAddress,
+          isAddress: (value) => value === responderAddress,
+        }),
+      }),
+    );
     const submitButton = findElement(
       tree,
       (node) => isElementNode(node) && node.props['data-testid'] === E2E_TESTIDS.SURVEY_SUBMIT,
@@ -757,40 +645,15 @@ describe('SurveyPileViewMode runtime surface', () => {
   });
 
   it('keeps the pile success checkmark non-clickable when no responder address is available', () => {
-    const shell = new SurveyTool({
-      minifiedMode: 'pile',
-      network: { id: 84532 },
-      networkChainId: 84532,
-      account: '',
-      questionResponsesNonce: 5,
-      onFilterChange: jest.fn(),
-    });
-    const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
-    const visibleList = [{ id: 'q1', type: 'freeform', prompt: 'Q1' }];
-
-    subject.isMaskedPromptText = jest.fn(() => false);
-    subject.getPendingStatsSnapshot = jest.fn(() => ({ total: 0, encrypted: 0 }));
-    subject.state = {
-      ...subject.state,
-      loading: false,
-      pileQuestions: visibleList,
-      allQuestionsForFilter: visibleList,
-      activePileIndex: 0,
-      filterState: {},
-      isFilterActive: false,
-      showCreate: false,
-      filterModalOpen: false,
-      submissionComplete: true,
-      submittedSinceLastEdit: true,
-      isSubmitting: false,
-      autoDecryptEnabled: false,
-      autoDecryptAttempted: {},
-      decryptingByKey: {},
-      isHydratingPriorResponses: false,
-    };
-
-    const tree = subject.render();
+    const tree = renderPileInteractionSurface(
+      buildSurfaceProps({
+        rail: baseRail({
+          pendingStats: { total: 0 },
+          submittedSinceLastEdit: true,
+          account: '',
+        }),
+      }),
+    );
     const successBadge = findNodeByClassName(tree, 'pileSubmitSuccessBadge');
     const successIcon = findNodeByClassName(tree, 'pileSubmitSuccessIcon');
 
@@ -804,43 +667,12 @@ describe('SurveyPileViewMode runtime surface', () => {
   });
 
   it('renders the pile hologram as a full-card takeover and hides pile controls while active', () => {
-    const shell = new SurveyTool({
-      minifiedMode: 'pile',
-      network: { id: 84532 },
-      networkChainId: 84532,
-      account: '',
-      questionResponsesNonce: 5,
-      onFilterChange: jest.fn(),
-      onViewAllClick: jest.fn(),
-    });
-    const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
-    const visibleList = [{ id: 'q1', type: 'freeform', prompt: 'Q1' }];
-
-    subject.renderActiveQuestion = jest.fn(() => null);
-    subject.isMaskedPromptText = jest.fn(() => false);
-    subject.setState = (updater) => {
-      const patch = typeof updater === 'function' ? updater(subject.state, subject.props) : updater;
-      subject.state = { ...subject.state, ...(patch || {}) };
-    };
-    subject.state = {
-      ...subject.state,
-      loading: false,
-      pileQuestions: visibleList,
-      allQuestionsForFilter: visibleList,
-      activePileIndex: 0,
-      filterState: {},
-      isFilterActive: false,
-      showCreate: false,
-      filterModalOpen: false,
-      submissionComplete: false,
-      autoDecryptEnabled: false,
-      autoDecryptAttempted: {},
-      decryptingByKey: {},
-      showHologramAssistant: false,
-    };
-
-    const closedTree = subject.render();
+    const closedTree = renderPileInteractionSurface(
+      buildSurfaceProps({
+        renderActiveQuestion: jest.fn(() => null),
+        showHologramAssistant: false,
+      }),
+    );
     const closedToggleButton = findElement(
       closedTree,
       (node) => isElementNode(node) && node.props['data-testid'] === E2E_TESTIDS.SURVEY_PILE_HOLOGRAM_TOGGLE,
@@ -922,38 +754,11 @@ describe('SurveyPileViewMode runtime surface', () => {
   });
 
   it('keeps the pile action container neutral while only the filter button gets the active class', () => {
-    const shell = new SurveyTool({
-      minifiedMode: 'pile',
-      network: { id: 84532 },
-      networkChainId: 84532,
-      account: '',
-      questionResponsesNonce: 5,
-      onFilterChange: jest.fn(),
-      onViewAllClick: jest.fn(),
-    });
-    const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
-    const visibleList = [{ id: 'q1', type: 'freeform', prompt: 'Q1' }];
-
-    subject.renderActiveQuestion = jest.fn(() => null);
-    subject.isMaskedPromptText = jest.fn(() => false);
-    subject.state = {
-      ...subject.state,
-      loading: false,
-      pileQuestions: visibleList,
-      allQuestionsForFilter: visibleList,
-      activePileIndex: 0,
-      filterState: {},
-      isFilterActive: true,
-      showCreate: false,
-      filterModalOpen: false,
-      submissionComplete: false,
-      autoDecryptEnabled: false,
-      autoDecryptAttempted: {},
-      decryptingByKey: {},
-    };
-
-    const tree = subject.render();
+    const tree = renderPileInteractionSurface(
+      buildSurfaceProps({
+        isFilterActive: true,
+      }),
+    );
     const actionsNode = findNodeByClassName(tree, 'pileActions');
     const filterButton = findElement(
       tree,
@@ -989,39 +794,11 @@ describe('SurveyPileViewMode runtime surface', () => {
   });
 
   it('renders the pile mini spinner as a sibling of the controls stack during background refresh', () => {
-    const shell = new SurveyTool({
-      minifiedMode: 'pile',
-      network: { id: 84532 },
-      networkChainId: 84532,
-      account: '',
-      questionResponsesNonce: 5,
-      onFilterChange: jest.fn(),
-      onViewAllClick: jest.fn(),
-    });
-    const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
-    const visibleList = [{ id: 'q1', type: 'freeform', prompt: 'Q1' }];
-
-    subject.renderActiveQuestion = jest.fn(() => null);
-    subject.isMaskedPromptText = jest.fn(() => false);
-    subject.state = {
-      ...subject.state,
-      loading: true,
-      pileQuestions: visibleList,
-      allQuestionsForFilter: visibleList,
-      activePileIndex: 0,
-      filterState: {},
-      isFilterActive: false,
-      showCreate: false,
-      filterModalOpen: false,
-      submissionComplete: false,
-      autoDecryptEnabled: false,
-      autoDecryptAttempted: {},
-      decryptingByKey: {},
-      isHydratingPriorResponses: false,
-    };
-
-    const tree = subject.render();
+    const tree = renderPileInteractionSurface(
+      buildSurfaceProps({
+        showMiniBackgroundSpinner: true,
+      }),
+    );
     const interactionNode = findNodeByClassName(tree, 'pileInteractionUnit');
     const controlsNode = findNodeByClassName(tree, 'pileControls');
     const actionsNode = findNodeByClassName(controlsNode?.props?.children, 'pileActions');

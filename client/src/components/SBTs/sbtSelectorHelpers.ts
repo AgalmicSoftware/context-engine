@@ -1,5 +1,5 @@
 import { ethers } from 'ethers';
-import { normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
+import { normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
 import { getSbtMaskedFieldValue, hasSbtDisplayName, isSbtFieldLocked } from '../../utilities/sbt/sbtDisplayNames.js';
 import {
   canRetryNameLookup as canRetryNameLookupImpl,

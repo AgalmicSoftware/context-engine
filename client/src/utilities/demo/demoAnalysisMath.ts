@@ -110,9 +110,7 @@ type IndicatorHeatmapData = {
   pivotData: Array<Array<number | null>>;
 };
 
-const isFiniteNumber = (value: unknown): value is number => (
-  typeof value === 'number' && Number.isFinite(value)
-);
+const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 
 export const parseSegmentKey = (segmentKey: unknown = ''): SegmentDescriptor => {
   const normalized = String(segmentKey || '').trim();
@@ -178,7 +176,9 @@ export const calculateDivisiveness = (
   return Math.max(0, Math.min(divergence / 0.5, 1));
 };
 
-export const getMinMaxAgreement = (groupRates: AgreementRate[] = []): {
+export const getMinMaxAgreement = (
+  groupRates: AgreementRate[] = [],
+): {
   min: ResolvedAgreementRate;
   max: ResolvedAgreementRate;
 } => {
@@ -238,9 +238,8 @@ export const beeswarmByExtremity = (
       let candidateY = baseY;
       let layer = 0;
 
-      const collides = (x: number, y: number) => placed.some((existing) => (
-        Math.hypot(Number(existing.x || 0) - x, Number(existing.y || 0) - y) < radius * 2
-      ));
+      const collides = (x: number, y: number) =>
+        placed.some((existing) => Math.hypot(Number(existing.x || 0) - x, Number(existing.y || 0) - y) < radius * 2);
 
       while (collides(point.x, candidateY)) {
         layer += 1;

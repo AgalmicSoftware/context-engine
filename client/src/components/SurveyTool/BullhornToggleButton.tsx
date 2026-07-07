@@ -11,6 +11,36 @@ type BullhornToggleButtonProps = {
   active?: boolean;
 };
 
+export const buildBullhornToggleButtonClassName = ({
+  active = false,
+  activeClassName = '',
+  baseClassName = '',
+  bullhornClassName = '',
+  commentClassName = '',
+}: {
+  active?: unknown;
+  activeClassName?: unknown;
+  baseClassName?: unknown;
+  bullhornClassName?: unknown;
+  commentClassName?: unknown;
+} = {}): string =>
+  [
+    String(baseClassName || ''),
+    String(commentClassName || ''),
+    String(bullhornClassName || ''),
+    active ? String(activeClassName || '') : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+export const resolveBullhornToggleIconClassName = ({
+  active = false,
+  iconGlowClassName = '',
+}: {
+  active?: unknown;
+  iconGlowClassName?: unknown;
+} = {}): string | undefined => (active ? String(iconGlowClassName || '') || undefined : undefined);
+
 const BullhornToggleButton = ({
   onClick,
   disabled = false,

@@ -95,10 +95,16 @@ describe('CreateSBTGroup authoring display helpers', () => {
 
     expect(jsx).toMatch(/className=\{styles\.primaryCreateButton\}/);
     expect(jsx).toMatch(/className=\{styles\.primaryCreateButtonContent\}/);
-    expect(scss).toMatch(/\.mintingSteps\s*{[\s\S]*?\.primaryCreateButton\s*{[\s\S]*?@include finalSubmitCta\.final-submit-cta-shell\(/);
-    expect(scss).toMatch(/\.primaryCreateButtonContent\s*{[\s\S]*?@include finalSubmitCta\.final-submit-cta-content\(\$gap:\s*10px\);[\s\S]*?text-transform:\s*uppercase;/);
+    expect(scss).toMatch(
+      /\.mintingSteps\s*{[\s\S]*?\.primaryCreateButton\s*{[\s\S]*?@include finalSubmitCta\.final-submit-cta-shell\(/,
+    );
+    expect(scss).toMatch(
+      /\.primaryCreateButtonContent\s*{[\s\S]*?@include finalSubmitCta\.final-submit-cta-content\(\$gap:\s*10px\);[\s\S]*?text-transform:\s*uppercase;/,
+    );
     expect(mintingBlock).not.toMatch(/\n\s*button\s*{/);
     expect(scss).not.toMatch(/\.startFreshBtn\s*{[\s\S]*?@include finalSubmitCta\.final-submit-cta-shell\(/);
-    expect(scss).toMatch(/\.startFreshBtn\s*{[\s\S]*?background:\s*transparent;[\s\S]*?border:\s*1px solid rgba\(255,\s*255,\s*255,\s*0\.3\);[\s\S]*?box-shadow:\s*none;/);
+    expect(scss).toMatch(
+      /\.startFreshBtn\s*{[\s\S]*?background:\s*transparent;[\s\S]*?border:\s*1px solid rgba\(255,\s*255,\s*255,\s*0\.3\);[\s\S]*?box-shadow:\s*none;/,
+    );
   });
 });

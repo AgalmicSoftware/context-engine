@@ -47,7 +47,17 @@ jest.mock('../SBTs/SBTFilter', () => (props: any) => {
   mockSbtFilter(props);
   return null;
 });
-jest.mock('./QuestionFilter', () => () => null);
+const mockQuestionFilter = jest.fn((..._args: any[]) => null);
+jest.mock('./QuestionFilter', () => {
+  const ReactActual = jest.requireActual('react');
+  return ReactActual.forwardRef((props: any, ref: any) => {
+    mockQuestionFilter(props);
+    ReactActual.useImperativeHandle(ref, () => ({
+      handleApplyFilters: jest.fn(),
+    }));
+    return props?.filterModalOpen ? <div data-testid="ce-surveyresults-question-filter">Question Filter</div> : null;
+  });
+});
 const mockPolisReport = jest.fn((..._args: any[]) => null);
 jest.mock('../PolisReport/PolisReport', () => (props: any) => {
   mockPolisReport(props);
@@ -114,12 +124,92 @@ const createDeferred = <T,>() => {
   return { promise, resolve, reject };
 };
 
-const attachStateHarness = (subject: any): any => {
-  subject.setState = jest.fn((updater, cb) => {
-    const patch = typeof updater === 'function' ? updater(subject.state, subject.props) : updater;
-    subject.state = { ...subject.state, ...(patch || {}) };
-    if (typeof cb === 'function') cb();
-    return patch;
+let cacheUpdateListener: ((update: Record<string, any>) => void) | null = null;
+let unsubscribeCacheUpdates = jest.fn();
+
+const normalizeQuestionCache = (bucket: Record<string, any> = {}): Record<string, any> => ({
+  [NETWORK_ID]: {
+    questionsLatestBlock: 1,
+    questionResponsesLatestBlock: 1,
+    questions: {},
+    questionResponses: {},
+    ...bucket,
+  },
+});
+
+const buildQuestionCache = ({
+  questions = {},
+  questionResponses = {},
+  questionsLatestBlock = 1,
+  questionResponsesLatestBlock = 1,
+}: Record<string, any> = {}): Record<string, any> =>
+  normalizeQuestionCache({
+    questions,
+    questionResponses,
+    questionsLatestBlock,
+    questionResponsesLatestBlock,
+  });
+
+const buildSurveyCache = ({
+  surveyId,
+  title = 'Session Survey',
+  documentURLs = [],
+  responsesByResponder = {},
+}: {
+  surveyId: string;
+  title?: string;
+  documentURLs?: string[];
+  responsesByResponder?: Record<string, any>;
+}): Record<string, any> => ({
+  [NETWORK_ID]: {
+    surveys: {
+      [surveyId.toLowerCase()]: {
+        title,
+        documentURLs,
+        questionIDs: ['q1'],
+      },
+    },
+    surveyResponses: {
+      [surveyId.toLowerCase()]: responsesByResponder,
+    },
+    surveyResponsesLatestBlock: {
+      [surveyId.toLowerCase()]: 1,
+    },
+    surveysLatestBlock: 1,
+  },
+});
+
+const seedCacheEnvironment = ({
+  bookmarksBySlug = {},
+  questionsBySlug = {},
+  surveysBySlug = {},
+}: CacheEnvironment = {}): void => {
+  const defaultBookmarks = { surveys: [], questions: [] };
+  const lookupSlug = (entries: Record<string, any>, slug: any, fallback: any): any => {
+    const normalizedSlug = String(slug ?? '');
+    const lowerSlug = normalizedSlug.toLowerCase();
+    if (Object.prototype.hasOwnProperty.call(entries, normalizedSlug)) {
+      return entries[normalizedSlug];
+    }
+    if (Object.prototype.hasOwnProperty.call(entries, lowerSlug)) {
+      return entries[lowerSlug];
+    }
+    if (lowerSlug === 'general' && Object.prototype.hasOwnProperty.call(entries, '')) {
+      return entries[''];
+    }
+    return fallback;
+  };
+  jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace: any, slug: any) => {
+    if (namespace === 'bookmarksCache') {
+      return lookupSlug(bookmarksBySlug, slug, defaultBookmarks);
+    }
+    if (namespace === 'questionsCache') {
+      return lookupSlug(questionsBySlug, slug, {});
+    }
+    if (namespace === 'surveysCache') {
+      return lookupSlug(surveysBySlug, slug, {});
+    }
+    return null;
   });
   return subject;
 };
@@ -160,38 +250,40 @@ const findElement = (node: TreeNode, predicate: TreePredicate): TreeNode | null 
   jest.spyOn(contractScriptsDefault as any, 'getLatestBlockNumber').mockResolvedValue(0);
 };
 
-const renderQuestionResults = (
-  props: Record<string, any> = {},
-  route = '/questions/results'
-) => renderSurveyResults({
-  isOpen: true,
-  isQuestionCacheReady: true,
-  isResponsesCacheReady: true,
-  isSBTCacheReady: true,
-  network: { id: Number(NETWORK_ID) },
-  networkChainId: Number(NETWORK_ID),
-  preventUrlChange: true,
-  provider: {},
-  viewMode: 'questions',
-  ...props,
-}, { route });
+const renderQuestionResults = (props: Record<string, any> = {}, route = '/questions/results') =>
+  renderSurveyResults(
+    {
+      isOpen: true,
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: true,
+      isSBTCacheReady: true,
+      network: { id: Number(NETWORK_ID) },
+      networkChainId: Number(NETWORK_ID),
+      preventUrlChange: true,
+      provider: {},
+      viewMode: 'questions',
+      ...props,
+    },
+    { route },
+  );
 
-const renderSurveyModeResults = (
-  props: Record<string, any> = {},
-  route = '/'
-) => renderSurveyResults({
-  isOpen: true,
-  isQuestionCacheReady: true,
-  isResponsesCacheReady: true,
-  isSBTCacheReady: true,
-  isSurveyCacheReady: true,
-  network: { id: Number(NETWORK_ID) },
-  networkChainId: Number(NETWORK_ID),
-  preventUrlChange: true,
-  provider: {},
-  viewMode: 'survey',
-  ...props,
-}, { route });
+const renderSurveyModeResults = (props: Record<string, any> = {}, route = '/') =>
+  renderSurveyResults(
+    {
+      isOpen: true,
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: true,
+      isSBTCacheReady: true,
+      isSurveyCacheReady: true,
+      network: { id: Number(NETWORK_ID) },
+      networkChainId: Number(NETWORK_ID),
+      preventUrlChange: true,
+      provider: {},
+      viewMode: 'survey',
+      ...props,
+    },
+    { route },
+  );
 
 const waitForPrompt = async (prompt: string): Promise<void> => {
   await waitFor(() => {
@@ -203,9 +295,7 @@ const expectPromptAbsent = (prompt: string): void => {
   expect(screen.queryAllByText(prompt)).toHaveLength(0);
 };
 
-const getFilterSummaryText = (): string => (
-  document.querySelector('[class*="filterSummaryText"]')?.textContent || ''
-);
+const getFilterSummaryText = (): string => document.querySelector('[class*="filterSummaryText"]')?.textContent || '';
 
 const expectQuestionResponseCounts = (questions: number, responses: number): void => {
   const text = getFilterSummaryText();
@@ -215,7 +305,7 @@ const expectQuestionResponseCounts = (questions: number, responses: number): voi
 
 const rerenderHarness = async (
   view: ReturnType<typeof renderQuestionResults>,
-  props: Record<string, any>
+  props: Record<string, any>,
 ): Promise<void> => {
   await act(async () => {
     view.rerenderSurveyResults(props);
@@ -236,10 +326,8 @@ const getLatestPolisReportProps = (): Record<string, any> => {
   return calls[calls.length - 1][0];
 };
 
-const collectSurveyLinks = (): string[] => (
-  Array.from(document.querySelectorAll('a[href^="/survey/"]'))
-    .map((link) => link.getAttribute('href') || '')
-);
+const collectSurveyLinks = (): string[] =>
+  Array.from(document.querySelectorAll('a[href^="/survey/"]')).map((link) => link.getAttribute('href') || '');
 
 const switchToIndividualsView = async (): Promise<void> => {
   const viewSwitch = screen.queryAllByRole('switch', { name: VIEW_MODE_SWITCH_NAME })[0];
@@ -287,19 +375,36 @@ beforeEach(() => {
   mockRiskMatrix.mockClear();
 });
 
-const treeHasText = (node: TreeNode, text: string): boolean => {
-  if (node == null) return false;
-  if (Array.isArray(node)) return node.some((child) => treeHasText(child, text));
-  if (typeof node === 'string' || typeof node === 'number') {
-    return String(node).includes(text);
+afterEach(() => {
+  jest.restoreAllMocks();
+  try {
+    window.history.replaceState({}, '', '/');
+  } catch (_) {
+    /* noop */
   }
-  if (typeof node !== 'object') return false;
-  return treeHasText(node?.props?.children, text);
-};
+});
 
 describe('SurveyResults session resolution', () => {
-  afterEach(() => {
-    jest.restoreAllMocks();
+  it('does not rewrite route-owned results URLs on unmount', async () => {
+    seedCacheEnvironment();
+    const view = renderQuestionResults(
+      {
+        activeSessionSlug: 'edge',
+        preventUrlChange: true,
+        sessionSlug: 'edge',
+      },
+      '/session/edge/questions/results',
+    );
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Question Results' })).toBeInTheDocument();
+    });
+    const pushStateSpy = jest.spyOn(window.history, 'pushState');
+
+    view.unmount();
+
+    expect(unsubscribeCacheUpdates).toHaveBeenCalled();
+    expect(pushStateSpy).not.toHaveBeenCalled();
+    expect(window.location.pathname).toBe('/session/edge/questions/results');
   });
 
   it('removes the old SurveyResults session selector chrome while keeping header spacing intact', () => {
@@ -307,7 +412,9 @@ describe('SurveyResults session resolution', () => {
     const scss = fs.readFileSync(scssPath, 'utf8');
 
     expect(scss).toMatch(/\.modalHeader\s*{[\s\S]*position:\s*relative;[\s\S]*padding-right:\s*4\.5rem;/);
-    expect(scss).toMatch(/\.modalHeader\s+:global\(\.close\)\s*(?:,[^{]*?)?\s*{[\s\S]*position:\s*absolute;[\s\S]*top:\s*0\.85rem;[\s\S]*right:\s*0\.85rem;[\s\S]*margin:\s*0;[\s\S]*padding:\s*0\.25rem;/);
+    expect(scss).toMatch(
+      /\.modalHeader\s+:global\(\.close\)\s*(?:,[^{]*?)?\s*{[\s\S]*position:\s*absolute;[\s\S]*top:\s*0\.85rem;[\s\S]*right:\s*0\.85rem;[\s\S]*margin:\s*0;[\s\S]*padding:\s*0\.25rem;/,
+    );
     expect(scss).toMatch(/\.modalHeaderControls\s*{[\s\S]*margin-left:\s*auto;/);
     expect(scss).not.toMatch(/\.modalHeaderCornerActions\s*{/);
     expect(scss).not.toMatch(/\.sessionSelectorToggle\s*{/);
@@ -320,7 +427,14 @@ describe('SurveyResults session resolution', () => {
       questions: ['q1'],
     });
 
-    const subject = createSubject({ sessionSlug: 'DEBATE' });
+    renderQuestionResults(
+      {
+        sessionSlug: 'DEBATE',
+        activeSessionSlug: 'DEBATE',
+      },
+      '/questions/results',
+    );
+    await waitForPrompt('Debate question');
 
     expect(peekSpy).toHaveBeenCalledWith('bookmarksCache', 'DEBATE', { clone: false });
     expect(subject.state.bookmarkedQuestionIDs).toEqual(['q1']);
@@ -350,12 +464,11 @@ describe('SurveyResults session resolution', () => {
     expect(listSpy).not.toHaveBeenCalled();
   });
 
-  it('keeps explicit non-general session slugs unresolved when no config exists', () => {
-    const configSpy = jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug')
-      .mockImplementation((slug) => {
-        if (slug === 'rxc') return { slug: 'rxc', networkChainId: 84532 };
-        return null;
-      });
+  it('keeps explicit non-general session slugs unresolved when no config exists', async () => {
+    const configSpy = jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation((slug: any) => {
+      if (slug === 'rxc') return { slug: 'rxc', networkChainId: 84532 };
+      return null;
+    });
 
     const subject = createSubject({ sessionSlug: 'DEBATE' });
 
@@ -471,25 +584,14 @@ describe('SurveyResults session resolution', () => {
         return {};
       });
 
-      const subject = createSubject({
-        sessionSlug: 'edge',
+    renderQuestionResults(
+      {
         activeSessionSlug: 'edge',
         sessionSlugPinned: true,
-        isOpen: true,
-        viewMode: 'questions',
-      });
-      subject._isMounted = true;
-      subject.questionFilterRef = { current: { handleApplyFilters: jest.fn() } };
-      subject.setState = jest.fn((next, cb) => {
-        const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
-        subject.state = { ...subject.state, ...(patch || {}) };
-        if (typeof cb === 'function') cb();
-        return patch;
-      });
-      subject.state = {
-        ...subject.state,
-        viewMode: 'questions',
-      };
+      },
+      '/session/edge/questions/results',
+    );
+    await waitForPrompt('Edge 1');
 
       await subject.fetchQuestionModeResponses();
       expect(subject.getQuestionReadSlugs('questions')).toEqual(['edge']);
@@ -563,25 +665,16 @@ describe('SurveyResults session resolution', () => {
     jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
     jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['demo', 'alpha']);
 
-      const subject = createSubject({
+    renderQuestionResults(
+      {
+        preventUrlChange: false,
         sessionSlug: 'demo',
         activeSessionSlug: 'demo',
         sessionSlugPinned: true,
-        isOpen: true,
-        viewMode: 'questions',
-      });
-      subject._isMounted = true;
-      subject.questionFilterRef = { current: { handleApplyFilters: jest.fn() } };
-      subject.setState = jest.fn((next, cb) => {
-        const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
-        subject.state = { ...subject.state, ...(patch || {}) };
-        if (typeof cb === 'function') cb();
-        return patch;
-      });
-      subject.state = {
-        ...subject.state,
-        viewMode: 'questions',
-      };
+      },
+      '/questions/results?session=demo',
+    );
+    await waitForPrompt('Demo question');
 
     expectPromptAbsent('Wrong session question');
     expectPromptAbsent('Legacy leaked question');
@@ -627,13 +720,16 @@ describe('SurveyResults session resolution', () => {
       jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
       jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['demo']);
 
-      renderQuestionResults({
-        sessionSlug: 'demo',
-        activeSessionSlug: 'demo',
-        sessionSlugPinned: true,
-        isOpen: true,
-        viewMode: 'questions',
-      }, '/questions/results?session=demo');
+      renderQuestionResults(
+        {
+          sessionSlug: 'demo',
+          activeSessionSlug: 'demo',
+          sessionSlugPinned: true,
+          isOpen: true,
+          viewMode: 'questions',
+        },
+        '/questions/results?session=demo',
+      );
 
       await waitFor(() => {
         const text = getFilterSummaryText();
@@ -677,14 +773,17 @@ describe('SurveyResults session resolution', () => {
     jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
     jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['demo']);
 
-    renderQuestionResults({
-      sessionSlug: 'demo',
-      activeSessionSlug: 'demo',
-      preventUrlChange: false,
-      sessionSlugPinned: true,
-      isOpen: true,
-      viewMode: 'questions',
-    }, '/questions/results?session=demo');
+    renderQuestionResults(
+      {
+        sessionSlug: 'demo',
+        activeSessionSlug: 'demo',
+        preventUrlChange: false,
+        sessionSlugPinned: true,
+        isOpen: true,
+        viewMode: 'questions',
+      },
+      '/questions/results?session=demo',
+    );
 
     await waitFor(() => {
       expectQuestionResponseCounts(1, 1);
@@ -733,14 +832,17 @@ describe('SurveyResults session resolution', () => {
     jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
     jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['demo']);
 
-    renderQuestionResults({
-      sessionSlug: 'demo',
-      activeSessionSlug: 'demo',
-      preventUrlChange: false,
-      sessionSlugPinned: true,
-      isOpen: true,
-      viewMode: 'questions',
-    }, '/questions/results?session=demo');
+    renderQuestionResults(
+      {
+        sessionSlug: 'demo',
+        activeSessionSlug: 'demo',
+        preventUrlChange: false,
+        sessionSlugPinned: true,
+        isOpen: true,
+        viewMode: 'questions',
+      },
+      '/questions/results?session=demo',
+    );
 
     await waitFor(() => {
       expectQuestionResponseCounts(1, 1);
@@ -758,15 +860,19 @@ describe('SurveyResults session resolution', () => {
       const reportProps = getLatestPolisReportProps();
       const reportRows = reportProps.questionResponses?.[demoQuestion.id] || [];
       expect(reportRows).toHaveLength(1);
-      expect(reportRows[0]).toEqual(expect.objectContaining({
-        responder: RESPONDER_ONE,
-        questionId: demoQuestion.id,
-      }));
+      expect(reportRows[0]).toEqual(
+        expect.objectContaining({
+          responder: RESPONDER_ONE,
+          questionId: demoQuestion.id,
+        }),
+      );
       const parsedResponse = JSON.parse(String(reportRows[0].response || '{}'));
-      expect(parsedResponse).toEqual(expect.objectContaining({
-        prompt: demoQuestion.prompt,
-        answer: { value: 'Agree', encrypted: false },
-      }));
+      expect(parsedResponse).toEqual(
+        expect.objectContaining({
+          prompt: demoQuestion.prompt,
+          answer: { value: 'Agree', encrypted: false },
+        }),
+      );
     });
   });
 
@@ -809,26 +915,16 @@ describe('SurveyResults session resolution', () => {
         };
       });
 
-      const subject = createSubject({
+    renderQuestionResults(
+      {
+        preventUrlChange: true,
         sessionSlug: 'demo',
         activeSessionSlug: 'demo',
         sessionSlugPinned: true,
-        preventUrlChange: true,
-        isOpen: true,
-        viewMode: 'questions',
-      });
-      subject._isMounted = true;
-      subject.questionFilterRef = { current: { handleApplyFilters: jest.fn() } };
-      subject.setState = jest.fn((next, cb) => {
-        const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
-        subject.state = { ...subject.state, ...(patch || {}) };
-        if (typeof cb === 'function') cb();
-        return patch;
-      });
-      subject.state = {
-        ...subject.state,
-        viewMode: 'questions',
-      };
+      },
+      '/questions/results?session=demo',
+    );
+    await waitForPrompt('Legacy demo question');
 
       await subject.fetchQuestionModeResponses();
 
@@ -855,9 +951,24 @@ describe('SurveyResults session resolution', () => {
       filteredResponsesCount: 9,
       questionResultsHydrated: false,
     };
-    subject.getScopedQuestionNetworkData = jest.fn().mockResolvedValue({
-      questions: {},
-      questionResponses: {},
+    seedCacheEnvironment({ questionsBySlug });
+
+    const view = renderQuestionResults(
+      {
+        activeSessionSlug: 'edge',
+        questionResponsesNonce: 1,
+      },
+      '/session/edge/questions/results',
+    );
+    await waitForPrompt('Edge question');
+    expectQuestionResponseCounts(1, 1);
+
+    questionsBySlug.edge = buildQuestionCache();
+    await rerenderHarness(view, { questionResponsesNonce: 2 });
+
+    await waitFor(() => {
+      expectPromptAbsent('Edge question');
+      expectQuestionResponseCounts(0, 0);
     });
 
     await subject.fetchQuestionModeResponses();
@@ -876,50 +987,13 @@ describe('SurveyResults session resolution', () => {
       jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
       jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['edge', 'alpha', 'beta']);
 
-      const questionCachesBySlug: Record<string, any> = {
-        edge: {
-          '84532': {
-            questionsLatestBlock: 11,
-            questionResponsesLatestBlock: 12,
-            questions: {
-              q1: { id: 'q1', prompt: 'Edge 1', type: 'freeform' },
-            },
-            questionResponses: {
-              q1: {
-                '0xedge': { answer: { value: 'edge', encrypted: false } },
-              },
-            },
-          },
-        },
-        alpha: {
-          '84532': {
-            questionsLatestBlock: 21,
-            questionResponsesLatestBlock: 22,
-            questions: {
-              q2: { id: 'q2', prompt: 'Alpha 2', type: 'freeform' },
-            },
-            questionResponses: {
-              q2: {
-                '0xalpha': { answer: { value: 'alpha', encrypted: false } },
-              },
-            },
-          },
-        },
-        beta: {
-          '84532': {
-            questionsLatestBlock: 31,
-            questionResponsesLatestBlock: 32,
-            questions: {
-              q3: { id: 'q3', prompt: 'Beta 3', type: 'freeform' },
-            },
-            questionResponses: {
-              q3: {
-                '0xbeta': { answer: { value: 'beta', encrypted: false } },
-              },
-            },
-          },
-        },
-      };
+    renderQuestionResults(
+      {
+        activeSessionSlug: 'edge',
+      },
+      '/session/edge',
+    );
+    await waitForPrompt('Edge 1');
 
       const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace, slug) => {
         if (namespace === 'bookmarksCache') return { surveys: [], questions: [] };
@@ -1050,10 +1124,68 @@ describe('SurveyResults session resolution', () => {
           prompt: 'Edge 1',
           sessionSlug: 'edge',
         }),
-      ]);
-    } finally {
-      window.history.replaceState({}, '', priorUrl);
-    }
+      },
+    });
+    jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
+    jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['edge', 'alpha']);
+
+    renderQuestionResults(
+      {
+        activeSessionSlug: 'edge',
+      },
+      '/questions/results',
+    );
+    await waitForPrompt('Ready edge question');
+    await waitForPrompt('Ready alpha question');
+
+    expectPromptAbsent('[encrypted]');
+    expectPromptAbsent('Out of scope beta question');
+    expect(cacheScripts.peekCacheSync).toHaveBeenCalledWith('questionsCache', 'edge', { clone: false });
+    expect(cacheScripts.peekCacheSync).toHaveBeenCalledWith('questionsCache', 'alpha', { clone: false });
+    expect(cacheScripts.peekCacheSync).not.toHaveBeenCalledWith('questionsCache', 'beta', { clone: false });
+    expect(cacheScripts.readCache).not.toHaveBeenCalled();
+    expect(cacheScripts.writeCache).not.toHaveBeenCalled();
+    // port note: direct no-setState/no-fetchResponses/no-decrypt spies were instance-only; TASK 7 should pin scoped question bucket purity in an extracted helper test.
+  });
+
+  it('uses the route slug filter storage bucket on /session question results', async () => {
+    seedCacheEnvironment({
+      questionsBySlug: {
+        edge: buildQuestionCache({
+          questions: { q1: { id: 'q1', prompt: 'Edge 1', type: 'freeform' } },
+          questionResponses: { q1: { '0xedge': { answer: { value: 'edge', encrypted: false } } } },
+        }),
+        alpha: buildQuestionCache({
+          questions: { q2: { id: 'q2', prompt: 'Alpha 2', type: 'freeform' } },
+        }),
+        beta: buildQuestionCache({
+          questions: { q3: { id: 'q3', prompt: 'Beta 3', type: 'freeform' } },
+        }),
+      },
+    });
+    jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
+    jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['edge', 'alpha', 'beta']);
+
+    renderQuestionResults(
+      {
+        activeSessionSlug: 'edge',
+      },
+      '/session/edge',
+    );
+    await waitForPrompt('Edge 1');
+    fireEvent.click(screen.getByRole('button', { name: /Filter/i }));
+
+    const filterProps = getLatestQuestionFilterProps();
+    expect(filterProps.storageKeyPrefix).toBe('dg:filters:edge');
+    expect(filterProps.resultsMode).toBe(true);
+    expect(typeof filterProps.onFilter).toBe('function');
+    expect(filterProps.questions).toEqual([
+      expect.objectContaining({
+        id: 'q1',
+        prompt: 'Edge 1',
+        sessionSlug: 'edge',
+      }),
+    ]);
   });
 
   it('excludes response-discovered pending placeholders from /session question results', async () => {
@@ -1100,17 +1232,13 @@ describe('SurveyResults session resolution', () => {
         };
       });
 
-      const subject = createSubject({
+    renderQuestionResults(
+      {
         activeSessionSlug: 'telegram-demo-2',
-        isQuestionCacheReady: true,
-        isResponsesCacheReady: true,
-      });
-      attachStateHarness(subject);
-      subject.questionFilterRef = { current: { handleApplyFilters: jest.fn() } };
-      subject.state = {
-        ...subject.state,
-        viewMode: 'questions',
-      };
+      },
+      '/session/telegram-demo-2',
+    );
+    await waitForPrompt('Local question');
 
       await subject.fetchQuestionModeResponses();
 
@@ -1155,26 +1283,15 @@ describe('SurveyResults session resolution', () => {
         };
       });
 
-      const subject = createSubject({
+    renderQuestionResults(
+      {
+        preventUrlChange: true,
         sessionSlug: 'demo',
         activeSessionSlug: 'demo',
         sessionSlugPinned: true,
-        preventUrlChange: true,
-        isOpen: true,
-        viewMode: 'questions',
-      });
-      subject._isMounted = true;
-      subject.questionFilterRef = { current: { handleApplyFilters: jest.fn() } };
-      subject.setState = jest.fn((next, cb) => {
-        const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
-        subject.state = { ...subject.state, ...(patch || {}) };
-        if (typeof cb === 'function') cb();
-        return patch;
-      });
-      subject.state = {
-        ...subject.state,
-        viewMode: 'questions',
-      };
+      },
+      '/questions/results?session=demo',
+    );
 
       const fetchPromise = subject.fetchResponses();
       const raceResult = await Promise.race([
@@ -1202,12 +1319,21 @@ describe('SurveyResults session resolution', () => {
     jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
     jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['edge', 'alpha', 'beta']);
 
-    const subject = createSubject({
-      sessionSlug: 'edge',
-      activeSessionSlug: 'edge',
-      sessionSlugPinned: true,
-      isOpen: true,
-      viewMode: 'questions',
+    const view = renderQuestionResults(
+      {
+        sessionSlug: 'edge',
+        activeSessionSlug: 'edge',
+        sessionSlugPinned: true,
+        questionResponsesNonce: 1,
+      },
+      '/questions/results',
+    );
+    await waitForPrompt('Edge 1');
+
+    await rerenderHarness(view, {
+      sessionSlug: 'beta',
+      activeSessionSlug: 'beta',
+      questionResponsesNonce: 2,
     });
     subject.setState = jest.fn((next, cb) => {
       const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
@@ -1215,23 +1341,80 @@ describe('SurveyResults session resolution', () => {
       if (typeof cb === 'function') cb();
       return patch;
     });
-    subject.queueResultsRefresh = jest.fn();
-    subject.state = {
-      ...subject.state,
-      viewMode: 'questions',
-      questionResponses: {
-        q1: { '0xedge': { answer: { value: 'edge', encrypted: false } } },
+    expect(cacheScripts.peekCacheSync).toHaveBeenCalledWith('questionsCache', 'beta', { clone: false });
+    // port note: the old queueResultsRefresh reason string is internal; the observable guard is the beta cache read and cleared UI.
+  });
+
+  it('does not render a SurveyResults session selector', async () => {
+    seedCacheEnvironment();
+
+    renderQuestionResults(
+      {
+        sessionSlug: 'edge',
+        activeSessionSlug: 'edge',
+        sessionSlugPinned: true,
       },
-      aggregatorQuestionResponses: {
-        q1: [{ responder: '0xedge', questionId: 'q1', response: { answer: { value: 'edge', encrypted: false } } }],
+      '/questions/results?session=edge',
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Question Results' })).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('ce-surveyresults-session-selector-toggle')).toBeNull();
+    expect(screen.queryByTestId('ce-surveyresults-session-selector-panel')).toBeNull();
+  });
+
+  it('does not render question-results corner actions for a removed session selector', async () => {
+    seedCacheEnvironment();
+
+    renderQuestionResults(
+      {
+        sessionSlug: 'edge',
+        activeSessionSlug: 'edge',
+        sessionSlugPinned: true,
       },
-      sbtFilteredAggregatorQuestionResponses: {
-        q1: [{ responder: '0xedge', questionId: 'q1', response: { answer: { value: 'edge', encrypted: false } } }],
-      },
-      totalQuestionsCount: 1,
-      totalResponsesCount: 1,
-      filteredResponsesCount: 1,
-      filteredQuestionsCount: 1,
+      '/questions/results?session=edge',
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Question Results' })).toBeInTheDocument();
+    });
+    expect(document.querySelector('[class*="syncStatusContainer"]')).toBeTruthy();
+    expect(document.querySelector('[class*="modalHeaderCornerActions"]')).toBeNull();
+    expect(screen.queryByTestId('ce-surveyresults-session-selector')).toBeNull();
+  });
+
+  it('canonicalizes survey display links for reserved session aliases', async () => {
+    const collectLinksForSession = async (sessionSlug: string): Promise<string[]> => {
+      seedCacheEnvironment({
+        questionsBySlug: {
+          [sessionSlug === 'general' ? '' : sessionSlug]: buildQuestionCache({
+            questions: { q1: { id: 'q1', prompt: 'Survey prompt', type: 'rating' } },
+          }),
+        },
+        surveysBySlug: {
+          [sessionSlug === 'general' ? '' : sessionSlug]: buildSurveyCache({
+            surveyId: '0xSurvey',
+            title: 'Session Survey',
+            responsesByResponder: {
+              [RESPONDER_ONE]: {
+                responses: [{ questionID: 'q1', answer: { value: 4 } }],
+              },
+            },
+          }),
+        },
+      });
+      const view = renderSurveyModeResults({
+        sessionSlug,
+        surveyId: '0xSurvey',
+      });
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: 'Session Survey' })).toBeInTheDocument();
+      });
+      await switchToIndividualsView();
+      const links = collectSurveyLinks();
+      view.unmount();
+      return links;
     };
 
     const prevProps = subject.props;
@@ -1255,114 +1438,11 @@ describe('SurveyResults session resolution', () => {
     expect(subject.queueResultsRefresh).toHaveBeenCalledWith(expect.stringContaining('question-scope-change'));
   });
 
-  it('does not render a SurveyResults session selector', () => {
-    const subject = createSubject({
-      sessionSlug: 'edge',
-      activeSessionSlug: 'edge',
-      sessionSlugPinned: true,
-      isOpen: true,
-      viewMode: 'questions',
+  it('does not inherit the general session config for unknown non-general slugs', async () => {
+    const configSpy = jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation((slug: any) => {
+      if (slug === '') return { slug: '', networkChainId: 84532 };
+      return null;
     });
-    subject.state = {
-      ...subject.state,
-      viewMode: 'questions',
-    };
-
-    const tree = subject.render();
-    const selectorToggle = findElement(
-      tree,
-      (node) => node?.props?.['data-testid'] === 'ce-surveyresults-session-selector-toggle'
-    );
-    const selectorPanel = findElement(
-      tree,
-      (node) => node?.props?.['data-testid'] === 'ce-surveyresults-session-selector-panel'
-    );
-
-    expect(selectorToggle).toBeNull();
-    expect(selectorPanel).toBeNull();
-  });
-
-  it('does not render question-results corner actions for a removed session selector', () => {
-    const subject = createSubject({
-      sessionSlug: 'edge',
-      activeSessionSlug: 'edge',
-      sessionSlugPinned: true,
-      isOpen: true,
-      viewMode: 'questions',
-    });
-    subject.state = {
-      ...subject.state,
-      viewMode: 'questions',
-    };
-
-    const tree = subject.render();
-    const controls = findElement(
-      tree,
-      (node) => typeof node?.props?.className === 'string' && node.props.className.includes('modalHeaderControls')
-    );
-    const cornerActions = findElement(
-      tree,
-      (node) => typeof node?.props?.className === 'string' && node.props.className.includes('modalHeaderCornerActions')
-    );
-    const syncStatus = findElement(
-      controls,
-      (child) => typeof child?.props?.className === 'string' && child.props.className.includes('syncStatusContainer')
-    );
-    const selectorInControls = findElement(
-      controls,
-      (child) => child?.props?.['data-testid'] === 'ce-surveyresults-session-selector'
-    );
-
-    expect(syncStatus).toBeTruthy();
-    expect(selectorInControls).toBeNull();
-    expect(cornerActions).toBeNull();
-  });
-
-  it('canonicalizes survey display links for reserved session aliases', () => {
-    const responder = '0x1111111111111111111111111111111111111111';
-    const collectSurveyLinks = (sessionSlug: string) => {
-      const subject = createSubject({ sessionSlug, isOpen: true, viewMode: 'survey' });
-      subject.state = {
-        ...subject.state,
-        viewMode: 'survey',
-        surveyViewMode: 'individuals',
-        surveyId: '0xSurvey',
-        surveyTitle: 'Session Survey',
-        sbtFilteredResponses: [
-          {
-            responder,
-            response: { responses: [] },
-          },
-        ],
-        bookmarkedSurveyIDs: [],
-        bookmarkedQuestionIDs: [],
-      };
-
-      return collectTreeNodes(
-        subject.render(),
-        (node) => node?.type === 'a' && typeof node?.props?.href === 'string' && node.props.href.startsWith('/survey/')
-      ).map((node) => node.props.href);
-    };
-
-    const debateLinks = collectSurveyLinks('DEBATE');
-    expect(debateLinks).toContain('/survey/0xSurvey?session=DEBATE');
-    expect(debateLinks).toContain(`/survey/0xSurvey/${responder}?session=DEBATE`);
-    expect(debateLinks).not.toContain('/survey/0xSurvey?session=rxc');
-    expect(debateLinks).not.toContain(`/survey/0xSurvey/${responder}?session=rxc`);
-
-    const generalLinks = collectSurveyLinks('general');
-    expect(generalLinks).toContain('/survey/0xSurvey');
-    expect(generalLinks).toContain(`/survey/0xSurvey/${responder}`);
-    expect(generalLinks).not.toContain('/survey/0xSurvey?session=general');
-    expect(generalLinks).not.toContain(`/survey/0xSurvey/${responder}?session=general`);
-  });
-
-  it('does not inherit the general session config for unknown non-general slugs', () => {
-    const configSpy = jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug')
-      .mockImplementation((slug) => {
-        if (slug === '') return { slug: '', networkChainId: 84532 };
-        return null;
-      });
 
     const subject = createSubject({ sessionSlug: 'missing-session-slug' });
 

@@ -40,19 +40,29 @@ const createCompletionPorts = (events: string[] = []) =>
 
 describe('surveyQuestionsSubmitController', () => {
   it('falls back to the explicit session route when pile submit has no draft slug', () => {
-    expect(resolveSubmitEffectiveDraftSlug({
-      draftSlug: '',
-      routeSlug: ' demo-1 ',
-      normalizeSlug: (value) => String(value ?? '').trim().toLowerCase(),
-    })).toBe('demo-1');
+    expect(
+      resolveSubmitEffectiveDraftSlug({
+        draftSlug: '',
+        routeSlug: ' demo-1 ',
+        normalizeSlug: (value) =>
+          String(value ?? '')
+            .trim()
+            .toLowerCase(),
+      }),
+    ).toBe('demo-1');
   });
 
   it('keeps the id-derived draft slug ahead of the route slug for cross-session question submits', () => {
-    expect(resolveSubmitEffectiveDraftSlug({
-      draftSlug: 'question-session',
-      routeSlug: 'route-session',
-      normalizeSlug: (value) => String(value ?? '').trim().toLowerCase(),
-    })).toBe('question-session');
+    expect(
+      resolveSubmitEffectiveDraftSlug({
+        draftSlug: 'question-session',
+        routeSlug: 'route-session',
+        normalizeSlug: (value) =>
+          String(value ?? '')
+            .trim()
+            .toLowerCase(),
+      }),
+    ).toBe('question-session');
   });
 
   it.each([

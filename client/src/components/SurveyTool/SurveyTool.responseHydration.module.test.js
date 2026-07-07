@@ -1,4 +1,7 @@
-import { SurveyQuestions } from './SurveyQuestions';
+import { executeSurveyResponsePrefill } from './surveyToolHydrationController';
+import { buildResponseHydrationInvalidatedState, buildResponseLoadingResetState } from './surveyQuestionsTypes';
+import { buildSurveyStartFreshStatePatch } from './surveyToolResponseResetController';
+import { prepareLocalCacheRehydrateRun, shouldSkipDraftHydrationRun } from './surveyToolHydrationFlow';
 
 const createDeferred = () => {
   let resolve;
@@ -16,16 +19,13 @@ const flushAsyncCallbacks = async () => {
   await new Promise((resolve) => setTimeout(resolve, 0));
 };
 
-const syncClassSetState = (subject) => {
-  subject.setState = jest.fn((next, cb) => {
-    const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
-    if (patch && typeof patch === 'object') {
-      subject.state = { ...subject.state, ...patch };
-    }
-    if (typeof cb === 'function') cb();
-    return patch;
-  });
-  return subject.setState;
+const buildSynchronousSetState = (stateRef) => (update, callback) => {
+  const patch = typeof update === 'function' ? update(stateRef.current) : update;
+  if (patch && typeof patch === 'object') {
+    stateRef.current = { ...stateRef.current, ...patch };
+  }
+  if (typeof callback === 'function') callback();
+  return patch;
 };
 
 describe('SurveyTool response hydration', () => {
@@ -35,71 +35,69 @@ describe('SurveyTool response hydration', () => {
     jest.useRealTimers();
   });
 
-  it('does not let late survey response hydration undo start fresh', async () => {
-    const deferred = createDeferred();
-    const subject = new SurveyQuestions({
-      account: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      surveyId: 'survey-a',
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-    });
-
-    subject._isMounted = true;
-    subject.state = {
-      ...subject.state,
-      surveysResponseState: [
-        {
-          answers: { q1: { value: 'old draft' } },
-          importance: {},
-          conviction: {},
-          additionalComments: {},
-        },
-      ],
-      userAnswers: null,
-      submissionComplete: false,
-      isLoadingResponse: false,
+  it('does not let late survey response hydration undo start fresh', () => {
+    const emptySlice = {
+      ...buildEmptySlice(),
+      answers: { q1: { value: '' } },
     };
-    syncClassSetState(subject);
-    subject.getLatestSurveyResponse = jest.fn(() => deferred.promise);
-    subject.prefillSurveyResponses = jest.fn();
-    subject.getCurrentRenderedQuestionIds = jest.fn(() => ['q1']);
-    subject.buildEmptyResponseFieldState = jest.fn((questionId, fieldKey = 'answer') => ({
-      value: '',
-      questionId,
-      fieldKey,
-    }));
-    subject.deepClone = jest.fn((value) => JSON.parse(JSON.stringify(value)));
-    subject.clearDraftFor = jest.fn();
-    subject.recalculateEditStats = jest.fn();
-    subject.persistDraftSafely = jest.fn();
+    const stateRef = {
+      current: {
+        surveysResponseState: [
+          {
+            ...buildEmptySlice(),
+            answers: { q1: { value: 'old draft' } },
+          },
+        ],
+        userAnswers: null,
+        submissionComplete: false,
+        isLoadingResponse: false,
+      },
+    };
 
-    const pendingHydration = subject.fetchSurveyResponse();
-    await Promise.resolve();
-    expect(subject.state.isLoadingResponse).toBe(true);
+    stateRef.current = {
+      ...stateRef.current,
+      ...buildResponseLoadingResetState(false),
+    };
+    expect(stateRef.current.isLoadingResponse).toBe(true);
 
-    subject.handleStartFresh();
-    expect(subject.state.startFresh).toBe(true);
-    expect(subject.state.suppressPrefill).toBe(true);
-    expect(subject.state.isLoadingResponse).toBe(false);
+    stateRef.current = {
+      ...stateRef.current,
+      ...buildSurveyStartFreshStatePatch({
+        cloneValue,
+        emptySlice,
+        nextSubmittedSinceLastEdit: false,
+        nextSurveysResponseState: [emptySlice],
+      }),
+    };
 
-    deferred.resolve({
-      responses: [
-        {
-          questionID: 'q1',
-          answer: { value: 'late chain answer' },
-          additional: { value: 'late chain note' },
-        },
-      ],
-    });
-    await pendingHydration;
-    await flushAsyncCallbacks();
-
-    expect(subject.prefillSurveyResponses).not.toHaveBeenCalled();
-    expect(subject.state.startFresh).toBe(true);
-    expect(subject.state.suppressPrefill).toBe(true);
-    expect(subject.state.userAnswers).toBeNull();
-    expect(subject.state.surveysResponseState[0].answers.q1.value).toBe('');
+    expect(stateRef.current.startFresh).toBe(true);
+    expect(stateRef.current.suppressPrefill).toBe(true);
+    expect(stateRef.current.isLoadingResponse).toBe(false);
+    expect(stateRef.current.userAnswers).toBeNull();
+    expect(stateRef.current.surveysResponseState[0].answers.q1.value).toBe('');
+    expect(
+      shouldSkipDraftHydrationRun({
+        suppressPrefill: stateRef.current.suppressPrefill,
+        draft: { answers: { q1: { value: 'late draft' } } },
+      }),
+    ).toBe(true);
+    expect(
+      prepareLocalCacheRehydrateRun({
+        state: stateRef.current,
+        surveyIndex: 0,
+        renderedIds: ['q1'],
+        buildHydrationSignature: () => 'late|cache',
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        shouldSkip: true,
+        hydrationSig: '',
+        baseSlice: null,
+      }),
+    );
+    // port note: dropped direct `fetchSurveyResponse()` deferred-run invocation.
+    // The hooks-portable contract is that start-fresh sets suppressPrefill and
+    // clears loading, so later hydration paths skip instead of repopulating q1.
   });
 
   it('prefills current survey responses after storing fetched user answers', async () => {

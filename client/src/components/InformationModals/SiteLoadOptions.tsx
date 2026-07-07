@@ -155,45 +155,9 @@ class SiteLoadOptions extends Component<SiteLoadOptionsProps, SiteLoadOptionsSta
       </Card>
     );
 
-
-    <div className={styles.metricsDetailsPoints}>
-
-      <div className={styles.emailSubjects}>
-
-      <div className={styles.metricsCollectedText}>
-                Metrics:
-      </div>
-
-        <div className={styles.emailSubject}>
-        — UX Interacts
-        </div>
-
-        <div className={styles.emailSubject}>
-        — Screen Size
-        </div>
-
-        <div className={styles.emailSubject}>
-        — Region
-        </div>
-
-      </div>
-
-      <div className={styles.metricsDetailsButtons}>
-
-
-        <button className={buildClassName([styles.closeModalButton, 'close'])} aria-label="Close" type="button" onClick={this.toggleMetricsDetails}>
-                <FontAwesomeIcon icon={closeMetricsDetailsIcon} className={styles.closeModalIcon}  />
-        </button>
-
-      </div>
-
-    </div>
-
-    </Card>
-
-    const explainModal =
-    <>
-    <GreetingModal visible={this.state.explainerModalOpen} closeExplainerFunction={this.closeExplainerModal}/>
+    const explainModal = (
+      <>
+        <GreetingModal visible={this.state.explainerModalOpen} closeExplainerFunction={this.closeExplainerModal} />
         <div className={styles.welcomeSlideEmbed}>
           <CardFooter>
             <WelcomeSlideRenderer
@@ -203,20 +167,16 @@ class SiteLoadOptions extends Component<SiteLoadOptionsProps, SiteLoadOptionsSta
                 <div className={sidebarVisibleClassName} data-testid="ce-site-load-sidebar">
                   {metricsDetailExplainer}
 
-
-          { metricsDetailExplainer }
-
-          <button
-            className={buildClassName([styles.closeModalButton, 'close'])}
-            data-testid="ce-site-load-close-sidebar"
-            aria-label="Close"
-            type="button"
-            onClick={this.closeBetaSidebar}
-          >
-              <FontAwesomeIcon icon={closeModalIcon} className={styles.closeModalIcon} />
-          </button>
-
-          </div>
+                  <button
+                    className={buildClassName([styles.closeModalButton, 'close'])}
+                    data-testid="ce-site-load-close-sidebar"
+                    aria-label="Close"
+                    type="button"
+                    onClick={this.closeBetaSidebar}
+                  >
+                    <FontAwesomeIcon icon={closeModalIcon} className={styles.closeModalIcon} />
+                  </button>
+                </div>
               }
             />
           </CardFooter>

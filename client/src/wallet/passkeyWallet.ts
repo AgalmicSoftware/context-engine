@@ -12,10 +12,7 @@ import type {
   PasskeyWalletStorage,
   SignTypedDataPayload,
 } from './types.js';
-import {
-  PASSKEY_WALLET_CAPABILITIES,
-  getPasskeyWalletConfig,
-} from './config.js';
+import { PASSKEY_WALLET_CAPABILITIES, getPasskeyWalletConfig } from './config.js';
 import { chainHexId, chainHttpRpc, chainHttpRpcNoPath, getChainById, getDefaultChainId } from '../variables/chains.js';
 import { createPasskeyCredential } from './passkey/createCredential.js';
 import { authenticatePasskeyCredential } from './passkey/authenticateCredential.js';
@@ -31,10 +28,7 @@ import {
 import { encryptPrivateKey } from './keystore/encryptPrivateKey.js';
 import { indexedDbWalletStorage } from './keystore/storage.js';
 import { createSoftSessionPolicy } from './session/sessionPolicy.js';
-import {
-  createWorkerSoftSessionClient,
-  type SoftSessionClient,
-} from './session/sessionWorkerClient.js';
+import { createWorkerSoftSessionClient, type SoftSessionClient } from './session/sessionWorkerClient.js';
 import { createLogger } from '../utilities/logging.js';
 
 type ChainLike = Record<string, any>;
@@ -96,25 +90,23 @@ export class MissingPasskeyWalletRecordError extends Error {
   }
 }
 
-export const isMissingPasskeyWalletRecordError = (error: unknown): boolean => (
+export const isMissingPasskeyWalletRecordError = (error: unknown): boolean =>
   error instanceof MissingPasskeyWalletRecordError ||
-  (
-    !!error &&
-    typeof error === 'object' &&
-    (error as { code?: unknown }).code === MISSING_WALLET_CODE
-  )
-);
+  (!!error && typeof error === 'object' && (error as { code?: unknown }).code === MISSING_WALLET_CODE);
 
-const defaultChain = (): ChainLike => (
+const isPasskeyWalletLockedError = (error: unknown): boolean =>
+  error instanceof Error
+    ? error.message === PASSKEY_WALLET_LOCKED_MESSAGE
+    : String((error as { message?: unknown })?.message || error || '') === PASSKEY_WALLET_LOCKED_MESSAGE;
+
+const defaultChain = (): ChainLike =>
   getChainById(getDefaultChainId()) ||
   getChainById(11155420) ||
-  getChainById(84532) ||
-  {
+  getChainById(84532) || {
     id: 11155420,
     name: 'OP Sepolia',
     rpcUrls: { public: { http: [] }, default: { http: [] } },
-  }
-);
+  };
 
 const normalizeChain = (chainOrId?: unknown): ChainLike => {
   if (!chainOrId) return defaultChain();
@@ -126,11 +118,7 @@ const normalizeChain = (chainOrId?: unknown): ChainLike => {
   return defaultChain();
 };
 
-const resolveRpcUrl = (chain: ChainLike): string => (
-  chainHttpRpcNoPath(chain) ||
-  chainHttpRpc(chain) ||
-  ''
-);
+const resolveRpcUrl = (chain: ChainLike): string => chainHttpRpcNoPath(chain) || chainHttpRpc(chain) || '';
 
 const normalizeTypedData = (payload: unknown): SignTypedDataPayload => {
   const typedData = typeof payload === 'string' ? JSON.parse(payload) : payload;
@@ -146,13 +134,11 @@ const toHexString = (value: unknown): HexString => String(value || '') as HexStr
 
 const isExpired = (expiresAt: number, now = Date.now()): boolean => !!expiresAt && now >= expiresAt;
 
-const isEncryptedWalletRecord = (record: PasskeyWalletRecord): record is EncryptedWalletRecord => (
-  record.keyMode !== 'passkey-derived' && 'encryptedPrivateKey' in record
-);
+const isEncryptedWalletRecord = (record: PasskeyWalletRecord): record is EncryptedWalletRecord =>
+  record.keyMode !== 'passkey-derived' && 'encryptedPrivateKey' in record;
 
-const isPasskeyDerivedWalletRecord = (record: PasskeyWalletRecord): record is PasskeyDerivedWalletRecord => (
-  record.keyMode === 'passkey-derived'
-);
+const isPasskeyDerivedWalletRecord = (record: PasskeyWalletRecord): record is PasskeyDerivedWalletRecord =>
+  record.keyMode === 'passkey-derived';
 
 export class PasskeyEoaWalletClient {
   private readonly config: PasskeyWalletConfig;
@@ -339,35 +325,39 @@ export class PasskeyEoaWalletClient {
   }
 
   async signMessage(message: unknown): Promise<HexString> {
-    await this.ensureUnlocked();
-    return toHexString(await this.sessionClient.request({
-      method: 'personal_sign',
-      params: [message, this.activeAddress],
-    }));
+    return toHexString(
+      await this.requestUnlocked(() => ({
+        method: 'personal_sign',
+        params: [message, this.activeAddress],
+      })),
+    );
   }
 
   async signTypedData(typedData: unknown): Promise<HexString> {
-    await this.ensureUnlocked();
-    return toHexString(await this.sessionClient.request({
-      method: 'eth_signTypedData_v4',
-      params: [this.activeAddress, normalizeTypedData(typedData)],
-    }));
+    return toHexString(
+      await this.requestUnlocked(() => ({
+        method: 'eth_signTypedData_v4',
+        params: [this.activeAddress, normalizeTypedData(typedData)],
+      })),
+    );
   }
 
   async sendTransaction(tx: Record<string, unknown>): Promise<HexString> {
-    await this.ensureUnlocked();
-    return toHexString(await this.sessionClient.request({
-      method: 'eth_sendTransaction',
-      params: [{ ...tx, from: tx.from || this.activeAddress }],
-    }));
+    return toHexString(
+      await this.requestUnlocked(() => ({
+        method: 'eth_sendTransaction',
+        params: [{ ...tx, from: tx.from || this.activeAddress }],
+      })),
+    );
   }
 
   async signTransaction(tx: Record<string, unknown>): Promise<HexString> {
-    await this.ensureUnlocked();
-    return toHexString(await this.sessionClient.request({
-      method: 'eth_signTransaction',
-      params: [{ ...tx, from: tx.from || this.activeAddress }],
-    }));
+    return toHexString(
+      await this.requestUnlocked(() => ({
+        method: 'eth_signTransaction',
+        params: [{ ...tx, from: tx.from || this.activeAddress }],
+      })),
+    );
   }
 
   async request({ method, params = [] }: { method: string; params?: unknown[] }): Promise<unknown> {
@@ -377,7 +367,7 @@ export class PasskeyEoaWalletClient {
         return address ? [address] : [];
       }
       case 'eth_accounts': {
-        const address = this.activeAddress || await this.restoreSession({ requireSigner: false });
+        const address = this.activeAddress || (await this.restoreSession({ requireSigner: false }));
         return address ? [address] : [];
       }
       case 'eth_chainId':
@@ -461,9 +451,12 @@ export class PasskeyEoaWalletClient {
     this.activeAddress = record.evmAddress;
     this.unlockExpiresAt = expiresAt;
     if (this.lockTimer) clearTimeout(this.lockTimer);
-    this.lockTimer = setTimeout(() => {
-      void this.lock().catch((error) => walletLog.warn('Passkey wallet auto-lock failed:', error));
-    }, Math.max(0, expiresAt - this.now()));
+    this.lockTimer = setTimeout(
+      () => {
+        void this.lock().catch((error) => walletLog.warn('Passkey wallet auto-lock failed:', error));
+      },
+      Math.max(0, expiresAt - this.now()),
+    );
   }
 
   private async ensureUnlocked(): Promise<void> {
@@ -519,9 +512,7 @@ export class PasskeyEoaWalletClient {
         return provider.getTransactionReceipt(params[0]);
       case 'eth_getBlockByNumber':
       case 'eth_getBlockByHash':
-        return params[1]
-          ? provider.getBlockWithTransactions(params[0])
-          : provider.getBlock(params[0]);
+        return params[1] ? provider.getBlockWithTransactions(params[0]) : provider.getBlock(params[0]);
       default:
         return this.requestRawReadProviderRpc(provider, method, params);
     }
@@ -530,7 +521,7 @@ export class PasskeyEoaWalletClient {
   private async requestRawReadProviderRpc(
     provider: ReadOnlyRpcProvider,
     method: string,
-    params: unknown[]
+    params: unknown[],
   ): Promise<unknown> {
     if (typeof provider.send === 'function') return provider.send(method, params);
 
@@ -576,17 +567,15 @@ export const setPasskeyWalletChain = (chainOrId: unknown): ChainLike => getPassk
 export const getPasskeyWalletChain = (): ChainLike => getPasskeyWalletClient().getChain();
 export const createPasskeyWallet = (): Promise<HexString> => getPasskeyWalletClient().createWallet();
 export const unlockPasskeyWallet = (): Promise<HexString> => getPasskeyWalletClient().unlockWallet();
-export const restorePasskeyWalletSession = (options: RestoreOptions = {}): Promise<HexString | null> => (
-  getPasskeyWalletClient().restoreSession(options)
-);
+export const restorePasskeyWalletSession = (options: RestoreOptions = {}): Promise<HexString | null> =>
+  getPasskeyWalletClient().restoreSession(options);
 export const lockPasskeyWallet = (): Promise<void> => getPasskeyWalletClient().lock();
 export const logoutPasskeyWallet = (): Promise<void> => getPasskeyWalletClient().disconnect();
 export const getPasskeyWalletAddress = (): HexString | null => getPasskeyWalletClient().getAddress();
 export const hasPasskeyWalletSigner = (): boolean => getPasskeyWalletClient().hasSigner();
 export const isPasskeyWalletAutoSignReady = (): boolean => getPasskeyWalletClient().isUnlocked();
-export const sendPasskeyWalletTransaction = (tx: Record<string, unknown>): Promise<HexString> => (
-  getPasskeyWalletClient().sendTransaction(tx)
-);
+export const sendPasskeyWalletTransaction = (tx: Record<string, unknown>): Promise<HexString> =>
+  getPasskeyWalletClient().sendTransaction(tx);
 export const createPasskeyEip1193Provider = (): Eip1193Provider => getPasskeyWalletClient().createProvider();
 export const getPasskeyWalletCapabilities = (): PasskeyWalletCapabilities => PASSKEY_WALLET_CAPABILITIES;
 

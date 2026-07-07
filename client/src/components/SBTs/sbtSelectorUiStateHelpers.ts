@@ -205,9 +205,7 @@ export const getSbtSelectorLoadingStatusText = ({
 } = {}): string => {
   const safeCount = Math.max(0, Number(count || 0) || 0);
   const hasCount = safeCount > 0;
-  return compact
-    ? (hasCount ? `Loading ${safeCount}` : 'Loading')
-    : (hasCount ? `Loading ${safeCount}` : 'Loading');
+  return compact ? (hasCount ? `Loading ${safeCount}` : 'Loading') : hasCount ? `Loading ${safeCount}` : 'Loading';
 };
 
 export const resolveSbtSelectorGroupSourceSelection = ({

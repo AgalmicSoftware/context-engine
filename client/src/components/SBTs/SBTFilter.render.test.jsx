@@ -80,9 +80,8 @@ describe('SBTFilter render guards', () => {
     });
 
     const tree = subject.render();
-    const addressSelectors = findElementsInTree(
-      tree,
-      (element) => ['includeAddresses', 'excludeAddresses'].includes(element?.props?.id)
+    const addressSelectors = findElementsInTree(tree, (element) =>
+      ['includeAddresses', 'excludeAddresses'].includes(element?.props?.id),
     );
 
     expect(addressSelectors).toHaveLength(2);
@@ -150,9 +149,7 @@ describe('SBTFilter render guards', () => {
     const tree = subject.render();
     const [filterButton] = findElementsInTree(
       tree,
-      (element) =>
-        typeof element?.props?.className === 'string' &&
-        element.props.className.includes('filterButton')
+      (element) => typeof element?.props?.className === 'string' && element.props.className.includes('filterButton'),
     );
     const [filterOptions] = findElementsInTree(
       tree,

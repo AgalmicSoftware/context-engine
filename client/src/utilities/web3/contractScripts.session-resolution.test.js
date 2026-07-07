@@ -97,19 +97,9 @@ describe('contractScripts session resolution helpers', () => {
     );
     expect(getDemoSessionConfigBySlug('demo', { allowDemoFallback: true })).toEqual(
       expect.objectContaining({
-        slug: 'demo-sh',
-        sessionName: 'Demo Session',
-        sessionModeProfile: expect.objectContaining({
-          authority: { mode: 'worker_canonical' },
-          evm: { registryChainId: null },
-        }),
-      }),
-    );
-    expect(getDemoSessionConfigBySlug('demo', { allowDemoFallback: true })).toEqual(
-      expect.objectContaining({
         slug: '',
         sessionName: 'Context Engine',
-      })
+      }),
     );
     expect(getDemoSessionConfigBySlug('DEBATE', { allowDemoFallback: true })).toBeNull();
   });
@@ -132,7 +122,7 @@ describe('contractScripts session resolution helpers', () => {
           '0x5d2f0207B7EB26e807C4a12f2A185928558C00b9',
           '0xeAe3498C31302B421E19Cf30A3e87E814ae5C955',
         ]),
-      })
+      }),
     );
   });
 

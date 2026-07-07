@@ -95,11 +95,8 @@ const {
   emitMainSiteSbtDebug,
   hasCoreSbtMetadata,
   isForcedSbtSelectorDebugEnabled,
-} = require('../../components/MainSite/mainSiteUtils');
-const {
-  mergeSbtLiveProgressEntry,
-  shouldCommitThrottledProgress,
-} = require('../../components/MainSite/progressHelpers');
+} = require('../session/mainSiteUtils');
+const { mergeSbtLiveProgressEntry, shouldCommitThrottledProgress } = require('../session/mainSiteProgressHelpers');
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
@@ -881,11 +878,13 @@ describe('createSessionSbtCacheController', () => {
 
       expect(host.getSessionChainId).toHaveBeenCalledWith('demo');
       expect(host.getSessionCfg).toHaveBeenCalledWith('demo');
-      expect(contractScripts.getRelevantBlockWindowForFilter).toHaveBeenCalledWith(expect.objectContaining({
-        slug: 'demo',
-        networkChainId: 11155420,
-        __ignoreSessionScanScope: true,
-      }));
+      expect(contractScripts.getRelevantBlockWindowForFilter).toHaveBeenCalledWith(
+        expect.objectContaining({
+          slug: 'demo',
+          networkChainId: 11155420,
+          __ignoreSessionScanScope: true,
+        }),
+      );
       expect(contractScripts.getAllSbtAddressesCached).toHaveBeenCalledWith(
         'none',
         expect.objectContaining({
@@ -899,26 +898,28 @@ describe('createSessionSbtCacheController', () => {
           toBlock: 12,
           onProgress: expect.any(Function),
           onDiscoveredAddresses: expect.any(Function),
-        })
+        }),
       );
-      expect(host.getStored('sbtCache', 'demo')).toEqual(expect.objectContaining({
-        11155420: expect.objectContaining({
-          lastBlock: 12,
-          sbtList: expect.objectContaining({
-            [demoSbt.toLowerCase()]: expect.objectContaining({
-              sbtAddress: demoSbt,
-              slug: 'demo',
-              sessionSlug: 'demo',
-              sessionSlugExplicit: false,
-              sbtInfo: expect.objectContaining({
-                name: 'Mock SBT',
+      expect(host.getStored('sbtCache', 'demo')).toEqual(
+        expect.objectContaining({
+          11155420: expect.objectContaining({
+            lastBlock: 12,
+            sbtList: expect.objectContaining({
+              [demoSbt.toLowerCase()]: expect.objectContaining({
+                sbtAddress: demoSbt,
+                slug: 'demo',
                 sessionSlug: 'demo',
                 sessionSlugExplicit: false,
+                sbtInfo: expect.objectContaining({
+                  name: 'Mock SBT',
+                  sessionSlug: 'demo',
+                  sessionSlugExplicit: false,
+                }),
               }),
             }),
           }),
         }),
-      }));
+      );
     });
 
     it('preserves explicit SBT metadata session bindings during light discovery', async () => {
@@ -955,21 +956,23 @@ describe('createSessionSbtCacheController', () => {
 
       await controller.ensureLightSbtDiscovery('alpha');
 
-    expect(host.getStored('sbtCache', 'alpha')).toEqual(expect.objectContaining({
-      11155420: expect.objectContaining({
-        sbtList: expect.objectContaining({
-          [sbtAddress.toLowerCase()]: expect.objectContaining({
-              sessionSlug: 'alpha',
-              sessionSlugExplicit: true,
-              sbtInfo: expect.objectContaining({
-                name: 'Explicit Alpha SBT',
+      expect(host.getStored('sbtCache', 'alpha')).toEqual(
+        expect.objectContaining({
+          11155420: expect.objectContaining({
+            sbtList: expect.objectContaining({
+              [sbtAddress.toLowerCase()]: expect.objectContaining({
                 sessionSlug: 'alpha',
                 sessionSlugExplicit: true,
+                sbtInfo: expect.objectContaining({
+                  name: 'Explicit Alpha SBT',
+                  sessionSlug: 'alpha',
+                  sessionSlugExplicit: true,
+                }),
               }),
             }),
           }),
         }),
-      }));
+      );
     });
 
     it('downgrades stale cache-scoped explicit flags when hydrated metadata is inferred', async () => {
@@ -1014,22 +1017,24 @@ describe('createSessionSbtCacheController', () => {
 
       await controller.ensureLightSbtDiscovery('alpha');
 
-      expect(host.getStored('sbtCache', 'alpha')).toEqual(expect.objectContaining({
-        11155420: expect.objectContaining({
-          sbtList: expect.objectContaining({
-            [sbtAddress.toLowerCase()]: expect.objectContaining({
-              sessionSlug: 'alpha',
-              sessionSlugExplicit: false,
-              sbtInfo: expect.objectContaining({
-                name: 'Hydrated Inferred SBT',
+      expect(host.getStored('sbtCache', 'alpha')).toEqual(
+        expect.objectContaining({
+          11155420: expect.objectContaining({
+            sbtList: expect.objectContaining({
+              [sbtAddress.toLowerCase()]: expect.objectContaining({
                 sessionSlug: 'alpha',
                 sessionSlugExplicit: false,
-                tokenUriMetadataFetched: true,
+                sbtInfo: expect.objectContaining({
+                  name: 'Hydrated Inferred SBT',
+                  sessionSlug: 'alpha',
+                  sessionSlugExplicit: false,
+                  tokenUriMetadataFetched: true,
+                }),
               }),
             }),
           }),
         }),
-      }));
+      );
     });
 
     it('rehydrates core-only cached SBT metadata so list cards recover tokenURI image and description fields', async () => {
@@ -1073,22 +1078,24 @@ describe('createSessionSbtCacheController', () => {
 
       expect(contractScripts.getSbtMetadata).toHaveBeenCalledWith('none', sbtAddress, 'alpha');
       expect(contractScripts.getAllSbtAddressesCached).not.toHaveBeenCalled();
-      expect(host.getStored('sbtCache', 'alpha')).toEqual(expect.objectContaining({
-        11155420: expect.objectContaining({
-          sbtList: expect.objectContaining({
-            [sbtAddress.toLowerCase()]: expect.objectContaining({
-              blockNumber: 12,
-              sbtInfo: expect.objectContaining({
-                description: 'Visible list description',
-                image: 'ar://image-tx',
-                tokenUriMetadataFetched: true,
-                sessionSlug: 'alpha',
-                sessionSlugExplicit: false,
+      expect(host.getStored('sbtCache', 'alpha')).toEqual(
+        expect.objectContaining({
+          11155420: expect.objectContaining({
+            sbtList: expect.objectContaining({
+              [sbtAddress.toLowerCase()]: expect.objectContaining({
+                blockNumber: 12,
+                sbtInfo: expect.objectContaining({
+                  description: 'Visible list description',
+                  image: 'ar://image-tx',
+                  tokenUriMetadataFetched: true,
+                  sessionSlug: 'alpha',
+                  sessionSlugExplicit: false,
+                }),
               }),
             }),
           }),
         }),
-      }));
+      );
     });
 
     it('keeps light discovery watermark behind failed metadata hydration so later runs retry', async () => {
@@ -1112,10 +1119,12 @@ describe('createSessionSbtCacheController', () => {
 
       const afterFailure = host.getStored('sbtCache', 'alpha');
       expect(afterFailure[11155420].lastBlock).toBe(9);
-      expect(afterFailure[11155420].sbtList[sbtAddress.toLowerCase()]).toEqual(expect.objectContaining({
-        sbtAddress,
-        sbtInfo: null,
-      }));
+      expect(afterFailure[11155420].sbtList[sbtAddress.toLowerCase()]).toEqual(
+        expect.objectContaining({
+          sbtAddress,
+          sbtInfo: null,
+        }),
+      );
 
       await controller.ensureLightSbtDiscovery('alpha');
 
@@ -1127,23 +1136,25 @@ describe('createSessionSbtCacheController', () => {
         expect.objectContaining({
           fromBlock: 10,
           toBlock: 12,
-        })
+        }),
       );
-      expect(host.getStored('sbtCache', 'alpha')).toEqual(expect.objectContaining({
-        11155420: expect.objectContaining({
-          lastBlock: 12,
-          sbtList: expect.objectContaining({
-            [sbtAddress.toLowerCase()]: expect.objectContaining({
-              sbtInfo: expect.objectContaining({
-                name: 'Hydrated After Retry',
-                description: 'Recovered description',
-                image: 'ar://retry-image',
-                tokenUriMetadataFetched: true,
+      expect(host.getStored('sbtCache', 'alpha')).toEqual(
+        expect.objectContaining({
+          11155420: expect.objectContaining({
+            lastBlock: 12,
+            sbtList: expect.objectContaining({
+              [sbtAddress.toLowerCase()]: expect.objectContaining({
+                sbtInfo: expect.objectContaining({
+                  name: 'Hydrated After Retry',
+                  description: 'Recovered description',
+                  image: 'ar://retry-image',
+                  tokenUriMetadataFetched: true,
+                }),
               }),
             }),
           }),
         }),
-      }));
+      );
     });
 
     it('completes full scan holder writes when user cache has malformed SBT rows', async () => {
@@ -1163,9 +1174,7 @@ describe('createSessionSbtCacheController', () => {
                   lastBlockScanned: 9,
                   lastScanTimestamp: 1,
                   data: {
-                    sbts: [
-                      { sbtInfo: { name: 'legacy row without address' } },
-                    ],
+                    sbts: [{ sbtInfo: { name: 'legacy row without address' } }],
                     createdSurveys: [],
                     createdQuestions: [],
                     surveyResponses: [],
@@ -1180,9 +1189,7 @@ describe('createSessionSbtCacheController', () => {
       const controller = createSessionSbtCacheController(host);
 
       contractScripts.getRelevantBlockWindowForFilter.mockResolvedValueOnce({ fromBlock: 10, toBlock: 12 });
-      contractScripts.getSbtsCreated.mockResolvedValueOnce([
-        { sbtAddress, creationBlock: 10 },
-      ]);
+      contractScripts.getSbtsCreated.mockResolvedValueOnce([{ sbtAddress, creationBlock: 10 }]);
       contractScripts.getSbtMetadata.mockResolvedValueOnce(sbtMetadata);
       contractScripts.getSbtMintBurnCountsByAddress.mockResolvedValueOnce({
         ok: true,
@@ -1199,15 +1206,17 @@ describe('createSessionSbtCacheController', () => {
       const storedUserCache = host.getStored('userCache', 'alpha');
       const storedSbtCache = host.getStored('sbtCache', 'alpha');
 
-      expect(storedSbtCache[11155420]).toEqual(expect.objectContaining({
-        lastBlock: 12,
-        sbtList: expect.objectContaining({
-          [sbtAddress.toLowerCase()]: expect.objectContaining({
-            sbtAddress,
-            sbtInfo: expect.objectContaining({ name: 'Full Scan Holder SBT' }),
+      expect(storedSbtCache[11155420]).toEqual(
+        expect.objectContaining({
+          lastBlock: 12,
+          sbtList: expect.objectContaining({
+            [sbtAddress.toLowerCase()]: expect.objectContaining({
+              sbtAddress,
+              sbtInfo: expect.objectContaining({ name: 'Full Scan Holder SBT' }),
+            }),
           }),
         }),
-      }));
+      );
       expect(storedUserCache[holder][11155420].data.sbts).toEqual([
         { sbtInfo: { name: 'legacy row without address' } },
         {
@@ -1265,17 +1274,19 @@ describe('createSessionSbtCacheController', () => {
         10,
         40,
         'alpha',
-        expect.objectContaining({ onProgress: expect.any(Function) })
+        expect.objectContaining({ onProgress: expect.any(Function) }),
       );
-      expect(storedSbtCache[11155420]).toEqual(expect.objectContaining({
-        lastBlock: 9,
-        sbtList: expect.objectContaining({
-          [sbtAddress.toLowerCase()]: expect.objectContaining({
-            sbtAddress,
-            blockNumber: 40,
+      expect(storedSbtCache[11155420]).toEqual(
+        expect.objectContaining({
+          lastBlock: 9,
+          sbtList: expect.objectContaining({
+            [sbtAddress.toLowerCase()]: expect.objectContaining({
+              sbtAddress,
+              blockNumber: 40,
+            }),
           }),
         }),
-      }));
+      );
       expect(host.writeFlag).toHaveBeenCalledWith('sbt:deferredFullScanNeeded', 'alpha', true);
       expect(host.writeFlag).toHaveBeenCalledWith('sbt:partialReady', 'alpha', true);
       expect(host.writeFlag).toHaveBeenCalledWith('sbt:fullScanInProgress', 'alpha', false);

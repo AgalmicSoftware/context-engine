@@ -7,32 +7,7 @@ import { faPlus, faSpinner, faExternalLinkAlt, faDownload } from '@fortawesome/f
 import styles from './UserPage.module.scss';
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import {
-  buildCompareClassName,
-  buildCompareProfileHref,
-  resolveCompareAddressBlockieStyle,
-  resolveCompareAddressPillContentStyle,
-  resolveCompareBookmarksHeaderStyle,
-  resolveCompareBookmarksListStyle,
-  resolveCompareClickableResultItemStyle,
-  resolveCompareCompassLegendStyle,
-  resolveCompareCompassLegendSwatchStyle,
-  resolveCompareCompassScrollStyle,
-  resolveCompareDrillBodyStyle,
-  resolveCompareErrorStyle,
-  resolveCompareLoadingTextStyle,
-  resolveCompareUnsureHeaderStyle,
-  resolveCompareUnsureMoreStyle,
-  resolveCompareUnsurePanelStyle,
-  resolveCompareVennNoteStyle,
-  resolveCompareVennSbtImageStyle,
-  resolveCompareVennSbtRowStyle,
-  resolveCompareVennTooltipHeaderStyle,
-  resolveCompareVennTooltipListStyle,
-  resolveCompareVennTooltipStyle,
-  resolveCompareVennWrapStyle,
-  resolveCompareVisualSectionStyle,
-} from './compareAddressStyles';
+import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 
 // NEW: blockie data URL generator (tiny, deterministic)
 import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
@@ -596,6 +571,144 @@ export const buildCompareSbtImageMap = (
   return m;
 };
 
+export const resolveCompareAddressPillContentStyle = (): React.CSSProperties => ({
+  alignItems: 'center',
+  display: 'inline-flex',
+  gap: 8,
+});
+
+export const resolveCompareAddressBlockieStyle = (): React.CSSProperties => ({
+  borderRadius: 3,
+});
+
+export const buildCompareProfileHref = (address: unknown): string => {
+  const normalizedAddress = String(address || '').trim();
+  return normalizedAddress ? buildPublicRoute(`/u/${normalizedAddress}`) : '';
+};
+
+export const buildCompareClassName = (...classNames: unknown[]): string =>
+  classNames
+    .map((className) => String(className || ''))
+    .filter(Boolean)
+    .join(' ');
+
+export const resolveCompareUnsurePanelStyle = (): React.CSSProperties => ({
+  marginTop: 8,
+});
+
+export const resolveCompareUnsureHeaderStyle = (): React.CSSProperties => ({
+  fontWeight: 700,
+  marginBottom: 6,
+});
+
+export const resolveCompareUnsureMoreStyle = (): React.CSSProperties => ({
+  fontSize: 12,
+  marginTop: 6,
+  opacity: 0.8,
+});
+
+export const resolveCompareBookmarksHeaderStyle = (): React.CSSProperties => ({
+  color: 'white',
+  fontWeight: '600',
+  marginBottom: '10px',
+});
+
+export const resolveCompareBookmarksListStyle = (): React.CSSProperties => ({
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 10,
+});
+
+export const resolveCompareErrorStyle = (): React.CSSProperties => ({
+  marginTop: 8,
+});
+
+export const resolveCompareVisualSectionStyle = (): React.CSSProperties => ({
+  padding: '6px 0',
+});
+
+export const resolveCompareLoadingTextStyle = (): React.CSSProperties => ({
+  marginLeft: 6,
+});
+
+export const resolveCompareClickableResultItemStyle = (): React.CSSProperties => ({
+  cursor: 'pointer',
+});
+
+export const resolveCompareDrillBodyStyle = (): React.CSSProperties => ({
+  marginTop: 6,
+});
+
+export const resolveCompareVennWrapStyle = (): React.CSSProperties => ({
+  overflowX: 'auto',
+  position: 'relative',
+});
+
+export const resolveCompareVennTooltipStyle = ({
+  clientWidth,
+  x = 0,
+  y = 0,
+}: {
+  clientWidth?: unknown;
+  x?: unknown;
+  y?: unknown;
+} = {}): React.CSSProperties => {
+  const width = Number(clientWidth || 420);
+  const left = Math.max(8, Math.min(Number(x || 0) + 6, width - 420));
+  return {
+    left,
+    top: Number(y || 0) + 8,
+  };
+};
+
+export const resolveCompareVennTooltipHeaderStyle = (): React.CSSProperties => ({
+  fontWeight: 700,
+  marginBottom: 4,
+});
+
+export const resolveCompareVennTooltipListStyle = (): React.CSSProperties => ({
+  listStyle: 'none',
+  margin: 0,
+  padding: 0,
+});
+
+export const resolveCompareVennSbtRowStyle = (): React.CSSProperties => ({
+  alignItems: 'center',
+  display: 'flex',
+  gap: '8px',
+});
+
+export const resolveCompareVennSbtImageStyle = (): React.CSSProperties => ({
+  borderRadius: '4px',
+  flexShrink: 0,
+});
+
+export const resolveCompareVennNoteStyle = (): React.CSSProperties => ({
+  fontSize: 12,
+  marginTop: 4,
+  opacity: 0.75,
+});
+
+export const resolveCompareCompassLegendStyle = (): React.CSSProperties => ({
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 8,
+  marginBottom: 8,
+});
+
+export const resolveCompareCompassLegendSwatchStyle = (background: unknown): React.CSSProperties => ({
+  background: String(background || ''),
+  borderRadius: 5,
+  display: 'inline-block',
+  height: 10,
+  marginRight: 6,
+  width: 10,
+});
+
+export const resolveCompareCompassScrollStyle = (): React.CSSProperties => ({
+  overflowX: 'auto',
+});
+
 const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: CompareAddressProps) => {
   const [compareAddresses, setCompareAddresses] = useState<string[]>([]);
   const [showComparison, setShowComparison] = useState(false);
@@ -958,7 +1071,27 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
       if (users.length === 3) {
         try {
           const vennRaw = await runCompareToolkit('venn', { users, ...aiScope });
-          venn = mergeCompareVennWithEvidence(vennRaw, computeVennEvidence(users));
+          if (vennRaw && vennRaw.counts) {
+            const ensure = computeVennEvidence(users);
+            const out: CompareVennResult = {
+              counts: { ...ensure.counts, ...vennRaw.counts },
+              semantics: vennRaw.semantics || ensure.semantics,
+              evidenceMap: { ...ensure.evidenceMap, ...(vennRaw.evidenceMap || {}) } as Partial<
+                Record<VennRegionKey, unknown[]>
+              >,
+            };
+            const vennKeys: VennRegionKey[] = ['a', 'b', 'c', 'ab', 'ac', 'bc', 'abc'];
+            for (const k of vennKeys) {
+              if (
+                (out.counts[k] || 0) > 0 &&
+                (!Array.isArray(out.evidenceMap?.[k]) || out.evidenceMap[k]?.length === 0)
+              ) {
+                out.evidenceMap = out.evidenceMap || {};
+                out.evidenceMap[k] = ensure.evidenceMap[k];
+              }
+            }
+            venn = out;
+          }
         } catch (err) {
           accountLog.error('compare venn failed:', err);
         }

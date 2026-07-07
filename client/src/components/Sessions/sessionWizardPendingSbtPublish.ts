@@ -14,16 +14,19 @@ type PendingSbtCreateOptions = {
   [key: string]: unknown;
 };
 
-export type PendingSbtDeployReceipt = {
-  transactionHash?: string;
-  events?: unknown[];
-  logs?: unknown[];
-  receipt?: {
-    logs?: unknown[];
-    [key: string]: unknown;
-  } | null;
-  [key: string]: unknown;
-} | null | undefined;
+export type PendingSbtDeployReceipt =
+  | {
+      transactionHash?: string;
+      events?: unknown[];
+      logs?: unknown[];
+      receipt?: {
+        logs?: unknown[];
+        [key: string]: unknown;
+      } | null;
+      [key: string]: unknown;
+    }
+  | null
+  | undefined;
 
 type CreateSbtForPendingDraft = (
   providerLike: unknown,
@@ -39,7 +42,7 @@ type CreateSbtForPendingDraft = (
   finalGroupPasswordHash: string,
   sessionConfigForDeploy: AnyRecord,
   create2Salt: string,
-  createOptions: PendingSbtCreateOptions
+  createOptions: PendingSbtCreateOptions,
 ) => Promise<PendingSbtDeployReceipt>;
 
 type DeploySessionWizardPendingSbtDraftResult = {
@@ -69,17 +72,11 @@ export const buildPendingSbtDeployContextSignature = (
   fallbackChainId: ChainIdLike = null,
 ): string => {
   // Stronger invalidation and slug-finalization rules for linked pending SBT drafts remain future work.
-  const chainId = Number(
-    sessionLike?.networkChainId ||
-    sessionLike?.contracts?.sbtFactory?.chainId ||
-    fallbackChainId ||
-    0
-  ) || 0;
-  const sbtFactoryAddress = toStr(
-    sessionLike?.contracts?.sbtFactory?.address ||
-    sessionLike?.sbtFactoryAddress ||
-    ''
-  ).trim().toLowerCase();
+  const chainId =
+    Number(sessionLike?.networkChainId || sessionLike?.contracts?.sbtFactory?.chainId || fallbackChainId || 0) || 0;
+  const sbtFactoryAddress = toStr(sessionLike?.contracts?.sbtFactory?.address || sessionLike?.sbtFactoryAddress || '')
+    .trim()
+    .toLowerCase();
   return `${chainId}|${sbtFactoryAddress}`;
 };
 
@@ -162,8 +159,8 @@ export const deploySessionWizardPendingSbtDraft = async ({
     workerUrlOverride,
     createSbtComponentProps,
   });
-  const hasPasswordMintOnChain = finalizedDraft.hasPasswordMintOnChain === true
-    || hasPasswordMintForSbtMintMode(finalizedDraft.mintModeOnChain);
+  const hasPasswordMintOnChain =
+    finalizedDraft.hasPasswordMintOnChain === true || hasPasswordMintForSbtMintMode(finalizedDraft.mintModeOnChain);
   const receipt = await createSBT(
     providerLike,
     finalizedDraft.contractName,
@@ -200,10 +197,11 @@ export const persistSessionWizardSbtRecoveryCodes = ({
 } = {}) => {
   const codesToStore = finalizedDraft.usesInviteCodes
     ? [toStr(finalizedDraft.groupPassword).trim()].filter(Boolean)
-    : (Array.isArray(finalizedDraft.passwordList) ? finalizedDraft.passwordList : [])
-      .filter((value) => toStr(value).trim());
-  const hasPasswordMintOnChain = finalizedDraft.hasPasswordMintOnChain === true
-    || hasPasswordMintForSbtMintMode(finalizedDraft.mintModeOnChain);
+    : (Array.isArray(finalizedDraft.passwordList) ? finalizedDraft.passwordList : []).filter((value) =>
+        toStr(value).trim(),
+      );
+  const hasPasswordMintOnChain =
+    finalizedDraft.hasPasswordMintOnChain === true || hasPasswordMintForSbtMintMode(finalizedDraft.mintModeOnChain);
 
   if (!hasPasswordMintOnChain || codesToStore.length === 0) {
     return {

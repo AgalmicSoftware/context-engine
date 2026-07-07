@@ -3,19 +3,14 @@ import { ethers } from 'ethers';
 import { normalizeBlockLimitsForConfig } from '../../utilities/session/blockLimits.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { sanitizeSessionWizardMetadataPayload } from '../Sessions/sessionWizardWriteNormalization.js';
-import {
-  inferAiProviderFromModel,
-  normalizeAiProvider,
-} from './adminPageHelpers';
+import { inferAiProviderFromModel, normalizeAiProvider } from './adminPageHelpers';
 import {
   formatDefaultFilterStateDraft,
   formatDelimitedDraftList,
   parseDefaultFilterStateDraft,
   parseDelimitedDraftList,
 } from './adminPageDraftFormattingHelpers';
-import {
-  dedupeSbtSelections,
-} from './adminPageSbtGateSelectionHelpers';
+import { dedupeSbtSelections } from './adminPageSbtGateSelectionHelpers';
 
 const deepClone = (value: any) => JSON.parse(JSON.stringify(value || {}));
 
@@ -38,27 +33,26 @@ const ADMIN_EDITABLE_CONTRACT_FIELDS = Object.freeze([
 ]);
 
 export const ADMIN_EDITABLE_CONTRACT_KEY_SET: any = new Set(
-  ADMIN_EDITABLE_CONTRACT_FIELDS.map(({ contractKey }: any) => contractKey)
+  ADMIN_EDITABLE_CONTRACT_FIELDS.map(({ contractKey }: any) => contractKey),
 );
 
 const getAdminContractChainIdFallback = (metadata: any = {}, contractKey: any = '') => {
   const existingChainId = Number(metadata?.contracts?.[contractKey]?.chainId || 0) || 0;
   if (existingChainId) return existingChainId;
   if (contractKey === 'sessionRegistry') {
-    return Number(
-      metadata?.__registry?.registryChainId ||
-      metadata?.registryChainId ||
-      metadata?.__registry?.chainId ||
-      metadata?.networkChainId ||
-      0
-    ) || 0;
+    return (
+      Number(
+        metadata?.__registry?.registryChainId ||
+          metadata?.registryChainId ||
+          metadata?.__registry?.chainId ||
+          metadata?.networkChainId ||
+          0,
+      ) || 0
+    );
   }
-  return Number(
-    metadata?.networkChainId ||
-    metadata?.__registry?.chainId ||
-    metadata?.__registry?.registryChainId ||
-    0
-  ) || 0;
+  return (
+    Number(metadata?.networkChainId || metadata?.__registry?.chainId || metadata?.__registry?.registryChainId || 0) || 0
+  );
 };
 
 const normalizeAdminContractAddress = (raw: any, label: any) => {
@@ -72,21 +66,16 @@ const normalizeAdminContractAddress = (raw: any, label: any) => {
 };
 
 export const buildAdminMetadataDraft = (metadata: any = {}) => {
-  const fastModel = toStr(
-    metadata?.ai?.models?.fast?.model ||
-    metadata?.ai?.model ||
-    ADMIN_DEFAULT_AI_MODELS.fast
-  ).trim() || ADMIN_DEFAULT_AI_MODELS.fast;
-  const thinkingModel = toStr(
-    metadata?.ai?.models?.thinking?.model ||
-    metadata?.ai?.thinkingModel ||
-    ADMIN_DEFAULT_AI_MODELS.thinking
-  ).trim() || ADMIN_DEFAULT_AI_MODELS.thinking;
-  const transcriptionModel = toStr(
-    metadata?.ai?.models?.transcription?.model ||
-    metadata?.ai?.transcription ||
-    'whisper-1'
-  ).trim() || 'whisper-1';
+  const fastModel =
+    toStr(metadata?.ai?.models?.fast?.model || metadata?.ai?.model || ADMIN_DEFAULT_AI_MODELS.fast).trim() ||
+    ADMIN_DEFAULT_AI_MODELS.fast;
+  const thinkingModel =
+    toStr(
+      metadata?.ai?.models?.thinking?.model || metadata?.ai?.thinkingModel || ADMIN_DEFAULT_AI_MODELS.thinking,
+    ).trim() || ADMIN_DEFAULT_AI_MODELS.thinking;
+  const transcriptionModel =
+    toStr(metadata?.ai?.models?.transcription?.model || metadata?.ai?.transcription || 'whisper-1').trim() ||
+    'whisper-1';
 
   return {
     defaultTags: toStr(metadata?.defaultTags).trim(),
@@ -107,24 +96,21 @@ export const buildAdminMetadataDraft = (metadata: any = {}) => {
     faucetBalanceThresholdEth: toStr(metadata?.faucet?.balanceThresholdEth).trim(),
     aiFastProvider: normalizeAiProvider(
       metadata?.ai?.models?.fast?.provider ||
-      inferAiProviderFromModel(metadata?.ai?.models?.fast?.model) ||
-      metadata?.ai?.provider ||
-      metadata?.ai?.mode ||
-      'openai'
+        inferAiProviderFromModel(metadata?.ai?.models?.fast?.model) ||
+        metadata?.ai?.provider ||
+        metadata?.ai?.mode ||
+        'openai',
     ),
     aiFastModel: fastModel,
     aiThinkingProvider: normalizeAiProvider(
       metadata?.ai?.models?.thinking?.provider ||
-      inferAiProviderFromModel(metadata?.ai?.models?.thinking?.model) ||
-      metadata?.ai?.provider ||
-      metadata?.ai?.mode ||
-      'openai'
+        inferAiProviderFromModel(metadata?.ai?.models?.thinking?.model) ||
+        metadata?.ai?.provider ||
+        metadata?.ai?.mode ||
+        'openai',
     ),
     aiThinkingModel: thinkingModel,
-    aiTranscriptionProvider: normalizeAiProvider(
-      metadata?.ai?.models?.transcription?.provider || 'openai',
-      'openai'
-    ),
+    aiTranscriptionProvider: normalizeAiProvider(metadata?.ai?.models?.transcription?.provider || 'openai', 'openai'),
     aiTranscriptionModel: transcriptionModel,
   };
 };
@@ -144,15 +130,14 @@ export const applyAdminMetadataDraft = (metadata: any = {}, draft: any = {}) => 
   next.ignored_SBTs_LIST = parseDelimitedDraftList(draft.ignoredSbtsList);
   next.featured_SBTs_LIST = parseDelimitedDraftList(draft.featuredSbtsList);
 
-  const existingContracts = next.contracts && typeof next.contracts === 'object'
-    ? { ...next.contracts }
-    : {};
+  const existingContracts = next.contracts && typeof next.contracts === 'object' ? { ...next.contracts } : {};
   ADMIN_EDITABLE_CONTRACT_FIELDS.forEach(({ contractKey, draftKey, label }: any) => {
     const normalizedAddress = normalizeAdminContractAddress(draft[draftKey], label);
     if (!normalizedAddress) return;
-    const existingEntry = existingContracts[contractKey] && typeof existingContracts[contractKey] === 'object'
-      ? { ...existingContracts[contractKey] }
-      : {};
+    const existingEntry =
+      existingContracts[contractKey] && typeof existingContracts[contractKey] === 'object'
+        ? { ...existingContracts[contractKey] }
+        : {};
     const fallbackChainId = getAdminContractChainIdFallback(next, contractKey);
     existingContracts[contractKey] = {
       ...existingEntry,
@@ -174,14 +159,14 @@ export const applyAdminMetadataDraft = (metadata: any = {}, draft: any = {}) => 
 
   const hasExistingAi = !!(metadata && metadata.ai && typeof metadata.ai === 'object');
   const aiDefaults = buildAdminMetadataDraft({});
-  const aiDraftTouched = (
+  const aiDraftTouched =
     normalizeAiProvider(draft.aiFastProvider, aiDefaults.aiFastProvider) !== aiDefaults.aiFastProvider ||
     (toStr(draft.aiFastModel).trim() || aiDefaults.aiFastModel) !== aiDefaults.aiFastModel ||
     normalizeAiProvider(draft.aiThinkingProvider, aiDefaults.aiThinkingProvider) !== aiDefaults.aiThinkingProvider ||
     (toStr(draft.aiThinkingModel).trim() || aiDefaults.aiThinkingModel) !== aiDefaults.aiThinkingModel ||
-    normalizeAiProvider(draft.aiTranscriptionProvider, aiDefaults.aiTranscriptionProvider) !== aiDefaults.aiTranscriptionProvider ||
-    (toStr(draft.aiTranscriptionModel).trim() || aiDefaults.aiTranscriptionModel) !== aiDefaults.aiTranscriptionModel
-  );
+    normalizeAiProvider(draft.aiTranscriptionProvider, aiDefaults.aiTranscriptionProvider) !==
+      aiDefaults.aiTranscriptionProvider ||
+    (toStr(draft.aiTranscriptionModel).trim() || aiDefaults.aiTranscriptionModel) !== aiDefaults.aiTranscriptionModel;
 
   if (hasExistingAi || aiDraftTouched) {
     const ai = next.ai && typeof next.ai === 'object' ? { ...next.ai } : {};
@@ -199,7 +184,9 @@ export const applyAdminMetadataDraft = (metadata: any = {}, draft: any = {}) => 
         model: toStr(draft.aiThinkingModel).trim() || ADMIN_DEFAULT_AI_MODELS.thinking,
       },
       transcription: {
-        ...(existingModels.transcription && typeof existingModels.transcription === 'object' ? existingModels.transcription : {}),
+        ...(existingModels.transcription && typeof existingModels.transcription === 'object'
+          ? existingModels.transcription
+          : {}),
         provider: normalizeAiProvider(draft.aiTranscriptionProvider, 'openai'),
         model: toStr(draft.aiTranscriptionModel).trim() || 'whisper-1',
       },
@@ -211,7 +198,9 @@ export const applyAdminMetadataDraft = (metadata: any = {}, draft: any = {}) => 
 };
 
 const parseResourceDisplayAmount = (display: any) => {
-  const match = toStr(display).trim().match(/^([0-9]+(?:\.[0-9]+)?)\s+(AR|ETH)$/i);
+  const match = toStr(display)
+    .trim()
+    .match(/^([0-9]+(?:\.[0-9]+)?)\s+(AR|ETH)$/i);
   if (!match) return null;
   const amount = Number(match[1]);
   return Number.isFinite(amount) ? amount : null;
@@ -233,11 +222,10 @@ export const parseChainIdInput = (raw: any) => {
   return Number(matches[matches.length - 1]) || 0;
 };
 
-export const resolveAutoFeatureBySessionSlug = (metadata: any) => (
+export const resolveAutoFeatureBySessionSlug = (metadata: any) =>
   metadata?.autoFeatureSBTsBySessionSlug !== undefined
     ? metadata.autoFeatureSBTsBySessionSlug
-    : metadata?.autoFeatureSBTsWithFeaturedSbtTags
-);
+    : metadata?.autoFeatureSBTsWithFeaturedSbtTags;
 
 export const buildEditableSessionMetadataPayload = ({
   sessionConfig,
@@ -262,9 +250,8 @@ export const buildEditableSessionMetadataPayload = ({
   const existingAutoFeature = resolveAutoFeatureBySessionSlug(metadata);
   delete metadata.autoFeatureSBTsWithFeaturedSbtTags;
   if (hasAutoFeatureOverride) {
-    const overrideAutoFeature = autoFeatureSBTsBySessionSlug !== undefined
-      ? autoFeatureSBTsBySessionSlug
-      : autoFeatureSBTsWithFeaturedSbtTags;
+    const overrideAutoFeature =
+      autoFeatureSBTsBySessionSlug !== undefined ? autoFeatureSBTsBySessionSlug : autoFeatureSBTsWithFeaturedSbtTags;
     metadata.autoFeatureSBTsBySessionSlug = overrideAutoFeature === true;
   } else if (existingAutoFeature !== undefined) {
     metadata.autoFeatureSBTsBySessionSlug = existingAutoFeature;

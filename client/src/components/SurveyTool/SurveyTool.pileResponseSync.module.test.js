@@ -56,17 +56,7 @@ const flushAsyncCallbacks = async () => {
   await new Promise((resolve) => setTimeout(resolve, 0));
 };
 
-const syncClassSetState = (subject) => {
-  subject.setState = jest.fn((next, cb) => {
-    const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
-    if (patch && typeof patch === 'object') {
-      subject.state = { ...subject.state, ...patch };
-    }
-    if (typeof cb === 'function') cb();
-    return patch;
-  });
-  return subject.setState;
-};
+const mergeScopedQuestionResponses = (target = {}, source = {}) => mergeQuestionResponses(target, source);
 
 describe('SurveyTool pile response sync and JSON controls', () => {
   afterEach(() => {
@@ -547,21 +537,13 @@ describe('SurveyTool pile response sync and JSON controls', () => {
   });
 
   it('does not prefill pile answers from a borrowed general response cache when the slug is unresolved', () => {
-    const generalCfg = {
-      slug: '',
-      networkChainId: 84532,
-    };
-    const strictLookup = (slug) => (
-      String(slug || '').trim().toLowerCase() === ''
-        ? generalCfg
-        : null
-    );
-    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation(strictLookup);
-    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault').mockImplementation((slug) => (
-      strictLookup(slug) || generalCfg
-    ));
-    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({
-      '84532': {
+    const prefillPlan = buildPilePrefillReadPlan({
+      account: '0xabc',
+      networkIdStr: '',
+      pileQuestions: [createQuestion('q1')],
+    });
+    const readQuestionsCache = jest.fn(() => ({
+      84532: {
         questionResponses: {
           q1: {
             '0xabc': {

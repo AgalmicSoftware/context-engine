@@ -20,15 +20,23 @@ describe('SessionWizardHeader', () => {
     jest.clearAllMocks();
   });
 
-  it('renders the profile control without a duplicate Normal or Advanced switch', () => {
-    render(
-      <SessionWizardHeader
-        {...baseProps}
-        sessionModeProfileControl={<div data-testid="hosting-profile-control">hosting selector</div>}
-        sessionModeProfileLabel="Cloudflare"
-        wizardMode="normal"
-      />,
-    );
+  it('renders the default mode controls and forwards mode clicks', () => {
+    render(<SessionWizardHeader {...baseProps} wizardMode="normal" />);
+
+    expect(screen.getByRole('heading', { name: 'Session Setup' })).toBeInTheDocument();
+    expect(screen.queryByText('Advanced mode shows the full session configuration.')).not.toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_NORMAL)).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED)).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_NORMAL));
+
+    expect(baseProps.onEnterAdvancedMode).toHaveBeenCalledTimes(1);
+    expect(baseProps.onEnterNormalMode).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders sponsored display settings without changing the mode test ids', () => {
+    render(<SessionWizardHeader {...baseProps} hasSponsoredBundleLink wizardDisplaySettingsOpen />);
 
     expect(screen.getByRole('heading', { name: 'Session Setup (Cloudflare)' })).toBeInTheDocument();
     const hostingControl = screen.getByTestId('hosting-profile-control');

@@ -65,58 +65,6 @@ describe('sessionPublishReducer', () => {
     );
   });
 
-  it('publishes worker-canonical sessions through verified config persistence only', () => {
-    const plan = publishPlan({
-      persistWorkerConfig: true,
-      uploadMetadata: false,
-      registerSession: false,
-      refreshRegistryCache: false,
-    });
-
-    expect(buildSessionPublishEffectQueue(plan)).toEqual(['checkRequirements', 'persistWorkerConfig']);
-
-    const first = sessionPublishReducer(createInitialSessionPublishState({ status: 'editing' }), {
-      type: 'beginPublish',
-      plan,
-    });
-    const afterRequirements = sessionPublishReducer(first, {
-      type: 'effectSucceeded',
-      effect: 'checkRequirements',
-    });
-    const published = sessionPublishReducer(afterRequirements, {
-      type: 'effectSucceeded',
-      effect: 'persistWorkerConfig',
-      result: { workerUrl: 'https://worker.example.test' },
-    });
-
-    expect(afterRequirements).toEqual(
-      expect.objectContaining({
-        status: 'persistingWorkerConfig',
-        currentEffect: 'persistWorkerConfig',
-      }),
-    );
-    expect(published).toEqual(
-      expect.objectContaining({
-        status: 'published',
-        currentEffect: null,
-        workerUrl: 'https://worker.example.test',
-      }),
-    );
-    expect(published.completed).toEqual({
-      checkRequirements: true,
-      persistWorkerConfig: true,
-    });
-  });
-
-  it('preserves decentralized upload, registration, and registry refresh ordering', () => {
-    expect(buildSessionPublishEffectQueue(publishPlan())).toEqual([
-      'checkRequirements',
-      'uploadMetadata',
-      'registerSession',
-      'refreshRegistryCache',
-    ]);
-  });
-
   it('orders sponsored auto-deploy before metadata upload and registration', () => {
     const first = sessionPublishReducer(createInitialSessionPublishState({ status: 'editing' }), {
       type: 'beginPublish',

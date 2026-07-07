@@ -1,16 +1,16 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
-const SPONSORED_FAUCET_NOTICE = 'Faucet funding is currently provided by the sponsored bundle. Enter a private key here to override it.';
-const SPONSORED_DEPLOY_NOTICE = 'Deploy access is currently provided by the sponsored bundle. Enter a Cloudflare API token here to override it.';
+const SPONSORED_FAUCET_NOTICE =
+  'Faucet funding is currently provided by the sponsored bundle. Enter a private key here to override it.';
+const SPONSORED_DEPLOY_NOTICE =
+  'Deploy access is currently provided by the sponsored bundle. Enter a Cloudflare API token here to override it.';
 
-const getFieldInputByLabel = (labelText) => (
-  screen.getByText(labelText).parentElement.querySelector('input,textarea,select')
-);
+const getFieldInputByLabel = (labelText) =>
+  screen.getByText(labelText).parentElement.querySelector('input,textarea,select');
 
-const getToggleCheckbox = (labelText) => (
-  screen.getByText(labelText).closest('label').querySelector('input[type="checkbox"]')
-);
+const getToggleCheckbox = (labelText) =>
+  screen.getByText(labelText).closest('label').querySelector('input[type="checkbox"]');
 
 const enableAdvancedMode = () => {
   act(() => {
@@ -85,17 +85,20 @@ const setCloudflareTokenValue = (value) => {
 };
 
 const expectSponsoredStatus = async (message) => {
-  await waitFor(() => {
-    if (message instanceof RegExp) {
+  await waitFor(
+    () => {
+      if (message instanceof RegExp) {
+        expect(screen.getByTestId('ce-wizard-sponsored-status')).toHaveTextContent(message);
+        return;
+      }
+      if (message === 'Sponsored resources applied.') {
+        expect(screen.getByTestId('ce-wizard-sponsored-status')).toHaveTextContent(/^Sponsored resources applied:/i);
+        return;
+      }
       expect(screen.getByTestId('ce-wizard-sponsored-status')).toHaveTextContent(message);
-      return;
-    }
-    if (message === 'Sponsored resources applied.') {
-      expect(screen.getByTestId('ce-wizard-sponsored-status')).toHaveTextContent(/^Sponsored resources applied:/i);
-      return;
-    }
-    expect(screen.getByTestId('ce-wizard-sponsored-status')).toHaveTextContent(message);
-  }, { timeout: 10000 });
+    },
+    { timeout: 10000 },
+  );
 };
 
 const configureAdvancedUseUrlDeploy = async ({
@@ -125,7 +128,7 @@ const configureAdvancedUseUrlDeploy = async ({
   }
 
   const bundleUrlInput = screen.getByPlaceholderText(
-    'https://github.com/<org>/<repo>/releases/latest/download/sessionCorsWorker.bundle.js'
+    'https://github.com/<org>/<repo>/releases/latest/download/sessionCorsWorker.bundle.js',
   );
   setControlledInputValue(bundleUrlInput, bundleUrl);
   await waitFor(() => {
@@ -133,12 +136,10 @@ const configureAdvancedUseUrlDeploy = async ({
   });
   setControlledInputValue(
     screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_HELPER_URL),
-    'https://deploy-helper.example.test'
+    'https://deploy-helper.example.test',
   );
   await waitFor(() => {
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_HELPER_URL)).toHaveValue(
-      'https://deploy-helper.example.test'
-    );
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_HELPER_URL)).toHaveValue('https://deploy-helper.example.test');
   });
   setCloudflareTokenValue(cloudflareToken);
   fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {

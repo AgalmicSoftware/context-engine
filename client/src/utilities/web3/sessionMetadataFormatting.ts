@@ -71,9 +71,7 @@ export const normalizeSessionNameFields = (
   const next = metadata as UnknownRecord;
   const fallback = toStr(fallbackSessionName).trim();
   const sessionName = resolveSessionNameValue(next) || fallback;
-  const sessionSlug = normalizeSessionSlug(
-    toStr(options?.sessionSlug ?? next.sessionSlug ?? '').trim()
-  );
+  const sessionSlug = normalizeSessionSlug(toStr(options?.sessionSlug ?? next.sessionSlug ?? '').trim());
   if (sessionName) {
     next.sessionName = sessionName;
   } else {

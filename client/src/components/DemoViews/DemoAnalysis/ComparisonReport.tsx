@@ -347,7 +347,7 @@ const ComparisonReport = ({
 
   const selectedTagIDs = useMemo(
     () => new Set(Array.isArray(selectedTagIDsProp) ? selectedTagIDsProp : Array.from(internalSelectedTagIDs)),
-    [internalSelectedTagIDs, selectedTagIDsProp]
+    [internalSelectedTagIDs, selectedTagIDsProp],
   );
 
   const filteredRows = useMemo(() => {
@@ -558,8 +558,11 @@ const ComparisonReport = ({
       </button>
 
       <Collapse isOpen={reportOpen}>
-        <div id="demo-analysis-comparison-report-body" className={styles.reportCollapseBody} data-testid="demo-analysis-comparison-report-body">
-
+        <div
+          id="demo-analysis-comparison-report-body"
+          className={styles.reportCollapseBody}
+          data-testid="demo-analysis-comparison-report-body"
+        >
           <ComparisonLegend groups={comparisonGroups} colorScale={groupColorScale} />
           <TagLegend selectedTags={selectedTagsForLegend} colorScale={tagColorScale} />
 
@@ -591,7 +594,11 @@ const ComparisonReport = ({
                   </div>
                   {tagInfo.displayTags.length > 10 && (
                     <div className={styles.viewMoreContainer}>
-                      <button type="button" onClick={() => setShowAllTags((value) => !value)} className={styles.viewMoreButton}>
+                      <button
+                        type="button"
+                        onClick={() => setShowAllTags((value) => !value)}
+                        className={styles.viewMoreButton}
+                      >
                         {showAllTags ? 'Show Less' : `Show ${tagInfo.displayTags.length - 10} More Tags`}
                       </button>
                     </div>
@@ -635,7 +642,6 @@ const ComparisonReport = ({
               {hoveredContent}
             </div>
           )}
-
         </div>
       </Collapse>
     </div>

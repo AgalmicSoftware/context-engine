@@ -2,10 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 
 import SessionModeProfileField from './SessionModeProfileField';
-import {
-  SESSION_MODE_PRESET_IDS,
-  cloneSessionModePreset,
-} from '../../utilities/session/sessionModeProfile';
+import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 
 describe('SessionModeProfileField', () => {
   it('starts with no selected preset and gates Continue', () => {
@@ -17,6 +14,26 @@ describe('SessionModeProfileField', () => {
     expect(screen.getByTestId('ce-new-preset-trustless_public_decentralized')).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByText(/Hosted on Cloudflare\. Session-scoped by default\./)).toBeInTheDocument();
     expect(screen.getByText(/Published publicly and permanently unless you enable encryption\./)).toBeInTheDocument();
+    expect(screen.getByText('Cloudflare API token')).toBeInTheDocument();
+    expect(screen.getAllByText('AI provider key')).toHaveLength(2);
+    expect(screen.getByText('Arweave JWK')).toBeInTheDocument();
+    expect(screen.getByText('Arweave wallet/JWK')).toBeInTheDocument();
+    expect(screen.getAllByText('RPC URL/key')).toHaveLength(2);
+    expect(screen.getByText('Lit key only for Lit encryption')).toBeInTheDocument();
+    expect(screen.getByText('Lit API key if encryption is enabled')).toBeInTheDocument();
+  });
+
+  it('can render selected setup mode without the entry Continue button', () => {
+    const onChange = jest.fn();
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+
+    render(
+      <SessionModeProfileField registryChainId={11155420} value={profile} onChange={onChange} showContinue={false} />,
+    );
+
+    expect(screen.queryByTestId('ce-new-preset-continue')).not.toBeInTheDocument();
+    expect(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare')).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('button', { name: /advanced options/i })).toBeInTheDocument();
   });
 
   it('selects a preset and emits the compiled storage profile', () => {
@@ -33,19 +50,44 @@ describe('SessionModeProfileField', () => {
       }),
       expect.objectContaining({
         storageProfile: expect.objectContaining({ backend: 'arweave' }),
-      })
+      }),
     );
+  });
+
+  it('continues only after a mode profile exists', () => {
+    const onChange = jest.fn();
+    const onContinue = jest.fn();
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    const { rerender } = render(
+      <SessionModeProfileField registryChainId={11155420} onChange={onChange} onContinue={onContinue} />,
+    );
+
+    fireEvent.click(screen.getByTestId('ce-new-preset-continue'));
+    expect(onContinue).not.toHaveBeenCalled();
+
+    rerender(
+      <SessionModeProfileField
+        registryChainId={11155420}
+        value={profile}
+        onChange={onChange}
+        onContinue={onContinue}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('ce-new-preset-continue'));
+    expect(onContinue).toHaveBeenCalledTimes(1);
   });
 
   it('marks profile custom after an advanced override', () => {
     const onChange = jest.fn();
     const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
     const { rerender } = render(
-      <SessionModeProfileField registryChainId={11155420} value={profile} onChange={onChange} />
+      <SessionModeProfileField registryChainId={11155420} value={profile} onChange={onChange} />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: /advanced options/i }));
-    fireEvent.click(within(screen.getByRole('radiogroup', { name: /storage backend/i })).getByRole('radio', { name: /arweave/i }));
+    fireEvent.click(
+      within(screen.getByRole('radiogroup', { name: /storage backend/i })).getByRole('radio', { name: /arweave/i }),
+    );
 
     expect(onChange).toHaveBeenLastCalledWith(
       expect.objectContaining({
@@ -54,15 +96,11 @@ describe('SessionModeProfileField', () => {
       }),
       expect.objectContaining({
         storageProfile: expect.objectContaining({ backend: 'arweave' }),
-      })
+      }),
     );
 
     rerender(
-      <SessionModeProfileField
-        registryChainId={11155420}
-        value={onChange.mock.calls[0][0]}
-        onChange={onChange}
-      />
+      <SessionModeProfileField registryChainId={11155420} value={onChange.mock.calls[0][0]} onChange={onChange} />,
     );
     expect(screen.getByText('Custom')).toBeInTheDocument();
   });
@@ -90,15 +128,16 @@ describe('SessionModeProfileField', () => {
     fireEvent.click(screen.getByRole('button', { name: /advanced options/i }));
 
     expect(screen.getByText('Choose a registry chain before enabling Lit.')).toBeInTheDocument();
-    expect(within(screen.getByRole('radiogroup', { name: /encryption/i })).getByRole('radio', { name: /lit/i }))
-      .toBeDisabled();
+    expect(
+      within(screen.getByRole('radiogroup', { name: /encryption/i })).getByRole('radio', { name: /lit/i }),
+    ).toBeDisabled();
   });
 
   it('selects worker envelope only under Cloudflare and emits condition defaults', () => {
     const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
     const onChange = jest.fn();
     const { rerender } = render(
-      <SessionModeProfileField registryChainId={11155420} value={profile} onChange={onChange} />
+      <SessionModeProfileField registryChainId={11155420} value={profile} onChange={onChange} />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: /advanced options/i }));
@@ -113,7 +152,7 @@ describe('SessionModeProfileField', () => {
         storageProfile: expect.objectContaining({
           payloadAccessControl: { gate: 'sbt_gate', encryption: 'worker_envelope' },
         }),
-      })
+      }),
     );
 
     const selected = onChange.mock.calls.at(-1)?.[0];
@@ -139,7 +178,7 @@ describe('SessionModeProfileField', () => {
             },
           }),
         }),
-      })
+      }),
     );
   });
 
@@ -150,8 +189,9 @@ describe('SessionModeProfileField', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /advanced options/i }));
 
-    expect(screen.getByText(/Worker envelope encryption is available only with Cloudflare storage/))
-      .toBeInTheDocument();
+    expect(
+      screen.getByText(/Worker envelope encryption is available only with Cloudflare storage/),
+    ).toBeInTheDocument();
     expect(screen.getByTestId('ce-new-encryption-worker_envelope')).toBeDisabled();
   });
 });

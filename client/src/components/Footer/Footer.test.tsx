@@ -111,13 +111,23 @@ describe('Footer', () => {
   });
 
   it('uses larger footer text in the full-screen layout', () => {
-    expect(footerStylesheet).toMatch(/@media \(min-width:\s*1367px\)\s*{[\s\S]*?\.footer\s*{[\s\S]*?\.copyright\s*{[\s\S]*?font-size:\s*1\.18rem;/);
-    expect(footerStylesheet).toMatch(/@media \(min-width:\s*1367px\)\s*{[\s\S]*?\.footer\s*{[\s\S]*?nav\s*{[\s\S]*?ul\s*{[\s\S]*?li \.footerLink\s*{[\s\S]*?font-size:\s*1\.18rem;/);
-    expect(footerStylesheet).toMatch(/@media \(min-width:\s*1367px\)\s*{[\s\S]*?\.footerLink\s*{[\s\S]*?font-size:\s*1\.18rem;/);
+    expect(footerStylesheet).toMatch(
+      /@media \(min-width:\s*1367px\)\s*{[\s\S]*?\.footer\s*{[\s\S]*?\.copyright\s*{[\s\S]*?font-size:\s*1\.18rem;/,
+    );
+    expect(footerStylesheet).toMatch(
+      /@media \(min-width:\s*1367px\)\s*{[\s\S]*?\.footer\s*{[\s\S]*?nav\s*{[\s\S]*?ul\s*{[\s\S]*?li \.footerLink\s*{[\s\S]*?font-size:\s*1\.18rem;/,
+    );
+    expect(footerStylesheet).toMatch(
+      /@media \(min-width:\s*1367px\)\s*{[\s\S]*?\.footerLink\s*{[\s\S]*?font-size:\s*1\.18rem;/,
+    );
   });
 
   it('keeps desktop footer nav links as large as the attribution text', () => {
-    expect(footerStylesheet).toMatch(/@media \(min-width:\s*769px\) and \(max-width:\s*1366px\)\s*{[\s\S]*?\.footer\s*{[\s\S]*?\.copyright\s*{[\s\S]*?font-family:\s*inherit;/);
-    expect(footerStylesheet).toMatch(/@media \(min-width:\s*769px\) and \(max-width:\s*1366px\)\s*{[\s\S]*?\.footer\s*{[\s\S]*?nav\s*{[\s\S]*?ul\s*{[\s\S]*?li \.footerLink\s*{[\s\S]*?font-size:\s*1rem;/);
+    expect(footerStylesheet).toMatch(
+      /@media \(min-width:\s*769px\) and \(max-width:\s*1366px\)\s*{[\s\S]*?\.footer\s*{[\s\S]*?\.copyright\s*{[\s\S]*?font-family:\s*inherit;/,
+    );
+    expect(footerStylesheet).toMatch(
+      /@media \(min-width:\s*769px\) and \(max-width:\s*1366px\)\s*{[\s\S]*?\.footer\s*{[\s\S]*?nav\s*{[\s\S]*?ul\s*{[\s\S]*?li \.footerLink\s*{[\s\S]*?font-size:\s*1rem;/,
+    );
   });
 });

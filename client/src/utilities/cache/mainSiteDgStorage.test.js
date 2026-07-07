@@ -11,12 +11,16 @@ jest.mock('utilities/logging', () => ({
   createLogger: jest.fn(() => mockLogger),
 }));
 
-jest.mock('../../utilities/cache/cacheScripts', () => ({
-  __esModule: true,
-  peekCacheSync: jest.fn(),
-  removeCache: jest.fn(),
-  writeCacheOptimistic: jest.fn(),
-}));
+jest.mock(
+  '../../utilities/cache/cacheScripts.js',
+  () => ({
+    __esModule: true,
+    peekCacheSync: jest.fn(),
+    removeCache: jest.fn(),
+    writeCacheOptimistic: jest.fn(),
+  }),
+  { virtual: true },
+);
 
 jest.mock('../../components/MainSite/cacheConstants', () => ({
   __esModule: true,

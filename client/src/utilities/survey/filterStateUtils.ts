@@ -125,9 +125,9 @@ export function serializeFilterState(filterStateObj: FilterStateRecord | null | 
 
     // Convert to Base64URL format
     const base64UrlString = base64String
-      .replace(/\+/g, '-')  // Replace '+' with '-'
-      .replace(/\//g, '_')  // Replace '/' with '_'
-      .replace(/=+$/, '');   // Remove trailing '=' padding
+      .replace(/\+/g, '-') // Replace '+' with '-'
+      .replace(/\//g, '_') // Replace '/' with '_'
+      .replace(/=+$/, ''); // Remove trailing '=' padding
 
     return base64UrlString;
   } catch (error) {
@@ -158,8 +158,8 @@ export function deserializeFilterState(base64UrlString: string | null | undefine
   try {
     // Convert Base64URL back to standard Base64
     let base64String = base64UrlString
-      .replace(/-/g, '+')  // Replace '-' with '+'
-      .replace(/_/g, '/');  // Replace '_' with '/'
+      .replace(/-/g, '+') // Replace '-' with '+'
+      .replace(/_/g, '/'); // Replace '_' with '/'
 
     // Add Base64 padding if necessary. Standard Base64 decoders might require it.
     // The length of a Base64 string (sans padding) must be a multiple of 4 when padded.
@@ -237,9 +237,7 @@ export function deserializeFilterStateStrict(base64UrlString: string | null | un
     throw new Error('Filter state string is empty.');
   }
 
-  let base64String = base64UrlString
-    .replace(/-/g, '+')
-    .replace(/_/g, '/');
+  let base64String = base64UrlString.replace(/-/g, '+').replace(/_/g, '/');
   const paddingLength = base64String.length % 4;
   if (paddingLength === 1) {
     throw new Error('Filter state string is malformed.');

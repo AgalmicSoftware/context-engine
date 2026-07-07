@@ -27,11 +27,11 @@ export const createDeferred = <T,>() => {
   return { promise, resolve, reject };
 };
 
-export const getDocumentLibraryStateUpdateWarnings = (spy: any) => spy.mock.calls.filter(([message]: any[]) => {
-  const text = String(message || '');
-  return text.includes('Warning: An update to DocumentLibraryPanel')
-    || text.includes('unmounted component');
-});
+export const getDocumentLibraryStateUpdateWarnings = (spy: any) =>
+  spy.mock.calls.filter(([message]: any[]) => {
+    const text = String(message || '');
+    return text.includes('Warning: An update to DocumentLibraryPanel') || text.includes('unmounted component');
+  });
 
 jest.mock('../../utilities/logging.js', () => ({
   createLogger: () => ({
@@ -53,7 +53,8 @@ jest.mock('../../utilities/docLibrary/config.js', () => ({
 
 jest.mock('../../utilities/crypto/litProtocol.js', () => ({
   buildSbtAccessControlConditions: (...args: any[]) => mockBuildSbtAccessControlConditions(...args),
-  getUnsupportedLitContractAccessControlError: (...args: any[]) => mockGetUnsupportedLitContractAccessControlError(...args),
+  getUnsupportedLitContractAccessControlError: (...args: any[]) =>
+    mockGetUnsupportedLitContractAccessControlError(...args),
   getGlobalLitHooks: (...args: any[]) => mockGetGlobalLitHooks(...args),
   litStorage: {
     buildLitArweaveUrl: (txId: string) => `https://lit.example.test/${txId}`,
@@ -88,18 +89,19 @@ jest.mock('../SBTs/SBTSelector', () => ({
     mockSBTSelector(props);
     return (
       <div data-testid="mock-sbt-selector">
-        <button type="button" onClick={() => props.onAddSBT?.({
-          address: '0x00000000000000000000000000000000000000aa',
-          name: 'Mock Selected SBT',
-          chainId: 84532,
-        })}
+        <button
+          type="button"
+          onClick={() =>
+            props.onAddSBT?.({
+              address: '0x00000000000000000000000000000000000000aa',
+              name: 'Mock Selected SBT',
+              chainId: 84532,
+            })
+          }
         >
           Add mock selected SBT
         </button>
-        <button
-          type="button"
-          onClick={() => props.onRemoveSBT?.('0x00000000000000000000000000000000000000aa')}
-        >
+        <button type="button" onClick={() => props.onRemoveSBT?.('0x00000000000000000000000000000000000000aa')}>
           Remove mock selected SBT
         </button>
         <div>

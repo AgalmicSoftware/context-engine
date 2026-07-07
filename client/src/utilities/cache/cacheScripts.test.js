@@ -352,24 +352,28 @@ describe('cacheScripts', () => {
     const { cacheScripts } = loadCacheScripts();
     await cacheScripts.initCacheManager();
 
-    expect(cacheScripts.getCacheBackendDiagnostics()).toEqual(expect.objectContaining({
-      persistentBackend: 'indexeddb',
-      probeState: 'ready',
-      idbAvailable: true,
-      didHydrateMirror: true,
-    }));
+    expect(cacheScripts.getCacheBackendDiagnostics()).toEqual(
+      expect.objectContaining({
+        persistentBackend: 'indexeddb',
+        probeState: 'ready',
+        idbAvailable: true,
+        didHydrateMirror: true,
+      }),
+    );
   });
 
   it('reports localstorage fallback as the managed cache backend when the idb probe fails', async () => {
     const { cacheScripts } = loadCacheScripts({ failProbe: true });
     await cacheScripts.initCacheManager();
 
-    expect(cacheScripts.getCacheBackendDiagnostics()).toEqual(expect.objectContaining({
-      persistentBackend: 'localstorage',
-      probeState: 'ready',
-      idbAvailable: false,
-      didHydrateMirror: true,
-    }));
+    expect(cacheScripts.getCacheBackendDiagnostics()).toEqual(
+      expect.objectContaining({
+        persistentBackend: 'localstorage',
+        probeState: 'ready',
+        idbAvailable: false,
+        didHydrateMirror: true,
+      }),
+    );
   });
 
   it('serializes atomic updates per key to avoid lost merges', async () => {
@@ -650,7 +654,7 @@ describe('cacheScripts', () => {
           slug: 'recovery-unrelated',
           value: { value: 'keep' },
         }),
-      ])
+      ]),
     );
 
     releaseOptimisticPersist();

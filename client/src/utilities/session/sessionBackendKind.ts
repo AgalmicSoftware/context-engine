@@ -1,7 +1,4 @@
-import {
-  hasLegacyTelegramFirstSessionFlags,
-  isSessionModeProfileTelegramFirst,
-} from './sessionModeProfile';
+import { hasLegacyTelegramFirstSessionFlags, isSessionModeProfileTelegramFirst } from './sessionModeProfile';
 
 export type SessionBackendKind = 'onchain' | 'telegram';
 
@@ -19,7 +16,9 @@ export type ResolveSessionBackendKindArgs = {
 };
 
 const normalizeSessionSlug = (value: unknown): string => {
-  const slug = String(value || '').trim().toLowerCase();
+  const slug = String(value || '')
+    .trim()
+    .toLowerCase();
   return slug === 'general' ? '' : slug;
 };
 
@@ -30,12 +29,13 @@ export const isTelegramFirstSessionConfig = (metadata: unknown): boolean => {
 export const resolveSessionBackendKind = ({
   sessionConfig = null,
   probeResult = null,
-}: ResolveSessionBackendKindArgs = {}): SessionBackendKind => (
-  isTelegramFirstSessionConfig(sessionConfig) || probeResult?.telegramOnly === true
+  sessionSlug = '',
+}: ResolveSessionBackendKindArgs = {}): SessionBackendKind =>
+  isTelegramFirstSessionConfig(sessionConfig) ||
+  (probeResult?.telegramOnly === true &&
+    (!normalizeSessionSlug(sessionSlug) ||
+      normalizeSessionSlug(probeResult.sessionSlug) === normalizeSessionSlug(sessionSlug)))
     ? 'telegram'
-    : 'onchain'
-);
+    : 'onchain';
 
-export const isTelegramSessionBackendKind = (kind: SessionBackendKind): boolean => (
-  kind === 'telegram'
-);
+export const isTelegramSessionBackendKind = (kind: SessionBackendKind): boolean => kind === 'telegram';

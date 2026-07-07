@@ -566,9 +566,7 @@ const buildCanonicalEntry = (xid = ''): HistoricalFigureDemographicsEntry | null
 };
 
 const DEMO_PARTICIPANT_XIDS = Object.freeze(
-  (Array.isArray(historicalFigureUsers) ? historicalFigureUsers : [])
-    .map((figure) => String(figure?.username || '').trim())
-    .filter(Boolean)
+  historicalUserRecords.map((figure) => String(figure?.username || '').trim()).filter(Boolean),
 );
 
 const HISTORICAL_FIGURE_DEMOGRAPHICS = Object.freeze(

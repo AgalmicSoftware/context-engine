@@ -30,7 +30,7 @@ export type SessionWizardPublishReadinessDescriptor = {
 };
 
 export type SessionWizardPublishReadinessKind =
-  'blocked' | 'manual-metadata' | 'sponsored-auto-deploy' | 'uploaded-metadata' | 'worker-config' | 'worker-upload';
+  'blocked' | 'manual-metadata' | 'sponsored-auto-deploy' | 'uploaded-metadata' | 'worker-upload';
 
 export type SessionWizardPublishUiPlanInput = SessionWizardPublishReadinessInput & {
   buildMetadataGatewayUrl?: SessionWizardPublishMetadataGatewayUrlBuilder | null;
@@ -118,44 +118,30 @@ export function resolveSessionWizardPublishReadiness({
   metadataUrl,
   sessionModeProfile = null,
 }: SessionWizardPublishReadinessInput): SessionWizardPublishReadinessDescriptor {
-  const modeRequirements = resolveSessionWizardModeRequirements(sessionModeProfile);
   const canUploadMetadataNow =
-    !!resolvedWorkerBaseUrl && (workerMode === 'default' || (deployVerifiedInUi && deployWorkerMatchesConfiguredUrl));
+    !!resolvedWorkerBaseUrl &&
+    (workerMode === 'default' || usesDefaultWorkerUrl || (deployVerifiedInUi && deployWorkerMatchesConfiguredUrl));
   const uploadBlockedReason = !resolvedWorkerBaseUrl
     ? 'Set a worker URL before uploading metadata.'
-    : workerMode !== 'default' && !deployVerifiedInUi
+    : workerMode !== 'default' && !usesDefaultWorkerUrl && !deployVerifiedInUi
       ? 'Custom worker mode requires a successful deploy in this run before metadata upload.'
-      : workerMode !== 'default' && deployVerifiedInUi && !deployWorkerMatchesConfiguredUrl
+      : workerMode !== 'default' && !usesDefaultWorkerUrl && deployVerifiedInUi && !deployWorkerMatchesConfiguredUrl
         ? 'Configured worker URL differs from the last successful deploy URL; re-deploy or reset to the verified URL.'
         : 'Deploy the worker and ensure the worker URL is set before uploading metadata.';
   const hasManualMetadata = !!normalizeSessionWizardArweaveUri(manualMetadataUrl);
   const hasUploadedMetadata = !!normalizeSessionWizardArweaveUri(metadataUrl);
-  // Regression guard: a URL only proves where a custom worker lives. It does
-  // not prove that post-deploy config and required secrets reached that worker.
-  const canPersistWorkerConfigNow =
-    modeRequirements.isWorkerCanonical &&
-    !!resolvedWorkerBaseUrl &&
-    ((workerMode === 'default' && usesDefaultWorkerUrl) || (deployVerifiedInUi && deployWorkerMatchesConfiguredUrl));
-  const canPublishNow = modeRequirements.isWorkerCanonical
-    ? canPersistWorkerConfigNow || canUseSponsoredAutoDeployNow
-    : canUploadMetadataNow || canUseSponsoredAutoDeployNow || hasManualMetadata || hasUploadedMetadata;
-  const readinessKind: SessionWizardPublishReadinessKind = modeRequirements.isWorkerCanonical
-    ? canPersistWorkerConfigNow
-      ? 'worker-config'
-      : canUseSponsoredAutoDeployNow
-        ? 'sponsored-auto-deploy'
-        : 'blocked'
-    : hasManualMetadata
-      ? 'manual-metadata'
-      : hasUploadedMetadata
-        ? 'uploaded-metadata'
-        : canUploadMetadataNow
-          ? 'worker-upload'
-          : canUseSponsoredAutoDeployNow
-            ? 'sponsored-auto-deploy'
-            : 'blocked';
-  const showUploadBlockedReason =
-    !modeRequirements.isWorkerCanonical && !canPublishNow && !hasManualMetadata && !hasUploadedMetadata;
+  const canPublishNow =
+    canUploadMetadataNow || canUseSponsoredAutoDeployNow || hasManualMetadata || hasUploadedMetadata;
+  const readinessKind: SessionWizardPublishReadinessKind = hasManualMetadata
+    ? 'manual-metadata'
+    : hasUploadedMetadata
+      ? 'uploaded-metadata'
+      : canUploadMetadataNow
+        ? 'worker-upload'
+        : canUseSponsoredAutoDeployNow
+          ? 'sponsored-auto-deploy'
+          : 'blocked';
+  const showUploadBlockedReason = !canPublishNow && !hasManualMetadata && !hasUploadedMetadata;
 
   return {
     canUploadMetadataNow,

@@ -1,11 +1,5 @@
-import {
-  isTelegramFirstSessionConfig,
-  resolveSessionBackendKind,
-} from './sessionBackendKind';
-import {
-  SESSION_MODE_PRESET_IDS,
-  cloneSessionModePreset,
-} from './sessionModeProfile';
+import { isTelegramFirstSessionConfig, resolveSessionBackendKind } from './sessionBackendKind';
+import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from './sessionModeProfile';
 
 describe('sessionBackendKind', () => {
   it.each([
@@ -28,10 +22,27 @@ describe('sessionBackendKind', () => {
   });
 
   it('uses session-meta probe results when config is not locally available', () => {
-    expect(resolveSessionBackendKind({
-      sessionConfig: {},
-      probeResult: { ok: true, telegramOnly: true, telegramBridgeEnabled: true },
-    })).toBe('telegram');
+    expect(
+      resolveSessionBackendKind({
+        sessionConfig: {},
+        probeResult: { ok: true, telegramOnly: true, telegramBridgeEnabled: true },
+      }),
+    ).toBe('telegram');
+  });
+
+  it('ignores stale session-meta probe results from a different session slug', () => {
+    expect(
+      resolveSessionBackendKind({
+        sessionConfig: { slug: 'demo' },
+        sessionSlug: 'demo',
+        probeResult: {
+          ok: true,
+          sessionSlug: 'edge',
+          telegramOnly: true,
+          telegramBridgeEnabled: true,
+        },
+      }),
+    ).toBe('onchain');
   });
 
   it('defaults ordinary sessions to onchain', () => {

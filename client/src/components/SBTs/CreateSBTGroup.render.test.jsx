@@ -83,13 +83,13 @@ describe('CreateSBTGroup render and image authoring', () => {
     render(instance.render());
 
     const tokenInfoHeader = document.querySelector(
-      `[data-testid="${E2E_TESTIDS.SBT_CREATE_SECTION_HEADER}"][data-ce-section-key="tokenInfoCollapsed"]`
+      `[data-testid="${E2E_TESTIDS.SBT_CREATE_SECTION_HEADER}"][data-ce-section-key="tokenInfoCollapsed"]`,
     );
     const mintOptionsHeader = document.querySelector(
-      `[data-testid="${E2E_TESTIDS.SBT_CREATE_SECTION_HEADER}"][data-ce-section-key="mintOptionsCollapsed"]`
+      `[data-testid="${E2E_TESTIDS.SBT_CREATE_SECTION_HEADER}"][data-ce-section-key="mintOptionsCollapsed"]`,
     );
     const distributionHeader = document.querySelector(
-      `[data-testid="${E2E_TESTIDS.SBT_CREATE_SECTION_HEADER}"][data-ce-section-key="distributionOptionsCollapsed"]`
+      `[data-testid="${E2E_TESTIDS.SBT_CREATE_SECTION_HEADER}"][data-ce-section-key="distributionOptionsCollapsed"]`,
     );
 
     expect(tokenInfoHeader).toHaveAttribute('aria-expanded', 'true');
@@ -109,10 +109,10 @@ describe('CreateSBTGroup render and image authoring', () => {
     render(instance.render());
 
     const tokenInfoHeader = document.querySelector(
-      `[data-testid="${E2E_TESTIDS.SBT_CREATE_SECTION_HEADER}"][data-ce-section-key="tokenInfoCollapsed"]`
+      `[data-testid="${E2E_TESTIDS.SBT_CREATE_SECTION_HEADER}"][data-ce-section-key="tokenInfoCollapsed"]`,
     );
     const mintOptionsHeader = document.querySelector(
-      `[data-testid="${E2E_TESTIDS.SBT_CREATE_SECTION_HEADER}"][data-ce-section-key="mintOptionsCollapsed"]`
+      `[data-testid="${E2E_TESTIDS.SBT_CREATE_SECTION_HEADER}"][data-ce-section-key="mintOptionsCollapsed"]`,
     );
 
     expect(tokenInfoHeader).toHaveAttribute('aria-expanded', 'true');
@@ -187,10 +187,12 @@ describe('CreateSBTGroup render and image authoring', () => {
       Object.defineProperty(navigator, 'clipboard', {
         configurable: true,
         value: {
-          read: jest.fn().mockResolvedValue([{
-            types: ['image/png'],
-            getType: jest.fn().mockResolvedValue(clipboardBlob),
-          }]),
+          read: jest.fn().mockResolvedValue([
+            {
+              types: ['image/png'],
+              getType: jest.fn().mockResolvedValue(clipboardBlob),
+            },
+          ]),
           readText: jest.fn().mockResolvedValue(''),
         },
       });
@@ -210,7 +212,7 @@ describe('CreateSBTGroup render and image authoring', () => {
       await waitFor(() => {
         expect(screen.getByRole('img', { name: 'SBT artwork preview' })).toHaveAttribute(
           'src',
-          'blob:sbt-clipboard-preview'
+          'blob:sbt-clipboard-preview',
         );
       });
     } finally {
@@ -258,7 +260,7 @@ describe('CreateSBTGroup render and image authoring', () => {
       expect(instance.state.useImageUrl).toBe(true);
       expect(instance.state.sbtImageUrl).toBe('https://example.com/sbt-image.png');
       expect(screen.getByTestId(E2E_TESTIDS.SBT_CREATE_IMAGE_URL_INPUT)).toHaveValue(
-        'https://example.com/sbt-image.png'
+        'https://example.com/sbt-image.png',
       );
     } finally {
       Object.defineProperty(navigator, 'clipboard', {
@@ -340,7 +342,7 @@ describe('CreateSBTGroup render and image authoring', () => {
     const originalCreateObjectURL = URL.createObjectURL;
     const originalRevokeObjectURL = URL.revokeObjectURL;
     const existingFile = new File(['existing-image'], 'existing.png', { type: 'image/png' });
-    const oversizedBlob = new Blob([new Uint8Array((10 * 1024 * 1024) + 1)], { type: 'image/png' });
+    const oversizedBlob = new Blob([new Uint8Array(10 * 1024 * 1024 + 1)], { type: 'image/png' });
     const instance = makeInstance({
       network: { id: 84532, name: 'Base Sepolia' },
       sessionSlug: 'test',
@@ -362,10 +364,12 @@ describe('CreateSBTGroup render and image authoring', () => {
       Object.defineProperty(navigator, 'clipboard', {
         configurable: true,
         value: {
-          read: jest.fn().mockResolvedValue([{
-            types: ['image/png'],
-            getType: jest.fn().mockResolvedValue(oversizedBlob),
-          }]),
+          read: jest.fn().mockResolvedValue([
+            {
+              types: ['image/png'],
+              getType: jest.fn().mockResolvedValue(oversizedBlob),
+            },
+          ]),
           readText: jest.fn().mockResolvedValue(''),
         },
       });
@@ -383,7 +387,7 @@ describe('CreateSBTGroup render and image authoring', () => {
       expect(screen.getByText('existing.png')).toBeInTheDocument();
       expect(screen.getByRole('img', { name: 'SBT artwork preview' })).toHaveAttribute(
         'src',
-        'blob:existing-sbt-preview'
+        'blob:existing-sbt-preview',
       );
       expect(screen.getByText('Image too large (>10MB)')).toBeInTheDocument();
       expect(instance.state.sbtMinted).toBe(true);
@@ -417,9 +421,7 @@ describe('CreateSBTGroup render and image authoring', () => {
     instance.state.useImageUrl = false;
     URL.createObjectURL = jest.fn(() => 'blob:existing-sbt-preview');
     URL.revokeObjectURL = jest.fn();
-    mockFetchImageFromURL.mockRejectedValue(
-      new Error('Invalid image type')
-    );
+    mockFetchImageFromURL.mockRejectedValue(new Error('Invalid image type'));
 
     try {
       Object.defineProperty(navigator, 'clipboard', {
@@ -445,9 +447,14 @@ describe('CreateSBTGroup render and image authoring', () => {
       expect(screen.getByText('existing.png')).toBeInTheDocument();
       expect(screen.getByRole('img', { name: 'SBT artwork preview' })).toHaveAttribute(
         'src',
-        'blob:existing-sbt-preview'
+        'blob:existing-sbt-preview',
       );
       expect(screen.getByText('Invalid image type')).toBeInTheDocument();
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[sbt]',
+        'Failed to fetch pasted image via worker:',
+        expect.any(Error),
+      );
     } finally {
       Object.defineProperty(navigator, 'clipboard', {
         configurable: true,
@@ -541,7 +548,7 @@ describe('CreateSBTGroup render and image authoring', () => {
       expect(screen.getByText('existing.png')).toBeInTheDocument();
       expect(screen.getByRole('img', { name: 'SBT artwork preview' })).toHaveAttribute(
         'src',
-        'blob:existing-sbt-preview'
+        'blob:existing-sbt-preview',
       );
       expect(screen.getByText('Clipboard does not contain a supported image or URL.')).toBeInTheDocument();
     } finally {
@@ -558,36 +565,70 @@ describe('CreateSBTGroup render and image authoring', () => {
     const scssPath = path.join(__dirname, 'CreateSBTGroup.module.scss');
     const scss = fs.readFileSync(scssPath, 'utf8');
 
-    expect(scss).toMatch(/\.tokenInfoMetaCard\s*{[\s\S]*?padding:\s*0;[\s\S]*?background:\s*transparent;[\s\S]*?border:\s*none;/);
-    expect(scss).toMatch(/\.tagsContainer\s*{[\s\S]*?padding:\s*0;[\s\S]*?background:\s*transparent;[\s\S]*?border:\s*none;/);
+    expect(scss).toMatch(
+      /\.tokenInfoMetaCard\s*{[\s\S]*?padding:\s*0;[\s\S]*?background:\s*transparent;[\s\S]*?border:\s*none;/,
+    );
+    expect(scss).toMatch(
+      /\.tagsContainer\s*{[\s\S]*?padding:\s*0;[\s\S]*?background:\s*transparent;[\s\S]*?border:\s*none;/,
+    );
   });
 
   it('adds a narrow-panel stack while keeping lock controls inline on narrow and mobile views', () => {
     const scssPath = path.join(__dirname, 'CreateSBTGroup.module.scss');
     const scss = fs.readFileSync(scssPath, 'utf8');
 
-    expect(scss).toMatch(/\.createGroupExpanded\s*{[\s\S]*?container-type:\s*inline-size;[\s\S]*?container-name:\s*create-sbt-panel;/);
-    expect(scss).toMatch(/@mixin\s+tokenInfoNarrowLayout\s*{[\s\S]*?\.tokenInfoTopGrid,[\s\S]*?grid-template-columns:\s*1fr;/);
-    expect(scss).toMatch(/@mixin\s+tokenInfoNarrowLayout\s*{[\s\S]*?\.fieldLockRow\s*{[\s\S]*?flex-direction:\s*row;[\s\S]*?align-items:\s*flex-start;/);
-    expect(scss).toMatch(/@mixin\s+tokenInfoNarrowLayout\s*{[\s\S]*?\.imageUploadHeader\s*{[\s\S]*?flex-direction:\s*row;[\s\S]*?align-items:\s*center;/);
-    expect(scss).toMatch(/@mixin\s+tokenInfoNarrowLayout\s*{[\s\S]*?\.tagsInlineRow\s*{[\s\S]*?flex-direction:\s*row;[\s\S]*?align-items:\s*center;/);
-    expect(scss).toMatch(/@mixin\s+tokenInfoNarrowLayout\s*{[\s\S]*?\.addDocUrlSection\s*{[\s\S]*?flex-wrap:\s*wrap;[\s\S]*?>\s*\.inlineFieldLockControl\s*{[\s\S]*?order:\s*2;/);
-    expect(scss).not.toMatch(/@mixin\s+tokenInfoNarrowLayout\s*{[\s\S]*?\.fieldLockRow,\s*\.imageUploadHeader,\s*\.tagsInlineRow,\s*\.addDocUrlSection\s*{[\s\S]*?flex-direction:\s*column;/);
-    expect(scss).toMatch(/@media\s*\(max-width:\s*600px\)\s*{[\s\S]*?\.addDocUrlSection\s*{[\s\S]*?>\s*\.inlineFieldLockControl\s*{[\s\S]*?order:\s*2;/);
-    expect(scss).toMatch(/@media\s*\(max-width:\s*600px\)\s*{[\s\S]*?\.addDocUrlSection\s*{[\s\S]*?>\s*\.addDocUrlActionButton\s*{[\s\S]*?order:\s*3;[\s\S]*?width:\s*100%;/);
-    expect(scss).toMatch(/@container\s+create-sbt-panel\s*\(max-width:\s*820px\)\s*{\s*@include\s+tokenInfoNarrowLayout;/);
+    expect(scss).toMatch(
+      /\.createGroupExpanded\s*{[\s\S]*?container-type:\s*inline-size;[\s\S]*?container-name:\s*create-sbt-panel;/,
+    );
+    expect(scss).toMatch(
+      /@mixin\s+tokenInfoNarrowLayout\s*{[\s\S]*?\.tokenInfoTopGrid,[\s\S]*?grid-template-columns:\s*1fr;/,
+    );
+    expect(scss).toMatch(
+      /@mixin\s+tokenInfoNarrowLayout\s*{[\s\S]*?\.fieldLockRow\s*{[\s\S]*?flex-direction:\s*row;[\s\S]*?align-items:\s*flex-start;/,
+    );
+    expect(scss).toMatch(
+      /@mixin\s+tokenInfoNarrowLayout\s*{[\s\S]*?\.imageUploadHeader\s*{[\s\S]*?flex-direction:\s*row;[\s\S]*?align-items:\s*center;/,
+    );
+    expect(scss).toMatch(
+      /@mixin\s+tokenInfoNarrowLayout\s*{[\s\S]*?\.tagsInlineRow\s*{[\s\S]*?flex-direction:\s*row;[\s\S]*?align-items:\s*center;/,
+    );
+    expect(scss).toMatch(
+      /@mixin\s+tokenInfoNarrowLayout\s*{[\s\S]*?\.addDocUrlSection\s*{[\s\S]*?flex-wrap:\s*wrap;[\s\S]*?>\s*\.inlineFieldLockControl\s*{[\s\S]*?order:\s*2;/,
+    );
+    expect(scss).not.toMatch(
+      /@mixin\s+tokenInfoNarrowLayout\s*{[\s\S]*?\.fieldLockRow,\s*\.imageUploadHeader,\s*\.tagsInlineRow,\s*\.addDocUrlSection\s*{[\s\S]*?flex-direction:\s*column;/,
+    );
+    expect(scss).toMatch(
+      /@media\s*\(max-width:\s*600px\)\s*{[\s\S]*?\.addDocUrlSection\s*{[\s\S]*?>\s*\.inlineFieldLockControl\s*{[\s\S]*?order:\s*2;/,
+    );
+    expect(scss).toMatch(
+      /@media\s*\(max-width:\s*600px\)\s*{[\s\S]*?\.addDocUrlSection\s*{[\s\S]*?>\s*\.addDocUrlActionButton\s*{[\s\S]*?order:\s*3;[\s\S]*?width:\s*100%;/,
+    );
+    expect(scss).toMatch(
+      /@container\s+create-sbt-panel\s*\(max-width:\s*820px\)\s*{\s*@include\s+tokenInfoNarrowLayout;/,
+    );
   });
 
   it('keeps the create header tooltip large and pinned beside the title', () => {
     const scssPath = path.join(__dirname, 'CreateSBTGroup.module.scss');
     const scss = fs.readFileSync(scssPath, 'utf8');
 
-    expect(scss).toMatch(/\.headerContainer\s*{[\s\S]*?\.titleCluster\s*{[\s\S]*?display:\s*inline-flex;[\s\S]*?align-items:\s*center;[\s\S]*?gap:\s*14px;/);
+    expect(scss).toMatch(
+      /\.headerContainer\s*{[\s\S]*?\.titleCluster\s*{[\s\S]*?display:\s*inline-flex;[\s\S]*?align-items:\s*center;[\s\S]*?gap:\s*14px;/,
+    );
     expect(scss).toMatch(/\.createGroupTitle\s*{[\s\S]*?margin:\s*0;/);
-    expect(scss).toMatch(/\.createGroupTitleTooltip\s*{[\s\S]*?width:\s*1\.12em;[\s\S]*?height:\s*1\.12em;[\s\S]*?font-size:\s*clamp\(1\.9rem,\s*4\.7vw,\s*2\.45rem\);/);
-    expect(scss).toMatch(/@media\s*\(max-width:\s*900px\)\s*{[\s\S]*?\.titleCluster\s*{[\s\S]*?align-self:\s*flex-start;/);
-    expect(scss).toMatch(/@media\s*\(max-width:\s*600px\)\s*{[\s\S]*?\.createGroupTitle\s*{[\s\S]*?padding-right:\s*0;/);
-    expect(scss).toMatch(/@media\s*\(max-width:\s*600px\)\s*{[\s\S]*?\.createGroupTitleTooltip\s*{[\s\S]*?font-size:\s*clamp\(1\.9rem,\s*9vw,\s*2\.35rem\);/);
+    expect(scss).toMatch(
+      /\.createGroupTitleTooltip\s*{[\s\S]*?width:\s*1\.12em;[\s\S]*?height:\s*1\.12em;[\s\S]*?font-size:\s*clamp\(1\.9rem,\s*4\.7vw,\s*2\.45rem\);/,
+    );
+    expect(scss).toMatch(
+      /@media\s*\(max-width:\s*900px\)\s*{[\s\S]*?\.titleCluster\s*{[\s\S]*?align-self:\s*flex-start;/,
+    );
+    expect(scss).toMatch(
+      /@media\s*\(max-width:\s*600px\)\s*{[\s\S]*?\.createGroupTitle\s*{[\s\S]*?padding-right:\s*0;/,
+    );
+    expect(scss).toMatch(
+      /@media\s*\(max-width:\s*600px\)\s*{[\s\S]*?\.createGroupTitleTooltip\s*{[\s\S]*?font-size:\s*clamp\(1\.9rem,\s*9vw,\s*2\.35rem\);/,
+    );
   });
 
   it('uses muted large section header titles and collapses open headers to chevrons only', () => {
@@ -596,6 +637,8 @@ describe('CreateSBTGroup render and image authoring', () => {
 
     expect(scss).toMatch(/\.sectionHeaderButton\s*{[\s\S]*?font-family:\s*var\(--ce-font-body\);/);
     expect(scss).toMatch(/\.sectionHeaderButtonOpen\s*{[\s\S]*?justify-content:\s*flex-end;/);
-    expect(scss).toMatch(/\.sectionHeaderTitleText\s*{[\s\S]*?font-size:\s*1\.62rem;[\s\S]*?color:\s*rgba\(255,\s*255,\s*255,\s*0\.5\);/);
+    expect(scss).toMatch(
+      /\.sectionHeaderTitleText\s*{[\s\S]*?font-size:\s*1\.62rem;[\s\S]*?color:\s*rgba\(255,\s*255,\s*255,\s*0\.5\);/,
+    );
   });
 });

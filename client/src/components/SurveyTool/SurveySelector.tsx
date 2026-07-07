@@ -70,7 +70,7 @@ import contractScripts, {
   getAllSessionSlugs,
   getSessionConfigBySlug as getStrictSessionConfigBySlug,
   getSessionSlugByName,
-} from '../../utilities/web3/chainGateway.js';
+} from '../../utilities/web3/contractScripts.js';
 import { ethers, utils } from 'ethers';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { serializeFilterState, deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
@@ -286,7 +286,7 @@ export const SURVEY_SELECTOR_HEADER_SUBMIT_SPINNER_STYLE: React.CSSProperties = 
 export const LazyCreateQuestionsAndSurveys = React.lazy(() => import('./CreateQuestionsAndSurveys'));
 export const LazySurveyResults = React.lazy(() => import('./SurveyResults'));
 
-export const resolveSurveySelectorFilterButtonStyle = (isFilterActive: unknown): React.CSSProperties => (
+export const resolveSurveySelectorFilterButtonStyle = (isFilterActive: unknown): React.CSSProperties =>
   isFilterActive
     ? {
         color: SURVEY_SELECTOR_ACTIVE_FILTER_COLOR,
@@ -308,27 +308,6 @@ export const buildSurveySelectorDropdownItemClassName = (
 
 export const buildSurveySelectorHeaderSubmitButtonClassName = (styleMap: Record<string, string>) =>
   [styleMap.headerSubmitButton, styleMap.submitGlow].filter(Boolean).join(' ');
-
-const buildSurveySelectorFilterUrl = ({
-  pathname = '',
-  search = '',
-  hash = '',
-  serializedState = '',
-}: {
-  pathname?: string;
-  search?: string;
-  hash?: string;
-  serializedState?: string;
-}): string => {
-  const params = new URLSearchParams(String(search || ''));
-  if (serializedState) {
-    params.set('filter', serializedState);
-  } else {
-    params.delete('filter');
-  }
-  const query = params.toString();
-  return `${String(pathname || '')}${query ? `?${query}` : ''}${String(hash || '')}`;
-};
 
 const buildSurveySelectorFilterUrl = ({
   pathname = '',
@@ -507,8 +486,7 @@ type SurveySelectorQuestionCountSnapshot = {
   encryptedCount: number;
 };
 type SurveyQuestionsComponentType =
-  | React.ComponentType<SurveySelectorRecord>
-  | React.LazyExoticComponent<React.ComponentType<SurveySelectorRecord>>;
+  React.ComponentType<SurveySelectorRecord> | React.LazyExoticComponent<React.ComponentType<SurveySelectorRecord>>;
 type SurveyQuestionsComponentHost = {
   SurveyQuestionsComponent?: SurveyQuestionsComponentType;
 };
@@ -905,13 +883,11 @@ export class SurveySelector extends Component<any, any> {
     }
   };
 
-
-		  async fetchSurveys() {
-      const requestEpoch = (Number(this._surveySelectorFetchEpoch || 0) + 1);
-	      this._surveySelectorFetchEpoch = requestEpoch;
-      if (!this.state.loading) {
-		    this.setState(buildSurveySelectorLoadingPatch(true));
-      }
+  async fetchSurveys() {
+    const requestEpoch = Number(this._surveySelectorFetchEpoch || 0) + 1;
+    this._surveySelectorFetchEpoch = requestEpoch;
+    if (!this.state.loading) {
+      this.setState(buildSurveySelectorLoadingPatch(true));
     }
   };
 
@@ -921,6 +897,52 @@ export class SurveySelector extends Component<any, any> {
     if (!this.state.loading) {
       this.setState(buildSurveySelectorLoadingPatch(true));
     }
+
+    // 1. Resolve Context
+    const slug = resolveEffectiveSlug(this.props);
+    const surveyReadContext = resolveSurveyReadContext(this.props, slug);
+    const effectiveSlug = surveyReadContext.sessionSlug || slug;
+    const netIdStr = surveyReadContext.networkIdStr;
+
+    if (!netIdStr) {
+      if (requestEpoch !== this._surveySelectorFetchEpoch) return;
+      surveyLog.error('SurveySelector: Network ID is undefined in fetchSurveys.');
+      this.setState(buildSurveySelectorEmptySurveyListPatch());
+      return;
+    }
+
+    // 2. Read Caches (Pure Read - No Fetching)
+    let surveysCache = ensureSurveysNet(await readSurveysCacheAsync(effectiveSlug), netIdStr);
+    // Read path only: avoid write-on-read feedback loops via questionsCacheNonce.
+    if (requestEpoch !== this._surveySelectorFetchEpoch) return;
+
+    const surveyBag = surveysCache?.[netIdStr]?.surveys || {};
+
+    // 3. Build List from Cache
+    const userSubmittedSurveys = buildSurveySelectorSubmittedSurveyList(surveyBag);
+
+    // 4. Handle Cache Warmup State (Prevent flashing empty during transient re-fetches)
+    // Keep previous list when re-fetch produces empty AND context (slug+network) hasn't changed.
+    // This prevents unmounting SurveyQuestions during login-triggered cache re-reads.
+    const shouldKeepExisting =
+      userSubmittedSurveys.length === 0 &&
+      this.state.surveys &&
+      this.state.surveys.length > 0 &&
+      this._lastFetchSurveysSlug === effectiveSlug &&
+      this._lastFetchSurveysNetId === netIdStr;
+
+    if (shouldKeepExisting) {
+      if (requestEpoch !== this._surveySelectorFetchEpoch) return;
+      this.setState(buildSurveySelectorLoadingPatch(false), this.updateSelectedSurvey);
+      return;
+    }
+
+    if (requestEpoch !== this._surveySelectorFetchEpoch) return;
+    // Track context unconditionally so session/network switches always clear stale data.
+    this._lastFetchSurveysSlug = effectiveSlug;
+    this._lastFetchSurveysNetId = netIdStr;
+    this.setState(buildSurveySelectorLoadedSurveysPatch(userSubmittedSurveys), this.updateSelectedSurvey);
+  }
 
     // 1. Resolve Context
     const slug = resolveEffectiveSlug(this.props);
@@ -1724,10 +1746,10 @@ export class SurveySelector extends Component<any, any> {
             isSurveyCacheReady={this.props.isSurveyCacheReady}
             isSBTCacheReady={this.props.isSBTCacheReady}
             // Ref and handler for clear button
-	            questionFilterRef={this.questionFilterRef}
-	            onFilterActivityChange={this.handleFilterActivityChange}
-	            sessionSlug={this.props.sessionSlug}
-	            activeSessionSlug={activeSessionSlug}
+            questionFilterRef={this.questionFilterRef}
+            onFilterActivityChange={this.handleFilterActivityChange}
+            sessionSlug={this.props.sessionSlug}
+            activeSessionSlug={activeSessionSlug}
             sessionConfig={this.props.sessionConfig}
             ensureLightSbtUniverse={this.props.ensureLightSbtUniverse}
             ensureQuestionCached={this.props.ensureQuestionCached}
@@ -1966,9 +1988,7 @@ export class QuestionsDashboard extends Component<any, any> {
       );
     } else if (questions.length === 0 && Array.isArray(this.props.questionPool)) {
       this.props.questionPool.forEach((entry: QuestionsDashboardQuestionRow) => {
-        const questionIdRaw = (entry && entry.id != null && String(entry.id) !== '')
-          ? entry.id
-          : null;
+        const questionIdRaw = entry && entry.id != null && String(entry.id) !== '' ? entry.id : null;
         if (!questionIdRaw) return;
         const questionIdLower = String(questionIdRaw).toLowerCase();
         if (BLOCKED_QUESTION_IDS_SET.has(questionIdLower)) return;
@@ -2025,37 +2045,37 @@ export class QuestionsDashboard extends Component<any, any> {
       <div className={styles.questionsDashboard}>
         <div className={styles.questionsHeader}></div>
 
-      <QuestionFilter
-        ref={this.props.questionFilterRef}
-        onFilterActivityChange={this.props.onFilterActivityChange}
-        filterModalOpen={this.props.filterModalOpen}
-        toggleFilterModal={this.props.toggleFilterModal}
-        questions={this.state.questions}
-        questionResponses={this.state.questionResponses}
-        provider={this.props.provider}
-        network={this.props.network}
-        onFilter={this.handleFilteredQuestions}
-        onCountUpdate={this.props.onFilteredQuestionCountUpdate}
-        setFilterLoading={this.setFilterLoading}
-        defaultFilterState={this.props.defaultFilterState}
-        // Pass the active filterState so the component can initialize correctly from URL
-        filterState={this.props.filterState}
-        defaultFeaturedSBTs={this.props.defaultFeaturedSBTs}
-        activeSessionSlug={getActiveSessionSlugFromProps(this.props)}
-        sessionSlug={this.props.sessionSlug}
-        sessionConfig={this.props.sessionConfig}
-        ensureLightSbtUniverse={this.props.ensureLightSbtUniverse}
-        isQuestionCacheReady={this.props.isQuestionCacheReady}
-        isSurveyCacheReady={this.props.isSurveyCacheReady}
-        isSBTCacheReady={this.props.isSBTCacheReady}
-        currentViewModeForUrl={'questions'}
-        currentSurveyIdForUrl={null}
-        questionResponsesNonce={this.props.questionResponsesNonce}
-        questionsCacheNonce={this.props.questionsCacheNonce}
-        defaultTags={this.props.defaultTags}
-        /* Ensure per-group storage for filter prefs */
-        storageKeyPrefix={buildQuestionFilterStorageKeyPrefix(this.props, resolveEffectiveSlug(this.props))}
-      />
+        <QuestionFilter
+          ref={this.props.questionFilterRef}
+          onFilterActivityChange={this.props.onFilterActivityChange}
+          filterModalOpen={this.props.filterModalOpen}
+          toggleFilterModal={this.props.toggleFilterModal}
+          questions={this.state.questions}
+          questionResponses={this.state.questionResponses}
+          provider={this.props.provider}
+          network={this.props.network}
+          onFilter={this.handleFilteredQuestions}
+          onCountUpdate={this.props.onFilteredQuestionCountUpdate}
+          setFilterLoading={this.setFilterLoading}
+          defaultFilterState={this.props.defaultFilterState}
+          // Pass the active filterState so the component can initialize correctly from URL
+          filterState={this.props.filterState}
+          defaultFeaturedSBTs={this.props.defaultFeaturedSBTs}
+          activeSessionSlug={getActiveSessionSlugFromProps(this.props)}
+          sessionSlug={this.props.sessionSlug}
+          sessionConfig={this.props.sessionConfig}
+          ensureLightSbtUniverse={this.props.ensureLightSbtUniverse}
+          isQuestionCacheReady={this.props.isQuestionCacheReady}
+          isSurveyCacheReady={this.props.isSurveyCacheReady}
+          isSBTCacheReady={this.props.isSBTCacheReady}
+          currentViewModeForUrl={'questions'}
+          currentSurveyIdForUrl={null}
+          questionResponsesNonce={this.props.questionResponsesNonce}
+          questionsCacheNonce={this.props.questionsCacheNonce}
+          defaultTags={this.props.defaultTags}
+          /* Ensure per-group storage for filter prefs */
+          storageKeyPrefix={buildQuestionFilterStorageKeyPrefix(this.props, resolveEffectiveSlug(this.props))}
+        />
 
         {filterLoading ? (
           <div className={styles.loadingContainer}>

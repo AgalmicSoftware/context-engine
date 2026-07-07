@@ -302,32 +302,55 @@ describe('sbtOverviewPageHelpers', () => {
     expect(hasSBTsPageAuthoritativeSessionSlug({ sessionSlug: 'edge', sessionSlugExplicit: false })).toBe(false);
     expect(hasSBTsPageExplicitSessionSlug({ sessionSlug: 'edge' })).toBe(false);
     expect(hasSBTsPageExplicitSessionSlug({ sessionSlug: 'edge', sessionSlugExplicit: true })).toBe(true);
-    expect(resolveSBTsPageFeaturedSbtSessionSlug({
-      sessionSlug: 'top',
-      sbtInfo: { sessionSlug: 'info', sessionSlugExplicit: true },
-    })).toBe('info');
-    expect(resolveSBTsPageFeaturedSbtSessionSlug({
-      sessionSlug: 'top',
-      sessionSlugExplicit: true,
-      sbtInfo: { slug: 'legacy' },
-    })).toBe('top');
-    expect(resolveSBTsPageFeaturedSbtSessionSlug({
-      sbtInfo: { slug: 'legacy' },
-    })).toBe('legacy');
-    expect(resolveSBTsPageFeaturedSbtSessionSlug({
-      sessionSlug: 'alpha',
-      sessionSlugExplicit: false,
-      sbtInfo: { sessionSlug: 'alpha', sessionSlugExplicit: false },
-    })).toBeNull();
-    expect(resolveSBTsPageFeaturedSbtSessionSlug({
-      sbtInfo: { sessionSlug: 'legacy-compatible' },
-    }, { requireExplicitSessionSlug: true })).toBeNull();
-    expect(resolveSBTsPageFeaturedSbtSessionSlug({
-      sbtInfo: { slug: 'legacy' },
-    }, { requireExplicitSessionSlug: true })).toBeNull();
-    expect(resolveSBTsPageFeaturedSbtSessionSlug({
-      sbtInfo: { sessionSlug: 'explicit', sessionSlugExplicit: true },
-    }, { requireExplicitSessionSlug: true })).toBe('explicit');
+    expect(
+      resolveSBTsPageFeaturedSbtSessionSlug({
+        sessionSlug: 'top',
+        sbtInfo: { sessionSlug: 'info', sessionSlugExplicit: true },
+      }),
+    ).toBe('info');
+    expect(
+      resolveSBTsPageFeaturedSbtSessionSlug({
+        sessionSlug: 'top',
+        sessionSlugExplicit: true,
+        sbtInfo: { slug: 'legacy' },
+      }),
+    ).toBe('top');
+    expect(
+      resolveSBTsPageFeaturedSbtSessionSlug({
+        sbtInfo: { slug: 'legacy' },
+      }),
+    ).toBe('legacy');
+    expect(
+      resolveSBTsPageFeaturedSbtSessionSlug({
+        sessionSlug: 'alpha',
+        sessionSlugExplicit: false,
+        sbtInfo: { sessionSlug: 'alpha', sessionSlugExplicit: false },
+      }),
+    ).toBeNull();
+    expect(
+      resolveSBTsPageFeaturedSbtSessionSlug(
+        {
+          sbtInfo: { sessionSlug: 'legacy-compatible' },
+        },
+        { requireExplicitSessionSlug: true },
+      ),
+    ).toBeNull();
+    expect(
+      resolveSBTsPageFeaturedSbtSessionSlug(
+        {
+          sbtInfo: { slug: 'legacy' },
+        },
+        { requireExplicitSessionSlug: true },
+      ),
+    ).toBeNull();
+    expect(
+      resolveSBTsPageFeaturedSbtSessionSlug(
+        {
+          sbtInfo: { sessionSlug: 'explicit', sessionSlugExplicit: true },
+        },
+        { requireExplicitSessionSlug: true },
+      ),
+    ).toBe('explicit');
     expect(resolveSBTsPageFeaturedSbtSessionSlug(null)).toBeNull();
   });
 

@@ -1,5 +1,6 @@
 /** @file LoginAndSettingsModal.tsx */
 import React, { Component, Suspense } from 'react';
+import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import { ethers } from 'ethers';
 import { changeAccount } from '../../actions/accountActions.js';
@@ -23,16 +24,32 @@ import type { WagmiInjectedProps } from '../HooksHOC/withWagmiBridge';
 import '../../assets/css/contextEngine.scss';
 import styles from './Account.module.scss';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faWindowClose, faQuestionCircle, faCaretDown, faCaretUp } from '@fortawesome/free-solid-svg-icons';
+import {
+  faWindowClose,
+  faSpinner,
+  faQuestionCircle,
+  faWallet,
+  faBookmark,
+  faSignOutAlt,
+  faFingerprint,
+  faCog,
+  faCaretDown,
+  faCaretUp,
+} from '@fortawesome/free-solid-svg-icons';
+import MetaMaskLogo from 'assets/img/metamask_icon_white.png';
 
 // Reactstrap components
-import { Button, Card, CardHeader, CardFooter, Modal } from 'reactstrap';
+import { Button, Card, CardHeader, CardBody, CardFooter, Modal } from 'reactstrap';
 
 import CETooltip from '../Shared/CETooltip';
 import SessionChipSelector from '../Shared/SessionChipSelector';
 import { LoginSettingsSupportedResourceCard } from './LoginSettingsResourceSummary';
 import { LoginSettingsInlineNetworkSummary, LoginSettingsPanelNetworkSummary } from './LoginSettingsNetworkSummary';
-import { LoginSettingsConfigToggleControl, LoginSettingsControlRow } from './LoginSettingsControlRow';
+import {
+  LoginSettingsConfigToggleControl,
+  LoginSettingsControlRow,
+  LoginSettingsSessionSummary,
+} from './LoginSettingsControlRow';
 import LoginSettingsSectionCard from './LoginSettingsSectionCard';
 import { assignLoginAndSettingsModalLegacyStatics } from './loginAndSettingsModalLegacyStatics';
 import LoginModalDisplayBody from './LoginModalDisplayBody';
@@ -68,6 +85,7 @@ import {
   saveLocalResourceKeys,
   clearLocalResourceKeys,
 } from '../../utilities/session/resourceKeys.js';
+import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
 import { getWorkerSessionToken, clearAllWorkerSessionTokens } from '../../utilities/worker/workerAuth.js';
 import type { WorkerResourcePresence } from '../../utilities/worker/workerResourcePresence';
 import { resolveActiveSessionSlug, resolveSessionSlugFromPathname } from '../../utilities/session/sessionNaming.js';
@@ -113,8 +131,13 @@ import LoginAgentTokenPanel from './LoginAgentTokenPanel';
 import { createLoginAgentActions } from './loginAndSettingsAgentTokenActions';
 import { createLoginPasskeyActions } from './loginAndSettingsPasskeyActions';
 
-const accountLog = createLogger('account'); const normalizeAccountForComparison = (value: unknown): string => String(value || '').trim().toLowerCase();
-type AccountUserPageProps = { viewAddress?: string;
+const accountLog = createLogger('account');
+const normalizeAccountForComparison = (value: unknown): string =>
+  String(value || '')
+    .trim()
+    .toLowerCase();
+type AccountUserPageProps = {
+  viewAddress?: string;
   account?: string;
   provider?: string;
   minimized?: boolean;
@@ -123,9 +146,9 @@ type AccountUserPageProps = { viewAddress?: string;
   sessionConfig?: unknown;
   networkChainId?: unknown;
 };
-const AccountUserPage = React.lazy(
-  () => import("components/UserPage/UserPage")
-) as React.LazyExoticComponent<React.ComponentType<AccountUserPageProps>>;
+const AccountUserPage = React.lazy(() => import('components/UserPage/UserPage')) as React.LazyExoticComponent<
+  React.ComponentType<AccountUserPageProps>
+>;
 
 type LoginAndSettingsRecord = Record<string, any>;
 
@@ -226,15 +249,21 @@ type AiPresetConfig = {
   models?: Readonly<Record<string, unknown>>;
 };
 
-type ChainIdLike = {
-  id?: unknown;
-  chainId?: unknown;
-} | null | undefined;
+type ChainIdLike =
+  | {
+      id?: unknown;
+      chainId?: unknown;
+    }
+  | null
+  | undefined;
 
-type WagmiBalanceLike = {
-  data?: { value?: unknown };
-  value?: unknown;
-} | null | undefined;
+type WagmiBalanceLike =
+  | {
+      data?: { value?: unknown };
+      value?: unknown;
+    }
+  | null
+  | undefined;
 
 type TestFundsRequestOptions = {
   source?: 'manual' | 'auto';
@@ -262,26 +291,22 @@ type SettingsOverviewContext = {
 };
 
 export { buildBookmarksRoutePath };
-const getErrorCode = (error: unknown) => (
-  error && typeof error === 'object' ? (error as { code?: unknown }).code : undefined
-);
-const uniqueList = <T = unknown>(values: T[] = []) => (
+const getErrorCode = (error: unknown) =>
+  error && typeof error === 'object' ? (error as { code?: unknown }).code : undefined;
+const getErrorMessage = (error: unknown): string =>
+  error instanceof Error
+    ? error.message
+    : error && typeof error === 'object'
+      ? toStr((error as { message?: unknown }).message)
+      : toStr(error);
+const uniqueList = <T = unknown,>(values: T[] = []) =>
   Array.from(
-    new Set(
-      (Array.isArray(values) ? values : []).filter((value): value is T => value !== undefined && value !== null)
-    )
-  )
-);
-const readChainIdLike = (value: ChainIdLike): unknown => (
-  value && typeof value === 'object'
-    ? value.id ?? value.chainId ?? 0
-    : 0
-);
-const readWagmiBalanceValue = (value: WagmiBalanceLike): unknown => (
-  value && typeof value === 'object'
-    ? value.data?.value ?? value.value ?? null
-    : null
-);
+    new Set((Array.isArray(values) ? values : []).filter((value): value is T => value !== undefined && value !== null)),
+  );
+const readChainIdLike = (value: ChainIdLike): unknown =>
+  value && typeof value === 'object' ? (value.id ?? value.chainId ?? 0) : 0;
+const readWagmiBalanceValue = (value: WagmiBalanceLike): unknown =>
+  value && typeof value === 'object' ? (value.data?.value ?? value.value ?? null) : null;
 const AI_PRESET_LABELS: Record<string, { label: string; badgeLabel: string }> = Object.freeze({
   'gpt-5': { label: 'GPT-5 (default)', badgeLabel: 'GPT-5' },
   'gpt-4o': { label: 'GPT-4o', badgeLabel: 'GPT-4o' },
@@ -290,13 +315,15 @@ const AI_PRESET_LABELS: Record<string, { label: string; badgeLabel: string }> = 
 });
 
 const AI_PRESET_OPTIONS: readonly AiPresetOption[] = Object.freeze([
-  ...Object.entries(AI_PRESET_CONFIGS as Record<string, AiPresetConfig>).map(([key, config]) => Object.freeze({
-    key,
-    label: AI_PRESET_LABELS[key]?.label || key,
-    badgeLabel: AI_PRESET_LABELS[key]?.badgeLabel || key,
-    provider: config.provider,
-    models: config.models,
-  })),
+  ...Object.entries(AI_PRESET_CONFIGS as Record<string, AiPresetConfig>).map(([key, config]) =>
+    Object.freeze({
+      key,
+      label: AI_PRESET_LABELS[key]?.label || key,
+      badgeLabel: AI_PRESET_LABELS[key]?.badgeLabel || key,
+      provider: config.provider,
+      models: config.models,
+    }),
+  ),
   Object.freeze({
     key: 'custom',
     label: 'Custom...',
@@ -304,23 +331,18 @@ const AI_PRESET_OPTIONS: readonly AiPresetOption[] = Object.freeze([
   }),
 ]);
 
-const deriveAiPresetKey = (settings: AiSettingsLike = {}) => deriveAiPreset({
-  mode: settings?.mode,
-  models: settings?.models,
-  modelProviders: settings?.modelProviders,
-});
+const deriveAiPresetKey = (settings: AiSettingsLike = {}) =>
+  deriveAiPreset({
+    mode: settings?.mode,
+    models: settings?.models,
+    modelProviders: settings?.modelProviders,
+  });
 
-const getAiPresetMeta = (presetKey: unknown = ''): AiPresetOption => (
-  AI_PRESET_OPTIONS.find((entry) => entry.key === presetKey) ||
-  AI_PRESET_OPTIONS[AI_PRESET_OPTIONS.length - 1]
-);
+const getAiPresetMeta = (presetKey: unknown = ''): AiPresetOption =>
+  AI_PRESET_OPTIONS.find((entry) => entry.key === presetKey) || AI_PRESET_OPTIONS[AI_PRESET_OPTIONS.length - 1];
 
 const formatAiPresetBadgeLabel = (settings: AiSettingsLike = {}) => {
-  const hasModelShape = !!(
-    settings?.models?.fast ||
-    settings?.models?.thinking ||
-    settings?.mode
-  );
+  const hasModelShape = !!(settings?.models?.fast || settings?.models?.thinking || settings?.mode);
   if (!hasModelShape) {
     return getAiPresetMeta('gpt-5').badgeLabel;
   }
@@ -333,11 +355,10 @@ const formatAiPresetBadgeLabel = (settings: AiSettingsLike = {}) => {
   );
 };
 
-const settingsSupportReasoning = (settings: AiSettingsLike = {}) => (
+const settingsSupportReasoning = (settings: AiSettingsLike = {}) =>
   [settings?.models?.fast, settings?.models?.thinking]
     .map((model) => toModelLeaf(model))
-    .some((modelLeaf) => /^(gpt-5|o[13])/.test(toStr(modelLeaf)))
-);
+    .some((modelLeaf) => /^(gpt-5|o[13])/.test(toStr(modelLeaf)));
 
 export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps, LoginAndSettingsModalState> {
   state: LoginAndSettingsModalState = (() => {
@@ -373,14 +394,11 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       resourceKeysStatus: '',
       sponsoredAccess: null,
       sponsoredAccessLoading: false,
-      workerResourcePresence: null,
       sessionScanScope: normalizeSessionScanScope(this.props.selectedSessionScope || readSessionScanScope()),
       sessionScanSlugs: Array.isArray(initialSessionScanSlugs) ? initialSessionScanSlugs : [],
-      sessionScanSlugsInput: (
-        Array.isArray(initialSessionScanSlugs)
-          ? initialSessionScanSlugs
-          : []
-      ).map((slug: string) => (slug ? slug : 'general')).join(', '),
+      sessionScanSlugsInput: (Array.isArray(initialSessionScanSlugs) ? initialSessionScanSlugs : [])
+        .map((slug: string) => (slug ? slug : 'general'))
+        .join(', '),
       sessionScanStatus: '',
       preLoginSettingsOpen: false,
       preLoginConfigOpen: false,
@@ -402,31 +420,60 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   _settingsOverviewMemo: { key: string; value: SettingsOverviewContext } | null = null;
   _passkeyActions = createLoginPasskeyActions({
     accountLogError: (message, error) => accountLog.error(message, error),
-    changeAccount: (payload) => this.props.changeAccount(payload), clearAllWorkerSessionTokens,
-    getAccount: () => this.props.account, getErrorMessage,
-    getProvider: () => this.props.provider, getTargetNetwork: () => this.getTargetNetwork(),
+    changeAccount: (payload) => this.props.changeAccount(payload),
+    clearAllWorkerSessionTokens,
+    getAccount: () => this.props.account,
+    getErrorMessage,
+    getProvider: () => this.props.provider,
+    getTargetNetwork: () => this.getTargetNetwork(),
     isCurrentAction: (actionId) => this.isCurrentPasskeyWalletAction(actionId),
-    normalizeAccountForComparison, notifyInfo: (message) => notify.info(message), passkeyWallet,
-    setStatus: (patch) => this.setStateIfMounted(patch), startAction: () => this.startPasskeyWalletAction(),
+    normalizeAccountForComparison,
+    notifyInfo: (message) => notify.info(message),
+    passkeyWallet,
+    setStatus: (patch) => this.setStateIfMounted(patch),
+    startAction: () => this.startPasskeyWalletAction(),
     updateLoginInfo: (payload) => this.props.updateLoginInfo(payload),
   });
   syncPasskeyWalletChain = this._passkeyActions.syncPasskeyWalletChain;
   getPasskeyWalletNetwork = this._passkeyActions.getPasskeyWalletNetwork;
-  handlePasskeyWalletCreate = this._passkeyActions.handlePasskeyWalletCreate; handlePasskeyWalletSignIn = this._passkeyActions.handlePasskeyWalletSignIn;
+  handlePasskeyWalletCreate = this._passkeyActions.handlePasskeyWalletCreate;
+  handlePasskeyWalletSignIn = this._passkeyActions.handlePasskeyWalletSignIn;
   _finalizePasskeyWalletLogin = this._passkeyActions._finalizePasskeyWalletLogin;
   _agentTokenActions = createLoginAgentActions({
     changeAccount: (payload) => this.props.changeAccount(payload),
-    exchangeAgentClientLogin, extractAgentClientToken,
-    getActiveSessionSlug: () => this.getActiveSessionSlug(), getAgentTokenInput: () => this.state.agentTokenInput, getDemoSessionConfigBySlug,
-    getPropSessionConfig: () => this.props.sessionConfig, getSessionConfigBySlugOrDefault,
-    getTargetNetwork: () => this.getTargetNetwork(), isTelegramFirstSessionConfig, normalizeSettingsSessionSlug,
-    setState: (patch) => this.setState(patch), setStateIfMounted: (patch) => this.setStateIfMounted(patch),
+    exchangeAgentClientLogin,
+    extractAgentClientToken,
+    getActiveSessionSlug: () => this.getActiveSessionSlug(),
+    getAgentTokenInput: () => this.state.agentTokenInput,
+    getDemoSessionConfigBySlug,
+    getPropSessionConfig: () => this.props.sessionConfig,
+    getSessionConfigBySlugOrDefault,
+    getTargetNetwork: () => this.getTargetNetwork(),
+    isTelegramFirstSessionConfig,
+    normalizeSettingsSessionSlug,
+    setState: (patch) => {
+      if (typeof patch === 'function') {
+        this.setState(
+          (prev) =>
+            patch(prev) as Pick<
+              LoginAndSettingsModalState,
+              'agentTokenError' | 'agentTokenInput' | 'agentTokenStatus' | 'agentTokenLoginOpen'
+            >,
+        );
+        return;
+      }
+      this.setState(
+        patch as Pick<LoginAndSettingsModalState, 'agentTokenError' | 'agentTokenInput' | 'agentTokenStatus'>,
+      );
+    },
+    setStateIfMounted: (patch) => this.setStateIfMounted(patch),
     updateLoginInfo: (payload) => this.props.updateLoginInfo(payload),
     windowTarget: typeof window !== 'undefined' ? window : null,
   });
   getDisplaySessionConfig = this._agentTokenActions.getDisplaySessionConfig;
   getAgentTokenLoginSessionContext = this._agentTokenActions.getAgentTokenLoginSessionContext;
-  shouldShowAgentTokenLogin = this._agentTokenActions.shouldShowAgentTokenLogin; toggleAgentTokenLogin = this._agentTokenActions.toggleAgentTokenLogin;
+  shouldShowAgentTokenLogin = this._agentTokenActions.shouldShowAgentTokenLogin;
+  toggleAgentTokenLogin = this._agentTokenActions.toggleAgentTokenLogin;
   handleAgentTokenLoginSubmit = this._agentTokenActions.handleAgentTokenLoginSubmit;
 
   getListModePrimarySessionSlug = (state: Partial<LoginAndSettingsModalState> = this.state) => {
@@ -461,7 +508,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       ? normalizedPropList[0]
       : String(normalizedPropList || '')
           .split(',')
-          .map((slug) => slug.trim())
+          .map((slug: any) => slug.trim())
           .filter(Boolean)[0];
     const effectiveListPrimary = listModePrimary || normalizeSettingsSessionSlug(propListPrimary);
     const listIncludesGeneral =
@@ -508,7 +555,16 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     const fallback = getChainById(DEFAULT_CHAIN_ID);
     if (fallback) return fallback;
 
-    return this.buildTargetNetworkDescriptor(DEFAULT_CHAIN_ID);
+    return {
+      id: DEFAULT_CHAIN_ID,
+      chainId: DEFAULT_CHAIN_ID,
+      name: `Chain ${DEFAULT_CHAIN_ID}`,
+      network: String(DEFAULT_CHAIN_ID),
+      nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
+      rpcUrls: { default: { http: [] }, public: { http: [] } },
+      blockExplorers: { default: { name: '', url: '' } },
+      unsupported: false,
+    };
   };
 
   async componentDidMount() {
@@ -523,13 +579,12 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     const restoredAddress = await passkeyWallet.restorePasskeyWalletSession({ requireSigner: false });
     if (!this._isMounted) return;
 
-    const restoreStillCurrent = (
+    const restoreStillCurrent =
       passkeyRestoreReqId === this._passkeyWalletRestoreReqId &&
-      passkeyActionIdAtRestoreStart === this._passkeyWalletActionId
-    );
+      passkeyActionIdAtRestoreStart === this._passkeyWalletActionId;
     if (restoredAddress && restoreStillCurrent) {
-       accountLog.log("Restored passkey wallet session:", restoredAddress);
-       const web3info = {
+      accountLog.log('Restored passkey wallet session:', restoredAddress);
+      const web3info = {
         account: restoredAddress,
         provider: 'passkey_eoa',
         network: passkeyNetwork,
@@ -539,7 +594,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       this.props.updateLoginInfo({
         loginInProgress: false,
         loginComplete: true,
-        provider: "passkey_eoa",
+        provider: 'passkey_eoa',
       });
     }
 
@@ -579,14 +634,11 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   getWalletChainId = (props: LoginAndSettingsModalProps = this.props) =>
     Number(
       props.provider === 'wagmi'
-        ? (readChainIdLike(props.wagmiNetwork) || readChainIdLike(props.network))
-        : readChainIdLike(props.network)
-    ) || null
-  );
+        ? readChainIdLike(props.wagmiNetwork) || readChainIdLike(props.network)
+        : readChainIdLike(props.network),
+    ) || null;
 
-  getWagmiBalanceInput = (props: LoginAndSettingsModalProps = this.props) => (
-    readWagmiBalanceValue(props.wagmiBalance)
-  );
+  getWagmiBalanceInput = (props: LoginAndSettingsModalProps = this.props) => readWagmiBalanceValue(props.wagmiBalance);
 
   areWalletBalanceInputsEqual = (leftBalance: unknown, rightBalance: unknown) => {
     if (leftBalance === rightBalance) return true;
@@ -655,7 +707,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     }
 
     if (props.provider === 'passkey_eoa' || props.provider === 'web3auth') {
-      const providerResolver = (
+      const providerResolver =
         typeof getProviderLocation === 'function'
           ? getProviderLocation
           : contractScripts && typeof contractScripts.getProviderLocation === 'function'
@@ -720,7 +772,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
 
   buildTestFundsErrorMessage = (error: unknown, { source = 'manual' }: TestFundsRequestOptions = {}) => {
     const prefix = source === 'auto' ? 'Auto-funding failed' : 'Get test gas failed';
-    const errorRecord = error && typeof error === 'object' ? error as Record<string, unknown> : {};
+    const errorRecord = error && typeof error === 'object' ? (error as Record<string, unknown>) : {};
     const baseMessage = toStr(errorRecord.message).trim() || 'Failed to request test gas.';
     const status = Number(errorRecord.status || 0) || 0;
     if (status && !baseMessage.includes(`(${status})`) && !baseMessage.includes(`HTTP ${status}`)) {
@@ -789,14 +841,13 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     return this._passkeyWalletActionId;
   };
 
-  isCurrentPasskeyWalletAction = (actionId: number): boolean => (
-    this._isMounted && actionId === this._passkeyWalletActionId
-  );
+  isCurrentPasskeyWalletAction = (actionId: number): boolean =>
+    this._isMounted && actionId === this._passkeyWalletActionId;
 
   handleLogout = async () => {
     this._passkeyWalletActionId += 1;
     if (this.props.provider === 'passkey_eoa') {
-       await passkeyWallet.logoutPasskeyWallet();
+      await passkeyWallet.logoutPasskeyWallet();
     }
 
     if (this.props.provider === 'wagmi' && this.props.wagmiDisconnect) {
@@ -817,19 +868,13 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     clearAllWorkerSessionTokens();
   };
 
-  componentDidUpdate(
-    prevProps: Readonly<LoginAndSettingsModalProps>,
-    prevState: Readonly<LoginAndSettingsModalState>,
-  ) {
+  componentDidUpdate(prevProps: Readonly<LoginAndSettingsModalProps>, prevState: Readonly<LoginAndSettingsModalState>) {
     let needsBalanceCheck = false;
     const activeSessionChanged =
       this.getActiveSessionSlug(this.props, this.state) !== this.getActiveSessionSlug(prevProps, prevState);
     const testFundsContextChanged =
       this.getTestFundsRequestContextKey(this.props, this.state) !==
       this.getTestFundsRequestContextKey(prevProps, prevState);
-    const accountChanged = this.props.account !== prevProps.account;
-    const settingsOpened = this.props.loginModalToggled && !prevProps.loginModalToggled;
-    const needsSponsoredAccessRefresh = accountChanged || activeSessionChanged || settingsOpened;
     if (this.getWalletChainId() !== this.getWalletChainId(prevProps)) needsBalanceCheck = true;
     if (accountChanged) {
       needsBalanceCheck = true;
@@ -924,7 +969,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
         shouldTrigger = currentBalance.lte(threshold);
       }
     } catch (e) {
-      accountLog.error("Error parsing wallet balance in auto-send check:", e);
+      accountLog.error('Error parsing wallet balance in auto-send check:', e);
     }
 
     if (shouldTrigger && !this.state.sendingTestFunds && !this.state.autoSendTriggered) {
@@ -959,7 +1004,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   };
 
   addCorrectNetwork = async () => {
-    if (window.ethereum && this.props.provider === "wagmi") {
+    if (window.ethereum && this.props.provider === 'wagmi') {
       try {
         const tn = this.getTargetNetwork();
         const chainIdHex = chainHexId(tn);
@@ -992,13 +1037,14 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
 
   switchToCorrectNetwork = async () => {
     const ethereum = window.ethereum;
-    if (ethereum && this.props.provider === "wagmi") {
+    if (ethereum && this.props.provider === 'wagmi') {
       const tn = this.getTargetNetwork();
       const chainIdHex = chainHexId(tn);
-      const switchToTargetNetwork = () => ethereum.request({
-        method: 'wallet_switchEthereumChain',
-        params: [{ chainId: chainIdHex }],
-      });
+      const switchToTargetNetwork = () =>
+        ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: chainIdHex }],
+        });
       try {
         await switchToTargetNetwork();
       } catch (error: any) {
@@ -1197,16 +1243,17 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     const reqId = (this._sponsoredReqId = (this._sponsoredReqId || 0) + 1);
     this.setStateIfMounted({ sponsoredAccessLoading: true, workerResourcePresence: null });
     try {
-      const { loadLoginSettingsSponsoredAccess } = await import('./loginSettingsSponsoredAccessRuntime');
-      const { accessMap, workerResourcePresence } = await loadLoginSettingsSponsoredAccess({
-        slug,
-        sessionConfig: verifiedWorkerConfig || getSessionConfigBySlugOrDefault(slug) || {},
-        account: this.props.account || '',
-        providerLike: this.props.provider || null,
-        // Regression guard: old workers may reject resource-presence. Only probe
-        // when the settings UI that consumes the result is actually visible.
-        includeWorkerResourcePresence: !!this.props.loginModalToggled,
-      });
+      const keys = ['ai', 'arweave', 'rpc', 'txGas'];
+      const results = await Promise.all(
+        keys.map((resourceKey: any) =>
+          checkSponsoredAccess({
+            sessionConfig: cfg,
+            sessionSlug: slug,
+            account,
+            resourceKey,
+          }),
+        ),
+      );
       if (reqId !== this._sponsoredReqId) return;
       this.setStateIfMounted({
         sponsoredAccess: accessMap,
@@ -1306,7 +1353,10 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   };
 
   handleAiModeChange = (event: any) => {
-    const nextMode = toStr(event?.target?.value || '').trim().toLowerCase() || 'openai';
+    const nextMode =
+      toStr(event?.target?.value || '')
+        .trim()
+        .toLowerCase() || 'openai';
     this.updateAiSettings((s: any) => {
       const next = {
         ...s,
@@ -1534,15 +1584,12 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     return descriptor.label || descriptor.slugLabel || 'General';
   };
 
-  renderConfigToggleControl = ({
-    expanded = false,
-    onToggle = null,
-    testId = '',
-  }: any = {}) => LoginSettingsConfigToggleControl({
-    expanded,
-    onToggle,
-    testId,
-  });
+  renderConfigToggleControl = ({ expanded = false, onToggle = null, testId = '' }: any = {}) =>
+    LoginSettingsConfigToggleControl({
+      expanded,
+      onToggle,
+      testId,
+    });
 
   renderSessionSummary = (activeSessionIn: any = null) => {
     const activeSession = activeSessionIn || this.getSessionDescriptor(this.getActiveSessionSlug());
@@ -1572,16 +1619,11 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       beforeConfig,
       betweenSessionAndTooltips,
       afterDemo,
-      tooltipsControl: LoginTooltipsToggleControl({
+      tooltipsControl: this.renderTooltipsToggleControl({
         infoId: tooltipsInfoId,
-        onToggle: () => this.props.toggleTooltips?.(),
         tooltipPlacement,
-        tooltipsEnabled: this.props.tooltipsEnabled !== false,
       }),
-      demoControl: LoginDemoSurfaceToggleControl({
-        demoSurfaceEnabled: this.props.demoSurfaceMode !== false,
-        onToggle: () => this.props.setDemoSurfaceMode?.(this.props.demoSurfaceMode === false),
-      }),
+      demoControl: this.renderDemoSurfaceToggleControl(),
       containerClassName,
       rowClassName,
       sessionHref: buildSettingsSessionHref(activeSession.slug),
@@ -1927,17 +1969,52 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
           sessionSelectTestId: 'ce-prelogin-session-select',
           scopePrefix: 'ce-prelogin-session-scope',
         })}
-      />
+        <div className={styles.preLoginSettingsTitle}>AI settings</div>
+        <label className={styles.preLoginSettingsField}>
+          <span className={styles.preLoginSettingsLabel}>OpenAI API key</span>
+          <input
+            type="password"
+            className={styles.preLoginSettingsInput}
+            value={openAiApiKey}
+            onChange={(event: any) => this.handlePreLoginAiProviderKeyChange('openai', event)}
+            placeholder="sk-..."
+          />
+        </label>
+        <label className={styles.preLoginSettingsField}>
+          <span className={styles.preLoginSettingsLabel}>Anthropic API key</span>
+          <input
+            type="password"
+            className={styles.preLoginSettingsInput}
+            value={anthropicApiKey}
+            onChange={(event: any) => this.handlePreLoginAiProviderKeyChange('anthropic', event)}
+            placeholder="sk-ant-..."
+          />
+        </label>
+        <label className={styles.preLoginSettingsField}>
+          <span className={styles.preLoginSettingsLabel}>AI endpoint</span>
+          <input
+            type="text"
+            className={styles.preLoginSettingsInput}
+            value={customRpcUrl}
+            onChange={this.handlePreLoginAiEndpointChange}
+            placeholder="https://your-ai-endpoint.example/v1"
+          />
+        </label>
+        <div className={styles.preLoginSettingsHint}>
+          Anthropic powers local text tasks here. Audio and transcription still use local OpenAI, session defaults, or a
+          custom endpoint until downloadable local transcription lands.
+        </div>
+      </div>
     );
   };
 
   getSettingsOverviewContext = () => {
-    const walletNet = (this.props.provider === 'wagmi' ? this.props.wagmiNetwork : this.props.network);
+    const walletNet = this.props.provider === 'wagmi' ? this.props.wagmiNetwork : this.props.network;
     const tn = this.getTargetNetwork();
     const targetNetworkName = tn?.name || 'not configured';
     const walletNetworkName = walletNet?.name || 'not connected';
     const corrId = Number(tn.id);
-    const isCorrectNetwork = (walletNet?.id === corrId);
+    const isCorrectNetwork = walletNet?.id === corrId;
     const needsNetworkSwitch = this.props.provider === 'wagmi' && !isCorrectNetwork && this.props.loginComplete;
     const showWalletNetwork = this.props.provider === 'wagmi' && !!walletNet && walletNet?.id !== corrId;
     const sessionSlug = this.getActiveSessionSlug();
@@ -2028,12 +2105,13 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     resourceLabel = '',
     sponsoredKeys = {},
     sponsorSessions = {},
-  }: any = {}) => formatLoginSettingsResourceSponsorHint({
-    resourceKey,
-    resourceLabel,
-    sponsoredKeys,
-    sponsorSessions,
-  });
+  }: any = {}) =>
+    formatLoginSettingsResourceSponsorHint({
+      resourceKey,
+      resourceLabel,
+      sponsoredKeys,
+      sponsorSessions,
+    });
 
   renderSupportedResourceCard = (card: any) => {
     const activeSession = card?.activeSession || this.getSessionDescriptor(this.getActiveSessionSlug());
@@ -2059,11 +2137,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     );
   };
 
-  renderStaticSettingsSection = ({
-    title = '',
-    summary = '',
-    children = null,
-  }: any = {}) => (
+  renderStaticSettingsSection = ({ title = '', summary = '', children = null }: any = {}) => (
     <LoginSettingsSectionCard title={title} summary={summary}>
       {children}
     </LoginSettingsSectionCard>
@@ -2110,12 +2184,9 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     const aiProvider = String(aiDisplay.mode || 'openai').toLowerCase();
     const localProvider = String(aiLocal.mode || 'openai').toLowerCase();
     const aiProviderLabel = formatLoginSettingsAiProviderLabel(aiProvider);
-    const aiPresetKey = aiDisplay?.preset || (
-      (
-        aiDisplay?.models?.fast ||
-        aiDisplay?.models?.thinking ||
-        aiDisplay?.mode
-      )
+    const aiPresetKey =
+      aiDisplay?.preset ||
+      (aiDisplay?.models?.fast || aiDisplay?.models?.thinking || aiDisplay?.mode
         ? deriveAiPresetKey(aiDisplay)
         : 'gpt-5');
     const aiPresetLabel = formatAiPresetBadgeLabel(aiDisplay);
@@ -2140,9 +2211,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
         ? aiAccessStatus === 'granted'
           ? 'Sponsored key configured (unlocked)'
           : aiAccessIsConfirmedLocked
-            ? overview.capabilities.gateKind === 'sbt'
-              ? 'Sponsored key configured (SBT required)'
-              : 'Sponsored key configured (session access required)'
+            ? 'Sponsored key configured (SBT required)'
             : 'Sponsored key configured'
         : 'No sponsored key set';
 
@@ -2162,9 +2231,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
         ? aiAccessStatus === 'granted'
           ? 'Encrypted session key is ready and the current wallet satisfies the sponsor gate.'
           : aiAccessStatus === 'denied'
-            ? overview.capabilities.gateKind === 'sbt'
-              ? 'Encrypted session key exists, but this wallet still needs the sponsor SBT gate.'
-              : 'Encrypted session key exists, but this identity does not satisfy the configured session gate.'
+            ? 'Encrypted session key exists, but this wallet still needs the sponsor SBT gate.'
             : 'Encrypted session key is available for this session.'
         : '';
 
@@ -2188,19 +2255,18 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
           activeSession,
           configOpen: this.state.aiSettingsOpen,
           onToggleConfig: this.toggleAiSettingsPanel,
-          betweenSessionAndTooltips:
-            cryptoTerminology && overview.capabilities.showNetworkControls
-              ? this.renderInlineNetworkSummary({
-                  targetNetworkName: overview.targetNetworkName,
-                  walletNetworkName: overview.walletNetworkName,
-                  showWalletNetwork: overview.showWalletNetwork,
-                  tooltipId: 'networkInfoTooltipInline',
-                })
-              : null,
+          betweenSessionAndTooltips: cryptoTerminology
+            ? this.renderInlineNetworkSummary({
+                targetNetworkName: overview.targetNetworkName,
+                walletNetworkName: overview.walletNetworkName,
+                showWalletNetwork: overview.showWalletNetwork,
+                tooltipId: 'networkInfoTooltipInline',
+              })
+            : null,
           afterDemo:
-            cryptoTerminology && overview.capabilities.showNetworkControls && needsNetworkSwitch ? (
+            cryptoTerminology && needsNetworkSwitch ? (
               <Button onClick={this.switchToCorrectNetwork} className={`${styles.networkSwitchButton} ${styles.glow}`}>
-                Switch to {overview.targetNetworkName}
+                Switch to {targetNetwork?.name || overview.targetNetworkName}
               </Button>
             ) : null,
           tooltipsInfoId: 'postLoginTooltipsToggleTooltip',
@@ -2226,13 +2292,6 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
                           scopePrefix: 'ce-web3modal-session-scope',
                         })}
                       </div>
-                      {overview.capabilities.isWorkerCanonical ? (
-                        <div className={styles.aiSettingsHint} data-testid="ce-settings-worker-session-access">
-                          Passkey session access: {this.props.loginComplete ? 'signed in' : 'sign-in required'} ·
-                          Session Worker: {toStr(sessionConfig?.corsWorkerUrl).trim() ? 'configured' : 'URL missing'} ·
-                          AI: {useLocalAi ? 'local override' : 'session default'}
-                        </div>
-                      ) : null}
                     </>
                   ),
                 })}
@@ -2240,77 +2299,357 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
                 {renderSection({
                   key: 'aiConfig',
                   title: 'AI config',
-                  summary: (useLocalAi ? 'Local override on' : 'Using session defaults') + ' · ' + aiPresetLabel,
+                  summary: `${useLocalAi ? 'Local override on' : 'Using session defaults'} · ${aiPresetLabel}`,
                   children: (
-                    <Suspense fallback={<div className={styles.aiSettingsHint}>Loading AI settings…</div>}>
-                      <LoginSettingsAiConfigContent
-                        aiDisplay={aiDisplay}
-                        aiPresetKey={aiPresetKey}
-                        aiPresetOptions={AI_PRESET_OPTIONS}
-                        aiProviderLabel={aiProviderLabel}
-                        aiSettingsDirty={this.state.aiSettingsDirty}
-                        aiSettingsStatus={this.state.aiSettingsStatus}
-                        handleAiModeChange={this.handleAiModeChange}
-                        handleAiPresetChange={this.handleAiPresetChange}
-                        handleAiToggleLocal={this.handleAiToggleLocal}
-                        handleClearAiSettings={this.handleClearAiSettings}
-                        handleSaveAiSettings={this.handleSaveAiSettings}
-                        isAdvancedOpen={isAdvancedOpen}
-                        isPerTaskOpen={isPerTaskOpen}
-                        keyPlaceholder={keyPlaceholder}
-                        localProvider={localProvider}
-                        providerKeyHint={providerKeyHint}
-                        providerLocalEntry={providerLocalEntry}
-                        reasoningEffort={reasoningEffort}
-                        sessionDefaultBadgeText={sessionDefaultBadgeText}
-                        showCustomFields={showCustomFields}
-                        showCustomTranscription={showCustomTranscription}
-                        showReasoningControls={showReasoningControls}
-                        taskReasoningEffort={taskReasoningEffort}
-                        taskReasoningRows={AI_TASK_REASONING_ROWS}
-                        reasoningLevels={AI_REASONING_LEVELS}
-                        toggleAiSettingsSection={this.toggleAiSettingsSection}
-                        updateAiModelField={this.updateAiModelField}
-                        updateAiProviderField={this.updateAiProviderField}
-                        updateAiSettings={this.updateAiSettings}
-                        updateAiTaskReasoningField={this.updateAiTaskReasoningField}
-                        updateAiTranscriptionField={this.updateAiTranscriptionField}
-                        useLocalAi={useLocalAi}
-                        usingSessionDefaultsLabel={usingSessionDefaultsLabel}
-                      />
-                    </Suspense>
+                    <>
+                      <label className={styles.aiSettingsInlineToggle}>
+                        <input type="checkbox" checked={useLocalAi} onChange={this.handleAiToggleLocal} />
+                        <span>Use local override</span>
+                      </label>
+                      <div className={styles.aiSessionDefault}>
+                        <span>{sessionDefaultBadgeText}</span>
+                        {useLocalAi ? (
+                          <Button size="sm" color="secondary" outline onClick={this.handleClearAiSettings}>
+                            Clear
+                          </Button>
+                        ) : null}
+                      </div>
+                      <div className={styles.aiSettingsGrid}>
+                        <div className={styles.aiSettingsRow}>
+                          <label className={styles.aiSettingsLabel}>Model preset</label>
+                          <select
+                            className={`${styles.aiSettingsSelect} ${styles.aiPresetSelect}`}
+                            value={aiPresetKey}
+                            onChange={this.handleAiPresetChange}
+                            disabled={!useLocalAi}
+                          >
+                            {AI_PRESET_OPTIONS.map((option: any) => (
+                              <option key={option.key} value={option.key}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                          <div className={styles.aiSettingsHint}>
+                            Presets keep provider and model selection in sync. Choose Custom to edit provider/model
+                            details directly.
+                          </div>
+                        </div>
+
+                        <div className={styles.aiSettingsRow}>
+                          <label className={styles.aiSettingsLabel}>API key ({aiProviderLabel})</label>
+                          <input
+                            className={styles.aiSettingsInput}
+                            type="password"
+                            value={useLocalAi ? providerLocalEntry.apiKey || '' : ''}
+                            placeholder={keyPlaceholder}
+                            onChange={(e: any) => this.updateAiProviderField(localProvider, 'apiKey', e.target.value)}
+                            disabled={!useLocalAi}
+                          />
+                          {providerKeyHint ? <div className={styles.aiSettingsHint}>{providerKeyHint}</div> : null}
+                        </div>
+                      </div>
+
+                      {showReasoningControls && (
+                        <>
+                          <div className={styles.aiReasoningControl}>
+                            <label className={styles.aiSettingsLabel}>Reasoning effort</label>
+                            <div className={styles.aiReasoningButtons}>
+                              {AI_REASONING_LEVELS.map((level: any) => (
+                                <button
+                                  key={level}
+                                  type="button"
+                                  className={`${styles.aiReasoningBtn} ${reasoningEffort === level ? styles.aiReasoningBtnActive : ''}`}
+                                  onClick={() => this.updateAiSettings((s: any) => ({ ...s, reasoningEffort: level }))}
+                                  disabled={!useLocalAi}
+                                  aria-pressed={reasoningEffort === level}
+                                >
+                                  {level.charAt(0).toUpperCase() + level.slice(1)}
+                                </button>
+                              ))}
+                            </div>
+                            <div className={styles.aiSettingsHint}>
+                              Applied only to GPT-5 and OpenAI-compatible reasoning models.
+                            </div>
+                          </div>
+
+                          <div className={styles.aiPerTaskSection}>
+                            <button
+                              type="button"
+                              className={styles.aiAdvancedToggle}
+                              onClick={() => this.toggleAiSettingsSection('aiPerTask')}
+                              aria-expanded={isPerTaskOpen}
+                            >
+                              <span>Per-Task Reasoning</span>
+                              <FontAwesomeIcon
+                                icon={isPerTaskOpen ? faCaretUp : faCaretDown}
+                                className={styles.aiSettingsToggleIcon}
+                              />
+                            </button>
+                            {isPerTaskOpen && (
+                              <div className={styles.aiSettingsGrid}>
+                                {AI_TASK_REASONING_ROWS.map((row: any) => (
+                                  <div key={row.key} className={styles.aiPerTaskRow}>
+                                    <div>
+                                      <label className={styles.aiSettingsLabel}>{row.label}</label>
+                                      <div className={styles.aiSettingsHint}>{row.hint}</div>
+                                    </div>
+                                    <select
+                                      className={styles.aiSettingsSelect}
+                                      value={taskReasoningEffort?.[row.key] || ''}
+                                      onChange={(e: any) => this.updateAiTaskReasoningField(row.key, e.target.value)}
+                                      disabled={!useLocalAi}
+                                    >
+                                      <option value="">Global default</option>
+                                      <option value="low">Low</option>
+                                      <option value="medium">Medium</option>
+                                      <option value="high">High</option>
+                                    </select>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      )}
+
+                      <div>
+                        <button
+                          type="button"
+                          className={styles.aiAdvancedToggle}
+                          onClick={() => this.toggleAiSettingsSection('aiAdvanced')}
+                          aria-expanded={isAdvancedOpen}
+                        >
+                          <span>Advanced</span>
+                          <FontAwesomeIcon
+                            icon={isAdvancedOpen ? faCaretUp : faCaretDown}
+                            className={styles.aiSettingsToggleIcon}
+                          />
+                        </button>
+                        {isAdvancedOpen && (
+                          <div className={styles.aiSettingsGrid}>
+                            <div className={styles.aiSettingsRow}>
+                              <label className={styles.aiSettingsLabel}>Provider</label>
+                              <select
+                                className={styles.aiSettingsSelect}
+                                value={aiDisplay.mode || 'openai'}
+                                onChange={this.handleAiModeChange}
+                                disabled={!useLocalAi}
+                              >
+                                <option value="anthropic">Anthropic</option>
+                                <option value="openai">OpenAI</option>
+                                <option value="openrouter">OpenRouter</option>
+                                <option value="custom">Custom RPC</option>
+                              </select>
+                            </div>
+
+                            <div className={styles.aiSettingsRow}>
+                              <label className={styles.aiSettingsLabel}>Fast model</label>
+                              <input
+                                className={styles.aiSettingsInput}
+                                type="text"
+                                value={aiDisplay.models?.fast || ''}
+                                onChange={(e: any) => this.updateAiModelField('fast', e.target.value)}
+                                disabled={!useLocalAi}
+                              />
+                            </div>
+
+                            <div className={styles.aiSettingsRow}>
+                              <label className={styles.aiSettingsLabel}>Thinking model</label>
+                              <input
+                                className={styles.aiSettingsInput}
+                                type="text"
+                                value={aiDisplay.models?.thinking || ''}
+                                onChange={(e: any) => this.updateAiModelField('thinking', e.target.value)}
+                                disabled={!useLocalAi}
+                              />
+                            </div>
+
+                            {showCustomFields && (
+                              <>
+                                <div className={styles.aiSettingsRow}>
+                                  <label className={styles.aiSettingsLabel}>Custom RPC URL</label>
+                                  <input
+                                    className={styles.aiSettingsInput}
+                                    type="text"
+                                    value={aiDisplay.providers?.custom?.rpcUrl || ''}
+                                    onChange={(e: any) =>
+                                      this.updateAiProviderField('custom', 'rpcUrl', e.target.value)
+                                    }
+                                    disabled={!useLocalAi}
+                                  />
+                                </div>
+                                <div className={`${styles.aiSettingsRow} ${styles.aiSettingsRowFull}`}>
+                                  <label className={styles.aiSettingsLabel}>Functions JSON</label>
+                                  <textarea
+                                    className={styles.aiSettingsTextarea}
+                                    value={aiDisplay.providers?.custom?.functions || ''}
+                                    onChange={(e: any) =>
+                                      this.updateAiProviderField('custom', 'functions', e.target.value)
+                                    }
+                                    disabled={!useLocalAi}
+                                  />
+                                </div>
+                              </>
+                            )}
+
+                            <div className={styles.aiSettingsRow}>
+                              <label className={styles.aiSettingsLabel}>Transcription provider</label>
+                              <select
+                                className={styles.aiSettingsSelect}
+                                value={aiDisplay.transcription?.provider || 'openai'}
+                                onChange={(e: any) => this.updateAiTranscriptionField('provider', e.target.value)}
+                                disabled={!useLocalAi}
+                              >
+                                <option value="openai">OpenAI</option>
+                                <option value="custom">Custom RPC</option>
+                                <option value="local">Local (future)</option>
+                              </select>
+                            </div>
+
+                            <div className={styles.aiSettingsRow}>
+                              <label className={styles.aiSettingsLabel}>Transcription model</label>
+                              <input
+                                className={styles.aiSettingsInput}
+                                type="text"
+                                value={aiDisplay.transcription?.model || ''}
+                                onChange={(e: any) => this.updateAiTranscriptionField('model', e.target.value)}
+                                disabled={!useLocalAi}
+                              />
+                            </div>
+
+                            {showCustomTranscription && (
+                              <div className={styles.aiSettingsRow}>
+                                <label className={styles.aiSettingsLabel}>Transcription RPC URL</label>
+                                <input
+                                  className={styles.aiSettingsInput}
+                                  type="text"
+                                  value={aiDisplay.transcription?.rpcUrl || ''}
+                                  onChange={(e: any) => this.updateAiTranscriptionField('rpcUrl', e.target.value)}
+                                  disabled={!useLocalAi}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <div className={styles.aiSettingsFooterRow}>
+                        <div className={styles.aiSettingsStatus}>
+                          {usingSessionDefaultsLabel}
+                          {this.state.aiSettingsStatus ? ` ${this.state.aiSettingsStatus}` : ''}
+                        </div>
+                        <div className={styles.aiSettingsActions}>
+                          <Button
+                            size="sm"
+                            color="info"
+                            onClick={this.handleSaveAiSettings}
+                            disabled={!this.state.aiSettingsDirty}
+                          >
+                            Save
+                          </Button>
+                          <Button size="sm" color="secondary" outline onClick={this.handleClearAiSettings}>
+                            Clear local
+                          </Button>
+                        </div>
+                      </div>
+                    </>
                   ),
                 })}
 
-                {overview.capabilities.settingsResourceKeys.some((key) => key === 'rpc' || key === 'arweave')
-                  ? renderSection({
-                      key: 'resourceKeys',
-                      title: 'Resource keys',
-                      summary:
-                        useLocalRpc || useLocalArweave
-                          ? 'In-memory key overrides enabled'
-                          : 'Using session-sponsored fallbacks',
-                      children: (
-                        <Suspense fallback={<div className={styles.aiSettingsHint}>Loading resource settings…</div>}>
-                          <LoginSettingsResourceKeysContent
-                            formatResourceSponsorHint={this.formatResourceSponsorHint}
-                            handleClearResourceKeys={this.handleClearResourceKeys}
-                            handleResourceToggleLocal={this.handleResourceToggleLocal}
-                            handleSaveResourceKeys={this.handleSaveResourceKeys}
-                            resourceKeys={resourceKeys}
-                            resourceKeysDirty={this.state.resourceKeysDirty}
-                            resourceKeysStatus={this.state.resourceKeysStatus}
-                            sponsorSessions={sponsorSessions}
-                            sponsoredKeys={sponsoredKeys}
-                            updateResourceKeyField={this.updateResourceKeyField}
-                            useLocalArweave={useLocalArweave}
-                            useLocalRpc={useLocalRpc}
-                            visibleResources={overview.capabilities.settingsResourceKeys}
+                {renderSection({
+                  key: 'resourceKeys',
+                  title: 'Resource keys',
+                  summary: `${useLocalRpc || useLocalArweave ? 'Local key overrides enabled' : 'Using session-sponsored fallbacks'}`,
+                  children: (
+                    <>
+                      <div className={styles.aiSettingsGrid}>
+                        <div className={styles.aiSettingsRow}>
+                          <label className={styles.aiSettingsLabel}>RPC API key</label>
+                          <input
+                            className={styles.aiSettingsInput}
+                            type="password"
+                            value={useLocalRpc ? resourceKeys?.rpc?.apiKey || '' : ''}
+                            onChange={(e: any) => this.updateResourceKeyField('rpc', 'apiKey', e.target.value)}
+                            disabled={!useLocalRpc}
+                            placeholder={
+                              useLocalRpc
+                                ? 'Enter RPC API key'
+                                : sponsoredKeys.rpc
+                                  ? 'Sponsored key configured'
+                                  : 'No sponsored key set'
+                            }
                           />
-                        </Suspense>
-                      ),
-                    })
-                  : null}
+                          <label className={styles.aiSettingsInlineToggle}>
+                            <input
+                              type="checkbox"
+                              checked={useLocalRpc}
+                              onChange={(e: any) => this.handleResourceToggleLocal('rpc', e)}
+                            />
+                            <span>Use local override</span>
+                          </label>
+                          <div className={styles.aiSettingsHint}>
+                            {this.formatResourceSponsorHint({
+                              resourceKey: 'rpc',
+                              resourceLabel: 'RPC',
+                              sponsoredKeys,
+                              sponsorSessions,
+                            })}
+                          </div>
+                        </div>
+
+                        <div className={`${styles.aiSettingsRow} ${styles.aiSettingsRowFull}`}>
+                          <label className={styles.aiSettingsLabel}>Arweave JWK (JSON)</label>
+                          <textarea
+                            className={styles.aiSettingsTextarea}
+                            value={useLocalArweave ? resourceKeys?.arweave?.jwk || '' : ''}
+                            onChange={(e: any) => this.updateResourceKeyField('arweave', 'jwk', e.target.value)}
+                            disabled={!useLocalArweave}
+                            placeholder={
+                              useLocalArweave
+                                ? '{ "kty": "...", ... }'
+                                : sponsoredKeys.arweave
+                                  ? 'Sponsored key configured'
+                                  : 'No sponsored key set'
+                            }
+                          />
+                          <label className={styles.aiSettingsInlineToggle}>
+                            <input
+                              type="checkbox"
+                              checked={useLocalArweave}
+                              onChange={(e: any) => this.handleResourceToggleLocal('arweave', e)}
+                            />
+                            <span>Use local override</span>
+                          </label>
+                          <div className={styles.aiSettingsHint}>
+                            {this.formatResourceSponsorHint({
+                              resourceKey: 'arweave',
+                              resourceLabel: 'Arweave',
+                              sponsoredKeys,
+                              sponsorSessions,
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                      <div className={styles.aiSettingsFooterRow}>
+                        <div className={styles.aiSettingsStatus}>
+                          {this.state.resourceKeysStatus || 'Stored locally; only sent on the request that needs them.'}
+                        </div>
+                        <div className={styles.aiSettingsActions}>
+                          <Button
+                            size="sm"
+                            color="info"
+                            onClick={this.handleSaveResourceKeys}
+                            disabled={!this.state.resourceKeysDirty}
+                          >
+                            Save keys
+                          </Button>
+                          <Button size="sm" color="secondary" outline onClick={this.handleClearResourceKeys}>
+                            Clear keys
+                          </Button>
+                        </div>
+                      </div>
+                    </>
+                  ),
+                })}
               </>
             ),
           })}
@@ -2435,9 +2774,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
               autohide={false}
               className={styles.networkTooltip}
             >
-              <div style={{ padding: '10px' }}>
-                Toggle explainers throughout the app.
-              </div>
+              <div style={{ padding: '10px' }}>Toggle explainers throughout the app.</div>
             </CETooltip>
           </>
         ) : null}
@@ -2465,18 +2802,53 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   getPreLoginSettingsDisplay = () => {
     const overview = this.getSettingsOverviewContext();
 
-    return LoginPreLoginSettingsDisplay({
-      overview,
-      preLoginConfigOpen: this.state.preLoginConfigOpen,
-      preLoginSettingsOpen: this.state.preLoginSettingsOpen,
-      renderInlineNetworkSummary: this.renderInlineNetworkSummary,
-      renderPreLoginConfigPanel: this.renderPreLoginConfigPanel,
-      renderSettingsControlRow: this.renderSettingsControlRow,
-      renderSettingsOverviewPanel: this.renderSettingsOverviewPanel,
-      renderStaticSettingsSection: this.renderStaticSettingsSection,
-      togglePreLoginConfigPanel: this.togglePreLoginConfigPanel,
-      togglePreLoginSettingsPanel: this.togglePreLoginSettingsPanel,
-    });
+    return (
+      <div className={styles.preLoginSettingsShell}>
+        <div className={styles.preLoginSettingsTopRow}>
+          <button
+            type="button"
+            aria-label="Toggle pre-login settings"
+            className={styles.preLoginSettingsGear}
+            onClick={this.togglePreLoginSettingsPanel}
+            aria-expanded={this.state.preLoginSettingsOpen}
+          >
+            <FontAwesomeIcon icon={faCog} />
+          </button>
+        </div>
+        {this.state.preLoginSettingsOpen ? (
+          <div className={styles.preLoginSettingsPanel} data-testid="ce-prelogin-settings-panel">
+            {this.renderSettingsControlRow({
+              activeSession,
+              configOpen: this.state.preLoginConfigOpen,
+              onToggleConfig: this.togglePreLoginConfigPanel,
+              configTestId: 'ce-prelogin-config-toggle',
+              betweenSessionAndTooltips: cryptoTerminology
+                ? this.renderInlineNetworkSummary({
+                    targetNetworkName: overview.targetNetworkName,
+                    walletNetworkName: overview.walletNetworkName,
+                    showWalletNetwork: overview.showWalletNetwork,
+                    tooltipId: 'preLoginNetworkInfoTooltipInline',
+                  })
+                : null,
+              tooltipsInfoId: 'preLoginTooltipsToggleTooltip',
+              tooltipPlacement: 'right',
+              containerClassName: styles.preLoginSettingsSummaryContainer,
+            })}
+            {this.renderSettingsOverviewPanel({
+              overview,
+              networkTooltipId: 'preLoginNetworkInfoTooltipPanel',
+              extraContent: this.state.preLoginConfigOpen
+                ? this.renderStaticSettingsSection({
+                    title: 'Config',
+                    summary: 'Session selection and local AI overrides',
+                    children: this.renderPreLoginConfigPanel(),
+                  })
+                : null,
+            })}
+          </div>
+        ) : null}
+      </div>
+    );
   };
 
   openBookmarks = () => {
@@ -2501,8 +2873,11 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
           <div className={styles.accountWarningContainer}>
             <div className={styles.accountWarningMessage}>
               <p>
-                Account is an{" "}
-                <a href="https://ethereum.org/en/wallets/" target="_blank" rel="noopener noreferrer">Ethereum wallet</a>:
+                Account is an{' '}
+                <a href="https://ethereum.org/en/wallets/" target="_blank" rel="noopener noreferrer">
+                  Ethereum wallet
+                </a>
+                :
               </p>
               <ul>
                 <li>controlled by you</li>
@@ -2512,24 +2887,24 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
             </div>
 
             {/* Passkey wallet buttons */}
-             <div className={styles.passkeyButtonContainer}>
-               <Button
-                  onClick={this.handlePasskeyWalletCreate}
-                  color="primary"
-                  className={`${styles.passkeyButton} ${styles.passkeyButtonPrimary}`}
-                >
-                  <FontAwesomeIcon icon={faFingerprint} size="2x" />
-                  <span>Create  </span>
-               </Button>
-               <Button
-                  onClick={this.handlePasskeyWalletSignIn}
-                  color="secondary"
-                  outline
-                  className={`${styles.passkeyButton} ${styles.passkeyButtonOutline}`}
-                >
-                  <FontAwesomeIcon icon={faFingerprint} size="2x" />
-                  <span> Login</span>
-               </Button>
+            <div className={styles.passkeyButtonContainer}>
+              <Button
+                onClick={this.handlePasskeyWalletCreate}
+                color="primary"
+                className={`${styles.passkeyButton} ${styles.passkeyButtonPrimary}`}
+              >
+                <FontAwesomeIcon icon={faFingerprint} size="2x" />
+                <span>Create </span>
+              </Button>
+              <Button
+                onClick={this.handlePasskeyWalletSignIn}
+                color="secondary"
+                outline
+                className={`${styles.passkeyButton} ${styles.passkeyButtonOutline}`}
+              >
+                <FontAwesomeIcon icon={faFingerprint} size="2x" />
+                <span> Login</span>
+              </Button>
             </div>
             {this.state.passkeyWalletStatusMessage && (
               <div
@@ -2573,7 +2948,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     if (this.props.loginComplete) {
       const activeSessionSlug = this.getActiveSessionSlug();
       const activeSessionConfig = this.getDisplaySessionConfig(activeSessionSlug);
-       return (
+      return (
         <CardBody id={styles.accountModalCard}>
           <div id={styles.accountModalPanel}>
             <div className={styles.accountModalBody}>
@@ -2607,15 +2982,19 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       );
     }
 
-    return <CardBody><p>Please log in.</p></CardBody>;
-  }
+    return (
+      <CardBody>
+        <p>Please log in.</p>
+      </CardBody>
+    );
+  };
 
   getModalTitle = () => {
-    if (!this.props.loginComplete && !this.props.loginInProgress) return "LOGIN";
-    if (this.props.loginInProgress) return "ACCOUNT";
-    if (this.props.loginComplete) return "ACCOUNT";
-    return "CONNECT";
-  }
+    if (!this.props.loginComplete && !this.props.loginInProgress) return 'LOGIN';
+    if (this.props.loginInProgress) return 'ACCOUNT';
+    if (this.props.loginComplete) return 'ACCOUNT';
+    return 'CONNECT';
+  };
 
   render() {
     const modalTitle =

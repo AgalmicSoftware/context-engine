@@ -55,11 +55,7 @@ describe('resourceKeys session fallback policy', () => {
   it('purges legacy browser-storage keys without importing their secrets into memory', () => {
     localStorage.setItem(
       'ce:resourceKeys:v1',
-      '{"bySession":{"legacy":{"rpc":{"useLocal":true,"apiKey":"legacy-secret"}}}}',
-    );
-    sessionStorage.setItem(
-      'ce:resourceKeys:v1',
-      '{"bySession":{"legacy":{"rpc":{"useLocal":true,"apiKey":"legacy-session-secret"}}}}',
+      '{"bySession":{"":{"rpc":{"useLocal":true,"apiKey":"general-key"}},"__proto__":{"rpc":{"useLocal":true,"apiKey":"proto-key"}},"constructor":{"rpc":{"useLocal":true,"apiKey":"constructor-key"}},"prototype":{"rpc":{"useLocal":true,"apiKey":"prototype-key"}},"alpha":{"rpc":{"useLocal":true,"apiKey":"alpha-key"}}}}',
     );
 
     const legacy = getLocalResourceKeys('legacy');

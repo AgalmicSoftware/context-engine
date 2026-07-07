@@ -14,9 +14,9 @@ describe('UserPage cache refresh memoization and cache helpers', () => {
       latestBlockNumber: 100,
       sbtCacheRevision: 0,
     });
-    instance._dgHasAny = jest.fn((namespace) => (
-      namespace === 'questionsCache' || namespace === 'sbtCache' || namespace === 'userCache'
-    ));
+    instance._dgHasAny = jest.fn(
+      (namespace) => namespace === 'questionsCache' || namespace === 'sbtCache' || namespace === 'userCache',
+    );
     const aggregate = {
       userCaches: [],
       surveysById: {},
@@ -70,28 +70,30 @@ describe('UserPage cache refresh memoization and cache helpers', () => {
       surveysCache: [],
       sbtCache: [],
       userCache: [],
-      questionsCache: [{
-        slug: 'edge',
-        data: {
-          [networkID]: {
-            questions: {
-              q1: {
-                id: 'q1',
-                prompt: 'Encrypted Question',
-                type: 'freeform',
-                promptEncrypted: true,
+      questionsCache: [
+        {
+          slug: 'edge',
+          data: {
+            [networkID]: {
+              questions: {
+                q1: {
+                  id: 'q1',
+                  prompt: 'Encrypted Question',
+                  type: 'freeform',
+                  promptEncrypted: true,
+                },
               },
-            },
-            questionResponses: {
-              q1: {
-                [viewAddress.toLowerCase()]: JSON.stringify({
-                  answer: { value: '*' },
-                }),
+              questionResponses: {
+                q1: {
+                  [viewAddress.toLowerCase()]: JSON.stringify({
+                    answer: { value: '*' },
+                  }),
+                },
               },
             },
           },
         },
-      }],
+      ],
     };
 
     instance._dgHasAny = jest.fn(() => true);
@@ -128,9 +130,7 @@ describe('UserPage cache refresh memoization and cache helpers', () => {
 
   it('checks namespace presence through hasNamespaceEntriesSync helper', () => {
     const instance = makeInstance();
-    const hasSpy = jest
-      .spyOn(cacheScripts, 'hasNamespaceEntriesSync')
-      .mockReturnValue(true);
+    const hasSpy = jest.spyOn(cacheScripts, 'hasNamespaceEntriesSync').mockReturnValue(true);
 
     const result = instance._dgHasAny('questionsCache');
 
@@ -199,48 +199,54 @@ describe('UserPage cache refresh memoization and cache helpers', () => {
     });
 
     const dataByNamespace = {
-      surveysCache: [{
-        slug: 'edge',
-        data: {
-          [networkID]: {
-            surveys: {
-              s1: { id: 's1', title: 'Survey 1', creator: viewAddress, questionIDs: ['q1'] },
-            },
-            surveyResponses: {
-              s1: {
-                [viewAddress]: surveyResponsePayload,
-              },
-            },
-          },
-        },
-      }],
-      questionsCache: [{
-        slug: 'edge',
-        data: {
-          [networkID]: {
-            questions: {
-              q1: { id: 'q1', prompt: 'Question 1', type: 'freeform', creator: viewAddress },
-            },
-            questionResponses: {
-              q1: {
-                [viewAddress]: questionResponsePayload,
-              },
-            },
-          },
-        },
-      }],
-      sbtCache: [],
-      userCache: [{
-        slug: 'edge',
-        data: {
-          [viewLower]: {
+      surveysCache: [
+        {
+          slug: 'edge',
+          data: {
             [networkID]: {
-              lastBlockScanned: 120,
-              data: {},
+              surveys: {
+                s1: { id: 's1', title: 'Survey 1', creator: viewAddress, questionIDs: ['q1'] },
+              },
+              surveyResponses: {
+                s1: {
+                  [viewAddress]: surveyResponsePayload,
+                },
+              },
             },
           },
         },
-      }],
+      ],
+      questionsCache: [
+        {
+          slug: 'edge',
+          data: {
+            [networkID]: {
+              questions: {
+                q1: { id: 'q1', prompt: 'Question 1', type: 'freeform', creator: viewAddress },
+              },
+              questionResponses: {
+                q1: {
+                  [viewAddress]: questionResponsePayload,
+                },
+              },
+            },
+          },
+        },
+      ],
+      sbtCache: [],
+      userCache: [
+        {
+          slug: 'edge',
+          data: {
+            [viewLower]: {
+              [networkID]: {
+                lastBlockScanned: 120,
+                data: {},
+              },
+            },
+          },
+        },
+      ],
     };
 
     instance._dgHasAny = jest.fn(() => true);

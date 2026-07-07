@@ -69,10 +69,13 @@ export const buildSbtListRenderBuckets = <T extends SbtListHelperItem>({
     ),
   );
   const keyOptions = { allSessionsMode, listSlug, resolveSbtSessionSlug };
-  const sessionGroupListsBySlug = new Map<string, {
-    featuredSet: Set<string>;
-    ignoredSet: Set<string>;
-  }>();
+  const sessionGroupListsBySlug = new Map<
+    string,
+    {
+      featuredSet: Set<string>;
+      ignoredSet: Set<string>;
+    }
+  >();
   const getSessionGroupListSets = (slug: string) => {
     const cacheKey = String(slug || '');
     const cached = sessionGroupListsBySlug.get(cacheKey);

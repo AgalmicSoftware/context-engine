@@ -33,13 +33,15 @@ describe('surveyPileQuestionFlow', () => {
   });
 
   it('splits masked pile questions away from visible ones', () => {
-    expect(splitPileMaskedQuestions({
-      questions: [
-        { id: 'q1', prompt: '[encrypted]', promptDecrypted: false },
-        { id: 'q2', prompt: 'Visible question', promptDecrypted: true },
-        { id: 'qpending', prompt: '[encrypted]', __ceQuestionMetadataPending: true },
-      ],
-    })).toEqual({
+    expect(
+      splitPileMaskedQuestions({
+        questions: [
+          { id: 'q1', prompt: '[encrypted]', promptDecrypted: false },
+          { id: 'q2', prompt: 'Visible question', promptDecrypted: true },
+          { id: 'qpending', prompt: '[encrypted]', __ceQuestionMetadataPending: true },
+        ],
+      }),
+    ).toEqual({
       hiddenQuestions: [{ id: 'q1', prompt: '[encrypted]', promptDecrypted: false }],
       visibleQuestions: [{ id: 'q2', prompt: 'Visible question', promptDecrypted: true }],
       hasHiddenGatedQuestions: true,
@@ -47,24 +49,26 @@ describe('surveyPileQuestionFlow', () => {
   });
 
   it('builds a shared pile question pipeline state from sorted and masked questions', () => {
-    expect(buildPileQuestionPipelineState({
-      questions: [
-        { id: 'q1', prompt: 'Q1' },
-        { id: 'q2', prompt: '[encrypted]', promptDecrypted: false },
-        { id: 'q3', prompt: 'Q3' },
-        { id: 'qpending', prompt: '[encrypted]', __ceQuestionMetadataPending: true },
-      ],
-      questionResponses: {
-        q1: { '0xabc': { answer: { value: 'yes' } } },
-      },
-      responseCounts: {
-        q1: 3,
-        q2: 7,
-        q3: 2,
-      },
-      highlightedQuestionIds: new Set(['q2']),
-      account: '0xabc',
-    })).toEqual({
+    expect(
+      buildPileQuestionPipelineState({
+        questions: [
+          { id: 'q1', prompt: 'Q1' },
+          { id: 'q2', prompt: '[encrypted]', promptDecrypted: false },
+          { id: 'q3', prompt: 'Q3' },
+          { id: 'qpending', prompt: '[encrypted]', __ceQuestionMetadataPending: true },
+        ],
+        questionResponses: {
+          q1: { '0xabc': { answer: { value: 'yes' } } },
+        },
+        responseCounts: {
+          q1: 3,
+          q2: 7,
+          q3: 2,
+        },
+        highlightedQuestionIds: new Set(['q2']),
+        account: '0xabc',
+      }),
+    ).toEqual({
       sortedQuestions: [
         { id: 'q2', prompt: '[encrypted]', promptDecrypted: false },
         { id: 'q3', prompt: 'Q3' },

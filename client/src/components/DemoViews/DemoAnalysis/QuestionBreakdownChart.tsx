@@ -35,13 +35,10 @@ const formatCountLabel = (count = 0, singular = '', plural = '') => {
 };
 
 const formatDatasetMeta = (rows: FlatResponse[] = []) => {
-  const modeledResponseCount = rows.reduce(
-    (max, row) => Math.max(max, Number(row?.totalVotes || 0)),
-    0
-  );
+  const modeledResponseCount = rows.reduce((max, row) => Math.max(max, Number(row?.totalVotes || 0)), 0);
   const participantCount = rows.reduce(
     (max, row) => Math.max(max, Number(row?.participantCount || 0)),
-    modeledResponseCount
+    modeledResponseCount,
   );
   const responseCount = modeledResponseCount || participantCount;
 
@@ -62,7 +59,7 @@ const getOrderedOptions = (options: string[] = []) => {
   const optionSet = new Set(options);
   return [
     ...RESPONSE_ORDER.filter((responseText) => optionSet.has(responseText)),
-    ...options.filter((responseText) => !RESPONSE_ORDER.includes(responseText as typeof RESPONSE_ORDER[number])),
+    ...options.filter((responseText) => !RESPONSE_ORDER.includes(responseText as (typeof RESPONSE_ORDER)[number])),
   ];
 };
 
@@ -83,15 +80,16 @@ const QuestionBreakdownChart = ({
       return {
         label,
         segmentKey,
-        rows: getOrderedOptions(question.options).map((responseText) => (
-          rows.find((row) => row.responseText === responseText) || {
-            questionId: question.id,
-            segmentKey,
-            responseText,
-            rate: 0,
-            totalVotes: 0,
-          }
-        )),
+        rows: getOrderedOptions(question.options).map(
+          (responseText) =>
+            rows.find((row) => row.responseText === responseText) || {
+              questionId: question.id,
+              segmentKey,
+              responseText,
+              rate: 0,
+              totalVotes: 0,
+            },
+        ),
       };
     });
   }, [comparisonGroups, flatResponses, question]);

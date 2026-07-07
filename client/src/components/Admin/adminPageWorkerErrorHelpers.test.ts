@@ -77,7 +77,7 @@ describe('adminPageWorkerErrorHelpers', () => {
 
   it('adds session config guidance only for missing session config failures', () => {
     expect(addSessionConfigHint('Session config not found')).toContain(
-      'Return to /new with this Worker URL to complete signed setup',
+      'Re-run this test while connected as the admin wallet',
     );
     expect(addSessionConfigHint('Other failure')).toBe('Other failure');
     expect(addSessionConfigHint('')).toContain('Worker canonical config is missing');

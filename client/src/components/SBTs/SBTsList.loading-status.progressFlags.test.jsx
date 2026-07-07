@@ -44,7 +44,7 @@ describe('SBTsList progress and scan flag loading status', () => {
         latestBlockNumber={0}
         allSessionsMode
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: /Group list settings/i }));
@@ -64,7 +64,7 @@ describe('SBTsList progress and scan flag loading status', () => {
 
     const alphaAddress = '0x00000000000000000000000000000000000000a1';
     const syncedCache = {
-      '84532': {
+      84532: {
         sbtList: {
           [alphaAddress.toLowerCase()]: {
             sbtAddress: alphaAddress,
@@ -86,14 +86,18 @@ describe('SBTsList progress and scan flag loading status', () => {
     };
 
     mockPeekCacheSync.mockImplementation((_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized === 'alpha') return syncedCache;
-      return { '84532': { lastBlock: 0, sbtList: {} } };
+      return { 84532: { lastBlock: 0, sbtList: {} } };
     });
     mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized === 'alpha') return syncedCache;
-      return { '84532': { lastBlock: 0, sbtList: {} } };
+      return { 84532: { lastBlock: 0, sbtList: {} } };
     });
     mockGetRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 1000, toBlock: 1100 });
 
@@ -113,7 +117,7 @@ describe('SBTsList progress and scan flag loading status', () => {
         latestBlockNumber={0}
         allSessionsMode
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -128,9 +132,12 @@ describe('SBTsList progress and scan flag loading status', () => {
     await waitFor(() => {
       expect(screen.queryByTestId('session-chip-progress-wrap-alpha')).not.toBeInTheDocument();
     });
-    await waitFor(() => {
-      expect(screen.queryByTestId('section-spinner-live')).not.toBeInTheDocument();
-    }, { timeout: 2500 });
+    await waitFor(
+      () => {
+        expect(screen.queryByTestId('section-spinner-live')).not.toBeInTheDocument();
+      },
+      { timeout: 2500 },
+    );
   }, 15000);
 
   it('clears stale scan flags and marks session loaded after failed fetch when worker URL is missing', async () => {
@@ -139,19 +146,19 @@ describe('SBTsList progress and scan flag loading status', () => {
     localStorage.setItem('dg:sbt:fullScanInProgress:test-4', 'true');
     localStorage.setItem('dg:sbt:deferredFullScanNeeded:test-4', 'true');
 
-    mockGetAllSessionEntries.mockReturnValue([
-      ['test-4', { slug: 'test-4' }],
-    ]);
-    mockSessionRegistryGetAllSessionEntries.mockReturnValue([
-      ['test-4', { slug: 'test-4' }],
-    ]);
+    mockGetAllSessionEntries.mockReturnValue([['test-4', { slug: 'test-4' }]]);
+    mockSessionRegistryGetAllSessionEntries.mockReturnValue([['test-4', { slug: 'test-4' }]]);
     mockGetSessionChainId.mockImplementation((slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized === 'test-4') return null;
       return 84532;
     });
     mockGetSessionConfigBySlug.mockImplementation((slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized === 'test-4') {
         return {
           slug: 'test-4',
@@ -185,7 +192,7 @@ describe('SBTsList progress and scan flag loading status', () => {
         latestBlockNumber={0}
         allSessionsMode
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     await openSessionSelector();
@@ -209,19 +216,19 @@ describe('SBTsList progress and scan flag loading status', () => {
       },
     });
 
-    mockGetAllSessionEntries.mockReturnValue([
-      ['test-4', { slug: 'test-4' }],
-    ]);
-    mockSessionRegistryGetAllSessionEntries.mockReturnValue([
-      ['test-4', { slug: 'test-4' }],
-    ]);
+    mockGetAllSessionEntries.mockReturnValue([['test-4', { slug: 'test-4' }]]);
+    mockSessionRegistryGetAllSessionEntries.mockReturnValue([['test-4', { slug: 'test-4' }]]);
     mockGetSessionChainId.mockImplementation((slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized === 'test-4') return null;
       return 84532;
     });
     mockGetSessionConfigBySlug.mockImplementation((slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized === 'test-4') {
         return {
           slug: 'test-4',
@@ -255,7 +262,7 @@ describe('SBTsList progress and scan flag loading status', () => {
         latestBlockNumber={0}
         allSessionsMode
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     await openSessionSelector();
@@ -275,14 +282,12 @@ describe('SBTsList progress and scan flag loading status', () => {
     localStorage.setItem('dg:sbt:fullScanInProgress:edge', 'true');
     localStorage.setItem('dg:sbt:deferredFullScanNeeded:edge', 'true');
 
-    mockGetAllSessionEntries.mockReturnValue([
-      ['edge', { slug: 'edge' }],
-    ]);
-    mockSessionRegistryGetAllSessionEntries.mockReturnValue([
-      ['edge', { slug: 'edge' }],
-    ]);
+    mockGetAllSessionEntries.mockReturnValue([['edge', { slug: 'edge' }]]);
+    mockSessionRegistryGetAllSessionEntries.mockReturnValue([['edge', { slug: 'edge' }]]);
     mockGetSessionConfigBySlug.mockImplementation((slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized === 'edge') return null;
       return {
         sessionName: normalized || 'General',
@@ -291,7 +296,9 @@ describe('SBTsList progress and scan flag loading status', () => {
       };
     });
     mockGetDemoSessionConfigBySlug.mockImplementation((slug) => {
-      const normalized = String(slug || '').trim().toLowerCase();
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
       if (normalized !== 'edge') return null;
       return {
         slug: 'edge',
@@ -319,7 +326,7 @@ describe('SBTsList progress and scan flag loading status', () => {
         latestBlockNumber={0}
         allSessionsMode
         ensureLightSbtDiscovery={jest.fn()}
-      />
+      />,
     );
 
     await openSessionSelector();

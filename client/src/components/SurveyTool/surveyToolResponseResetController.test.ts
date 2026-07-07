@@ -224,14 +224,17 @@ describe('surveyToolResponseResetController', () => {
       renderedQuestionIds: ['q1', 'q2'],
     });
 
-    expect(setState).toHaveBeenCalledWith(expect.objectContaining({
-      suppressPrefill: true,
-      startFresh: true,
-      modifiedCount: 0,
-      isDirty: false,
-      isLoadingResponse: false,
-      submittedSinceLastEdit: false,
-    }), expect.any(Function));
+    expect(setState).toHaveBeenCalledWith(
+      expect.objectContaining({
+        suppressPrefill: true,
+        startFresh: true,
+        modifiedCount: 0,
+        isDirty: false,
+        isLoadingResponse: false,
+        submittedSinceLastEdit: false,
+      }),
+      expect.any(Function),
+    );
     expect(clearDraftFor).toHaveBeenNthCalledWith(1, 'q1');
     expect(clearDraftFor).toHaveBeenNthCalledWith(2, 'q2');
     expect(recalculateEditStats).toHaveBeenCalledTimes(1);

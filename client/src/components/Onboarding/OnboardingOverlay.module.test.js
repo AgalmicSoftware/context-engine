@@ -46,14 +46,26 @@ describe('Onboarding overlay welcome slide styles', () => {
   });
 
   it('keeps minimized slide titles and bullets on the full welcome scale', () => {
-    expect(scss).toMatch(/\.onboardingTitle\s*\{[\s\S]*?font-weight:\s*800;[\s\S]*?letter-spacing:\s*0;[\s\S]*?font-size:\s*clamp\(4\.75rem,\s*6\.2vw,\s*7\.6rem\);/);
+    expect(scss).toMatch(
+      /\.onboardingTitle\s*\{[\s\S]*?font-weight:\s*800;[\s\S]*?letter-spacing:\s*0;[\s\S]*?font-size:\s*clamp\(4\.75rem,\s*6\.2vw,\s*7\.6rem\);/,
+    );
     expect(scss).toMatch(/\.deck\s*\{[\s\S]*?align-items:\s*center;[\s\S]*?flex:\s*1 1 auto;/);
-    expect(scss).toMatch(/\.bulletList\s*\{[\s\S]*?font-size:\s*clamp\(1\.35rem,\s*1\.9vw,\s*2\.05rem\);[\s\S]*?gap:\s*clamp\(14px,\s*1\.45vh,\s*26px\);/);
+    expect(scss).toMatch(
+      /\.bulletList\s*\{[\s\S]*?font-size:\s*clamp\(1\.35rem,\s*1\.9vw,\s*2\.05rem\);[\s\S]*?gap:\s*clamp\(14px,\s*1\.45vh,\s*26px\);/,
+    );
     expect(scss).toMatch(/\.bulletText\s*\{[\s\S]*?font-size:\s*1\.32em;[\s\S]*?line-height:\s*1\.14;/);
-    expect(scss).toMatch(/@media \(max-width:\s*760px\)\s*\{[\s\S]*?\.onboardingTitle\s*\{[\s\S]*?font-size:\s*clamp\(3\.4rem,\s*8\.4vw,\s*5\.4rem\);/);
-    expect(scss).toMatch(/@media \(max-width:\s*640px\)\s*\{[\s\S]*?\.onboardingTitle\s*\{[\s\S]*?font-size:\s*clamp\(3rem,\s*11vw,\s*4\.6rem\);[\s\S]*?line-height:\s*0\.95;/);
-    expect(scss).toMatch(/@media \(max-width:\s*640px\)\s*\{[\s\S]*?\.bulletList\s*\{[\s\S]*?font-size:\s*clamp\(1\.35rem,\s*5\.4vw,\s*2\.05rem\);[\s\S]*?gap:\s*clamp\(9px,\s*1\.6vh,\s*16px\);/);
-    expect(scss).toMatch(/@media \(max-width:\s*640px\)\s*\{[\s\S]*?\.bulletText\s*\{[\s\S]*?font-size:\s*1\.08em;[\s\S]*?line-height:\s*1\.15;/);
+    expect(scss).toMatch(
+      /@media \(max-width:\s*760px\)\s*\{[\s\S]*?\.onboardingTitle\s*\{[\s\S]*?font-size:\s*clamp\(3\.4rem,\s*8\.4vw,\s*5\.4rem\);/,
+    );
+    expect(scss).toMatch(
+      /@media \(max-width:\s*640px\)\s*\{[\s\S]*?\.onboardingTitle\s*\{[\s\S]*?font-size:\s*clamp\(3rem,\s*11vw,\s*4\.6rem\);[\s\S]*?line-height:\s*0\.95;/,
+    );
+    expect(scss).toMatch(
+      /@media \(max-width:\s*640px\)\s*\{[\s\S]*?\.bulletList\s*\{[\s\S]*?font-size:\s*clamp\(1\.35rem,\s*5\.4vw,\s*2\.05rem\);[\s\S]*?gap:\s*clamp\(9px,\s*1\.6vh,\s*16px\);/,
+    );
+    expect(scss).toMatch(
+      /@media \(max-width:\s*640px\)\s*\{[\s\S]*?\.bulletText\s*\{[\s\S]*?font-size:\s*1\.08em;[\s\S]*?line-height:\s*1\.15;/,
+    );
   });
 
   it('gives the first minimized slide a larger artwork slot without changing later slide media sizing', () => {

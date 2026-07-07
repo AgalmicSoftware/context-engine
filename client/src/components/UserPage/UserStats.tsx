@@ -24,11 +24,7 @@ const UserStats = ({ userStats, collapseOpen, toggleCollapse }: UserStatsProps) 
   return (
     <div className={styles.stats}>
       {Object.entries(userStats).map(([key, value]) => (
-        <div
-          key={key}
-          className={styles.statItem}
-          onClick={() => toggleCollapse(key)}
-        >
+        <div key={key} className={styles.statItem} onClick={() => toggleCollapse(key)}>
           {`${key.charAt(0).toUpperCase() + key.slice(1)}: `}
           <span>{value}</span>
           <Collapse isOpen={collapseOpen === key}>{renderStatItemCollapse(key)}</Collapse>

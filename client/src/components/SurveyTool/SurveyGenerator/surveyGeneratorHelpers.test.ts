@@ -107,15 +107,6 @@ describe('surveyGeneratorHelpers', () => {
     );
   });
 
-  it('keeps the AI prompt toggle visually quiet on the dark generator panel', () => {
-    const scss = fs.readFileSync(path.join(__dirname, 'AudioSurveyGenerator.module.scss'), 'utf8');
-    const toggleBlock = scss.match(/\.aiPromptToggleBtn\s*{[\s\S]*?^\s*}/m)?.[0] || '';
-
-    expect(toggleBlock).toMatch(/background:\s*transparent;/);
-    expect(toggleBlock).toMatch(/color:\s*rgba\(255,\s*255,\s*255,\s*0\.5\);/);
-    expect(toggleBlock).toMatch(/&:hover\s*{[\s\S]*?background:\s*transparent;[\s\S]*?color:\s*rgba\(255,\s*255,\s*255,\s*0\.72\);/);
-  });
-
   it('builds stable additional source ids from a mutable counter ref', () => {
     const ref = { current: 7 };
 
@@ -494,45 +485,6 @@ describe('surveyGeneratorHelpers', () => {
     });
 
     expect(prompt).toBe(["source $& $$ $` $'", '$& default, $$ tag', "instructions $& $$ $` $'"].join('\n'));
-  });
-
-  it('replaces every source type token in generation prompts', () => {
-    const prompt = buildSingleGenerationPrompt({
-      promptTemplate: 'source=<SourceType>\nconditional=<SourceType>',
-      sourceDocContent: '',
-      count: 2,
-      questionTypes: {
-        freeform: true,
-      },
-      defaultTags: [],
-      transcriptMode: true,
-    });
-
-    expect(prompt).toBe('source=transcript\nconditional=transcript');
-    expect(prompt).not.toContain('<SourceType>');
-  });
-
-  it('inserts user prompt replacements literally when values contain dollar tokens', () => {
-    const prompt = buildSingleGenerationPrompt({
-      promptTemplate: [
-        '<SourceDocContent>',
-        '<DefaultTags>',
-        '<GroupCustomInstructions>',
-      ].join('\n'),
-      sourceDocContent: "source $& $$ $` $'",
-      count: 3,
-      questionTypes: {
-        binary: true,
-      },
-      defaultTags: ['$& default', '$$ tag'],
-      sessionInstructions: "instructions $& $$ $` $'",
-    });
-
-    expect(prompt).toBe([
-      "source $& $$ $` $'",
-      '$& default, $$ tag',
-      "instructions $& $$ $` $'",
-    ].join('\n'));
   });
 
   it('uses prompt defaults when no question types or overrides are selected', () => {

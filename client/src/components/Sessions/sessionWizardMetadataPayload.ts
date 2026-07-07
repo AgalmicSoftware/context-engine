@@ -109,15 +109,11 @@ export const stripSessionWizardMetadataSecretFields = (metadata: AnyRecord): Any
 
 export const getSessionWizardMetadataSecretFieldGateKeys = (metadata: unknown): string[] => {
   if (!isRecord(metadata) || !isRecord(metadata.encryptedFieldGates)) return [];
-  return Object.keys(metadata.encryptedFieldGates).filter((key) => (
-    isSecretFieldPath(key.split('.'))
-  ));
+  return Object.keys(metadata.encryptedFieldGates).filter((key) => isSecretFieldPath(key.split('.')));
 };
 
 export const buildSessionWizardSecretFieldGateErrorMessage = (keys: unknown): string => {
-  const list = Array.isArray(keys)
-    ? keys.map((key) => toStr(key).trim()).filter(Boolean)
-    : [];
+  const list = Array.isArray(keys) ? keys.map((key) => toStr(key).trim()).filter(Boolean) : [];
   const suffix = list.length ? `: ${list.join(', ')}.` : '.';
   return `Worker secret fields cannot be locked in public metadata${suffix} Store secrets in the Worker panel instead.`;
 };

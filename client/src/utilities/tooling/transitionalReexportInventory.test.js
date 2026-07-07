@@ -3,9 +3,7 @@ const path = require('path');
 
 const SRC_ROOT = path.resolve(__dirname, '../..');
 
-const EXPECTED_NON_PURE_TS_TRANSITIONAL_FILES = [
-  'variables/appConfig.js',
-];
+const EXPECTED_NON_PURE_TS_TRANSITIONAL_FILES = ['variables/appConfig.js'];
 
 const toPosixPath = (filePath) => filePath.split(path.sep).join('/');
 
@@ -32,15 +30,14 @@ const isJsToTsReexportBarrel = (filePath) => {
   return matches.length > 0 && normalizeForComparison(source) === normalizeForComparison(matches.join(''));
 };
 
-const hasAdjacentTsReexport = (filePath) => (
-  /from ['"]\.\/[^'"]+\.tsx?['"]/.test(fs.readFileSync(filePath, 'utf8'))
-);
+const hasAdjacentTsReexport = (filePath) => /from ['"]\.\/[^'"]+\.tsx?['"]/.test(fs.readFileSync(filePath, 'utf8'));
 
-const collectJsFiles = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-  const filePath = path.join(dir, entry.name);
-  if (entry.isDirectory()) return collectJsFiles(filePath);
-  return entry.isFile() && entry.name.endsWith('.js') ? [filePath] : [];
-});
+const collectJsFiles = (dir) =>
+  fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const filePath = path.join(dir, entry.name);
+    if (entry.isDirectory()) return collectJsFiles(filePath);
+    return entry.isFile() && entry.name.endsWith('.js') ? [filePath] : [];
+  });
 
 describe('transitional re-export inventory', () => {
   it('keeps pure js-to-ts compatibility barrels retired', () => {
@@ -59,7 +56,6 @@ describe('transitional re-export inventory', () => {
       .sort();
 
     expect(discovered).toEqual(EXPECTED_NON_PURE_TS_TRANSITIONAL_FILES);
-    expect(fs.readFileSync(path.join(SRC_ROOT, 'variables/appConfig.js'), 'utf8'))
-      .toContain('initializeRuntimeConfig');
+    expect(fs.readFileSync(path.join(SRC_ROOT, 'variables/appConfig.js'), 'utf8')).toContain('initializeRuntimeConfig');
   });
 });

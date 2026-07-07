@@ -3,20 +3,12 @@ import { Button, FormGroup, Input, Label } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faClipboard, faLock, faLockOpen, faPen } from '@fortawesome/free-solid-svg-icons';
 import styles from '../Admin/AdminPage.module.scss';
-import CEDateTimeInput from '../Shared/CEDateTimeInput.jsx';
-import {
-  USE_ONCHAIN_SESSION_REGISTRY,
-} from '../../variables/appConfig.js';
-import { corsProxyUtils } from '../../utilities/worker/corsProxy.js';
-import { buildSignedAdminActionAuth, buildSignedBootstrapAdminAuth } from '../../utilities/worker/workerAuth.js';
-import {
-  fetchSessionFromRegistry,
-  loadSessionRegistryCache,
-  SESSION_REGISTRY_CACHE_UPDATED_EVENT,
-  sessionRegistryStore,
-  sessionRegistryUtils,
-  upsertSessionRegistryCache,
-} from '../../utilities/web3/sessionRegistry.js';
+import CEDateTimeInput from '../Shared/CEDateTimeInput';
+import { USE_ONCHAIN_SESSION_REGISTRY } from '../../variables/appConfig.js';
+import { sessionRegistryReadsPort } from '../../domains/sessions/registry/sessionRegistryReadPorts.js';
+import { sponsoredBundlePort } from '../../domains/storage/sponsoredBundlePorts.js';
+import { adminArweavePort } from '../../domains/storage/adminArweavePorts.js';
+import { adminWorkerPorts } from '../../domains/worker/adminWorkerPorts.js';
 import {
   getUsableSessionWorkerUrl,
   hasUsableSessionWorkerConfig,
@@ -130,9 +122,8 @@ type SponsoredFieldGroup = {
   fields: readonly SponsoredField[];
 };
 
-const isRecord = (value: unknown): value is UnknownRecord => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
+const isRecord = (value: unknown): value is UnknownRecord =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
 const getErrorMessage = (error: unknown, fallback = 'Unknown error') => {
   if (error instanceof Error && error.message) return error.message;
@@ -178,13 +169,15 @@ const stableCreateContextValue = (value: unknown, seen = new WeakSet<object>()):
     return result;
   }
   const record = value as UnknownRecord;
-  const result = Object.keys(record).sort().reduce<UnknownRecord>((acc, key) => {
-    const nextValue = record[key];
-    if (typeof nextValue !== 'function' && typeof nextValue !== 'undefined') {
-      acc[key] = stableCreateContextValue(nextValue, seen);
-    }
-    return acc;
-  }, {});
+  const result = Object.keys(record)
+    .sort()
+    .reduce<UnknownRecord>((acc, key) => {
+      const nextValue = record[key];
+      if (typeof nextValue !== 'function' && typeof nextValue !== 'undefined') {
+        acc[key] = stableCreateContextValue(nextValue, seen);
+      }
+      return acc;
+    }, {});
   seen.delete(value);
   return result;
 };
@@ -265,13 +258,13 @@ const readSponsorPageCache = (): SponsorPageCache => {
   try {
     const parsed: unknown = JSON.parse(window.localStorage.getItem(SPONSOR_PAGE_CACHE_KEY) || 'null');
     if (!isRecord(parsed) || Number(parsed.v || 0) !== SPONSOR_PAGE_CACHE_VERSION) return fallback;
-    const persistBundleDraft = typeof parsed.persistBundleDraft === 'boolean'
-      ? parsed.persistBundleDraft
-      : typeof parsed.persistBundleSecrets === 'boolean'
-        ? parsed.persistBundleSecrets
-        : fallback.persistBundleDraft;
-    const expiresAtRaw = toStr(parsed.expiresAt || '').trim();
-    const expiresAt = expiresAtRaw ? new Date(expiresAtRaw) : null;
+    const persistBundleDraft =
+      typeof parsed.persistBundleDraft === 'boolean'
+        ? parsed.persistBundleDraft
+        : typeof parsed.persistBundleSecrets === 'boolean'
+          ? parsed.persistBundleSecrets
+          : fallback.persistBundleDraft;
+    const expiresAt = normalizeRestoredExpiryDate(parsed.expiresAt);
     return {
       persistBundleDraft,
       bundleForm: persistBundleDraft ? normalizeSponsorBundleDraftForm(parsed.bundleForm) : buildEmptyBundleForm(),
@@ -287,22 +280,23 @@ const writeSponsorPageCache = (cache: Partial<SponsorPageCache> = {}) => {
   const bundleForm = cache.bundleForm ?? buildEmptyBundleForm();
   const expiresAt = cache.expiresAt ?? null;
   try {
-    window.localStorage.setItem(SPONSOR_PAGE_CACHE_KEY, JSON.stringify({
-      v: SPONSOR_PAGE_CACHE_VERSION,
-      persistBundleDraft: !!persistBundleDraft,
-      persistBundleSecrets: false,
-      bundleForm: persistBundleDraft ? normalizeSponsorBundleDraftForm(bundleForm) : {},
-      expiresAt: persistBundleDraft && expiresAt instanceof Date && Number.isFinite(expiresAt.getTime())
-        ? expiresAt.toISOString()
-        : '',
-    }));
+    window.localStorage.setItem(
+      SPONSOR_PAGE_CACHE_KEY,
+      JSON.stringify({
+        v: SPONSOR_PAGE_CACHE_VERSION,
+        persistBundleDraft: !!persistBundleDraft,
+        persistBundleSecrets: false,
+        bundleForm: persistBundleDraft ? normalizeSponsorBundleDraftForm(bundleForm) : {},
+        expiresAt:
+          persistBundleDraft && expiresAt instanceof Date && Number.isFinite(expiresAt.getTime())
+            ? expiresAt.toISOString()
+            : '',
+      }),
+    );
   } catch (_) {}
 };
-const getCurrentOrigin = () => (
-  typeof window !== 'undefined' && window.location
-    ? toStr(window.location.origin).trim()
-    : ''
-);
+const getCurrentOrigin = () =>
+  typeof window !== 'undefined' && window.location ? toStr(window.location.origin).trim() : '';
 const buildSponsorGrantCorsMessage = (workerBase: unknown, detail: unknown = '') => {
   const origin = getCurrentOrigin() || '<current-origin>';
   const worker = toStr(workerBase).trim() || 'sponsoring worker';
@@ -376,7 +370,8 @@ const SPONSORED_FIELD_GROUPS: readonly SponsoredFieldGroup[] = Object.freeze([
   {
     key: 'lit',
     label: 'Lit',
-    notice: 'Account API keys are authority for bundle-owned Lit accounts. Usage API keys are scoped runtime secrets. Group, PKP, and Lit Action identifiers are operational config.',
+    notice:
+      'Account API keys are authority for bundle-owned Lit accounts. Usage API keys are scoped runtime secrets. Group, PKP, and Lit Action identifiers are operational config.',
     fields: [
       { key: 'litApiBase', label: 'Lit API base', type: 'text', placeholder: 'https://api.chipotle.litprotocol.com' },
       { key: 'litGroupId', label: 'Lit group ID', type: 'text', placeholder: 'group_...' },
@@ -460,43 +455,43 @@ const SponsorPage = ({
     return nextSessions;
   }, []);
 
-  const loadSessions = useCallback(async ({ forceOnChain, isCancelled }: LoadSessionsOptions = {}) => {
-    const cached = syncSessionsFromRegistryCache({ isCancelled });
+  const loadSessions = useCallback(
+    async ({ forceOnChain, isCancelled }: LoadSessionsOptions = {}) => {
+      const cached = syncSessionsFromRegistryCache({ isCancelled });
 
-    const chainIds = requestedChainId ? [requestedChainId] : undefined;
-    const shouldForceRegistryRead = !USE_ONCHAIN_SESSION_REGISTRY || !!forceOnChain;
-    const runRegistryLoad = async (bootstrapRpc: boolean): Promise<UnknownRecord> => {
-      try {
-        const result = await sessionRegistryReadsPort.loadSessionRegistryCache({
-          ...(chainIds ? { chainIds } : {}),
-          force: shouldForceRegistryRead,
-          providerLike: null,
-          account: '',
-          lit: null,
-          bootstrapRpc,
-        });
-        return isRecord(result) ? result : {};
-      } catch (error) {
-        return { __error: error };
+      const chainIds = requestedChainId ? [requestedChainId] : undefined;
+      const shouldForceRegistryRead = !USE_ONCHAIN_SESSION_REGISTRY || !!forceOnChain;
+      const runRegistryLoad = async (bootstrapRpc: boolean): Promise<UnknownRecord> => {
+        try {
+          const result = await sessionRegistryReadsPort.loadSessionRegistryCache({
+            ...(chainIds ? { chainIds } : {}),
+            force: shouldForceRegistryRead,
+            providerLike: null,
+            account: '',
+            lit: null,
+            bootstrapRpc,
+          });
+          return isRecord(result) ? result : {};
+        } catch (error) {
+          return { __error: error };
+        }
+      };
+
+      const primaryResult = await runRegistryLoad(true);
+      let refreshed = syncSessionsFromRegistryCache({ isCancelled });
+      if (typeof isCancelled === 'function' && isCancelled()) return refreshed;
+      const primaryCount = countSessionsForChain(refreshed, requestedChainId);
+      const loadMeta = isRecord(primaryResult.__loadMeta) ? primaryResult.__loadMeta : null;
+      const primaryLoadHadErrors = !!primaryResult?.__error || loadMeta?.hadLoadErrors === true;
+      const shouldRetryWithDefaultRpc = primaryCount <= 0 || primaryLoadHadErrors;
+      if (shouldRetryWithDefaultRpc) {
+        await runRegistryLoad(false);
+        refreshed = syncSessionsFromRegistryCache({ isCancelled });
       }
-    };
-
-    const primaryResult = await runRegistryLoad(true);
-    let refreshed = syncSessionsFromRegistryCache({ isCancelled });
-    if (typeof isCancelled === 'function' && isCancelled()) return refreshed;
-    const primaryCount = countSessionsForChain(refreshed, requestedChainId);
-    const loadMeta = isRecord(primaryResult.__loadMeta) ? primaryResult.__loadMeta : null;
-    const primaryLoadHadErrors = (
-      !!primaryResult?.__error ||
-      loadMeta?.hadLoadErrors === true
-    );
-    const shouldRetryWithDefaultRpc = primaryCount <= 0 || primaryLoadHadErrors;
-    if (shouldRetryWithDefaultRpc) {
-      await runRegistryLoad(false);
-      refreshed = syncSessionsFromRegistryCache({ isCancelled });
-    }
-    return refreshed;
-  }, [requestedChainId, syncSessionsFromRegistryCache]);
+      return refreshed;
+    },
+    [requestedChainId, syncSessionsFromRegistryCache],
+  );
 
   const handleRefreshSessions = useCallback(async () => {
     setSessionsRefreshBusy(true);
@@ -563,10 +558,12 @@ const SponsorPage = ({
   const requestedSessionMatch = useMemo(() => {
     if (!requestedSessionRaw) return null;
     if (requestedSessionIdHex) {
-      return sessionsForChain.find(([, cfg]) => {
-        const cfgId = sessionRegistryReadsPort.normalizeSessionIdHex(cfg?.__registry?.sessionIdHex || cfg?.sessionId);
-        return cfgId && cfgId === requestedSessionIdHex;
-      }) || null;
+      return (
+        sessionsForChain.find(([, cfg]) => {
+          const cfgId = sessionRegistryReadsPort.normalizeSessionIdHex(cfg?.__registry?.sessionIdHex || cfg?.sessionId);
+          return cfgId && cfgId === requestedSessionIdHex;
+        }) || null
+      );
     }
     return sessionsForChain.find(([slug]) => slug === requestedSessionSlug) || null;
   }, [requestedSessionIdHex, requestedSessionRaw, requestedSessionSlug, sessionsForChain]);
@@ -704,30 +701,17 @@ const SponsorPage = ({
   const hasManualWorkerUrlOverride = workerUrlOverrideDirty && !!normalizedEnteredWorkerUrl;
   const deploySponsoringWorkerUrl = normalizedEnteredWorkerUrl || selectedConfigWorkerUrl || '';
   const accountLower = toStr(account || '').toLowerCase();
-  const selectedConfigCreateSignature = useMemo(
-    () => buildCreateConfigSignature(selectedConfig),
-    [selectedConfig]
-  );
-  const createContextKey = useMemo(() => [
-    normalizeSlug(selectedSlug),
-    accountLower,
-    String(relevantSessionChainId || ''),
-    deploySponsoringWorkerUrl,
-    selectedConfigCreateSignature,
-  ].join('|'), [
-    accountLower,
-    deploySponsoringWorkerUrl,
-    relevantSessionChainId,
-    selectedConfigCreateSignature,
-    selectedSlug,
-  ]);
-  const activeCreateContextKeyRef = useRef(createContextKey);
-  activeCreateContextKeyRef.current = createContextKey;
-  const selectedSessionSupportsEmbeddedDeploy = useMemo(() => (
-    selectedConfig?.embeddedDeployHelperEnabled !== false
-  ), [selectedConfig]);
-  const canCreateSponsoredUrl = !!selectedConfig && (
-    selectedSessionHasUsableWorker || hasManualWorkerUrlOverride
+  const selectedConfigCreateSignature = useMemo(() => buildCreateConfigSignature(selectedConfig), [selectedConfig]);
+  const createContextKey = useMemo(
+    () =>
+      [
+        normalizeSlug(selectedSlug),
+        accountLower,
+        String(relevantSessionChainId || ''),
+        deploySponsoringWorkerUrl,
+        selectedConfigCreateSignature,
+      ].join('|'),
+    [accountLower, deploySponsoringWorkerUrl, relevantSessionChainId, selectedConfigCreateSignature, selectedSlug],
   );
   const activeCreateContextKeyRef = useRef(createContextKey);
   activeCreateContextKeyRef.current = createContextKey;
@@ -736,15 +720,6 @@ const SponsorPage = ({
     [selectedConfig],
   );
   const canCreateSponsoredUrl = !!selectedConfig && (selectedSessionHasUsableWorker || hasManualWorkerUrlOverride);
-
-  useEffect(() => {
-    createRequestSeqRef.current += 1;
-    setCreateBusy(false);
-    setCreateStatus('');
-    setShareUrl('');
-    setShareKey('');
-    setShareTxId('');
-  }, [createContextKey]);
 
   useEffect(() => {
     createRequestSeqRef.current += 1;
@@ -813,57 +788,85 @@ const SponsorPage = ({
     setBundleForm((prev) => ({ ...prev, [key]: value }));
   }, []);
 
-  const buildBootstrapUploadAuth = useCallback(async ({ workerUrl: overrideWorkerUrl }: WorkerUrlOverride = {}) => {
-    if (!account) {
-      if (toggleLoginModal) toggleLoginModal(true);
-      throw new Error('Connect a wallet to sign admin requests.');
-    }
-    const slug = normalizeSlug(selectedSlug);
-    const baseUrl = adminWorkerPorts.workerUrl.normalizeWorkerUrl(overrideWorkerUrl || workerUrl || selectedConfigWorkerUrl);
-    if (!baseUrl) throw new Error('Worker URL is missing.');
-    const chainId = Number(selectedConfig?.__registry?.chainId || selectedConfig?.networkChainId || network?.id || 1) || 1;
-    return adminWorkerPorts.adminAuth.buildSignedBootstrapAdminAuth({
-      slug,
-      workerUrl: baseUrl,
-      statement: 'Admin request: bootstrap arweave upload',
-      context: {
-        account,
-        chainId,
-        providerLike: typeof provider === 'string' ? provider : undefined,
-      },
-    });
-  }, [account, network?.id, provider, selectedConfig, selectedConfigWorkerUrl, selectedSlug, toggleLoginModal, workerUrl]);
+  const buildBootstrapUploadAuth = useCallback(
+    async ({ workerUrl: overrideWorkerUrl }: WorkerUrlOverride = {}) => {
+      if (!account) {
+        if (toggleLoginModal) toggleLoginModal(true);
+        throw new Error('Connect a wallet to sign admin requests.');
+      }
+      const slug = normalizeSlug(selectedSlug);
+      const baseUrl = adminWorkerPorts.workerUrl.normalizeWorkerUrl(
+        overrideWorkerUrl || workerUrl || selectedConfigWorkerUrl,
+      );
+      if (!baseUrl) throw new Error('Worker URL is missing.');
+      const chainId =
+        Number(selectedConfig?.__registry?.chainId || selectedConfig?.networkChainId || network?.id || 1) || 1;
+      return adminWorkerPorts.adminAuth.buildSignedBootstrapAdminAuth({
+        slug,
+        workerUrl: baseUrl,
+        statement: 'Admin request: bootstrap arweave upload',
+        context: {
+          account,
+          chainId,
+          providerLike: typeof provider === 'string' ? provider : undefined,
+        },
+      });
+    },
+    [
+      account,
+      network?.id,
+      provider,
+      selectedConfig,
+      selectedConfigWorkerUrl,
+      selectedSlug,
+      toggleLoginModal,
+      workerUrl,
+    ],
+  );
 
-  const buildGrantIssueAuth = useCallback(async ({ workerUrl: overrideWorkerUrl, body }: GrantIssueAuthArgs = {}) => {
-    if (!account) {
-      if (toggleLoginModal) toggleLoginModal(true);
-      throw new Error('Connect a wallet to sign admin requests.');
-    }
-    const slug = normalizeSlug(selectedSlug);
-    const baseUrl = adminWorkerPorts.workerUrl.normalizeWorkerUrl(overrideWorkerUrl || workerUrl || selectedConfigWorkerUrl);
-    if (!baseUrl) throw new Error('Worker URL is missing.');
-    const chainId = Number(selectedConfig?.__registry?.chainId || selectedConfig?.networkChainId || network?.id || 1) || 1;
-    return adminWorkerPorts.adminAuth.buildSignedAdminActionAuth({
-      action: 'issue-sponsored-grants',
-      slug,
-      body,
-      workerUrl: baseUrl,
-      context: {
-        account,
-        chainId,
-        providerLike: typeof provider === 'string' ? provider : undefined,
-      },
-    });
-  }, [account, network?.id, provider, selectedConfig, selectedConfigWorkerUrl, selectedSlug, toggleLoginModal, workerUrl]);
+  const buildGrantIssueAuth = useCallback(
+    async ({ workerUrl: overrideWorkerUrl, body }: GrantIssueAuthArgs = {}) => {
+      if (!account) {
+        if (toggleLoginModal) toggleLoginModal(true);
+        throw new Error('Connect a wallet to sign admin requests.');
+      }
+      const slug = normalizeSlug(selectedSlug);
+      const baseUrl = adminWorkerPorts.workerUrl.normalizeWorkerUrl(
+        overrideWorkerUrl || workerUrl || selectedConfigWorkerUrl,
+      );
+      if (!baseUrl) throw new Error('Worker URL is missing.');
+      const chainId =
+        Number(selectedConfig?.__registry?.chainId || selectedConfig?.networkChainId || network?.id || 1) || 1;
+      return adminWorkerPorts.adminAuth.buildSignedAdminActionAuth({
+        action: 'issue-sponsored-grants',
+        slug,
+        body,
+        workerUrl: baseUrl,
+        context: {
+          account,
+          chainId,
+          providerLike: typeof provider === 'string' ? provider : undefined,
+        },
+      });
+    },
+    [
+      account,
+      network?.id,
+      provider,
+      selectedConfig,
+      selectedConfigWorkerUrl,
+      selectedSlug,
+      toggleLoginModal,
+      workerUrl,
+    ],
+  );
 
   const handleCreateSponsoredUrl = useCallback(async () => {
     const requestSeq = createRequestSeqRef.current + 1;
     createRequestSeqRef.current = requestSeq;
     const requestContextKey = activeCreateContextKeyRef.current;
-    const isCurrentCreateRequest = () => (
-      createRequestSeqRef.current === requestSeq &&
-      activeCreateContextKeyRef.current === requestContextKey
-    );
+    const isCurrentCreateRequest = () =>
+      createRequestSeqRef.current === requestSeq && activeCreateContextKeyRef.current === requestContextKey;
     const setCreateStatusIfCurrent = (nextStatus: string) => {
       if (isCurrentCreateRequest()) setCreateStatus(nextStatus);
     };
@@ -1157,7 +1160,8 @@ const SponsorPage = ({
                 <span>Remember non-secret draft fields</span>
               </Label>
               <div className={styles.panelHint}>
-                Stores only non-secret metadata such as label and expiry in localStorage. API keys, private keys, tokens, JWKs, and RPC URLs are never restored.
+                Stores only non-secret metadata such as label and expiry in localStorage. API keys, private keys,
+                tokens, JWKs, and RPC URLs are never restored.
               </div>
             </div>
           </div>
@@ -1210,10 +1214,9 @@ const SponsorPage = ({
         <section className={`${styles.panel} ${styles.metadataPanel}`}>
           <div className={styles.panelHeader}>
             <div className={styles.panelTitleGroup}>
-              <div className={styles.panelTitle}>Create sponsored handoff</div>
+              <div className={styles.panelTitle}>Create share URL</div>
               <div className={styles.panelHint}>
-                The URL contains only the opaque bundle ID. Share the decryption key separately; it stays in memory and
-                is never added to the URL or browser storage.
+                `txId` lives in the query string and the decrypt secret stays in `#k=` client-side only.
               </div>
             </div>
           </div>
@@ -1271,11 +1274,15 @@ const SponsorPage = ({
                 className={styles.heroCardInput}
                 readOnly={!workerUrlEditable}
                 data-testid={E2E_TESTIDS.SPONSOR_WORKER_URL}
-                onChange={workerUrlEditable ? (e) => {
-                  workerUrlOverrideDirtyRef.current = true;
-                  setWorkerUrlOverrideDirty(true);
-                  setWorkerUrl(e.target.value);
-                } : undefined}
+                onChange={
+                  workerUrlEditable
+                    ? (e) => {
+                        workerUrlOverrideDirtyRef.current = true;
+                        setWorkerUrlOverrideDirty(true);
+                        setWorkerUrl(e.target.value);
+                      }
+                    : undefined
+                }
               />
               <div className={styles.heroCardInputActions}>
                 <button

@@ -39,10 +39,7 @@ describe('historicalFigureDemographics', () => {
   });
 
   it('does not pull the demo polis vote fixture into the demographics module', () => {
-    const demographicsSource = fs.readFileSync(
-      path.join(__dirname, 'historical_figure_demographics.js'),
-      'utf8'
-    );
+    const demographicsSource = fs.readFileSync(path.join(__dirname, 'historical_figure_demographics.ts'), 'utf8');
 
     expect(demographicsSource).not.toMatch(/demo_polis_data\.json/);
   });

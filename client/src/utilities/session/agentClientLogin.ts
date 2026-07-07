@@ -37,11 +37,8 @@ export type ExchangeAgentClientLoginArgs = {
 const STORAGE_PREFIX = 'ce:agentClientLogin:v1';
 const RAW_AGENT_TOKEN_RE = /ceagt_[A-Za-z0-9_-]{16,}/;
 
-const toRecord = (value: unknown): UnknownRecord => (
-  value && typeof value === 'object' && !Array.isArray(value)
-    ? value as UnknownRecord
-    : {}
-);
+const toRecord = (value: unknown): UnknownRecord =>
+  value && typeof value === 'object' && !Array.isArray(value) ? (value as UnknownRecord) : {};
 
 const toStr = (value: unknown): string => String(value ?? '').trim();
 
@@ -50,9 +47,8 @@ const normalizeSessionSlug = (value: unknown): string => {
   return slug === 'general' ? '' : slug;
 };
 
-const storageKey = (sessionSlug: unknown): string => (
-  `${STORAGE_PREFIX}:${encodeURIComponent(normalizeSessionSlug(sessionSlug) || 'general')}`
-);
+const storageKey = (sessionSlug: unknown): string =>
+  `${STORAGE_PREFIX}:${encodeURIComponent(normalizeSessionSlug(sessionSlug) || 'general')}`;
 
 const sessionStorageSafe = (): Storage | null => {
   if (typeof window === 'undefined') return null;
@@ -71,7 +67,9 @@ const extractTokenFromUrl = (input: string): string => {
       parsed.searchParams.get('agentToken'),
       parsed.searchParams.get('telegramToken'),
       parsed.searchParams.get('ceagt'),
-    ].map(toStr).find((candidate) => RAW_AGENT_TOKEN_RE.test(candidate));
+    ]
+      .map(toStr)
+      .find((candidate) => RAW_AGENT_TOKEN_RE.test(candidate));
     if (fromParams) return fromParams.match(RAW_AGENT_TOKEN_RE)?.[0] || '';
     return input.match(RAW_AGENT_TOKEN_RE)?.[0] || '';
   } catch (_) {
@@ -131,16 +129,9 @@ const normalizeExchangeEnvelope = ({
   if (normalizedSlug !== normalizeSessionSlug(sessionSlug)) {
     throw new Error('telegram_client_login_session_mismatch');
   }
-  const expiresAt = toStr(body.expiresAt) || (
-    Number(body.exp || 0) > 0
-      ? new Date(Number(body.exp) * 1000).toISOString()
-      : ''
-  );
-  const address = toStr(
-    toRecord(body.account).address ||
-    body.accountAddress ||
-    body.address
-  );
+  const expiresAt =
+    toStr(body.expiresAt) || (Number(body.exp || 0) > 0 ? new Date(Number(body.exp) * 1000).toISOString() : '');
+  const address = toStr(toRecord(body.account).address || body.accountAddress || body.address);
   const envelope: AgentClientLoginEnvelope = {
     v: 1,
     sessionSlug: normalizedSlug,
@@ -239,23 +230,14 @@ export const clearAgentClientLoginEnvelope = (sessionSlug: unknown): void => {
   if (storage) storage.removeItem(storageKey(sessionSlug));
 };
 
-export const buildAgentClientAuthHeaders = (
-  envelope: AgentClientLoginEnvelope | null,
-): Record<string, string> => (
-  envelope?.credential?.token
-    ? { Authorization: `Bearer ${envelope.credential.token}` }
-    : {}
-);
+export const buildAgentClientAuthHeaders = (envelope: AgentClientLoginEnvelope | null): Record<string, string> =>
+  envelope?.credential?.token ? { Authorization: `Bearer ${envelope.credential.token}` } : {};
 
 export const exchangeAgentClientLogin = async ({
   agentBridgeUrl,
   sessionSlug,
   tokenOrLink,
-  requestedCapabilities = [
-    'client_session_read',
-    'client_results_read',
-    'client_answer_submit',
-  ],
+  requestedCapabilities = ['client_session_read', 'client_results_read', 'client_answer_submit'],
   fetchImpl = fetch,
 }: ExchangeAgentClientLoginArgs): Promise<AgentClientLoginEnvelope> => {
   const bridge = normalizeWorkerUrl(agentBridgeUrl);

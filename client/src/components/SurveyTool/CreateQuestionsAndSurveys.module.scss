@@ -1,6 +1,6 @@
-@use "sass:color";
-@use "scss/finalSubmitCta" as finalSubmitCta;
-@use "scss/variables" as tokens;
+@use 'sass:color';
+@use 'scss/finalSubmitCta' as finalSubmitCta;
+@use 'scss/variables' as tokens;
 
 /* --- Variables (Matching SBTPage) --- */
 $user-page-text-color: tokens.$ce-white;

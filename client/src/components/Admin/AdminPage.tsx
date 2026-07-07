@@ -7,9 +7,12 @@ import {
   faCaretUp,
   faClipboard,
   faExternalLinkAlt,
+  faLock,
+  faLockOpen,
   faPen,
   faQuestionCircle,
   faSync,
+  faTimes,
 } from '@fortawesome/free-solid-svg-icons';
 import { ethers } from 'ethers';
 import styles from './AdminPage.module.scss';
@@ -158,7 +161,10 @@ export const __adminPageTestUtils = {
 const asAdminSessionConfig = (value: unknown): AdminSessionConfigLike =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as AdminSessionConfigLike) : {};
 
-const AdminPageRuntime = ({
+const asAdminSessionConfig = (value: unknown): AdminSessionConfigLike =>
+  value && typeof value === 'object' && !Array.isArray(value) ? (value as AdminSessionConfigLike) : {};
+
+const AdminPage = ({
   account,
   provider,
   network,
@@ -215,7 +221,10 @@ const AdminPageRuntime = ({
   const [sessionsRefreshBusy, setSessionsRefreshBusy] = useState(false);
   const [defaultGateTouched, setDefaultGateTouched] = useState(false);
   const [gateConfigDirty, setGateConfigDirty] = useState(false);
-  const [metadataBlockLimitsDraft, setMetadataBlockLimitsDraft] = useState<AdminMetadataBlockLimitsDraft>({ start: '', end: '' });
+  const [metadataBlockLimitsDraft, setMetadataBlockLimitsDraft] = useState<AdminMetadataBlockLimitsDraft>({
+    start: '',
+    end: '',
+  });
   const [metadataDraftTouched, setMetadataDraftTouched] = useState(false);
   const [metadataAutoFeatureDraft, setMetadataAutoFeatureDraft] = useState(true);
   const [metadataAutoFeatureTouched, setMetadataAutoFeatureTouched] = useState(false);
@@ -249,7 +258,18 @@ const AdminPageRuntime = ({
   });
   const [workerSecretsDirty, setWorkerSecretsDirty] = useState(false);
   const [clearedSecretKeys, setClearedSecretKeys] = useState<AdminSecretKeySet>(() => new Set());
-  const [openSecretCards, setOpenSecretCards] = useState<AdminOpenSecretCards>({ ai: false, rpc: false, arweave: false, faucet: false, lit: false });
+  const [storedSecretPresence, setStoredSecretPresence] = useState<Record<string, boolean>>({});
+  const [secretPresenceStatus, setSecretPresenceStatus] = useState<'idle' | 'loading' | 'partial' | 'loaded' | 'error'>(
+    'idle',
+  );
+  const [secretPresenceMessage, setSecretPresenceMessage] = useState('');
+  const [openSecretCards, setOpenSecretCards] = useState<AdminOpenSecretCards>({
+    ai: false,
+    rpc: false,
+    arweave: false,
+    faucet: false,
+    lit: false,
+  });
   const [arweaveResource, setArweaveResource] = useState<any>(() => buildAdminArweaveEmptyResource());
   const [faucetResource, setFaucetResource] = useState<any>(() => buildAdminFaucetEmptyResource());
   const [litResource, setLitResource] = useState<any>({
@@ -327,7 +347,6 @@ const AdminPageRuntime = ({
   const loadSessions = useCallback(
     async ({ forceOnChain }: any = {}) => {
       const cached = syncSessionsFromRegistryCache();
-      if (initialWorkerCanonicalConfigRef.current) return cached;
 
       const chainIds = requestedChainId ? [requestedChainId] : undefined;
       const shouldForceRegistryRead = !USE_ONCHAIN_SESSION_REGISTRY || !!forceOnChain;
@@ -545,10 +564,8 @@ const AdminPageRuntime = ({
     const match = availableSessions.find(([slug]) => slug === selectedSlug);
     return match ? asAdminSessionConfig(match[1]) : null;
   }, [availableSessions, selectedSlug]);
-  const adminCapabilityRoute = useMemo(() => resolveAdminCapabilityRoute(selectedConfig), [selectedConfig]);
-  const { sessionCapabilities, selectedWorkerSessionId } = adminCapabilityRoute;
-  const effectiveWorkerCorsState = useMemo(() => {
-    if (!selectedConfig) return { origins: [], reported: false };
+  const effectiveWorkerAllowOrigins = useMemo(() => {
+    if (!selectedConfig) return [];
     const cachedWorkerConfig: any =
       getCachedSessionWorkerConfig({
         slug: selectedSlug,
@@ -560,7 +577,6 @@ const AdminPageRuntime = ({
     const reported = Object.prototype.hasOwnProperty.call(selectedConfig, 'allowOrigins');
     return { origins: parseAllowOriginsDraft(selectedConfig?.allowOrigins), reported };
   }, [selectedConfig, selectedSlug]);
-  const effectiveWorkerAllowOrigins = effectiveWorkerCorsState.origins;
   const effectiveAllowOriginsDraft = useMemo(
     () => formatAllowOriginsDraft(effectiveWorkerAllowOrigins),
     [effectiveWorkerAllowOrigins],
@@ -573,23 +589,32 @@ const AdminPageRuntime = ({
   const allowOriginsHasChanges = normalizedAllowOriginsDraftText !== effectiveAllowOriginsDraft;
 
   const groupMetadata = useMemo(() => selectedConfig, [selectedConfig]);
-  const relevantSessionChainId = useMemo(() => (
-    Number(selectedConfig?.networkChainId || selectedConfig?.__registry?.chainId || network?.id || 0) || 0
-  ), [selectedConfig, network?.id]);
-  const relevantRegistryChainId = useMemo(() => (
-    Number(
-      selectedConfig?.__registry?.registryChainId ||
-      selectedConfig?.__registry?.chainId ||
-      selectedConfig?.networkChainId ||
-      network?.id ||
-      0
-    ) || 0
-  ), [selectedConfig, network?.id]);
-  const encryptedFieldsSessionKey = useMemo(() => ([
-    normalizeSlug(groupMetadata?.slug || selectedSlug),
-    toStr(groupMetadata?.sessionId || groupMetadata?.__registry?.sessionIdHex).trim(),
-    toStr(groupMetadata?.__registry?.registryChainId || groupMetadata?.__registry?.chainId || relevantRegistryChainId).trim(),
-  ].join('|')), [groupMetadata, selectedSlug, relevantRegistryChainId]);
+  const relevantSessionChainId = useMemo(
+    () => Number(selectedConfig?.networkChainId || selectedConfig?.__registry?.chainId || network?.id || 0) || 0,
+    [selectedConfig, network?.id],
+  );
+  const relevantRegistryChainId = useMemo(
+    () =>
+      Number(
+        selectedConfig?.__registry?.registryChainId ||
+          selectedConfig?.__registry?.chainId ||
+          selectedConfig?.networkChainId ||
+          network?.id ||
+          0,
+      ) || 0,
+    [selectedConfig, network?.id],
+  );
+  const encryptedFieldsSessionKey = useMemo(
+    () =>
+      [
+        normalizeSlug(groupMetadata?.slug || selectedSlug),
+        toStr(groupMetadata?.sessionId || groupMetadata?.__registry?.sessionIdHex).trim(),
+        toStr(
+          groupMetadata?.__registry?.registryChainId || groupMetadata?.__registry?.chainId || relevantRegistryChainId,
+        ).trim(),
+      ].join('|'),
+    [groupMetadata, selectedSlug, relevantRegistryChainId],
+  );
   const relevantSessionChainLabel = useMemo(() => {
     if (!relevantSessionChainId) return '';
     const name = getChainName(relevantSessionChainId);
@@ -746,7 +771,7 @@ const AdminPageRuntime = ({
         ) {
           next[key] = {
             ...previousEntry,
-            status: previousEntry.status === 'wallet-required' ? 'locked' : (previousEntry.status || 'locked'),
+            status: previousEntry.status === 'wallet-required' ? 'locked' : previousEntry.status || 'locked',
             encryptedAvailable: true,
             envelope,
           };
@@ -806,30 +831,18 @@ const AdminPageRuntime = ({
       ),
     [selectedConfig, selectedSlug],
   );
-  const exactSelectedConfigWorkerUrl = useMemo(
+  const selectedSessionHasUsableWorker = useMemo(
     () =>
-      normalizeWorkerUrl(
-        getUsableSessionWorkerUrl({
-          slug: selectedSlug,
-          sessionConfig: selectedConfig,
-          requireExactWorkerSession: true,
-        }),
-      ),
-    [selectedConfig, selectedSlug],
-  );
-  const agentSessionWrappedWorkerUrl = useMemo(
-    () =>
-      resolveAdminAgentSessionWrappedWorkerOrigin({
-        editedWorkerUrl: workerUrl,
+      hasUsableSessionWorkerConfig({
+        slug: selectedSlug,
         sessionConfig: selectedConfig,
-        sessionSlug: selectedSlug,
-        workerUrlEditable,
+        allowSharedFallback: true,
       }),
-    [selectedConfig, selectedSlug, workerUrl, workerUrlEditable],
+    [selectedConfig, selectedSlug],
   );
   const secretPresenceTargetKey = useMemo(
     () =>
-      buildAdminSecretPresenceTargetKey({
+      buildSecretPresenceTargetKey({
         slug: selectedSlug,
         workerUrl: workerUrl || selectedConfigWorkerUrl,
       }),
@@ -927,18 +940,22 @@ const AdminPageRuntime = ({
       const arweaveBalance = await adminArweavePort.readArweaveWalletBalance(parsedJwk);
       address = arweaveBalance.address;
       if (requestId !== arweaveResourceRequestRef.current) return;
-      setArweaveResource(buildAdminArweaveBalanceResource({
-        address,
-        winston: arweaveBalance.winston,
-        formatWinstonToAr: arweaveScripts.formatWinstonToAr,
-        shortAddress,
-      }));
+      setArweaveResource(
+        buildAdminArweaveBalanceResource({
+          address,
+          winston: arweaveBalance.winston,
+          formatWinstonToAr: adminArweavePort.formatWinstonToAr,
+          shortAddress,
+        }),
+      );
     } catch (err) {
       if (requestId !== arweaveResourceRequestRef.current) return;
-      setArweaveResource(buildAdminArweaveErrorResource({
-        address,
-        shortAddress,
-      }));
+      setArweaveResource(
+        buildAdminArweaveErrorResource({
+          address,
+          shortAddress,
+        }),
+      );
     }
   }, [secrets.arweaveJwk]);
 
@@ -964,35 +981,43 @@ const AdminPageRuntime = ({
       relevantSessionChainLabel || (sessionReadRpc.chainId ? String(sessionReadRpc.chainId) : '');
     if (!sessionReadRpc.chainId) {
       if (requestId !== faucetResourceRequestRef.current) return;
-      setFaucetResource(buildAdminFaucetRpcUnavailableResource({
-        address,
-        shortAddress,
-      }));
+      setFaucetResource(
+        buildAdminFaucetRpcUnavailableResource({
+          address,
+          shortAddress,
+        }),
+      );
       return;
     }
 
-    setFaucetResource(buildAdminFaucetLoadingResource({
-      address,
-      sessionChainLabel,
-      shortAddress,
-    }));
+    setFaucetResource(
+      buildAdminFaucetLoadingResource({
+        address,
+        sessionChainLabel,
+        shortAddress,
+      }),
+    );
 
     try {
       const balanceWei = await rpcProvidersChainReadsPort.getNativeBalanceWeiForChain(sessionReadRpc.chainId, address);
       if (requestId !== faucetResourceRequestRef.current) return;
-      setFaucetResource(buildAdminFaucetBalanceResource({
-        address,
-        balanceWei,
-        sessionChainLabel,
-        formatEther: ethers.utils.formatEther,
-        shortAddress,
-      }));
+      setFaucetResource(
+        buildAdminFaucetBalanceResource({
+          address,
+          balanceWei,
+          sessionChainLabel,
+          formatEther: ethers.utils.formatEther,
+          shortAddress,
+        }),
+      );
     } catch (_) {
       if (requestId !== faucetResourceRequestRef.current) return;
-      setFaucetResource(buildAdminFaucetErrorResource({
-        address,
-        shortAddress,
-      }));
+      setFaucetResource(
+        buildAdminFaucetErrorResource({
+          address,
+          shortAddress,
+        }),
+      );
     }
   }, [relevantSessionChainLabel, secrets.faucetPrivateKey, sessionReadRpc.chainId]);
 
@@ -1021,197 +1046,273 @@ const AdminPageRuntime = ({
         if (toggleLoginModal) toggleLoginModal(true);
         throw new Error('Connect a wallet to sign admin requests.');
       }
-
-      const data = await res.json().catch(() => ({}));
-      if (res.ok) {
-        return { baseUrl, response: res, data };
-      }
-
-      const responseError = data?.error || '';
-      if (attempt < retryAttempts && isRetryableAdminNonceFailure({
-        responseStatus: res.status,
-        responseError,
-      })) {
-        // A concurrent admin action may have consumed the previous nonce.
-        // Re-sign with a fresh nonce instead of surfacing a transient failure.
-        // eslint-disable-next-line no-await-in-loop
-        await sleep(250 * attempt);
-        continue;
-      }
-
-      lastError = new Error(normalizeAdminWorkerFetchError({
-        error: responseError || `Request failed (${res.status}).`,
-        workerBase: baseUrl,
-        responseStatus: res.status,
-        responseError,
-      }));
-      throw lastError;
-    }
-
-    throw lastError || new Error(`Failed admin action: ${action}`);
-  }, [
-    selectedConfigWorkerUrl,
-    signAdminAction,
-    workerUrl,
-  ]);
-
-  const refreshLitResource = useCallback(async ({ includeSignedStatus = true }: any = {}) => {
-    const requestId = litResourceRequestRef.current + 1;
-    litResourceRequestRef.current = requestId;
-    const baseUrl = normalizeWorkerUrl(workerUrl || selectedConfigWorkerUrl);
-    const litCredentials = selectedConfig?.litCredentials
-      && typeof selectedConfig.litCredentials === 'object'
-      && !Array.isArray(selectedConfig.litCredentials)
-      ? selectedConfig.litCredentials
-      : {};
-    const accountApiKey = toStr(secrets.litAccountApiKey).trim();
-    const usageApiKey = toStr(secrets.litUsageApiKey).trim();
-    const configuredLitApiBase = toStr(litCredentials?.litApiBase).trim();
-    const configuredLitGroupId = toStr(litCredentials?.litGroupId).trim();
-    const configuredLitPkpId = toStr(litCredentials?.litPkpId).trim();
-    const configuredLitActionCid = toStr(litCredentials?.litActionCid).trim();
-    const hasChipotleConfig = !!(
-      configuredLitApiBase ||
-      configuredLitGroupId ||
-      configuredLitPkpId ||
-      configuredLitActionCid
-    );
-    const useChipotlePath = !!(accountApiKey || usageApiKey || hasChipotleConfig);
-
-    if (!useChipotlePath && !baseUrl) {
-      setLitResource({
-        address: '',
-        display: 'Lit Chipotle not configured',
-        meta: 'Enter a Lit account API key or Lit usage API key above, or save Lit Chipotle config to the worker, then refresh status.',
-        loading: false,
-        manualRefreshAvailable: false,
-      });
-      return;
-    }
-
-    if (!baseUrl || !selectedConfig) {
-      if (requestId !== litResourceRequestRef.current) return;
-      setLitResource({
-        address: '',
-        display: useChipotlePath ? 'Worker unavailable' : 'Lit Chipotle not configured',
-        meta: useChipotlePath
-          ? 'Resolve the worker URL to read Lit Chipotle status.'
-          : 'Enter a Lit account API key or Lit usage API key above, or save Lit Chipotle config to the worker, then refresh status.',
-        loading: false,
-        manualRefreshAvailable: false,
-      });
-      return;
-    }
-
-    if (!includeSignedStatus) {
-      if (requestId !== litResourceRequestRef.current) return;
-      setLitResource({
-        address: '',
-        display: 'Status not loaded',
-        meta: [
-          accountApiKey ? 'Unsaved account key' : '',
-          usageApiKey ? 'Unsaved usage key' : '',
-          !accountApiKey && !usageApiKey ? 'Saved worker config' : '',
-          configuredLitApiBase ? formatPreviewValue(configuredLitApiBase.replace(/^https?:\/\//, ''), 28) : '',
-          configuredLitGroupId ? `group ${formatPreviewValue(configuredLitGroupId, 20)}` : '',
-          configuredLitPkpId ? 'PKP configured' : '',
-          configuredLitActionCid ? 'Action configured' : '',
-          'Click refresh to query the worker for Lit Chipotle status.',
-        ].filter(Boolean).join(' • '),
-        loading: false,
-        manualRefreshAvailable: true,
-      });
-      return;
-    }
-
-    setLitResource({
-      address: '',
-      display: 'Loading...',
-      meta: configuredLitGroupId
-        ? `Checking group ${formatPreviewValue(configuredLitGroupId, 20)}`
-        : 'Checking Lit Chipotle worker status',
-      loading: true,
-      manualRefreshAvailable: true,
-    });
-
-    try {
       const slug = normalizeSlug(selectedSlug);
-      const requestBody = {
-        sessionSlug: slug,
-        ...(usageApiKey ? { litUsageApiKey: usageApiKey } : {}),
-        ...(accountApiKey ? { apiKey: accountApiKey } : {}),
-      };
+      const baseUrl = normalizeWorkerUrl(overrideWorkerUrl || workerUrl || selectedConfigWorkerUrl);
+      if (!baseUrl) throw new Error('Worker URL is missing.');
+
+      const chainId =
+        Number(
+          chainIdOverride || selectedConfig?.__registry?.chainId || selectedConfig?.networkChainId || network?.id || 1,
+        ) || 1;
+
+      return adminWorkerPorts.adminAuth.buildSignedAdminActionAuth({
+        action,
+        slug,
+        body,
+        workerUrl: baseUrl,
+        context: {
+          account,
+          chainId,
+          providerLike: typeof provider === 'string' ? provider : undefined,
+        },
+      });
+    },
+    [
+      account,
+      network?.id,
+      provider,
+      selectedConfig,
+      selectedConfigWorkerUrl,
+      selectedSlug,
+      toggleLoginModal,
+      workerUrl,
+    ],
+  );
+
+  const postSignedAdminRequest = useCallback(
+    async ({
+      action = 'set-config',
+      body = {},
+      path,
+      chainId: chainIdOverride = null,
+      workerUrl: overrideWorkerUrl,
+      retryAttempts = ADMIN_ACTION_NONCE_RETRY_ATTEMPTS,
+    }: any = {}) => {
+      const baseUrl = normalizeWorkerUrl(overrideWorkerUrl || workerUrl || selectedConfigWorkerUrl);
+      if (!baseUrl) throw new Error('Worker URL is missing.');
+
+      let lastError: any = null;
+      for (let attempt = 1; attempt <= retryAttempts; attempt += 1) {
+        const auth = await signAdminAction({
+          action,
+          body,
+          chainId: chainIdOverride,
+          workerUrl: baseUrl,
+        });
+        let res;
+        try {
+          res = await fetch(`${baseUrl}${path}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...body, ...auth }),
+          });
+        } catch (error) {
+          throw new Error(
+            normalizeAdminWorkerFetchError({
+              error,
+              workerBase: baseUrl,
+            }),
+          );
+        }
+
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) {
+          return { baseUrl, response: res, data };
+        }
+
+        const responseError = data?.error || '';
+        if (
+          attempt < retryAttempts &&
+          isRetryableAdminNonceFailure({
+            responseStatus: res.status,
+            responseError,
+          })
+        ) {
+          // A concurrent admin action may have consumed the previous nonce.
+          // Re-sign with a fresh nonce instead of surfacing a transient failure.
+          // eslint-disable-next-line no-await-in-loop
+          await sleep(250 * attempt);
+          continue;
+        }
+
+        lastError = new Error(
+          normalizeAdminWorkerFetchError({
+            error: responseError || `Request failed (${res.status}).`,
+            workerBase: baseUrl,
+            responseStatus: res.status,
+            responseError,
+          }),
+        );
+        throw lastError;
+      }
+
+      throw lastError || new Error(`Failed admin action: ${action}`);
+    },
+    [selectedConfigWorkerUrl, signAdminAction, workerUrl],
+  );
+
+  const mergeStoredSecretPresenceFromPayload = useCallback(
+    (payload: Record<string, unknown> = {}) => {
+      const patch = normalizeAdminSecretPresencePatch(payload);
+      setStoredSecretPresence((prev) => {
+        const next = { ...prev, ...patch };
+        return secretPresenceStatus === 'loaded' ? normalizeAdminSecretPresence(next) : next;
+      });
+      if (secretPresenceStatus !== 'loaded') {
+        setSecretPresenceStatus('partial');
+      }
+    },
+    [secretPresenceStatus],
+  );
+
+  const refreshSecretPresence = useCallback(async () => {
+    let baseUrl = '';
+    let requestId = 0;
+    let targetKey = '';
+    try {
+      if (!selectedConfig) throw new Error('Select a session.');
+      const slug = normalizeSlug(selectedSlug);
+      baseUrl = normalizeWorkerUrl(workerUrl || selectedConfigWorkerUrl);
+      if (!baseUrl) throw new Error('Worker URL is missing.');
+      targetKey = buildSecretPresenceTargetKey({ slug, workerUrl: baseUrl });
+      requestId = secretPresenceRequestRef.current + 1;
+      secretPresenceRequestRef.current = requestId;
+      setSecretPresenceStatus('loading');
+      setSecretPresenceMessage('Checking stored secret status…');
       const { data } = await postSignedAdminRequest({
-        action: 'lit-chipotle-status',
-        body: requestBody,
-        path: '/admin/lit-chipotle-status',
+        action: 'secret-presence',
+        body: { sessionSlug: slug },
+        path: '/admin/secret-presence',
         workerUrl: baseUrl,
       });
-      if (requestId !== litResourceRequestRef.current) return;
-
-      const ready = data?.ready === true;
-      const warnings = Array.isArray(data?.warnings) ? data.warnings : [];
-      const groupSummary = data?.groupSummary && typeof data.groupSummary === 'object'
-        ? data.groupSummary
-        : {};
-      const walletCount = groupSummary.walletCount == null ? null : Number(groupSummary.walletCount);
-      const actionCount = groupSummary.actionCount == null ? null : Number(groupSummary.actionCount);
-      const hasHardConfigMiss = (
-        groupSummary.hasConfiguredPkp === false ||
-        groupSummary.hasConfiguredAction === false
+      if (requestId !== secretPresenceRequestRef.current || targetKey !== secretPresenceTargetKeyRef.current) {
+        return;
+      }
+      setStoredSecretPresence(normalizeAdminSecretPresence(data?.secrets));
+      setSecretPresenceStatus('loaded');
+      setSecretPresenceMessage('Stored secret status refreshed.');
+    } catch (err) {
+      if (
+        requestId &&
+        (requestId !== secretPresenceRequestRef.current || targetKey !== secretPresenceTargetKeyRef.current)
+      ) {
+        return;
+      }
+      setSecretPresenceStatus('error');
+      setSecretPresenceMessage(
+        normalizeAdminWorkerFetchError({
+          error: err,
+          workerBase: baseUrl || normalizeWorkerUrl(workerUrl || selectedConfigWorkerUrl),
+        }),
       );
-      const balanceDisplay = toStr(data?.balance?.balance_display || '').trim();
-      setLitResource({
-        address: '',
-        display: ready
-          ? 'Ready'
-          : hasHardConfigMiss
-            ? 'Needs config'
-            : warnings.length
-              ? 'Needs review'
-              : 'Configured',
-        meta: [
-          configuredLitApiBase ? formatPreviewValue(configuredLitApiBase.replace(/^https?:\/\//, ''), 28) : '',
-          balanceDisplay ? `balance ${balanceDisplay}` : '',
-          configuredLitGroupId ? `group ${formatPreviewValue(configuredLitGroupId, 20)}` : '',
-          configuredLitPkpId
-            ? (groupSummary.hasConfiguredPkp === true
-              ? 'PKP ready'
-              : groupSummary.hasConfiguredPkp === false
-                ? 'PKP missing'
-                : 'PKP unchecked')
-            : (walletCount != null ? `${walletCount} wallet${walletCount === 1 ? '' : 's'}` : ''),
-          configuredLitActionCid
-            ? (groupSummary.hasConfiguredAction === true
-              ? 'Action ready'
-              : groupSummary.hasConfiguredAction === false
-                ? 'Action missing'
-                : 'Action unchecked')
-            : (actionCount != null ? `${actionCount} action${actionCount === 1 ? '' : 's'}` : ''),
-          warnings.length ? `${warnings.length} warning${warnings.length === 1 ? '' : 's'}` : '',
-        ].filter(Boolean).join(' • ') || 'Lit Chipotle status loaded.',
-        loading: false,
-        manualRefreshAvailable: true,
-      });
-    } catch (error: any) {
-      if (requestId !== litResourceRequestRef.current) return;
-      setLitResource({
-        address: '',
-        display: 'Unable to load status',
-        meta: getErrorMessage(error, 'Failed to load Lit Chipotle status.'),
-        loading: false,
-        manualRefreshAvailable: true,
-      });
     }
-  }, [
-    secrets.litAccountApiKey,
-    secrets.litUsageApiKey,
-    selectedConfig,
-    selectedConfigWorkerUrl,
-    selectedSlug,
-    postSignedAdminRequest,
-    workerUrl,
-  ]);
+  }, [postSignedAdminRequest, selectedConfig, selectedConfigWorkerUrl, selectedSlug, workerUrl]);
+
+  const refreshLitResource = useCallback(
+    async ({ includeSignedStatus = true }: any = {}) => {
+      const requestId = litResourceRequestRef.current + 1;
+      litResourceRequestRef.current = requestId;
+      const baseUrl = normalizeWorkerUrl(workerUrl || selectedConfigWorkerUrl);
+      const litCredentials =
+        selectedConfig?.litCredentials &&
+        typeof selectedConfig.litCredentials === 'object' &&
+        !Array.isArray(selectedConfig.litCredentials)
+          ? selectedConfig.litCredentials
+          : {};
+      const accountApiKey = toStr(secrets.litAccountApiKey).trim();
+      const usageApiKey = toStr(secrets.litUsageApiKey).trim();
+      const configuredLitApiBase = toStr(litCredentials?.litApiBase).trim();
+      const configuredLitGroupId = toStr(litCredentials?.litGroupId).trim();
+      const configuredLitPkpId = toStr(litCredentials?.litPkpId).trim();
+      const configuredLitActionCid = toStr(litCredentials?.litActionCid).trim();
+      const hasChipotleConfig = !!(
+        configuredLitApiBase ||
+        configuredLitGroupId ||
+        configuredLitPkpId ||
+        configuredLitActionCid
+      );
+      const useChipotlePath = !!(accountApiKey || usageApiKey || hasChipotleConfig);
+
+      if (!useChipotlePath && !baseUrl) {
+        setLitResource(buildAdminLitNotConfiguredResource());
+        return;
+      }
+
+      if (!baseUrl || !selectedConfig) {
+        if (requestId !== litResourceRequestRef.current) return;
+        setLitResource(buildAdminLitUnavailableResource({ useChipotlePath }));
+        return;
+      }
+
+      if (!includeSignedStatus) {
+        if (requestId !== litResourceRequestRef.current) return;
+        setLitResource(
+          buildAdminLitStatusNotLoadedResource({
+            hasAccountApiKey: !!accountApiKey,
+            hasUsageApiKey: !!usageApiKey,
+            configuredLitApiBase,
+            configuredLitGroupId,
+            configuredLitPkpId,
+            configuredLitActionCid,
+            formatPreviewValue,
+          }),
+        );
+        return;
+      }
+
+      setLitResource(
+        buildAdminLitLoadingResource({
+          configuredLitGroupId,
+          formatPreviewValue,
+        }),
+      );
+
+      try {
+        const slug = normalizeSlug(selectedSlug);
+        const requestBody = {
+          sessionSlug: slug,
+          ...(usageApiKey ? { litUsageApiKey: usageApiKey } : {}),
+          ...(accountApiKey ? { apiKey: accountApiKey } : {}),
+        };
+        const { data } = await postSignedAdminRequest({
+          action: 'lit-chipotle-status',
+          body: requestBody,
+          path: '/admin/lit-chipotle-status',
+          workerUrl: baseUrl,
+        });
+        if (requestId !== litResourceRequestRef.current) return;
+
+        const warnings = Array.isArray(data?.warnings) ? data.warnings : [];
+        const groupSummary = data?.groupSummary && typeof data.groupSummary === 'object' ? data.groupSummary : {};
+        const balanceDisplay = toStr(data?.balance?.balance_display || '').trim();
+        setLitResource(
+          buildAdminLitStatusResource({
+            ready: data?.ready === true,
+            warnings,
+            groupSummary,
+            balanceDisplay,
+            configuredLitApiBase,
+            configuredLitGroupId,
+            configuredLitPkpId,
+            configuredLitActionCid,
+            formatPreviewValue,
+          }),
+        );
+      } catch (error: any) {
+        if (requestId !== litResourceRequestRef.current) return;
+        setLitResource(buildAdminLitErrorResource(getErrorMessage(error, 'Failed to load Lit Chipotle status.')));
+      }
+    },
+    [
+      secrets.litAccountApiKey,
+      secrets.litUsageApiKey,
+      selectedConfig,
+      selectedConfigWorkerUrl,
+      selectedSlug,
+      postSignedAdminRequest,
+      workerUrl,
+    ],
+  );
 
   useEffect(() => {
     refreshLitResource({ includeSignedStatus: false });
@@ -1221,19 +1322,20 @@ const AdminPageRuntime = ({
   }, [refreshLitResource]);
 
   const litResourceLabel = useMemo(() => {
-    const litCredentials = selectedConfig?.litCredentials
-      && typeof selectedConfig.litCredentials === 'object'
-      && !Array.isArray(selectedConfig.litCredentials)
-      ? selectedConfig.litCredentials
-      : {};
-    return (
-      toStr(secrets.litAccountApiKey).trim() ||
-      toStr(secrets.litUsageApiKey).trim() ||
-      toStr(litCredentials?.litApiBase).trim() ||
-      toStr(litCredentials?.litGroupId).trim() ||
-      toStr(litCredentials?.litPkpId).trim() ||
-      toStr(litCredentials?.litActionCid).trim()
-    ) ? 'Lit Chipotle status' : 'Lit sponsorship status';
+    const litCredentials =
+      selectedConfig?.litCredentials &&
+      typeof selectedConfig.litCredentials === 'object' &&
+      !Array.isArray(selectedConfig.litCredentials)
+        ? selectedConfig.litCredentials
+        : {};
+    return getAdminLitResourceLabel({
+      hasAccountApiKey: !!toStr(secrets.litAccountApiKey).trim(),
+      hasUsageApiKey: !!toStr(secrets.litUsageApiKey).trim(),
+      configuredLitApiBase: litCredentials?.litApiBase,
+      configuredLitGroupId: litCredentials?.litGroupId,
+      configuredLitPkpId: litCredentials?.litPkpId,
+      configuredLitActionCid: litCredentials?.litActionCid,
+    });
   }, [selectedConfig, secrets.litAccountApiKey, secrets.litUsageApiKey]);
 
   const resolveSuggestedAllowOrigins = (extraOrigins: any = normalizedAllowOriginsDraft) => {
@@ -1360,24 +1462,26 @@ const AdminPageRuntime = ({
       });
       setSaveStatus(`Worker secrets saved for ${sessionLabel}.`);
 
-      const registryChainId = Number(
-        selectedConfig?.__registry?.registryChainId ||
-        selectedConfig?.__registry?.chainId ||
-        selectedConfig?.networkChainId ||
-        network?.id ||
-        0
-      ) || 0;
-      const shouldPreserveSponsoredLit = (
+      const registryChainId =
+        Number(
+          selectedConfig?.__registry?.registryChainId ||
+            selectedConfig?.__registry?.chainId ||
+            selectedConfig?.networkChainId ||
+            network?.id ||
+            0,
+        ) || 0;
+      const shouldPreserveSponsoredLit =
         currentSponsoredLit &&
         !clearedSecretKeys.has('litAccountApiKey') &&
         !clearedSecretKeys.has('litUsageApiKey') &&
         !Object.prototype.hasOwnProperty.call(secretsPayload, 'litAccountApiKey') &&
-        !Object.prototype.hasOwnProperty.call(secretsPayload, 'litUsageApiKey')
-      );
-      const sponsoredFields = buildSponsoredSessionFlagFields({
-        secrets: secretsPayload,
-        fallbackFields: shouldPreserveSponsoredLit ? { sponsored_lit: '1' } : {},
-        includeCustomRpcInAi: true,
+        !Object.prototype.hasOwnProperty.call(secretsPayload, 'litUsageApiKey');
+      const sponsoredFields = adminSessionRegistryPorts.writes.buildRegistrySessionFields({
+        sponsoredFields: buildSponsoredSessionFlagFields({
+          secrets: secretsPayload,
+          fallbackFields: shouldPreserveSponsoredLit ? { sponsored_lit: '1' } : {},
+          includeCustomRpcInAi: true,
+        }),
       });
       setChainStatus('Updating sponsored flags on-chain…');
       await setSessionFieldsOnChain({
@@ -1470,7 +1574,7 @@ const AdminPageRuntime = ({
     setGateSyncResult(null);
     try {
       if (!selectedConfig) throw new Error('Select a session first.');
-      if (!canAdminRegistry) throw new Error('Connect the registry admin wallet to update gates.');
+      if (!canAdmin) throw new Error('Connect the admin wallet to update gates.');
       const registryChainId =
         Number(
           selectedConfig?.__registry?.registryChainId ||
@@ -1533,22 +1637,8 @@ const AdminPageRuntime = ({
   const testSessionConfig = selectedConfig
     ? { ...selectedConfig, corsWorkerUrl: baseWorkerUrl || selectedConfigWorkerUrl || '' }
     : null;
-  const {
-    ensureSessionWorkerAttached: ensureAgentSessionWrappedWorkerAttached,
-    handleConfigUpdated: handleAgentSessionWrappedConfigUpdated,
-  } = useAdminAgentSessionWrappedConfigUpdate({
-    selectedConfig,
-    selectedSlug: normalizeSlug(selectedSlug),
-    setSessions,
-    providerLike: provider,
-  });
   const ensureWorkerSessionConfig = useCallback(
-    async ({
-      sessionConfigOverride,
-      configPayloadOverride,
-      action = 'set-config',
-      workerUrl: workerUrlOverride,
-    }: any = {}) => {
+    async ({ sessionConfigOverride, action = 'set-config', workerUrl: workerUrlOverride }: any = {}) => {
       const sessionConfigForSync = sessionConfigOverride || selectedConfig;
       if (!sessionConfigForSync) throw new Error('Select a session first.');
       if (!account) {
@@ -1559,13 +1649,11 @@ const AdminPageRuntime = ({
       const baseUrl = normalizeWorkerUrl(workerUrlOverride || baseWorkerUrl || selectedConfigWorkerUrl);
       if (!baseUrl) throw new Error('Worker URL is missing.');
 
-      const configPayload = configPayloadOverride
-        ? { ...asAdminSessionConfig(configPayloadOverride) }
-        : buildWorkerSessionConfigPayload({
-            sessionConfig: sessionConfigForSync,
-            account,
-            fallbackChainId: testChainId,
-          });
+      const configPayload = buildWorkerSessionConfigPayload({
+        sessionConfig: sessionConfigForSync,
+        account,
+        fallbackChainId: testChainId,
+      });
       const requestBody = {
         sessionSlug: slug,
         adminAddress: configPayload.adminAddress || account,
@@ -1578,11 +1666,13 @@ const AdminPageRuntime = ({
         chainId: testChainId,
         workerUrl: baseUrl,
       });
-      const existingCachedConfig = getCachedSessionWorkerConfig({ slug, sessionConfig: selectedConfig }) || {};
       upsertCachedSessionWorkerConfig({
         slug,
         sessionConfig: selectedConfig,
-        config: { ...existingCachedConfig, ...configPayload, corsWorkerUrl: baseUrl },
+        config: {
+          ...configPayload,
+          corsWorkerUrl: baseUrl,
+        },
       });
       return { data, configPayload };
     },
@@ -1628,7 +1718,10 @@ const AdminPageRuntime = ({
       unauthStatus = Number(unauthResp.status || 0) || 0;
       unauthError = toStr(unauthData?.error).trim();
       if (unauthResp.ok) {
-        setTestResults((prev) => ({ ...prev, health: `OK (${unauthData?.ts ? new Date(unauthData.ts).toISOString() : 'healthy'})` }));
+        setTestResults((prev) => ({
+          ...prev,
+          health: `OK (${unauthData?.ts ? new Date(unauthData.ts).toISOString() : 'healthy'})`,
+        }));
         setTestStatus('Health check succeeded.');
         return;
       }
@@ -1948,9 +2041,8 @@ const AdminPageRuntime = ({
         throw new Error('Lit hooks not initialized.');
       }
       const litNetwork = toStr(hooks?.litNetwork).trim() || 'chipotle';
-      const chainId = Number(
-        groupMetadata?.networkChainId || groupMetadata?.__registry?.chainId || network?.id || 0
-      ) || null;
+      const chainId =
+        Number(groupMetadata?.networkChainId || groupMetadata?.__registry?.chainId || network?.id || 0) || null;
       const decrypted = await cryptoUtils.decryptEnvelopeValue(litTestEnvelope, {
         account,
         chainId,
@@ -1967,17 +2059,10 @@ const AdminPageRuntime = ({
     }
   };
 
-  const SECRET_CARDS = [
-    { key: 'ai', label: 'AI', fields: ['openaiKey', 'anthropicKey', 'openrouterKey'] },
-    { key: 'rpc', label: 'RPC', fields: ['customRpcUrl', 'customRpcKey'] },
-    { key: 'arweave', label: 'Arweave', fields: ['arweaveJwk'] },
-    { key: 'faucet', label: 'Faucet', fields: ['faucetPrivateKey'] },
-    { key: 'lit', label: 'Lit', fields: ['litAccountApiKey', 'litUsageApiKey'] },
-  ];
-  const cardHasValue = (fields: any) => fields.some((f: any) => toStr(secrets[f]).trim());
-  const currentBlockSummary = Number.isFinite(Number(metadataLatestBlock)) && Number(metadataLatestBlock) > 0
-    ? `Current block on ${relevantSessionChainLabel || 'selected chain'}: ${Number(metadataLatestBlock).toLocaleString()}`
-    : metadataLatestBlockStatus;
+  const currentBlockSummary =
+    Number.isFinite(Number(metadataLatestBlock)) && Number(metadataLatestBlock) > 0
+      ? `Current block on ${relevantSessionChainLabel || 'selected chain'}: ${Number(metadataLatestBlock).toLocaleString()}`
+      : metadataLatestBlockStatus;
 
   const handleUseCurrentBlockForMetadata = () => {
     const nextStart = Number(metadataLatestBlock || 0);
@@ -1994,9 +2079,9 @@ const AdminPageRuntime = ({
     setMetadataUpdateStatus(canAdminRegistry ? 'Uploading updated metadata…' : 'Updating worker metadata…');
     try {
       if (!groupMetadata) throw new Error('Select a session first.');
-      if (!canAdminWorker && !canAdminRegistry) throw new Error('Connect the admin wallet to update session metadata.');
-      if (canAdminRegistry && !relevantRegistryChainId) throw new Error('Registry chain id is missing.');
-      if (canAdminRegistry && !metadataContractsReadyForSave) {
+      if (!canAdmin) throw new Error('Connect the admin wallet to update session metadata.');
+      if (!relevantRegistryChainId) throw new Error('Registry chain id is missing.');
+      if (!metadataContractsReadyForSave) {
         throw new Error(
           'Session metadata contracts are currently synthesized defaults. Verify or edit the contract addresses before saving.',
         );
@@ -2071,22 +2156,22 @@ const AdminPageRuntime = ({
         const metadataSyncWorkerUrl = normalizeWorkerUrl(
           getUsableSessionWorkerUrl({
             slug: selectedSlug,
-            sessionConfig: nextRegistryConfig,
+            sessionConfig: nextConfig,
             allowSharedFallback: true,
           }) ||
             baseWorkerUrl ||
             selectedConfigWorkerUrl,
         );
-        if (canAdminWorker && typeof fetch === 'function' && metadataSyncWorkerUrl) {
+        if (typeof fetch === 'function' && metadataSyncWorkerUrl) {
           setMetadataUpdateStatus('Syncing worker config…');
           await ensureWorkerSessionConfig({
-            sessionConfigOverride: nextRegistryConfig,
+            sessionConfigOverride: nextConfig,
             action: 'set-config',
             workerUrl: metadataSyncWorkerUrl,
           });
           workerSyncSuffix = ' Worker config synced.';
         } else {
-          workerSyncSuffix = ' Worker config sync skipped (worker admin or worker URL unavailable).';
+          workerSyncSuffix = ' Worker config sync skipped (worker URL missing).';
         }
       } catch (syncError: any) {
         workerSyncSuffix = ` Worker config sync failed: ${getErrorMessage(syncError, 'unknown error')}`;
@@ -2169,15 +2254,13 @@ const AdminPageRuntime = ({
     if (metadataLoadState === 'unavailable') return 'Metadata unavailable; contracts below may be chain defaults';
     return 'No registry metadata URI configured';
   })();
-  const metadataContracts = asAdminSessionConfig(groupMetadata?.contracts);
+  const metadataContracts =
+    groupMetadata?.contracts && typeof groupMetadata.contracts === 'object' ? groupMetadata.contracts : {};
   const visibleMetadataContracts = Object.entries(metadataContracts).filter(
-    (entry): entry is [string, Record<string, unknown>] => {
-      const value = entry[1];
-      return !!value && typeof value === 'object' && !Array.isArray(value);
-    },
+    ([, value]: any) => value && typeof value === 'object',
   );
   const readonlyMetadataContracts = visibleMetadataContracts.filter(
-    ([key]) => !ADMIN_EDITABLE_CONTRACT_KEY_SET.has(key),
+    ([key]: any) => !ADMIN_EDITABLE_CONTRACT_KEY_SET.has(key),
   );
   const sessionCardTone = selectedConfig ? 'ready' : availableSessions.length ? 'idle' : 'warning';
   const showHeroMedia = !!resolvedSessionHeader && heroHeaderImageReady;
@@ -2486,482 +2569,7 @@ const AdminPageRuntime = ({
       </header>
 
       <div className={styles.sectionStack}>
-      <section className={`${styles.panel} ${styles.metadataPanel}`}>
-        <div className={styles.panelHeader}>
-          <div className={styles.panelTitleGroup}>
-            <div className={styles.panelTitleRow}>
-              <div className={styles.panelTitle}>Session metadata</div>
-              {renderInfoTooltip(
-                'admin-metadata-tip',
-                'Review the canonical config and make careful live edits when needed.'
-              )}
-            </div>
-          </div>
-          <Button
-            size="sm"
-            color="secondary"
-            outline
-            className={styles.collapseToggle}
-            onClick={() => toggleSection('metadata')}
-            aria-label="Toggle Session metadata section"
-          >
-            <FontAwesomeIcon icon={metadataOpen ? faCaretUp : faCaretDown} />
-          </Button>
-        </div>
-        {!groupMetadata && (
-          <div className={styles.warningNote}>
-            No metadata found for this session yet. Register the session on-chain or select a legacy demo session.
-          </div>
-        )}
-        {metadataOpen && groupMetadata && (
-          <>
-            <div className={styles.metadataGrid}>
-              <div className={styles.metadataItem}>
-                <span>Slug</span>
-                <span>
-                  {metadataSessionUrl ? (
-                    <a href={metadataSessionUrl} target="_blank" rel="noreferrer" className={styles.metadataLink}>
-                      {metadataSlugDisplay}
-                    </a>
-                  ) : metadataSlugDisplay}
-                </span>
-              </div>
-              <div className={styles.metadataItem}>
-                <span>Session name</span>
-                <span>{toStr(groupMetadata.sessionName || '').trim() || '—'}</span>
-              </div>
-              <div className={styles.metadataItem}>
-                <span>Chain / Registry</span>
-                <span>{(() => {
-                  const chainId = toStr(groupMetadata.networkChainId || groupMetadata.__registry?.chainId || '').trim();
-                  const chainName = getChainName(chainId);
-                  const registryChainId = toStr(groupMetadata.__registry?.registryChainId || groupMetadata.registryChainId || '').trim();
-                  const chainDisplay = chainName ? `${chainName} (${chainId})` : (chainId || '\u2014');
-                  const chainNum = Number(chainId);
-                  const registryNum = Number(registryChainId);
-                  const sameChain = chainId && registryChainId && Number.isFinite(chainNum) && Number.isFinite(registryNum)
-                    ? chainNum === registryNum
-                    : registryChainId === chainId;
-                  if (!registryChainId || sameChain) return chainDisplay;
-                  const registryName = getChainName(registryChainId);
-                  const registryDisplay = registryName ? `${registryName} (${registryChainId})` : registryChainId;
-                  return `${chainDisplay} / ${registryDisplay}`;
-                })()}</span>
-              </div>
-              <div className={styles.metadataItem}>
-                <span>Admin</span>
-                <span>
-                  {metadataAdminUrl ? (
-                    <a href={metadataAdminUrl} target="_blank" rel="noreferrer" className={styles.metadataLink}>
-                      {shortAddress(metadataAdminAddress) || metadataAdminAddress}
-                    </a>
-                  ) : '—'}
-                </span>
-              </div>
-              <div className={styles.metadataItem}>
-                <span>Metadata URI</span>
-                <span>
-                  {metadataUriUrl ? (
-                    <a href={metadataUriUrl} target="_blank" rel="noreferrer" className={styles.metadataLink}>
-                      {metadataUriValue}
-                    </a>
-                  ) : '—'}
-                </span>
-              </div>
-              <div className={styles.metadataItem}>
-                <span>Metadata source</span>
-                <span>{metadataLoadStateLabel}</span>
-              </div>
-            </div>
-            {metadataContractsNeedVerification && (
-              <div className={styles.warningNote}>
-                Session metadata could not be loaded, so the contract addresses below are currently synthesized from chain defaults.
-                Verify them before publishing any metadata update.
-              </div>
-            )}
-            {canAdmin && (
-              <div className={styles.metadataEditorCard}>
-                <div className={styles.metadataEditorIntro}>
-                  Publish session defaults and curation metadata here. Block limits, faucet settings,
-                  contracts, and registry/RPC context are also synced to worker config when a worker URL is available.
-                </div>
-                <div className={styles.metadataSectionGrid}>
-                  <div className={styles.metadataSectionCard}>
-                    <div className={styles.panelSubtitle}>Session defaults</div>
-                    <div className={styles.metadataEditorGrid}>
-                      <FormGroup>
-                        <Label>Default tags</Label>
-                        <Input
-                          value={metadataConfigDraft.defaultTags}
-                          placeholder="ai, governance, survey"
-                          onChange={(e: any) => updateMetadataConfigDraft('defaultTags', e.target.value)}
-                        />
-                      </FormGroup>
-                      <FormGroup>
-                        <Label>Default SBT tags</Label>
-                        <Input
-                          value={metadataConfigDraft.defaultSbtTags}
-                          placeholder="member, contributor"
-                          onChange={(e: any) => updateMetadataConfigDraft('defaultSbtTags', e.target.value)}
-                        />
-                      </FormGroup>
-                    </div>
-                    <FormGroup className={styles.metadataTextAreaGroup}>
-                      <Label>Question generation prompt</Label>
-                      <Input
-                        type="textarea"
-                        rows={4}
-                        value={metadataConfigDraft.questionsGenPrompt}
-                        placeholder="Optional prompt used when auto-generating questions"
-                        onChange={(e: any) => updateMetadataConfigDraft('questionsGenPrompt', e.target.value)}
-                      />
-                    </FormGroup>
-                    <FormGroup className={styles.metadataTextAreaGroup}>
-                      <Label>Default filter state</Label>
-                      <Input
-                        type="textarea"
-                        rows={4}
-                        value={metadataConfigDraft.defaultFilterState}
-                        placeholder='{"sort":"recent"} or tag=ai&sort=recent'
-                        onChange={(e: any) => updateMetadataConfigDraft('defaultFilterState', e.target.value)}
-                      />
-                    </FormGroup>
-                    <FormGroup check className={styles.metadataToggle}>
-                      <Label check className={styles.metadataToggleLabel}>
-                        <Input
-                          type="checkbox"
-                          checked={metadataAutoFeatureDraft}
-                          onChange={(e: any) => {
-                            setMetadataDraftTouched(true);
-                            setMetadataAutoFeatureTouched(true);
-                            setMetadataAutoFeatureDraft(!!e.target.checked);
-                          }}
-                        />
-                        Auto-feature by session slug
-                      </Label>
-                    </FormGroup>
-                    <FormGroup className={styles.metadataSelectorGroup}>
-                      <Label>Default featured SBTs</Label>
-                      <SBTSelector
-                        id="admin-default-featured-sbts"
-                        label=""
-                        selectedSBTs={metadataConfigDraft.defaultFeaturedSBTs}
-                        onAddSBT={(sbt: any) => {
-                          updateMetadataConfigDraft(
-                            'defaultFeaturedSBTs',
-                            dedupeSbtSelections([...(metadataConfigDraft.defaultFeaturedSBTs || []), sbt])
-                          );
-                        }}
-                        onRemoveSBT={(address: any) => {
-                          updateMetadataConfigDraft(
-                            'defaultFeaturedSBTs',
-                            dedupeSbtSelections(metadataConfigDraft.defaultFeaturedSBTs || []).filter(
-                              (entry: any) => toStr(entry.address).toLowerCase() !== toStr(address).toLowerCase()
-                            )
-                          );
-                        }}
-                        network={network}
-                        chainId={relevantSessionChainId || network?.id || null}
-                        sessionSlug={normalizeSlug(selectedSlug)}
-                        variant="admin"
-                        ensureLightSbtUniverse={ensureLightSbtUniverse}
-                        defaultFeaturedSBTs={(metadataConfigDraft.defaultFeaturedSBTs || []).map((entry: any) => entry.address)}
-                      />
-                    </FormGroup>
-                  </div>
-
-                  <div className={styles.metadataSectionCard}>
-                    <div className={styles.panelSubtitle}>AI defaults</div>
-                    <div className={styles.metadataEditorGrid}>
-                      <FormGroup>
-                        <Label>Fast provider</Label>
-                        <Input
-                          type="select"
-                          value={metadataConfigDraft.aiFastProvider}
-                          onChange={(e: any) => updateMetadataConfigDraft('aiFastProvider', e.target.value)}
-                        >
-                          {ADMIN_AI_PROVIDER_OPTIONS.map((option: any) => (
-                            <option key={option.value} value={option.value}>{option.label}</option>
-                          ))}
-                        </Input>
-                      </FormGroup>
-                      <FormGroup>
-                        <Label>Fast model</Label>
-                        <Input
-                          value={metadataConfigDraft.aiFastModel}
-                          onChange={(e: any) => updateMetadataConfigDraft('aiFastModel', e.target.value)}
-                        />
-                      </FormGroup>
-                      <FormGroup>
-                        <Label>Thinking provider</Label>
-                        <Input
-                          type="select"
-                          value={metadataConfigDraft.aiThinkingProvider}
-                          onChange={(e: any) => updateMetadataConfigDraft('aiThinkingProvider', e.target.value)}
-                        >
-                          {ADMIN_AI_PROVIDER_OPTIONS.map((option: any) => (
-                            <option key={option.value} value={option.value}>{option.label}</option>
-                          ))}
-                        </Input>
-                      </FormGroup>
-                      <FormGroup>
-                        <Label>Thinking model</Label>
-                        <Input
-                          value={metadataConfigDraft.aiThinkingModel}
-                          onChange={(e: any) => updateMetadataConfigDraft('aiThinkingModel', e.target.value)}
-                        />
-                      </FormGroup>
-                      <FormGroup>
-                        <Label>Transcription provider</Label>
-                        <Input
-                          type="select"
-                          value={metadataConfigDraft.aiTranscriptionProvider}
-                          onChange={(e: any) => updateMetadataConfigDraft('aiTranscriptionProvider', e.target.value)}
-                        >
-                          <option value="openai">OpenAI</option>
-                        </Input>
-                      </FormGroup>
-                      <FormGroup>
-                        <Label>Transcription model</Label>
-                        <Input
-                          value={metadataConfigDraft.aiTranscriptionModel}
-                          onChange={(e: any) => updateMetadataConfigDraft('aiTranscriptionModel', e.target.value)}
-                        />
-                      </FormGroup>
-                    </div>
-                  </div>
-
-                  <div className={styles.metadataSectionCard}>
-                    <div className={styles.panelSubtitle}>Runtime sync</div>
-                    <div className={styles.metadataEditorGrid}>
-                      <FormGroup>
-                        <Label>Start block</Label>
-                        <Input
-                          type="number"
-                          value={metadataBlockLimitsDraft.start}
-                          onChange={(e: any) => {
-                            setMetadataDraftTouched(true);
-                            setMetadataBlockLimitsDraft((prev) => ({
-                              ...(prev || {}),
-                              start: e.target.value,
-                            }));
-                          }}
-                        />
-                      </FormGroup>
-                      <FormGroup>
-                        <Label>End block</Label>
-                        <Input
-                          type="number"
-                          value={metadataBlockLimitsDraft.end}
-                          placeholder="Optional"
-                          onChange={(e: any) => {
-                            setMetadataDraftTouched(true);
-                            setMetadataBlockLimitsDraft((prev) => ({
-                              ...(prev || {}),
-                              end: e.target.value,
-                            }));
-                          }}
-                        />
-                      </FormGroup>
-                      <FormGroup>
-                        <Label>Faucet amount (ETH)</Label>
-                        <Input
-                          value={metadataConfigDraft.faucetAmountEth}
-                          placeholder="0.0002"
-                          onChange={(e: any) => updateMetadataConfigDraft('faucetAmountEth', e.target.value)}
-                        />
-                      </FormGroup>
-                      <FormGroup>
-                        <Label>Faucet threshold (ETH)</Label>
-                        <Input
-                          value={metadataConfigDraft.faucetBalanceThresholdEth}
-                          placeholder="0.001"
-                          onChange={(e: any) => updateMetadataConfigDraft('faucetBalanceThresholdEth', e.target.value)}
-                        />
-                      </FormGroup>
-                    </div>
-                    {currentBlockSummary && (
-                      <div className={styles.statusNote}>{currentBlockSummary}</div>
-                    )}
-                    <Button
-                      size="sm"
-                      color="secondary"
-                      outline
-                      className={styles.actionButton}
-                      onClick={handleUseCurrentBlockForMetadata}
-                      disabled={metadataUpdateBusy || !metadataLatestBlock}
-                    >
-                      Use current block
-                    </Button>
-                  </div>
-
-                  <div className={styles.metadataSectionCard}>
-                    <div className={styles.panelSubtitle}>Contracts</div>
-                    <div className={styles.metadataEditorGrid}>
-                      <FormGroup>
-                        <Label>Surveys contract</Label>
-                        <Input
-                          value={metadataConfigDraft.contractSurveysAddress}
-                          placeholder="0x..."
-                          onChange={(e: any) => updateMetadataConfigDraft('contractSurveysAddress', e.target.value)}
-                        />
-                        <FormText color="muted">
-                          Chain: {relevantSessionChainLabel || 'Uses session chain'}
-                        </FormText>
-                      </FormGroup>
-                      <FormGroup>
-                        <Label>SBT factory contract</Label>
-                        <Input
-                          value={metadataConfigDraft.contractSbtFactoryAddress}
-                          placeholder="0x..."
-                          onChange={(e: any) => updateMetadataConfigDraft('contractSbtFactoryAddress', e.target.value)}
-                        />
-                        <FormText color="muted">
-                          Chain: {relevantSessionChainLabel || 'Uses session chain'}
-                        </FormText>
-                      </FormGroup>
-                      <FormGroup>
-                        <Label>SessionRegistry contract</Label>
-                        <Input
-                          value={metadataConfigDraft.contractSessionRegistryAddress}
-                          placeholder="0x..."
-                          onChange={(e: any) => updateMetadataConfigDraft('contractSessionRegistryAddress', e.target.value)}
-                        />
-                        <FormText color="muted">
-                          Chain: {relevantRegistryChainLabel || relevantSessionChainLabel || 'Uses registry chain'}
-                        </FormText>
-                      </FormGroup>
-                    </div>
-                    {metadataContractsNeedVerification && metadataDefaultedEditableContractKeys.length > 0 && (
-                      <FormGroup check className={styles.metadataToggle}>
-                        <Label check className={styles.metadataToggleLabel}>
-                          <Input
-                            type="checkbox"
-                            checked={metadataContractsVerified}
-                            onChange={(e: any) => setMetadataContractsVerified(!!e.target.checked)}
-                          />
-                          I verified these fallback defaults and want to publish them if I save metadata
-                        </Label>
-                      </FormGroup>
-                    )}
-                    {metadataContractsNeedVerification && !metadataContractsReadyForSave && (
-                      <div className={styles.warningNote}>
-                        Saving is blocked until you verify or edit the synthesized contract addresses above.
-                      </div>
-                    )}
-                    {readonlyMetadataContracts.length ? (
-                      <div className={styles.metadataReadonlyGrid}>
-                        {readonlyMetadataContracts.map(([key, value]: any) => (
-                          <div key={key} className={styles.metadataReadonlyItem}>
-                            <span>{key}</span>
-                            <strong>{toStr(value?.address).trim() || '—'}</strong>
-                            <span>{toStr(value?.chainId).trim() || '—'}</span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : null}
-                    {!visibleMetadataContracts.length && (
-                      <div className={styles.statusNote}>No contract metadata found for this session.</div>
-                    )}
-                  </div>
-                </div>
-
-                <div className={styles.metadataSectionCard}>
-                  <div className={styles.panelSubtitle}>Curated lists</div>
-                  <div className={styles.metadataSectionGrid}>
-                    <FormGroup className={styles.metadataTextAreaGroup}>
-                      <Label>Highlighted question IDs</Label>
-                      <Input
-                        type="textarea"
-                        rows={3}
-                        value={metadataConfigDraft.highlightedQuestionIds}
-                        placeholder="One question id per line"
-                        onChange={(e: any) => updateMetadataConfigDraft('highlightedQuestionIds', e.target.value)}
-                      />
-                    </FormGroup>
-                    <FormGroup className={styles.metadataTextAreaGroup}>
-                      <Label>Blocked question IDs</Label>
-                      <Input
-                        type="textarea"
-                        rows={3}
-                        value={metadataConfigDraft.blockedQuestionIds}
-                        placeholder="One question id per line"
-                        onChange={(e: any) => updateMetadataConfigDraft('blockedQuestionIds', e.target.value)}
-                      />
-                    </FormGroup>
-                    <FormGroup className={styles.metadataTextAreaGroup}>
-                      <Label>Highlighted survey IDs</Label>
-                      <Input
-                        type="textarea"
-                        rows={3}
-                        value={metadataConfigDraft.highlightedSurveyIds}
-                        placeholder="One survey id per line"
-                        onChange={(e: any) => updateMetadataConfigDraft('highlightedSurveyIds', e.target.value)}
-                      />
-                    </FormGroup>
-                    <FormGroup className={styles.metadataTextAreaGroup}>
-                      <Label>Blocked survey IDs</Label>
-                      <Input
-                        type="textarea"
-                        rows={3}
-                        value={metadataConfigDraft.blockedSurveyIds}
-                        placeholder="One survey id per line"
-                        onChange={(e: any) => updateMetadataConfigDraft('blockedSurveyIds', e.target.value)}
-                      />
-                    </FormGroup>
-                    <FormGroup className={styles.metadataTextAreaGroup}>
-                      <Label>Ignored SBT list</Label>
-                      <Input
-                        type="textarea"
-                        rows={3}
-                        value={metadataConfigDraft.ignoredSbtsList}
-                        placeholder="One SBT address per line"
-                        onChange={(e: any) => updateMetadataConfigDraft('ignoredSbtsList', e.target.value)}
-                      />
-                    </FormGroup>
-                    <FormGroup className={styles.metadataTextAreaGroup}>
-                      <Label>Featured SBT list</Label>
-                      <Input
-                        type="textarea"
-                        rows={3}
-                        value={metadataConfigDraft.featuredSbtsList}
-                        placeholder="One SBT address per line"
-                        onChange={(e: any) => updateMetadataConfigDraft('featuredSbtsList', e.target.value)}
-                      />
-                    </FormGroup>
-                  </div>
-                </div>
-
-                <div className={styles.metadataEditorActions}>
-                  <Button
-                    color="primary"
-                    className={styles.actionButton}
-                    onClick={handleSaveSessionMetadata}
-                    disabled={metadataUpdateBusy}
-                  >
-                    {metadataUpdateBusy ? 'Updating metadata…' : 'Update metadata'}
-                  </Button>
-                </div>
-                {metadataUpdateStatus && <div className={styles.statusNote}>{metadataUpdateStatus}</div>}
-              </div>
-            )}
-            <div className={styles.metadataJsonSection}>
-              <div className={styles.resultBoxLabel}>Raw metadata</div>
-              <JsonPanel
-                onCopy={handleCopyRawMetadata}
-                copied={copiedRawMetadataJson}
-                copyTitle="Copy raw metadata JSON"
-                as="pre"
-                contentProps={{ className: styles.metadataJsonContent }}
-                className={styles.metadataJsonPanel}
-              >
-                {JSON.stringify(groupMetadata, null, 2)}
-              </JsonPanel>
-            </div>
-          </>
-        )}
-      {!!Object.keys(encryptedFields || {}).length && (
-        <>
+        <section className={`${styles.panel} ${styles.metadataPanel}`}>
           <div className={styles.panelHeader}>
             <div className={styles.panelTitleGroup}>
               <div className={styles.panelTitleRow}>
@@ -2985,310 +2593,443 @@ const AdminPageRuntime = ({
           </div>
           {!groupMetadata && (
             <div className={styles.warningNote}>
-              {sessionCapabilities.isWorkerCanonical
-                ? 'No canonical Session Worker config was loaded. Restore the Worker URL and retry.'
-                : 'No metadata found for this session yet. Register the session on-chain or select a legacy demo session.'}
+              No metadata found for this session yet. Register the session on-chain or select a legacy demo session.
             </div>
           )}
-          <div className={styles.grid}>
-            {Object.entries(encryptedFields).map(([key, envelope]: any) => {
-                const resolved = decryptedFields[key] || {};
-                const status = resolved.status || 'locked';
-                const decrypted = toStr(resolved.value);
-                const decryptedPreview = decrypted ? formatPreviewValue(decrypted) : null;
-                return (
-                  <div
-                    key={key}
-                    className={`${styles.statusItem} ${!decryptedPreview ? styles.statusItemClickable : ''}`}
-                    onClick={() => { if (!decryptedPreview && !decryptFieldsBusy) handleDecryptEncryptedFields(); }}
-                    role={!decryptedPreview ? 'button' : undefined}
-                    title={!decryptedPreview ? (walletReady ? 'Click to decrypt' : 'Connect wallet to decrypt') : undefined}
-                  >
-                    <span>{key}</span>
-                    <span>{decryptedPreview || '[encrypted]'}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        )}
-      </section>
-
-      <section className={`${styles.panel} ${styles.gatePanel}`}>
-        <div className={styles.panelHeader}>
-          <div className={styles.panelTitleGroup}>
-            <div className={styles.panelTitleRow}>
-              <div className={styles.panelTitle}>On-chain default gate</div>
-              {renderInfoTooltip(
-                'admin-default-gate-tip',
-                'Match the default worker-auth gate to the session’s intended access model.'
-              )}
-            </div>
-          </div>
-          <Button
-            size="sm"
-            color="secondary"
-            outline
-            className={styles.collapseToggle}
-            onClick={() => toggleSection('defaultGate')}
-            aria-label="Toggle On-chain default gate section"
-          >
-            <FontAwesomeIcon icon={defaultGateOpen ? faCaretUp : faCaretDown} />
-          </Button>
-        </div>
-        {defaultGateOpen && (
-          <>
-            <div className={styles.formRow}>
-              <FormGroup>
-                <Label className={styles.gateLabelRow}>
-                  <span>Default gate SBTs</span>
-                  <Input
-                    type="select"
-                    value={defaultGateDraft.mode}
-                    data-testid={E2E_TESTIDS.ADMIN_GATE_MODE_SELECT}
-                    onChange={(e: any) => {
-                      setDefaultGateTouched(true);
-                      setGateConfigDirty(true);
-                      setDefaultGateDraft((prev: any) => ({ ...prev, mode: e.target.value }));
-                    }}
-                    className={styles.gateModeSelect}
-                  >
-                    <option value="any">ANY</option>
-                    <option value="all">ALL</option>
-                  </Input>
-                </Label>
-                <SBTSelector
-                  id="admin-default-gate-sbts"
-                  label=""
-                  selectedSBTs={dedupeSbtSelections(defaultGateDraft.sbts || [])}
-                  onAddSBT={(sbt: any) => {
-                    setDefaultGateTouched(true);
-                    setGateConfigDirty(true);
-                    setDefaultGateDraft((prev: any) => ({
-                      ...prev,
-                      sbts: dedupeSbtSelections([...(prev.sbts || []), sbt]),
-                    }));
-                  }}
-                  onRemoveSBT={(address: any) => {
-                    setDefaultGateTouched(true);
-                    setGateConfigDirty(true);
-                    setDefaultGateDraft((prev: any) => ({
-                      ...prev,
-                      sbts: dedupeSbtSelections(prev.sbts || []).filter(
-                        (entry: any) => toStr(entry.address).toLowerCase() !== toStr(address).toLowerCase()
-                      ),
-                    }));
-                  }}
-                  network={network}
-                  chainId={
-                    Number(selectedConfig?.networkChainId || selectedConfig?.__registry?.chainId || network?.id || 0) ||
-                    null
-                  }
-                  sessionSlug={normalizeSlug(selectedSlug)}
-                  variant="admin"
-                  ensureLightSbtUniverse={ensureLightSbtUniverse}
-                />
-              </FormGroup>
-            </div>
-            <Button
-              color="primary"
-              className={styles.actionButton}
-              onClick={handleSyncDefaultGate}
-              data-testid={E2E_TESTIDS.ADMIN_GATE_UPDATE_BUTTON}
-              disabled={!canAdmin || gateSyncBusy}
-              style={{ opacity: gateConfigDirty ? 1 : 0.5 }}
-            >
-              Update default gate on-chain
-            </Button>
-            {gateSyncStatus && (
-              <div className={styles.statusNote} data-testid={E2E_TESTIDS.ADMIN_GATE_STATUS}>
-                {gateSyncStatus}
-              </div>
-            )}
-            {gateSyncResult && <div className={styles.statusNote}>{renderAdminTestResult(gateSyncResult)}</div>}
-          </>
-        )}
-      </section>
-
-      <section className={`${styles.panel} ${styles.secretsPanel}`}>
-        <div className={styles.panelHeader}>
-          <div className={styles.panelTitleGroup}>
-            <div className={styles.panelTitleRow}>
-              <div className={styles.panelTitle}>Worker secrets</div>
-              {renderInfoTooltip(
-                'admin-worker-secrets-tip',
-                'Edit operator credentials without revealing what is already stored in the worker.'
-              )}
-            </div>
-          </div>
-          <Button
-            size="sm"
-            color="secondary"
-            outline
-            className={styles.collapseToggle}
-            onClick={() => toggleSection('workerSecrets')}
-            aria-label="Toggle Worker secrets section"
-          >
-            <FontAwesomeIcon icon={workerSecretsOpen ? faCaretUp : faCaretDown} />
-          </Button>
-        </div>
-        {workerSecretsOpen && (
-          <>
-            <div className={styles.secretOptionsGrid}>
-              {SECRET_CARDS.map((card: any) => {
-                const isOpen = openSecretCards[card.key];
-                const hasValue = cardHasValue(card.fields);
-                return (
-                  <div key={card.key} className={`${styles.secretOptionCard}${isOpen ? ` ${styles.activeOption}` : ''}`}>
-                    <button
-                      type="button"
-                      className={styles.secretOptionHeader}
-                      aria-label={card.label}
-                      onClick={() => setOpenSecretCards((p) => ({ ...p, [card.key]: !p[card.key] }))}
-                      aria-expanded={isOpen}
-                    >
-                      <FontAwesomeIcon icon={hasValue ? faLock : faLockOpen} style={{ opacity: hasValue ? 0.9 : 0.4, marginRight: 8 }} />
-                      <span className={styles.secretOptionText}>
-                        <span>{card.label}</span>
-                        <span className={styles.secretOptionMeta}>{hasValue ? 'Configured' : 'Empty'}</span>
-                      </span>
-                      <FontAwesomeIcon icon={isOpen ? faCaretUp : faCaretDown} style={{ marginLeft: 'auto' }} />
-                    </button>
-                    {isOpen && (
-                      <div className={styles.secretOptionBody}>
-                        {card.fields.map((fieldKey: any) => {
-                          const secretFieldKey = String(fieldKey);
-                          const isTextarea = secretFieldKey === 'arweaveJwk';
-                          const isPassword = !isTextarea && secretFieldKey !== 'customRpcUrl';
-                          const secretFieldLabels: Record<string, string> = {
-                            openaiKey: 'OpenAI API key',
-                            anthropicKey: 'Anthropic API key',
-                            openrouterKey: 'OpenRouter API key',
-                            customRpcUrl: 'Custom RPC URL',
-                            customRpcKey: 'Custom RPC key',
-                            arweaveJwk: 'Arweave JWK (JSON)',
-                            faucetPrivateKey: 'Faucet private key',
-                            litAccountApiKey: 'Lit account API key',
-                            litUsageApiKey: 'Lit usage API key',
-                          };
-                          const label = secretFieldLabels[secretFieldKey] || secretFieldKey;
-                          return (
-                            <FormGroup key={secretFieldKey}>
-                              <Label>{label}</Label>
-                              <div className={`${styles.secretInputRow}${isTextarea ? ` ${styles.secretInputRowMultiline}` : ''}`}>
-                                <Input
-                                  type={isTextarea ? 'textarea' : isPassword ? 'password' : 'text'}
-                                  rows={isTextarea ? 3 : undefined}
-                                  value={secrets[secretFieldKey]}
-                                  onChange={(e: any) => handleSecretChange(secretFieldKey, e.target.value)}
-                                  className={styles.secretInput}
-                                />
-                                <button
-                                  type="button"
-                                  className={`${styles.secretRemoveButton}${clearedSecretKeys.has(secretFieldKey) ? ` ${styles.secretRemoveButtonActive}` : ''}`}
-                                  onClick={() => handleClearSecret(secretFieldKey)}
-                                  title={`Clear ${label} on next save`}
-                                  aria-label={`Clear ${label}`}
-                                  data-testid={`ce-admin-secret-remove-${secretFieldKey.replace(/([A-Z])/g, '-$1').toLowerCase()}`}
-                                >
-                                  <FontAwesomeIcon icon={faTimes} />
-                                </button>
-                              </div>
-                              {secretFieldKey === 'litAccountApiKey' ? (
-                                <div className={styles.warningNote}>
-                                  Anyone with this key can create new Lit groups, PKPs, usage keys, and actions inside that bundle-owned Lit account. Use disposable per-bundle accounts instead of a shared deployment account.
-                                </div>
-                              ) : null}
-                            </FormGroup>
-                          );
-                        })}
-                        {card.key === 'arweave' && renderInlineResourceSummary({
-                          key: 'arweave-resource',
-                          label: 'Arweave balance',
-                          resource: arweaveResource,
-                          onRefresh: refreshArweaveResource,
-                          refreshLabel: 'Refresh Arweave balance',
-                        })}
-                        {card.key === 'faucet' && renderInlineResourceSummary({
-                          key: 'faucet-resource',
-                          label: 'Faucet balance',
-                          resource: faucetResource,
-                          onRefresh: refreshFaucetResource,
-                          refreshLabel: 'Refresh faucet balance',
-                        })}
-                        {card.key === 'lit' && renderInlineResourceSummary({
-                          key: 'lit-resource',
-                          label: litResourceLabel,
-                          resource: litResource,
-                          onRefresh: () => refreshLitResource({ includeSignedStatus: true }),
-                          refreshLabel: 'Refresh Lit status',
-                        })}
-                      </div>
+          {metadataOpen && groupMetadata && (
+            <>
+              <div className={styles.metadataGrid}>
+                <div className={styles.metadataItem}>
+                  <span>Slug</span>
+                  <span>
+                    {metadataSessionUrl ? (
+                      <a href={metadataSessionUrl} target="_blank" rel="noreferrer" className={styles.metadataLink}>
+                        {metadataSlugDisplay}
+                      </a>
+                    ) : (
+                      metadataSlugDisplay
                     )}
-                  </div>
-                );
-              })}
-            </div>
-            {canAdmin && workerSecretsDirty && (
-              <Button
-                color="primary"
-                className={styles.actionButton}
-                onClick={handleSaveWorkerSecrets}
-                disabled={!canAdmin}
-              >
-                Save worker secrets
-              </Button>
-            )}
-            {saveStatus && <div className={styles.statusNote}>{saveStatus}</div>}
-            {chainStatus && <div className={styles.statusNote}>{chainStatus}</div>}
-          </>
-        )}
-      </section>
-
-      {showTestsPanel && (
-      <section className={`${styles.panel} ${styles.testsPanel}`}>
-        <div className={styles.panelHeader}>
-          <div className={styles.panelTitleGroup}>
-            <div className={styles.panelTitleRow}>
-              <div className={styles.panelTitle}>Tests</div>
-              {renderInfoTooltip(
-                'admin-tests-tip',
-                <div className={styles.tooltipTextStack}>
-                  <div>Run quick checks against the selected worker and the session&apos;s gate rules.</div>
-                  <div>Run these as a user who holds the sponsored SBT. Tests use the configured worker URL and auth flow.</div>
+                  </span>
+                </div>
+                <div className={styles.metadataItem}>
+                  <span>Session name</span>
+                  <span>{toStr(groupMetadata.sessionName || '').trim() || '—'}</span>
+                </div>
+                <div className={styles.metadataItem}>
+                  <span>Chain / Registry</span>
+                  <span>
+                    {buildAdminChainRegistryDisplay({
+                      chainId: groupMetadata.networkChainId || groupMetadata.__registry?.chainId || '',
+                      registryChainId: groupMetadata.__registry?.registryChainId || groupMetadata.registryChainId || '',
+                    })}
+                  </span>
+                </div>
+                <div className={styles.metadataItem}>
+                  <span>Admin</span>
+                  <span>
+                    {metadataAdminUrl ? (
+                      <a href={metadataAdminUrl} target="_blank" rel="noreferrer" className={styles.metadataLink}>
+                        {shortAddress(metadataAdminAddress) || metadataAdminAddress}
+                      </a>
+                    ) : (
+                      '—'
+                    )}
+                  </span>
+                </div>
+                <div className={styles.metadataItem}>
+                  <span>Metadata URI</span>
+                  <span>
+                    {metadataUriUrl ? (
+                      <a href={metadataUriUrl} target="_blank" rel="noreferrer" className={styles.metadataLink}>
+                        {metadataUriValue}
+                      </a>
+                    ) : (
+                      '—'
+                    )}
+                  </span>
+                </div>
+                <div className={styles.metadataItem}>
+                  <span>Metadata source</span>
+                  <span>{metadataLoadStateLabel}</span>
+                </div>
+              </div>
+              {metadataContractsNeedVerification && (
+                <div className={styles.warningNote}>
+                  Session metadata could not be loaded, so the contract addresses below are currently synthesized from
+                  chain defaults. Verify them before publishing any metadata update.
                 </div>
               )}
-              {(canAdminWorker || canAdminRegistry) && (
-                <AdminPageMetadataEditor
-                  metadataConfigDraft={metadataConfigDraft}
-                  updateMetadataConfigDraft={updateMetadataConfigDraft}
-                  metadataAutoFeatureDraft={metadataAutoFeatureDraft}
-                  setMetadataDraftTouched={setMetadataDraftTouched}
-                  setMetadataAutoFeatureTouched={setMetadataAutoFeatureTouched}
-                  setMetadataAutoFeatureDraft={setMetadataAutoFeatureDraft}
-                  network={network}
-                  relevantSessionChainId={relevantSessionChainId}
-                  relevantSessionChainLabel={relevantSessionChainLabel}
-                  relevantRegistryChainLabel={relevantRegistryChainLabel}
-                  selectedSlug={selectedSlug}
-                  ensureLightSbtUniverse={ensureLightSbtUniverse}
-                  metadataBlockLimitsDraft={metadataBlockLimitsDraft}
-                  setMetadataBlockLimitsDraft={setMetadataBlockLimitsDraft}
-                  currentBlockSummary={currentBlockSummary}
-                  handleUseCurrentBlockForMetadata={handleUseCurrentBlockForMetadata}
-                  metadataUpdateBusy={metadataUpdateBusy}
-                  metadataLatestBlock={metadataLatestBlock}
-                  metadataContractsNeedVerification={metadataContractsNeedVerification}
-                  metadataDefaultedEditableContractKeys={metadataDefaultedEditableContractKeys}
-                  metadataContractsVerified={metadataContractsVerified}
-                  setMetadataContractsVerified={setMetadataContractsVerified}
-                  metadataContractsReadyForSave={metadataContractsReadyForSave}
-                  readonlyMetadataContracts={readonlyMetadataContracts}
-                  visibleMetadataContracts={visibleMetadataContracts}
-                  handleSaveSessionMetadata={handleSaveSessionMetadata}
-                  metadataUpdateStatus={metadataUpdateStatus}
-                  showChainFields={sessionCapabilities.usesChainMetadata}
-                />
+              {canAdmin && (
+                <div className={styles.metadataEditorCard}>
+                  <div className={styles.metadataEditorIntro}>
+                    Publish session defaults and curation metadata here. Block limits, faucet settings, contracts, and
+                    registry/RPC context are also synced to worker config when a worker URL is available.
+                  </div>
+                  <div className={styles.metadataSectionGrid}>
+                    <div className={styles.metadataSectionCard}>
+                      <div className={styles.panelSubtitle}>Session defaults</div>
+                      <div className={styles.metadataEditorGrid}>
+                        <FormGroup>
+                          <Label>Default tags</Label>
+                          <Input
+                            value={metadataConfigDraft.defaultTags}
+                            placeholder="ai, governance, survey"
+                            onChange={(e: any) => updateMetadataConfigDraft('defaultTags', e.target.value)}
+                          />
+                        </FormGroup>
+                        <FormGroup>
+                          <Label>Default SBT tags</Label>
+                          <Input
+                            value={metadataConfigDraft.defaultSbtTags}
+                            placeholder="member, contributor"
+                            onChange={(e: any) => updateMetadataConfigDraft('defaultSbtTags', e.target.value)}
+                          />
+                        </FormGroup>
+                      </div>
+                      <FormGroup className={styles.metadataTextAreaGroup}>
+                        <Label>Question generation prompt</Label>
+                        <Input
+                          type="textarea"
+                          rows={4}
+                          value={metadataConfigDraft.questionsGenPrompt}
+                          placeholder="Optional prompt used when auto-generating questions"
+                          onChange={(e: any) => updateMetadataConfigDraft('questionsGenPrompt', e.target.value)}
+                        />
+                      </FormGroup>
+                      <FormGroup className={styles.metadataTextAreaGroup}>
+                        <Label>Default filter state</Label>
+                        <Input
+                          type="textarea"
+                          rows={4}
+                          value={metadataConfigDraft.defaultFilterState}
+                          placeholder='{"sort":"recent"} or tag=ai&sort=recent'
+                          onChange={(e: any) => updateMetadataConfigDraft('defaultFilterState', e.target.value)}
+                        />
+                      </FormGroup>
+                      <FormGroup check className={styles.metadataToggle}>
+                        <Label check className={styles.metadataToggleLabel}>
+                          <Input
+                            type="checkbox"
+                            checked={metadataAutoFeatureDraft}
+                            onChange={(e: any) => {
+                              setMetadataDraftTouched(true);
+                              setMetadataAutoFeatureTouched(true);
+                              setMetadataAutoFeatureDraft(!!e.target.checked);
+                            }}
+                          />
+                          Auto-feature by session slug
+                        </Label>
+                      </FormGroup>
+                      <FormGroup className={styles.metadataSelectorGroup}>
+                        <Label>Default featured SBTs</Label>
+                        <SBTSelector
+                          id="admin-default-featured-sbts"
+                          label=""
+                          selectedSBTs={metadataConfigDraft.defaultFeaturedSBTs}
+                          onAddSBT={(sbt: any) => {
+                            updateMetadataConfigDraft(
+                              'defaultFeaturedSBTs',
+                              dedupeSbtSelections([...(metadataConfigDraft.defaultFeaturedSBTs || []), sbt]),
+                            );
+                          }}
+                          onRemoveSBT={(address: any) => {
+                            updateMetadataConfigDraft(
+                              'defaultFeaturedSBTs',
+                              dedupeSbtSelections(metadataConfigDraft.defaultFeaturedSBTs || []).filter(
+                                (entry: any) => toStr(entry.address).toLowerCase() !== toStr(address).toLowerCase(),
+                              ),
+                            );
+                          }}
+                          network={network}
+                          chainId={relevantSessionChainId || network?.id || null}
+                          sessionSlug={normalizeSlug(selectedSlug)}
+                          variant="admin"
+                          ensureLightSbtUniverse={ensureLightSbtUniverse}
+                          defaultFeaturedSBTs={(metadataConfigDraft.defaultFeaturedSBTs || []).map(
+                            (entry: any) => entry.address,
+                          )}
+                        />
+                      </FormGroup>
+                    </div>
+
+                    <div className={styles.metadataSectionCard}>
+                      <div className={styles.panelSubtitle}>AI defaults</div>
+                      <div className={styles.metadataEditorGrid}>
+                        <FormGroup>
+                          <Label>Fast provider</Label>
+                          <Input
+                            type="select"
+                            value={metadataConfigDraft.aiFastProvider}
+                            onChange={(e: any) => updateMetadataConfigDraft('aiFastProvider', e.target.value)}
+                          >
+                            {ADMIN_AI_PROVIDER_OPTIONS.map((option: any) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </Input>
+                        </FormGroup>
+                        <FormGroup>
+                          <Label>Fast model</Label>
+                          <Input
+                            value={metadataConfigDraft.aiFastModel}
+                            onChange={(e: any) => updateMetadataConfigDraft('aiFastModel', e.target.value)}
+                          />
+                        </FormGroup>
+                        <FormGroup>
+                          <Label>Thinking provider</Label>
+                          <Input
+                            type="select"
+                            value={metadataConfigDraft.aiThinkingProvider}
+                            onChange={(e: any) => updateMetadataConfigDraft('aiThinkingProvider', e.target.value)}
+                          >
+                            {ADMIN_AI_PROVIDER_OPTIONS.map((option: any) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </Input>
+                        </FormGroup>
+                        <FormGroup>
+                          <Label>Thinking model</Label>
+                          <Input
+                            value={metadataConfigDraft.aiThinkingModel}
+                            onChange={(e: any) => updateMetadataConfigDraft('aiThinkingModel', e.target.value)}
+                          />
+                        </FormGroup>
+                        <FormGroup>
+                          <Label>Transcription provider</Label>
+                          <Input
+                            type="select"
+                            value={metadataConfigDraft.aiTranscriptionProvider}
+                            onChange={(e: any) => updateMetadataConfigDraft('aiTranscriptionProvider', e.target.value)}
+                          >
+                            <option value="openai">OpenAI</option>
+                          </Input>
+                        </FormGroup>
+                        <FormGroup>
+                          <Label>Transcription model</Label>
+                          <Input
+                            value={metadataConfigDraft.aiTranscriptionModel}
+                            onChange={(e: any) => updateMetadataConfigDraft('aiTranscriptionModel', e.target.value)}
+                          />
+                        </FormGroup>
+                      </div>
+                    </div>
+
+                    <div className={styles.metadataSectionCard}>
+                      <div className={styles.panelSubtitle}>Runtime sync</div>
+                      <div className={styles.metadataEditorGrid}>
+                        <FormGroup>
+                          <Label>Start block</Label>
+                          <Input
+                            type="number"
+                            value={metadataBlockLimitsDraft.start}
+                            onChange={(e: any) => {
+                              setMetadataDraftTouched(true);
+                              setMetadataBlockLimitsDraft((prev) => ({
+                                ...(prev || {}),
+                                start: e.target.value,
+                              }));
+                            }}
+                          />
+                        </FormGroup>
+                        <FormGroup>
+                          <Label>End block</Label>
+                          <Input
+                            type="number"
+                            value={metadataBlockLimitsDraft.end}
+                            placeholder="Optional"
+                            onChange={(e: any) => {
+                              setMetadataDraftTouched(true);
+                              setMetadataBlockLimitsDraft((prev) => ({
+                                ...(prev || {}),
+                                end: e.target.value,
+                              }));
+                            }}
+                          />
+                        </FormGroup>
+                        <FormGroup>
+                          <Label>Faucet amount (ETH)</Label>
+                          <Input
+                            value={metadataConfigDraft.faucetAmountEth}
+                            placeholder="0.0002"
+                            onChange={(e: any) => updateMetadataConfigDraft('faucetAmountEth', e.target.value)}
+                          />
+                        </FormGroup>
+                        <FormGroup>
+                          <Label>Faucet threshold (ETH)</Label>
+                          <Input
+                            value={metadataConfigDraft.faucetBalanceThresholdEth}
+                            placeholder="0.001"
+                            onChange={(e: any) =>
+                              updateMetadataConfigDraft('faucetBalanceThresholdEth', e.target.value)
+                            }
+                          />
+                        </FormGroup>
+                      </div>
+                      {currentBlockSummary && <div className={styles.statusNote}>{currentBlockSummary}</div>}
+                      <Button
+                        size="sm"
+                        color="secondary"
+                        outline
+                        className={styles.actionButton}
+                        onClick={handleUseCurrentBlockForMetadata}
+                        disabled={metadataUpdateBusy || !metadataLatestBlock}
+                      >
+                        Use current block
+                      </Button>
+                    </div>
+
+                    <div className={styles.metadataSectionCard}>
+                      <div className={styles.panelSubtitle}>Contracts</div>
+                      <div className={styles.metadataEditorGrid}>
+                        <FormGroup>
+                          <Label>Surveys contract</Label>
+                          <Input
+                            value={metadataConfigDraft.contractSurveysAddress}
+                            placeholder="0x..."
+                            onChange={(e: any) => updateMetadataConfigDraft('contractSurveysAddress', e.target.value)}
+                          />
+                          <FormText color="muted">Chain: {relevantSessionChainLabel || 'Uses session chain'}</FormText>
+                        </FormGroup>
+                        <FormGroup>
+                          <Label>SBT factory contract</Label>
+                          <Input
+                            value={metadataConfigDraft.contractSbtFactoryAddress}
+                            placeholder="0x..."
+                            onChange={(e: any) =>
+                              updateMetadataConfigDraft('contractSbtFactoryAddress', e.target.value)
+                            }
+                          />
+                          <FormText color="muted">Chain: {relevantSessionChainLabel || 'Uses session chain'}</FormText>
+                        </FormGroup>
+                        <FormGroup>
+                          <Label>SessionRegistry contract</Label>
+                          <Input
+                            value={metadataConfigDraft.contractSessionRegistryAddress}
+                            placeholder="0x..."
+                            onChange={(e: any) =>
+                              updateMetadataConfigDraft('contractSessionRegistryAddress', e.target.value)
+                            }
+                          />
+                          <FormText color="muted">
+                            Chain: {relevantRegistryChainLabel || relevantSessionChainLabel || 'Uses registry chain'}
+                          </FormText>
+                        </FormGroup>
+                      </div>
+                      {metadataContractsNeedVerification && metadataDefaultedEditableContractKeys.length > 0 && (
+                        <FormGroup check className={styles.metadataToggle}>
+                          <Label check className={styles.metadataToggleLabel}>
+                            <Input
+                              type="checkbox"
+                              checked={metadataContractsVerified}
+                              onChange={(e: any) => setMetadataContractsVerified(!!e.target.checked)}
+                            />
+                            I verified these fallback defaults and want to publish them if I save metadata
+                          </Label>
+                        </FormGroup>
+                      )}
+                      {metadataContractsNeedVerification && !metadataContractsReadyForSave && (
+                        <div className={styles.warningNote}>
+                          Saving is blocked until you verify or edit the synthesized contract addresses above.
+                        </div>
+                      )}
+                      {readonlyMetadataContracts.length ? (
+                        <div className={styles.metadataReadonlyGrid}>
+                          {readonlyMetadataContracts.map(([key, value]: any) => (
+                            <div key={key} className={styles.metadataReadonlyItem}>
+                              <span>{key}</span>
+                              <strong>{toStr(value?.address).trim() || '—'}</strong>
+                              <span>{toStr(value?.chainId).trim() || '—'}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                      {!visibleMetadataContracts.length && (
+                        <div className={styles.statusNote}>No contract metadata found for this session.</div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className={styles.metadataSectionCard}>
+                    <div className={styles.panelSubtitle}>Curated lists</div>
+                    <div className={styles.metadataSectionGrid}>
+                      <FormGroup className={styles.metadataTextAreaGroup}>
+                        <Label>Highlighted question IDs</Label>
+                        <Input
+                          type="textarea"
+                          rows={3}
+                          value={metadataConfigDraft.highlightedQuestionIds}
+                          placeholder="One question id per line"
+                          onChange={(e: any) => updateMetadataConfigDraft('highlightedQuestionIds', e.target.value)}
+                        />
+                      </FormGroup>
+                      <FormGroup className={styles.metadataTextAreaGroup}>
+                        <Label>Blocked question IDs</Label>
+                        <Input
+                          type="textarea"
+                          rows={3}
+                          value={metadataConfigDraft.blockedQuestionIds}
+                          placeholder="One question id per line"
+                          onChange={(e: any) => updateMetadataConfigDraft('blockedQuestionIds', e.target.value)}
+                        />
+                      </FormGroup>
+                      <FormGroup className={styles.metadataTextAreaGroup}>
+                        <Label>Highlighted survey IDs</Label>
+                        <Input
+                          type="textarea"
+                          rows={3}
+                          value={metadataConfigDraft.highlightedSurveyIds}
+                          placeholder="One survey id per line"
+                          onChange={(e: any) => updateMetadataConfigDraft('highlightedSurveyIds', e.target.value)}
+                        />
+                      </FormGroup>
+                      <FormGroup className={styles.metadataTextAreaGroup}>
+                        <Label>Blocked survey IDs</Label>
+                        <Input
+                          type="textarea"
+                          rows={3}
+                          value={metadataConfigDraft.blockedSurveyIds}
+                          placeholder="One survey id per line"
+                          onChange={(e: any) => updateMetadataConfigDraft('blockedSurveyIds', e.target.value)}
+                        />
+                      </FormGroup>
+                      <FormGroup className={styles.metadataTextAreaGroup}>
+                        <Label>Ignored SBT list</Label>
+                        <Input
+                          type="textarea"
+                          rows={3}
+                          value={metadataConfigDraft.ignoredSbtsList}
+                          placeholder="One SBT address per line"
+                          onChange={(e: any) => updateMetadataConfigDraft('ignoredSbtsList', e.target.value)}
+                        />
+                      </FormGroup>
+                      <FormGroup className={styles.metadataTextAreaGroup}>
+                        <Label>Featured SBT list</Label>
+                        <Input
+                          type="textarea"
+                          rows={3}
+                          value={metadataConfigDraft.featuredSbtsList}
+                          placeholder="One SBT address per line"
+                          onChange={(e: any) => updateMetadataConfigDraft('featuredSbtsList', e.target.value)}
+                        />
+                      </FormGroup>
+                    </div>
+                  </div>
+
+                  <div className={styles.metadataEditorActions}>
+                    <Button
+                      color="primary"
+                      className={styles.actionButton}
+                      onClick={handleSaveSessionMetadata}
+                      disabled={metadataUpdateBusy}
+                    >
+                      {metadataUpdateBusy ? 'Updating metadata…' : 'Update metadata'}
+                    </Button>
+                  </div>
+                  {metadataUpdateStatus && <div className={styles.statusNote}>{metadataUpdateStatus}</div>}
+                </div>
               )}
               <div className={styles.metadataJsonSection}>
                 <div className={styles.resultBoxLabel}>Raw metadata</div>
@@ -3353,15 +3094,293 @@ const AdminPageRuntime = ({
           )}
         </section>
 
-        {sessionCapabilities.isRegistryCanonical ? (
-          <section className={`${styles.panel} ${styles.gatePanel}`}>
+        <section className={`${styles.panel} ${styles.gatePanel}`}>
+          <div className={styles.panelHeader}>
+            <div className={styles.panelTitleGroup}>
+              <div className={styles.panelTitleRow}>
+                <div className={styles.panelTitle}>On-chain default gate</div>
+                {renderInfoTooltip(
+                  'admin-default-gate-tip',
+                  'Match the default worker-auth gate to the session’s intended access model.',
+                )}
+              </div>
+            </div>
+            <Button
+              size="sm"
+              color="secondary"
+              outline
+              className={styles.collapseToggle}
+              onClick={() => toggleSection('defaultGate')}
+              aria-label="Toggle On-chain default gate section"
+            >
+              <FontAwesomeIcon icon={defaultGateOpen ? faCaretUp : faCaretDown} />
+            </Button>
+          </div>
+          {defaultGateOpen && (
+            <>
+              <div className={styles.formRow}>
+                <FormGroup>
+                  <Label className={styles.gateLabelRow}>
+                    <span>Default gate SBTs</span>
+                    <Input
+                      type="select"
+                      value={defaultGateDraft.mode}
+                      data-testid={E2E_TESTIDS.ADMIN_GATE_MODE_SELECT}
+                      onChange={(e: any) => {
+                        setDefaultGateTouched(true);
+                        setGateConfigDirty(true);
+                        setDefaultGateDraft((prev: any) => ({ ...prev, mode: e.target.value }));
+                      }}
+                      className={styles.gateModeSelect}
+                    >
+                      <option value="any">ANY</option>
+                      <option value="all">ALL</option>
+                    </Input>
+                  </Label>
+                  <SBTSelector
+                    id="admin-default-gate-sbts"
+                    label=""
+                    selectedSBTs={dedupeSbtSelections(defaultGateDraft.sbts || [])}
+                    onAddSBT={(sbt: any) => {
+                      setDefaultGateTouched(true);
+                      setGateConfigDirty(true);
+                      setDefaultGateDraft((prev: any) => ({
+                        ...prev,
+                        sbts: dedupeSbtSelections([...(prev.sbts || []), sbt]),
+                      }));
+                    }}
+                    onRemoveSBT={(address: any) => {
+                      setDefaultGateTouched(true);
+                      setGateConfigDirty(true);
+                      setDefaultGateDraft((prev: any) => ({
+                        ...prev,
+                        sbts: dedupeSbtSelections(prev.sbts || []).filter(
+                          (entry: any) => toStr(entry.address).toLowerCase() !== toStr(address).toLowerCase(),
+                        ),
+                      }));
+                    }}
+                    network={network}
+                    chainId={
+                      Number(
+                        selectedConfig?.networkChainId || selectedConfig?.__registry?.chainId || network?.id || 0,
+                      ) || null
+                    }
+                    sessionSlug={normalizeSlug(selectedSlug)}
+                    variant="admin"
+                    ensureLightSbtUniverse={ensureLightSbtUniverse}
+                  />
+                </FormGroup>
+              </div>
+              <Button
+                color="primary"
+                className={styles.actionButton}
+                onClick={handleSyncDefaultGate}
+                data-testid={E2E_TESTIDS.ADMIN_GATE_UPDATE_BUTTON}
+                disabled={!canAdmin || gateSyncBusy}
+                style={{ opacity: gateConfigDirty ? 1 : 0.5 }}
+              >
+                Update default gate on-chain
+              </Button>
+              {gateSyncStatus && (
+                <div className={styles.statusNote} data-testid={E2E_TESTIDS.ADMIN_GATE_STATUS}>
+                  {gateSyncStatus}
+                </div>
+              )}
+              {gateSyncResult && <div className={styles.statusNote}>{renderAdminTestResult(gateSyncResult)}</div>}
+            </>
+          )}
+        </section>
+
+        <section className={`${styles.panel} ${styles.secretsPanel}`}>
+          <div className={styles.panelHeader}>
+            <div className={styles.panelTitleGroup}>
+              <div className={styles.panelTitleRow}>
+                <div className={styles.panelTitle}>Worker secrets</div>
+                {renderInfoTooltip(
+                  'admin-worker-secrets-tip',
+                  'Edit operator credentials without revealing what is already stored in the worker.',
+                )}
+              </div>
+            </div>
+            <Button
+              size="sm"
+              color="secondary"
+              outline
+              className={styles.collapseToggle}
+              onClick={() => toggleSection('workerSecrets')}
+              aria-label="Toggle Worker secrets section"
+            >
+              <FontAwesomeIcon icon={workerSecretsOpen ? faCaretUp : faCaretDown} />
+            </Button>
+          </div>
+          {workerSecretsOpen && (
+            <>
+              <div className={styles.secretStatusBar}>
+                <div className={styles.statusNote}>
+                  {secretPresenceMessage ||
+                    'Stored secret status not checked. Refresh to verify worker-managed secrets without revealing values.'}
+                </div>
+                <Button
+                  size="sm"
+                  color="secondary"
+                  outline
+                  className={styles.subtleActionButton}
+                  onClick={refreshSecretPresence}
+                  disabled={
+                    secretPresenceStatus === 'loading' ||
+                    !selectedConfig ||
+                    !normalizeWorkerUrl(workerUrl || selectedConfigWorkerUrl)
+                  }
+                >
+                  <FontAwesomeIcon icon={faSync} style={{ marginRight: 6 }} />
+                  {secretPresenceStatus === 'loading' ? 'Checking...' : 'Refresh secret status'}
+                </Button>
+              </div>
+              <div className={styles.secretOptionsGrid}>
+                {ADMIN_SECRET_CARDS.map((card: any) => {
+                  const isOpen = openSecretCards[card.key];
+                  const cardStatus = getAdminSecretCardStatus({
+                    fields: card.fields,
+                    secrets,
+                    clearedSecretKeys,
+                    storedSecretPresence,
+                    secretPresenceStatus,
+                    workerSecretsDirty,
+                  });
+                  return (
+                    <div
+                      key={card.key}
+                      className={`${styles.secretOptionCard}${isOpen ? ` ${styles.activeOption}` : ''}`}
+                    >
+                      <button
+                        type="button"
+                        className={styles.secretOptionHeader}
+                        aria-label={card.label}
+                        onClick={() => setOpenSecretCards((p) => ({ ...p, [card.key]: !p[card.key] }))}
+                        aria-expanded={isOpen}
+                      >
+                        <FontAwesomeIcon
+                          icon={cardStatus.iconLocked ? faLock : faLockOpen}
+                          style={{ opacity: cardStatus.iconLocked ? 0.9 : 0.4, marginRight: 8 }}
+                        />
+                        <span className={styles.secretOptionText}>
+                          <span>{card.label}</span>
+                          <span className={styles.secretOptionMeta}>{cardStatus.label}</span>
+                        </span>
+                        <FontAwesomeIcon icon={isOpen ? faCaretUp : faCaretDown} style={{ marginLeft: 'auto' }} />
+                      </button>
+                      {isOpen && (
+                        <div className={styles.secretOptionBody}>
+                          {card.fields.map((fieldKey: any) => {
+                            const secretFieldKey = String(fieldKey);
+                            const inputType = getAdminSecretFieldInputType(secretFieldKey);
+                            const isTextarea = inputType === 'textarea';
+                            const label = getAdminSecretFieldLabel(secretFieldKey);
+                            return (
+                              <FormGroup key={secretFieldKey}>
+                                <Label>{label}</Label>
+                                <div
+                                  className={`${styles.secretInputRow}${isTextarea ? ` ${styles.secretInputRowMultiline}` : ''}`}
+                                >
+                                  <Input
+                                    type={inputType}
+                                    rows={getAdminSecretFieldRows(secretFieldKey)}
+                                    value={secrets[secretFieldKey]}
+                                    onChange={(e: any) => handleSecretChange(secretFieldKey, e.target.value)}
+                                    className={styles.secretInput}
+                                  />
+                                  <button
+                                    type="button"
+                                    className={`${styles.secretRemoveButton}${clearedSecretKeys.has(secretFieldKey) ? ` ${styles.secretRemoveButtonActive}` : ''}`}
+                                    onClick={() => handleClearSecret(secretFieldKey)}
+                                    title={`Clear ${label} on next save`}
+                                    aria-label={`Clear ${label}`}
+                                    data-testid={buildAdminSecretRemoveTestId(secretFieldKey)}
+                                  >
+                                    <FontAwesomeIcon icon={faTimes} />
+                                  </button>
+                                </div>
+                                <div className={styles.secretFieldStatus}>
+                                  {getAdminSecretFieldStatusLabel({
+                                    fieldKey: secretFieldKey,
+                                    secrets,
+                                    clearedSecretKeys,
+                                    storedSecretPresence,
+                                    secretPresenceStatus,
+                                    workerSecretsDirty,
+                                  })}
+                                </div>
+                                {secretFieldKey === 'litAccountApiKey' ? (
+                                  <div className={styles.warningNote}>
+                                    Anyone with this key can create new Lit groups, PKPs, usage keys, and actions inside
+                                    that bundle-owned Lit account. Use disposable per-bundle accounts instead of a
+                                    shared deployment account.
+                                  </div>
+                                ) : null}
+                              </FormGroup>
+                            );
+                          })}
+                          {card.key === 'arweave' &&
+                            renderInlineResourceSummary({
+                              key: 'arweave-resource',
+                              label: 'Arweave balance',
+                              resource: arweaveResource,
+                              onRefresh: refreshArweaveResource,
+                              refreshLabel: 'Refresh Arweave balance',
+                            })}
+                          {card.key === 'faucet' &&
+                            renderInlineResourceSummary({
+                              key: 'faucet-resource',
+                              label: 'Faucet balance',
+                              resource: faucetResource,
+                              onRefresh: refreshFaucetResource,
+                              refreshLabel: 'Refresh faucet balance',
+                            })}
+                          {card.key === 'lit' &&
+                            renderInlineResourceSummary({
+                              key: 'lit-resource',
+                              label: litResourceLabel,
+                              resource: litResource,
+                              onRefresh: () => refreshLitResource({ includeSignedStatus: true }),
+                              refreshLabel: 'Refresh Lit status',
+                            })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {canAdmin && workerSecretsDirty && (
+                <Button
+                  color="primary"
+                  className={styles.actionButton}
+                  onClick={handleSaveWorkerSecrets}
+                  disabled={!canAdmin}
+                >
+                  Save worker secrets
+                </Button>
+              )}
+              {saveStatus && <div className={styles.statusNote}>{saveStatus}</div>}
+              {chainStatus && <div className={styles.statusNote}>{chainStatus}</div>}
+            </>
+          )}
+        </section>
+
+        {showTestsPanel && (
+          <section className={`${styles.panel} ${styles.testsPanel}`}>
             <div className={styles.panelHeader}>
               <div className={styles.panelTitleGroup}>
                 <div className={styles.panelTitleRow}>
-                  <div className={styles.panelTitle}>On-chain default gate</div>
+                  <div className={styles.panelTitle}>Tests</div>
                   {renderInfoTooltip(
-                    'admin-default-gate-tip',
-                    'Match the default worker-auth gate to the session’s intended access model.',
+                    'admin-tests-tip',
+                    <div className={styles.tooltipTextStack}>
+                      <div>Run quick checks against the selected worker and the session&apos;s gate rules.</div>
+                      <div>
+                        Run these as a user who holds the sponsored SBT. Tests use the configured worker URL and auth
+                        flow.
+                      </div>
+                    </div>,
                   )}
                 </div>
               </div>
@@ -3370,274 +3389,270 @@ const AdminPageRuntime = ({
                 color="secondary"
                 outline
                 className={styles.collapseToggle}
-                onClick={() => toggleSection('defaultGate')}
-                aria-label="Toggle On-chain default gate section"
+                onClick={() => {
+                  setShowTestsPanel(false);
+                  setOpenSection((prev: any) => (prev === 'tests' ? '' : prev));
+                }}
+                aria-label="Toggle Tests section"
               >
-                <FontAwesomeIcon icon={defaultGateOpen ? faCaretUp : faCaretDown} />
+                <FontAwesomeIcon icon={testsOpen ? faCaretUp : faCaretDown} />
               </Button>
             </div>
-            {defaultGateOpen && (
+            {testsOpen && (
               <>
-                <div className={styles.formRow}>
-                  <FormGroup>
-                    <Label className={styles.gateLabelRow}>
-                      <span>Default gate SBTs</span>
-                      <Input
-                        type="select"
-                        value={defaultGateDraft.mode}
-                        data-testid={E2E_TESTIDS.ADMIN_GATE_MODE_SELECT}
-                        onChange={(e: any) => {
-                          setDefaultGateTouched(true);
-                          setGateConfigDirty(true);
-                          setDefaultGateDraft((prev: any) => ({ ...prev, mode: e.target.value }));
-                        }}
-                        className={styles.gateModeSelect}
-                      >
-                        <option value="any">ANY</option>
-                        <option value="all">ALL</option>
-                      </Input>
-                    </Label>
-                    <SBTSelector
-                      id="admin-default-gate-sbts"
-                      label=""
-                      selectedSBTs={dedupeSbtSelections(defaultGateDraft.sbts || [])}
-                      onAddSBT={(sbt: any) => {
-                        setDefaultGateTouched(true);
-                        setGateConfigDirty(true);
-                        setDefaultGateDraft((prev: any) => ({
-                          ...prev,
-                          sbts: dedupeSbtSelections([...(prev.sbts || []), sbt]),
-                        }));
-                      }}
-                      onRemoveSBT={(address: any) => {
-                        setDefaultGateTouched(true);
-                        setGateConfigDirty(true);
-                        setDefaultGateDraft((prev: any) => ({
-                          ...prev,
-                          sbts: dedupeSbtSelections(prev.sbts || []).filter(
-                            (entry: any) => toStr(entry.address).toLowerCase() !== toStr(address).toLowerCase(),
-                          ),
-                        }));
-                      }}
-                      network={network}
-                      chainId={
-                        Number(
-                          selectedConfig?.networkChainId || selectedConfig?.__registry?.chainId || network?.id || 0,
-                        ) || null
-                      }
-                      sessionSlug={normalizeSlug(selectedSlug)}
-                      variant="admin"
-                      ensureLightSbtUniverse={ensureLightSbtUniverse}
-                    />
-                  </FormGroup>
+                <div className={styles.panelTitleRow}>
+                  <div className={styles.panelSubtitle}>Lit quick test (no worker)</div>
+                  {renderInfoTooltip(
+                    'admin-lit-test-tip',
+                    'Uses the selected session’s default gate + Lit hooks. Does not call the worker.',
+                  )}
                 </div>
-                <Button
-                  color="primary"
-                  className={styles.actionButton}
-                  onClick={handleSyncDefaultGate}
-                  data-testid={E2E_TESTIDS.ADMIN_GATE_UPDATE_BUTTON}
-                  disabled={!canAdminRegistry || gateSyncBusy}
-                  style={{ opacity: gateConfigDirty ? 1 : 0.5 }}
-                >
-                  Update default gate on-chain
-                </Button>
-                {gateSyncStatus && (
-                  <div className={styles.statusNote} data-testid={E2E_TESTIDS.ADMIN_GATE_STATUS}>
-                    {gateSyncStatus}
+                <FormGroup>
+                  <Label>Lit test value</Label>
+                  <Input
+                    type="textarea"
+                    rows="2"
+                    value={litTestValue}
+                    onChange={(e: any) => setLitTestValue(e.target.value)}
+                    placeholder="Type a short test string"
+                  />
+                </FormGroup>
+                <div className={`${styles.formRow} ${styles.litActionRow}`}>
+                  <Button
+                    color="primary"
+                    outline
+                    className={styles.actionButton}
+                    onClick={runLitEncryptTest}
+                    disabled={litTestBusy}
+                  >
+                    Encrypt
+                  </Button>
+                  <Button
+                    color="primary"
+                    outline
+                    className={styles.actionButton}
+                    onClick={runLitDecryptTest}
+                    disabled={litTestBusy || !litTestEnvelope}
+                  >
+                    Decrypt
+                  </Button>
+                </div>
+                {litTestStatus && <div className={styles.statusNote}>{litTestStatus}</div>}
+                {litTestEnvelope && (
+                  <div className={styles.resultBox}>
+                    <div>Envelope</div>
+                    <pre>{litTestEnvelope}</pre>
                   </div>
                 )}
-                {gateSyncResult && <div className={styles.statusNote}>{renderAdminTestResult(gateSyncResult)}</div>}
+                {litTestDecrypted && <div className={styles.statusNote}>Decrypted: {litTestDecrypted}</div>}
+                <div className={styles.inlineRow}>
+                  <Label>
+                    Transcription test (AudioInput)
+                    {!canRunTests &&
+                      renderInfoTooltip(
+                        'admin-transcription-tip',
+                        'Connect a wallet and set a worker URL to test transcription.',
+                      )}
+                  </Label>
+                  {canRunTests ? (
+                    <AudioInput
+                      placeholder="Record a short clip to test /transcribe…"
+                      updateFunction={(next: any) => {
+                        setTranscribeText(next);
+                        const trimmed = toStr(next).trim();
+                        setTestResults((prev) => ({
+                          ...prev,
+                          transcribe: trimmed ? `OK (${trimmed.slice(0, 80)})` : '',
+                        }));
+                      }}
+                      toggleEncryption={() => {}}
+                      value={transcribeText}
+                      encrypted={false}
+                      hideEncryption
+                      disableEncryption
+                      enableAiRewrite={false}
+                      sessionSlug={normalizeSlug(selectedSlug)}
+                      sessionConfig={testSessionConfig}
+                      context={testContext}
+                      workerUrl={baseWorkerUrl}
+                    />
+                  ) : null}
+                </div>
+                {testStatus && <div className={styles.statusNote}>{testStatus}</div>}
+                <div className={styles.grid}>
+                  <div
+                    className={`${styles.statusItem} ${canRunHealthTest ? styles.statusItemClickable : ''}`}
+                    onClick={() => {
+                      if (!testBusy && canRunHealthTest) runWorkerHealthTest();
+                    }}
+                    role={canRunHealthTest ? 'button' : undefined}
+                    tabIndex={canRunHealthTest ? 0 : -1}
+                    onKeyDown={(e: any) => {
+                      if (e.key === 'Enter' && !testBusy && canRunHealthTest) runWorkerHealthTest();
+                    }}
+                    title={(() => {
+                      if (!baseWorkerUrl) return 'Set a worker URL to test /health';
+                      if (!defaultGateIsEmpty && !walletReady) return 'Connect a wallet to run the gated access test.';
+                      return 'Click to test /health';
+                    })()}
+                    id={!defaultGateIsEmpty && !walletReady ? 'admin-health-test-chip' : undefined}
+                  >
+                    <span>Health</span>
+                    <span>{testBusy ? 'Testing\u2026' : renderAdminTestResult(testResults.health)}</span>
+                  </div>
+                  {!defaultGateIsEmpty && !walletReady && (
+                    <CETooltip
+                      placement="top"
+                      trigger="hover focus click"
+                      target="admin-health-test-chip"
+                      className={styles.tooltipBubble}
+                    >
+                      Connect a wallet to run the gated access test.
+                    </CETooltip>
+                  )}
+                  <div
+                    className={`${styles.statusItem} ${account ? styles.statusItemClickable : ''}`}
+                    onClick={() => {
+                      if (!testBusy && account) runWorkerAiTest();
+                    }}
+                    role={account ? 'button' : undefined}
+                    tabIndex={account ? 0 : -1}
+                    onKeyDown={(e: any) => {
+                      if (e.key === 'Enter' && !testBusy && account) runWorkerAiTest();
+                    }}
+                    title="Click to test AI"
+                  >
+                    <span>AI</span>
+                    <span>{testBusy ? 'Testing\u2026' : renderAdminTestResult(testResults.ai)}</span>
+                  </div>
+                  <div
+                    className={`${styles.statusItem} ${account ? styles.statusItemClickable : ''}`}
+                    onClick={() => {
+                      if (!testBusy && account) runWorkerArweaveTest();
+                    }}
+                    role={account ? 'button' : undefined}
+                    tabIndex={account ? 0 : -1}
+                    onKeyDown={(e: any) => {
+                      if (e.key === 'Enter' && !testBusy && account) runWorkerArweaveTest();
+                    }}
+                    title="Click to test Arweave upload"
+                  >
+                    <span>Arweave</span>
+                    <span>{testBusy ? 'Testing\u2026' : renderAdminTestResult(testResults.arweave)}</span>
+                  </div>
+                  <div
+                    className={`${styles.statusItem} ${account ? styles.statusItemClickable : ''}`}
+                    onClick={() => {
+                      if (!testBusy && account) runWorkerFaucetTest();
+                    }}
+                    role={account ? 'button' : undefined}
+                    tabIndex={account ? 0 : -1}
+                    onKeyDown={(e: any) => {
+                      if (e.key === 'Enter' && !testBusy && account) runWorkerFaucetTest();
+                    }}
+                    title="Click to test faucet (0.0000001)"
+                  >
+                    <span>Faucet</span>
+                    <span>{testBusy ? 'Testing\u2026' : renderAdminTestResult(testResults.faucet)}</span>
+                  </div>
+                  <div className={styles.statusItem}>
+                    <span>Transcribe</span>
+                    <span>{renderAdminTestResult(testResults.transcribe)}</span>
+                  </div>
+                </div>
+                <div className={styles.panelTitleRow} style={{ marginTop: 16 }}>
+                  <div className={styles.panelTitle}>Negative tests (denied access)</div>
+                  {renderInfoTooltip(
+                    'admin-negative-tests-tip',
+                    'Connect a wallet that does NOT hold the sponsored SBT. Each test expects a 403 during login.',
+                  )}
+                </div>
+                {deniedStatus && <div className={styles.statusNote}>{deniedStatus}</div>}
+                <div className={styles.grid}>
+                  <div
+                    className={`${styles.statusItem} ${!deniedBusy ? styles.statusItemClickable : ''}`}
+                    onClick={() => {
+                      if (!deniedBusy) runDeniedAccessTest('login');
+                    }}
+                    role={!deniedBusy ? 'button' : undefined}
+                    tabIndex={!deniedBusy ? 0 : -1}
+                    onKeyDown={(e: any) => {
+                      if (e.key === 'Enter' && !deniedBusy) runDeniedAccessTest('login');
+                    }}
+                    title="Click to test login denied"
+                    data-testid="ce-admin-denied-chip-login"
+                  >
+                    <span>Login</span>
+                    <span>{renderAdminTestResult(deniedResults.login)}</span>
+                  </div>
+                  <div
+                    className={`${styles.statusItem} ${!deniedBusy ? styles.statusItemClickable : ''}`}
+                    onClick={() => {
+                      if (!deniedBusy) runDeniedAccessTest('ai');
+                    }}
+                    role={!deniedBusy ? 'button' : undefined}
+                    tabIndex={!deniedBusy ? 0 : -1}
+                    onKeyDown={(e: any) => {
+                      if (e.key === 'Enter' && !deniedBusy) runDeniedAccessTest('ai');
+                    }}
+                    title="Click to test AI denied"
+                    data-testid="ce-admin-denied-chip-ai"
+                  >
+                    <span>AI</span>
+                    <span>{renderAdminTestResult(deniedResults.ai)}</span>
+                  </div>
+                  <div
+                    className={`${styles.statusItem} ${!deniedBusy ? styles.statusItemClickable : ''}`}
+                    onClick={() => {
+                      if (!deniedBusy) runDeniedAccessTest('arweave');
+                    }}
+                    role={!deniedBusy ? 'button' : undefined}
+                    tabIndex={!deniedBusy ? 0 : -1}
+                    onKeyDown={(e: any) => {
+                      if (e.key === 'Enter' && !deniedBusy) runDeniedAccessTest('arweave');
+                    }}
+                    title="Click to test Arweave denied"
+                    data-testid="ce-admin-denied-chip-arweave"
+                  >
+                    <span>Arweave</span>
+                    <span>{renderAdminTestResult(deniedResults.arweave)}</span>
+                  </div>
+                  <div
+                    className={`${styles.statusItem} ${!deniedBusy ? styles.statusItemClickable : ''}`}
+                    onClick={() => {
+                      if (!deniedBusy) runDeniedAccessTest('transcribe');
+                    }}
+                    role={!deniedBusy ? 'button' : undefined}
+                    tabIndex={!deniedBusy ? 0 : -1}
+                    onKeyDown={(e: any) => {
+                      if (e.key === 'Enter' && !deniedBusy) runDeniedAccessTest('transcribe');
+                    }}
+                    title="Click to test transcription denied"
+                    data-testid="ce-admin-denied-chip-transcribe"
+                  >
+                    <span>Transcribe</span>
+                    <span>{renderAdminTestResult(deniedResults.transcribe)}</span>
+                  </div>
+                  <div
+                    className={`${styles.statusItem} ${!deniedBusy ? styles.statusItemClickable : ''}`}
+                    onClick={() => {
+                      if (!deniedBusy) runDeniedAccessTest('faucet');
+                    }}
+                    role={!deniedBusy ? 'button' : undefined}
+                    tabIndex={!deniedBusy ? 0 : -1}
+                    onKeyDown={(e: any) => {
+                      if (e.key === 'Enter' && !deniedBusy) runDeniedAccessTest('faucet');
+                    }}
+                    title="Click to test faucet denied"
+                    data-testid="ce-admin-denied-chip-faucet"
+                  >
+                    <span>Faucet</span>
+                    <span>{renderAdminTestResult(deniedResults.faucet)}</span>
+                  </div>
+                </div>
               </>
             )}
-          </Label>
-          {canRunTests ? (
-            <AudioInput
-              placeholder="Record a short clip to test /transcribe…"
-              updateFunction={(next: any) => {
-                setTranscribeText(next);
-                const trimmed = toStr(next).trim();
-                setTestResults((prev) => ({ ...prev, transcribe: trimmed ? `OK (${trimmed.slice(0, 80)})` : '' }));
-              }}
-              toggleEncryption={() => {}}
-              value={transcribeText}
-              encrypted={false}
-              hideEncryption
-              disableEncryption
-              enableAiRewrite={false}
-              sessionSlug={normalizeSlug(selectedSlug)}
-              sessionConfig={testSessionConfig}
-              context={testContext}
-              workerUrl={baseWorkerUrl}
-            />
-          ) : null}
-        </div>
-        {testStatus && <div className={styles.statusNote}>{testStatus}</div>}
-        <div className={styles.grid}>
-            <div
-              className={`${styles.statusItem} ${canRunHealthTest ? styles.statusItemClickable : ''}`}
-              onClick={() => {
-                if (!testBusy && canRunHealthTest) runWorkerHealthTest();
-              }}
-              role={canRunHealthTest ? 'button' : undefined}
-              tabIndex={canRunHealthTest ? 0 : -1}
-              onKeyDown={(e: any) => {
-                if (e.key === 'Enter' && !testBusy && canRunHealthTest) runWorkerHealthTest();
-              }}
-              title={(() => {
-                if (!baseWorkerUrl) return 'Set a worker URL to test /health';
-                if (!defaultGateIsEmpty && !walletReady) return 'Connect a wallet to run the gated access test.';
-                return 'Click to test /health';
-              })()}
-              id={!defaultGateIsEmpty && !walletReady ? 'admin-health-test-chip' : undefined}
-            >
-            <span>Health</span>
-            <span>{testBusy ? 'Testing\u2026' : renderAdminTestResult(testResults.health)}</span>
-          </div>
-          {!defaultGateIsEmpty && !walletReady && (
-            <CETooltip
-              placement="top"
-              trigger="hover focus click"
-              target="admin-health-test-chip"
-              className={styles.tooltipBubble}
-            >
-              Connect a wallet to run the gated access test.
-            </CETooltip>
-          )}
-          <div
-            className={`${styles.statusItem} ${account ? styles.statusItemClickable : ''}`}
-            onClick={() => {
-              if (!testBusy && account) runWorkerAiTest();
-            }}
-            role={account ? 'button' : undefined}
-            tabIndex={account ? 0 : -1}
-            onKeyDown={(e: any) => { if (e.key === 'Enter' && !testBusy && account) runWorkerAiTest(); }}
-            title="Click to test AI"
-          >
-            <span>AI</span>
-            <span>{testBusy ? 'Testing\u2026' : renderAdminTestResult(testResults.ai)}</span>
-          </div>
-          <div
-            className={`${styles.statusItem} ${account ? styles.statusItemClickable : ''}`}
-            onClick={() => {
-              if (!testBusy && account) runWorkerArweaveTest();
-            }}
-            role={account ? 'button' : undefined}
-            tabIndex={account ? 0 : -1}
-            onKeyDown={(e: any) => { if (e.key === 'Enter' && !testBusy && account) runWorkerArweaveTest(); }}
-            title="Click to test Arweave upload"
-          >
-            <span>Arweave</span>
-            <span>{testBusy ? 'Testing\u2026' : renderAdminTestResult(testResults.arweave)}</span>
-          </div>
-          <div
-            className={`${styles.statusItem} ${account ? styles.statusItemClickable : ''}`}
-            onClick={() => {
-              if (!testBusy && account) runWorkerFaucetTest();
-            }}
-            role={account ? 'button' : undefined}
-            tabIndex={account ? 0 : -1}
-            onKeyDown={(e: any) => { if (e.key === 'Enter' && !testBusy && account) runWorkerFaucetTest(); }}
-            title="Click to test faucet (0.0000001)"
-          >
-            <span>Faucet</span>
-            <span>{testBusy ? 'Testing\u2026' : renderAdminTestResult(testResults.faucet)}</span>
-          </div>
-          <div className={styles.statusItem}>
-            <span>Transcribe</span>
-            <span>{renderAdminTestResult(testResults.transcribe)}</span>
-          </div>
-        </div>
-        <div className={styles.panelTitleRow} style={{ marginTop: 16 }}>
-          <div className={styles.panelTitle}>Negative tests (denied access)</div>
-          {renderInfoTooltip(
-            'admin-negative-tests-tip',
-            'Connect a wallet that does NOT hold the sponsored SBT. Each test expects a 403 during login.'
-          )}
-        </div>
-        {deniedStatus && <div className={styles.statusNote}>{deniedStatus}</div>}
-        <div className={styles.grid}>
-          <div
-            className={`${styles.statusItem} ${!deniedBusy ? styles.statusItemClickable : ''}`}
-            onClick={() => {
-              if (!deniedBusy) runDeniedAccessTest('login');
-            }}
-            role={!deniedBusy ? 'button' : undefined}
-            tabIndex={!deniedBusy ? 0 : -1}
-            onKeyDown={(e: any) => {
-              if (e.key === 'Enter' && !deniedBusy) runDeniedAccessTest('login');
-            }}
-            title="Click to test login denied"
-            data-testid="ce-admin-denied-chip-login"
-          >
-            <span>Login</span>
-            <span>{renderAdminTestResult(deniedResults.login)}</span>
-          </div>
-          <div
-            className={`${styles.statusItem} ${!deniedBusy ? styles.statusItemClickable : ''}`}
-            onClick={() => {
-              if (!deniedBusy) runDeniedAccessTest('ai');
-            }}
-            role={!deniedBusy ? 'button' : undefined}
-            tabIndex={!deniedBusy ? 0 : -1}
-            onKeyDown={(e: any) => {
-              if (e.key === 'Enter' && !deniedBusy) runDeniedAccessTest('ai');
-            }}
-            title="Click to test AI denied"
-            data-testid="ce-admin-denied-chip-ai"
-          >
-            <span>AI</span>
-            <span>{renderAdminTestResult(deniedResults.ai)}</span>
-          </div>
-          <div
-            className={`${styles.statusItem} ${!deniedBusy ? styles.statusItemClickable : ''}`}
-            onClick={() => {
-              if (!deniedBusy) runDeniedAccessTest('arweave');
-            }}
-            role={!deniedBusy ? 'button' : undefined}
-            tabIndex={!deniedBusy ? 0 : -1}
-            onKeyDown={(e: any) => {
-              if (e.key === 'Enter' && !deniedBusy) runDeniedAccessTest('arweave');
-            }}
-            title="Click to test Arweave denied"
-            data-testid="ce-admin-denied-chip-arweave"
-          >
-            <span>Arweave</span>
-            <span>{renderAdminTestResult(deniedResults.arweave)}</span>
-          </div>
-          <div
-            className={`${styles.statusItem} ${!deniedBusy ? styles.statusItemClickable : ''}`}
-            onClick={() => {
-              if (!deniedBusy) runDeniedAccessTest('transcribe');
-            }}
-            role={!deniedBusy ? 'button' : undefined}
-            tabIndex={!deniedBusy ? 0 : -1}
-            onKeyDown={(e: any) => {
-              if (e.key === 'Enter' && !deniedBusy) runDeniedAccessTest('transcribe');
-            }}
-            title="Click to test transcription denied"
-            data-testid="ce-admin-denied-chip-transcribe"
-          >
-            <span>Transcribe</span>
-            <span>{renderAdminTestResult(deniedResults.transcribe)}</span>
-          </div>
-          <div
-            className={`${styles.statusItem} ${!deniedBusy ? styles.statusItemClickable : ''}`}
-            onClick={() => {
-              if (!deniedBusy) runDeniedAccessTest('faucet');
-            }}
-            role={!deniedBusy ? 'button' : undefined}
-            tabIndex={!deniedBusy ? 0 : -1}
-            onKeyDown={(e: any) => {
-              if (e.key === 'Enter' && !deniedBusy) runDeniedAccessTest('faucet');
-            }}
-            title="Click to test faucet denied"
-            data-testid="ce-admin-denied-chip-faucet"
-          >
-            <span>Faucet</span>
-            <span>{renderAdminTestResult(deniedResults.faucet)}</span>
-          </div>
-        </div>
-          </>
+          </section>
         )}
       </div>
     </div>

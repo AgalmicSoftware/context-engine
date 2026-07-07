@@ -54,7 +54,7 @@ describe('AdminPage', () => {
     expect(payload.rpcUrlsByChainId).toEqual(
       expect.objectContaining({
         [String(DEFAULT_CONFIG_CHAIN_ID)]: [getDefaultHttpRpc(DEFAULT_CONFIG_CHAIN_ID)],
-      })
+      }),
     );
   });
 

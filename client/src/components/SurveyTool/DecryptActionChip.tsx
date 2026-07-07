@@ -35,12 +35,7 @@ const DecryptActionChip = ({
 
   return (
     <div className={styles.decryptChip}>
-      <Button
-        onClick={onClick}
-        id={styles.decryptQuestionButton}
-        disabled={disabled}
-        title={title}
-      >
+      <Button onClick={onClick} className={styles.decryptQuestionButton} disabled={disabled} title={title}>
         {busy ? busyLabel : actionLabel}
       </Button>
     </div>

@@ -3,10 +3,7 @@ import {
   parseQuestionSessionSlugFromSearch,
 } from '../../utilities/survey/questionRouting.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
-import {
-  buildPublicRoute,
-  stripPublicUrlBasePath,
-} from '../../utilities/ui/publicUrl.js';
+import { buildPublicRoute, stripPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 import { createLogger } from 'utilities/logging.js';
 
 const surveyLog = createLogger('surveys');
