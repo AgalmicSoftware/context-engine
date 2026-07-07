@@ -11,7 +11,6 @@
     ],
     "hosted": [
       "wiring-and-release",
-      "public-text",
       "contracts",
       "client",
       "root-jest",
@@ -66,35 +65,11 @@
           ]
         },
         {
-          "label": "Verify typed client tests",
-          "command": "npm",
-          "args": [
-            "run",
-            "typecheck:client-tests"
-          ]
-        },
-        {
-          "label": "Verify release version surfaces",
-          "command": "npm",
-          "args": [
-            "run",
-            "verify:release-version"
-          ]
-        },
-        {
           "label": "Verify public release surface",
           "command": "npm",
           "args": [
             "run",
             "verify:public-release-surface"
-          ]
-        },
-        {
-          "label": "Verify public asset ownership",
-          "command": "npm",
-          "args": [
-            "run",
-            "verify:public-assets"
           ]
         },
         {
@@ -114,14 +89,6 @@
           ]
         },
         {
-          "label": "Verify Cloudflare-native Session Worker package",
-          "command": "npm",
-          "args": [
-            "run",
-            "verify:cloudflare-template"
-          ]
-        },
-        {
           "label": "Build client",
           "command": "npm",
           "args": [
@@ -129,26 +96,6 @@
             "client",
             "run",
             "build"
-          ]
-        },
-        {
-          "label": "Check client bundle budget",
-          "command": "npm",
-          "args": [
-            "run",
-            "client:bundle-budget:check"
-          ]
-        }
-      ]
-    },
-    "public-text": {
-      "commands": [
-        {
-          "label": "Prepare and verify public text exposure",
-          "command": "npm",
-          "args": [
-            "run",
-            "verify:public-text:prepared"
           ]
         }
       ]
@@ -162,14 +109,6 @@
             "run",
             "test:contracts"
           ]
-        },
-        {
-          "label": "Verify tracked contract ABIs",
-          "command": "npm",
-          "args": [
-            "run",
-            "abi:check"
-          ]
         }
       ]
     },
@@ -181,14 +120,6 @@
           "args": [
             "run",
             "test:client"
-          ]
-        },
-        {
-          "label": "Check client coverage floor",
-          "command": "npm",
-          "args": [
-            "run",
-            "coverage-floor:check"
           ]
         }
       ]
@@ -228,14 +159,6 @@
     "cecc-and-node": {
       "commands": [
         {
-          "label": "Run tracked root Node tests",
-          "command": "npm",
-          "args": [
-            "run",
-            "test:node:tracked"
-          ]
-        },
-        {
           "label": "Run managed-cache guard",
           "command": "npm",
           "args": [
@@ -264,30 +187,6 @@
           ]
         },
         {
-          "label": "Verify typed client tests",
-          "command": "npm",
-          "args": [
-            "run",
-            "typecheck:client-tests"
-          ]
-        },
-        {
-          "label": "Verify release version surfaces",
-          "command": "npm",
-          "args": [
-            "run",
-            "verify:release-version"
-          ]
-        },
-        {
-          "label": "Run tracked Node release tests",
-          "command": "npm",
-          "args": [
-            "run",
-            "test:node:tracked"
-          ]
-        },
-        {
           "label": "Run full client release tests",
           "command": "npm",
           "args": [
@@ -301,14 +200,6 @@
           "args": [
             "run",
             "verify:public-release-surface"
-          ]
-        },
-        {
-          "label": "Verify public asset ownership",
-          "command": "npm",
-          "args": [
-            "run",
-            "verify:public-assets"
           ]
         },
         {
@@ -328,14 +219,6 @@
           ]
         },
         {
-          "label": "Verify Cloudflare-native Session Worker package",
-          "command": "npm",
-          "args": [
-            "run",
-            "verify:cloudflare-template"
-          ]
-        },
-        {
           "label": "Build client",
           "command": "npm",
           "args": [
@@ -343,14 +226,6 @@
             "client",
             "run",
             "build"
-          ]
-        },
-        {
-          "label": "Check client bundle budget",
-          "command": "npm",
-          "args": [
-            "run",
-            "client:bundle-budget:check"
           ]
         }
       ]

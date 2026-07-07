@@ -28,7 +28,7 @@ Vite is the canonical client dev/build path:
 cd client
 npm run dev
 npm run build
-npm run preview:vite
+npm run preview
 ```
 
 The Vite production build writes to `client/build/`, which is also what

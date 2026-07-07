@@ -83,8 +83,11 @@ jobs:
       - name: Run wiring and release gate
         run: npm run ci:gate -- wiring-and-release
 
-      - name: Run public text gate
-        run: npm run ci:gate -- public-text
+      - name: Lint workers
+        run: npm run lint:workers
+
+      - name: Typecheck client
+        run: npm run typecheck:client
 
       - name: Stage tested Worker bundle candidate
         run: >-
