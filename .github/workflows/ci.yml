@@ -69,6 +69,9 @@ jobs:
       - name: Lint client
         run: npm run lint
 
+      - name: Check client formatting
+        run: npm --prefix client run format:check
+
       - name: Lint workers
         run: npm run lint:workers
 

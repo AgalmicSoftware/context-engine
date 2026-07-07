@@ -1,0 +1,17 @@
+client/public/
+client/build/
+client/dist/
+build/
+dist/
+coverage/
+client/coverage/
+node_modules/
+
+client/src/contractsABI/**/*.json
+client/src/artifacts/
+client/src/assets/**/*.min.*
+client/src/assets/vendor/
+
+package-lock.json
+client/package-lock.json
+workers/sessionCorsWorker/package-lock.json

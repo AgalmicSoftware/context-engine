@@ -77,6 +77,9 @@ describe('client package modernization contract', () => {
     expect(pkg.scripts.start).toBe('serve -s build');
     expect(pkg.scripts.test).toBe('jest');
     expect(pkg.scripts.lint).toBe(expectedLintCommand);
+    expect(pkg.scripts['format:check']).toBe(
+      'prettier --config .prettierrc.js --ignore-path ../.prettierignore --check "src/**/*.{js,jsx,mjs,cjs,ts,tsx,css,scss}"',
+    );
   });
 
   it('keeps legacy Vite aliases and CRA fallback scripts removed from the client package contract', () => {
