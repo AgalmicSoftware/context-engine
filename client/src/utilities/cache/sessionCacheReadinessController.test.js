@@ -14,15 +14,6 @@ jest.mock(
 );
 
 jest.mock(
-  '../../utilities/ui/uiRuntimeStats.js',
-  () => ({
-    __esModule: true,
-    recordCeRuntimeCacheEvent: jest.fn(),
-  }),
-  { virtual: true },
-);
-
-jest.mock(
   '../../utilities/web3/contractScripts.js',
   () => ({
     __esModule: true,
@@ -32,7 +23,12 @@ jest.mock(
 );
 
 const { createSessionCacheReadinessController } = require('./sessionCacheReadinessController.js');
-const { recordCeRuntimeCacheEvent } = require('../../utilities/ui/uiRuntimeStats.js');
+const {
+  resetCeRuntimeStats,
+  snapshotCeRuntimeStats,
+  startCeRuntimeStats,
+  stopCeRuntimeStats,
+} = require('../../utilities/ui/uiRuntimeStats.js');
 const contractScriptsModule = require('../../utilities/web3/contractScripts.js');
 
 const createMockHost = (overrides = {}) => {
@@ -130,6 +126,8 @@ describe('createSessionCacheReadinessController', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    stopCeRuntimeStats();
+    resetCeRuntimeStats();
     contractScriptsModule.normalizeSessionSlug.mockImplementation((slug) =>
       String(slug || '')
         .trim()
@@ -156,6 +154,8 @@ describe('createSessionCacheReadinessController', () => {
         value: originalCancelAnimationFrame,
       });
     }
+    stopCeRuntimeStats();
+    resetCeRuntimeStats();
     jest.restoreAllMocks();
     jest.useRealTimers();
   });
@@ -552,10 +552,13 @@ describe('createSessionCacheReadinessController', () => {
         slug: 'other-slug',
         source: 'remote',
       };
+      startCeRuntimeStats({ sampleIntervalMs: 1000, maxSamples: 5 });
 
       controller.handleCrossTabCacheUpdateEvent(evt);
 
-      expect(recordCeRuntimeCacheEvent).toHaveBeenCalledWith(evt);
+      const snapshot = snapshotCeRuntimeStats();
+      expect(snapshot.cachePressure.totals.sbtCache).toBe(1);
+      expect(snapshot.cachePressure.sinceLast.sbtCache).toBe(1);
     });
 
     it('ignores events for non-active slugs', () => {
