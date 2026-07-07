@@ -1,5 +1,5 @@
 import { QuestionFilter as QuestionFilterComponent } from './QuestionFilter';
-import * as aiScripts from '../../utilities/ai/aiScripts.js';
+import * as aiClient from '../../utilities/ai/aiClient.js';
 import * as aiSettings from '../../utilities/ai/aiSettings.js';
 import * as sponsoredAccess from '../../utilities/web3/sponsoredAccess.js';
 import { serializeFilterState } from '../../utilities/survey/filterStateUtils.js';
@@ -47,7 +47,7 @@ describe('QuestionFilter AI ranking lifecycle', () => {
       .spyOn(sponsoredAccessAny, 'resolveSponsoredGateStateForResource')
       .mockReturnValue({ status: sponsoredAccess.SPONSORED_GATE_STATES.OPEN });
     const localSpy = jest.spyOn(aiSettings, 'getLocalAiSettings').mockReturnValue({ providers: {} });
-    const rankSpy = jest.spyOn(aiScripts, 'rankQuestionsAI').mockResolvedValue(['q3', 'q1']);
+    const rankSpy = jest.spyOn(aiClient, 'rankQuestionsAI').mockResolvedValue(['q3', 'q1']);
 
     const questions = [
       { id: 'q1', type: 'binary', tags: ['alpha'], prompt: 'Q1' },
@@ -122,7 +122,7 @@ describe('QuestionFilter AI ranking lifecycle', () => {
       .spyOn(sponsoredAccessAny, 'resolveSponsoredGateStateForResource')
       .mockReturnValue({ status: sponsoredAccess.SPONSORED_GATE_STATES.OPEN });
     const localSpy = jest.spyOn(aiSettings, 'getLocalAiSettings').mockReturnValue({ providers: {} });
-    const rankSpy = jest.spyOn(aiScripts, 'rankQuestionsAI').mockResolvedValue(['q3', 'q1']);
+    const rankSpy = jest.spyOn(aiClient, 'rankQuestionsAI').mockResolvedValue(['q3', 'q1']);
 
     const questions = [
       { id: 'q1', type: 'binary', tags: ['alpha'], prompt: 'Q1' },
@@ -265,7 +265,7 @@ describe('QuestionFilter AI ranking lifecycle', () => {
       .spyOn(sponsoredAccessAny, 'resolveSponsoredGateStateForResource')
       .mockReturnValue({ status: sponsoredAccess.SPONSORED_GATE_STATES.OPEN });
     const localSpy = jest.spyOn(aiSettings, 'getLocalAiSettings').mockReturnValue({ providers: {} });
-    const rankSpy = jest.spyOn(aiScripts, 'rankQuestionsAI').mockResolvedValue(['q4', 'q2']);
+    const rankSpy = jest.spyOn(aiClient, 'rankQuestionsAI').mockResolvedValue(['q4', 'q2']);
     const onFilter = jest.fn();
 
     const questions = [
@@ -359,7 +359,7 @@ describe('QuestionFilter AI ranking lifecycle', () => {
       .spyOn(sponsoredAccessAny, 'resolveSponsoredGateStateForResource')
       .mockReturnValue({ status: sponsoredAccess.SPONSORED_GATE_STATES.OPEN });
     const localSpy = jest.spyOn(aiSettings, 'getLocalAiSettings').mockReturnValue({ providers: {} });
-    const rankSpy = jest.spyOn(aiScripts, 'rankQuestionsAI').mockResolvedValue(['q4', 'q2', 'q3', 'q1']);
+    const rankSpy = jest.spyOn(aiClient, 'rankQuestionsAI').mockResolvedValue(['q4', 'q2', 'q3', 'q1']);
 
     const questions = [
       { id: 'q1', type: 'binary', tags: ['alpha'], prompt: 'Q1' },
@@ -505,7 +505,7 @@ describe('QuestionFilter AI ranking lifecycle', () => {
       .spyOn(sponsoredAccessAny, 'resolveSponsoredGateStateForResource')
       .mockReturnValue({ status: sponsoredAccess.SPONSORED_GATE_STATES.OPEN });
     const localSpy = jest.spyOn(aiSettings, 'getLocalAiSettings').mockReturnValue({ providers: {} });
-    const rankSpy = jest.spyOn(aiScripts, 'rankQuestionsAI').mockResolvedValue(['q1']);
+    const rankSpy = jest.spyOn(aiClient, 'rankQuestionsAI').mockResolvedValue(['q1']);
 
     const questions = [{ id: 'q1', type: 'binary', tags: [], prompt: 'Q1' }];
     const instance = new QuestionFilter({
@@ -557,7 +557,7 @@ describe('QuestionFilter AI ranking lifecycle', () => {
       .mockReturnValue({ status: sponsoredAccess.SPONSORED_GATE_STATES.OPEN });
     const localSpy = jest.spyOn(aiSettings, 'getLocalAiSettings').mockReturnValue({ providers: {} });
     const rankSpy = jest
-      .spyOn(aiScripts, 'rankQuestionsAI')
+      .spyOn(aiClient, 'rankQuestionsAI')
       .mockResolvedValueOnce(['q1'])
       .mockResolvedValueOnce(['q2', 'q1']);
 
@@ -627,7 +627,7 @@ describe('QuestionFilter AI ranking lifecycle', () => {
       .spyOn(sponsoredAccessAny, 'resolveSponsoredGateStateForResource')
       .mockReturnValue({ status: sponsoredAccess.SPONSORED_GATE_STATES.OPEN });
     const localSpy = jest.spyOn(aiSettings, 'getLocalAiSettings').mockReturnValue({ providers: {} });
-    const rankSpy = jest.spyOn(aiScripts, 'rankQuestionsAI').mockResolvedValue(['q2']);
+    const rankSpy = jest.spyOn(aiClient, 'rankQuestionsAI').mockResolvedValue(['q2']);
 
     const questions = [
       { id: 'q1', type: 'binary', tags: [], prompt: 'Q1' },
@@ -696,7 +696,7 @@ describe('QuestionFilter AI ranking lifecycle', () => {
       .spyOn(sponsoredAccessAny, 'resolveSponsoredGateStateForResource')
       .mockReturnValue({ status: sponsoredAccess.SPONSORED_GATE_STATES.OPEN });
     const localSpy = jest.spyOn(aiSettings, 'getLocalAiSettings').mockReturnValue({ providers: {} });
-    const rankSpy = jest.spyOn(aiScripts, 'rankQuestionsAI').mockResolvedValue(['q1']);
+    const rankSpy = jest.spyOn(aiClient, 'rankQuestionsAI').mockResolvedValue(['q1']);
 
     const instance = new QuestionFilter({
       activeSessionSlug: 'edge',
@@ -779,7 +779,7 @@ describe('QuestionFilter AI ranking lifecycle', () => {
     const rankPromise = new Promise((resolve) => {
       resolveRank = resolve as (value: any) => void;
     });
-    const rankSpy = jest.spyOn(aiScripts, 'rankQuestionsAI').mockImplementationOnce(() => rankPromise);
+    const rankSpy = jest.spyOn(aiClient, 'rankQuestionsAI').mockImplementationOnce(() => rankPromise);
 
     const questions = [
       { id: 'q1', type: 'binary', tags: [], prompt: 'Q1' },
@@ -860,7 +860,7 @@ describe('QuestionFilter AI ranking lifecycle', () => {
       resolveSecond = resolve as (value: any) => void;
     });
     const rankSpy = jest
-      .spyOn(aiScripts, 'rankQuestionsAI')
+      .spyOn(aiClient, 'rankQuestionsAI')
       .mockImplementationOnce(() => firstPromise)
       .mockImplementationOnce(() => secondPromise);
 
@@ -930,7 +930,7 @@ describe('QuestionFilter AI ranking lifecycle', () => {
     const rankPromise = new Promise((resolve) => {
       resolveRank = resolve as (value: any) => void;
     });
-    const rankSpy = jest.spyOn(aiScripts, 'rankQuestionsAI').mockImplementationOnce(() => rankPromise);
+    const rankSpy = jest.spyOn(aiClient, 'rankQuestionsAI').mockImplementationOnce(() => rankPromise);
 
     const questions = [
       { id: 'q1', type: 'binary', tags: [], prompt: 'Q1' },
@@ -1006,7 +1006,7 @@ describe('QuestionFilter AI ranking lifecycle', () => {
     const rankPromise = new Promise((resolve) => {
       resolveRank = resolve as (value: any) => void;
     });
-    const rankSpy = jest.spyOn(aiScripts, 'rankQuestionsAI').mockImplementationOnce(() => rankPromise);
+    const rankSpy = jest.spyOn(aiClient, 'rankQuestionsAI').mockImplementationOnce(() => rankPromise);
 
     const questions = [
       { id: 'q1', type: 'binary', tags: [], prompt: 'Q1' },
@@ -1071,7 +1071,7 @@ describe('QuestionFilter AI ranking lifecycle', () => {
     const localSpy = jest.spyOn(aiSettings, 'getLocalAiSettings').mockReturnValue({ providers: {} });
     const rankingError = new Error('boom');
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-    const rankSpy = jest.spyOn(aiScripts, 'rankQuestionsAI').mockRejectedValue(rankingError);
+    const rankSpy = jest.spyOn(aiClient, 'rankQuestionsAI').mockRejectedValue(rankingError);
 
     const questions = [
       { id: 'q1', type: 'binary', tags: [], prompt: 'Q1' },

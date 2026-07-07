@@ -1,8 +1,8 @@
-/** @file arweaveScripts.failurePolicy.test.js */
+/** @file arweaveClient.failurePolicy.test.js */
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
 import { getCorsProxyUrlOrThrow, resolveCorsProxyUrl } from '../worker/corsProxy.js';
 import { readSessionScanSlugs } from '../session/sessionScanScope.js';
-import { arweaveScripts } from './arweaveScripts.js';
+import { arweaveClient } from './arweaveClient.js';
 
 jest.mock('../worker/workerAuth.js', () => ({
   fetchWorkerWithAuth: jest.fn(),
@@ -33,7 +33,7 @@ const jsonResp = (status, payload = {}) => {
 
 const TEST_ARWEAVE_GATEWAY = 'https://arweave.example.test';
 
-describe('arweaveScripts failure policy', () => {
+describe('arweaveClient failure policy', () => {
   beforeEach(() => {
     global.fetch = jest.fn();
     globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = false;
@@ -100,7 +100,7 @@ describe('arweaveScripts failure policy', () => {
 
     const txId = 'missing-response-cooldown';
     await expect(
-      arweaveScripts.downloadDataFromArweave(txId, {
+      arweaveClient.downloadDataFromArweave(txId, {
         gateways: [TEST_ARWEAVE_GATEWAY],
         retries: 0,
         disableExistencePrecheck: true,
@@ -114,7 +114,7 @@ describe('arweaveScripts failure policy', () => {
 
     let cooldownErr = null;
     try {
-      await arweaveScripts.downloadDataFromArweave(txId, {
+      await arweaveClient.downloadDataFromArweave(txId, {
         gateways: [TEST_ARWEAVE_GATEWAY],
         retries: 0,
         disableExistencePrecheck: true,
@@ -140,7 +140,7 @@ describe('arweaveScripts failure policy', () => {
 
     const txId = 'missing-session-metadata-cooldown';
     await expect(
-      arweaveScripts.downloadDataFromArweave(txId, {
+      arweaveClient.downloadDataFromArweave(txId, {
         gateways: [TEST_ARWEAVE_GATEWAY],
         retries: 0,
         debugContext: { category: 'session_registry_metadata' },
@@ -153,7 +153,7 @@ describe('arweaveScripts failure policy', () => {
 
     let cooldownErr = null;
     try {
-      await arweaveScripts.downloadDataFromArweave(txId, {
+      await arweaveClient.downloadDataFromArweave(txId, {
         gateways: [TEST_ARWEAVE_GATEWAY],
         retries: 0,
         debugContext: { category: 'session_registry_metadata' },
@@ -172,7 +172,7 @@ describe('arweaveScripts failure policy', () => {
   it('skips GraphQL existence checks when SBT metadata preflight is disabled', async () => {
     globalThis.CE_ARWEAVE_PREFLIGHT_SBT_METADATA = false;
 
-    const exists = await arweaveScripts.checkTxExists('sbt-image-no-preflight', {
+    const exists = await arweaveClient.checkTxExists('sbt-image-no-preflight', {
       debugContext: { category: 'sbt_metadata' },
     });
 
@@ -188,7 +188,7 @@ describe('arweaveScripts failure policy', () => {
     });
 
     await expect(
-      arweaveScripts.downloadDataFromArweave('badtx', {
+      arweaveClient.downloadDataFromArweave('badtx', {
         gateways: [TEST_ARWEAVE_GATEWAY],
         retries: 1,
         bypassCache: true,

@@ -177,7 +177,7 @@ import {
   runUserPageCacheRefreshActionController,
 } from './userPageActionController';
 
-import { analyzeUserOpinions } from 'utilities/ai/aiScripts.js';
+import { analyzeUserOpinions } from 'utilities/ai/aiClient.js';
 import { getEffectiveAiConfig } from 'utilities/ai/aiSettings.js';
 
 import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';

@@ -1,8 +1,8 @@
-/** @file arweaveScripts.test.js */
+/** @file arweaveClient.test.js */
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
 import { getCorsProxyUrlOrThrow, resolveCorsProxyUrl } from '../worker/corsProxy.js';
 import { readSessionScanSlugs } from '../session/sessionScanScope.js';
-import { arweaveScripts } from './arweaveScripts.js';
+import { arweaveClient } from './arweaveClient.js';
 
 jest.mock('../worker/workerAuth.js', () => ({
   fetchWorkerWithAuth: jest.fn(),
@@ -44,7 +44,7 @@ const TEST_ARWEAVE_GATEWAY = 'https://arweave.example.test';
 const TEST_ARWEAVE_BACKUP_GATEWAY = 'https://arweave-backup.example.test';
 const TEST_AR_IO_GATEWAY = 'https://unit.ar-io.dev'; // intentional: real URL - verifies AR.IO gateway override handling
 
-describe('arweaveScripts.downloadDataFromArweave', () => {
+describe('arweaveClient.downloadDataFromArweave', () => {
   beforeEach(() => {
     global.fetch = jest.fn();
     globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = false;
@@ -142,11 +142,11 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
     });
 
     const txId = 'abc123';
-    const first = await arweaveScripts.downloadDataFromArweave(txId, {
+    const first = await arweaveClient.downloadDataFromArweave(txId, {
       gateways: [TEST_ARWEAVE_GATEWAY],
       retries: 0,
     });
-    const second = await arweaveScripts.downloadDataFromArweave(txId, {
+    const second = await arweaveClient.downloadDataFromArweave(txId, {
       gateways: [TEST_ARWEAVE_GATEWAY],
       retries: 0,
     });
@@ -164,7 +164,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
     });
 
     await expect(
-      arweaveScripts.downloadDataFromArweave('missingtx', {
+      arweaveClient.downloadDataFromArweave('missingtx', {
         gateways: [TEST_ARWEAVE_GATEWAY],
         retries: 0,
         bypassCache: true,
@@ -187,7 +187,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
 
     const txId = 'missingtx-cooldown';
     await expect(
-      arweaveScripts.downloadDataFromArweave(txId, {
+      arweaveClient.downloadDataFromArweave(txId, {
         gateways: [TEST_ARWEAVE_GATEWAY],
         retries: 0,
       }),
@@ -198,7 +198,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
     });
 
     await expect(
-      arweaveScripts.downloadDataFromArweave(txId, {
+      arweaveClient.downloadDataFromArweave(txId, {
         gateways: [TEST_ARWEAVE_GATEWAY],
         retries: 0,
       }),
@@ -226,7 +226,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
     try {
       nowSpy.mockReturnValue(realNow + 3 * 24 * 60 * 60 * 1000);
       await expect(
-        arweaveScripts.downloadDataFromArweave(txId, {
+        arweaveClient.downloadDataFromArweave(txId, {
           gateways: [TEST_ARWEAVE_GATEWAY],
           retries: 0,
         }),
@@ -241,7 +241,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
 
     let err = null;
     try {
-      await arweaveScripts.downloadDataFromArweave(txId, {
+      await arweaveClient.downloadDataFromArweave(txId, {
         gateways: [TEST_ARWEAVE_GATEWAY],
         retries: 0,
       });
@@ -268,7 +268,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
 
     const txId = 'missingtx-bypass';
     await expect(
-      arweaveScripts.downloadDataFromArweave(txId, {
+      arweaveClient.downloadDataFromArweave(txId, {
         gateways: [TEST_ARWEAVE_GATEWAY],
         retries: 0,
       }),
@@ -279,7 +279,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
     });
 
     await expect(
-      arweaveScripts.downloadDataFromArweave(txId, {
+      arweaveClient.downloadDataFromArweave(txId, {
         gateways: [TEST_ARWEAVE_GATEWAY],
         retries: 0,
         bypassFailureCache: true,
@@ -302,7 +302,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
     });
 
     await expect(
-      arweaveScripts.downloadDataFromArweave('missingtx2', {
+      arweaveClient.downloadDataFromArweave('missingtx2', {
         gateways: [TEST_ARWEAVE_GATEWAY, TEST_ARWEAVE_BACKUP_GATEWAY],
         retries: 3,
         bypassCache: true,
@@ -325,7 +325,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
     });
 
     await expect(
-      arweaveScripts.downloadDataFromArweave('missingtx-question-metadata', {
+      arweaveClient.downloadDataFromArweave('missingtx-question-metadata', {
         gateways: [TEST_ARWEAVE_GATEWAY, TEST_ARWEAVE_BACKUP_GATEWAY, TEST_AR_IO_GATEWAY],
         retries: 3,
         bypassCache: true,
@@ -361,7 +361,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
       });
 
     await expect(
-      arweaveScripts.downloadDataFromArweave('mixed-gateway-error', {
+      arweaveClient.downloadDataFromArweave('mixed-gateway-error', {
         gateways: [TEST_ARWEAVE_GATEWAY],
         retries: 0,
         bypassCache: true,
@@ -407,7 +407,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
         text: async () => '{"ok":"runtime-fallback-hit"}',
       });
 
-    const text = await arweaveScripts.downloadDataFromArweave('runtime-fallback-tx', {
+    const text = await arweaveClient.downloadDataFromArweave('runtime-fallback-tx', {
       retries: 0,
       bypassCache: true,
       disableExistencePrecheck: true,
@@ -434,7 +434,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
       text: async () => '{"ok":"canonicalized"}',
     });
 
-    const text = await arweaveScripts.downloadDataFromArweave(`https://example.example.test/ar/${txId}?view=1`, {
+    const text = await arweaveClient.downloadDataFromArweave(`https://example.example.test/ar/${txId}?view=1`, {
       gateways: [TEST_ARWEAVE_GATEWAY],
       retries: 0,
       bypassCache: true,
@@ -472,7 +472,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
       });
 
     const txId = 'retryable-roundtrip';
-    const text = await arweaveScripts.downloadDataFromArweave(txId, {
+    const text = await arweaveClient.downloadDataFromArweave(txId, {
       gateways: [TEST_ARWEAVE_GATEWAY],
       retries: 1,
       retryDelayMs: 0,
@@ -503,7 +503,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
       });
 
     const txId = 'response-fallback-404';
-    const text = await arweaveScripts.downloadDataFromArweave(txId, {
+    const text = await arweaveClient.downloadDataFromArweave(txId, {
       gateways: [TEST_ARWEAVE_GATEWAY, TEST_ARWEAVE_BACKUP_GATEWAY],
       retries: 0,
       bypassCache: true,
@@ -537,7 +537,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
       });
 
     const txId = 'raw-route-fallback';
-    const text = await arweaveScripts.downloadDataFromArweave(txId, {
+    const text = await arweaveClient.downloadDataFromArweave(txId, {
       gateways: [TEST_ARWEAVE_GATEWAY, TEST_ARWEAVE_BACKUP_GATEWAY],
       retries: 0,
       bypassCache: true,
@@ -563,7 +563,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
       .mockResolvedValueOnce(textResp(200, '{"ok":"html-fallback-hit"}', 'application/json'));
 
     const txId = 'html-payload-fallback';
-    const text = await arweaveScripts.downloadDataFromArweave(txId, {
+    const text = await arweaveClient.downloadDataFromArweave(txId, {
       gateways: [TEST_ARWEAVE_GATEWAY],
       retries: 0,
       bypassCache: true,
@@ -586,7 +586,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
     );
 
     const txId = 'html-document-hit';
-    const text = await arweaveScripts.downloadDataFromArweave(txId, {
+    const text = await arweaveClient.downloadDataFromArweave(txId, {
       gateways: [TEST_ARWEAVE_GATEWAY],
       retries: 0,
       bypassCache: true,
@@ -622,7 +622,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
         text: async () => '{"ok":"gateway-fallback-hit"}',
       });
 
-    const text = await arweaveScripts.downloadDataFromArweave('gateway-route-fallback', {
+    const text = await arweaveClient.downloadDataFromArweave('gateway-route-fallback', {
       gateways: [TEST_ARWEAVE_GATEWAY, TEST_ARWEAVE_BACKUP_GATEWAY],
       retries: 0,
       bypassCache: true,
@@ -670,7 +670,7 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
         text: async () => '{"ok":"wayfinder-hit"}',
       });
 
-    const text = await arweaveScripts.downloadDataFromArweave('wayfinder-fallback-hit', {
+    const text = await arweaveClient.downloadDataFromArweave('wayfinder-fallback-hit', {
       gateways: [TEST_ARWEAVE_GATEWAY],
       retries: 0,
       bypassCache: true,

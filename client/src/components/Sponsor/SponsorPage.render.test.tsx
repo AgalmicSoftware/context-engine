@@ -76,8 +76,8 @@ jest.mock('../../utilities/crypto/cryptography.js', () => ({
   },
 }));
 
-jest.mock('../../utilities/arweave/arweaveScripts.js', () => ({
-  arweaveScripts: {
+jest.mock('../../utilities/arweave/arweaveClient.js', () => ({
+  arweaveClient: {
     uploadDataToArweave: (...args: any[]) => mockUploadDataToArweave(...args),
     downloadDataFromArweave: jest.fn(),
   },

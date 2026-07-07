@@ -18,7 +18,7 @@ let originalCreateObjectURL;
 let originalRevokeObjectURL;
 let previewUrlCounter = 0;
 
-jest.mock('../../../utilities/ai/aiScripts.js', () => ({
+jest.mock('../../../utilities/ai/aiClient.js', () => ({
   callAI: (...args) => mockCallAI(...args),
   transcribeAudio: jest.fn(),
   generateAudioDiscussionSummary: jest.fn(),

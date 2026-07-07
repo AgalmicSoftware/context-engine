@@ -1,4 +1,4 @@
-/** @file arweaveScripts.resilience.test.js */
+/** @file arweaveClient.resilience.test.js */
 import Arweave from 'arweave';
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
 import { getCorsProxyUrlOrThrow, resolveCorsProxyUrl } from '../worker/corsProxy.js';
@@ -6,7 +6,7 @@ import { readSessionScanSlugs } from '../session/sessionScanScope.js';
 import { readSponsoredBootstrapFundingContext } from '../session/sponsoredBootstrapFunding.js';
 import { getSharedFallbackWorkerUrl } from '../session/sessionWorkerAvailability.js';
 import { __mockLogger as mockLogger } from '../logging';
-import { ARWEAVE_CHUNK_UPLOAD_TIMEOUT_MS, arweaveScripts } from './arweaveScripts.js';
+import { ARWEAVE_CHUNK_UPLOAD_TIMEOUT_MS, arweaveClient } from './arweaveClient.js';
 
 jest.mock('arweave', () => ({
   __esModule: true,
@@ -80,7 +80,7 @@ const malformedJsonResp = (status, body) => ({
   }),
 });
 
-describe('arweaveScripts upload/download resilience', () => {
+describe('arweaveClient upload/download resilience', () => {
   beforeEach(() => {
     global.fetch = jest.fn();
     globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = false;
@@ -147,7 +147,7 @@ describe('arweaveScripts upload/download resilience', () => {
       },
     });
 
-    const uploadPromise = arweaveScripts.uploadDataToArweave({ ok: true }, 'json', {
+    const uploadPromise = arweaveClient.uploadDataToArweave({ ok: true }, 'json', {
       arweaveJwk: '{"kty":"RSA"}',
       forceDirectArweaveUpload: true,
     });
@@ -181,14 +181,14 @@ describe('arweaveScripts upload/download resilience', () => {
       .mockResolvedValueOnce(textResp(200, '   ', 'application/json'))
       .mockResolvedValueOnce(textResp(200, '{"ok":true}', 'application/json'));
 
-    await expect(arweaveScripts.downloadDataFromArweave(txId, readOpts)).rejects.toMatchObject({
+    await expect(arweaveClient.downloadDataFromArweave(txId, readOpts)).rejects.toMatchObject({
       name: 'ArweaveFetchError',
       kind: 'network',
       retryable: true,
       message: 'Arweave gateway returned empty response body.',
     });
 
-    const retryText = await arweaveScripts.downloadDataFromArweave(txId, readOpts);
+    const retryText = await arweaveClient.downloadDataFromArweave(txId, readOpts);
     expect(retryText).toBe('{"ok":true}');
     expect(global.fetch).toHaveBeenCalledTimes(2);
   });
@@ -198,7 +198,7 @@ describe('arweaveScripts upload/download resilience', () => {
     fetchWorkerWithAuth.mockResolvedValueOnce(malformedJsonResp(200, htmlBody));
 
     await expect(
-      arweaveScripts.uploadDataToArweave({ ok: true }, 'json', {
+      arweaveClient.uploadDataToArweave({ ok: true }, 'json', {
         sessionSlug: 'selected',
       }),
     ).rejects.toThrow('arweave upload response malformed');
@@ -220,7 +220,7 @@ describe('arweaveScripts upload/download resilience', () => {
     const htmlBody = `<html>${'transient worker error '.repeat(20)}</html>`;
     fetchWorkerWithAuth.mockResolvedValue(malformedJsonResp(502, htmlBody));
 
-    const uploadPromise = arweaveScripts.uploadDataToArweave({ ok: true }, 'json', {
+    const uploadPromise = arweaveClient.uploadDataToArweave({ ok: true }, 'json', {
       sessionSlug: 'selected',
     });
     const assertion = expect(uploadPromise).rejects.toMatchObject({

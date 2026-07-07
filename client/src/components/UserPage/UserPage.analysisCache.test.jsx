@@ -3,7 +3,7 @@ import UserPage from './UserPage';
 import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
-import { analyzeUserOpinions } from 'utilities/ai/aiScripts.js';
+import { analyzeUserOpinions } from 'utilities/ai/aiClient.js';
 
 jest.mock('../../utilities/crypto/litProtocol.js', () => ({
   getGlobalLitHooks: jest.fn(() => null),
@@ -19,7 +19,7 @@ jest.mock('../../utilities/web3/sponsoredAccess.js', () => ({
   checkSponsoredAccess: jest.fn(),
 }));
 
-jest.mock('utilities/ai/aiScripts.js', () => ({
+jest.mock('utilities/ai/aiClient.js', () => ({
   analyzeUserOpinions: jest.fn(async () => ({
     summary: 'summary',
     details: 'details',

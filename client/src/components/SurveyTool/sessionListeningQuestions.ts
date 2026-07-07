@@ -1,4 +1,4 @@
-import { callAI } from '../../utilities/ai/aiScripts.js';
+import { callAI } from '../../utilities/ai/aiClient.js';
 import { seedGenPrompt } from '../../prompts/seedGenPrompt.js';
 import { generateQuestionId as generateSharedQuestionId } from '../../utilities/shared/questionUtils.mjs';
 import {

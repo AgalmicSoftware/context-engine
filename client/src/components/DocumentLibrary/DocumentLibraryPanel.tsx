@@ -9,7 +9,7 @@ import styles from './DocumentLibraryPanel.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { DOC_LIBRARY_ARWEAVE_GATEWAYS } from '../../variables/arweaveGateways.js';
 
-import { arweaveClient as arweaveScripts } from '../../utilities/arweave/arweaveClient.js';
+import { arweaveClient as arweaveClient } from '../../utilities/arweave/arweaveClient.js';
 import {
   buildSbtAccessControlConditions,
   getUnsupportedLitContractAccessControlError,
@@ -373,7 +373,7 @@ const fetchArweaveBlobWithFallback = async (
 
   let lastErr: unknown = null;
   for (const gw of gateways) {
-    const url = arweaveScripts.buildArweaveGatewayUrl(txId, gw);
+    const url = arweaveClient.buildArweaveGatewayUrl(txId, gw);
     try {
       // eslint-disable-next-line no-await-in-loop
       const resp = await fetch(url, { cache: 'no-store' });
@@ -1006,7 +1006,7 @@ export default function DocumentLibraryPanel({
         }
 
         if (kind === 'link') {
-          const text = await arweaveScripts.downloadDataFromArweave(txId, {
+          const text = await arweaveClient.downloadDataFromArweave(txId, {
             debugContext: {
               category: 'doc_link_payload',
               caller: 'DocumentLibraryPanel.openDoc.link',

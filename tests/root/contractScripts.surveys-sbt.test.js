@@ -6,7 +6,7 @@ import SURVEYS_ABI from '../../client/src/contractsABI/SURVEYS_ABI.json';
 import * as localArweaveDb from '../helpers/localArweaveDb.js';
 
 import contractScripts from '../../client/src/utilities/web3/contractScripts.js';
-import { arweaveScripts } from '../../client/src/utilities/arweave/arweaveClient.js';
+import { arweaveClient } from '../../client/src/utilities/arweave/arweaveClient.js';
 
 const LOCAL_RPC_URL = process.env.LOCAL_RPC_URL || 'http://127.0.0.1:8545';
 const utils = ethers.utils || {
@@ -70,17 +70,17 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
     const nextTxId = () => {
       const hex = utils.hexZeroPad(utils.hexlify(counter), 32);
       counter += 1;
-      return arweaveScripts.hexToBase64url(hex);
+      return arweaveClient.hexToBase64url(hex);
     };
 
-    arweaveScripts.uploadDataToArweave = async (data) => {
+    arweaveClient.uploadDataToArweave = async (data) => {
       const txId = nextTxId();
       const payload = typeof data === 'string' ? data : JSON.stringify(data || {});
       localArweaveDb.put(txId, payload);
       return txId;
     };
 
-    arweaveScripts.downloadDataFromArweave = async (txId) =>
+    arweaveClient.downloadDataFromArweave = async (txId) =>
       localArweaveDb.get(txId) || JSON.stringify({});
   };
 
@@ -194,7 +194,7 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
 
   const uploadTokenUri = async (overrides = {}) => {
     const payload = buildTokenUriData(overrides);
-    const txId = await arweaveScripts.uploadDataToArweave(JSON.stringify(payload), 'json', {
+    const txId = await arweaveClient.uploadDataToArweave(JSON.stringify(payload), 'json', {
       arweaveJwk: '',
     });
     return { txId, payload };

@@ -70,7 +70,7 @@ import SURVEYS from '../../contractsABI/SURVEYS_ABI.json';
 import SBT_FACTORY_ABI from '../../contractsABI/SBT_FACTORY_ABI.json';
 import CUSTOM_SBT_ABI from '../../contractsABI/CUSTOM_SBT_ABI.json';
 import { cryptoUtils } from '../crypto/cryptography.js';
-import { arweaveScripts } from '../arweave/arweaveScripts.js';
+import { arweaveClient } from '../arweave/arweaveClient.js';
 import { normalizeArweaveUrl, parseArweaveTxId } from '../arweave/arweaveUrls.js';
 import { createArweaveDownloadOps } from '../arweave/arweaveDownload.js';
 import { buildArweaveUploadTags, resolveArweaveUploadOpts } from '../arweave/arweaveUploadHelpers.js';
@@ -706,7 +706,7 @@ const isCloudflareStorageResource = (cfg: any, resource: any, opts: any = {}) =>
 const payloadPointerIdToBytes32 = (id: any, label: any = 'storage pointer') => {
   const pointerId = toStr(id).trim();
   if (!pointerId) throw new Error(`${label}: missing storage pointer id.`);
-  const hex = arweaveScripts.base64urlToHex(pointerId);
+  const hex = arweaveClient.base64urlToHex(pointerId);
   if (!/^0x[0-9a-fA-F]{64}$/.test(toStr(hex))) {
     throw new Error(`${label}: storage pointer id is not bytes32-compatible (hex length ${toStr(hex).length}).`);
   }
@@ -752,7 +752,7 @@ const uploadJsonPayloadForContractPointer = async ({
   }
   const txId = uploadWithRetry
     ? await uploadDataToArweaveWithRetry(payloadString, 'json', arweaveUploadOpts)
-    : await arweaveScripts.uploadDataToArweave(payloadString, 'json', arweaveUploadOpts);
+    : await arweaveClient.uploadDataToArweave(payloadString, 'json', arweaveUploadOpts);
   return {
     pointerId: txId,
     pointerBytes: payloadPointerIdToBytes32(txId, `${resource} Arweave upload`),
@@ -938,7 +938,7 @@ const contractScriptsRuntimeDeps = {
   STORAGE_RESOURCE_KEYS,
   SURVEYS,
   SURVEYS_INTERFACE,
-  arweaveScripts,
+  arweaveClient,
   attachStorageRefCompatibilityFields,
   attachPayloadPointerFields,
   buildArweaveDebugContext,

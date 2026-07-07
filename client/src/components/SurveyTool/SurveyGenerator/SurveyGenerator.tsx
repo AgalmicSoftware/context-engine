@@ -27,7 +27,7 @@ import {
   processAdditionalSources,
   fetchContentFromURL,
   analyzePhotoForQuestionGeneration,
-} from '../../../utilities/ai/aiScripts.js';
+} from '../../../utilities/ai/aiClient.js';
 import { getEffectiveAiConfig } from '../../../utilities/ai/aiSettings.js';
 import { getAllSessionSlugs, getSessionConfigBySlug } from '../../../utilities/web3/contractScripts.js';
 import AudioInput from '../../Shared/AudioInput/AudioInput';

@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import type { Root } from 'react-dom/client';
 
 import AudioInput from './AudioInput';
-import { requestAiRewrite } from '../../../utilities/ai/aiScripts';
+import { requestAiRewrite } from '../../../utilities/ai/aiClient';
 import { useWhisper, RECORDING_STATUS } from '../../../utilities/useWhisper';
 
 type LastRecording = {
@@ -77,8 +77,8 @@ const actGlobal = globalThis as typeof globalThis & {
   IS_REACT_ACT_ENVIRONMENT?: boolean;
 };
 
-jest.mock('../../../utilities/ai/aiScripts', () => {
-  const actual = jest.requireActual('../../../utilities/ai/aiScripts');
+jest.mock('../../../utilities/ai/aiClient', () => {
+  const actual = jest.requireActual('../../../utilities/ai/aiClient');
   return {
     ...actual,
     requestAiRewrite: jest.fn(),

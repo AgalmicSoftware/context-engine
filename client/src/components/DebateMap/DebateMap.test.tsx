@@ -43,8 +43,8 @@ jest.mock('react-router-dom', () => {
 });
 
 jest.mock('../Shared/AudioInput/AudioInput', () => () => <div data-testid="atlas-audio-input" />);
-jest.mock('../../utilities/arweave/arweaveScripts.js', () => ({
-  arweaveScripts: {
+jest.mock('../../utilities/arweave/arweaveClient.js', () => ({
+  arweaveClient: {
     uploadDataToArweave: jest.fn(),
   },
 }));

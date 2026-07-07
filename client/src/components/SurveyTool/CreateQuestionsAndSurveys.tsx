@@ -22,7 +22,7 @@ import {
   faQuestionCircle,
 } from '@fortawesome/free-solid-svg-icons';
 import styles from './CreateQuestionsAndSurveys.module.scss';
-import { arweaveClient as arweaveScripts } from '../../utilities/arweave/arweaveClient';
+import { arweaveClient as arweaveClient } from '../../utilities/arweave/arweaveClient';
 import CETooltip from '../Shared/CETooltip';
 import CEConfirmDialog from '../Shared/CEConfirmDialog';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
@@ -39,7 +39,7 @@ import { getEffectiveArweaveKey } from '../../utilities/session/resourceKeys.js'
 import { sessionRegistryStore, sessionRegistryUtils } from '../../utilities/web3/sessionRegistry.js';
 import { ethers } from 'ethers';
 import AudioSurveyGenerator from './SurveyGenerator/SurveyGenerator';
-import { callAI } from '../../utilities/ai/aiScripts.js';
+import { callAI } from '../../utilities/ai/aiClient.js';
 import { getEffectiveAiConfig } from '../../utilities/ai/aiSettings.js';
 import { seedGenPrompt } from '../../prompts/seedGenPrompt.js';
 import { JsonButtonRow, JsonPanel, JsonToggleButton } from '../Shared/Json/JsonControls';
@@ -2632,7 +2632,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
         if (!cloudflareSurveyStorage) {
           try {
             surveyArweaveTxId = String(
-              (await arweaveScripts.uploadDataToArweave(surveyDataString, 'json', {
+              (await arweaveClient.uploadDataToArweave(surveyDataString, 'json', {
                 arweaveJwk: arweaveKey?.arweaveJwk || '',
                 forceDirectArweaveUpload: arweaveKey?.source === 'local' && !!arweaveKey?.arweaveJwk,
                 sessionSlug,

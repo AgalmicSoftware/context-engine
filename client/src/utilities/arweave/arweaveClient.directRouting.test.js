@@ -1,8 +1,8 @@
-/** @file arweaveScripts.directRouting.test.js */
+/** @file arweaveClient.directRouting.test.js */
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
 import { getCorsProxyUrlOrThrow, resolveCorsProxyUrl } from '../worker/corsProxy.js';
 import { readSessionScanSlugs } from '../session/sessionScanScope.js';
-import { arweaveScripts } from './arweaveScripts.js';
+import { arweaveClient } from './arweaveClient.js';
 
 jest.mock('../worker/workerAuth.js', () => ({
   fetchWorkerWithAuth: jest.fn(),
@@ -44,7 +44,7 @@ const TEST_ARWEAVE_GATEWAY = 'https://arweave.example.test';
 const TEST_AR_IO_GATEWAY = 'https://unit.ar-io.dev'; // intentional: real URL - verifies AR.IO gateway override handling
 const TEST_IRYS_GATEWAY = 'https://gateway-irys.example.test';
 
-describe('arweaveScripts.downloadDataFromArweave direct routing', () => {
+describe('arweaveClient.downloadDataFromArweave direct routing', () => {
   beforeEach(() => {
     global.fetch = jest.fn();
     globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = false;
@@ -112,7 +112,7 @@ describe('arweaveScripts.downloadDataFromArweave direct routing', () => {
     });
 
     const txId = 'ar-io-first-mode';
-    const text = await arweaveScripts.downloadDataFromArweave(txId, {
+    const text = await arweaveClient.downloadDataFromArweave(txId, {
       gateways: [TEST_ARWEAVE_GATEWAY],
       retries: 0,
       bypassCache: true,
@@ -135,7 +135,7 @@ describe('arweaveScripts.downloadDataFromArweave direct routing', () => {
     globalThis.CE_ARWEAVE_AR_IO_URL = TEST_AR_IO_GATEWAY;
     global.fetch.mockResolvedValueOnce(textResp(200, '{"ok":"metadata-ar-io-hit"}', 'application/json'));
 
-    const text = await arweaveScripts.downloadDataFromArweave('session-meta-ar-io', {
+    const text = await arweaveClient.downloadDataFromArweave('session-meta-ar-io', {
       gateways: [TEST_ARWEAVE_GATEWAY],
       retries: 0,
       bypassCache: true,
@@ -156,7 +156,7 @@ describe('arweaveScripts.downloadDataFromArweave direct routing', () => {
     global.fetch.mockResolvedValueOnce(textResp(200, '<html><title>404 - Page not found.</title></html>', 'text/html'));
 
     await expect(
-      arweaveScripts.downloadDataFromArweave('ar-io-html-fallback', {
+      arweaveClient.downloadDataFromArweave('ar-io-html-fallback', {
         gateways: [TEST_ARWEAVE_GATEWAY],
         retries: 0,
         bypassCache: true,
@@ -194,7 +194,7 @@ describe('arweaveScripts.downloadDataFromArweave direct routing', () => {
         text: async () => '{"ok":"ar-io-retry-hit"}',
       });
 
-    const text = await arweaveScripts.downloadDataFromArweave('ar-io-retry-fallback', {
+    const text = await arweaveClient.downloadDataFromArweave('ar-io-retry-fallback', {
       gateways: [TEST_ARWEAVE_GATEWAY, TEST_IRYS_GATEWAY],
       retries: 1,
       retryDelayMs: 0,
@@ -227,7 +227,7 @@ describe('arweaveScripts.downloadDataFromArweave direct routing', () => {
     });
 
     await expect(
-      arweaveScripts.downloadDataFromArweave('default-gateway-fanout', {
+      arweaveClient.downloadDataFromArweave('default-gateway-fanout', {
         retries: 0,
         bypassCache: true,
         disableExistencePrecheck: true,
@@ -264,7 +264,7 @@ describe('arweaveScripts.downloadDataFromArweave direct routing', () => {
         headers: { get: () => 'application/json' },
       });
 
-    const text = await arweaveScripts.downloadDataFromArweave('response-gateway-fanout', {
+    const text = await arweaveClient.downloadDataFromArweave('response-gateway-fanout', {
       directToArIo: false,
       retries: 0,
       bypassCache: true,
@@ -293,7 +293,7 @@ describe('arweaveScripts.downloadDataFromArweave direct routing', () => {
     });
 
     await expect(
-      arweaveScripts.downloadDataFromArweave('ar-io-no-tx-data', {
+      arweaveClient.downloadDataFromArweave('ar-io-no-tx-data', {
         gateways: [TEST_ARWEAVE_GATEWAY],
         retries: 0,
         bypassCache: true,

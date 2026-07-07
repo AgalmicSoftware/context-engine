@@ -34,7 +34,7 @@ import { CE_DEMO_SESSION_SLUGS, POLIS_DEMO_DATA_AUTOLOAD_SLUGS } from '../../var
 import { getChainById } from '../../variables/chains.js';
 import styles from './PolisReport.module.scss';
 import { QRCodeSVG } from 'qrcode.react';
-import { analyzeClusterOpinions } from '../../utilities/ai/aiScripts.js';
+import { analyzeClusterOpinions } from '../../utilities/ai/aiClient.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { peekCacheSync } from '../../utilities/cache/cacheScripts.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';

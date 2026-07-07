@@ -15,7 +15,7 @@ jest.mock('../../utilities/web3/sponsoredAccess.js', () => ({
   checkSponsoredAccess: jest.fn(),
 }));
 
-jest.mock('utilities/ai/aiScripts.js', () => ({
+jest.mock('utilities/ai/aiClient.js', () => ({
   analyzeUserOpinions: jest.fn(async () => ({
     summary: 'summary',
     details: 'details',

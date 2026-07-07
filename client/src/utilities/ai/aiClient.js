@@ -1898,7 +1898,7 @@ export async function generateAudioDiscussionSummary(transcript, opts = {}) {
 
 /**
  * uploadMarkdownSummaryToArweave(markdown)
- * - Uploads the given Markdown to Arweave via arweaveScripts.
+ * - Uploads the given Markdown to Arweave via arweaveClient.
  * - Returns { txId, url }.
  * - Throws on empty input or upload failures with a clear message.
  *
@@ -1910,7 +1910,7 @@ export async function uploadMarkdownSummaryToArweave(markdown, opts = {}) {
   if (!md) throw new Error('Cannot upload empty Markdown summary.');
 
   try {
-    const { arweaveScripts } = await import('../arweave/arweaveScriptsLazy.js');
+    const { arweaveClient } = await import('../arweave/arweaveClientLazy.js');
     const sessionSlug = resolveSessionSlugOpt(opts);
     const sessionConfig = resolveSessionConfigOpt(opts);
     const arweaveKey = opts?.arweaveJwk
@@ -1936,11 +1936,11 @@ export async function uploadMarkdownSummaryToArweave(markdown, opts = {}) {
     let txId;
     try {
       // Preferred path per spec
-      txId = await arweaveScripts.uploadDataToArweave(md, 'md', uploadOpts);
+      txId = await arweaveClient.uploadDataToArweave(md, 'md', uploadOpts);
     } catch (e) {
       // Graceful fallback for environments where 'md' is not supported by the uploader
       if (/Unsupported format:\s*md/i.test(String(e?.message || ''))) {
-        txId = await arweaveScripts.uploadDataToArweave(md, 'json', uploadOpts);
+        txId = await arweaveClient.uploadDataToArweave(md, 'json', uploadOpts);
       } else {
         throw e;
       }
@@ -1950,7 +1950,7 @@ export async function uploadMarkdownSummaryToArweave(markdown, opts = {}) {
       throw new Error('Upload failed: missing transaction ID.');
     }
 
-    const url = arweaveScripts.buildArweaveGatewayUrl(txId);
+    const url = arweaveClient.buildArweaveGatewayUrl(txId);
     const mdUrl = `[${url}](${url})`;
     return { txId, url, mdUrl };
   } catch (err) {

@@ -5,7 +5,7 @@ import {
   rankQuestionsAI,
   runCompareToolkit,
   transcribeAudio,
-} from './aiScripts.js';
+} from './aiClient.js';
 import { getEffectiveAiConfig, getEffectiveTranscriptionConfig } from './aiSettings.js';
 import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
@@ -31,7 +31,7 @@ jest.mock('../logging.js', () => ({
   }),
 }));
 
-describe('aiScripts worker auth options', () => {
+describe('aiClient worker auth options', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });

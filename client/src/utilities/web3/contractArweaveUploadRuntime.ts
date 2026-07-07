@@ -7,7 +7,7 @@
  */
 
 import { ethers } from 'ethers';
-import { arweaveScripts } from '../arweave/arweaveScripts.js';
+import { arweaveClient } from '../arweave/arweaveClient.js';
 import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
 import { buildSiweMessage } from '../worker/workerAuth.js';
 import { normalizeSessionSlug } from './sessionConfigResolvers.js';
@@ -153,7 +153,7 @@ export const uploadDataToArweaveWithRetry = async (
   let lastErr: unknown = null;
   for (let i = 0; i < attempts; i += 1) {
     try {
-      return await arweaveScripts.uploadDataToArweave(data, format, opts as Record<string, unknown> | undefined);
+      return await arweaveClient.uploadDataToArweave(data, format, opts as Record<string, unknown> | undefined);
     } catch (err) {
       lastErr = err;
       if (i >= attempts - 1 || !isRetryableArweaveUploadError(err)) {

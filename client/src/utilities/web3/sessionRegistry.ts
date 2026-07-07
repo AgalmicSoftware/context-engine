@@ -23,7 +23,7 @@ import {
   getSessionRegistryAddress,
   getSessionRegistryChainIds,
 } from '../../variables/chains.js';
-import { arweaveScripts } from '../arweave/arweaveScripts.js';
+import { arweaveClient } from '../arweave/arweaveClient.js';
 import { getCacheBackendDiagnostics } from '../cache/cacheScripts.js';
 import { litStorage } from '../crypto/litProtocol.js';
 import { cryptoUtils } from '../crypto/cryptography.js';
@@ -1003,7 +1003,7 @@ const fetchMetadataFromArweave = async (uri: unknown, opts: AnyRecord = {}) => {
   };
   let text = '';
   try {
-    text = await arweaveScripts.downloadDataFromArweave(txId, {
+    text = await arweaveClient.downloadDataFromArweave(txId, {
       debugContext,
     });
   } catch (err) {
@@ -1838,7 +1838,7 @@ export const uploadSessionMetadata = async (metadata: AnyRecord, opts: AnyRecord
     throw new Error('Metadata must be an object.');
   }
   const payload = stripAuthoritativeSessionGateFields({ ...metadata });
-  const txId = await arweaveScripts.uploadDataToArweave(payload, 'json', opts);
+  const txId = await arweaveClient.uploadDataToArweave(payload, 'json', opts);
   return {
     txId,
     arweaveUrl: `https://arweave.net/${txId}`,

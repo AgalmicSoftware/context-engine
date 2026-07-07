@@ -1,4 +1,4 @@
-import { arweaveClient as defaultArweaveScripts } from '../../utilities/arweave/arweaveClient.js';
+import { arweaveClient as defaultArweaveClient } from '../../utilities/arweave/arweaveClient.js';
 import * as defaultArweaveUrls from '../../utilities/arweave/arweaveUrls.js';
 
 export type AdminArweaveRecord = Record<string, unknown>;
@@ -17,7 +17,7 @@ export type AdminNormalizeArweaveUrlOptions = {
   contextLabel?: unknown;
 };
 
-export type AdminArweaveScriptsModule = {
+export type AdminArweaveClientModule = {
   readArweaveWalletBalance: (jwk: unknown, opts?: AdminArweaveRecord) => Promise<AdminArweaveWalletBalance>;
   formatWinstonToAr: (winston: unknown, decimals?: number) => string;
   uploadDataToArweave: (data: unknown, format: string, opts?: AdminArweaveUploadOptions) => Promise<string | undefined>;
@@ -37,12 +37,12 @@ export type AdminArweavePort = {
 };
 
 export type BindAdminArweavePortsArgs = {
-  scripts: () => AdminArweaveScriptsModule;
+  client: () => AdminArweaveClientModule;
   urls: () => AdminArweaveUrlsModule;
 };
 
 export const bindAdminArweavePorts = ({
-  scripts: readScripts,
+  client: readScripts,
   urls: readUrls,
 }: BindAdminArweavePortsArgs): AdminArweavePort => ({
   readArweaveWalletBalance: (jwk, opts) =>
@@ -66,6 +66,6 @@ export const bindAdminArweavePorts = ({
 });
 
 export const adminArweavePort = bindAdminArweavePorts({
-  scripts: () => defaultArweaveScripts,
+  client: () => defaultArweaveClient,
   urls: () => defaultArweaveUrls,
 });

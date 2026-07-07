@@ -182,8 +182,8 @@ jest.mock('../../utilities/crypto/cryptography.js', () => ({
   },
 }));
 
-jest.mock('../../utilities/arweave/arweaveScripts.js', () => ({
-  arweaveScripts: {
+jest.mock('../../utilities/arweave/arweaveClient.js', () => ({
+  arweaveClient: {
     uploadDataToArweave: jest.fn(),
     downloadDataFromArweave: (...args) => mockDownloadDataFromArweave(...args),
     buildArweaveGatewayUrl: jest.fn((txId) => `https://arweave.example.test/${txId}`),
@@ -910,7 +910,7 @@ describe('SessionWizard rendered validation', () => {
   );
 
   it('checks session slug collisions before publish upload or register side effects', async () => {
-    const { arweaveScripts } = require('../../utilities/arweave/arweaveScripts.js');
+    const { arweaveClient } = require('../../utilities/arweave/arweaveClient.js');
     let publishClicked = false;
     mockSessionExists.mockImplementation(async () => publishClicked);
 
@@ -943,7 +943,7 @@ describe('SessionWizard rendered validation', () => {
     expect(await screen.findByText('Session slug already exists on-chain: duplicate-session')).toBeInTheDocument();
     expect(mockSessionExists).toHaveBeenCalledWith('duplicate-session');
     expect(mockCreateSBT).not.toHaveBeenCalled();
-    expect(arweaveScripts.uploadDataToArweave).not.toHaveBeenCalled();
+    expect(arweaveClient.uploadDataToArweave).not.toHaveBeenCalled();
     expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
   });
 

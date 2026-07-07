@@ -7,8 +7,8 @@ import {
   parseArweaveTxId,
 } from './arweaveUrls';
 
-jest.mock('./arweaveScripts.js', () => ({
-  arweaveScripts: {
+jest.mock('./arweaveClient.js', () => ({
+  arweaveClient: {
     registerTxContext: jest.fn(),
   },
 }));

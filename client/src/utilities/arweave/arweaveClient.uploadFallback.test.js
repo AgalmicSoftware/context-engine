@@ -1,11 +1,11 @@
-/** @file arweaveScripts.uploadFallback.test.js */
+/** @file arweaveClient.uploadFallback.test.js */
 import Arweave from 'arweave';
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
 import { getCorsProxyUrlOrThrow, resolveCorsProxyUrl } from '../worker/corsProxy.js';
 import { readSessionScanSlugs } from '../session/sessionScanScope.js';
 import { readSponsoredBootstrapFundingContext } from '../session/sponsoredBootstrapFunding.js';
 import { getSharedFallbackWorkerUrl } from '../session/sessionWorkerAvailability.js';
-import { arweaveScripts } from './arweaveScripts.js';
+import { arweaveClient } from './arweaveClient.js';
 
 jest.mock('../worker/workerAuth.js', () => ({
   fetchWorkerWithAuth: jest.fn(),
@@ -42,7 +42,7 @@ const jsonResp = (status, payload = {}) => {
   return buildResponse();
 };
 
-describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
+describe('arweaveClient.uploadDataToArweave fallback routing', () => {
   beforeEach(() => {
     global.fetch = jest.fn();
     readSponsoredBootstrapFundingContext.mockReturnValue(null);
@@ -104,7 +104,7 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
   it('normalizes explicit worker endpoint URLs before upload', async () => {
     fetchWorkerWithAuth.mockResolvedValueOnce(jsonResp(200, { id: 'tx-explicit' }));
 
-    const txId = await arweaveScripts.uploadDataToArweave({ ok: true }, 'json', {
+    const txId = await arweaveClient.uploadDataToArweave({ ok: true }, 'json', {
       sessionSlug: 'selected',
       workerUrl: 'https://selected.worker.example.test/arweave/upload',
     });
@@ -124,7 +124,7 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
       }),
     );
 
-    const result = await arweaveScripts.uploadDataToArweave({ ok: true }, 'json', {
+    const result = await arweaveClient.uploadDataToArweave({ ok: true }, 'json', {
       sessionSlug: 'selected',
       workerUrl: 'https://selected.worker.example.test/arweave/upload',
     });
@@ -143,7 +143,7 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
       }),
     );
 
-    const result = await arweaveScripts.uploadDataToArweave({ ok: true }, 'json', {
+    const result = await arweaveClient.uploadDataToArweave({ ok: true }, 'json', {
       sessionSlug: 'selected',
       workerUrl: 'https://selected.worker.example.test/arweave/upload',
     });
@@ -158,7 +158,7 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
       .mockResolvedValueOnce(jsonResp(403, { error: 'Access denied: on-chain gate data unavailable.' }))
       .mockResolvedValueOnce(jsonResp(200, { id: 'tx-open' }));
 
-    const txId = await arweaveScripts.uploadDataToArweave({ ok: true }, 'json', {
+    const txId = await arweaveClient.uploadDataToArweave({ ok: true }, 'json', {
       sessionSlug: 'selected',
     });
 
@@ -232,7 +232,7 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
       .mockResolvedValueOnce(jsonResp(403, { error: 'Access denied: on-chain gate data unavailable.' }))
       .mockResolvedValueOnce(jsonResp(200, { id: 'tx-source' }));
 
-    const txId = await arweaveScripts.uploadDataToArweave({ ok: true }, 'json', {
+    const txId = await arweaveClient.uploadDataToArweave({ ok: true }, 'json', {
       sessionSlug: 'selected',
     });
 
@@ -302,7 +302,7 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
       .mockResolvedValueOnce(jsonResp(403, { error: 'Access denied: on-chain gate data unavailable.' }))
       .mockResolvedValueOnce(jsonResp(200, { id: 'tx-shared' }));
 
-    const txId = await arweaveScripts.uploadDataToArweave({ ok: true }, 'json', {
+    const txId = await arweaveClient.uploadDataToArweave({ ok: true }, 'json', {
       sessionSlug: 'selected',
     });
 
@@ -364,7 +364,7 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
       .mockResolvedValueOnce(jsonResp(200, { id: 'tx-supported' }));
 
     try {
-      const txId = await arweaveScripts.uploadDataToArweave({ ok: true }, 'json', {
+      const txId = await arweaveClient.uploadDataToArweave({ ok: true }, 'json', {
         sessionSlug: 'selected',
       });
 
@@ -443,7 +443,7 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
       .mockResolvedValueOnce(jsonResp(403, { error: 'Arweave key not configured in worker.' }))
       .mockResolvedValueOnce(jsonResp(200, { id: 'tx-supported' }));
 
-    const txId = await arweaveScripts.uploadDataToArweave({ ok: true }, 'json', {
+    const txId = await arweaveClient.uploadDataToArweave({ ok: true }, 'json', {
       sessionSlug: 'selected',
     });
 
@@ -462,7 +462,7 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
       .mockResolvedValueOnce(jsonResp(401, { error: 'Session secrets not configured.' }))
       .mockResolvedValueOnce(jsonResp(200, { id: 'tx-bootstrap' }));
 
-    const txId = await arweaveScripts.uploadDataToArweave({ ok: true }, 'json', {
+    const txId = await arweaveClient.uploadDataToArweave({ ok: true }, 'json', {
       sessionSlug: 'selected',
       arweaveJwk: '{"kty":"RSA"}',
     });
@@ -517,7 +517,7 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
     }));
 
     try {
-      const txId = await arweaveScripts.uploadDataToArweave({ ok: true }, 'json', {
+      const txId = await arweaveClient.uploadDataToArweave({ ok: true }, 'json', {
         sessionSlug: 'selected',
         arweaveJwk: '{"kty":"RSA"}',
       });
@@ -570,7 +570,7 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
     }));
 
     try {
-      const txId = await arweaveScripts.uploadDataToArweave({ ok: true }, 'json', {
+      const txId = await arweaveClient.uploadDataToArweave({ ok: true }, 'json', {
         sessionSlug: 'selected',
         arweaveJwk: '{"kty":"RSA"}',
       });
@@ -607,7 +607,7 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
     }));
 
     try {
-      const txId = await arweaveScripts.uploadDataToArweave({ ok: true }, 'json', {
+      const txId = await arweaveClient.uploadDataToArweave({ ok: true }, 'json', {
         sessionSlug: 'selected',
         workerUrl: 'https://selected.worker.example.test',
         arweaveJwk: '{"kty":"RSA"}',
@@ -630,7 +630,7 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
     resolveCorsProxyUrl.mockResolvedValue(null);
 
     await expect(
-      arweaveScripts.uploadDataToArweave({ ok: true }, 'json', {
+      arweaveClient.uploadDataToArweave({ ok: true }, 'json', {
         sessionSlug: 'selected',
       }),
     ).rejects.toThrow('Worker URL is missing for Arweave upload.');
@@ -646,7 +646,7 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
       .mockResolvedValueOnce(jsonResp(403, { error: 'Access denied: on-chain gate data unavailable.' }));
 
     await expect(
-      arweaveScripts.uploadDataToArweave({ ok: true }, 'json', {
+      arweaveClient.uploadDataToArweave({ ok: true }, 'json', {
         sessionSlug: 'selected',
       }),
     ).rejects.toThrow('worker fallback exhausted');
@@ -659,7 +659,7 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
     fetchWorkerWithAuth.mockResolvedValueOnce(jsonResp(500, { error: 'Internal worker error.' }));
 
     await expect(
-      arweaveScripts.uploadDataToArweave({ ok: true }, 'json', {
+      arweaveClient.uploadDataToArweave({ ok: true }, 'json', {
         sessionSlug: 'selected',
       }),
     ).rejects.toThrow('Internal worker error.');
@@ -675,7 +675,7 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
       )
       .mockResolvedValueOnce(jsonResp(200, { id: 'tx-after-retry' }));
 
-    const txId = await arweaveScripts.uploadDataToArweave({ ok: true }, 'json', {
+    const txId = await arweaveClient.uploadDataToArweave({ ok: true }, 'json', {
       sessionSlug: 'selected',
     });
 

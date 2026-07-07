@@ -20,7 +20,7 @@ import {
   faEraser,
 } from '@fortawesome/free-solid-svg-icons';
 import { ethers } from 'ethers';
-import { arweaveClient as arweaveScripts } from '../../utilities/arweave/arweaveClient.js';
+import { arweaveClient as arweaveClient } from '../../utilities/arweave/arweaveClient.js';
 import { resolvePublishArweaveUploadOptions } from '../../utilities/arweave/publishUploadAuth.js';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import { validateNoLockedPlaintextInPayload } from '../../utilities/arweave/noLeakPayloads.js';
@@ -2585,7 +2585,7 @@ class CreateSBTGroup extends Component<any, any> {
           sbtImageUrl: '',
         };
       }
-      const imageTxId = await arweaveScripts.uploadDataToArweave(fileToUpload, imageFormat, {
+      const imageTxId = await arweaveClient.uploadDataToArweave(fileToUpload, imageFormat, {
         arweaveJwk: arweaveKey?.arweaveJwk || '',
         ...arweaveRequestOptions,
       });
@@ -2829,7 +2829,7 @@ class CreateSBTGroup extends Component<any, any> {
       const tokenUriData = JSON.stringify(tokenUriBase);
       const arweaveKey = await this.getEffectiveArweaveUploadKey();
       const arweaveRequestOptions = await this.buildArweaveUploadRequestOptions();
-      const tokenUriTxId = await arweaveScripts.uploadDataToArweave(tokenUriData, 'json', {
+      const tokenUriTxId = await arweaveClient.uploadDataToArweave(tokenUriData, 'json', {
         arweaveJwk: arweaveKey?.arweaveJwk || '',
         ...arweaveRequestOptions,
       });

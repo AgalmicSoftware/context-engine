@@ -1,8 +1,8 @@
 import { act, renderHook } from '@testing-library/react';
 import { useRollingTranscriptionRecorder } from './useRollingTranscriptionRecorder';
-import { transcribeAudio } from '../ai/aiScripts.js';
+import { transcribeAudio } from '../ai/aiClient.js';
 
-jest.mock('../ai/aiScripts.js', () => ({
+jest.mock('../ai/aiClient.js', () => ({
   transcribeAudio: jest.fn(),
 }));
 

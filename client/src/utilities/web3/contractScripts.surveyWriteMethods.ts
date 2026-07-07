@@ -65,7 +65,7 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
     STORAGE_RESOURCE_KEYS,
     SURVEYS,
     SURVEYS_INTERFACE,
-    arweaveScripts,
+    arweaveClient,
     attachStorageRefCompatibilityFields,
     buildSbtScopeMemoTag,
     clearReadCachesForGroup,

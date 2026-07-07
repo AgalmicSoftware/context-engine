@@ -42,7 +42,7 @@ export function generateQuestionId(type, prompt, options = [], singleSelect = fa
 }
 
 // --- Hex ↔ Base64url conversion ---
-// Canonical implementation. Matches arweaveScripts.js.
+// Canonical implementation. Matches arweaveClient.js.
 
 function padBase64String(b64string) {
   const remainder = b64string.length % 4;

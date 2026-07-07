@@ -150,7 +150,7 @@ const emitArweaveUploadFallbackTelemetry = (payload = {}) => {
     if (existing.length > 500) existing.splice(0, existing.length - 500);
     globalThis[ARWEAVE_UPLOAD_FALLBACK_TELEMETRY_KEY] = existing;
   } catch (e) {
-    log.warn('arweaveScripts: telemetry', e);
+    log.warn('arweaveClient: telemetry', e);
   }
 };
 
@@ -944,7 +944,7 @@ const fetchWithTimeout = async (url, options = {}, timeoutMs = ARWEAVE_GRAPHQL_T
       try {
         ctrl.abort();
       } catch (e) {
-        log.warn('arweaveScripts: cleanup', e);
+        log.warn('arweaveClient: cleanup', e);
       }
       reject(buildFetchTimeoutError(url, timeout));
     }, timeout);
@@ -1011,7 +1011,7 @@ const resolveWayfinderUrlForTx = async ({
       const resolvedUrl = normalizeHttpUrl(resolved?.toString ? resolved.toString() : resolved);
       if (resolvedUrl) return resolvedUrl;
     } catch (e) {
-      log.warn('arweaveScripts: fallback', e);
+      log.warn('arweaveClient: fallback', e);
     }
   }
 
@@ -1041,7 +1041,7 @@ const buildWayfinderRouteCandidates = ({ txId = '', resolvedUrl = '', opts = {} 
       push(`wayfinder-${route}`, url, normalizeGatewayBase(gatewayBase) || 'wayfinder');
     });
   } catch (e) {
-    log.warn('arweaveScripts: fallback', e);
+    log.warn('arweaveClient: fallback', e);
   }
 
   return out;
@@ -1220,13 +1220,13 @@ const ensureArweaveResourceErrorListener = () => {
             tag: String(target.tagName || '').toLowerCase() || null,
           });
         } catch (e) {
-          log.warn('arweaveScripts: fallback', e);
+          log.warn('arweaveClient: fallback', e);
         }
       },
       true,
     );
   } catch (e) {
-    log.warn('arweaveScripts: fallback', e);
+    log.warn('arweaveClient: fallback', e);
   }
 };
 
@@ -2170,7 +2170,7 @@ async function uploadDataToArweave(data, format, opts = {}) {
         try {
           form.append('tags', JSON.stringify(tags));
         } catch (e) {
-          log.warn('arweaveScripts: fallback', e);
+          log.warn('arweaveClient: fallback', e);
         }
       }
       if (arweaveJwkValue) form.append('arweaveJwk', arweaveJwkValue);
@@ -2815,5 +2815,3 @@ export const arweaveClient = {
   base64DecodeURL,
   base64urlToBase64,
 };
-
-export const arweaveScripts = arweaveClient;

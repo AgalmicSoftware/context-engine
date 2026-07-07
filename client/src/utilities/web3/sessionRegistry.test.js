@@ -1,8 +1,8 @@
 import { ethers } from 'ethers';
 import { DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
 
-jest.mock('../arweave/arweaveScripts.js', () => ({
-  arweaveScripts: {
+jest.mock('../arweave/arweaveClient.js', () => ({
+  arweaveClient: {
     uploadDataToArweave: jest.fn(),
     downloadDataFromArweave: jest.fn(),
   },
@@ -27,7 +27,7 @@ import {
   upsertSessionRegistryCache,
   uploadSessionMetadata,
 } from './sessionRegistry.js';
-import { arweaveScripts } from '../arweave/arweaveScripts.js';
+import { arweaveClient } from '../arweave/arweaveClient.js';
 import { cryptoUtils } from '../crypto/cryptography.js';
 import { getChainById, getDefaultGasPriceGwei, getSessionRegistryAddress } from '../../variables/chains.js';
 import { upsertCachedSessionWorkerConfig } from '../session/sessionWorkerConfigCache.js';
@@ -120,9 +120,9 @@ const getLatestSendTxParams = (walletProvider) =>
 
 describe('sessionRegistry metadata upload', () => {
   beforeEach(() => {
-    arweaveScripts.uploadDataToArweave.mockReset();
-    arweaveScripts.uploadDataToArweave.mockResolvedValue('example_tx_id');
-    arweaveScripts.downloadDataFromArweave.mockReset();
+    arweaveClient.uploadDataToArweave.mockReset();
+    arweaveClient.uploadDataToArweave.mockResolvedValue('example_tx_id');
+    arweaveClient.downloadDataFromArweave.mockReset();
   });
 
   it('strips authoritative gate fields before Arweave upload', async () => {
@@ -138,8 +138,8 @@ describe('sessionRegistry metadata upload', () => {
 
     await uploadSessionMetadata(metadata);
 
-    expect(arweaveScripts.uploadDataToArweave).toHaveBeenCalledTimes(1);
-    const [payload, format] = arweaveScripts.uploadDataToArweave.mock.calls[0];
+    expect(arweaveClient.uploadDataToArweave).toHaveBeenCalledTimes(1);
+    const [payload, format] = arweaveClient.uploadDataToArweave.mock.calls[0];
     expect(format).toBe('json');
     expect(payload.sponsored).toBeUndefined();
     expect(payload.sponsoredSbtAddress).toBeUndefined();
@@ -152,12 +152,12 @@ describe('sessionRegistry metadata upload', () => {
 
 describe('sessionRegistry metadata reads', () => {
   beforeEach(() => {
-    arweaveScripts.downloadDataFromArweave.mockReset();
+    arweaveClient.downloadDataFromArweave.mockReset();
   });
 
   it('leaves session metadata preflight policy to the arweave resolver', async () => {
     const txId = 'YWNXjJUfKtOUN56pL_U4HxTv2dYfZORfBFAtZpc7q5g';
-    arweaveScripts.downloadDataFromArweave.mockResolvedValue(
+    arweaveClient.downloadDataFromArweave.mockResolvedValue(
       JSON.stringify({
         slug: 'edge',
         sessionName: 'Edge',
@@ -174,9 +174,9 @@ describe('sessionRegistry metadata reads', () => {
       slug: 'edge',
       sessionName: 'Edge',
     });
-    const [, arweaveOpts] = arweaveScripts.downloadDataFromArweave.mock.calls[0];
-    expect(arweaveScripts.downloadDataFromArweave).toHaveBeenCalledTimes(1);
-    expect(arweaveScripts.downloadDataFromArweave).toHaveBeenCalledWith(txId, expect.any(Object));
+    const [, arweaveOpts] = arweaveClient.downloadDataFromArweave.mock.calls[0];
+    expect(arweaveClient.downloadDataFromArweave).toHaveBeenCalledTimes(1);
+    expect(arweaveClient.downloadDataFromArweave).toHaveBeenCalledWith(txId, expect.any(Object));
     expect(arweaveOpts).toEqual(
       expect.objectContaining({
         debugContext: expect.objectContaining({
@@ -395,7 +395,7 @@ describe('refreshSessionRegistryFieldsCache', () => {
   });
 
   it('updates worker fields without clearing cached metadata or gates', async () => {
-    arweaveScripts.downloadDataFromArweave.mockClear();
+    arweaveClient.downloadDataFromArweave.mockClear();
     const sessionIdHex = '0x00000000000000000000000000000033';
     const txGasGate = {
       lookupStatus: 'ok',
@@ -461,7 +461,7 @@ describe('refreshSessionRegistryFieldsCache', () => {
       slug: 'demo-1',
     });
 
-    expect(arweaveScripts.downloadDataFromArweave).not.toHaveBeenCalled();
+    expect(arweaveClient.downloadDataFromArweave).not.toHaveBeenCalled();
     expect(contractMock.getSessionBySlug).toHaveBeenCalledWith('demo-1');
     expect(contractMock.getSessionFields).toHaveBeenCalledWith(
       'demo-1',

@@ -4,7 +4,7 @@ describe('surveyResultsAnalysisGenerationPort', () => {
   it('calls AI with the existing analysis request options', async () => {
     const callAI = jest.fn(async () => ({ ok: true }));
     const port = bindSurveyResultsAnalysisGenerationPort({
-      aiScripts: () => ({ callAI }),
+      aiClient: () => ({ callAI }),
     });
 
     await expect(
@@ -27,11 +27,11 @@ describe('surveyResultsAnalysisGenerationPort', () => {
   it('performs call-time AI lookup so module mocks keep intercepting', async () => {
     const firstCallAI = jest.fn(async () => 'first');
     const secondCallAI = jest.fn(async () => 'second');
-    const aiScripts = {
+    const aiClient = {
       callAI: firstCallAI,
     };
     const port = bindSurveyResultsAnalysisGenerationPort({
-      aiScripts: () => aiScripts,
+      aiClient: () => aiClient,
     });
 
     await expect(
@@ -41,7 +41,7 @@ describe('surveyResultsAnalysisGenerationPort', () => {
         sessionSlug: 'alpha',
       }),
     ).resolves.toBe('first');
-    aiScripts.callAI = secondCallAI;
+    aiClient.callAI = secondCallAI;
     await expect(
       port.generateSection({
         maxTokens: 2,

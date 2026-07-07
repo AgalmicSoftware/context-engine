@@ -2,7 +2,7 @@ import bufferModule from 'buffer/';
 import { cryptoUtils } from '../crypto/cryptography.js';
 import { toStr } from '../shared/primitives.js';
 import { buildPublicRoute } from '../ui/publicUrl.js';
-import { arweaveScripts } from './arweaveScripts.js';
+import { arweaveClient } from './arweaveClient.js';
 
 type LooseRecord = Record<string, any>;
 
@@ -237,7 +237,7 @@ export const readSponsoredBundleFromArweave = async ({
   if (!resolvedTxId) {
     throw createSponsoredBundleError('malformed_link', 'Sponsored link is missing a bundle id.');
   }
-  const raw = await arweaveScripts.downloadDataFromArweave(resolvedTxId, arweaveOpts);
+  const raw = await arweaveClient.downloadDataFromArweave(resolvedTxId, arweaveOpts);
   const envelope = parseSponsoredBundleEnvelope(raw);
   const bundle = await decryptSponsoredBundleEnvelope({ envelope, secret });
   if (!hasSponsoredBundleFields(bundle)) {
@@ -329,7 +329,7 @@ export const uploadSponsoredBundle = async ({
   }
   const encryptedData = await cryptoUtils.encryptWithPassword(plaintext, password);
   const envelope = buildSponsoredBundleEnvelope({ encryptedData });
-  const txId = await arweaveScripts.uploadDataToArweave(envelope, 'json', {
+  const txId = await arweaveClient.uploadDataToArweave(envelope, 'json', {
     arweaveJwk,
     workerUrl,
     sessionSlug,

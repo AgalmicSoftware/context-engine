@@ -34,7 +34,7 @@ jest.mock('../../utilities/sessionResultsExport', () => {
     downloadSessionResultsPdfReport: jest.fn(),
   };
 });
-jest.mock('../../utilities/ai/aiScripts.js', () => ({
+jest.mock('../../utilities/ai/aiClient.js', () => ({
   callAI: jest.fn(),
 }));
 const mockPolisReport = jest.fn((..._args: any[]) => null);

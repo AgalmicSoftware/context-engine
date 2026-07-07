@@ -5,7 +5,7 @@ import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
-import { analyzeUserOpinions } from 'utilities/ai/aiScripts.js';
+import { analyzeUserOpinions } from 'utilities/ai/aiClient.js';
 import { ethers } from 'ethers';
 import { notify } from '../../utilities/ui/notify.js';
 
@@ -23,7 +23,7 @@ jest.mock('../../utilities/web3/sponsoredAccess.js', () => ({
   checkSponsoredAccess: jest.fn(),
 }));
 
-jest.mock('utilities/ai/aiScripts.js', () => ({
+jest.mock('utilities/ai/aiClient.js', () => ({
   analyzeUserOpinions: jest.fn(async () => ({
     summary: 'summary',
     details: 'details',

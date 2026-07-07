@@ -1,4 +1,4 @@
-import * as aiScriptsModule from '../../utilities/ai/aiScripts.js';
+import * as aiClientModule from '../../utilities/ai/aiClient.js';
 
 export type SurveyResultsAnalysisGenerationCallOptions = {
   maxTokens: number;
@@ -18,19 +18,19 @@ export type SurveyResultsAnalysisGenerationPort = {
   generateSection: (request: SurveyResultsAnalysisGenerationRequest) => Promise<unknown>;
 };
 
-export type SurveyResultsAiScriptsModule = {
+export type SurveyResultsAiClientModule = {
   callAI: (prompt: string, options: SurveyResultsAnalysisGenerationCallOptions) => Promise<unknown> | unknown;
 };
 
 export type BindSurveyResultsAnalysisGenerationPortArgs = {
-  aiScripts: () => SurveyResultsAiScriptsModule;
+  aiClient: () => SurveyResultsAiClientModule;
 };
 
 export const bindSurveyResultsAnalysisGenerationPort = ({
-  aiScripts,
+  aiClient,
 }: BindSurveyResultsAnalysisGenerationPortArgs): SurveyResultsAnalysisGenerationPort => ({
   generateSection: async ({ maxTokens, prompt, sessionSlug }) =>
-    aiScripts().callAI(prompt, {
+    aiClient().callAI(prompt, {
       maxTokens,
       response_format: { type: 'json_object' },
       sessionSlug,
@@ -40,5 +40,5 @@ export const bindSurveyResultsAnalysisGenerationPort = ({
 });
 
 export const surveyResultsAnalysisGenerationPort = bindSurveyResultsAnalysisGenerationPort({
-  aiScripts: () => aiScriptsModule as SurveyResultsAiScriptsModule,
+  aiClient: () => aiClientModule as SurveyResultsAiClientModule,
 });

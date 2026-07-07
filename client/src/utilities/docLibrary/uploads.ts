@@ -1,7 +1,7 @@
 /** @file uploads.ts */
 
 import { Buffer } from 'buffer';
-import { arweaveClient as arweaveScripts } from '../arweave/arweaveClient.js';
+import { arweaveClient as arweaveClient } from '../arweave/arweaveClient.js';
 import { uploadDataToSessionStorage } from '../storage/storageClient.js';
 import { STORAGE_BACKENDS, normalizeStorageRef } from '../storage/storageRefs.js';
 import { cryptoUtils } from '../crypto/cryptography.js';
@@ -243,7 +243,7 @@ export const uploadSelfRecipientEncryptedDocData = async ({
     contextLabel: contextLabel || 'doc-self',
   });
 
-  const txId = await arweaveScripts.uploadDataToArweave(envelope, 'json', {
+  const txId = await arweaveClient.uploadDataToArweave(envelope, 'json', {
     arweaveJwk,
     tags,
     ...spreadRecord(arweave),
@@ -252,7 +252,7 @@ export const uploadSelfRecipientEncryptedDocData = async ({
   return {
     txId,
     url: litStorage.buildLitArweaveUrl(txId),
-    arweaveUrl: arweaveScripts.buildArweaveGatewayUrl(txId),
+    arweaveUrl: arweaveClient.buildArweaveGatewayUrl(txId),
     envelope,
   };
 };
@@ -391,7 +391,7 @@ export const uploadDocLibraryFile = async ({
       storage === STORAGE_BACKENDS.CLOUDFLARE
         ? toStr(readRecord(resultStorageRef, 'uri')).trim()
         : txId
-          ? arweaveScripts.buildArweaveGatewayUrl(txId)
+          ? arweaveClient.buildArweaveGatewayUrl(txId)
           : '',
     storage,
     storageRef: resultStorageRef || null,
@@ -472,7 +472,7 @@ export const uploadDocLibraryUrlRecord = async ({
       storage === STORAGE_BACKENDS.CLOUDFLARE
         ? toStr(readRecord(resultStorageRef, 'uri')).trim()
         : txId
-          ? arweaveScripts.buildArweaveGatewayUrl(txId)
+          ? arweaveClient.buildArweaveGatewayUrl(txId)
           : '',
     storage,
     storageRef: resultStorageRef || null,

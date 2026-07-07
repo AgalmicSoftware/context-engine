@@ -1,7 +1,7 @@
 import React from 'react';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import styles from './SurveyResults.module.scss';
-import { callAI } from '../../utilities/ai/aiScripts.js';
+import { callAI } from '../../utilities/ai/aiClient.js';
 import {
   downloadSessionResultsHtmlReport,
   downloadSessionResultsPdfReport,
@@ -37,7 +37,7 @@ jest.mock('../../utilities/sessionResultsExport', () => {
     downloadSessionResultsPdfReport: jest.fn(),
   };
 });
-jest.mock('../../utilities/ai/aiScripts.js', () => ({
+jest.mock('../../utilities/ai/aiClient.js', () => ({
   callAI: jest.fn(),
 }));
 const mockPolisReport = jest.fn((..._args: any[]) => null);

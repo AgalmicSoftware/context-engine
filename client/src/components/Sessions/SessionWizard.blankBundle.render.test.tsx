@@ -81,8 +81,8 @@ jest.mock('../../utilities/crypto/cryptography.js', () => ({
   },
 }));
 
-jest.mock('../../utilities/arweave/arweaveScripts.js', () => ({
-  arweaveScripts: {
+jest.mock('../../utilities/arweave/arweaveClient.js', () => ({
+  arweaveClient: {
     uploadDataToArweave: jest.fn(),
     downloadDataFromArweave: (...args: any[]) => mockDownloadDataFromArweave(...args),
     buildArweaveGatewayUrl: jest.fn((txId) => `https://arweave.example.test/${txId}`),
@@ -247,7 +247,7 @@ describe('SessionWizard blank bundle render regression', () => {
   const originalFetch = global.fetch;
 
   beforeEach(() => {
-    const { arweaveScripts } = require('../../utilities/arweave/arweaveScripts.js');
+    const { arweaveClient } = require('../../utilities/arweave/arweaveClient.js');
     const { registerSessionOnChain } = require('../../utilities/web3/sessionRegistry.js');
 
     jest.clearAllMocks();
@@ -257,7 +257,7 @@ describe('SessionWizard blank bundle render regression', () => {
     global.fetch = createDefaultFetchMock() as any;
     mockDownloadDataFromArweave.mockResolvedValue(buildMockSponsoredBundleEnvelope());
     mockDecryptWithPassword.mockResolvedValue(buildMockSponsoredBundle());
-    arweaveScripts.uploadDataToArweave.mockResolvedValue('a'.repeat(43));
+    arweaveClient.uploadDataToArweave.mockResolvedValue('a'.repeat(43));
     registerSessionOnChain.mockResolvedValue({ txs: [] });
     mockedBuildContractViewerContracts.mockImplementation(() => []);
   });

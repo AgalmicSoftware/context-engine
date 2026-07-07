@@ -16,7 +16,7 @@ All examples use `contextEngine` names.
 
 Arweave payload reads are now cache-first in the client:
 
-- `arweaveClient.downloadDataFromArweave(txId)` uses (`arweaveScripts` remains a compatibility alias):
+- `arweaveClient.downloadDataFromArweave(txId)` uses (`arweaveClient` remains a compatibility alias):
   - in-memory text cache (TTL-based),
   - in-flight request dedupe per `txId`.
 - `contractScripts` stores per-session payload text cache in `questionsCache` under:

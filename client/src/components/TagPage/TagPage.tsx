@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faCaretUp, faCog, faExternalLinkAlt, faPlus } from '@fortawesome/free-solid-svg-icons';
 import { listNamespaceEntriesSync, subscribeCacheUpdates } from '../../utilities/cache/cacheScripts.js';
-import { callAI } from '../../utilities/ai/aiScripts.js';
+import { callAI } from '../../utilities/ai/aiClient.js';
 import buildTagInterpretationPrompt from '../../prompts/tagInterpretationPrompt.js';
 import { normalizeTagList } from '../../utilities/defaultTags.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';

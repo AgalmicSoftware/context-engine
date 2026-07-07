@@ -31,7 +31,7 @@ describe('session publish adapters', () => {
       adminAuth: null,
     }));
     const adapter = bindArweavePublishAdapter({
-      arweaveScripts: () => currentScripts,
+      arweaveClient: () => currentScripts,
       resolveUploadOptions,
     });
     const payload = { slug: 'alpha' };
@@ -72,7 +72,7 @@ describe('session publish adapters', () => {
   it('propagates Arweave upload errors', async () => {
     const failure = new Error('upload failed');
     const adapter = bindArweavePublishAdapter({
-      arweaveScripts: () => ({
+      arweaveClient: () => ({
         uploadDataToArweave: jest.fn(async () => {
           throw failure;
         }),

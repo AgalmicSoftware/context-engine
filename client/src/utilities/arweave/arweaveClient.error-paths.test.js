@@ -1,7 +1,7 @@
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
 import { getCorsProxyUrlOrThrow, resolveCorsProxyUrl } from '../worker/corsProxy.js';
 import { readSessionScanSlugs } from '../session/sessionScanScope.js';
-import { arweaveScripts } from './arweaveScripts.js';
+import { arweaveClient } from './arweaveClient.js';
 
 jest.mock('../worker/workerAuth.js', () => ({
   fetchWorkerWithAuth: jest.fn(),
@@ -82,7 +82,7 @@ describe('error paths', () => {
     fetchWorkerWithAuth.mockRejectedValueOnce(new TypeError('network down'));
 
     await expect(
-      arweaveScripts.uploadDataToArweave({ ok: true }, 'json', {
+      arweaveClient.uploadDataToArweave({ ok: true }, 'json', {
         sessionSlug: 'selected',
       }),
     ).rejects.toThrow('Arweave upload network error');
@@ -105,7 +105,7 @@ describe('error paths', () => {
     });
 
     await expect(
-      arweaveScripts.downloadDataFromArweave(TX_ID_404, {
+      arweaveClient.downloadDataFromArweave(TX_ID_404, {
         gateways: [TEST_ARWEAVE_GATEWAY],
         retries: 0,
         bypassCache: true,
@@ -124,7 +124,7 @@ describe('error paths', () => {
     global.fetch.mockRejectedValue(new Error('gateway timeout'));
 
     await expect(
-      arweaveScripts.downloadDataFromArweave(TX_ID_TIMEOUT, {
+      arweaveClient.downloadDataFromArweave(TX_ID_TIMEOUT, {
         gateways: [TEST_ARWEAVE_GATEWAY],
         retries: 0,
         bypassCache: true,
@@ -146,7 +146,7 @@ describe('error paths', () => {
       return new Promise(() => {});
     });
 
-    const pending = arweaveScripts.downloadDataFromArweave(TX_ID_TIMEOUT, {
+    const pending = arweaveClient.downloadDataFromArweave(TX_ID_TIMEOUT, {
       gateways: [TEST_AR_IO_GATEWAY],
       retries: 0,
       bypassCache: true,
@@ -167,7 +167,7 @@ describe('error paths', () => {
     fetchWorkerWithAuth.mockResolvedValueOnce(jsonResp(200, { ok: true }));
 
     await expect(
-      arweaveScripts.uploadDataToArweave({ ok: true }, 'json', {
+      arweaveClient.uploadDataToArweave({ ok: true }, 'json', {
         sessionSlug: 'selected',
       }),
     ).rejects.toThrow('Arweave upload succeeded but no tx id was returned by worker.');

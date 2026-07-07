@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { transcribeAudio } from '../ai/aiScripts.js';
+import { transcribeAudio } from '../ai/aiClient.js';
 import {
   DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS,
   RollingTranscriptSegment,

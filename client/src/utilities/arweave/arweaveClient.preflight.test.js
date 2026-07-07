@@ -1,8 +1,8 @@
-/** @file arweaveScripts.preflight.test.js */
+/** @file arweaveClient.preflight.test.js */
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
 import { getCorsProxyUrlOrThrow, resolveCorsProxyUrl } from '../worker/corsProxy.js';
 import { readSessionScanSlugs } from '../session/sessionScanScope.js';
-import { arweaveScripts } from './arweaveScripts.js';
+import { arweaveClient } from './arweaveClient.js';
 
 jest.mock('../worker/workerAuth.js', () => ({
   fetchWorkerWithAuth: jest.fn(),
@@ -35,7 +35,7 @@ const TEST_ARWEAVE_GATEWAY = 'https://arweave.example.test';
 const PERMAGATE_GRAPHQL_URL = 'https://permagate.io/graphql'; // intentional: real URL - verifies production GraphQL precheck routing
 const G8WAY_GRAPHQL_URL = 'https://g8way.io/graphql'; // intentional: real URL - verifies production GraphQL fallback routing
 
-describe('arweaveScripts.downloadDataFromArweave preflight routing', () => {
+describe('arweaveClient.downloadDataFromArweave preflight routing', () => {
   beforeEach(() => {
     global.fetch = jest.fn();
     globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = false;
@@ -103,7 +103,7 @@ describe('arweaveScripts.downloadDataFromArweave preflight routing', () => {
       text: async () => '{"ok":true}',
     });
 
-    const text = await arweaveScripts.downloadDataFromArweave('skip-preflight-explicit', {
+    const text = await arweaveClient.downloadDataFromArweave('skip-preflight-explicit', {
       gateways: [TEST_ARWEAVE_GATEWAY],
       retries: 0,
       bypassCache: true,
@@ -124,7 +124,7 @@ describe('arweaveScripts.downloadDataFromArweave preflight routing', () => {
       text: async () => '{"session":"ok"}',
     });
 
-    const text = await arweaveScripts.downloadDataFromArweave('session-meta-no-preflight', {
+    const text = await arweaveClient.downloadDataFromArweave('session-meta-no-preflight', {
       gateways: [TEST_ARWEAVE_GATEWAY],
       retries: 0,
       bypassCache: true,
@@ -145,7 +145,7 @@ describe('arweaveScripts.downloadDataFromArweave preflight routing', () => {
     );
 
     await expect(
-      arweaveScripts.downloadDataFromArweave('session-meta-with-preflight', {
+      arweaveClient.downloadDataFromArweave('session-meta-with-preflight', {
         gateways: [TEST_ARWEAVE_GATEWAY],
         retries: 0,
         bypassCache: true,
@@ -168,7 +168,7 @@ describe('arweaveScripts.downloadDataFromArweave preflight routing', () => {
       text: async () => '{"name":"badge"}',
     });
 
-    const text = await arweaveScripts.downloadDataFromArweave('sbt-meta-no-preflight', {
+    const text = await arweaveClient.downloadDataFromArweave('sbt-meta-no-preflight', {
       gateways: [TEST_ARWEAVE_GATEWAY],
       retries: 0,
       bypassCache: true,
@@ -188,7 +188,7 @@ describe('arweaveScripts.downloadDataFromArweave preflight routing', () => {
       text: async () => '{"response":"ok"}',
     });
 
-    const text = await arweaveScripts.downloadDataFromArweave('response-meta-no-preflight', {
+    const text = await arweaveClient.downloadDataFromArweave('response-meta-no-preflight', {
       gateways: [TEST_ARWEAVE_GATEWAY],
       retries: 0,
       bypassCache: true,
@@ -209,7 +209,7 @@ describe('arweaveScripts.downloadDataFromArweave preflight routing', () => {
     );
 
     await expect(
-      arweaveScripts.downloadDataFromArweave('graphql-primary-health-check', {
+      arweaveClient.downloadDataFromArweave('graphql-primary-health-check', {
         gateways: [TEST_ARWEAVE_GATEWAY],
         retries: 0,
         bypassCache: true,
@@ -241,7 +241,7 @@ describe('arweaveScripts.downloadDataFromArweave preflight routing', () => {
       );
 
     await expect(
-      arweaveScripts.downloadDataFromArweave('graphql-secondary-fallback', {
+      arweaveClient.downloadDataFromArweave('graphql-secondary-fallback', {
         gateways: [TEST_ARWEAVE_GATEWAY],
         retries: 0,
         bypassCache: true,

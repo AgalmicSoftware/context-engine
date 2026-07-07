@@ -16,7 +16,7 @@ import {
   normalizeChipotleCekHex,
   normalizeLitChipotleMetadataVersion,
 } from './litChipotlePolicy.js';
-import { arweaveScripts } from '../arweave/arweaveScripts.js';
+import { arweaveClient } from '../arweave/arweaveClient.js';
 import { createLogger } from '../logging';
 import { perfDebugLitGetKey } from '../web3/rpcDebugStats.js';
 import { toStr } from '../shared/primitives.js';
@@ -2040,7 +2040,7 @@ export const uploadEncryptedArweaveData = async ({
     },
   });
 
-  const txId = await arweaveScripts.uploadDataToArweave(envelope, 'json', {
+  const txId = await arweaveClient.uploadDataToArweave(envelope, 'json', {
     arweaveJwk,
     tags,
     ...(arweave && typeof arweave === 'object' ? arweave : {}),
@@ -2048,7 +2048,7 @@ export const uploadEncryptedArweaveData = async ({
   return {
     txId,
     url: buildLitArweaveUrl(txId),
-    arweaveUrl: arweaveScripts.buildArweaveGatewayUrl(txId),
+    arweaveUrl: arweaveClient.buildArweaveGatewayUrl(txId),
     envelope,
   };
 };
@@ -2089,7 +2089,7 @@ export const downloadEncryptedArweaveData = async ({
     caller: toStr(existingDebugContext.caller).trim() || 'litProtocol.downloadEncryptedArweaveData',
   };
 
-  const envelopeJson = await arweaveScripts.downloadDataFromArweave(resolvedTx, arweaveOpts);
+  const envelopeJson = await arweaveClient.downloadDataFromArweave(resolvedTx, arweaveOpts);
   const litOpts = lit && typeof lit.getKey === 'function' ? { getKey: lit.getKey } : undefined;
   const payload = await cryptoUtils.decryptEnvelopeValue(envelopeJson, {
     account,

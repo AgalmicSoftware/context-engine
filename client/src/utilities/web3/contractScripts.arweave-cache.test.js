@@ -1,10 +1,10 @@
-import { arweaveScripts } from '../arweave/arweaveScripts.js';
+import { arweaveClient } from '../arweave/arweaveClient.js';
 import { initCacheManager, removeCache, updateCacheAtomic } from '../cache/cacheScripts.js';
 import contractScripts from './contractScripts.js';
 import { __test__contractScriptsArweaveCache } from './contractScripts.js';
 
-jest.mock('../arweave/arweaveScripts.js', () => ({
-  arweaveScripts: {
+jest.mock('../arweave/arweaveClient.js', () => ({
+  arweaveClient: {
     uploadDataToArweave: jest.fn(),
     downloadDataFromArweave: jest.fn(),
     hexToBase64url: jest.fn((v) => v),
@@ -37,7 +37,7 @@ describe('contractScripts arweave tx cache + failure cache', () => {
   });
 
   beforeEach(async () => {
-    arweaveScripts.downloadDataFromArweave.mockReset();
+    arweaveClient.downloadDataFromArweave.mockReset();
     await removeCache('questionsCache', TEST_SLUG).catch(() => null);
     await removeCache('questionsCache', TEST_SLUG_ALT).catch(() => null);
   });
@@ -69,7 +69,7 @@ describe('contractScripts arweave tx cache + failure cache', () => {
     });
 
     expect(text).toBe('{"cached":true}');
-    expect(arweaveScripts.downloadDataFromArweave).not.toHaveBeenCalled();
+    expect(arweaveClient.downloadDataFromArweave).not.toHaveBeenCalled();
   });
 
   it('short-circuits during cooldown without network fetch', async () => {
@@ -98,7 +98,7 @@ describe('contractScripts arweave tx cache + failure cache', () => {
       state: 'transient',
       retryable: true,
     });
-    expect(arweaveScripts.downloadDataFromArweave).not.toHaveBeenCalled();
+    expect(arweaveClient.downloadDataFromArweave).not.toHaveBeenCalled();
   });
 
   it('short-circuits terminal failures', async () => {
@@ -126,7 +126,7 @@ describe('contractScripts arweave tx cache + failure cache', () => {
       state: 'terminal_not_found',
       retryable: false,
     });
-    expect(arweaveScripts.downloadDataFromArweave).not.toHaveBeenCalled();
+    expect(arweaveClient.downloadDataFromArweave).not.toHaveBeenCalled();
   });
 
   it('revalidates memoized failure entries against persisted cache state', async () => {
@@ -191,7 +191,7 @@ describe('contractScripts arweave tx cache + failure cache', () => {
         message: 'retry window elapsed',
       },
     });
-    arweaveScripts.downloadDataFromArweave.mockResolvedValue('{"recovered":true}');
+    arweaveClient.downloadDataFromArweave.mockResolvedValue('{"recovered":true}');
 
     const text = await __test__contractScriptsArweaveCache.downloadArweaveTextForGroup({
       txId: 'tx_terminal_recheck',
@@ -199,7 +199,7 @@ describe('contractScripts arweave tx cache + failure cache', () => {
     });
 
     expect(text).toBe('{"recovered":true}');
-    expect(arweaveScripts.downloadDataFromArweave).toHaveBeenCalledTimes(1);
+    expect(arweaveClient.downloadDataFromArweave).toHaveBeenCalledTimes(1);
     const failureEntry = await __test__contractScriptsArweaveCache.readArweaveTxFailureCacheEntry({
       txId: 'tx_terminal_recheck',
       groupKeyOrCfg: groupCtx,
@@ -222,7 +222,7 @@ describe('contractScripts arweave tx cache + failure cache', () => {
         message: 'temporary',
       },
     });
-    arweaveScripts.downloadDataFromArweave.mockResolvedValue('{"ok":1}');
+    arweaveClient.downloadDataFromArweave.mockResolvedValue('{"ok":1}');
 
     const text = await __test__contractScriptsArweaveCache.downloadArweaveTextForGroup({
       txId: 'tx_success',
@@ -230,7 +230,7 @@ describe('contractScripts arweave tx cache + failure cache', () => {
     });
 
     expect(text).toBe('{"ok":1}');
-    expect(arweaveScripts.downloadDataFromArweave).toHaveBeenCalledTimes(1);
+    expect(arweaveClient.downloadDataFromArweave).toHaveBeenCalledTimes(1);
 
     const txCacheEntry = await __test__contractScriptsArweaveCache.readArweaveTxCacheEntry({
       txId: 'tx_success',
@@ -247,7 +247,7 @@ describe('contractScripts arweave tx cache + failure cache', () => {
   });
 
   it('coalesces concurrent tx downloads to a single network fetch', async () => {
-    arweaveScripts.downloadDataFromArweave.mockImplementation(
+    arweaveClient.downloadDataFromArweave.mockImplementation(
       async () => new Promise((resolve) => setTimeout(() => resolve('{"ok":true}'), 20)),
     );
 
@@ -264,11 +264,11 @@ describe('contractScripts arweave tx cache + failure cache', () => {
 
     expect(a).toBe('{"ok":true}');
     expect(b).toBe('{"ok":true}');
-    expect(arweaveScripts.downloadDataFromArweave).toHaveBeenCalledTimes(1);
+    expect(arweaveClient.downloadDataFromArweave).toHaveBeenCalledTimes(1);
   });
 
   it('coalesces concurrent tx downloads across slugs on the same chain', async () => {
-    arweaveScripts.downloadDataFromArweave.mockImplementation(
+    arweaveClient.downloadDataFromArweave.mockImplementation(
       async () => new Promise((resolve) => setTimeout(() => resolve('{"ok":true}'), 20)),
     );
 
@@ -285,7 +285,7 @@ describe('contractScripts arweave tx cache + failure cache', () => {
 
     expect(a).toBe('{"ok":true}');
     expect(b).toBe('{"ok":true}');
-    expect(arweaveScripts.downloadDataFromArweave).toHaveBeenCalledTimes(1);
+    expect(arweaveClient.downloadDataFromArweave).toHaveBeenCalledTimes(1);
   });
 
   it('returns null without constructing a contract when surveys address is unresolved', async () => {
@@ -392,7 +392,7 @@ describe('contractScripts arweave tx cache + failure cache', () => {
     const surveyId = '0x4444444444444444444444444444444444444444444444444444444444444444';
     const surveyTxId = 'force_recover_survey_tx';
     const hashSpy = jest.spyOn(contractScripts, 'getSurveyHash').mockResolvedValue(surveyTxId);
-    arweaveScripts.downloadDataFromArweave.mockResolvedValue('{"title":"Recovered survey","questionIDs":["q1"]}');
+    arweaveClient.downloadDataFromArweave.mockResolvedValue('{"title":"Recovered survey","questionIDs":["q1"]}');
 
     try {
       await __test__contractScriptsArweaveCache.writeArweaveTxFailureCacheEntry({
@@ -421,7 +421,7 @@ describe('contractScripts arweave tx cache + failure cache', () => {
         }),
       );
 
-      expect(arweaveScripts.downloadDataFromArweave).toHaveBeenCalledWith(
+      expect(arweaveClient.downloadDataFromArweave).toHaveBeenCalledWith(
         surveyTxId,
         expect.objectContaining({
           forceRetry: true,
@@ -438,7 +438,7 @@ describe('contractScripts arweave tx cache + failure cache', () => {
     const surveyId = '0x5555555555555555555555555555555555555555555555555555555555555555';
     const surveyTxId = 'force_inflight_survey_tx';
     const hashSpy = jest.spyOn(contractScripts, 'getSurveyHash').mockResolvedValue(surveyTxId);
-    arweaveScripts.downloadDataFromArweave.mockImplementation(
+    arweaveClient.downloadDataFromArweave.mockImplementation(
       (_txId, opts = {}) =>
         new Promise((resolve) => {
           setTimeout(() => {
@@ -476,8 +476,8 @@ describe('contractScripts arweave tx cache + failure cache', () => {
         }),
       );
       expect(hashSpy).toHaveBeenCalledTimes(2);
-      expect(arweaveScripts.downloadDataFromArweave).toHaveBeenCalledTimes(2);
-      expect(arweaveScripts.downloadDataFromArweave).toHaveBeenCalledWith(
+      expect(arweaveClient.downloadDataFromArweave).toHaveBeenCalledTimes(2);
+      expect(arweaveClient.downloadDataFromArweave).toHaveBeenCalledWith(
         surveyTxId,
         expect.objectContaining({
           forceRetry: false,
@@ -485,7 +485,7 @@ describe('contractScripts arweave tx cache + failure cache', () => {
           bypassFailureCache: false,
         }),
       );
-      expect(arweaveScripts.downloadDataFromArweave).toHaveBeenCalledWith(
+      expect(arweaveClient.downloadDataFromArweave).toHaveBeenCalledWith(
         surveyTxId,
         expect.objectContaining({
           forceRetry: true,

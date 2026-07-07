@@ -1,6 +1,6 @@
 /** @file storageClient.ts */
 
-import { arweaveScripts } from '../arweave/arweaveScripts.js';
+import { arweaveClient } from '../arweave/arweaveClient.js';
 import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
 import { defaultStrictAllowDemoFallback } from '../worker/workerSessionResolution.js';
@@ -101,7 +101,7 @@ export const uploadDataToSessionStorage = async (
   const storageConfig = normalizeSessionStorageConfig(sessionConfig);
 
   if (backend === STORAGE_BACKENDS.ARWEAVE || backend === STORAGE_BACKENDS.LIT_ARWEAVE) {
-    const txId = await arweaveScripts.uploadDataToArweave(data, format, {
+    const txId = await arweaveClient.uploadDataToArweave(data, format, {
       sessionSlug,
       sessionConfig,
       context,

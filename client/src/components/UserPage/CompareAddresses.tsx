@@ -13,7 +13,7 @@ import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
 
 // NEW: single public entry for comparison bundle + drilldown stays on toolkit path
-import { runCompareToolkit } from 'utilities/ai/aiScripts.js';
+import { runCompareToolkit } from 'utilities/ai/aiClient.js';
 
 // Keep small deterministic helpers (labels/bookmarks/builders) from utilities
 import {

@@ -1,7 +1,7 @@
 import { ethers } from 'ethers';
 import contractScripts from './contractScripts.js';
 import { getWeb3Context } from './contractScripts.impl.js';
-import { arweaveScripts } from '../arweave/arweaveScripts.js';
+import { arweaveClient } from '../arweave/arweaveClient.js';
 
 describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
   jest.setTimeout(10000);
@@ -614,7 +614,7 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
     stub.name.mockResolvedValue('Name Only SBT');
     stub.symbol.mockResolvedValue('CE-SBT-38');
     contractSpy = jest.spyOn(ethers, 'Contract').mockImplementation(() => stub);
-    arweaveSpy = jest.spyOn(arweaveScripts, 'downloadDataFromArweave').mockImplementation(() => new Promise(() => {}));
+    arweaveSpy = jest.spyOn(arweaveClient, 'downloadDataFromArweave').mockImplementation(() => new Promise(() => {}));
 
     const metaPromise = contractScripts.getSbtMetadata('none', sbtAddress, {
       slug: 'edge',
@@ -645,7 +645,7 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
     const stub = baseContractStub(rawTxId);
     stub.name.mockResolvedValue('Gateway First SBT');
     contractSpy = jest.spyOn(ethers, 'Contract').mockImplementation(() => stub);
-    arweaveSpy = jest.spyOn(arweaveScripts, 'downloadDataFromArweave').mockResolvedValue(
+    arweaveSpy = jest.spyOn(arweaveClient, 'downloadDataFromArweave').mockResolvedValue(
       JSON.stringify({
         name: 'Gateway First SBT',
         image: 'https://example.com/assets/gateway-first.png',
@@ -689,8 +689,8 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
     stub.name.mockResolvedValue('Gateway First Image SBT');
     contractSpy = jest.spyOn(ethers, 'Contract').mockImplementation(() => stub);
     fetchSpy = jest.spyOn(global, 'fetch');
-    checkTxExistsSpy = jest.spyOn(arweaveScripts, 'checkTxExists');
-    arweaveSpy = jest.spyOn(arweaveScripts, 'downloadDataFromArweave').mockResolvedValue(
+    checkTxExistsSpy = jest.spyOn(arweaveClient, 'checkTxExists');
+    arweaveSpy = jest.spyOn(arweaveClient, 'downloadDataFromArweave').mockResolvedValue(
       JSON.stringify({
         name: 'Gateway First Image SBT',
         image: `ar://${imageTxId}`,

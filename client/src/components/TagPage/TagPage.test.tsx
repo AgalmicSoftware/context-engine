@@ -37,7 +37,7 @@ jest.mock('../../utilities/web3/sessionRegistry.js', () => ({
   SESSION_REGISTRY_CACHE_UPDATED_EVENT: 'ce:session-registry-cache-updated',
 }));
 
-jest.mock('../../utilities/ai/aiScripts.js', () => ({
+jest.mock('../../utilities/ai/aiClient.js', () => ({
   __esModule: true,
   callAI: (...args: any[]) => mockCallAI(...args),
 }));

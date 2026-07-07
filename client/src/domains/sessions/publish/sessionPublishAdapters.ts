@@ -1,4 +1,4 @@
-import { arweaveScripts as defaultArweaveScripts } from '../../../utilities/arweave/arweaveScripts.js';
+import { arweaveClient as defaultArweaveClient } from '../../../utilities/arweave/arweaveClient.js';
 import { resolvePublishArweaveUploadOptions as defaultResolvePublishArweaveUploadOptions } from '../../../utilities/arweave/publishUploadAuth.js';
 import * as defaultSponsoredBundles from '../../../utilities/arweave/sponsoredBundles.js';
 import * as defaultSessionRegistry from '../../../utilities/web3/sessionRegistry.js';
@@ -28,17 +28,17 @@ export type ArweaveGatewayUrlInput = {
 export type ResolvePublishArweaveUploadOptions = typeof defaultResolvePublishArweaveUploadOptions;
 
 export type BindArweavePublishAdapterArgs = {
-  arweaveScripts: () => ArweavePublishScripts;
+  arweaveClient: () => ArweavePublishScripts;
   resolveUploadOptions?: ResolvePublishArweaveUploadOptions;
 };
 
 export const bindArweavePublishAdapter = ({
-  arweaveScripts: readArweaveScripts,
+  arweaveClient: readArweaveClient,
   resolveUploadOptions = defaultResolvePublishArweaveUploadOptions,
 }: BindArweavePublishAdapterArgs) => ({
   uploadDataToArweave: ({ data, format, options }: ArweaveUploadInput) =>
-    readArweaveScripts().uploadDataToArweave(data, format, options),
-  buildArweaveGatewayUrl: ({ txId }: ArweaveGatewayUrlInput) => readArweaveScripts().buildArweaveGatewayUrl(txId),
+    readArweaveClient().uploadDataToArweave(data, format, options),
+  buildArweaveGatewayUrl: ({ txId }: ArweaveGatewayUrlInput) => readArweaveClient().buildArweaveGatewayUrl(txId),
   resolveUploadOptions: (input: Parameters<ResolvePublishArweaveUploadOptions>[0]) => resolveUploadOptions(input),
 });
 
@@ -182,7 +182,7 @@ export const bindSessionPublishSbtMetadataAdapter = ({
 });
 
 export const arweavePublishAdapter = bindArweavePublishAdapter({
-  arweaveScripts: () => defaultArweaveScripts,
+  arweaveClient: () => defaultArweaveClient,
 });
 
 export const sessionRegistryPublishAdapter = bindSessionRegistryPublishAdapter({

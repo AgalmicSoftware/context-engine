@@ -70,7 +70,7 @@ describe('SessionWizard publish boundary rendering', () => {
   beforeEach(resetSessionWizardWorkerPanelTestState);
 
   it('keeps advanced publish disabled and inert when metadata upload has no verified worker', async () => {
-    const { arweaveScripts } = require('../../utilities/arweave/arweaveScripts.js');
+    const { arweaveClient } = require('../../utilities/arweave/arweaveClient.js');
 
     renderLoggedInSessionWizard();
     enableAdvancedMode();
@@ -90,7 +90,7 @@ describe('SessionWizard publish boundary rendering', () => {
     fireEvent.click(publishButton);
 
     expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
-    expect(arweaveScripts.uploadDataToArweave).not.toHaveBeenCalled();
+    expect(arweaveClient.uploadDataToArweave).not.toHaveBeenCalled();
   });
 
   it('lets manual metadata satisfy publish readiness without firing from settings controls', async () => {
@@ -123,7 +123,7 @@ describe('SessionWizard publish boundary rendering', () => {
   });
 
   it('keeps blank manual metadata blocked and inert without upload or registry execution', async () => {
-    const { arweaveScripts } = require('../../utilities/arweave/arweaveScripts.js');
+    const { arweaveClient } = require('../../utilities/arweave/arweaveClient.js');
 
     renderLoggedInSessionWizard();
     enableAdvancedMode();
@@ -151,7 +151,7 @@ describe('SessionWizard publish boundary rendering', () => {
     fireEvent.click(publishButton);
 
     expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
-    expect(arweaveScripts.uploadDataToArweave).not.toHaveBeenCalled();
+    expect(arweaveClient.uploadDataToArweave).not.toHaveBeenCalled();
   });
 
   it('renders parent-derived register progress during manual metadata publish', async () => {
@@ -321,7 +321,7 @@ describe('SessionWizard publish boundary rendering', () => {
   });
 
   it('passes uploaded metadata through the register boundary without custom deploy execution', async () => {
-    const { arweaveScripts } = require('../../utilities/arweave/arweaveScripts.js');
+    const { arweaveClient } = require('../../utilities/arweave/arweaveClient.js');
     const uploadedTxId = 'd'.repeat(43);
     const uploadEvents = [];
     const restoreLogging = enableGeneralInfoLogging();
@@ -332,7 +332,7 @@ describe('SessionWizard publish boundary rendering', () => {
         uploadEvents.push(`log:${message}:${payload?.requestId || ''}`);
       }
     });
-    arweaveScripts.uploadDataToArweave.mockImplementation(async (_payload, format, uploadOptions = {}) => {
+    arweaveClient.uploadDataToArweave.mockImplementation(async (_payload, format, uploadOptions = {}) => {
       uploadEvents.push(`upload:${format}:${uploadOptions.requestId || ''}`);
       return uploadedTxId;
     });
@@ -365,13 +365,13 @@ describe('SessionWizard publish boundary rendering', () => {
       fireEvent.click(publishButton);
 
       await waitFor(() => {
-        expect(arweaveScripts.uploadDataToArweave).toHaveBeenCalledTimes(1);
+        expect(arweaveClient.uploadDataToArweave).toHaveBeenCalledTimes(1);
       });
       await waitFor(() => {
         expect(mockRegisterSessionOnChain).toHaveBeenCalledTimes(1);
       });
 
-      const [metadataPayload, uploadFormat, uploadOptions] = arweaveScripts.uploadDataToArweave.mock.calls[0];
+      const [metadataPayload, uploadFormat, uploadOptions] = arweaveClient.uploadDataToArweave.mock.calls[0];
       expect(metadataPayload).toEqual(
         expect.objectContaining({
           sessionName: 'Uploaded Metadata Register Boundary Session',
@@ -416,7 +416,7 @@ describe('SessionWizard publish boundary rendering', () => {
   });
 
   it('uploads a session header before metadata with request-scoped logs', async () => {
-    const { arweaveScripts } = require('../../utilities/arweave/arweaveScripts.js');
+    const { arweaveClient } = require('../../utilities/arweave/arweaveClient.js');
     const headerTxId = 'h'.repeat(43);
     const metadataTxId = 'm'.repeat(43);
     const uploadEvents = [];
@@ -428,7 +428,7 @@ describe('SessionWizard publish boundary rendering', () => {
         uploadEvents.push(`log:${message}:${payload?.requestId || ''}`);
       }
     });
-    arweaveScripts.uploadDataToArweave.mockImplementation(async (_payload, format, uploadOptions = {}) => {
+    arweaveClient.uploadDataToArweave.mockImplementation(async (_payload, format, uploadOptions = {}) => {
       uploadEvents.push(`upload:${format}:${uploadOptions.requestId || ''}`);
       return format === 'json' ? metadataTxId : headerTxId;
     });
@@ -458,14 +458,14 @@ describe('SessionWizard publish boundary rendering', () => {
       fireEvent.click(publishButton);
 
       await waitFor(() => {
-        expect(arweaveScripts.uploadDataToArweave).toHaveBeenCalledTimes(2);
+        expect(arweaveClient.uploadDataToArweave).toHaveBeenCalledTimes(2);
       });
       await waitFor(() => {
         expect(mockRegisterSessionOnChain).toHaveBeenCalledTimes(1);
       });
 
-      const [headerPayload, headerFormat, headerOptions] = arweaveScripts.uploadDataToArweave.mock.calls[0];
-      const [metadataPayload, metadataFormat, metadataOptions] = arweaveScripts.uploadDataToArweave.mock.calls[1];
+      const [headerPayload, headerFormat, headerOptions] = arweaveClient.uploadDataToArweave.mock.calls[0];
+      const [metadataPayload, metadataFormat, metadataOptions] = arweaveClient.uploadDataToArweave.mock.calls[1];
       expect(headerPayload).toEqual(expect.any(File));
       expect(headerFormat).toBe('png');
       expect(headerOptions).toEqual(
@@ -502,7 +502,7 @@ describe('SessionWizard publish boundary rendering', () => {
   });
 
   it('blocks cached secret field gates before metadata upload', async () => {
-    const { arweaveScripts } = require('../../utilities/arweave/arweaveScripts.js');
+    const { arweaveClient } = require('../../utilities/arweave/arweaveClient.js');
     seedVerifiedWorkerCache('https://worker.example.test', {
       encryptedFieldGates: {
         'arweave.jwk': 'gate-1',
@@ -530,18 +530,18 @@ describe('SessionWizard publish boundary rendering', () => {
         ),
       ).toBeInTheDocument();
     });
-    expect(arweaveScripts.uploadDataToArweave).not.toHaveBeenCalled();
+    expect(arweaveClient.uploadDataToArweave).not.toHaveBeenCalled();
     expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
   });
 
   it('resets progress and keeps publish retryable after metadata upload failure', async () => {
-    const { arweaveScripts } = require('../../utilities/arweave/arweaveScripts.js');
+    const { arweaveClient } = require('../../utilities/arweave/arweaveClient.js');
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     let rejectUpload = () => {};
     const uploadPromise = new Promise((_, reject) => {
       rejectUpload = reject;
     });
-    arweaveScripts.uploadDataToArweave.mockReturnValue(uploadPromise);
+    arweaveClient.uploadDataToArweave.mockReturnValue(uploadPromise);
     seedVerifiedWorkerCache();
 
     renderLoggedInSessionWizard();

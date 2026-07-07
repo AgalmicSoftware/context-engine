@@ -14,7 +14,7 @@ import { Button, Input } from 'reactstrap';
 
 import styles from './DocumentLibraryPanel.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { arweaveClient as arweaveScripts } from '../../utilities/arweave/arweaveClient.js';
+import { arweaveClient as arweaveClient } from '../../utilities/arweave/arweaveClient.js';
 import { DOC_LIBRARY_DOC_ROLES } from '../../utilities/docLibrary/tags.js';
 import { getGlobalLitHooks, litStorage } from '../../utilities/crypto/litProtocol.js';
 import { STORAGE_BACKENDS, normalizeStorageRef } from '../../utilities/storage/storageRefs.js';
@@ -743,7 +743,7 @@ export const DocumentLibraryList = ({
         fallbackBackend: storage || STORAGE_BACKENDS.ARWEAVE,
       });
       const isCloudflareStorage = storageRef?.backend === STORAGE_BACKENDS.CLOUDFLARE;
-      const arweaveUrl = txId && !isCloudflareStorage ? arweaveScripts.buildArweaveGatewayUrl(txId) : '';
+      const arweaveUrl = txId && !isCloudflareStorage ? arweaveClient.buildArweaveGatewayUrl(txId) : '';
       const litUrl = txId && !isCloudflareStorage ? litStorage.buildLitArweaveUrl(txId) : '';
       const storageUrl = isCloudflareStorage ? toStr(storageRef?.uri).trim() : isEncryptedStorage ? litUrl : arweaveUrl;
       const ts = doc?.block?.timestamp ? Number(doc.block.timestamp) * 1000 : null;

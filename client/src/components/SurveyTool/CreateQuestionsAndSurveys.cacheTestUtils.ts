@@ -8,7 +8,7 @@ import CreateQuestionsAndSurveys, {
 import type { ComponentProps } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
-import { arweaveScripts } from '../../utilities/arweave/arweaveScripts';
+import { arweaveClient } from '../../utilities/arweave/arweaveClient';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import * as resourceKeys from '../../utilities/session/resourceKeys.js';
 import contractScripts from '../../utilities/web3/contractScripts.js';
@@ -110,7 +110,7 @@ export {
   selectManagedNetBucketSnapshot,
   renderToStaticMarkup,
   cacheScripts,
-  arweaveScripts,
+  arweaveClient,
   normalizeArweaveUrl,
   resourceKeys,
   contractScripts,

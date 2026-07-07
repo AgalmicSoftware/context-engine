@@ -6,7 +6,7 @@
  */
 
 import { createLogger } from '../logging.js';
-import { arweaveScripts } from './arweaveScripts.js';
+import { arweaveClient } from './arweaveClient.js';
 import {
   isTerminalArweaveFailureState,
   normalizeArweaveFailureMeta,
@@ -196,7 +196,7 @@ export function createArweaveDownloadOps({
 
         let text = '';
         try {
-          text = await arweaveScripts.downloadDataFromArweave(normalizedTxId, arweaveOpts || {});
+          text = await arweaveClient.downloadDataFromArweave(normalizedTxId, arweaveOpts || {});
           if (typeof text !== 'string' || text.length === 0) {
             throw buildArweaveFailureError({
               txId: normalizedTxId,

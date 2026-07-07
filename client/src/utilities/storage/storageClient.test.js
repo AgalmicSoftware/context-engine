@@ -1,7 +1,7 @@
 import { listSessionStorageRefs, readSessionStorageBlob, uploadDataToSessionStorage } from './storageClient.js';
 
-jest.mock('../arweave/arweaveScripts.js', () => ({
-  arweaveScripts: {
+jest.mock('../arweave/arweaveClient.js', () => ({
+  arweaveClient: {
     uploadDataToArweave: jest.fn(),
     buildArweaveGatewayUrl: jest.fn((id) => `https://arweave.net/${id}`),
   },
@@ -15,7 +15,7 @@ jest.mock('../worker/workerAuth.js', () => ({
   fetchWorkerWithAuth: jest.fn(),
 }));
 
-const { arweaveScripts } = require('../arweave/arweaveScripts.js');
+const { arweaveClient } = require('../arweave/arweaveClient.js');
 const { getCorsProxyUrlOrThrow } = require('../worker/corsProxy.js');
 const { fetchWorkerWithAuth } = require('../worker/workerAuth.js');
 
@@ -24,7 +24,7 @@ const TX_ID = 'abc123abc123abc123abc123abc123abc123abc1230';
 describe('storageClient', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    arweaveScripts.uploadDataToArweave.mockResolvedValue(TX_ID);
+    arweaveClient.uploadDataToArweave.mockResolvedValue(TX_ID);
     getCorsProxyUrlOrThrow.mockResolvedValue('https://worker.example');
     fetchWorkerWithAuth.mockResolvedValue(
       new Response(
@@ -50,7 +50,7 @@ describe('storageClient', () => {
       tags: [{ name: 'CE-DocStorage', value: 'arweave' }],
     });
 
-    expect(arweaveScripts.uploadDataToArweave).toHaveBeenCalledWith(
+    expect(arweaveClient.uploadDataToArweave).toHaveBeenCalledWith(
       { ok: true },
       'json',
       expect.objectContaining({ sessionSlug: 'alpha' }),
@@ -66,7 +66,7 @@ describe('storageClient', () => {
       encrypted: true,
     });
 
-    expect(arweaveScripts.uploadDataToArweave).toHaveBeenCalledTimes(1);
+    expect(arweaveClient.uploadDataToArweave).toHaveBeenCalledTimes(1);
     expect(result.storageRef).toEqual({
       backend: 'lit-arweave',
       id: TX_ID,
@@ -84,7 +84,7 @@ describe('storageClient', () => {
       tags: [{ name: 'CE-DocStorage', value: 'cloudflare' }],
     });
 
-    expect(arweaveScripts.uploadDataToArweave).not.toHaveBeenCalled();
+    expect(arweaveClient.uploadDataToArweave).not.toHaveBeenCalled();
     expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(1);
     expect(String(fetchWorkerWithAuth.mock.calls[0][0])).toBe('https://worker.example/storage/upload');
     expect(JSON.parse(fetchWorkerWithAuth.mock.calls[0][1].body)).toEqual(

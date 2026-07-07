@@ -18,7 +18,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 
 import styles from './AudioInput.module.scss';
-import { requestAiRewrite, setVadTrimEnabled } from '../../../utilities/ai/aiScripts.js';
+import { requestAiRewrite, setVadTrimEnabled } from '../../../utilities/ai/aiClient.js';
 import { useWhisper, RECORDING_STATUS } from '../../../utilities/useWhisper.js';
 import { createLogger } from '../../../utilities/logging.js';
 
