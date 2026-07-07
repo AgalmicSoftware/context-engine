@@ -271,13 +271,14 @@ That ENS lookup is not implemented yet.
 │           │    { token, exp }              │                   │
 │           │                               │   Mint token:     │
 │           │    4. Authenticated requests   │   { sub, slug,    │
-│           │    Authorization: Bearer <tok> │     scopes, exp } │
-│           │──────────────────────────────▸│   HMAC-signed     │
+│           │    Authorization: Bearer <tok> │     scopes, exp,  │
+│           │──────────────────────────────▸│     jti }         │
+│           │                               │   HMAC + KV jti   │
 └──────────┘                               └───────────────────┘
 
 Token format: base64url(payload) + "." + base64url(hmac(payload))
 Scopes: ai, arweave, transcribe, faucet, fetch
-TTL: 24 hours
+TTL: 4 hours; the `authToken:{slug}:{sub}:{jti}` KV marker uses the same TTL
 ```
 
 ## Session Config Data Shape
