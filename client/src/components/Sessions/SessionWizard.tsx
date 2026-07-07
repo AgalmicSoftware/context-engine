@@ -22,8 +22,6 @@ import CollapsibleFieldGroup from './CollapsibleFieldGroup';
 import SessionWizardContractsField from './SessionWizardContractsField';
 import SessionWizardStorageProfileMetadataField from './SessionWizardStorageProfileMetadataField';
 import type { WorkerPanelProps } from './WorkerPanel';
-import WorkerResourceCard from './WorkerResourceCard';
-import WorkerResourceInputs from './WorkerResourceInputs';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
   buildSbtAccessControlConditions,
@@ -87,6 +85,7 @@ import useSessionWizardCleanupEffect from './hooks/useSessionWizardCleanupEffect
 import useSessionWizardSponsoredBundleController from './hooks/useSessionWizardSponsoredBundleController';
 import useSessionWizardWorkerSecretsController from './hooks/useSessionWizardWorkerSecretsController';
 import useSessionWizardPendingSbtController from './hooks/useSessionWizardPendingSbtController';
+import useSessionWizardWorkerResourceRenderer from './hooks/useSessionWizardWorkerResourceRenderer';
 import {
   arweavePublishAdapter,
   sbtFactoryReceiptPublishAdapter,
@@ -257,14 +256,13 @@ import {
   useStableSerializedObject,
   writeSessionWizardCache,
 } from './sessionWizardLocalStateSupport';
-import { RESOURCE_LABELS, RESOURCE_SECTION_TOOLTIPS } from './sessionWizardResourceConfig';
 import {
   buildSessionWizardNewSessionBannerDismissalContextKey,
   isNewSessionWizardPathname,
 } from './sessionWizardRouteState';
 import { buildPublishedPendingSbtLinks, type PublishedPendingSbtLink } from './sessionWizardPublishLinks';
 import { resolveSessionWizardNewSessionRequirementsDisplayState } from './sessionWizardRequirementsDisplay';
-import { getSessionWizardSecretFieldTestId, resolveSessionHeaderImageFormat } from './sessionWizardUiSupport';
+import { resolveSessionHeaderImageFormat } from './sessionWizardUiSupport';
 import {
   getSessionWizardExplorerBaseUrl as getExplorerBaseUrl,
   normalizeSessionWizardSlug as normalizeSlug,
@@ -275,7 +273,6 @@ import {
   buildSessionWizardGateOptions,
   normalizeSessionWizardGateIds as normalizeGateIds,
   resolveSessionWizardResourceGate as resolveResourceGate,
-  resolveSessionWizardResourceGateSelectionState,
   resolveSessionWizardResourceGateSelectionUpdate,
   type SessionWizardResourceGateSelectionState,
 } from './sessionWizardResourceGateSupport';
@@ -3322,13 +3319,6 @@ const SessionWizard = ({
     [encryptionGates],
   );
 
-  const updateResourceGate = (resourceKey: string, gateId: SessionWizardResourceGateSelectionState) => {
-    setResourceGateMap((prev) => ({
-      ...prev,
-      [resourceKey]: gateId,
-    }));
-  };
-
   const renderSessionWizardInfoTooltip = useCallback(
     ({
       id,
@@ -3350,59 +3340,6 @@ const SessionWizard = ({
     },
     [sessionWizardTooltipsEnabled],
   );
-
-  const renderResourceInputs = (resourceKey: string) => {
-    const fields = getResourceSecretFields(resourceKey);
-    return (
-      <WorkerResourceInputs
-        resourceKey={resourceKey}
-        fields={fields}
-        workerSecrets={workerSecrets}
-        workerSecretsEnabled={workerSecretsEnabled}
-        isNormalMode={isNormalMode}
-        showSponsoredFaucetNotice={showSponsoredFaucetNotice}
-        effectiveDefaultWorkerRpcUrl={effectiveDefaultWorkerRpcUrl}
-        getSecretFieldTestId={getSessionWizardSecretFieldTestId}
-        onUpdateSecret={(fieldKey: string, nextValue: string) => {
-          applyWorkerSecretsUpdate((prev: WorkerSecretsLike) => ({ ...prev, [fieldKey]: nextValue }));
-        }}
-      />
-    );
-  };
-
-  const renderResourceCard = (resourceKey: string) => {
-    const resourceGateSelectionState = resolveSessionWizardResourceGateSelectionState({
-      value: resourceGateMap[resourceKey],
-      fallbackGateId: defaultGateId || resourceGateOptions[0]?.value || '',
-      gateOptions: resourceGateOptions,
-    });
-    return (
-      <WorkerResourceCard
-        key={resourceKey}
-        resourceKey={resourceKey}
-        label={RESOURCE_LABELS[resourceKey] || resourceKey}
-        tooltipText={RESOURCE_SECTION_TOOLTIPS[resourceKey] || ''}
-        renderInfoTooltip={renderSessionWizardInfoTooltip}
-        gateOptions={gateOptions}
-        selectedGateIds={resourceGateSelectionState.selectedGateIds}
-        onChangeSelectedGateIds={(nextIds: unknown) => {
-          updateResourceGate(
-            resourceKey,
-            resolveSessionWizardResourceGateSelectionUpdate({
-              nextIds,
-              availableGateIds: resourceGateSelectionState.availableGateIds,
-              fallbackGateId: resourceGateSelectionState.fallbackGateId,
-            }),
-          );
-        }}
-        open={openResourceGateKey === resourceKey}
-        onToggleOpen={(nextOpen) => setOpenResourceGateKey(nextOpen ? resourceKey : '')}
-        disabled={resourceGateSelectionState.disabled}
-      >
-        {renderResourceInputs(resourceKey)}
-      </WorkerResourceCard>
-    );
-  };
 
   const orderedDraftEntries = useMemo(() => getSessionWizardOrderedDraftEntries(draft), [draft]);
 
@@ -3467,6 +3404,23 @@ const SessionWizard = ({
     sponsoredBundle: sponsoredBundleAppliedBundleRef.current,
     workerSecrets,
     deployForm,
+  });
+  const { renderResourceCard } = useSessionWizardWorkerResourceRenderer({
+    defaultGateId,
+    effectiveDefaultWorkerRpcUrl,
+    gateOptions,
+    isNormalMode,
+    openResourceGateKey,
+    resourceGateMap,
+    resourceGateOptions,
+    showSponsoredFaucetNotice,
+    workerSecrets,
+    workerSecretsEnabled,
+    applyWorkerSecretsUpdate,
+    getResourceSecretFields,
+    renderInfoTooltip: renderSessionWizardInfoTooltip,
+    setOpenResourceGateKey,
+    setResourceGateMap,
   });
   const {
     canUseSponsoredAutoDeployNow,
