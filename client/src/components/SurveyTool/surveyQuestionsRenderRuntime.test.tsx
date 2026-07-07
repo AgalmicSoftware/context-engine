@@ -125,6 +125,7 @@ describe('surveyQuestionsRenderRuntime', () => {
         renderAdditionalDecryptControl: context.renderQuestionFieldDecryptControl,
         renderAnswerDecryptControl: context.renderQuestionFieldDecryptControl,
         renderResponseInput: context.renderFullQuestionResponseInput,
+        onToggleComments: context.toggleComments,
         sliderOpen: true,
         surveyIndex: 2,
       }),

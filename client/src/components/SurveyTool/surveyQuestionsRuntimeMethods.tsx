@@ -1009,6 +1009,7 @@ export const createSurveyQuestionsRuntimeMethods = (
     setSliderMode,
   } = createSurveyQuestionsQuestionDisplayRuntime({
     ...context,
+    buildEmptyResponseFieldState,
     getAudioInputWorkerProps,
     handleAdditional,
     handleAnswer,
@@ -1085,6 +1086,7 @@ export const createSurveyQuestionsRuntimeMethods = (
     renderQuestionAnswerLockControl,
     renderQuestionFieldDecryptControl,
     renderQuestionMaskedPromptCard,
+    toggleComments,
   });
 
   const {
