@@ -70,7 +70,7 @@ jest.mock('../../utilities/arweave/arweaveClient.js', () => {
     buildArweaveGatewayUrl: (txId: string, gateway = 'https://arweave.example.test') => `${gateway}/${txId}`,
     downloadDataFromArweave: jest.fn(),
   };
-  return { arweaveClient, arweaveClient: arweaveClient };
+  return { arweaveClient };
 });
 
 jest.mock('../../utilities/docLibrary/uploads.js', () => ({

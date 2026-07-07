@@ -56,7 +56,7 @@ jest.mock('../../utilities/arweave/arweaveClient.js', () => {
     readArweaveWalletBalance: jest.fn(),
     formatWinstonToAr: jest.fn(),
   };
-  return { arweaveClient, arweaveClient: arweaveClient };
+  return { arweaveClient };
 });
 
 jest.mock('../../utilities/crypto/encryptedFields.js', () => ({

@@ -18,7 +18,7 @@ jest.mock('../arweave/arweaveClient.js', () => {
     downloadDataFromArweave: (...args) => mockDownloadDataFromArweave(...args),
     buildArweaveGatewayUrl: (txId, gateway = 'https://arweave.example.test') => `${gateway}/${txId}`,
   };
-  return { arweaveClient, arweaveClient: arweaveClient };
+  return { arweaveClient };
 });
 
 const ACCOUNT = '0x00000000000000000000000000000000000000aa';
