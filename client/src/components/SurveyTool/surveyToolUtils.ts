@@ -1,4 +1,4 @@
-/** @file surveyToolUtils.js */
+/** @file surveyToolUtils.ts */
 
 export {
   buildQuestionCacheHydrationPatch,

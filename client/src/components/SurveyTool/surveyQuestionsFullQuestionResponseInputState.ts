@@ -1,5 +1,5 @@
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { getNormalizedUiRatingValue, isSingleSelectMultichoice, normalizeMultichoiceValue } from './surveyToolUtils.js';
+import { getNormalizedUiRatingValue, isSingleSelectMultichoice, normalizeMultichoiceValue } from './surveyToolUtils';
 
 type SurveyQuestionRecord = {
   id: string;

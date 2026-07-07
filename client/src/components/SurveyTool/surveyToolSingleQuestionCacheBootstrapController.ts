@@ -7,7 +7,7 @@ import {
   resolveEffectiveSlug,
   resolveExplicitSessionContext,
   resolveSlugForIds,
-} from './surveyToolUtils.js';
+} from './surveyToolUtils';
 
 type QuestionPayload = UnknownRecord & {
   creator?: unknown;

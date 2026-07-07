@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { updateSubmittedSinceLastEdit } from './surveyToolUtils.js';
+import { updateSubmittedSinceLastEdit } from './surveyToolUtils';
 import { buildQuestionRoutePath } from '../../utilities/survey/questionRouting.js';
 import type { ResponseSlice, UnknownRecord } from './surveyToolTypes.js';
 import {

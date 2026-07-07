@@ -6,7 +6,7 @@ import {
   buildLocalCacheRehydrationUpdatePlan,
   loadLocalCacheHydrationSlice,
   mergeQuestionResponses,
-} from './surveyToolUtils.js';
+} from './surveyToolUtils';
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 

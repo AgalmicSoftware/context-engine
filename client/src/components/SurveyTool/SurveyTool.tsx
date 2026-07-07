@@ -21,7 +21,7 @@ import {
   resolveUpdateCacheContext,
   resolveSurveyReadContext,
   resolveEnsureQuestionCachedContext,
-} from './surveyToolUtils.js';
+} from './surveyToolUtils';
 import {
   buildSurveyToolHydratedFilterState,
   buildSurveyToolLoadingStatePatch,

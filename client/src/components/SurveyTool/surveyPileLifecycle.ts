@@ -1,5 +1,5 @@
 import { buildPileCacheUpdatePlan, type PileCacheUpdatePlan } from './surveyPileCacheSync.js';
-import { updateSubmittedSinceLastEdit } from './surveyToolUtils.js';
+import { updateSubmittedSinceLastEdit } from './surveyToolUtils';
 
 export type PileQuestionProgressLike = {
   slug?: unknown;

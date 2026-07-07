@@ -2,7 +2,7 @@ import { screen } from '@testing-library/react';
 
 import { createPileViewRuntimeStrategy } from './SurveyPileViewMode';
 import { renderSurveyPileViewMode } from './surveyQuestionsTestHarness';
-import { resolveQuestionPayloadCacheWriteContext } from './surveyToolUtils.js';
+import { resolveQuestionPayloadCacheWriteContext } from './surveyToolUtils';
 import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 

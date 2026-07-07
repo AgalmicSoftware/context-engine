@@ -44,7 +44,7 @@ import {
   buildQuestionScanProgressDisplay,
   doesQuestionProgressMatchSlug,
   normalizeQuestionProgressSlug,
-} from '../SurveyTool/surveyToolUtils.js';
+} from '../SurveyTool/surveyToolUtils';
 import { canonicalizeLegacySessionAlias } from '../../utilities/session/sessionDemoCompat.js';
 
 /**************************************************************

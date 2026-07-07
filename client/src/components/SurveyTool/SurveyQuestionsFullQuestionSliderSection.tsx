@@ -5,7 +5,7 @@ import ConvictionImportanceLabel from './ConvictionImportanceLabel';
 import ConvictionImportanceSliderControl from './ConvictionImportanceSliderControl';
 import DeferredConvictionImportanceSlider from './DeferredConvictionImportanceSlider';
 import styles from './SurveyTool.module.scss';
-import { shouldExpandSliderToggle } from './surveyToolUtils.js';
+import { shouldExpandSliderToggle } from './surveyToolUtils';
 import type { SliderMode } from './surveyToolSliderState.js';
 
 type SurveyQuestionsFullQuestionSliderSectionProps = {

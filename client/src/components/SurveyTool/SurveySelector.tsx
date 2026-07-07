@@ -266,7 +266,7 @@ import {
   writeQuestionsCache,
   writeSurveysCache,
   bumpSurveyPerfCounter,
-} from './surveyToolUtils.js';
+} from './surveyToolUtils';
 import {
   appendMissingAuthoritativePoolQuestions,
   filterQuestionsByAuthoritativePool,

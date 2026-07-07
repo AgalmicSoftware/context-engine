@@ -3,7 +3,7 @@
 import {
   buildCanDecryptOtherResponsesSnapshot,
   resolveCanDecryptOtherResponsesVerdict,
-} from './surveyToolResponseAccess.js';
+} from './surveyToolResponseAccess';
 
 export type CanDecryptSessionConfig = Record<string, unknown> & {
   __registry?: Record<string, unknown>;

@@ -2,7 +2,7 @@ import { screen, waitFor } from '@testing-library/react';
 
 import { createPileViewRuntimeStrategy } from './SurveyPileViewMode';
 import { renderSurveyPileViewMode } from './surveyQuestionsTestHarness';
-import { buildQuestionFilterStorageKeyPrefix } from './surveyToolUtils.js';
+import { buildQuestionFilterStorageKeyPrefix } from './surveyToolUtils';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
 import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';

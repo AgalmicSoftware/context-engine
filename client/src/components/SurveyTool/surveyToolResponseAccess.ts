@@ -1,3 +1,24 @@
+type UnknownRecord = Record<string, unknown>;
+
+type ResponseAccessPolicy = {
+  recipients?: unknown;
+  primaryResource?: unknown;
+};
+
+type ResponseAccessConfig = {
+  networkChainId?: unknown;
+  sponsored?: {
+    defaultGateId?: unknown;
+    gates?: unknown;
+    resources?: unknown;
+  } | null;
+  __registry?: {
+    updatedAt?: unknown;
+    gateAuthority?: unknown;
+    gatesByResource?: unknown;
+  } | null;
+};
+
 export const buildCanDecryptOtherResponsesSnapshot = ({
   account = '',
   loginComplete = false,
@@ -7,6 +28,15 @@ export const buildCanDecryptOtherResponsesSnapshot = ({
   slug = '',
   sbtCacheRevision = 0,
   cfg = null,
+}: {
+  account?: unknown;
+  loginComplete?: unknown;
+  singleQuestionMode?: unknown;
+  isStandalone?: unknown;
+  policy?: ResponseAccessPolicy | null;
+  slug?: unknown;
+  sbtCacheRevision?: unknown;
+  cfg?: ResponseAccessConfig | null;
 } = {}) => {
   const normalizedAccount = String(account || '').trim();
   const loggedIn = !!(loginComplete && normalizedAccount);
@@ -36,21 +66,23 @@ export const buildCanDecryptOtherResponsesSnapshot = ({
   };
 };
 
-export const buildResponseGateConfigSignature = (cfg = {}) => {
-  const normText = (value) =>
+const readObj = (value: unknown): UnknownRecord => (value && typeof value === 'object' ? (value as UnknownRecord) : {});
+
+export const buildResponseGateConfigSignature = (cfg: ResponseAccessConfig = {}) => {
+  const normText = (value: unknown) =>
     String(value == null ? '' : value)
       .trim()
       .toLowerCase();
-  const normChain = (value) => {
+  const normChain = (value: unknown) => {
     const normalizedValue = Number(value || 0);
     return Number.isFinite(normalizedValue) && normalizedValue > 0 ? String(normalizedValue) : '';
   };
-  const normAddresses = (...sources) =>
+  const normAddresses = (...sources: unknown[]) =>
     Array.from(
       new Set(
         sources
           .flat()
-          .map((address) =>
+          .map((address: unknown) =>
             String(address || '')
               .trim()
               .toLowerCase(),
@@ -60,13 +92,14 @@ export const buildResponseGateConfigSignature = (cfg = {}) => {
     )
       .sort()
       .join(',');
-  const readObj = (value) => (value && typeof value === 'object' ? value : {});
-  const stablePairs = (obj, mapper) =>
-    Object.keys(readObj(obj))
+  const stablePairs = (obj: unknown, mapper: (value: unknown, key: string) => string) => {
+    const record = readObj(obj);
+    return Object.keys(record)
       .sort()
-      .map((key) => `${key}:${mapper(readObj(obj)[key], key)}`)
+      .map((key) => `${key}:${mapper(record[key], key)}`)
       .join('|');
-  const gateSnapshot = (gate = {}) => {
+  };
+  const gateSnapshot = (gate: unknown = {}) => {
     const nextGate = readObj(gate);
     return [
       normText(nextGate.gateId || nextGate.id),
@@ -78,7 +111,7 @@ export const buildResponseGateConfigSignature = (cfg = {}) => {
       normText(nextGate.lookupStatus),
     ].join(',');
   };
-  const resourceSnapshot = (resource = {}) => {
+  const resourceSnapshot = (resource: unknown = {}) => {
     const nextResource = readObj(resource);
     return [
       normText(nextResource.status),
@@ -108,7 +141,7 @@ export const buildResponseGateConfigSignature = (cfg = {}) => {
   ].join('|');
 };
 
-export const resolveCanDecryptOtherResponsesVerdict = (verdicts = []) => {
+export const resolveCanDecryptOtherResponsesVerdict = (verdicts: Array<{ status?: unknown }> = []) => {
   const statuses = verdicts.map((verdict) => String(verdict?.status || 'unknown'));
   const canDecrypt = statuses.includes('granted');
   const status = canDecrypt

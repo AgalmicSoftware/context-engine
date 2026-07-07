@@ -6,7 +6,7 @@ import {
   normalizeSurveyToolFilterState,
   resolveEffectiveSlug,
   serializeSurveyToolFilterState,
-} from './surveyToolUtils.js';
+} from './surveyToolUtils';
 import { deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
 
 type SurveyToolPropsLike = {

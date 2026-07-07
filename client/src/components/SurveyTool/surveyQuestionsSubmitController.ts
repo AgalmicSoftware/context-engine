@@ -5,7 +5,7 @@ import type {
   SurveyQuestionsPrimarySubmitPlan,
 } from './surveyQuestionsTypes.js';
 import { buildSubmitFailureState, buildSubmitStartState, buildSubmitSuccessState } from './surveyQuestionsTypes.js';
-import { updateSubmittedSinceLastEdit } from './surveyToolUtils.js';
+import { updateSubmittedSinceLastEdit } from './surveyToolUtils';
 import { buildQuestionRoutePath } from '../../utilities/survey/questionRouting.js';
 
 export type SurveyQuestionsSubmitNavigationPort = (path: string, plan: SurveyQuestionsPrimarySubmitPlan) => void;
