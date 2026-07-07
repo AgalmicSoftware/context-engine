@@ -85,7 +85,7 @@ jest.mock('ethers', () => {
 const { ethers } = require('ethers');
 const { arweaveClient } = require('../arweave/arweaveClient.js');
 const { uploadDataToSessionStorage, readSessionStorageBlob } = require('../storage/storageClient.js');
-const contractScriptsBarrel = require('./contractScripts');
+const contractScriptsBarrel = require('./chainGateway');
 
 const contractScripts = contractScriptsBarrel.default;
 const submitResponses = (...args) => contractScripts.submitResponses(...args);
