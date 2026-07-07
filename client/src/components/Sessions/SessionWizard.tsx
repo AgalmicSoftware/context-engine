@@ -27,10 +27,8 @@ import WorkerResourceInputs from './WorkerResourceInputs';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
   buildSbtAccessControlConditions,
-  createLitHooks,
   resolveLitChain,
   getGlobalLitHooks,
-  setGlobalLitHooks,
 } from '../../utilities/crypto/litProtocol.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { getEffectiveArweaveKey } from '../../utilities/session/resourceKeys.js';
@@ -51,7 +49,6 @@ import type { SessionConfig, UnknownRecord } from '../../utilities/session/sessi
 import { normalizeBlockLimitsForConfig } from '../../utilities/session/blockLimits.js';
 import { normalizeBaseUrl } from '../../utilities/urlUtils.js';
 import { t } from '../../utilities/ui/terminology.js';
-import { buildSponsoredFlagFields as buildSponsoredSessionFlagFields } from '../../utilities/session/sponsoredFlags.js';
 import { createLogger } from '../../utilities/logging';
 import {
   getSessionWizardContractDefaults,
@@ -88,6 +85,7 @@ import useSessionWizardNormalModeSectionVisibility from './hooks/useSessionWizar
 import useSessionWizardPublishElapsed from './hooks/useSessionWizardPublishElapsed';
 import useSessionWizardCleanupEffect from './hooks/useSessionWizardCleanupEffect';
 import useSessionWizardSponsoredBundleController from './hooks/useSessionWizardSponsoredBundleController';
+import useSessionWizardWorkerSecretsController from './hooks/useSessionWizardWorkerSecretsController';
 import {
   arweavePublishAdapter,
   sbtFactoryReceiptPublishAdapter,
@@ -217,7 +215,6 @@ import {
 } from './sessionWizardSponsoredBundleSupport';
 import { __test__resetSessionWizardSponsoredBundleCacheKey } from './sessionWizardSponsoredBundleCache';
 import {
-  CHIPOTLE_LIT_CONFIG_FIELDS,
   buildWorkerLitCredentialsConfig,
   getSessionWizardWorkerResourceKeys,
   sanitizeSessionWizardSponsoredFieldSnapshotForLitMode,
@@ -263,11 +260,7 @@ import {
   useStableSerializedObject,
   writeSessionWizardCache,
 } from './sessionWizardLocalStateSupport';
-import {
-  RESOURCE_LABELS,
-  RESOURCE_SECTION_TOOLTIPS,
-  resolveSessionWizardResourceSecretFields,
-} from './sessionWizardResourceConfig';
+import { RESOURCE_LABELS, RESOURCE_SECTION_TOOLTIPS } from './sessionWizardResourceConfig';
 import {
   buildSessionWizardNewSessionBannerDismissalContextKey,
   isNewSessionWizardPathname,
@@ -280,14 +273,7 @@ import {
   normalizeSessionWizardSlug as normalizeSlug,
   normalizeSessionWizardWorkerUrl as normalizeWorkerUrl,
 } from './sessionWizardUrlSupport';
-import {
-  parseSessionWizardAllowOriginsInput,
-  resolveSessionWizardWorkerBaseUrlFromDraft,
-  resolveSessionWizardWorkerFaucetConfigFromDraft,
-  resolveSessionWizardWorkerRpcUrlFromDraft,
-  resolveSessionWizardWorkerRpcUrlMapFromDraft,
-  resolveSessionWizardWorkerUrlSourceState,
-} from './sessionWizardWorkerRuntimeSupport';
+import { resolveSessionWizardWorkerUrlSourceState } from './sessionWizardWorkerRuntimeSupport';
 import {
   buildSessionWizardGateOptions,
   normalizeSessionWizardGateIds as normalizeGateIds,
@@ -520,28 +506,6 @@ type ProvisionedSponsoredContextState = UnknownRecord & {
   sessionSlug: string;
   workerUrl: string;
   fields: UnknownRecord;
-};
-
-type BootstrapAdminActionInput = {
-  statement?: unknown;
-  targetSlug?: unknown;
-  workerUrl?: unknown;
-  accountOverride?: unknown;
-};
-
-type TypedAdminActionInput = {
-  action?: string;
-  body?: UnknownRecord;
-  targetSlug?: unknown;
-  workerUrl?: unknown;
-  accountOverride?: unknown;
-};
-
-type PublishArweaveUploadOptionsInput = {
-  arweaveJwk?: unknown;
-  workerUrl?: unknown;
-  sessionSlug?: unknown;
-  authAccount?: unknown;
 };
 
 type SessionWizardMetadataEncryptionResult = {
@@ -3581,66 +3545,46 @@ const SessionWizard = ({
       });
   };
 
-  const resolveWorkerBaseUrl = () =>
-    resolveSessionWizardWorkerBaseUrlFromDraft({
-      draft,
-      wizardMode,
-      deployComplete,
-      deployWorkerUrl,
-      workerMode,
-      allowNormalModeSharedHostedWorker: NORMAL_MODE_SHARED_HOSTED_WORKER_ENABLED,
-    });
-
-  const resolveWorkerRpcUrl = () =>
-    resolveSessionWizardWorkerRpcUrlFromDraft({
-      draft,
-      registryChainId,
-      networkId: network?.id,
-      workerSecrets: getCurrentEnabledWorkerSecrets(),
-    });
-
-  const resolveWorkerRpcUrlMap = () =>
-    resolveSessionWizardWorkerRpcUrlMapFromDraft({
-      draft,
-      registryChainId,
-      networkId: network?.id,
-      workerSecrets: getCurrentEnabledWorkerSecrets(),
-    });
-
-  const resolveWorkerFaucetConfig = () =>
-    resolveSessionWizardWorkerFaucetConfigFromDraft({
-      draft,
-      registryChainId,
-      networkId: network?.id,
-      workerSecrets: getCurrentEnabledWorkerSecrets(),
-    });
-  const effectiveDefaultWorkerRpcUrl = toStr(resolveWorkerRpcUrl()).trim();
-  const resolvedWorkerBaseUrlForDelegation = resolveWorkerBaseUrl();
-
-  const parseAllowOriginsInput = () => parseSessionWizardAllowOriginsInput(workerAllowOrigins);
-
-  const getResourceSecretFields = (resourceKey: string) => {
-    return resolveSessionWizardResourceSecretFields(resourceKey, draft?.ai);
-  };
-
-  const buildSponsoredFlagFields = (secretsSnapshot: WorkerSecretsLike = getCurrentWorkerSecrets()) => {
-    const currentSlug = normalizeSlug(draft?.slug || '');
-    const currentWorkerUrl = workerAuthPublishAdapter.normalizeWorkerUrl(resolvedWorkerBaseUrlForDelegation);
-    const fallbackFields =
-      currentSlug &&
-      currentSlug === normalizeSlug(provisionedSponsoredContext?.sessionSlug || '') &&
-      (!currentWorkerUrl ||
-        !provisionedSponsoredContext?.workerUrl ||
-        currentWorkerUrl === provisionedSponsoredContext.workerUrl)
-        ? provisionedSponsoredContext?.fields
-        : {};
-
-    return buildSponsoredSessionFlagFields({
-      secrets: sanitizeSessionWizardWorkerSecretsForLitMode(secretsSnapshot),
-      fallbackFields: sanitizeSessionWizardSponsoredFieldSnapshotForLitMode(fallbackFields),
-      workerSecretsEnabled,
-    });
-  };
+  const {
+    buildSessionWizardPublishArweaveUploadOptions,
+    buildSponsoredFlagFields,
+    clearCachedArweaveJwkAfterUpload,
+    clearCachedWorkerSecretsAfterDeploy,
+    clearWorkerSecretFields,
+    effectiveDefaultWorkerRpcUrl,
+    getMissingWorkerSecretsForDeploy,
+    getResourceSecretFields,
+    parseAllowOriginsInput,
+    resolveWorkerBaseUrl,
+    resolveWorkerFaucetConfig,
+    resolveWorkerRpcUrl,
+    resolveWorkerRpcUrlMap,
+    resolvedWorkerBaseUrlForDelegation,
+    signBootstrapAdminAction,
+    signTypedAdminAction,
+  } = useSessionWizardWorkerSecretsController({
+    account,
+    provider,
+    network,
+    draft,
+    wizardMode,
+    deployComplete,
+    deployWorkerUrl,
+    workerMode,
+    workerSecrets,
+    workerSecretsEnabled,
+    workerAllowOrigins,
+    provisionedSponsoredContext,
+    effectivePersistWorkerSecrets,
+    registryChainId,
+    allowNormalModeSharedHostedWorker: NORMAL_MODE_SHARED_HOSTED_WORKER_ENABLED,
+    getCurrentWorkerSecrets,
+    getCurrentEnabledWorkerSecrets,
+    applyWorkerSecretsUpdate,
+    updateDraftValue,
+    resolvedWalletAccountRef,
+    resolveChipotleHookConfig: resolveSessionWizardChipotleHookConfig,
+  });
 
   // Build a snapshot of gate selections from the current gate UI (default gate + resource mapping).
   // This keeps on-chain resource gates aligned with the selected default gate even if state updates are still pending.
@@ -3673,201 +3617,6 @@ const SessionWizard = ({
       };
     });
     return snapshot;
-  };
-
-  const getMissingWorkerSecretsForDeploy = (secretsSnapshot = getCurrentWorkerSecrets()) => {
-    const missing = [];
-    if (!toStr(secretsSnapshot.openaiKey).trim()) {
-      missing.push('OpenAI key');
-    }
-    if (!toStr(secretsSnapshot.arweaveJwk).trim()) missing.push('Arweave JWK');
-    const rpcUrl = resolveWorkerRpcUrl();
-    if (!rpcUrl) missing.push('Worker RPC URL');
-    const hasAnyChipotleField =
-      CHIPOTLE_LIT_CONFIG_FIELDS.some((key) => !!toStr(secretsSnapshot?.[key]).trim()) ||
-      !!toStr(secretsSnapshot?.litAccountApiKey).trim() ||
-      !!toStr(secretsSnapshot?.litUsageApiKey).trim();
-    const accountKeyOnlyChipotleConfig = !!toStr(secretsSnapshot?.litAccountApiKey).trim();
-    const bootstrapOnlyChipotleConfig =
-      accountKeyOnlyChipotleConfig ||
-      (!!toStr(secretsSnapshot?.litApiBase).trim() &&
-        !toStr(secretsSnapshot?.litGroupId).trim() &&
-        !toStr(secretsSnapshot?.litPkpId).trim() &&
-        !toStr(secretsSnapshot?.litActionCid).trim() &&
-        !toStr(secretsSnapshot?.litUsageApiKey).trim());
-    if (hasAnyChipotleField && !bootstrapOnlyChipotleConfig) {
-      const requiredChipotleFields = [
-        ['litApiBase', 'Lit API base'],
-        ['litGroupId', 'Lit group ID'],
-        ['litPkpId', 'Lit PKP ID'],
-      ];
-      requiredChipotleFields.forEach(([key, label]) => {
-        if (!toStr(secretsSnapshot?.[key]).trim()) missing.push(label);
-      });
-    }
-    return missing;
-  };
-
-  const chipotleHookWorkerSecrets = useMemo<WorkerSecretsLike>(
-    () => ({
-      litApiBase: workerSecrets.litApiBase,
-      litGroupId: workerSecrets.litGroupId,
-      litPkpId: workerSecrets.litPkpId,
-      litActionCid: workerSecrets.litActionCid,
-      litAccountApiKey: workerSecrets.litAccountApiKey,
-      litUsageApiKey: workerSecrets.litUsageApiKey,
-    }),
-    [
-      workerSecrets.litAccountApiKey,
-      workerSecrets.litActionCid,
-      workerSecrets.litApiBase,
-      workerSecrets.litGroupId,
-      workerSecrets.litPkpId,
-      workerSecrets.litUsageApiKey,
-    ],
-  );
-
-  useEffect(() => {
-    const previousHooks = getGlobalLitHooks();
-    const chainId = Number(registryChainId || draft?.networkChainId || network?.id || 0) || null;
-    const chipotle = resolveSessionWizardChipotleHookConfig({
-      workerSecretsEnabled,
-      workerSecrets: chipotleHookWorkerSecrets,
-      resolvedWorkerUrl: resolvedWorkerBaseUrlForDelegation,
-      draft,
-    });
-    const nextHooks = chipotle
-      ? createLitHooks({
-          providerLike: provider,
-          account,
-          chainId,
-          litChain: resolveLitChain({ chainId }),
-          litNetwork: 'chipotle',
-          chipotle,
-        })
-      : null;
-    setGlobalLitHooks(nextHooks);
-    return () => {
-      setGlobalLitHooks(previousHooks);
-    };
-  }, [
-    account,
-    draft,
-    network?.id,
-    provider,
-    registryChainId,
-    resolvedWorkerBaseUrlForDelegation,
-    chipotleHookWorkerSecrets,
-    workerSecretsEnabled,
-  ]);
-
-  const clearWorkerSecretFields = () => {
-    const aiConfig =
-      draft?.ai && typeof draft.ai === 'object' && !Array.isArray(draft.ai) ? (draft.ai as UnknownRecord) : {};
-    const aiProviders =
-      aiConfig.providers && typeof aiConfig.providers === 'object' && !Array.isArray(aiConfig.providers)
-        ? (aiConfig.providers as UnknownRecord)
-        : {};
-    Object.keys(aiProviders).forEach((key) => {
-      updateDraftValue(['ai', 'providers', key, 'apiKey'], '');
-      updateDraftValue(['ai', 'providers', key, 'encryptedApiKey'], '');
-    });
-    const rpcConfig =
-      draft?.rpc && typeof draft.rpc === 'object' && !Array.isArray(draft.rpc) ? (draft.rpc as UnknownRecord) : {};
-    const rpcProviders =
-      rpcConfig.providers && typeof rpcConfig.providers === 'object' && !Array.isArray(rpcConfig.providers)
-        ? (rpcConfig.providers as UnknownRecord)
-        : {};
-    Object.keys(rpcProviders).forEach((key) => {
-      updateDraftValue(['rpc', 'providers', key, 'apiKey'], '');
-      updateDraftValue(['rpc', 'providers', key, 'encryptedApiKey'], '');
-    });
-    updateDraftValue(['arweave', 'jwk'], '');
-    updateDraftValue(['arweave', 'encryptedJwk'], '');
-    updateDraftValue(['faucet', 'privateKey'], '');
-    updateDraftValue(['faucet', 'encryptedPrivateKey'], '');
-  };
-
-  // Cache worker secrets only until they've been submitted in a deploy payload.
-  // After a successful deploy, stop persisting secrets to cache. Keep the live
-  // in-memory copy so the current publish run can still finish without forcing
-  // the user to re-enter keys.
-  const clearCachedWorkerSecretsAfterDeploy = () => {
-    if (effectivePersistWorkerSecrets) return;
-  };
-
-  // After successful metadata upload, clear arweaveJwk from cache (skip in dev).
-  const clearCachedArweaveJwkAfterUpload = () => {
-    if (effectivePersistWorkerSecrets) return;
-    applyWorkerSecretsUpdate((prev: WorkerSecretsLike) => ({ ...prev, arweaveJwk: '' }));
-  };
-
-  const signBootstrapAdminAction = async ({
-    statement = '',
-    targetSlug = '',
-    workerUrl = '',
-    accountOverride = '',
-  }: BootstrapAdminActionInput = {}) => {
-    const baseUrl = normalizeWorkerUrl(toStr(workerUrl || resolveWorkerBaseUrl()).trim());
-    if (!baseUrl) throw new Error('Worker URL is missing.');
-    const authAccount = toStr(accountOverride || resolvedWalletAccountRef.current || account).trim();
-    return workerAuthPublishAdapter.buildSignedBootstrapAdminAuth({
-      slug: normalizeSlug(targetSlug),
-      workerUrl: baseUrl,
-      statement: toStr(statement).trim(),
-      context: {
-        account: authAccount,
-        chainId: Number(registryChainId || draft.networkChainId || network?.id || 1) || 1,
-        providerLike: typeof provider === 'string' ? provider : undefined,
-      },
-    });
-  };
-
-  const buildSessionWizardPublishArweaveUploadOptions = async ({
-    arweaveJwk = '',
-    workerUrl = '',
-    sessionSlug = '',
-    authAccount = '',
-  }: PublishArweaveUploadOptionsInput = {}) =>
-    // Regression guard: keep session metadata/header uploads on the same
-    // sponsored-JWK path as deferred SBT finalization so /new publish does not
-    // fix only one Arweave leg and regress the next.
-    arweavePublishAdapter.resolveUploadOptions({
-      arweaveJwk,
-      workerUrl,
-      preferDirectArweaveUpload: !!toStr(arweaveJwk).trim(),
-      allowDirectFallbackOnBootstrapFailure: false,
-      requireAdminAuthWithoutJwk: true,
-      buildAdminAuth: ({ workerUrl: resolvedWorkerUrl }) =>
-        signBootstrapAdminAction({
-          statement: 'Admin request: bootstrap arweave upload',
-          targetSlug: sessionSlug,
-          workerUrl: resolvedWorkerUrl,
-          accountOverride: authAccount,
-        }),
-    });
-
-  const signTypedAdminAction = async ({
-    action = 'set-config',
-    body = {},
-    targetSlug = '',
-    workerUrl = '',
-    accountOverride = '',
-  }: TypedAdminActionInput = {}) => {
-    const baseUrl = normalizeWorkerUrl(toStr(workerUrl || resolveWorkerBaseUrl()).trim());
-    if (!baseUrl) throw new Error('Worker URL is missing.');
-    const authAccount = toStr(accountOverride || resolvedWalletAccountRef.current || account).trim();
-    return workerAuthPublishAdapter.buildSignedAdminActionAuth({
-      action: toStr(action).trim() || 'set-config',
-      slug: normalizeSlug(targetSlug),
-      body,
-      workerUrl: baseUrl,
-      context: {
-        account: authAccount,
-        chainId: Number(registryChainId || draft.networkChainId || network?.id || 1) || 1,
-        providerLike: typeof provider === 'string' ? provider : undefined,
-      },
-    });
   };
 
   const sessionIdHex = sessionRegistryPublishAdapter.normalizeSessionIdHex(sessionId);
