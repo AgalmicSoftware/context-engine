@@ -1,0 +1,14 @@
+{
+  "posts": [
+    {
+      "slug": "agent-village-wrapped",
+      "title": "Agent Village Wrapped and the Agent Mirror Test",
+      "date": "2026-07-06",
+      "summary": "A quiz people want to take, an eval hiding inside it: measuring how accurately agents model their humans by recording what people correct when they see their agent's predictions.",
+      "author": "Context Engine",
+      "tags": ["agent evals", "agent village", "sensemaking", "defining ai futures"],
+      "file": "agent-village-wrapped/agent-village-wrapped.md",
+      "attachments": "agent-village-wrapped/attachments"
+    }
+  ]
+}
