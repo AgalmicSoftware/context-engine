@@ -3,19 +3,59 @@ import { ethers } from 'ethers';
 export const CHIPOTLE_WRAPPED_KEY_VERSION = 2;
 export const CHIPOTLE_POLICY_VERSION = 'chipotle-sbt-v2';
 
-const ethersUtils = ethers?.utils || ethers;
+type EthersUtilsLike = {
+  isAddress: (value: string) => boolean;
+  getAddress: (value: string) => string;
+  keccak256: (value: Uint8Array | string) => string;
+  toUtf8Bytes: (value: string) => Uint8Array;
+  hexlify: (value: unknown) => string;
+  arrayify: (value: unknown) => Uint8Array;
+};
 
-const toStr = (value) => (typeof value === 'string' ? value : value == null ? '' : String(value));
+type LitChipotlePolicyInput = {
+  chainId?: unknown;
+  gateMode?: unknown;
+  sbtAddresses?: unknown;
+  litActionCid?: unknown;
+  litPkpId?: unknown;
+};
 
-export const normalizeChipotleGateMode = (value) => (toStr(value).trim().toLowerCase() === 'all' ? 'all' : 'any');
+type LitChipotlePolicy = {
+  version: typeof CHIPOTLE_POLICY_VERSION;
+  chainId: number;
+  gateMode: 'any' | 'all';
+  sbtAddresses: string[];
+  litActionCid: string;
+  litPkpId: string;
+};
 
-export const normalizeChipotleChainId = (value) => {
+type LitChipotleWrappedPlaintextInput = {
+  cekHex?: unknown;
+  policy?: LitChipotlePolicyInput;
+};
+
+type LitChipotleWrappedPlaintext = {
+  v: typeof CHIPOTLE_WRAPPED_KEY_VERSION;
+  cekHex: string;
+  policyFingerprint: string;
+  policy: LitChipotlePolicy;
+};
+
+const ethersUtilsCandidate: unknown = (ethers as { utils?: EthersUtilsLike }).utils || ethers;
+const ethersUtils = ethersUtilsCandidate as EthersUtilsLike;
+
+const toStr = (value: unknown) => (typeof value === 'string' ? value : value == null ? '' : String(value));
+
+export const normalizeChipotleGateMode = (value: unknown): 'any' | 'all' =>
+  toStr(value).trim().toLowerCase() === 'all' ? 'all' : 'any';
+
+export const normalizeChipotleChainId = (value: unknown) => {
   const parsed = Number(value || 0);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
 };
 
-export const normalizeChipotleSbtAddresses = (values = []) => {
-  const out = [];
+export const normalizeChipotleSbtAddresses = (values: unknown = []) => {
+  const out: string[] = [];
   const seen = new Set();
   (Array.isArray(values) ? values : [values]).forEach((raw) => {
     const value = toStr(raw).trim();
@@ -32,19 +72,20 @@ export const normalizeChipotleSbtAddresses = (values = []) => {
   return out;
 };
 
-export const stableChipotleStringify = (value) => {
-  const walk = (entry) => {
+export const stableChipotleStringify = (value: unknown) => {
+  const walk = (entry: unknown): unknown => {
     if (entry == null) return entry;
     if (typeof entry === 'string' || typeof entry === 'number' || typeof entry === 'boolean') {
       return entry;
     }
     if (Array.isArray(entry)) return entry.map(walk);
     if (typeof entry === 'object') {
-      const out = {};
-      Object.keys(entry)
+      const record = entry as Record<string, unknown>;
+      const out: Record<string, unknown> = {};
+      Object.keys(record)
         .sort()
         .forEach((key) => {
-          out[key] = walk(entry[key]);
+          out[key] = walk(record[key]);
         });
       return out;
     }
@@ -59,7 +100,7 @@ export const buildLitChipotlePolicy = ({
   sbtAddresses = [],
   litActionCid = '',
   litPkpId = '',
-} = {}) => {
+}: LitChipotlePolicyInput = {}): LitChipotlePolicy => {
   const normalizedChainId = normalizeChipotleChainId(chainId);
   if (!normalizedChainId) {
     throw new Error('Lit Chipotle policy requires a chain ID.');
@@ -87,12 +128,12 @@ export const buildLitChipotlePolicy = ({
   };
 };
 
-export const fingerprintLitChipotlePolicy = (policy = {}) => {
+export const fingerprintLitChipotlePolicy = (policy: LitChipotlePolicyInput = {}) => {
   const canonicalPolicy = buildLitChipotlePolicy(policy);
   return ethersUtils.keccak256(ethersUtils.toUtf8Bytes(stableChipotleStringify(canonicalPolicy)));
 };
 
-export const normalizeChipotleCekHex = (value) => {
+export const normalizeChipotleCekHex = (value: unknown) => {
   const raw = toStr(value).trim();
   if (!/^0x[0-9a-f]{64}$/i.test(raw)) {
     throw new Error('Lit Chipotle CEK must be a 32-byte hex string.');
@@ -100,7 +141,10 @@ export const normalizeChipotleCekHex = (value) => {
   return ethersUtils.hexlify(ethersUtils.arrayify(raw));
 };
 
-export const buildLitChipotleWrappedPlaintext = ({ cekHex, policy } = {}) => {
+export const buildLitChipotleWrappedPlaintext = ({
+  cekHex,
+  policy,
+}: LitChipotleWrappedPlaintextInput = {}): LitChipotleWrappedPlaintext => {
   const canonicalPolicy = buildLitChipotlePolicy(policy);
   return {
     v: CHIPOTLE_WRAPPED_KEY_VERSION,
@@ -110,32 +154,41 @@ export const buildLitChipotleWrappedPlaintext = ({ cekHex, policy } = {}) => {
   };
 };
 
-export const parseLitChipotleWrappedPlaintext = (value) => {
-  let parsed;
+export const parseLitChipotleWrappedPlaintext = (value: unknown): LitChipotleWrappedPlaintext => {
+  let parsed: unknown;
   try {
     parsed = typeof value === 'string' ? JSON.parse(value) : value;
   } catch {
     throw new Error('Lit Chipotle wrapped key is not valid v2 JSON.');
   }
-  if (!parsed || typeof parsed !== 'object' || parsed.v !== CHIPOTLE_WRAPPED_KEY_VERSION) {
+  const parsedRecord = parsed as {
+    v?: unknown;
+    cekHex?: unknown;
+    policy?: LitChipotlePolicyInput;
+    policyFingerprint?: unknown;
+  };
+  if (!parsed || typeof parsed !== 'object' || parsedRecord.v !== CHIPOTLE_WRAPPED_KEY_VERSION) {
     throw new Error('Lit Chipotle legacy wrapped keys are not supported.');
   }
-  const policy = buildLitChipotlePolicy(parsed.policy || {});
+  const policy = buildLitChipotlePolicy(parsedRecord.policy || {});
   const expectedFingerprint = fingerprintLitChipotlePolicy(policy);
-  const actualFingerprint = toStr(parsed.policyFingerprint).trim().toLowerCase();
+  const actualFingerprint = toStr(parsedRecord.policyFingerprint).trim().toLowerCase();
   if (!actualFingerprint || actualFingerprint !== expectedFingerprint.toLowerCase()) {
     throw new Error('Lit Chipotle wrapped key policy fingerprint mismatch.');
   }
   return {
     v: CHIPOTLE_WRAPPED_KEY_VERSION,
-    cekHex: normalizeChipotleCekHex(parsed.cekHex),
+    cekHex: normalizeChipotleCekHex(parsedRecord.cekHex),
     policyFingerprint: expectedFingerprint,
     policy,
   };
 };
 
-export const normalizeLitChipotleMetadataVersion = (chipotle = {}) => {
-  const raw = chipotle && typeof chipotle === 'object' ? (chipotle.version ?? chipotle.v) : null;
+export const normalizeLitChipotleMetadataVersion = (chipotle: unknown = {}) => {
+  const raw =
+    chipotle && typeof chipotle === 'object'
+      ? ((chipotle as { version?: unknown; v?: unknown }).version ?? (chipotle as { v?: unknown }).v)
+      : null;
   const parsed = Number(raw || 0);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
 };
