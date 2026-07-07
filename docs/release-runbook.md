@@ -89,10 +89,69 @@ For a stripped artifact release:
 
 ```bash
 bash scripts/prepare-public-release.sh --force release-public
+npm run verify:public-release-pii -- release-public
 ```
 
-Then run the PII and secrets review from `docs/releasing.md` inside the stripped
-output before publishing.
+## M1 Replay Procedure
+
+M1 shipped on 2026-07-06 by merging `release-staging` into public `main` with a
+history-preserving PR. The verified public base was `cee385f5d`, and the public
+merge commit was `dc2974152`.
+
+Use this procedure for a history-preserving release:
+
+```bash
+git fetch --prune origin
+git ls-remote origin --heads main dev release-staging
+npm run test:wiring
+npm run type-debt:check
+npm run typecheck:client
+make release
+npm run verify:public-release-pii -- release-public
+bash scripts/sync-public-history.sh --dry-run release-staging
+bash scripts/sync-public-history.sh --push release-staging
+```
+
+Before the operator opens or merges the PR, verify the replay branch with the
+guardrails in `docs/releasing.md`: tip parity against the canonical artifact,
+full-history stripped-path and commit-message sweeps, public identity audit,
+public PII scan, wiring, type-debt, and public Node tests. For diverged-source
+repairs, add one final `chore: true-up public tree to release artifact` commit
+when the replayed tip differs from the canonical artifact.
+
+For the artifact-only fallback:
+
+```bash
+git fetch --prune origin
+make release
+npm run verify:public-release-pii -- release-public
+git switch release-staging
+git reset --hard origin/main
+# replace the release-staging working tree with release-public/ contents
+git add -A
+git commit -m "chore: refresh release staging source"
+npm run test:wiring
+npm run type-debt:check
+npm run test:node
+```
+
+The operator push command for either prepared branch is:
+
+```bash
+git push origin release-staging --force-with-lease
+```
+
+Then open the comparison PR:
+
+```text
+https://github.com/AgalmicSoftware/context-engine/compare/main...release-staging
+```
+
+Post-merge, confirm the latest release asset:
+
+```bash
+bash scripts/verify-release-assets.sh
+```
 
 ## Rollback
 
@@ -109,6 +168,13 @@ output before publishing.
 - Public history branch: rebuild the replay branch from the intended private
   source using the sync flow in `docs/releasing.md`; do not force-push `dev`
   itself.
+- Public main: prefer a normal revert PR for application bugs. Use an admin
+  branch reset only for accidental-publication incidents, and guard it with
+  `--force-with-lease=refs/heads/main:<expected-full-sha>`.
+- Worker release asset: the `publish-worker-bundles` workflow creates a new
+  latest release on every public `main` push. To roll back the default bundle
+  URL, republish bundles from the previous known-good commit or mark that
+  previous worker-bundle release as latest in GitHub.
 
 ## OPERATOR-CONFIRM
 

@@ -1,29 +1,39 @@
 # Releasing Public History or Artifacts
 
-This repo now supports two public-release workflows:
+The 2026-07-06 M1 release shipped through a history-preserving
+`release-staging` PR into public `main`. `origin/main` advanced to merge commit
+`dc2974152`, preserving 436 public-safe commits since `cee385f5d` plus the
+GitHub merge commit. Use this replay flow when public history must preserve the
+reviewable commit narrative.
 
-- `scripts/prepare-public-release.sh` builds a stripped working-tree artifact in `release-public/`
-- `scripts/sync-public-history.sh` replays `dev` commits onto public `main` one-by-one so GitHub shows readable per-commit diffs
+This repo supports two public-release workflows:
 
-Separately, `.github/workflows/publish-worker-bundles.yml` rebuilds the Cloudflare worker fallback bundles on every push to public `main`/`master`, publishes them as GitHub release assets, and explicitly marks that worker-bundle release as the repo's latest release so the client default bundle URL at `releases/latest/download/sessionCorsWorker.bundle.js` keeps resolving to fresh assets.
+- `scripts/sync-public-history.sh` replays `dev` commits onto public `main`
+  one-by-one so GitHub shows readable per-commit diffs.
+- `scripts/prepare-public-release.sh` builds a stripped working-tree artifact
+  in `release-public/`; use it as the canonical tip-parity artifact and as the
+  fallback when full-history replay sweeps are not green.
 
-Use the history-sync flow when you want a public PR with preserved commit narrative. Use the artifact flow when you need a standalone stripped copy of the repo.
+Separately, `.github/workflows/publish-worker-bundles.yml` rebuilds the
+Cloudflare worker fallback bundles on every push to public `main`/`master`,
+publishes them as GitHub release assets, and explicitly marks that
+worker-bundle release as the repo's latest release so the client default bundle
+URL at `releases/latest/download/sessionCorsWorker.bundle.js` keeps resolving
+to fresh assets.
 
 The artifact exporter copies tracked files plus untracked files that are not ignored by git, then applies the private strip list. Ignored local files such as keys, caches, build output, generated media, and previous release folders are skipped before the strip phase.
 
 ## Quick start
 
 ```bash
-# Per-commit public branch replay
+# History-preserving public branch replay, the M1 path
 make install-private-branch-guard
-make sync-public
-make sync-public-push
 bash scripts/sync-public-history.sh --dry-run release-candidate
+make release
+npm run verify:public-release-pii -- release-public
 bash scripts/sync-public-history.sh --push release-staging
-# Still accepted for compatibility, but no longer required
-bash scripts/sync-public-history.sh --push --force-with-lease release-staging
 
-# Stripped release artifact
+# Stripped release artifact and fallback
 make release                 # output in ./release-public/
 npm run verify:public-release-pii -- release-public
 make release RELEASE_DIR=./out   # custom output path
@@ -58,6 +68,29 @@ Push safety:
 - The same strip patterns as `prepare-public-release.sh` are applied before every replayed commit is created
 - The public-surface import verifier uses the same strip-pattern helper, so newly stripped paths automatically become invalid import targets from public files
 - The replayed public tree runs `npm run test:wiring`, `npm run type-debt:check`, and `npm run test:node` before push with the source checkout's `node_modules` linked into the temporary public checkout when available, so public-copy inventory, boundary/type-debt baselines, and stripped-path assumptions fail locally before PR CI
+
+Full-history replay guardrails:
+
+- Build a fresh canonical artifact with `make release` and scan it with
+  `npm run verify:public-release-pii -- release-public` before publishing a
+  replay branch.
+- Compare the replay tip tree to the canonical artifact. If a diverged replay
+  drops merge-resolution diffs, keep the replayed commits for provenance and
+  add one final `chore: true-up public tree to release artifact` commit that
+  makes the tip byte-identical to the artifact before running gates.
+- Sweep every replayed commit, not just the tip, for stripped/private path
+  names such as `TODO/`, private planning docs, private companion tooling,
+  private worker paths, private E2E runners, and local secret baselines.
+- Sweep replayed commit messages for private planning IDs and stripped path
+  names. Use `--sanitize-private-replay-messages` only when the underlying
+  patch is public-safe.
+- Verify replay identities independently with
+  `git log --format='%ae%n%ce' <base>..<branch> | sort -u`; the only expected
+  email is `agalmicsoftware@protonmail.com`.
+- Do not proceed with a history-preserving push unless tip parity, full-history
+  content/message sweeps, identity checks, PII scan, wiring, type-debt, and
+  public Node tests are green. If those checks are not green, ship the single
+  artifact branch first and repair replay history separately.
 
 Baseline monotonicity:
 
@@ -113,9 +146,15 @@ The scanner fails on email addresses outside known public metadata/contact surfa
 1. Develop on local `dev` with private/internal files present where needed
 2. Install the private-branch guard once with `make install-private-branch-guard` if you have not already
    - Any `make sync-public` / `make sync-public-push` run also installs it automatically
-3. Run `make sync-public` or `bash scripts/sync-public-history.sh --push release-staging` to build or refresh the replayed public branch
+3. Run `make release` and `npm run verify:public-release-pii -- release-public`
+   to create the canonical stripped artifact for tip parity
+4. Run `make sync-public` or `bash scripts/sync-public-history.sh --push release-staging` to build or refresh the replayed public branch
    - If `release-staging` already exists locally, add `--force-with-lease`
    - The command fails before push if any public source file still imports a stripped private path, if test wiring or type-debt checks fail, or if public Node tests fail
-4. Open or update the PR from `release-staging` into `main`
-5. Choose the merge method intentionally: `Merge pull request` preserves the replayed `release-staging` commit SHAs on `main`, while `Rebase and merge` keeps `main` linear but assigns new SHAs
-6. For the artifact workflow, run `make release` and then `npm run verify:public-release-pii -- release-public` against the stripped output before publishing it
+5. Run the full-history replay guardrails above before asking the operator to push or merge
+6. Open or update the PR from `release-staging` into `main`
+7. Choose the merge method intentionally: `Merge pull request` preserves the replayed `release-staging` commit SHAs on `main`, while `Rebase and merge` keeps `main` linear but assigns new SHAs
+8. For the artifact-only fallback, replace the `release-staging` tree with
+   `release-public/`, commit `chore: refresh release staging source`, verify
+   the public tree, and open the PR from that branch instead of replaying
+   history

@@ -1,0 +1,43 @@
+name: Public Drift
+
+on:
+  schedule:
+    - cron: '27 9 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  public-drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build stripped public artifact
+        run: bash scripts/prepare-public-release.sh --force "$RUNNER_TEMP/release-public"
+
+      - name: Verify public artifact PII
+        run: npm run verify:public-release-pii -- "$RUNNER_TEMP/release-public"
+
+      - name: Report drift from public main tree
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/main-tree"
+          git archive --format=tar HEAD | tar -xf - -C "$RUNNER_TEMP/main-tree"
+          rm -f "$RUNNER_TEMP/main-tree/private-pack.manifest.json"
+          rm -f "$RUNNER_TEMP/release-public/private-pack.manifest.json"
+          if ! diff -qr "$RUNNER_TEMP/main-tree" "$RUNNER_TEMP/release-public" > "$RUNNER_TEMP/public-drift.diff"; then
+            echo "The stripped public artifact differs from the public main tree:"
+            cat "$RUNNER_TEMP/public-drift.diff"
+            exit 1
+          fi
+          echo "Public artifact matches the public main tree."

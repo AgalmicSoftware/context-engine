@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.0] - 2026-07-06
+
+### Added
+
+- Published the M1 public release through a history-preserving
+  `release-staging` PR, keeping the public-safe commit narrative on `main`.
+- Added the mode-first session creation entry flow for Cloudflare-backed and
+  decentralized sessions, with the existing setup UI revealed after Continue.
+- Added public release PII scanning and stricter public push protection for
+  release branches.
+
+### Fixed
+
+- Fixed public CI regressions in passkey PRF normalization, public contact
+  email handling, stripped corpus helper scripts, and private E2E script naming.
+- Kept public package scripts and release-surface checks aligned with stripped
+  private runner paths.
+
+### Operator TODOs
+
+- Tag `v0.7.0` after the public `main` state and latest worker-bundle release
+  asset smoke check are confirmed.
+
 ## 2026-06-09
 
 ### Completed TODOs
