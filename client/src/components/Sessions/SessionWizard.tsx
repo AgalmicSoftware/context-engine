@@ -112,7 +112,6 @@ import {
 import SessionWizardInfoTooltip, {
   type SessionWizardTooltipRenderOptions,
 } from './SessionWizardInfoTooltip';
-import { SESSION_WIZARD_REQUIREMENT_LINKS } from './SessionWizardRequirementsBanner';
 import SessionWizardShell from './SessionWizardShell';
 import SessionWizardSessionIdBadge from './SessionWizardSessionIdBadge';
 import SessionWizardSessionModeProfileControl from './SessionWizardSessionModeProfileControl';
@@ -327,6 +326,7 @@ import {
 import {
   getSessionWizardWorkerDeployValidationError,
 } from './sessionWizardWorkerRpc';
+import { resolveSessionWizardFundingRequirement } from './sessionWizardFundingRequirement';
 import {
   getSessionWizardFieldLabel,
   getSessionWizardFieldTooltip,
@@ -1215,29 +1215,14 @@ const SessionWizard = ({
   }, [registryChainId, draft?.contracts]);
   const registryChainName = useMemo(() => getChainName(registryChainId), [registryChainId]);
   const registryChainOptions = useMemo(() => getSessionRegistryChains(), []);
-  const newSessionFundingChain = useMemo(() => {
-    const chainId = Number(
-      registryChainId ||
-      DEFAULT_CHAIN_ID ||
-      0
-    ) || 0;
-    const chain = getChainById(chainId);
-    if (chain) return chain;
-    if (!chainId) return null;
-    return {
-      id: chainId,
-      name: getChainName(chainId) || `Chain ${chainId}`,
-      nativeCurrency: { symbol: 'ETH' },
-    };
-  }, [registryChainId]);
-  const newSessionFundingRequirementLabel = useMemo(() => {
-    const chainName = toStr(newSessionFundingChain?.name).trim();
-    const chainSymbol = toStr(newSessionFundingChain?.nativeCurrency?.symbol).trim() || 'ETH';
-    return `${chainName || 'Selected network'} ${chainSymbol} for on-chain registration`;
-  }, [newSessionFundingChain]);
-  const newSessionFundingRequirementHref = Number(newSessionFundingChain?.id || 0) === 11155420
-    ? SESSION_WIZARD_REQUIREMENT_LINKS.optimismSepoliaFaucet
-    : '';
+  const newSessionFundingRequirement = useMemo(() => resolveSessionWizardFundingRequirement({
+    defaultChainId: DEFAULT_CHAIN_ID,
+    getChainById,
+    getChainName,
+    registryChainId,
+  }), [registryChainId]);
+  const newSessionFundingRequirementLabel = newSessionFundingRequirement.label;
+  const newSessionFundingRequirementHref = newSessionFundingRequirement.href;
 
   const buildWorkerName = (rawName: unknown): string => {
     const base = toStr(rawName)
