@@ -159,6 +159,7 @@ test('dispatchAuthenticatedSecretPathRoute allows authenticated arweave uploads 
       arweaveUpload: async (value) => {
         assert.deepEqual(value, {
           request,
+          env: { GROUP_KV: {} },
           secrets: {},
           baseHeaders: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
           config,
@@ -204,6 +205,7 @@ test('dispatchAuthenticatedSecretPathRoute hands authenticated arweave uploads d
       arweaveUpload: async (value) => {
         assert.deepEqual(value, {
           request,
+          env: { GROUP_KV: {} },
           secrets,
           baseHeaders: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
           config,

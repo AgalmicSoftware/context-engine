@@ -1,7 +1,13 @@
+import {
+  rejectBytesOverLimit,
+  rejectContentLengthOverLimit,
+  resolveMaxUploadBytes,
+} from './uploadSizeLimits.js';
+
 const hasOwn = Object.prototype.hasOwnProperty;
 const encoder = new TextEncoder();
 
-export const normalizeArweaveUploadJsonPayload = (raw) => {
+export const normalizeArweaveUploadJsonPayload = (raw, { maxUploadBytes } = {}) => {
   const source = raw && typeof raw === 'object' ? raw : {};
   if (!hasOwn.call(source, 'data')) {
     return {
@@ -12,11 +18,14 @@ export const normalizeArweaveUploadJsonPayload = (raw) => {
   }
 
   const rawData = typeof source.data === 'string' ? source.data : JSON.stringify(source.data);
+  const bytes = encoder.encode(rawData);
+  const tooLarge = rejectBytesOverLimit({ bytes, maxUploadBytes });
+  if (tooLarge) return tooLarge;
   return {
     ok: true,
     error: '',
     payload: {
-      bytes: encoder.encode(rawData),
+      bytes,
       contentType: source.contentType || 'application/json',
       tagsInput: hasOwn.call(source, 'tags') ? source.tags : null,
       requestId: source?.requestId != null
@@ -29,7 +38,7 @@ export const normalizeArweaveUploadJsonPayload = (raw) => {
   };
 };
 
-const readMultipartArweaveUploadPayload = async (request) => {
+const readMultipartArweaveUploadPayload = async (request, { maxUploadBytes } = {}) => {
   let form;
   try {
     const source = typeof request?.clone === 'function' ? request.clone() : request;
@@ -52,6 +61,9 @@ const readMultipartArweaveUploadPayload = async (request) => {
   }
 
   const buf = await fileOrBlob.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  const tooLarge = rejectBytesOverLimit({ bytes, maxUploadBytes });
+  if (tooLarge) return tooLarge;
   const formRequestId = form.get('requestId');
   const formJwk = form.get('arweaveJwk');
 
@@ -59,7 +71,7 @@ const readMultipartArweaveUploadPayload = async (request) => {
     ok: true,
     error: '',
     payload: {
-      bytes: new Uint8Array(buf),
+      bytes,
       contentType: form.get('contentType') || fileOrBlob.type || 'application/octet-stream',
       tagsInput: form.has('tags') ? form.get('tags') : null,
       requestId: typeof formRequestId === 'string' && formRequestId.trim()
@@ -72,7 +84,7 @@ const readMultipartArweaveUploadPayload = async (request) => {
   };
 };
 
-const readJsonArweaveUploadPayload = async (request) => {
+const readJsonArweaveUploadPayload = async (request, { maxUploadBytes } = {}) => {
   let raw;
   try {
     const source = typeof request?.clone === 'function' ? request.clone() : request;
@@ -85,17 +97,20 @@ const readJsonArweaveUploadPayload = async (request) => {
     };
   }
 
-  return normalizeArweaveUploadJsonPayload(raw);
+  return normalizeArweaveUploadJsonPayload(raw, { maxUploadBytes });
 };
 
-export const readArweaveUploadRequestPayload = async (request) => {
+export const readArweaveUploadRequestPayload = async (request, options = {}) => {
   const contentType = request.headers.get('content-type') || '';
+  const maxUploadBytes = resolveMaxUploadBytes(options);
+  const contentLengthRejection = rejectContentLengthOverLimit({ request, maxUploadBytes });
+  if (contentLengthRejection) return contentLengthRejection;
 
   if (contentType.includes('multipart/form-data')) {
-    return readMultipartArweaveUploadPayload(request);
+    return readMultipartArweaveUploadPayload(request, { maxUploadBytes });
   }
   if (contentType.includes('application/json')) {
-    return readJsonArweaveUploadPayload(request);
+    return readJsonArweaveUploadPayload(request, { maxUploadBytes });
   }
 
   return {

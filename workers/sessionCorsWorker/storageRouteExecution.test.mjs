@@ -243,6 +243,91 @@ test('storageRoute returns lit-arweave storageRef for encrypted Arweave session 
   });
 });
 
+test('storageRoute rejects oversized Arweave storage uploads before handoff', async () => {
+  let uploadCalled = false;
+  const response = await storageRoute({
+    path: '/storage/upload',
+    method: 'POST',
+    request: new Request('https://worker.example/storage/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: 'too-large', storage: 'arweave' }),
+    }),
+    env: { CE_MAX_UPLOAD_BYTES: '4' },
+    config: { storageProfile: { backend: 'arweave' } },
+    slug: 'session-a',
+    uploaderAddress: '0xabc',
+    baseHeaders: {},
+    deps: {
+      json,
+      arweaveUpload: async () => {
+        uploadCalled = true;
+        return json({ id: TX_ID });
+      },
+    },
+  });
+
+  const body = await readJson(response);
+  assert.equal(uploadCalled, false);
+  assert.equal(response.status, 413);
+  assert.match(body.error, /Upload payload too large/);
+});
+
+test('storageRoute rejects oversized Cloudflare uploads and accepts under-cap uploads', async () => {
+  const r2 = createMockR2();
+  const kv = createMockKv();
+  const env = { CE_STORAGE_R2: r2, CE_STORAGE_INDEX_KV: kv, CE_MAX_UPLOAD_BYTES: '8' };
+  const oversized = await storageRoute({
+    path: '/storage/upload',
+    method: 'POST',
+    request: new Request('https://worker.example/storage/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: 'too-large', contentType: 'text/plain', resource: 'questions' }),
+    }),
+    env,
+    config: CLOUDFLARE_WORKER_GATE_CONFIG,
+    slug: 'session-a',
+    uploaderAddress: '0xabc',
+    baseHeaders: {},
+    deps: {
+      json,
+      randomBytes: fixedRandomBytes,
+      now: () => Date.parse('2026-01-02T03:04:05.000Z'),
+    },
+  });
+
+  const oversizedBody = await readJson(oversized);
+  assert.equal(oversized.status, 413);
+  assert.match(oversizedBody.error, /Upload payload too large/);
+  assert.equal(r2.store.size, 0);
+
+  const underCap = await storageRoute({
+    path: '/storage/upload',
+    method: 'POST',
+    request: new Request('https://worker.example/storage/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: 'ok', contentType: 'text/plain', resource: 'questions' }),
+    }),
+    env,
+    config: CLOUDFLARE_WORKER_GATE_CONFIG,
+    slug: 'session-a',
+    uploaderAddress: '0xabc',
+    baseHeaders: {},
+    deps: {
+      json,
+      randomBytes: fixedRandomBytes,
+      now: () => Date.parse('2026-01-02T03:04:05.000Z'),
+    },
+  });
+
+  const underCapBody = await readJson(underCap);
+  assert.equal(underCap.status, 200);
+  assert.equal(underCapBody.storageRef.backend, 'cloudflare');
+  assert.equal(r2.store.size, 1);
+});
+
 for (const resource of ['questions', 'surveys', 'responses']) {
   test(`storageRoute stores and lists Cloudflare ${resource} payloads behind opaque refs`, async () => {
     const r2 = createMockR2();

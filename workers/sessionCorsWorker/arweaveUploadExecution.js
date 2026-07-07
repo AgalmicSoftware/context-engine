@@ -2,6 +2,7 @@ import { normalizeArweaveAssociationTags } from './arweaveAssociationNormalizati
 import { normalizeArweaveCeTags } from './arweaveCeTagNormalization.js';
 import { resolveArweaveUploadJwk } from './arweaveJwkNormalization.js';
 import { readArweaveUploadRequestPayload } from './arweaveUploadRequestNormalization.js';
+import { resolveMaxUploadBytes } from './uploadSizeLimits.js';
 
 const ARWEAVE_UNAVAILABLE_ERROR = 'Arweave library not available in this runtime (check bundling and try arweave/web).';
 
@@ -99,6 +100,7 @@ export const resolveArweaveCtor = async ({ deps } = {}) => {
 
 export const arweaveUpload = async ({
   request,
+  env,
   secrets,
   baseHeaders,
   config,
@@ -111,9 +113,12 @@ export const arweaveUpload = async ({
   const error = resolveError(deps);
   const json = deps?.json;
   const hasAuthHeader = !!request?.headers?.get?.('authorization');
-  const uploadPayload = await (deps?.readArweaveUploadRequestPayload || readArweaveUploadRequestPayload)(request);
+  const maxUploadBytes = resolveMaxUploadBytes({ env, deps });
+  const uploadPayload = await (
+    deps?.readArweaveUploadRequestPayload || readArweaveUploadRequestPayload
+  )(request, { maxUploadBytes });
   if (!uploadPayload?.ok) {
-    return json?.({ error: uploadPayload?.error }, 400, baseHeaders);
+    return json?.({ error: uploadPayload?.error }, uploadPayload?.status || 400, baseHeaders);
   }
 
   const {

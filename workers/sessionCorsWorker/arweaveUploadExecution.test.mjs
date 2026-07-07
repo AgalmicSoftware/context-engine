@@ -87,6 +87,34 @@ test('arweaveUpload preserves tag rejection logging and response payloads', asyn
   ]]);
 });
 
+test('arweaveUpload rejects oversized uploads before resolving Arweave dependencies', async () => {
+  let resolvedArweave = false;
+  const result = await arweaveUpload({
+    request: new Request('https://worker.example/arweave/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: 'too-large' }),
+    }),
+    env: { CE_MAX_UPLOAD_BYTES: '4' },
+    secrets: {},
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    config: null,
+    slug: 'session-a',
+    uploaderAddress: '',
+    deps: {
+      json: createJsonStub(),
+      resolveArweaveCtor: async () => {
+        resolvedArweave = true;
+        return null;
+      },
+    },
+  });
+
+  assert.equal(resolvedArweave, false);
+  assert.equal(result.status, 413);
+  assert.match(result.body.error, /Upload payload too large/);
+});
+
 test('arweaveUpload preserves session-id resolve rejection logging and status passthrough', async () => {
   const logs = [];
 

@@ -257,6 +257,7 @@ Admin test panel:
 Authenticated clients can use the worker as the session storage boundary:
 
 - `POST /storage/upload`: accepts JSON or multipart payloads for CE payload resources (`docsContext`, `questions`, `surveys`, `responses`, `generatedArtifacts`, and `media`). `arweave` and `lit-arweave` delegate to the existing Arweave upload behavior and return both `arweaveTxId` and `storageRef`. `cloudflare` writes blobs to R2 and metadata/index rows to KV/D1-style bindings when R2 is available. For small JSON/demo deployments where R2 is not enabled, the worker can store opaque payload envelopes in KV-only Cloudflare storage. Both modes return an opaque 32-byte base64url Cloudflare `storageRef.id` that existing Surveys `bytes32` pointer fields can carry without changing the ABI.
+  - Upload bodies are capped at 25 MB by default before Arweave or Cloudflare storage handoff. Set `CE_MAX_UPLOAD_BYTES` on the Worker to lower or raise that limit for `/storage/upload` and `/arweave/upload`.
 - `GET|POST /storage/read`: reads a Cloudflare object by opaque `storageRef.id` after the configured Cloudflare payload access check. Public-read sessions may be served anonymously; gated sessions require authenticated route preflight. It returns the payload bytes with `X-CE-Storage-Backend: cloudflare`, `X-CE-Payload-Access-Mode`, and no raw object keys.
 - `GET|POST /storage/list`: lists Cloudflare metadata/index rows for a resource such as `docsContext`, returning safe `storageRef` objects, tag metadata, and the configured payload access mode. Public-read sessions may list anonymously; gated sessions require authenticated route preflight.
 - `GET|POST /storage/export-envelopes`: returns ciphertext plus envelope metadata for encrypted Cloudflare payloads in the requested resource. It does not decrypt payload bytes and does not include session KEK material.
@@ -1166,6 +1167,7 @@ Signed login/bootstrap requests:
     `safeFetch` / blocked-url / default-URL deps bundle before the execution helper runs.
 - `POST /arweave/upload` (multipart or JSON)
   - Optional override: `arweaveJwk` (JSON string or object).
+  - Upload bodies are capped at 25 MB by default. The Worker rejects oversized `Content-Length`, JSON `data`, or multipart file bytes with `413`; set `CE_MAX_UPLOAD_BYTES` to configure the limit.
   - Bootstrap parsing for unauthenticated uploads is normalized across JSON and multipart before slug validation/admin checks.
   - Unauthenticated bootstrap upload dispatch now also routes through a shared helper:
     it preserves the no-auth-only bootstrap handoff, the missing-config + request-`arweaveJwk` bootstrap rule,
