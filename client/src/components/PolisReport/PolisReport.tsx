@@ -243,10 +243,42 @@ type JsPdfDocument = {
 
 type JsPdfConstructor = new (...args: unknown[]) => JsPdfDocument;
 
-const d3Report = d3 as unknown as D3ReportApi;
-const doUMAPTyped = doUMAP as unknown as DoUMAPFn;
-const clusterUMAPPointsKmeansTyped = clusterUMAPPointsKmeans as unknown as ClusterPointsFn;
-const analyzeClusterOpinionsTyped = analyzeClusterOpinions as unknown as AnalyzeClusterOpinionsFn;
+type RuntimeFunction = (...args: unknown[]) => unknown;
+const d3Runtime = Object(d3) as Record<string, unknown>;
+const getD3Function = (key: string): RuntimeFunction => {
+  const fn = d3Runtime[key];
+  if (typeof fn !== 'function') {
+    throw new Error(`d3.${key} is not available.`);
+  }
+  return fn as RuntimeFunction;
+};
+const getD3StringArray = (key: string): readonly string[] => {
+  const value = d3Runtime[key];
+  if (!Array.isArray(value)) {
+    throw new Error(`d3.${key} is not available.`);
+  }
+  return value.map(String);
+};
+
+const d3Report: D3ReportApi = {
+  scaleOrdinal: (range) => Reflect.apply(getD3Function('scaleOrdinal'), d3, [range]) as (
+    value: string | number,
+  ) => string,
+  schemeCategory10: getD3StringArray('schemeCategory10'),
+  polygonHull: (points) => Reflect.apply(getD3Function('polygonHull'), d3, [points]) as [number, number][] | null,
+  min: (values) => Reflect.apply(getD3Function('min'), d3, [values]) as number | undefined,
+  max: (values) => Reflect.apply(getD3Function('max'), d3, [values]) as number | undefined,
+  scaleLinear: () => Reflect.apply(getD3Function('scaleLinear'), d3, []) as D3LinearScale,
+  line: () => Reflect.apply(getD3Function('line'), d3, []) as (points: [number, number][]) => string | null,
+};
+const doUMAPTyped: DoUMAPFn = (data, nNeighbors, randomSeed) =>
+  Reflect.apply(doUMAP, null, [data, nNeighbors, randomSeed]) as [number, number][];
+const clusterUMAPPointsKmeansTyped: ClusterPointsFn = (points, clusterCount, randomSeed) =>
+  Reflect.apply(clusterUMAPPointsKmeans, null, [points, clusterCount, randomSeed]) as number[];
+const analyzeClusterOpinionsTyped: AnalyzeClusterOpinionsFn = (payload, allClustersData, options) =>
+  Reflect.apply(analyzeClusterOpinions, null, [payload, allClustersData, options]) as Promise<
+    Partial<PolisClusterAnalysisResult>
+  >;
 const asRecord = (value: unknown): UnknownRecord =>
   value && typeof value === 'object' ? (value as UnknownRecord) : {};
 const getErrorMessage = (error: unknown, fallback = 'Unknown error') => {

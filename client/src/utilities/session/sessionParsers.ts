@@ -48,6 +48,7 @@ const LOCAL_OVERRIDE_SECTIONS = [
   { sectionKey: 'arweave', secretKey: 'jwk' },
   { sectionKey: 'faucet', secretKey: 'privateKey' },
 ] as const;
+type MutableLocalOverrideSection = UnknownRecord & { useLocal: boolean };
 const WORKER_LIT_CREDENTIAL_FIELDS = ['litApiBase', 'litGroupId', 'litPkpId', 'litActionCid'] as const;
 
 const isObj = (value: unknown): value is UnknownRecord => !!value && typeof value === 'object' && !Array.isArray(value);
@@ -77,6 +78,21 @@ const defaultLocalOverrides = (): LocalResourceOverrides => ({
   arweave: { useLocal: false, jwk: '' },
   faucet: { useLocal: false, privateKey: '' },
 });
+const getMutableLocalOverrideSection = (
+  overrides: LocalResourceOverrides,
+  sectionKey: (typeof LOCAL_OVERRIDE_SECTIONS)[number]['sectionKey'],
+): MutableLocalOverrideSection => {
+  switch (sectionKey) {
+    case 'rpc':
+      return overrides.rpc;
+    case 'arweave':
+      return overrides.arweave;
+    case 'faucet':
+      return overrides.faucet;
+    default:
+      return sectionKey satisfies never;
+  }
+};
 const normalizeOptionalStringField = (
   target: UnknownRecord,
   key: string,
@@ -426,7 +442,7 @@ export const parseLocalResourceOverrides = (raw: unknown): ParsedLocalResourceOv
       pushTypeError(errors, sectionKey, 'an object');
       return;
     }
-    const section = overrides[sectionKey] as unknown as UnknownRecord;
+    const section = getMutableLocalOverrideSection(overrides, sectionKey);
     section.useLocal = normalizeOptionalBooleanField(sectionRaw, 'useLocal', errors, {
       label: `${sectionKey}.useLocal`,
     });

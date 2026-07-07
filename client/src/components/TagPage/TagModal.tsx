@@ -32,10 +32,20 @@ type TagModalProps = {
   toggle: () => void;
   activeTag?: string | null;
   demoCorpusMode?: boolean;
-  demoCorpusRecords?: any[];
+  demoCorpusRecords?: unknown[];
 };
 
-const TagPageComponent = TagPage as React.ComponentType<any>;
+type EmbeddedTagPageProps = {
+  embedded: boolean;
+  demoCorpusMode?: boolean;
+  demoCorpusRecords?: unknown[];
+  selectedTagsOverride?: string[];
+  onSelectedTagsChange?: (tags: unknown[]) => void;
+  emptyQuestionsText?: string;
+  hideEmbeddedSessionSelector?: boolean;
+};
+
+const TagPageComponent = TagPage as React.ComponentType<EmbeddedTagPageProps>;
 
 const dedupeSessionSlugs = (values: unknown[] | unknown = []): string[] => {
   const seen = new Set<string>();
@@ -59,7 +69,7 @@ const buildSessionScopeLabel = (slugIn = ''): string => {
     : sessionName || slug;
 };
 
-const buildGlobalTagPageScope = (selection: Record<string, any> = {}): SessionScopeState => {
+const buildGlobalTagPageScope = (selection: Record<string, unknown> = {}): SessionScopeState => {
   const scopeMode =
     String(selection?.selectedSessionScope || '')
       .trim()

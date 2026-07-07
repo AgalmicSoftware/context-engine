@@ -53,10 +53,14 @@ type ToolData = {
 type ExpandedComponentState = {
   component: ToolComponent;
   data: ToolData;
-  props?: Record<string, any>;
+  props?: Record<string, unknown>;
 } | null;
 
-type ToolExplorerProps = Record<string, any>;
+type ToolExplorerProps = {
+  activeSessionSlug?: unknown;
+  demoSurfaceMode?: unknown;
+  [key: string]: unknown;
+};
 
 const ToolExplorer = (props: ToolExplorerProps) => {
   const [expandedComponent, setExpandedComponent] = useState<ExpandedComponentState>(null);
@@ -186,7 +190,7 @@ const ToolExplorer = (props: ToolExplorerProps) => {
     };
 
     pushOption(selectedDataSessionSlug);
-    pushOption(props.activeSessionSlug);
+    pushOption(toStr(props.activeSessionSlug));
     pushOption('');
     (getAllSessionSlugs({ includeEmpty: true }) || []).forEach(pushOption);
     return Array.from(options.values());
@@ -194,10 +198,10 @@ const ToolExplorer = (props: ToolExplorerProps) => {
 
   const readInitialGroupsCreateState = () =>
     hasCachedCreateSbtForm({
-      sessionSlug: props.activeSessionSlug || '',
+      sessionSlug: toStr(props.activeSessionSlug),
       migrateLegacyToSessionKey: true,
       clearInvalid: true,
-    } as any);
+    });
 
   const handleClick = (Component: ToolComponent, data: ToolData) => {
     if (!data.disabled) {

@@ -56,18 +56,23 @@ type NavbarState = {
   showAnimatedLogo: boolean;
 };
 
+type NavbarRuntimeWindow = Window & {
+  __ceLogoAnimationPlayed?: boolean;
+};
+
 export class Navbar extends Component<NavbarProps, NavbarState> {
   logoTimeoutId: number | null = null;
 
   constructor(props: NavbarProps) {
     super(props);
     const hasWindow = typeof window !== 'undefined';
-    const shouldAnimate = ENABLE_CE_LOGO_ANIMATION && hasWindow && !(window as any).__ceLogoAnimationPlayed;
+    const runtimeWindow = hasWindow ? (window as NavbarRuntimeWindow) : null;
+    const shouldAnimate = ENABLE_CE_LOGO_ANIMATION && !!runtimeWindow && !runtimeWindow.__ceLogoAnimationPlayed;
     this.state = {
       showAnimatedLogo: shouldAnimate,
     };
-    if (shouldAnimate && hasWindow) {
-      (window as any).__ceLogoAnimationPlayed = true;
+    if (shouldAnimate && runtimeWindow) {
+      runtimeWindow.__ceLogoAnimationPlayed = true;
     }
   }
 

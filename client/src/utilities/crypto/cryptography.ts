@@ -375,7 +375,9 @@ const sha256 = async (bytes: BufferSource): Promise<Uint8Array> => {
     }
   }
   try {
-    return utils.arrayify(utils.sha256(bytes as unknown as Parameters<typeof utils.sha256>[0]));
+    const bytesLike =
+      bytes instanceof ArrayBuffer ? new Uint8Array(bytes) : new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    return utils.arrayify(utils.sha256(bytesLike));
   } catch (_) {
     throw new Error('SHA-256 is not available in this environment.');
   }

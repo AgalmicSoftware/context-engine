@@ -1812,7 +1812,7 @@ class UserPage extends Component<any, any> {
 
     let decryptedResult: unknown = null;
     try {
-      decryptedResult = await (cryptoUtils as unknown as CryptoUtilsWithSingleField).decryptSingleField(
+      decryptedResult = await (cryptoUtils as CryptoUtilsWithSingleField).decryptSingleField(
         decryptRequestPlan.responseSlice,
         qid,
         fieldToDecrypt,

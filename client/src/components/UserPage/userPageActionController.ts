@@ -73,7 +73,7 @@ const preventDefault = (event?: UserPageActionEventLike | null): void => {
 };
 
 export const runUserPageAnalyzeActionController = <AnalyzeArgs extends readonly unknown[] = readonly unknown[]>({
-  analyzeArgs = [] as unknown as AnalyzeArgs,
+  analyzeArgs,
   event = null,
   plan = null,
   ports = {},
@@ -108,7 +108,8 @@ export const runUserPageAnalyzeActionController = <AnalyzeArgs extends readonly 
     };
   }
 
-  ports.dispatchAnalyze(...analyzeArgs);
+  const dispatchAnalyze = ports.dispatchAnalyze as UserPageActionDispatch<readonly unknown[]>;
+  dispatchAnalyze(...(analyzeArgs || []));
   return {
     blockedReason: plan.blockedReason,
     status: 'dispatched',
@@ -116,7 +117,7 @@ export const runUserPageAnalyzeActionController = <AnalyzeArgs extends readonly 
 };
 
 export const runUserPageBookmarkActionController = <BookmarkArgs extends readonly unknown[] = readonly unknown[]>({
-  bookmarkArgs = [] as unknown as BookmarkArgs,
+  bookmarkArgs,
   event = null,
   plan = null,
   ports = {},
@@ -151,7 +152,8 @@ export const runUserPageBookmarkActionController = <BookmarkArgs extends readonl
     };
   }
 
-  ports.dispatchBookmark(...bookmarkArgs);
+  const dispatchBookmark = ports.dispatchBookmark as UserPageActionDispatch<readonly unknown[]>;
+  dispatchBookmark(...(bookmarkArgs || []));
   return {
     blockedReason: plan.blockedReason,
     status: 'dispatched',
@@ -161,7 +163,7 @@ export const runUserPageBookmarkActionController = <BookmarkArgs extends readonl
 export const runUserPageCacheRefreshActionController = <
   CacheRefreshArgs extends readonly unknown[] = readonly unknown[],
 >({
-  cacheRefreshArgs = [] as unknown as CacheRefreshArgs,
+  cacheRefreshArgs,
   event = null,
   plan = null,
   ports = {},
@@ -196,7 +198,8 @@ export const runUserPageCacheRefreshActionController = <
     };
   }
 
-  ports.dispatchCacheRefresh(...cacheRefreshArgs);
+  const dispatchCacheRefresh = ports.dispatchCacheRefresh as UserPageActionDispatch<readonly unknown[]>;
+  dispatchCacheRefresh(...(cacheRefreshArgs || []));
   return {
     blockedReason: plan.blockedReason,
     status: 'dispatched',

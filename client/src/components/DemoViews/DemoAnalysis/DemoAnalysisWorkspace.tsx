@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import demoAnalysisData from '../../../variables/demo/demo_analysis_data.json';
 import historicalFigureDemographics from '../../../variables/demo/historical_figure_demographics.js';
 import buildDemoAnalysisData from '../../../utilities/demo/demoAnalysisAdapter.js';
+import type { DemoAnalysisMetadataByXid, DemoAnalysisSource } from '../../../utilities/demo/demoAnalysisAdapter';
 import {
   buildComparisonGroup,
   findMostDivergentPairs,
@@ -76,10 +77,11 @@ type DemoAnalysisWorkspaceProps = {
   sessionSlug?: string;
 };
 
-const getDemoAnalysisData = buildDemoAnalysisData as unknown as (
-  demoData?: unknown,
-  metadataByXid?: unknown,
-) => AnalysisData;
+const getDemoAnalysisData = (demoData?: unknown, metadataByXid?: unknown): AnalysisData =>
+  buildDemoAnalysisData(
+    demoData as DemoAnalysisSource | undefined,
+    metadataByXid as DemoAnalysisMetadataByXid | undefined,
+  );
 const getComparisonGroup = buildComparisonGroup as (segmentKey: string) => ComparisonGroup;
 const getDivergentPairs = findMostDivergentPairs as (input: Record<string, unknown>) => Suggestion[];
 const getParsedSegment = parseSegmentKey as (segmentKey: string) => { category: string; value: string };

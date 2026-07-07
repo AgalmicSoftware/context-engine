@@ -50,7 +50,7 @@ type DeploySessionWizardPendingSbtDraftResult = {
   receipt: PendingSbtDeployReceipt;
 };
 
-const createSessionWizardPendingDraftSbt = contractScripts.createSBT as unknown as CreateSbtForPendingDraft;
+const createSessionWizardPendingDraftSbt = contractScripts.createSBT as CreateSbtForPendingDraft;
 
 export const FEATURED_DRAFT_GATE_AUTO_LINK_GATE_ID = 'gate-1';
 export const FEATURED_DRAFT_GATE_AUTO_LINK_SOURCE = 'defaultFeaturedSBTs';

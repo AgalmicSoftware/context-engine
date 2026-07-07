@@ -1134,7 +1134,7 @@ export const buildSbtAccessControlConditions = ({
       returnValueTest: { comparator: '>', value: '0' },
     }));
 
-  if (!conditions.length) return null as unknown as undefined;
+  if (!conditions.length) return undefined;
   if (conditions.length === 1) return conditions;
   const out: LitAccessControlCondition[] = [];
   conditions.forEach((cond, idx) => {
