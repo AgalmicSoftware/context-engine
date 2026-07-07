@@ -7,6 +7,8 @@ import {
   mergeSurveyResponsePayloads,
   stampResponsePayloadWithMeta,
   toResponseRecencyMeta,
+  type QuestionsCacheByNetwork,
+  type SurveysCacheByNetwork,
 } from './surveyToolCacheState.js';
 import { normalizeQuestionIdKey } from './surveyToolSignatures.js';
 import { normalizeSessionSlugValue } from './surveyToolScope.js';
@@ -102,8 +104,8 @@ export async function writeSubmittedResponsesToLocalCaches(
 
   const submittedQuestionResponses = Array.isArray(questionResponses) ? questionResponses : [];
   if (submittedQuestionResponses.length > 0) {
-    await updateCacheAtomic('questionsCache', slug, (current) => {
-      const nextCache = ensureQuestionsNet(current, netIdStr);
+    await updateCacheAtomic<QuestionsCacheByNetwork>('questionsCache', slug, (current) => {
+      const nextCache = ensureQuestionsNet(current || {}, netIdStr);
       const net = nextCache[netIdStr];
       if (!net.questions || typeof net.questions !== 'object') net.questions = {};
       if (!net.questionResponses || typeof net.questionResponses !== 'object') net.questionResponses = {};
@@ -160,8 +162,8 @@ export async function writeSubmittedResponsesToLocalCaches(
     surveyIdLower !== normalizeQuestionIdKey(ethers.constants.HashZero);
 
   if (shouldWriteSurveyCache) {
-    await updateCacheAtomic('surveysCache', slug, (current) => {
-      const nextCache = ensureSurveysNet(current, netIdStr);
+    await updateCacheAtomic<SurveysCacheByNetwork>('surveysCache', slug, (current) => {
+      const nextCache = ensureSurveysNet(current || {}, netIdStr);
       const net = nextCache[netIdStr];
       if (!net.surveys || typeof net.surveys !== 'object') net.surveys = {};
       if (!net.surveyResponses || typeof net.surveyResponses !== 'object') net.surveyResponses = {};

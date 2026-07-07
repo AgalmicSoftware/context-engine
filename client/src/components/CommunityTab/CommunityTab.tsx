@@ -60,6 +60,21 @@ type ScopeCacheEntry = {
   questionsCache: Record<string, unknown>;
   sbtCache: Record<string, unknown>;
 };
+type CommunitySbtCacheEntry = Record<string, unknown> & {
+  blockNumber?: unknown;
+  burnedAddresses?: unknown;
+  burnedCountByAddress?: unknown;
+  burnedEventCount?: unknown;
+  countsScanCheckpoint?: unknown;
+  mintedAddresses?: unknown;
+  mintedCountByAddress?: unknown;
+  mintedEventCount?: unknown;
+  sbtAddress?: unknown;
+};
+type CommunitySbtNetworkCache = Record<string, unknown> & {
+  sbtList?: Record<string, CommunitySbtCacheEntry>;
+};
+type CommunitySbtCache = Record<string, CommunitySbtNetworkCache>;
 type ContractScriptsWithBlockWindow = typeof contractScripts & {
   getRelevantBlockWindowForFilter: (slug?: string) => Promise<{ toBlock?: unknown }>;
 };
@@ -400,7 +415,7 @@ class CommunityTab extends Component<any, any> {
     const netKey = this._resolveNetKeyForSlug(slug);
     if (!netKey) return;
 
-    let cacheObj = await readCache('sbtCache', slug);
+    let cacheObj = await readCache<CommunitySbtCache>('sbtCache', slug);
     if (!cacheObj || typeof cacheObj !== 'object') cacheObj = {};
     if (!cacheObj[netKey]) cacheObj[netKey] = { sbtList: {} };
     const sbtList = cacheObj[netKey].sbtList || {};

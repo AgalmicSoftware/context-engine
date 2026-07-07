@@ -72,6 +72,21 @@ type OnePageGlobalState = typeof globalThis & {
   __CE_DEBUG_COUNTERS__?: boolean;
   __CE_PERF_COUNTERS__?: Record<string, Record<string, number>>;
 };
+type OnePageSbtCacheEntry = Record<string, unknown> & {
+  burnedAddresses?: unknown[];
+  burnedCountByAddress?: Record<string, unknown>;
+  countsLoaded?: boolean;
+  countsScanCheckpoint?: Record<string, unknown> | null;
+  mintedAddresses?: unknown[];
+  mintedCountByAddress?: Record<string, unknown>;
+  sbtInfo?: Record<string, unknown> & {
+    tokenURI?: unknown;
+  };
+};
+type OnePageSbtNetworkCache = Record<string, unknown> & {
+  sbtList?: Record<string, OnePageSbtCacheEntry>;
+};
+type OnePageSbtCache = Record<string, OnePageSbtNetworkCache>;
 const globalState = globalThis as OnePageGlobalState;
 
 const getErrorMessage = (error: unknown, fallback = 'Unknown error') =>
@@ -1101,7 +1116,7 @@ class OnePageSession extends Component<any, any> {
     let cachedNames: Record<string, any> = {};
     let cachedImages: Record<string, any> = {};
     try {
-      const parsed = peekCacheSync('sbtCache', slug, { clone: false });
+      const parsed = peekCacheSync<OnePageSbtCache>('sbtCache', slug, { clone: false });
       if (parsed && typeof parsed === 'object') {
         // Determine network key if available, else null
         const netId = this.props.network?.id || this.props.networkChainId;
@@ -1583,7 +1598,7 @@ class OnePageSession extends Component<any, any> {
         // We look for a cache entry that has 'sbtInfo' AND 'tokenURI' to ensure it's complete enough for minting.
         for (const s of slugsToCheck) {
           try {
-            const parsed = peekCacheSync('sbtCache', s, { clone: false });
+            const parsed = peekCacheSync<OnePageSbtCache>('sbtCache', s, { clone: false });
             if (!parsed || typeof parsed !== 'object') continue;
             // Iterate all networks in this cache (e.g. "84532", "1")
             for (const netKey of Object.keys(parsed)) {
@@ -1631,7 +1646,7 @@ class OnePageSession extends Component<any, any> {
               return out;
             };
             for (const s of slugsToCheck) {
-              const parsed = peekCacheSync('sbtCache', s, { clone: false });
+              const parsed = peekCacheSync<OnePageSbtCache>('sbtCache', s, { clone: false });
               if (!parsed || typeof parsed !== 'object') continue;
               for (const netKey of Object.keys(parsed)) {
                 const entry = parsed[netKey]?.sbtList?.[sbtKey];

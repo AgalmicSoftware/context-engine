@@ -16,6 +16,91 @@ import { createLogger } from '../logging.js';
 
 const cacheLog = createLogger('cacheScripts');
 
+type CacheLegacyCollection = CacheLegacyNode & {
+  includes: (searchElement: unknown, fromIndex?: number) => boolean;
+};
+type CacheLegacyIndexedNode = {
+  [key: string]: CacheLegacyNode | CacheLegacyCollection | undefined;
+  questions?: CacheLegacyCollection;
+  questionResponses?: CacheLegacyNode;
+  sbtList?: CacheLegacyNode;
+  surveys?: CacheLegacyNode;
+  users?: CacheLegacyCollection;
+};
+type CacheLegacyNode = CacheLegacyIndexedNode & {
+  blockNumber?: number;
+  burnedAddresses?: CacheLegacyCollection;
+  burnedCountByAddress?: CacheLegacyNode;
+  burnedEventCount?: number;
+  countsLoaded?: boolean;
+  countsScanCheckpoint?: CacheLegacyNode | null;
+  mintedAddresses?: CacheLegacyCollection;
+  mintedCountByAddress?: CacheLegacyNode;
+  mintedEventCount?: number;
+  sbtAddress?: string;
+  sbtInfo?: CacheLegacyNode;
+  tokenURI?: unknown;
+};
+type CacheValue = unknown;
+type CacheObject = Record<string, CacheValue>;
+type StorageKeyParts = {
+  key: string;
+  namespace: string;
+  slug: string;
+};
+type CacheEntry<TValue = CacheLegacyNode> = {
+  namespace: string;
+  slug: string;
+  key: string;
+  value: TValue;
+};
+type CacheUpdatePayload<TValue = CacheValue> = {
+  action?: string;
+  namespace?: string;
+  slug?: string;
+  key?: string;
+  value?: TValue;
+  source?: string;
+  _dgCacheScripts?: boolean;
+  sourceId?: string;
+  ts?: number;
+};
+type CacheUpdateHandler = (payload: CacheUpdatePayload) => void;
+type MigrationReport = {
+  moved: number;
+  removed: number;
+  failed: number;
+};
+type ActiveOptimisticMirrorEntry = {
+  key: string;
+  seq: number;
+  value: CacheValue;
+};
+type ManagedWriteInput = {
+  namespace: string;
+  slug: string;
+  key: string;
+  value: CacheValue;
+};
+type ManagedKeyInput = {
+  namespace: string;
+  slug: string;
+  key: string;
+};
+type CachePeekOptions = {
+  clone?: boolean;
+};
+type CacheListOptions = {
+  cloneValues?: boolean;
+};
+type CacheBackendDiagnostics = {
+  persistentBackend: 'unknown' | 'indexeddb' | 'localstorage';
+  probeState: 'unprobed' | 'probing' | 'ready';
+  idbAvailable: boolean;
+  didHydrateMirror: boolean;
+  recoveryInFlight: boolean;
+};
+
 const DB_NAME = 'ce_cache_v1';
 const DB_STORE = 'ce_cache_entries_v1';
 const IDB_STORE = createStore(DB_NAME, DB_STORE);
@@ -24,7 +109,10 @@ const IDB_PROBE_KEY = '__dg_cache_probe__';
 const IDB_CONSECUTIVE_FAILURE_THRESHOLD = 3;
 const IDB_RECOVERY_RETRY_MS = 30 * 1000;
 const READ_FAILED = Symbol('dg-cache-read-failed');
-const safeClone = typeof structuredClone === 'function' ? structuredClone : (v) => JSON.parse(JSON.stringify(v));
+const safeClone = <T>(value: T): T => {
+  if (typeof structuredClone === 'function') return structuredClone(value);
+  return JSON.parse(JSON.stringify(value)) as T;
+};
 
 const MANAGED_NAMESPACE_LIST = [
   'questionsCache',
@@ -37,20 +125,20 @@ const MANAGED_NAMESPACE_LIST = [
 ];
 const MANAGED_NAMESPACES = new Set(MANAGED_NAMESPACE_LIST);
 
-const mirrorByKey = new Map();
-const mirrorByNamespace = new Map();
-const writeQueuesByKey = new Map();
-const optimisticWriteSeqByKey = new Map();
-const subscribers = new Set();
+const mirrorByKey = new Map<string, CacheValue>();
+const mirrorByNamespace = new Map<string, Map<string, CacheValue>>();
+const writeQueuesByKey = new Map<string, Promise<unknown>>();
+const optimisticWriteSeqByKey = new Map<string, number>();
+const subscribers = new Set<CacheUpdateHandler>();
 
-let initPromise = null;
-let backendReadyPromise = null;
+let initPromise: Promise<void> | null = null;
+let backendReadyPromise: Promise<void> | null = null;
 let didHydrateMirror = false;
 let idbAvailable = true;
 let idbConsecutiveFailures = 0;
 let idbLastRecoveryProbeAt = 0;
-let idbRecoveryPromise = null;
-let broadcastChannel = null;
+let idbRecoveryPromise: Promise<boolean> | null = null;
+let broadcastChannel: BroadcastChannel | null = null;
 let storageListenerAttached = false;
 let optimisticWriteSeqCounter = 0;
 
@@ -65,11 +153,14 @@ const clientId = (() => {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 })();
 
-const isManagedNamespace = (namespace) => MANAGED_NAMESPACES.has(String(namespace || ''));
+const getErrorMessage = (error: unknown): unknown => (error instanceof Error ? error.message : error);
 
-const toStorageKey = (namespace, slug = '') => `dg:${String(namespace || '')}:${String(slug || '')}`;
+const isManagedNamespace = (namespace: unknown): boolean => MANAGED_NAMESPACES.has(String(namespace || ''));
 
-const parseStorageKey = (key) => {
+const toStorageKey = (namespace: unknown, slug: unknown = ''): string =>
+  `dg:${String(namespace || '')}:${String(slug || '')}`;
+
+const parseStorageKey = (key: unknown): StorageKeyParts | null => {
   const raw = String(key || '');
   const m = raw.match(/^dg:([^:]+):(.*)$/);
   if (!m) return null;
@@ -80,9 +171,8 @@ const parseStorageKey = (key) => {
   };
 };
 
-const cloneValue = (value) => {
-  if (value === undefined) return undefined;
-  if (value === null) return null;
+const cloneValue = <T>(value: T): T => {
+  if (value === undefined || value === null) return value;
   try {
     return safeClone(value);
   } catch (_) {
@@ -90,9 +180,10 @@ const cloneValue = (value) => {
   }
 };
 
-const isPlainObject = (value) => value != null && typeof value === 'object' && !Array.isArray(value);
+const isPlainObject = (value: unknown): value is CacheObject =>
+  value != null && typeof value === 'object' && !Array.isArray(value);
 
-const valuesEqual = (a, b) => {
+const valuesEqual = (a: unknown, b: unknown): boolean => {
   try {
     return JSON.stringify(a) === JSON.stringify(b);
   } catch (_) {
@@ -102,11 +193,11 @@ const valuesEqual = (a, b) => {
 
 // When fallback writes land in localStorage while IDB is unhealthy, merge them
 // back into IDB by preferring the fallback branch while preserving IDB-only data.
-const mergeMigrationValues = (existingValue, incomingValue) => {
+const mergeMigrationValues = (existingValue: CacheValue, incomingValue: CacheValue): CacheValue => {
   if (!isPlainObject(existingValue) || !isPlainObject(incomingValue)) {
     return cloneValue(incomingValue);
   }
-  const next = cloneValue(existingValue) || {};
+  const next: CacheObject = { ...existingValue };
   Object.keys(incomingValue).forEach((key) => {
     const existingChild = existingValue[key];
     const incomingChild = incomingValue[key];
@@ -119,12 +210,12 @@ const mergeMigrationValues = (existingValue, incomingValue) => {
   return next;
 };
 
-const getNamespaceBucket = (namespace) => {
+const getNamespaceBucket = (namespace: unknown): Map<string, CacheValue> => {
   const ns = String(namespace || '');
   if (!mirrorByNamespace.has(ns)) {
     mirrorByNamespace.set(ns, new Map());
   }
-  return mirrorByNamespace.get(ns);
+  return mirrorByNamespace.get(ns)!;
 };
 
 const clearMirror = () => {
@@ -132,22 +223,22 @@ const clearMirror = () => {
   mirrorByNamespace.clear();
 };
 
-const setMirrorValue = (namespace, slug, value) => {
+const setMirrorValue = (namespace: unknown, slug: unknown, value: CacheValue): void => {
   const key = toStorageKey(namespace, slug);
   const next = cloneValue(value);
   mirrorByKey.set(key, next);
   getNamespaceBucket(namespace).set(String(slug || ''), next);
 };
 
-const removeMirrorValue = (namespace, slug) => {
+const removeMirrorValue = (namespace: unknown, slug: unknown): void => {
   const key = toStorageKey(namespace, slug);
   mirrorByKey.delete(key);
   const bucket = getNamespaceBucket(namespace);
   bucket.delete(String(slug || ''));
 };
 
-const snapshotActiveOptimisticMirrorEntries = () => {
-  const entries = [];
+const snapshotActiveOptimisticMirrorEntries = (): ActiveOptimisticMirrorEntry[] => {
+  const entries: ActiveOptimisticMirrorEntry[] = [];
   optimisticWriteSeqByKey.forEach((seq, key) => {
     if (!mirrorByKey.has(key)) return;
     entries.push({
@@ -159,7 +250,7 @@ const snapshotActiveOptimisticMirrorEntries = () => {
   return entries;
 };
 
-const restoreActiveOptimisticMirrorEntries = (entries = []) => {
+const restoreActiveOptimisticMirrorEntries = (entries: ActiveOptimisticMirrorEntry[] = []): void => {
   entries.forEach(({ key, seq, value }) => {
     if (optimisticWriteSeqByKey.get(key) !== seq) return;
     const parsed = parseStorageKey(key);
@@ -168,7 +259,7 @@ const restoreActiveOptimisticMirrorEntries = (entries = []) => {
   });
 };
 
-const emitUpdate = (payload = {}) => {
+const emitUpdate = (payload: CacheUpdatePayload = {}): void => {
   subscribers.forEach((handler) => {
     try {
       handler(payload);
@@ -178,11 +269,11 @@ const emitUpdate = (payload = {}) => {
   });
 };
 
-const noteIdbSuccess = () => {
+const noteIdbSuccess = (): void => {
   idbConsecutiveFailures = 0;
 };
 
-const noteIdbFailure = (op, storageKey, error) => {
+const noteIdbFailure = (op: string, storageKey: string, error: unknown): void => {
   idbConsecutiveFailures += 1;
   if (idbConsecutiveFailures >= IDB_CONSECUTIVE_FAILURE_THRESHOLD) {
     idbAvailable = false;
@@ -190,7 +281,7 @@ const noteIdbFailure = (op, storageKey, error) => {
       op,
       storageKey,
       consecutiveFailures: idbConsecutiveFailures,
-      error: error?.message || error,
+      error: getErrorMessage(error),
     });
     return;
   }
@@ -198,11 +289,11 @@ const noteIdbFailure = (op, storageKey, error) => {
     op,
     storageKey,
     consecutiveFailures: idbConsecutiveFailures,
-    error: error?.message || error,
+    error: getErrorMessage(error),
   });
 };
 
-const getBroadcastChannel = () => {
+const getBroadcastChannel = (): BroadcastChannel | null => {
   if (broadcastChannel) return broadcastChannel;
   try {
     if (typeof BroadcastChannel === 'undefined') return null;
@@ -214,7 +305,7 @@ const getBroadcastChannel = () => {
   }
 };
 
-const broadcastUpdate = (payload = {}) => {
+const broadcastUpdate = (payload: CacheUpdatePayload = {}): void => {
   if (!idbAvailable) return;
   const chan = getBroadcastChannel();
   if (!chan) return;
@@ -230,7 +321,7 @@ const broadcastUpdate = (payload = {}) => {
   }
 };
 
-const parseJsonOrNull = (raw) => {
+const parseJsonOrNull = (raw: string | null): CacheValue | null => {
   if (raw == null) return null;
   try {
     return JSON.parse(raw);
@@ -239,7 +330,7 @@ const parseJsonOrNull = (raw) => {
   }
 };
 
-const readLocalStorageKey = (key) => {
+const readLocalStorageKey = (key: string): CacheValue | null => {
   try {
     if (typeof localStorage === 'undefined') return null;
     return parseJsonOrNull(localStorage.getItem(key));
@@ -248,18 +339,18 @@ const readLocalStorageKey = (key) => {
   }
 };
 
-const writeLocalStorageKey = (key, value) => {
+const writeLocalStorageKey = (key: string, value: CacheValue): boolean => {
   try {
     if (typeof localStorage === 'undefined') return false;
     localStorage.setItem(key, JSON.stringify(value));
     return true;
   } catch (e) {
-    cacheLog.warn('[cacheScripts] localStorage write failed', { key, error: e?.message || e });
+    cacheLog.warn('[cacheScripts] localStorage write failed', { key, error: getErrorMessage(e) });
     return false;
   }
 };
 
-const removeLocalStorageKey = (key) => {
+const removeLocalStorageKey = (key: string): boolean => {
   try {
     if (typeof localStorage === 'undefined') return false;
     localStorage.removeItem(key);
@@ -269,21 +360,21 @@ const removeLocalStorageKey = (key) => {
   }
 };
 
-const updateMirrorFromStorageKey = (storageKey, value) => {
+const updateMirrorFromStorageKey = (storageKey: string, value: CacheValue): void => {
   const parsed = parseStorageKey(storageKey);
   if (!parsed) return;
   if (!isManagedNamespace(parsed.namespace)) return;
   setMirrorValue(parsed.namespace, parsed.slug, value);
 };
 
-const removeMirrorFromStorageKey = (storageKey) => {
+const removeMirrorFromStorageKey = (storageKey: string): void => {
   const parsed = parseStorageKey(storageKey);
   if (!parsed) return;
   if (!isManagedNamespace(parsed.namespace)) return;
   removeMirrorValue(parsed.namespace, parsed.slug);
 };
 
-const attachStorageListenerOnce = () => {
+const attachStorageListenerOnce = (): void => {
   if (storageListenerAttached) return;
   if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return;
   window.addEventListener('storage', (event) => {
@@ -320,10 +411,10 @@ const attachStorageListenerOnce = () => {
   storageListenerAttached = true;
 };
 
-const attachBroadcastListenerOnce = () => {
+const attachBroadcastListenerOnce = (): void => {
   const chan = getBroadcastChannel();
   if (!chan) return;
-  const onMessage = (event) => {
+  const onMessage = (event: MessageEvent<CacheUpdatePayload>) => {
     if (!idbAvailable) return;
     const data = event?.data;
     if (!data || data._dgCacheScripts !== true) return;
@@ -359,7 +450,7 @@ const attachBroadcastListenerOnce = () => {
   }
 };
 
-const probeIdbAvailability = async () => {
+const probeIdbAvailability = async (): Promise<boolean> => {
   try {
     await idbSet(IDB_PROBE_KEY, { ok: true, ts: Date.now() }, IDB_STORE);
     await idbDel(IDB_PROBE_KEY, IDB_STORE);
@@ -370,7 +461,7 @@ const probeIdbAvailability = async () => {
   }
 };
 
-const ensureBackendReady = async () => {
+const ensureBackendReady = async (): Promise<void> => {
   if (backendReadyPromise) return backendReadyPromise;
   backendReadyPromise = (async () => {
     attachStorageListenerOnce();
@@ -381,15 +472,20 @@ const ensureBackendReady = async () => {
   return backendReadyPromise;
 };
 
-const hydrateMirrorFromIdb = async ({ preserveOptimistic = false } = {}) => {
+const hydrateMirrorFromIdb = async ({
+  preserveOptimistic = false,
+}: {
+  preserveOptimistic?: boolean;
+} = {}): Promise<void> => {
   const optimisticSnapshots = preserveOptimistic ? snapshotActiveOptimisticMirrorEntries() : [];
   clearMirror();
   try {
     const all = await idbEntries(IDB_STORE);
     all.forEach(([key, value]) => {
-      const parsed = parseStorageKey(key);
+      const storageKey = String(key || '');
+      const parsed = parseStorageKey(storageKey);
       if (!parsed || !isManagedNamespace(parsed.namespace)) return;
-      if (preserveOptimistic && optimisticWriteSeqByKey.has(key)) return;
+      if (preserveOptimistic && optimisticWriteSeqByKey.has(storageKey)) return;
       setMirrorValue(parsed.namespace, parsed.slug, value);
     });
     if (preserveOptimistic) {
@@ -401,7 +497,7 @@ const hydrateMirrorFromIdb = async ({ preserveOptimistic = false } = {}) => {
   didHydrateMirror = true;
 };
 
-const hydrateMirrorFromLocalStorage = () => {
+const hydrateMirrorFromLocalStorage = (): void => {
   clearMirror();
   try {
     if (typeof localStorage === 'undefined') {
@@ -410,6 +506,7 @@ const hydrateMirrorFromLocalStorage = () => {
     }
     for (let i = 0; i < localStorage.length; i += 1) {
       const key = localStorage.key(i);
+      if (!key) continue;
       const parsed = parseStorageKey(key);
       if (!parsed || !isManagedNamespace(parsed.namespace)) continue;
       setMirrorValue(parsed.namespace, parsed.slug, readLocalStorageKey(key));
@@ -420,7 +517,7 @@ const hydrateMirrorFromLocalStorage = () => {
   didHydrateMirror = true;
 };
 
-const hydrateMissingMirrorFromLocalStorage = () => {
+const hydrateMissingMirrorFromLocalStorage = (): number => {
   let hydrated = 0;
   try {
     if (typeof localStorage === 'undefined') return hydrated;
@@ -440,9 +537,13 @@ const hydrateMissingMirrorFromLocalStorage = () => {
   return hydrated;
 };
 
-const migrateManagedKeysFromLocalStorage = async ({ useIdb = true } = {}) => {
+const migrateManagedKeysFromLocalStorage = async ({
+  useIdb = true,
+}: {
+  useIdb?: boolean;
+} = {}): Promise<MigrationReport> => {
   if (typeof localStorage === 'undefined') return { moved: 0, removed: 0, failed: 0 };
-  const keys = [];
+  const keys: string[] = [];
   try {
     for (let i = 0; i < localStorage.length; i += 1) {
       const key = localStorage.key(i);
@@ -464,7 +565,7 @@ const migrateManagedKeysFromLocalStorage = async ({ useIdb = true } = {}) => {
     if (!parsed) continue;
     const value = readLocalStorageKey(key);
     if (value == null) continue;
-    let valueForMirror = value;
+    let valueForMirror: CacheValue = value;
 
     if (!useIdb) {
       updateMirrorFromStorageKey(key, value);
@@ -493,7 +594,7 @@ const migrateManagedKeysFromLocalStorage = async ({ useIdb = true } = {}) => {
       noteIdbFailure('migrate-managed-local', key, e);
       cacheLog.warn('[cacheScripts] Failed migrating managed key to IDB', {
         key,
-        error: e?.message || e,
+        error: getErrorMessage(e),
       });
     }
 
@@ -505,7 +606,7 @@ const migrateManagedKeysFromLocalStorage = async ({ useIdb = true } = {}) => {
   return { moved, removed, failed };
 };
 
-const attemptIdbRecovery = async ({ force = false } = {}) => {
+const attemptIdbRecovery = async ({ force = false }: { force?: boolean } = {}): Promise<boolean> => {
   if (idbAvailable) return true;
   const now = Date.now();
   if (!force && now - idbLastRecoveryProbeAt < IDB_RECOVERY_RETRY_MS) return false;
@@ -544,7 +645,7 @@ const attemptIdbRecovery = async ({ force = false } = {}) => {
   return idbRecoveryPromise;
 };
 
-const repairIdbKeyFromLocalStorage = async (storageKey, fallbackValue) => {
+const repairIdbKeyFromLocalStorage = async (storageKey: string, fallbackValue: CacheValue): Promise<void> => {
   if (fallbackValue == null || !idbAvailable) return;
   try {
     await idbSet(storageKey, cloneValue(fallbackValue), IDB_STORE);
@@ -555,7 +656,7 @@ const repairIdbKeyFromLocalStorage = async (storageKey, fallbackValue) => {
   }
 };
 
-const persistKey = async (storageKey, value) => {
+const persistKey = async (storageKey: string, value: CacheValue): Promise<boolean> => {
   await ensureBackendReady();
   if (!idbAvailable) {
     await attemptIdbRecovery();
@@ -567,7 +668,7 @@ const persistKey = async (storageKey, value) => {
       } catch (firstError) {
         cacheLog.warn('[cacheScripts] IDB write failed; retrying once', {
           storageKey,
-          error: firstError?.message || firstError,
+          error: getErrorMessage(firstError),
         });
         await idbSet(storageKey, cloneValue(value), IDB_STORE);
       }
@@ -585,7 +686,7 @@ const persistKey = async (storageKey, value) => {
   return writeLocalStorageKey(storageKey, value);
 };
 
-const deleteKey = async (storageKey) => {
+const deleteKey = async (storageKey: string): Promise<boolean> => {
   await ensureBackendReady();
   if (!idbAvailable) {
     await attemptIdbRecovery();
@@ -597,7 +698,7 @@ const deleteKey = async (storageKey) => {
       } catch (firstError) {
         cacheLog.warn('[cacheScripts] IDB delete failed; retrying once', {
           storageKey,
-          error: firstError?.message || firstError,
+          error: getErrorMessage(firstError),
         });
         await idbDel(storageKey, IDB_STORE);
       }
@@ -615,20 +716,20 @@ const deleteKey = async (storageKey) => {
   return removeLocalStorageKey(storageKey);
 };
 
-const readPersistentKey = async (storageKey) => {
+const readPersistentKey = async (storageKey: string): Promise<CacheValue | null | typeof READ_FAILED> => {
   await ensureBackendReady();
   if (!idbAvailable) {
     await attemptIdbRecovery();
   }
   if (idbAvailable) {
     try {
-      let value;
+      let value: CacheValue;
       try {
         value = await idbGet(storageKey, IDB_STORE);
       } catch (firstError) {
         cacheLog.warn('[cacheScripts] IDB read failed; retrying once', {
           storageKey,
-          error: firstError?.message || firstError,
+          error: getErrorMessage(firstError),
         });
         value = await idbGet(storageKey, IDB_STORE);
       }
@@ -652,7 +753,7 @@ const readPersistentKey = async (storageKey) => {
   return readLocalStorageKey(storageKey);
 };
 
-const enqueueWriteTaskForStorageKey = (storageKey, task) => {
+const enqueueWriteTaskForStorageKey = <T>(storageKey: string, task: () => Promise<T>): Promise<T> => {
   const prev = writeQueuesByKey.get(storageKey) || Promise.resolve();
   const run = prev.catch(() => null).then(async () => task());
   writeQueuesByKey.set(storageKey, run);
@@ -668,7 +769,7 @@ const enqueueWriteTaskForStorageKey = (storageKey, task) => {
   return run;
 };
 
-const commitManagedWrite = ({ namespace, slug, key, value }) => {
+const commitManagedWrite = ({ namespace, slug, key, value }: ManagedWriteInput): void => {
   setMirrorValue(namespace, slug, value);
   emitUpdate({
     action: 'write',
@@ -687,7 +788,7 @@ const commitManagedWrite = ({ namespace, slug, key, value }) => {
   });
 };
 
-export const initCacheManager = async () => {
+export const initCacheManager = async (): Promise<void> => {
   if (initPromise) return initPromise;
   initPromise = (async () => {
     await ensureBackendReady();
@@ -708,7 +809,13 @@ export const initCacheManager = async () => {
   return initPromise;
 };
 
-export const migrateLocalStorageToIDB = async () => {
+export const migrateLocalStorageToIDB = async (): Promise<{
+  migrated: boolean;
+  idb: boolean;
+  moved: number;
+  removed: number;
+  failed: number;
+}> => {
   await ensureBackendReady();
   const managed = await migrateManagedKeysFromLocalStorage({ useIdb: !!idbAvailable });
   const report = {
@@ -727,7 +834,10 @@ export const migrateLocalStorageToIDB = async () => {
   return report;
 };
 
-export const readCache = async (namespace, slug = '') => {
+export const readCache = async <TValue = CacheLegacyNode>(
+  namespace: unknown,
+  slug: unknown = '',
+): Promise<TValue | null> => {
   const ns = String(namespace || '');
   const sl = String(slug || '');
   if (!isManagedNamespace(ns)) return null;
@@ -735,24 +845,24 @@ export const readCache = async (namespace, slug = '') => {
   const key = toStorageKey(ns, sl);
   const value = await readPersistentKey(key);
   if (value === READ_FAILED) {
-    if (mirrorByKey.has(key)) return cloneValue(mirrorByKey.get(key));
+    if (mirrorByKey.has(key)) return cloneValue(mirrorByKey.get(key)) as TValue;
     return null;
   }
   if (value == null) {
     if (optimisticWriteSeqByKey.has(key) && mirrorByKey.has(key)) {
-      return cloneValue(mirrorByKey.get(key));
+      return cloneValue(mirrorByKey.get(key)) as TValue;
     }
     removeMirrorValue(ns, sl);
     return null;
   }
   if (optimisticWriteSeqByKey.has(key) && mirrorByKey.has(key)) {
-    return cloneValue(mirrorByKey.get(key));
+    return cloneValue(mirrorByKey.get(key)) as TValue;
   }
   setMirrorValue(ns, sl, value);
-  return cloneValue(value);
+  return cloneValue(value) as TValue;
 };
 
-const writeCacheDirect = async ({ namespace, slug, key, value }) => {
+const writeCacheDirect = async ({ namespace, slug, key, value }: ManagedWriteInput): Promise<boolean> => {
   await initCacheManager();
   const ok = await persistKey(key, value);
   if (!ok) return false;
@@ -760,7 +870,11 @@ const writeCacheDirect = async ({ namespace, slug, key, value }) => {
   return true;
 };
 
-export const writeCache = async (namespace, slug = '', value = null) => {
+export const writeCache = async (
+  namespace: unknown,
+  slug: unknown = '',
+  value: CacheValue = null,
+): Promise<boolean> => {
   const ns = String(namespace || '');
   const sl = String(slug || '');
   if (!isManagedNamespace(ns)) return false;
@@ -770,7 +884,7 @@ export const writeCache = async (namespace, slug = '', value = null) => {
 
 // Optimistic write for read-after-write flows that intentionally do not await persistence.
 // Mirror is updated synchronously, then rolled back if persistence fails.
-export const writeCacheOptimistic = (namespace, slug = '', value = null) => {
+export const writeCacheOptimistic = (namespace: unknown, slug: unknown = '', value: CacheValue = null): Promise<boolean> => {
   const ns = String(namespace || '');
   const sl = String(slug || '');
   if (!isManagedNamespace(ns)) return Promise.resolve(false);
@@ -782,7 +896,10 @@ export const writeCacheOptimistic = (namespace, slug = '', value = null) => {
   optimisticWriteSeqByKey.set(key, writeSeq);
   setMirrorValue(ns, sl, value);
 
-  const restoreMirrorFromSnapshot = (snapshotValue, { restorePreviousWhenEmpty = false } = {}) => {
+  const restoreMirrorFromSnapshot = (
+    snapshotValue: CacheValue | null | typeof READ_FAILED,
+    { restorePreviousWhenEmpty = false }: { restorePreviousWhenEmpty?: boolean } = {},
+  ): boolean => {
     if (snapshotValue === READ_FAILED) return false;
     if (snapshotValue == null) {
       if (restorePreviousWhenEmpty && hadPrevious) {
@@ -796,7 +913,11 @@ export const writeCacheOptimistic = (namespace, slug = '', value = null) => {
     return true;
   };
 
-  const rollback = async ({ persistedSnapshot = READ_FAILED } = {}) => {
+  const rollback = async ({
+    persistedSnapshot = READ_FAILED,
+  }: {
+    persistedSnapshot?: CacheValue | null | typeof READ_FAILED;
+  } = {}): Promise<void> => {
     if (optimisticWriteSeqByKey.get(key) !== writeSeq) return;
 
     let restored = restoreMirrorFromSnapshot(persistedSnapshot, { restorePreviousWhenEmpty: true });
@@ -816,7 +937,7 @@ export const writeCacheOptimistic = (namespace, slug = '', value = null) => {
     optimisticWriteSeqByKey.delete(key);
   };
 
-  const settle = () => {
+  const settle = (): void => {
     if (optimisticWriteSeqByKey.get(key) === writeSeq) {
       optimisticWriteSeqByKey.delete(key);
     }
@@ -844,7 +965,11 @@ export const writeCacheOptimistic = (namespace, slug = '', value = null) => {
   });
 };
 
-export const updateCacheAtomic = async (namespace, slug = '', updater = (current) => current) => {
+export const updateCacheAtomic = async <TValue = CacheLegacyNode>(
+  namespace: unknown,
+  slug: unknown = '',
+  updater: (current: TValue | null) => TValue | Promise<TValue> = (current) => current as TValue,
+): Promise<TValue | null> => {
   const ns = String(namespace || '');
   const sl = String(slug || '');
   if (!isManagedNamespace(ns)) return null;
@@ -853,17 +978,17 @@ export const updateCacheAtomic = async (namespace, slug = '', updater = (current
 
   const key = toStorageKey(ns, sl);
   return enqueueWriteTaskForStorageKey(key, async () => {
-    const current = cloneValue(mirrorByKey.get(key));
+    const current = cloneValue(mirrorByKey.get(key)) as TValue | undefined;
     const next = await updater(current == null ? null : current);
     const ok = await writeCacheDirect({ namespace: ns, slug: sl, key, value: next });
     if (!ok) {
       throw new Error(`[cacheScripts] Failed to persist atomic update for ${key}`);
     }
-    return cloneValue(next);
+    return cloneValue(next) as TValue;
   });
 };
 
-const removeCacheDirect = async ({ namespace, slug, key }) => {
+const removeCacheDirect = async ({ namespace, slug, key }: ManagedKeyInput): Promise<boolean> => {
   await initCacheManager();
   const ok = await deleteKey(key);
   if (!ok) return false;
@@ -884,7 +1009,7 @@ const removeCacheDirect = async ({ namespace, slug, key }) => {
   return true;
 };
 
-export const removeCache = async (namespace, slug = '') => {
+export const removeCache = async (namespace: unknown, slug: unknown = ''): Promise<boolean> => {
   const ns = String(namespace || '');
   const sl = String(slug || '');
   if (!isManagedNamespace(ns)) return false;
@@ -892,7 +1017,11 @@ export const removeCache = async (namespace, slug = '') => {
   return enqueueWriteTaskForStorageKey(key, async () => removeCacheDirect({ namespace: ns, slug: sl, key }));
 };
 
-export const peekCacheSync = (namespace, slug = '', options = {}) => {
+export const peekCacheSync = <TValue = CacheLegacyNode>(
+  namespace: unknown,
+  slug: unknown = '',
+  options: CachePeekOptions = {},
+): TValue | null => {
   const ns = String(namespace || '');
   const sl = String(slug || '');
   if (!isManagedNamespace(ns)) return null;
@@ -900,24 +1029,27 @@ export const peekCacheSync = (namespace, slug = '', options = {}) => {
   if (!mirrorByKey.has(key)) return null;
   const shouldClone = options?.clone !== false;
   const value = mirrorByKey.get(key);
-  return shouldClone ? cloneValue(value) : value;
+  return (shouldClone ? cloneValue(value) : value) as TValue;
 };
 
-export const hasNamespaceEntriesSync = (namespace) => {
+export const hasNamespaceEntriesSync = (namespace: unknown): boolean => {
   const ns = String(namespace || '');
   if (!isManagedNamespace(ns)) return false;
   const bucket = getNamespaceBucket(ns);
   return bucket.size > 0;
 };
 
-export const listNamespaceSlugsSync = (namespace) => {
+export const listNamespaceSlugsSync = (namespace: unknown): string[] => {
   const ns = String(namespace || '');
   if (!isManagedNamespace(ns)) return [];
   const bucket = getNamespaceBucket(ns);
   return Array.from(bucket.keys()).map((slug) => String(slug || ''));
 };
 
-export const listNamespaceEntriesSync = (namespace, options = {}) => {
+export const listNamespaceEntriesSync = <TValue = CacheLegacyNode>(
+  namespace: unknown,
+  options: CacheListOptions = {},
+): CacheEntry<TValue>[] => {
   const ns = String(namespace || '');
   if (!isManagedNamespace(ns)) return [];
   const bucket = getNamespaceBucket(ns);
@@ -926,11 +1058,11 @@ export const listNamespaceEntriesSync = (namespace, options = {}) => {
     namespace: ns,
     slug: String(slug || ''),
     key: toStorageKey(ns, slug),
-    value: shouldCloneValues ? cloneValue(value) : value,
+    value: (shouldCloneValues ? cloneValue(value) : value) as TValue,
   }));
 };
 
-export const getCacheBackendDiagnostics = () => {
+export const getCacheBackendDiagnostics = (): CacheBackendDiagnostics => {
   const probeState = backendReadyPromise ? (didHydrateMirror ? 'ready' : 'probing') : 'unprobed';
   const persistentBackend = probeState === 'unprobed' ? 'unknown' : idbAvailable ? 'indexeddb' : 'localstorage';
   return {
@@ -942,7 +1074,7 @@ export const getCacheBackendDiagnostics = () => {
   };
 };
 
-export const subscribeCacheUpdates = (handler) => {
+export const subscribeCacheUpdates = (handler: CacheUpdateHandler): (() => void) => {
   if (typeof handler !== 'function') return () => {};
   subscribers.add(handler);
   return () => {

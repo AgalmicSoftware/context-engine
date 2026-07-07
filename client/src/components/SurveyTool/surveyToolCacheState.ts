@@ -45,19 +45,21 @@ export type SurveyNetworkCache = UnknownRecord & {
   surveyResponses: Record<string, Record<string, SurveyResponseCacheItem>>;
   surveyResponsesLatestBlock?: UnknownRecord;
 };
+export type QuestionsCacheByNetwork = Record<string, QuestionNetworkCache>;
+export type SurveysCacheByNetwork = Record<string, SurveyNetworkCache>;
 
 const RECENT_QUESTION_PAYLOADS_KEY = 'dg:recentQuestionPayloads';
 const RECENT_QUESTION_PAYLOADS_TTL_MS = 12 * 60 * 60 * 1000;
-export function readQuestionsCache(slug: string) {
-  return peekCacheSync('questionsCache', slug) || {};
+export function readQuestionsCache(slug: string): QuestionsCacheByNetwork {
+  return peekCacheSync<QuestionsCacheByNetwork>('questionsCache', slug) || {};
 }
 
-export function readQuestionsCacheRef(slug: string) {
-  return peekCacheSync('questionsCache', slug, { clone: false }) || {};
+export function readQuestionsCacheRef(slug: string): QuestionsCacheByNetwork {
+  return peekCacheSync<QuestionsCacheByNetwork>('questionsCache', slug, { clone: false }) || {};
 }
 
-export async function readQuestionsCacheAsync(slug: string) {
-  const value = await readCache('questionsCache', slug);
+export async function readQuestionsCacheAsync(slug: string): Promise<QuestionsCacheByNetwork> {
+  const value = await readCache<QuestionsCacheByNetwork>('questionsCache', slug);
   return value && typeof value === 'object' ? value : readQuestionsCache(slug) || {};
 }
 
@@ -90,16 +92,16 @@ export function writeQuestionsCache(slug: string, obj: unknown) {
   );
 }
 
-export function readSurveysCache(slug: string) {
-  return peekCacheSync('surveysCache', slug) || {};
+export function readSurveysCache(slug: string): SurveysCacheByNetwork {
+  return peekCacheSync<SurveysCacheByNetwork>('surveysCache', slug) || {};
 }
 
-export function readSurveysCacheRef(slug: string) {
-  return peekCacheSync('surveysCache', slug, { clone: false }) || {};
+export function readSurveysCacheRef(slug: string): SurveysCacheByNetwork {
+  return peekCacheSync<SurveysCacheByNetwork>('surveysCache', slug, { clone: false }) || {};
 }
 
-export async function readSurveysCacheAsync(slug: string) {
-  const value = await readCache('surveysCache', slug);
+export async function readSurveysCacheAsync(slug: string): Promise<SurveysCacheByNetwork> {
+  const value = await readCache<SurveysCacheByNetwork>('surveysCache', slug);
   return value && typeof value === 'object' ? value : readSurveysCache(slug) || {};
 }
 

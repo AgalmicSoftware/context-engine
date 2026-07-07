@@ -168,12 +168,14 @@ export const createMainSiteDgStorage = (): MainSiteDgStorage => {
   const remove = (name: string, slug: string): Promise<void> => {
     const storageKey = `dg:${name}:${slug}`;
     if (isManagedDgCacheName(name)) {
-      return removeCache(name, slug).catch((e: unknown) => {
-        log.warn('[MainSite] DG.remove managed cache persist failed', {
-          storageKey,
-          error: (e as { message?: string })?.message || e,
+      return removeCache(name, slug)
+        .then(() => undefined)
+        .catch((e: unknown) => {
+          log.warn('[MainSite] DG.remove managed cache persist failed', {
+            storageKey,
+            error: (e as { message?: string })?.message || e,
+          });
         });
-      });
     }
     try {
       localStorage.removeItem(storageKey);
