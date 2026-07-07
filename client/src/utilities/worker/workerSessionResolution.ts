@@ -9,7 +9,11 @@ import {
 } from '../session/sessionNaming.js';
 import { getDemoSessionConfigForDisplay } from '../session/sessionSourceResolver.js';
 
+type UnknownRecord = Record<string, unknown>;
+
 const shouldPreferRegistrySessionConfig = () => true;
+const asRecord = (value: unknown): UnknownRecord =>
+  value && typeof value === 'object' ? (value as UnknownRecord) : {};
 
 const shouldAllowDefaultWorkerDemoFallback = (): boolean => !USE_ONCHAIN_SESSION_REGISTRY;
 
@@ -70,7 +74,7 @@ export const resolveWorkerSessionConfigBySlug = ({
 
 const getActiveSessionSlugFromStore = (): string => {
   try {
-    return resolveActiveSessionSlug(store?.getState?.()?.sessionState || {});
+    return resolveActiveSessionSlug(asRecord(store?.getState?.()?.sessionState));
   } catch {
     return '';
   }

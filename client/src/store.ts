@@ -1,7 +1,9 @@
 import { createStore, applyMiddleware } from 'redux';
+import type { PreloadedState } from 'redux';
 // import { persistReducer, persistStore } from 'redux-persist';
 import thunk from 'redux-thunk';
 import rootReducer from './reducers';
+import type { RootState } from './reducers';
 import { composeWithOptionalDevTools } from './utilities/state/composeEnhancers.js';
 // import storage from 'redux-persist/lib/storage';
 
@@ -12,7 +14,7 @@ import { composeWithOptionalDevTools } from './utilities/state/composeEnhancers.
 // };
 // const presistedReducer = persistReducer(persistConfig, reducer);
 
-const initialState = {};
+const initialState: PreloadedState<RootState> = {};
 
 const middleware = [thunk];
 
