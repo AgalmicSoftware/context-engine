@@ -153,6 +153,7 @@ import {
   SPONSORED_DEPLOY_NOTICE,
   SPONSORED_FAUCET_NOTICE,
   configureAdvancedUseUrlDeploy,
+  continueNewSessionEntry,
   enableAdvancedMode,
   expectSponsoredStatus,
   getFieldInputByLabel,
@@ -446,6 +447,7 @@ describe('SessionWizard sponsored bundle flow', () => {
       initialSponsoredBundleKey: 'bundle-secret',
     });
 
+    continueNewSessionEntry();
     await expectSponsoredStatus('Sponsored resources applied.');
     expect(window.location.hash).toBe('#preview=1');
   });
@@ -925,6 +927,7 @@ describe('SessionWizard sponsored bundle flow', () => {
       initialSponsoredBundleKey: 'bundle-secret',
     });
 
+    continueNewSessionEntry();
     await expectSponsoredStatus('Sponsored bundle expired.');
     expect(window.location.hash).toBe('#preview=1');
   });

@@ -58,6 +58,17 @@ const ensureSessionModeProfileSelected = () => {
   }
 };
 
+const continueNewSessionEntry = () => {
+  const continueButton = screen.queryByTestId('ce-new-preset-continue');
+  if (!continueButton) return;
+  ensureSessionModeProfileSelected();
+  const enabledContinueButton = screen.queryByTestId('ce-new-preset-continue');
+  if (!enabledContinueButton || enabledContinueButton.disabled) return;
+  act(() => {
+    fireEvent.click(enabledContinueButton);
+  });
+};
+
 const selectNormalModeCard = (label) => {
   ensureSessionModeProfileSelected();
   fireEvent.click(screen.getByRole('button', { name: new RegExp(label, 'i') }));
@@ -160,6 +171,7 @@ export {
   SPONSORED_DEPLOY_NOTICE,
   SPONSORED_FAUCET_NOTICE,
   configureAdvancedUseUrlDeploy,
+  continueNewSessionEntry,
   enableAdvancedMode,
   expectSponsoredStatus,
   getFieldInputByLabel,
