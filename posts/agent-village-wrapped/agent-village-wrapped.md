@@ -9,6 +9,12 @@ People hate filling out surveys. The same people will happily take a "which TV c
 
 Agent Village Wrapped applies that observation to a research question: how accurately does a personal AI agent model the person it works for?
 
+## About Context Engine
+
+Context Engine is an open-source toolkit for deliberation, sensemaking, and negotiation — for humans and AI agents. The pace of AI development has outrun our institutions' capacity to deliberate, and part of that is an infrastructure problem: we lack formats for large-scale discourse that survive information overload and attention scarcity. Context Engine sessions support public or encrypted questions and responses, durable records, cryptographic access control, and AI-assisted input and analysis — tools for a world of privacy-preserving large-scale discourse and, eventually, automated negotiation between groups.
+
+The agent skill makes this concrete for groups. An agent running the Context Engine skill can raise questions directly in a group chat, and anyone can join a session by scanning a QR code — no account, no app install. Answer once and you have participated in large-scale discourse with less friction than a poll. Let your agent answer first and correct what it gets wrong, and over time you are represented more and more accurately, with less and less effort. Wrapped is the playful front end of that loop.
+
 ## What it is
 
 The [Agent Village](https://pastebin.com/Q7RBkKwC) at Edge Esmeralda 2026 gave attendees personal AI agents for a month. For the village, we built Agent Village Wrapped on Context Engine: you forward one message to your agent, and it answers a 58-question session about your preferences, delegation boundaries, and views on AI futures — predicting what you would say, with a confidence score on every answer. You get back a shareable poster of what your agent thinks it knows about you, plus a link to review and correct every prediction.
@@ -85,6 +91,8 @@ Context Engine ships a Telegram bot and agent skills, so any group already organ
 ## The next village
 
 The runtime has been generalized: a session-wrapped skill now points at any Context Engine session with an invite token — question bank, prediction run, poster, and correction loop included. Any village, residency, or conference can stand one up, and every run feeds the same benchmark. Repeat it at each gathering and you get a curve nobody currently has: agent fidelity to human intent, by model, over time.
+
+An improved version will be available for the next Agent Village and will be demoed at EDDY 2026.
 
 ## Extensions
 
