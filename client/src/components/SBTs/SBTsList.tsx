@@ -1,7 +1,7 @@
 /** @file SBTsList */
 
 import React, { useEffect, useLayoutEffect, useState, useRef, useMemo, useCallback } from 'react';
-import contractScripts, {
+import {
   getAllSessionEntries,
   getDemoSessionConfigBySlug,
   getSessionChainId,
@@ -27,7 +27,6 @@ import {
   SbtListSectionTitle,
 } from './SbtListSectionChrome';
 import { ethers } from 'ethers';
-import { createLogger } from '../../utilities/logging.js';
 import {
   listNamespaceEntriesSync,
   peekCacheSync,
@@ -42,16 +41,13 @@ import {
   readStoredGlobalSessionSelection,
 } from '../../utilities/session/globalSessionState.js';
 import { hasUsableSessionWorkerConfig } from '../../utilities/session/sessionWorkerAvailability.js';
-import { hasCachedCreateSbtForm } from '../../utilities/sbt/sbtCreateFormCache.js';
 import { getSbtDescriptionText, getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { readPublicUrlBasePath, stripPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
-import { bindSbtListRuntimePorts } from './sbtListRuntimePorts';
 import {
   filterSessionUniverseEntriesByDemoVisibility,
   getCustomDemoSessionEntries,
   mergeSessionUniverseEntriesBySlug,
 } from './sbtSessionUniverse.js';
-import { getDemoSessionMap } from '../../utilities/session/sessionDemoCompat.js';
 import { t } from '../../utilities/ui/terminology.js';
 import {
   areSbtListArraysEqual,
@@ -84,7 +80,6 @@ import {
   collectSbtListLinkedScopedEntries,
   dedupeNormalizedSbtListSlugs,
   getSbtCardDetails,
-  getVisibleSbtListSessionSlugsFromEntries,
   mergeSbtListsByAddress,
   hasSbtListExplicitNoSessionAssociation,
   hasSbtListMissingOrEmptySessionSlug,
@@ -123,174 +118,48 @@ import {
   isSbtListSyntheticNoSessionSlug,
   resolveSbtListSessionSelectorSummarySlugs,
 } from './sbtListHelpers';
+import {
+  DEMO_SESSION_MAP,
+  FEATURED_CARD_INTERACTIVE_SELECTOR,
+  SBT_CHIP_PROGRESS_VISIBILITY_MIN_INTERVAL_MS,
+  SBT_LIVE_PROGRESS_BRIDGE_MS,
+  SBT_LIVE_PROGRESS_BRIDGE_TAIL_BLOCKS,
+  getVisibleSessionSlugsFromEntries,
+  isRecord,
+  isSbtListPointerEventLike,
+  sbtListRuntimePorts,
+  sbtLog,
+} from './sbtListRuntimeValues';
 import type {
-  SbtListChipProgressBooleanBySlug,
-  SbtListChipProgressVisibilityMeta,
   SbtCacheMetaSnapshot,
   SbtCardDetails,
-  SbtListHelperItem,
+  SBTsListProps,
+  SbtListBooleanBySlug,
+  SbtListBySlug,
+  SbtListChipProgressMeta,
+  SbtListChipProgressMetaBySlug,
+  SbtListFetchRunBySlug,
+  SbtListFetchSBTs,
+  SbtListGroupPasswordMap,
+  SbtListInitDeps,
+  SbtListItem,
+  SbtListLiveProgress,
+  SbtListLiveProgressBySlug,
+  SbtListLoadStateBySlug,
+  SbtListPasswordFlagResult,
+  SbtListPointerEventLike,
   SbtPassiveLatestLookupInFlightBySlug,
   SbtPassiveLatestLookupStateBySlug,
-  SbtListRealtimeProgressBySlug,
-  SbtListRealtimeProgressRecord,
   SbtListScopedEntryOptions,
-  SbtListSessionChipStateBySlug,
-  SbtListSessionLoadingStatus,
-  SbtListSessionLoadingStatusBySlug,
-  SbtListSessionLoadingStatusOptions,
-  SbtListSessionProgressSnapshot,
-  SbtListSessionUniverseSnapshot,
-} from './sbtListHelpers';
-
-const sbtLog = createLogger('sbt');
-type UnknownRecord = Record<string, unknown>;
-type SbtListMetadata = UnknownRecord & {
-  chainID?: unknown;
-  chainId?: unknown;
-  description?: unknown;
-  image?: unknown;
-  name?: unknown;
-  sessionName?: unknown;
-  sessionSlug?: unknown;
-  sessionSlugExplicit?: unknown;
-  title?: unknown;
-  tokenURI?: unknown;
-  tokenUri?: unknown;
-};
-type SbtListItem = SbtListHelperItem & {
-  blockNumber?: unknown;
-  burnedAddresses?: unknown;
-  defaultSbtTags?: unknown;
-  docURLs?: unknown;
-  documentURLs?: unknown;
-  documentUrls?: unknown;
-  documents?: unknown;
-  featuredSbtTags?: unknown;
-  historySummary?: UnknownRecord & {
-    currentHolderCount?: unknown;
-    historicalHolderCount?: unknown;
-  };
-  mintedAddresses?: unknown;
-  sbtAddress?: unknown;
-  sbtInfo?: SbtListMetadata;
-  sessionName?: unknown;
-  sessionSlug?: unknown;
-  sessionSlugExplicit?: unknown;
-  slug?: unknown;
-  __sourceSessionSlug?: unknown;
-};
-type SbtListPointerEventLike = {
-  altKey?: boolean;
-  button?: number;
-  ctrlKey?: boolean;
-  currentTarget?: EventTarget | null;
-  defaultPrevented?: boolean;
-  metaKey?: boolean;
-  preventDefault?: () => void;
-  shiftKey?: boolean;
-  stopPropagation?: () => void;
-  target?: EventTarget | null;
-};
-type SbtSessionUniverseSnapshot = SbtListSessionUniverseSnapshot;
-type SbtListLiveProgress = SbtListRealtimeProgressRecord;
-type SbtListBySlug = Record<string, SbtListItem[] | undefined>;
-type SbtListLiveProgressBySlug = SbtListRealtimeProgressBySlug;
-type SbtListBooleanBySlug = Record<string, boolean | undefined>;
-type SbtListLoadState = 'idle' | 'loading' | 'loaded' | 'error';
-type SbtListLoadStateBySlug = Record<string, SbtListLoadState | undefined>;
-type SbtListFetchRunBySlug = Record<string, number | undefined>;
-type SbtSessionDisplayConfig = UnknownRecord & {
-  blockLimits?: UnknownRecord & {
-    start?: unknown;
-  };
-  sessionName?: string;
-};
-type SbtSessionProgressSnapshot = SbtListSessionProgressSnapshot;
-type SbtSessionLoadingOptions = SbtListSessionLoadingStatusOptions;
-type SbtSessionLoadingStatus = SbtListSessionLoadingStatus;
-type SbtSessionLoadingStatusBySlug = SbtListSessionLoadingStatusBySlug;
-type SbtSessionChipStateBySlug = SbtListSessionChipStateBySlug;
-type SbtListInitDeps = {
-  listSlug: string;
-  allSessionsMode: boolean;
-  selectedSessionSignature: string;
-  universeSignature: string;
-  sessionUniverseRegistryPending: boolean;
-  sbtCacheRevision: number;
-};
-type SbtListFetchSBTs = (
-  forceRefresh?: boolean,
-  showLoadingIndicator?: boolean,
-  slugOverride?: unknown,
-  options?: {
-    markSessionLoading?: boolean;
-  },
-) => Promise<boolean>;
-type SbtListChipProgressMeta = SbtListChipProgressVisibilityMeta;
-type SbtListChipProgressMetaBySlug = Record<string, SbtListChipProgressMeta | undefined>;
-type SbtListGroupPasswordMap = Record<string, boolean | undefined>;
-type SbtListPasswordFlagResult = [string, boolean];
-type SbtListNetwork = UnknownRecord & {
-  id?: unknown;
-};
-type SbtLightDiscoveryOptions = {
-  force?: boolean;
-  forceScopeSlug?: string;
-};
-type SbtUniverseDiscoveryOptions = {
-  force?: boolean;
-};
-type SBTsListProps = {
-  account?: unknown;
-  litHooks?: unknown;
-  allSessionsMode?: boolean;
-  communityTabCompactSettings?: boolean;
-  embeddedMode?: boolean;
-  ensureLightSbtDiscovery?: (slug: string, options?: SbtLightDiscoveryOptions) => Promise<unknown> | unknown;
-  ensureLightSbtUniverse?: (slugs: string[], options?: SbtUniverseDiscoveryOptions) => Promise<unknown> | unknown;
-  interactiveMiniCards?: boolean;
-  isSBTCacheReady?: boolean;
-  latestBlockNumber?: unknown;
-  loginComplete?: unknown;
-  miniaturized?: boolean;
-  network?: SbtListNetwork | null;
-  onNavigateToSbt?: (sbtAddress: string, href: string) => void;
-  onRequestSbtCacheRefresh?: () => void;
-  provider?: unknown;
-  refreshSbtData?: unknown;
-  refreshSessionUniverseRegistryCache?: () => Promise<unknown> | unknown;
-  sbtCacheRevision?: unknown;
-  sbtRealtimeCoverageBySlug?: SbtListBooleanBySlug | UnknownRecord;
-  sbtScanProgressBySlug?: SbtListLiveProgressBySlug | UnknownRecord;
-  sessionSlug?: unknown;
-  toggleLoginModal?: unknown;
-  viewMode?: 'standard' | 'modal' | string;
-};
-const isRecord = (value: unknown): value is UnknownRecord => !!value && typeof value === 'object';
-const isSbtListPointerEventLike = (value: unknown): value is SbtListPointerEventLike =>
-  !!value && typeof value === 'object';
-const sbtListRuntimePorts = bindSbtListRuntimePorts({
-  contractScripts: () => contractScripts,
-  hasCachedCreateSbtForm: () => hasCachedCreateSbtForm,
-});
-const DEMO_SESSION_MAP = getDemoSessionMap();
-
-const SBT_LIVE_PROGRESS_BRIDGE_MS = 2500;
-const SBT_LIVE_PROGRESS_BRIDGE_TAIL_BLOCKS = 5;
-const SBT_CHIP_PROGRESS_VISIBILITY_MIN_INTERVAL_MS = 5000;
-const FEATURED_CARD_INTERACTIVE_SELECTOR = [
-  'button',
-  'a',
-  'input',
-  'select',
-  'textarea',
-  '[role="button"]',
-  '[role="link"]',
-  '[data-featured-card-ignore-nav="true"]',
-].join(', ');
-
-const getVisibleSessionSlugsFromEntries = (entries: unknown = []): string[] =>
-  getVisibleSbtListSessionSlugsFromEntries(entries, { demoSessionMap: DEMO_SESSION_MAP });
+  SbtSessionChipStateBySlug,
+  SbtSessionDisplayConfig,
+  SbtSessionLoadingOptions,
+  SbtSessionLoadingStatus,
+  SbtSessionLoadingStatusBySlug,
+  SbtSessionProgressSnapshot,
+  SbtSessionUniverseSnapshot,
+  UnknownRecord,
+} from './sbtListTypes';
 
 export const __test__areSbtListArraysEqual = areSbtListArraysEqual;
 
