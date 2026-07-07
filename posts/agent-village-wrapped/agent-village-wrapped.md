@@ -9,19 +9,15 @@ People hate filling out surveys. The same people will happily take a "which TV c
 
 Agent Village Wrapped applies that observation to a research question: how accurately does a personal AI agent model the person it works for?
 
-## About Context Engine
+## Background
 
-Context Engine is an open-source toolkit for deliberation, sensemaking, and negotiation — for humans and AI agents. The pace of AI development has outrun our institutions' capacity to deliberate, and part of that is an infrastructure problem: we lack formats for large-scale discourse that survive information overload and attention scarcity. Context Engine sessions support public or encrypted questions and responses, durable records, cryptographic access control, and AI-assisted input and analysis — tools for a world of privacy-preserving large-scale discourse and, eventually, automated negotiation between groups.
-
-The agent skill makes this concrete for groups. An agent running the Context Engine skill can raise questions directly in a group chat, and anyone can join a session by scanning a QR code — no account, no app install. Answer once and you have participated in large-scale discourse with less friction than a poll. Let your agent answer first and correct what it gets wrong, and over time you are represented more and more accurately, with less and less effort. Wrapped is the playful front end of that loop.
-
-## What it is
-
-The [Agent Village](https://pastebin.com/Q7RBkKwC) at Edge Esmeralda 2026 gave attendees personal AI agents for a month. For the village, we built Agent Village Wrapped on Context Engine: you forward one message to your agent, and it answers a 58-question session about your preferences, delegation boundaries, and views on AI futures — predicting what you would say, with a confidence score on every answer. You get back a shareable poster of what your agent thinks it knows about you, plus a link to review and correct every prediction.
+**Agent Village Wrapped** is a quiz your agent takes about you. You forward one message; your agent predicts your answers to a 58-question session on delegation, privacy, and AI futures, with a confidence score on every answer. You get back a shareable poster of what it thinks it knows about you, plus a link to review and correct each prediction.
 
 ![Example Agent Village Wrapped output](attachments/example-wrapped-poster.png)
 
-The proposal was [selected for funding on Simocracy](https://www.simocracy.org/proposals/did%3Aplc%3Abnb2onvsvtmryjvy77fmrtou/3mognd4flwk2i), where AI sims evaluate and fund proposals — the first backers of this eval were bots. We finished it in the closing days of the village, so only a few people ran it. The design is reusable, and that is what this post is about.
+**The Agent Village** at Edge Esmeralda 2026 gave attendees personal AI agents for a month ([overview](https://pastebin.com/Q7RBkKwC)). Wrapped ran there as an opt-in experiment, [funded through Simocracy](https://www.simocracy.org/proposals/did%3Aplc%3Abnb2onvsvtmryjvy77fmrtou/3mognd4flwk2i), where AI sims evaluate and fund proposals — the first backers of this eval were bots. It shipped in the village's closing days, so only a few people ran it. The design is reusable, and that is what this post is about.
+
+**Context Engine**, the toolkit underneath, is open-source infrastructure for deliberation, sensemaking, and negotiation — for humans and AI agents ([whitepaper](https://github.com/AgalmicSoftware/context-engine/blob/main/whitepaper/whitepaper.md)). Sessions support public or encrypted responses, durable records, and AI-assisted input and analysis, aiming at privacy-preserving large-scale discourse. An agent running the Context Engine skill can raise appropriate questions from sessions to a user, based on context, and draft responses to reduce input friction. You can join a session from a QR code, and over time your agent represents you more and more accurately, with less and less effort.
 
 ## The eval
 
