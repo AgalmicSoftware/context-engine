@@ -20,6 +20,7 @@ const readClientJestConfig = () => require(path.resolve(__dirname, '../../../jes
 
 const expectedLintCommand = [
   'eslint --no-error-on-unmatched-pattern src/',
+  '"src/**/*.{js,jsx,mjs,cjs}"',
   '"src/domains/**/*.{ts,tsx}"',
   '"src/utilities/session/**/*.{ts,tsx}"',
   '"src/utilities/worker/**/*.{ts,tsx}"',

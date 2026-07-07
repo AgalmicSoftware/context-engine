@@ -134,6 +134,9 @@ jobs:
       - name: Run client coverage tests
         run: npm run test:client
 
+      - name: Check client coverage floor
+        run: npm run coverage-floor:check
+
       - name: Upload client coverage
         if: always()
         uses: actions/upload-artifact@v4
@@ -229,6 +232,10 @@ jobs:
 
       - name: Run cache guard
         run: npm run test:cache-guard
+
+      - name: Run dead export advisory
+        continue-on-error: true
+        run: npm run dead-exports:advisory
 
   test:
     runs-on: ubuntu-latest

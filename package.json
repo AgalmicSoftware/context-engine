@@ -42,6 +42,7 @@
     "test:cc:coverage": "NODE_V8_COVERAGE=coverage node scripts/run-contextengine-cc-tests.js --experimental-test-coverage",
     "test:node": "node scripts/run-node-tests.js",
     "client-boundaries:check": "node scripts/check-client-boundaries.mjs",
+    "dead-exports:advisory": "node scripts/check-dead-exports-advisory.mjs",
     "test:hygiene": "node scripts/check-text-hygiene.mjs",
     "test:wiring": "node scripts/verify-test-wiring.js && node scripts/verify-test-inventory.js && npm run -s client-boundaries:check && npm run -s test:hygiene",
     "test:release:client": "cd client && npm test -- --watchAll=false --runInBand",

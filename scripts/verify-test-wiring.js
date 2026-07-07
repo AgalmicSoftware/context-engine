@@ -90,6 +90,8 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFile('scripts/check-coverage-floor.mjs');
   expectFile('scripts/check-coverage-floor.test.mjs');
   expectFile('scripts/coverage-baseline.json');
+  expectFile('scripts/check-dead-exports-advisory.mjs');
+  expectFile('scripts/check-dead-exports-advisory.test.mjs');
   expectFile('scripts/check-baseline-monotonicity.mjs');
   expectFile('scripts/check-baseline-monotonicity.test.mjs');
   expectFile('scripts/testInventoryConfig.js');
@@ -152,6 +154,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('verify:public-release-surface', 'scripts/verify-public-release-surface.js');
   expectScriptContains('verify:public-release-pii', 'scripts/verify-public-release-pii.sh');
   expectScriptContains('coverage-floor:check', 'scripts/check-coverage-floor.mjs');
+  expectScriptContains('dead-exports:advisory', 'scripts/check-dead-exports-advisory.mjs');
   expectScriptContains('verify:release', 'npm run lint');
   expectScriptContains('verify:release', 'npm run typecheck:client');
   expectScriptContains('verify:release', 'npm run test:release:client');
@@ -183,11 +186,14 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectWorkflowContains('run: npm --prefix client run build', '"npm --prefix client run build"');
   expectWorkflowContains('run: npm run test:contracts', '"npm run test:contracts"');
   expectWorkflowContains('run: npm run test:client', '"npm run test:client"');
+  expectWorkflowContains('run: npm run coverage-floor:check', '"npm run coverage-floor:check"');
   expectWorkflowContains('run: npm run test:root:jest', '"npm run test:root:jest"');
   expectWorkflowContains('run: npm run test:worker:session-cors', '"npm run test:worker:session-cors"');
   expectWorkflowContains('run: npm run test:cc', '"npm run test:cc"');
   expectWorkflowContains('run: npm run test:node', '"npm run test:node"');
   expectWorkflowContains('run: npm run test:cache-guard', '"npm run test:cache-guard"');
+  expectWorkflowContains('continue-on-error: true', 'non-blocking advisory step');
+  expectWorkflowContains('run: npm run dead-exports:advisory', '"npm run dead-exports:advisory"');
   expectWorkflowContains('uses: actions/upload-artifact@v4', 'client coverage artifact upload');
   expectWorkflowContains('path: client/coverage/lcov.info', 'client coverage artifact path');
   expectWorkflowContains('needs:', 'aggregate job dependency list');
