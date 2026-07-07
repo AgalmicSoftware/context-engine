@@ -948,8 +948,11 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
         const chainIdHex = chainHexId(tn);
         const rpcHttp = chainHttpRpcNoPath(tn) || chainHttpRpc(tn);
         const native = chainCurrency(tn);
+        const ethereum = window.ethereum as {
+          request: (request: { method: string; params?: unknown[] }) => Promise<unknown>;
+        };
 
-        await window.ethereum.request({
+        await ethereum.request({
           method: 'wallet_addEthereumChain',
           params: [
             {

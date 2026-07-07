@@ -37,8 +37,11 @@ import { perfDebugDecryptEnvelope } from '../web3/rpcDebugStats.js';
 
 type UnknownRecord = Record<string, unknown>;
 type EthereumRequest = { method: string; params?: unknown[] };
-type Eip1193Provider = UnknownRecord & {
+type Eip1193Provider = {
   request: (request: EthereumRequest) => Promise<unknown>;
+  address?: unknown;
+  isPasskeyEoa?: boolean;
+  selectedAddress?: unknown;
 };
 type ProviderLike =
   | string
@@ -198,7 +201,6 @@ declare global {
     __passkeyEoaProvider?: Eip1193Provider & { isPasskeyEoa?: boolean };
     __ceCreatePasskeyEip1193Provider?: () => Eip1193Provider | null;
     web3authProvider?: Eip1193Provider;
-    ethereum?: Eip1193Provider;
     poseidon?: PoseidonHasher;
     poseidon1?: PoseidonHasher;
     Poseidon?: PoseidonHasher;
@@ -730,7 +732,9 @@ const _getProvider = (providerLike: ProviderLike): Eip1193Provider => {
     }
   }
   if (typeof window !== 'undefined') {
-    if (window.ethereum) return window.ethereum;
+    if (window.ethereum && typeof window.ethereum.request === 'function') {
+      return window.ethereum as Eip1193Provider;
+    }
     if (window.web3authProvider) return window.web3authProvider;
   }
 
