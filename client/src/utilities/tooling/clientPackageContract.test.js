@@ -67,19 +67,20 @@ describe('client package modernization contract', () => {
     expect(pkg.scripts.dev).toBe('PUBLIC_URL=/ vite --host 0.0.0.0 --port 3000');
     expect(pkg.scripts.prebuild).toBe('node scripts/clean-legacy-vite-output.mjs');
     expect(pkg.scripts.build).toBe('PUBLIC_URL=/ vite build');
-    expect(pkg.scripts['prebuild:vite']).toBe('node scripts/clean-legacy-vite-output.mjs');
+    expect(pkg.scripts.preview).toBe('vite preview --host 0.0.0.0');
     expect(pkg.scripts.start).toBe('serve -s build');
     expect(pkg.scripts.test).toBe('jest');
     expect(pkg.scripts.lint).toBe(expectedLintCommand);
   });
 
-  it('keeps CRA fallback scripts removed from the client package contract', () => {
+  it('keeps legacy Vite aliases and CRA fallback scripts removed from the client package contract', () => {
     const pkg = readClientPackageJson();
     const eslintConfig = readClientFile('eslint.config.mjs');
 
-    expect(pkg.scripts['dev:vite']).toBe('PUBLIC_URL=/ vite --host 0.0.0.0 --port 3000');
-    expect(pkg.scripts['build:vite']).toBe('PUBLIC_URL=/ vite build');
-    expect(pkg.scripts['preview:vite']).toBe('vite preview --host 0.0.0.0');
+    expect(pkg.scripts['dev:vite']).toBeUndefined();
+    expect(pkg.scripts['build:vite']).toBeUndefined();
+    expect(pkg.scripts['prebuild:vite']).toBeUndefined();
+    expect(pkg.scripts['preview:vite']).toBeUndefined();
     expect(pkg.scripts['dev:cra']).toBeUndefined();
     expect(pkg.scripts['build:cra']).toBeUndefined();
     expect(pkg.scripts.eject).toBeUndefined();
