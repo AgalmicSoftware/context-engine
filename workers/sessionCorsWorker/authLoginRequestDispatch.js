@@ -5,6 +5,22 @@ import {
   buildAuthTokenJti,
   persistAuthTokenRecord,
 } from './authTokenClaims.js';
+import {
+  ABUSE_COUNTER_TYPES,
+  recordAbuseEvent as recordAbuseEventBoundary,
+} from './abuseObservability.js';
+
+const recordAuthFailure = async ({ env, deps } = {}) => {
+  try {
+    await (deps?.recordAbuseEvent || recordAbuseEventBoundary)({
+      env,
+      type: ABUSE_COUNTER_TYPES.AUTH_FAILURE,
+      now: deps?.now,
+    });
+  } catch {
+    // Auth telemetry must not alter login failure responses.
+  }
+};
 
 export const dispatchAuthLoginRequest = async ({
   request,
@@ -50,7 +66,10 @@ export const dispatchAuthLoginRequest = async ({
       SESSION_CONFIG_NOT_FOUND_ERROR: deps?.SESSION_CONFIG_NOT_FOUND_ERROR,
     },
   });
-  if (!authorityResult?.ok) return authorityResult?.response;
+  if (!authorityResult?.ok) {
+    await recordAuthFailure({ env, deps });
+    return authorityResult?.response;
+  }
 
   const {
     address,

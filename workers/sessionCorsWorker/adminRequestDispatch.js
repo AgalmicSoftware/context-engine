@@ -27,6 +27,10 @@ import {
 import {
   dispatchAdminWorkerGroupRequest,
 } from './workerGroups.js';
+import {
+  ABUSE_COUNTER_TYPES,
+  recordAbuseEvent as recordAbuseEventBoundary,
+} from './abuseObservability.js';
 
 const ALLOWED_SECRET_KEYS = [
   'openaiKey',
@@ -47,6 +51,18 @@ const toTrimmedString = (value) => (
       ? ''
       : String(value).trim()
 );
+
+const recordAuthFailure = async ({ env, deps } = {}) => {
+  try {
+    await (deps?.recordAbuseEvent || recordAbuseEventBoundary)({
+      env,
+      type: ABUSE_COUNTER_TYPES.AUTH_FAILURE,
+      now: deps?.now,
+    });
+  } catch {
+    // Admin auth telemetry must not alter the original failure response.
+  }
+};
 
 const buildSecretPresenceManifest = (secrets) => {
   const source = secrets && typeof secrets === 'object' ? secrets : {};
@@ -134,7 +150,10 @@ export const dispatchAdminRequest = async ({
       MISSING_SLUG_ERROR: deps?.MISSING_SLUG_ERROR,
     },
   });
-  if (!authorityResult?.ok) return authorityResult?.response;
+  if (!authorityResult?.ok) {
+    await recordAuthFailure({ env, deps });
+    return authorityResult?.response;
+  }
 
   const {
     existingConfig,

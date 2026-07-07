@@ -34,7 +34,10 @@ export const dispatchAdminRequestWithWorkerDeps = async ({
         slugArg,
         addressArg,
         nonceArg,
-        { usedNonceTtlSeconds: constants?.usedNonceTtlSeconds },
+        {
+          usedNonceTtlSeconds: constants?.usedNonceTtlSeconds,
+          ...(deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {}),
+        },
       ),
       validateBootstrapAdmin: deps?.validateBootstrapAdmin,
       validateAdmin: deps?.validateAdmin,
@@ -44,6 +47,7 @@ export const dispatchAdminRequestWithWorkerDeps = async ({
       getSessionSecrets: deps?.getSessionSecrets,
       normalizeSecretValue: deps?.normalizeSecretValue,
       putSessionSecrets: deps?.putSessionSecrets,
+      ...(deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {}),
       MISSING_SLUG_ERROR: constants?.missingSlugError,
     },
   })

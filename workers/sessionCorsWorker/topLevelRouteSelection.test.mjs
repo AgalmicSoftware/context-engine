@@ -46,6 +46,16 @@ test('resolveTopLevelRouteSelection preserves options, auth, and admin route cla
 
   assert.deepEqual(
     resolveTopLevelRouteSelection({
+      path: '/admin/abuse-summary',
+      method: 'GET',
+      request: createRequest({ Authorization: 'Bearer token' }),
+      deps: { toStr: String },
+    }),
+    { kind: 'admin-abuse-summary' }
+  );
+
+  assert.deepEqual(
+    resolveTopLevelRouteSelection({
       path: '/health',
       method: 'OPTIONS',
       request: createRequest(),

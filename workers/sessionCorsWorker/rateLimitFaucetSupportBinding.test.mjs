@@ -48,6 +48,39 @@ test('createRateLimitFaucetSupportWithWorkerDeps preserves rate-limit keying, re
   ]);
 });
 
+test('createRateLimitFaucetSupportWithWorkerDeps records rate-limit denials', async () => {
+  const events = [];
+  const env = {
+    GROUP_KV: {
+      get: async () => JSON.stringify({ count: 2, resetAt: 2_000 }),
+      put: async () => {},
+    },
+  };
+
+  const { checkRateLimit } = createRateLimitFaucetSupportWithWorkerDeps({
+    deps: {
+      toStr: (value) => (typeof value === 'string' ? value : value == null ? '' : String(value)),
+      now: () => 1_000,
+      recordAbuseEvent: async (event) => {
+        events.push(event);
+        return { ok: true };
+      },
+    },
+  });
+
+  const allowed = await checkRateLimit({
+    env,
+    slug: 'session-a',
+    address: '0xabc',
+    limit: 2,
+    route: 'ai',
+  });
+
+  assert.equal(allowed, false);
+  assert.equal(events.length, 1);
+  assert.equal(events[0].type, 'rate_limit_trips');
+});
+
 test('createRateLimitFaucetSupportWithWorkerDeps preserves faucet gate authority helper wiring', () => {
   const helperBundle = {
     findSessionGateForSbt: 'findSessionGateForSbt',

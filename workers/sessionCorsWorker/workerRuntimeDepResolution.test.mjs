@@ -47,6 +47,8 @@ test('resolveWorkerRuntimeDeps preserves worker-local and imported dependency wi
     buildNonce: 'buildNonce',
     checkNonceRateLimit: 'checkNonceRateLimit',
     consumeNonce: 'consumeNonce',
+    recordAbuseEvent: 'recordAbuseEvent',
+    readAbuseCounterSummary: 'readAbuseCounterSummary',
     base64UrlEncode: 'base64UrlEncode',
     signToken: 'signToken',
     buildAuthTokenJti: 'buildAuthTokenJti',

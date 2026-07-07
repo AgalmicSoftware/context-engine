@@ -80,6 +80,36 @@ test('resolveAuthenticatedRequest preserves verifyToken error passthrough', asyn
   });
 });
 
+test('resolveAuthenticatedRequest records invalid bearer tokens as auth failures', async () => {
+  const events = [];
+  const baseHeaders = { 'Access-Control-Allow-Origin': '*' };
+
+  const result = await resolveAuthenticatedRequest({
+    request: {
+      headers: new Headers({
+        Authorization: 'Bearer test-token',
+      }),
+    },
+    env: {
+      TOKEN_HMAC_SECRET: 'secret',
+    },
+    baseHeaders,
+    deps: {
+      verifyToken: async () => ({ ok: false, error: 'Token expired.' }),
+      recordAbuseEvent: async (event) => {
+        events.push(event);
+        return { ok: true };
+      },
+      json: createJsonStub(),
+      MISSING_SLUG_ERROR: 'Missing sessionSlug.',
+    },
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(events.length, 1);
+  assert.equal(events[0].type, 'auth_failures');
+});
+
 test('resolveAuthenticatedRequest passes token and header slug data through with countEmptyHeaderAsExplicit enabled', async () => {
   let received = null;
   const payload = { sub: '0xabc' };

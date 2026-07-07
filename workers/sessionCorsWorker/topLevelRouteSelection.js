@@ -41,6 +41,10 @@ export const resolveTopLevelRouteSelection = ({
     };
   }
 
+  if (path === '/admin/abuse-summary' && method === 'GET') {
+    return { kind: 'admin-abuse-summary' };
+  }
+
   if (path.startsWith('/admin/') && method === 'POST') {
     return {
       kind: 'admin',
