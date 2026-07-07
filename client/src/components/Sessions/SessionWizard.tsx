@@ -60,7 +60,6 @@ import {
   resolveSessionWizardRegistryAddress,
   sanitizeSessionWizardContracts,
 } from './sessionWizardContracts.js';
-import { resolveWorkerSecretsSnapshot } from './sessionWizardSecrets.js';
 import { resolveSessionWizardDeployStatusDisplayState } from './sessionWizardDeployErrors';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { toStr } from '../../utilities/shared/primitives.js';
@@ -71,7 +70,6 @@ import {
   sanitizeSessionWizardMetadataPayload,
 } from './sessionWizardWriteNormalization.js';
 import usePendingSbtDrafts, { normalizePendingSbtDrafts, type PendingSbtDraft } from './hooks/usePendingSbtDrafts.js';
-import useSponsoredBundleLifecycle from './hooks/useSponsoredBundleLifecycle';
 import useSessionWizardWorkerDeploy, {
   type SessionWizardWorkerDeployRuntime,
 } from './hooks/useSessionWizardWorkerDeploy';
@@ -89,6 +87,7 @@ import useSessionWizardTooltipPreference from './hooks/useSessionWizardTooltipPr
 import useSessionWizardNormalModeSectionVisibility from './hooks/useSessionWizardNormalModeSectionVisibility';
 import useSessionWizardPublishElapsed from './hooks/useSessionWizardPublishElapsed';
 import useSessionWizardCleanupEffect from './hooks/useSessionWizardCleanupEffect';
+import useSessionWizardSponsoredBundleController from './hooks/useSessionWizardSponsoredBundleController';
 import {
   arweavePublishAdapter,
   sbtFactoryReceiptPublishAdapter,
@@ -219,10 +218,8 @@ import {
 import { __test__resetSessionWizardSponsoredBundleCacheKey } from './sessionWizardSponsoredBundleCache';
 import {
   CHIPOTLE_LIT_CONFIG_FIELDS,
-  DEFAULT_WORKER_SECRETS,
   buildWorkerLitCredentialsConfig,
   getSessionWizardWorkerResourceKeys,
-  resolveSessionWizardEnabledWorkerSecrets,
   sanitizeSessionWizardSponsoredFieldSnapshotForLitMode,
   sanitizeSessionWizardWorkerSecretsForLitMode,
 } from './sessionWizardWorkerSecretSupport';
@@ -517,27 +514,7 @@ type SessionRegistryReadContract = {
   sessionIdExists?: (sessionIdHex: string) => Promise<boolean> | boolean;
 };
 
-type WorkerSecretsUpdateFn = (current: WorkerSecretsLike) => WorkerSecretsLike | UnknownRecord | null | undefined;
-
 const ignoreSessionPublishStep = (_publishStep: number): void => {};
-
-type SponsoredBundleDeploymentStatePatch = {
-  deployForm?: DeployFormState;
-  deployStatus?: string;
-  deployInFlight?: boolean;
-  deployComplete?: boolean;
-  workerMode?: string;
-  deployWorkerUrl?: string;
-  provisionedSponsoredContext?: UnknownRecord;
-  forceManualBundleFile?: boolean;
-  normalModeBundleUrlOverride?: string;
-  workerUrlAutoFilled?: boolean;
-};
-
-type SponsoredBundleWorkerSecretStatePatch = {
-  workerSecretsEnabled?: boolean;
-  persistWorkerSecrets?: boolean;
-};
 
 type ProvisionedSponsoredContextState = UnknownRecord & {
   sessionSlug: string;
@@ -982,123 +959,22 @@ const SessionWizard = ({
     );
     return toStr(secrets?.arweaveJwk).trim();
   };
-  // Regression guard: sponsored-bundle apply/restore spans async work, so these
-  // helpers must read from refs instead of state dependencies. Recreating them
-  // mid-apply causes the bundle loader effect to cancel before it can finish.
-  const getCurrentWorkerSecrets = useCallback(
-    () =>
-      sanitizeSessionWizardWorkerSecretsForLitMode(
-        resolveWorkerSecretsSnapshot({
-          workerSecretsRef,
-          defaults: DEFAULT_WORKER_SECRETS,
-        }),
-      ),
-    [],
-  );
-  const getCurrentEnabledWorkerSecrets = useCallback(
-    () =>
-      resolveSessionWizardEnabledWorkerSecrets({
-        workerSecrets: getCurrentWorkerSecrets(),
-        workerSecretsEnabled,
-      }),
-    [getCurrentWorkerSecrets, workerSecretsEnabled],
-  );
-  const applyWorkerSecretsUpdate = useCallback((nextValueOrUpdater: unknown) => {
-    const current = resolveWorkerSecretsSnapshot({
-      workerSecretsRef,
-      defaults: DEFAULT_WORKER_SECRETS,
-    });
-    const nextValue =
-      typeof nextValueOrUpdater === 'function'
-        ? (nextValueOrUpdater as WorkerSecretsUpdateFn)(current)
-        : nextValueOrUpdater;
-    const next = sanitizeSessionWizardWorkerSecretsForLitMode({
-      ...DEFAULT_WORKER_SECRETS,
-      ...(nextValue && typeof nextValue === 'object' ? nextValue : {}),
-    });
-    workerSecretsRef.current = next;
-    setWorkerSecrets(next);
-    return next;
-  }, []);
-  const updateSponsoredBundleDraftCorsWorkerUrl = useCallback((nextCorsWorkerUrl = '') => {
-    setDraft((prev) => {
-      const desiredWorkerUrl = toStr(nextCorsWorkerUrl || '').trim();
-      if (toStr(prev?.corsWorkerUrl || '').trim() === desiredWorkerUrl) return prev;
-      const next = deepClone(prev);
-      next.corsWorkerUrl = desiredWorkerUrl;
-      return next;
-    });
-  }, []);
-  const updateSponsoredBundleDeploymentState = useCallback(
-    ({
-      deployForm: nextDeployForm,
-      deployStatus: nextDeployStatus,
-      deployInFlight: nextDeployInFlight,
-      deployComplete: nextDeployComplete,
-      workerMode: nextWorkerMode,
-      deployWorkerUrl: nextDeployWorkerUrl,
-      provisionedSponsoredContext: nextProvisionedSponsoredContext,
-      forceManualBundleFile: nextForceManualBundleFile,
-      normalModeBundleUrlOverride: nextNormalModeBundleUrlOverride,
-      workerUrlAutoFilled: nextWorkerUrlAutoFilled,
-    }: SponsoredBundleDeploymentStatePatch = {}) => {
-      if (nextDeployForm !== undefined) {
-        setDeployForm(nextDeployForm);
-      }
-      if (typeof nextDeployStatus === 'string') {
-        setDeployStatus(nextDeployStatus);
-      }
-      if (typeof nextDeployInFlight === 'boolean') {
-        setDeployInFlight(nextDeployInFlight);
-      }
-      if (typeof nextDeployComplete === 'boolean') {
-        setDeployComplete(nextDeployComplete);
-      }
-      if (typeof nextWorkerMode === 'string') {
-        setWorkerMode(nextWorkerMode);
-      }
-      if (typeof nextDeployWorkerUrl === 'string') {
-        setDeployWorkerUrl(nextDeployWorkerUrl);
-      }
-      if (nextProvisionedSponsoredContext !== undefined) {
-        setProvisionedSponsoredContext(buildProvisionedSponsoredContextState(nextProvisionedSponsoredContext));
-      }
-      if (typeof nextForceManualBundleFile === 'boolean') {
-        setForceManualBundleFile(nextForceManualBundleFile);
-      }
-      if (typeof nextNormalModeBundleUrlOverride === 'string') {
-        setNormalModeBundleUrlOverride(nextNormalModeBundleUrlOverride);
-      }
-      if (typeof nextWorkerUrlAutoFilled === 'boolean') {
-        setWorkerUrlAutoFilled(nextWorkerUrlAutoFilled);
-      }
-    },
-    [],
-  );
-  const updateSponsoredBundleWorkerSecretState = useCallback(
-    ({
-      workerSecretsEnabled: nextWorkerSecretsEnabled,
-      persistWorkerSecrets: nextPersistWorkerSecrets,
-    }: SponsoredBundleWorkerSecretStatePatch = {}) => {
-      if (typeof nextWorkerSecretsEnabled === 'boolean') {
-        setWorkerSecretsEnabled(nextWorkerSecretsEnabled);
-      }
-      if (typeof nextPersistWorkerSecrets === 'boolean') {
-        setPersistWorkerSecrets(nextPersistWorkerSecrets);
-      }
-    },
-    [],
-  );
   const {
     sponsoredBundleStatus,
     sponsoredBundleRetryNonce,
     setSponsoredBundleRetryNonce,
     sponsoredBundleAppliedBundleRef,
     hasSponsoredBundleLink,
-  } = useSponsoredBundleLifecycle({
+    getCurrentWorkerSecrets,
+    getCurrentEnabledWorkerSecrets,
+    applyWorkerSecretsUpdate,
+    updateSponsoredBundleDeploymentState,
+    clearSelectedBundleFile,
+  } = useSessionWizardSponsoredBundleController<DraftState, DeployFormState, ProvisionedSponsoredContextState>({
     initialSponsoredBundleId,
     initialSponsoredBundleKey,
     draftSlug: draft?.slug,
+    workerSecretsEnabled,
     refs: {
       draftRef,
       deployFormRef,
@@ -1107,25 +983,28 @@ const SessionWizard = ({
       provisionedSponsoredContextRef,
       workerSecretsEnabledRef,
       persistWorkerSecretsRef,
+      workerSecretsRef,
+      advancedBundleFileInputRef,
+      normalModeRetryBundleFileInputRef,
+      sponsoredPublishBundleFileInputRef,
     },
-    getCurrentWorkerSecrets,
-    applyWorkerSecretsUpdate,
-    updateDraftCorsWorkerUrl: updateSponsoredBundleDraftCorsWorkerUrl,
-    updateDeploymentState: updateSponsoredBundleDeploymentState,
-    updateWorkerSecretState: updateSponsoredBundleWorkerSecretState,
+    setWorkerSecrets,
+    setDraft,
+    setDeployForm,
+    setDeployStatus,
+    setDeployInFlight,
+    setDeployComplete,
+    setWorkerMode,
+    setDeployWorkerUrl,
+    setProvisionedSponsoredContext,
+    setForceManualBundleFile,
+    setNormalModeBundleUrlOverride,
+    setWorkerUrlAutoFilled,
+    setWorkerSecretsEnabled,
+    setPersistWorkerSecrets,
+    setBundleFile,
+    buildProvisionedSponsoredContextState,
   });
-  const clearSelectedBundleFile = useCallback(() => {
-    setBundleFile(null);
-    [
-      advancedBundleFileInputRef.current,
-      normalModeRetryBundleFileInputRef.current,
-      sponsoredPublishBundleFileInputRef.current,
-    ].forEach((input) => {
-      if (input && typeof input.value === 'string') {
-        input.value = '';
-      }
-    });
-  }, []);
   const {
     sessionHeaderMode,
     setSessionHeaderMode,
