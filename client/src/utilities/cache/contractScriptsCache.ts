@@ -14,6 +14,157 @@ import { normalizeAddress } from '../web3/addressNormalization.js';
 import { sessionRegistryStore } from '../web3/sessionRegistry.js';
 import { toStr } from '../shared/primitives.js';
 
+type UnknownRecord = Record<string, unknown>;
+type TimestampedEntry = Record<string, unknown>;
+type TimestampedRecord = Record<string, TimestampedEntry>;
+type PruneTimestampedOptions = {
+  tsField?: string;
+  maxEntries?: number;
+};
+type SessionConfigRecord = UnknownRecord & {
+  _isWeb3Context?: boolean;
+  activeSessionSlug?: unknown;
+  blockLimits?: UnknownRecord;
+  cfg?: unknown;
+  contracts?: {
+    surveys?: { chainId?: unknown };
+    sbtFactory?: { chainId?: unknown };
+  };
+  group?: unknown;
+  groupKeyOrCfg?: unknown;
+  networkChainId?: unknown;
+  sessionConfig?: unknown;
+  sessionSlug?: unknown;
+  slug?: unknown;
+};
+type ResolvedSessionConfig = {
+  sessionSlug?: string;
+  sessionConfig?: SessionConfigRecord | null;
+  sessionConfigSource?: string;
+  warnings?: unknown[];
+};
+type TimedMemoEntry<T> = {
+  value: T;
+  ts: number;
+};
+type HashReadMemoKeyInput = {
+  baseKey: unknown;
+  id: unknown;
+};
+type HashReadInflightKeyInput = HashReadMemoKeyInput & {
+  throwOnError?: boolean;
+};
+type SessionAddresses = {
+  sbtFactory?: {
+    address?: unknown;
+    chainId?: unknown;
+  };
+};
+type SessionRegistryStoreLike = {
+  getSessionConfig: (slug: string) => SessionConfigRecord | null | undefined;
+};
+type RegistryLog = {
+  blockNumber?: unknown;
+};
+type RegistryContractLike = {
+  address?: string;
+  provider?: {
+    getBlockNumber?: () => Promise<unknown>;
+    getLogs?: (filter: UnknownRecord) => Promise<RegistryLog[]>;
+  };
+  filters?: {
+    SessionCreated?: (arg0: unknown, arg1: unknown) => unknown;
+  };
+  interface?: {
+    getEventTopic?: (eventName: string) => string;
+  };
+  queryFilter?: (filter: unknown, fromBlock: number, toBlock: number | string) => Promise<RegistryLog[]>;
+};
+type SessionRegistryUtilsLike = {
+  toRegistrySlug: (slug: string) => string;
+  getRegistryContract: (
+    chainId: number,
+    provider?: null,
+    options?: { bootstrapRpc?: boolean },
+  ) => unknown;
+  upsertSessionRegistryCache: (input: UnknownRecord) => void;
+};
+type ContractScriptsCacheDeps = {
+  resolveSession: (groupKeyOrCfg: unknown) => SessionConfigRecord | null;
+  normalizeSessionSlug: (slug: unknown) => string;
+  getSessionAddresses: (cfg: SessionConfigRecord | null) => SessionAddresses;
+  shouldBypassSessionScopeWindow: (groupKeyOrCfg: unknown, cfg: SessionConfigRecord | null) => boolean;
+  sessionRegistryStore: SessionRegistryStoreLike;
+  sessionRegistryUtils: SessionRegistryUtilsLike;
+  DEFAULT_CHAIN_ID: unknown;
+  contractsLog: {
+    warn: (message: string, context?: UnknownRecord) => void;
+  };
+  parsePositiveBlockNumber: (value: unknown) => number | null;
+  ethers: {
+    utils: {
+      keccak256: (value: string | Uint8Array) => string;
+      toUtf8Bytes: (value: string) => Uint8Array;
+    };
+  };
+};
+type ArweaveTxCacheEntry = UnknownRecord & {
+  text?: string;
+  contentType?: string;
+  savedAtMs?: number;
+};
+type QuestionsNetworkNode = UnknownRecord & {
+  questionsLatestBlock: unknown;
+  questionsDiscoveryCheckpointBlock: unknown;
+  questions: UnknownRecord;
+  questionResponses: UnknownRecord;
+  questionResponsesLatestBlock: unknown;
+  questionResponsesMeta: UnknownRecord;
+  arweaveTxCache: Record<string, ArweaveTxCacheEntry>;
+  arweaveTxFailureCache: Record<string, UnknownRecord>;
+  questionHydrationMeta: UnknownRecord;
+};
+type ArweaveTxInput = {
+  groupKeyOrCfg?: unknown;
+  txId?: unknown;
+};
+type ArweaveFailureInput = ArweaveTxInput & {
+  entry?: unknown;
+};
+type ArweaveReadFailureInput = ArweaveTxInput & {
+  preferMemo?: boolean;
+};
+type ArweaveWriteCacheInput = ArweaveTxInput & {
+  text?: unknown;
+  contentType?: unknown;
+};
+type ArweaveInflightKeyInput = {
+  chainId?: unknown;
+  txId?: unknown;
+  forceFetch?: boolean;
+};
+type ArweaveInflightRunInput<T> = ArweaveInflightKeyInput & {
+  task: () => Promise<T> | T;
+};
+type SessionStartInput = {
+  cfg: SessionConfigRecord | null;
+  slug: string;
+};
+type RunVersionStore = UnknownRecord & {
+  _runVersion?: Record<string, number>;
+};
+
+const isRecord = (value: unknown): value is UnknownRecord =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
+
+const asSessionConfigRecord = (value: unknown): SessionConfigRecord | null =>
+  isRecord(value) ? (value as SessionConfigRecord) : null;
+
+const asRegistryContract = (value: unknown): RegistryContractLike | null =>
+  isRecord(value) ? (value as RegistryContractLike) : null;
+
+const errorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error));
+
 export const BLOCK_CACHE_MS = 30000;
 export const latestBlockCache = { value: null, promise: null, ts: 0 };
 export const gasPriceCache = { value: null, promise: null, ts: 0 };
@@ -24,12 +175,15 @@ export const ARWEAVE_TX_CACHE_MAX_ENTRIES = 1200;
 export const ARWEAVE_TX_FAILURE_CACHE_MAX_ENTRIES = 1200;
 export const HASH_MISS_SENTINEL = '__ce_hash_missing__';
 
-const pruneTimestampedRecord = (record, { tsField, maxEntries } = {}) => {
+const pruneTimestampedRecord = (record: TimestampedRecord, { tsField, maxEntries }: PruneTimestampedOptions = {}) => {
   if (!record || typeof record !== 'object') return record;
+  const timestampField = tsField || 'ts';
   const max = Math.max(0, Math.floor(Number(maxEntries) || 0));
   const keys = Object.keys(record);
   if (max <= 0 || keys.length <= max) return record;
-  const sorted = keys.map((key) => ({ key, ts: Number(record?.[key]?.[tsField] || 0) })).sort((a, b) => a.ts - b.ts);
+  const sorted = keys
+    .map((key) => ({ key, ts: Number(record?.[key]?.[timestampField] || 0) }))
+    .sort((a, b) => a.ts - b.ts);
   for (let i = 0; i < sorted.length - max; i += 1) {
     try {
       delete record[sorted[i].key];
@@ -44,17 +198,20 @@ const QUESTION_HASH_REVERT_LOGGED = new Set();
 const SURVEY_HASH_REVERT_LOGGED = new Set();
 const SESSION_START_BLOCK_FALLBACK_CACHE = new Map();
 const _resolveSessionCache = new Map();
-let _resolveSessionCacheTimer = null;
+let _resolveSessionCacheTimer: ReturnType<typeof setTimeout> | null = null;
 
 const defaultStrictAllowDemoFallback = () => !USE_ONCHAIN_SESSION_REGISTRY;
 
-const resolveSessionConfigEntry = (sessionSlug, opts = {}) => {
+const resolveSessionConfigEntry = (
+  sessionSlug: string,
+  opts: { allowDemoFallback?: boolean; preferRegistry?: boolean } = {},
+): ResolvedSessionConfig => {
   const hasAllowDemoFallback = Object.prototype.hasOwnProperty.call(opts, 'allowDemoFallback');
   const allowDemoFallback = hasAllowDemoFallback ? !!opts.allowDemoFallback : defaultStrictAllowDemoFallback();
   const preferRegistry = Object.prototype.hasOwnProperty.call(opts, 'preferRegistry') ? !!opts.preferRegistry : true;
   const resolved = resolveSessionConfigFromSources({
     sessionSlug,
-    getRegistrySessionConfig: (slug) => sessionRegistryStore.getSessionConfig(slug),
+    getRegistrySessionConfig: (slug: string) => sessionRegistryStore.getSessionConfig(slug),
     preferRegistry,
     allowDemoFallback: false,
   });
@@ -68,7 +225,10 @@ const resolveSessionConfigEntry = (sessionSlug, opts = {}) => {
   };
 };
 
-const normalizeResolvedSessionConfig = (resolved, opts = {}) => {
+const normalizeResolvedSessionConfig = (
+  resolved: ResolvedSessionConfig,
+  opts: { normalizeRegistry?: boolean } = {},
+): SessionConfigRecord | null => {
   if (!resolved?.sessionConfig) return null;
   if (resolved.sessionConfigSource === 'registry' && opts.normalizeRegistry !== true) {
     return overlayCachedSessionWorkerConfig({
@@ -82,18 +242,19 @@ const normalizeResolvedSessionConfig = (resolved, opts = {}) => {
   });
 };
 
-const resolveSession = (groupKeyOrCfg) => {
-  if (groupKeyOrCfg && typeof groupKeyOrCfg === 'object') {
-    const aliasResolved = resolveSessionConfigAliases(groupKeyOrCfg);
-    const aliasCfg = aliasResolved.sessionConfig || null;
-    if (aliasCfg && typeof aliasCfg === 'object') {
-      const merged = { ...(aliasCfg || {}), ...(groupKeyOrCfg || {}) };
+const resolveSession = (groupKeyOrCfg: unknown): SessionConfigRecord | null => {
+  const groupRecord = asSessionConfigRecord(groupKeyOrCfg);
+  if (groupRecord) {
+    const aliasResolved = resolveSessionConfigAliases(groupRecord);
+    const aliasCfg = asSessionConfigRecord(aliasResolved.sessionConfig || null);
+    if (aliasCfg) {
+      const merged = { ...(aliasCfg || {}), ...(groupRecord || {}) };
       delete merged.sessionConfig;
       delete merged.sessionSlug;
       delete merged.activeSessionSlug;
       delete merged.group;
       if (!merged.slug && aliasResolved.sessionSlug) merged.slug = aliasResolved.sessionSlug;
-      return normalizeSessionNaming(merged);
+      return normalizeSessionNaming(merged) as SessionConfigRecord;
     }
     if (aliasResolved.hasExplicitSessionSlug) {
       groupKeyOrCfg = aliasResolved.sessionSlug;
@@ -112,15 +273,16 @@ const resolveSession = (groupKeyOrCfg) => {
       __unresolved: true,
     };
   }
-  if (typeof groupKeyOrCfg === 'object') return normalizeSessionNaming(groupKeyOrCfg);
+  if (groupRecord) return normalizeSessionNaming(groupRecord) as SessionConfigRecord;
   if (!defaultStrictAllowDemoFallback()) return null;
   return getDemoDefaultSessionConfig();
 };
 
-export const memoizedResolveSession = (groupKeyOrCfg) => {
+export const memoizedResolveSession = (groupKeyOrCfg: unknown) => {
+  const groupRecord = asSessionConfigRecord(groupKeyOrCfg);
   const resolvedInput =
-    groupKeyOrCfg && typeof groupKeyOrCfg === 'object' && groupKeyOrCfg._isWeb3Context === true
-      ? (groupKeyOrCfg.groupKeyOrCfg ?? groupKeyOrCfg.cfg ?? groupKeyOrCfg)
+    groupRecord && groupRecord._isWeb3Context === true
+      ? (groupRecord.groupKeyOrCfg ?? groupRecord.cfg ?? groupRecord)
       : groupKeyOrCfg;
   const key =
     resolvedInput === undefined
@@ -153,7 +315,7 @@ export const READ_INFLIGHT = {
   questionData: new Map(),
 };
 
-const pruneMapBySize = (map, maxEntries) => {
+const pruneMapBySize = (map: Map<string, unknown>, maxEntries: number) => {
   while (map.size > maxEntries) {
     const oldest = map.keys().next().value;
     if (!oldest) break;
@@ -161,7 +323,7 @@ const pruneMapBySize = (map, maxEntries) => {
   }
 };
 
-export const markHashRevertLoggedOnce = (set, key, maxEntries = 1200) => {
+export const markHashRevertLoggedOnce = (set: Set<string>, key: unknown, maxEntries = 1200) => {
   const memoKey = String(key || '');
   if (!memoKey) return false;
   if (set.has(memoKey)) return false;
@@ -174,7 +336,7 @@ export const markHashRevertLoggedOnce = (set, key, maxEntries = 1200) => {
   return true;
 };
 
-export const getTimedMemoValue = (map, key, ttlMs) => {
+export const getTimedMemoValue = <T>(map: Map<string, TimedMemoEntry<T>>, key: string, ttlMs: number): T | null => {
   const entry = map.get(key);
   if (!entry) return null;
   const age = Date.now() - Number(entry.ts || 0);
@@ -187,24 +349,30 @@ export const getTimedMemoValue = (map, key, ttlMs) => {
   return entry.value;
 };
 
-export const setTimedMemoValue = (map, key, value, maxEntries = HASH_READ_MAX_ENTRIES) => {
+export const setTimedMemoValue = <T>(
+  map: Map<string, TimedMemoEntry<T>>,
+  key: string,
+  value: T,
+  maxEntries = HASH_READ_MAX_ENTRIES,
+) => {
   map.delete(key);
   map.set(key, { value, ts: Date.now() });
   pruneMapBySize(map, maxEntries);
 };
 
-export const buildHashReadMemoKey = ({ baseKey, id }) => `${baseKey}|${id}`;
+export const buildHashReadMemoKey = ({ baseKey, id }: HashReadMemoKeyInput) => `${baseKey}|${id}`;
 
-export const buildHashReadInflightKey = ({ baseKey, id, throwOnError = false }) =>
+export const buildHashReadInflightKey = ({ baseKey, id, throwOnError = false }: HashReadInflightKeyInput) =>
   `${buildHashReadMemoKey({ baseKey, id })}|strict:${throwOnError ? '1' : '0'}`;
 
-const readQuestionsCacheStorage = async (slug) => {
+const readQuestionsCacheStorage = async (slug: string): Promise<UnknownRecord> => {
   const parsed = await readCache('questionsCache', slug);
-  return parsed && typeof parsed === 'object' ? parsed : {};
+  return isRecord(parsed) ? parsed : {};
 };
 
-const ensureQuestionsNetworkNode = (cacheObj, netIdStr) => {
-  if (!cacheObj[netIdStr]) {
+const ensureQuestionsNetworkNode = (cacheObj: UnknownRecord, netIdStr: string): QuestionsNetworkNode => {
+  const existing = cacheObj[netIdStr];
+  if (!isRecord(existing)) {
     cacheObj[netIdStr] = {
       questionsLatestBlock: 0,
       questionsDiscoveryCheckpointBlock: 0,
@@ -217,7 +385,7 @@ const ensureQuestionsNetworkNode = (cacheObj, netIdStr) => {
       questionHydrationMeta: {},
     };
   }
-  const net = cacheObj[netIdStr];
+  const net = cacheObj[netIdStr] as QuestionsNetworkNode;
   if (!Number.isFinite(Number(net.questionsDiscoveryCheckpointBlock))) net.questionsDiscoveryCheckpointBlock = 0;
   if (!net.questions || typeof net.questions !== 'object') net.questions = {};
   if (!net.questionResponses || typeof net.questionResponses !== 'object') net.questionResponses = {};
@@ -240,8 +408,8 @@ export const createContractScriptsCache = ({
   contractsLog,
   parsePositiveBlockNumber,
   ethers,
-}) => {
-  const resolveReadContext = (groupKeyOrCfg) => {
+}: ContractScriptsCacheDeps) => {
+  const resolveReadContext = (groupKeyOrCfg: unknown) => {
     const cfg = resolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
     const slug = normalizeSessionSlug((typeof groupKeyOrCfg === 'string' ? groupKeyOrCfg : cfg?.slug || '') || '');
     const chainId =
@@ -254,7 +422,7 @@ export const createContractScriptsCache = ({
     };
   };
 
-  const buildArweaveDebugContext = (groupKeyOrCfg, category = '', extra = {}) => {
+  const buildArweaveDebugContext = (groupKeyOrCfg: unknown, category = '', extra: UnknownRecord = {}) => {
     const { slug, chainId } = resolveReadContext(groupKeyOrCfg);
     return {
       category: String(category || '').trim() || 'unknown',
@@ -265,14 +433,14 @@ export const createContractScriptsCache = ({
     };
   };
 
-  const normalizeBlockWindowMemoPart = (value, fallback = 'na') => {
+  const normalizeBlockWindowMemoPart = (value: unknown, fallback = 'na') => {
     if (value == null || value === '') return fallback;
     const n = Number(value);
     if (!Number.isFinite(n)) return fallback;
     return String(Math.max(0, Math.floor(n)));
   };
 
-  const buildSbtScopeMemoTag = (groupKeyOrCfg, resolvedCfg = null) => {
+  const buildSbtScopeMemoTag = (groupKeyOrCfg: unknown, resolvedCfg: SessionConfigRecord | null = null) => {
     const cfg =
       resolvedCfg && typeof resolvedCfg === 'object'
         ? resolvedCfg
@@ -288,28 +456,28 @@ export const createContractScriptsCache = ({
     return `${factoryAddr}:${chainId}:${scopeBypass ? 'scope-bypass' : 'scope-default'}:${slug}:${blockStart}:${blockEnd}`;
   };
 
-  const bumpSbtMemoRunVersion = (store, memoKey) => {
+  const bumpSbtMemoRunVersion = (store: RunVersionStore, memoKey: string) => {
     if (!store._runVersion) store._runVersion = {};
     const next = Number(store._runVersion[memoKey] || 0) + 1;
     store._runVersion[memoKey] = next;
     return next;
   };
 
-  const isLatestSbtMemoRun = (store, memoKey, runVersion) =>
+  const isLatestSbtMemoRun = (store: RunVersionStore, memoKey: string, runVersion: unknown) =>
     Number(store?._runVersion?.[memoKey] || 0) === Number(runVersion || 0);
 
-  const buildSessionStartCacheKey = (chainId, registrySlug) => {
+  const buildSessionStartCacheKey = (chainId: unknown, registrySlug: unknown) => {
     const id = Number(chainId || 0) || 0;
     return `${id}:${toStr(registrySlug || '').toLowerCase()}`;
   };
 
-  const readSessionCreatedBlockViaQueryFilter = async (contract, slugHash) => {
+  const readSessionCreatedBlockViaQueryFilter = async (contract: RegistryContractLike | null, slugHash: string) => {
     if (!contract || typeof contract.queryFilter !== 'function') return null;
     const filter = contract?.filters?.SessionCreated ? contract.filters.SessionCreated(null, slugHash) : null;
     if (!filter) return null;
     const events = await contract.queryFilter(filter, 0, 'latest');
     if (!Array.isArray(events) || !events.length) return null;
-    let minBlock = null;
+    let minBlock: number | null = null;
     events.forEach((evt) => {
       const bn = parsePositiveBlockNumber(evt?.blockNumber);
       if (!bn) return;
@@ -318,7 +486,7 @@ export const createContractScriptsCache = ({
     return minBlock;
   };
 
-  const readSessionCreatedBlockViaChunkedLogs = async (contract, slugHash) => {
+  const readSessionCreatedBlockViaChunkedLogs = async (contract: RegistryContractLike | null, slugHash: string) => {
     const provider = contract?.provider;
     if (!provider || typeof provider.getLogs !== 'function') return null;
 
@@ -327,7 +495,9 @@ export const createContractScriptsCache = ({
 
     let latest = 0;
     try {
-      latest = Number(await provider.getBlockNumber()) || 0;
+      const getBlockNumber = provider.getBlockNumber;
+      if (typeof getBlockNumber !== 'function') return null;
+      latest = Number(await getBlockNumber()) || 0;
     } catch (_) {
       return null;
     }
@@ -343,7 +513,7 @@ export const createContractScriptsCache = ({
         toBlock,
       });
       if (!Array.isArray(logs) || !logs.length) continue;
-      let minBlock = null;
+      let minBlock: number | null = null;
       logs.forEach((log) => {
         const bn = parsePositiveBlockNumber(log?.blockNumber);
         if (!bn) return;
@@ -354,7 +524,7 @@ export const createContractScriptsCache = ({
     return null;
   };
 
-  const resolveSessionStartFromRegistry = async ({ cfg, slug }) => {
+  const resolveSessionStartFromRegistry = async ({ cfg, slug }: SessionStartInput) => {
     const chainId = Number(cfg?.networkChainId || DEFAULT_CHAIN_ID || 0) || 0;
     if (!chainId) return null;
 
@@ -363,9 +533,9 @@ export const createContractScriptsCache = ({
     const cached = parsePositiveBlockNumber(SESSION_START_BLOCK_FALLBACK_CACHE.get(cacheKey));
     if (cached) return cached;
 
-    let contract = null;
+    let contract: RegistryContractLike | null = null;
     try {
-      contract = sessionRegistryUtils.getRegistryContract(chainId, null, { bootstrapRpc: true });
+      contract = asRegistryContract(sessionRegistryUtils.getRegistryContract(chainId, null, { bootstrapRpc: true }));
     } catch (_) {
       contract = null;
     }
@@ -380,7 +550,7 @@ export const createContractScriptsCache = ({
       contractsLog.warn('[blockLimits] SessionCreated queryFilter fallback failed; trying chunked logs.', {
         slug: slug || 'general',
         chainId,
-        error: err?.message || String(err),
+        error: errorMessage(err),
       });
     }
 
@@ -391,7 +561,7 @@ export const createContractScriptsCache = ({
         contractsLog.warn('[blockLimits] SessionCreated chunked log fallback failed.', {
           slug: slug || 'general',
           chainId,
-          error: err?.message || String(err),
+          error: errorMessage(err),
         });
       }
     }
@@ -420,14 +590,14 @@ export const createContractScriptsCache = ({
     return valid;
   };
 
-  const buildArweaveFailureMemoKey = ({ groupKeyOrCfg, txId }) => {
+  const buildArweaveFailureMemoKey = ({ groupKeyOrCfg, txId }: ArweaveTxInput) => {
     const normalizedTxId = String(txId || '').trim();
     if (!normalizedTxId) return '';
     const { baseKey } = resolveReadContext(groupKeyOrCfg);
     return `${baseKey}|${normalizedTxId}`;
   };
 
-  const setArweaveFailureMemoEntry = ({ groupKeyOrCfg, txId, entry }) => {
+  const setArweaveFailureMemoEntry = ({ groupKeyOrCfg, txId, entry }: ArweaveFailureInput) => {
     const memoKey = buildArweaveFailureMemoKey({ groupKeyOrCfg, txId });
     if (!memoKey) return;
     if (!entry || typeof entry !== 'object') {
@@ -438,7 +608,7 @@ export const createContractScriptsCache = ({
     pruneMapBySize(ARWEAVE_TX_FAILURE_MEMO, 2400);
   };
 
-  const getArweaveFailureMemoEntry = ({ groupKeyOrCfg, txId }) => {
+  const getArweaveFailureMemoEntry = ({ groupKeyOrCfg, txId }: ArweaveTxInput) => {
     const memoKey = buildArweaveFailureMemoKey({ groupKeyOrCfg, txId });
     if (!memoKey) return null;
     const entry = ARWEAVE_TX_FAILURE_MEMO.get(memoKey);
@@ -446,7 +616,7 @@ export const createContractScriptsCache = ({
     return { ...entry };
   };
 
-  const readArweaveTxCacheEntry = async ({ groupKeyOrCfg, txId }) => {
+  const readArweaveTxCacheEntry = async ({ groupKeyOrCfg, txId }: ArweaveTxInput) => {
     const normalizedTxId = String(txId || '').trim();
     if (!normalizedTxId) return null;
     const { slug, chainId } = resolveReadContext(groupKeyOrCfg);
@@ -461,7 +631,11 @@ export const createContractScriptsCache = ({
     return entry;
   };
 
-  const readArweaveTxFailureCacheEntry = async ({ groupKeyOrCfg, txId, preferMemo = true }) => {
+  const readArweaveTxFailureCacheEntry = async ({
+    groupKeyOrCfg,
+    txId,
+    preferMemo = true,
+  }: ArweaveReadFailureInput) => {
     const normalizedTxId = String(txId || '').trim();
     if (!normalizedTxId) return null;
     const memoHit = preferMemo ? getArweaveFailureMemoEntry({ groupKeyOrCfg, txId: normalizedTxId }) : null;
@@ -486,15 +660,15 @@ export const createContractScriptsCache = ({
     }
   };
 
-  const writeArweaveTxFailureCacheEntry = async ({ groupKeyOrCfg, txId, entry }) => {
+  const writeArweaveTxFailureCacheEntry = async ({ groupKeyOrCfg, txId, entry }: ArweaveFailureInput) => {
     const normalizedTxId = String(txId || '').trim();
     const normalizedEntry = normalizeFailureEntry(entry);
     if (!normalizedTxId || !normalizedEntry) return null;
     const { slug, chainId } = resolveReadContext(groupKeyOrCfg);
     if (!chainId) return null;
     const netIdStr = String(chainId);
-    await updateCacheAtomic('questionsCache', slug, (current) => {
-      const cache = current && typeof current === 'object' ? current : {};
+    await updateCacheAtomic('questionsCache', slug, (current: unknown) => {
+      const cache = isRecord(current) ? current : {};
       const net = ensureQuestionsNetworkNode(cache, netIdStr);
       net.arweaveTxFailureCache[normalizedTxId] = { ...normalizedEntry };
       pruneTimestampedRecord(net.arweaveTxFailureCache, {
@@ -507,14 +681,14 @@ export const createContractScriptsCache = ({
     return normalizedEntry;
   };
 
-  const clearArweaveTxFailureCacheEntry = async ({ groupKeyOrCfg, txId }) => {
+  const clearArweaveTxFailureCacheEntry = async ({ groupKeyOrCfg, txId }: ArweaveTxInput) => {
     const normalizedTxId = String(txId || '').trim();
     if (!normalizedTxId) return;
     const { slug, chainId } = resolveReadContext(groupKeyOrCfg);
     if (!chainId) return;
     const netIdStr = String(chainId);
-    await updateCacheAtomic('questionsCache', slug, (current) => {
-      const cache = current && typeof current === 'object' ? current : {};
+    await updateCacheAtomic('questionsCache', slug, (current: unknown) => {
+      const cache = isRecord(current) ? current : {};
       const net = ensureQuestionsNetworkNode(cache, netIdStr);
       if (
         net.arweaveTxFailureCache &&
@@ -529,14 +703,19 @@ export const createContractScriptsCache = ({
     setArweaveFailureMemoEntry({ groupKeyOrCfg, txId: normalizedTxId, entry: null });
   };
 
-  const writeArweaveTxCacheEntry = async ({ groupKeyOrCfg, txId, text, contentType = 'application/json' }) => {
+  const writeArweaveTxCacheEntry = async ({
+    groupKeyOrCfg,
+    txId,
+    text,
+    contentType = 'application/json',
+  }: ArweaveWriteCacheInput) => {
     const normalizedTxId = String(txId || '').trim();
     if (!normalizedTxId || typeof text !== 'string' || text.length === 0) return;
     const { slug, chainId } = resolveReadContext(groupKeyOrCfg);
     if (!chainId) return;
     const netIdStr = String(chainId);
-    await updateCacheAtomic('questionsCache', slug, (current) => {
-      const cache = current && typeof current === 'object' ? current : {};
+    await updateCacheAtomic('questionsCache', slug, (current: unknown) => {
+      const cache = isRecord(current) ? current : {};
       const net = ensureQuestionsNetworkNode(cache, netIdStr);
       net.arweaveTxCache[normalizedTxId] = {
         text,
@@ -551,10 +730,15 @@ export const createContractScriptsCache = ({
     });
   };
 
-  const buildArweaveTxFetchInflightKey = ({ chainId, txId, forceFetch = false }) =>
+  const buildArweaveTxFetchInflightKey = ({ chainId, txId, forceFetch = false }: ArweaveInflightKeyInput) =>
     `${Number(chainId || 0)}|${String(txId || '').trim()}|force:${forceFetch ? '1' : '0'}`;
 
-  const runArweaveTxFetchCoalesced = async ({ chainId, txId, forceFetch = false, task }) => {
+  const runArweaveTxFetchCoalesced = async <T>({
+    chainId,
+    txId,
+    forceFetch = false,
+    task,
+  }: ArweaveInflightRunInput<T>) => {
     const inflightKey = buildArweaveTxFetchInflightKey({ chainId, txId, forceFetch });
     if (ARWEAVE_TX_FETCH_INFLIGHT.has(inflightKey)) {
       return ARWEAVE_TX_FETCH_INFLIGHT.get(inflightKey);
@@ -570,7 +754,7 @@ export const createContractScriptsCache = ({
     }
   };
 
-  const clearReadCachesForGroup = (groupKeyOrCfg = null) => {
+  const clearReadCachesForGroup = (groupKeyOrCfg: unknown = null) => {
     const { baseKey, chainId } = resolveReadContext(groupKeyOrCfg);
     if (!baseKey) return;
     const prefix = `${baseKey}|`;
