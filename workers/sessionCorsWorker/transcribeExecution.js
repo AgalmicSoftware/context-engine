@@ -1,6 +1,5 @@
 import { readTranscribeRequestPayload } from './transcribeRequestNormalization.js';
-
-const OPENAI_TRANSCRIBE_URL = 'https://api.openai.com/v1/audio/transcriptions';
+import { resolveOpenAiTranscribeUrl } from './endpointConfig.js';
 
 const toTrimmedString = (value, deps) => (
   deps?.toStr
@@ -29,7 +28,7 @@ export const transcribe = async ({
     upstreamFormData,
   } = normalizedRequest.payload || {};
 
-  let targetUrl = constants?.openAiTranscribeUrl || OPENAI_TRANSCRIBE_URL;
+  let targetUrl = resolveOpenAiTranscribeUrl({ constants });
   let key = requestApiKey || toTrimmedString(secrets?.openaiKey, deps);
   if (provider === 'custom') {
     targetUrl = requestRpcUrl;

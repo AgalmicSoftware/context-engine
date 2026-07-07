@@ -9,6 +9,9 @@ import {
   DEFAULT_ALLOWED_ORIGINS,
   ensureWorkersDevSubdomain,
 } from '../../workers/shared/deployHelperCore.mjs';
+import {
+  CLOUDFLARE_API_BASE_URL_ENV,
+} from '../../workers/shared/deployHelperEndpointConfig.mjs';
 
 const makeKvBinding = (initial = {}) => {
   const store = new Map(Object.entries(initial));
@@ -109,4 +112,55 @@ test('ensureWorkersDevSubdomain clears stale lookup errors after it successfully
     'https://ce-deploy-helper.ce-ab09af5b7d.workers.dev/' // intentional: real URL — tests worker URL construction
   );
   assert.match(String(calls[1][1]?.body || ''), /"subdomain":"ce-ab09af5b7d"/);
+});
+
+test('ensureWorkersDevSubdomain uses the configured Cloudflare API base URL', async () => {
+  const responses = [
+    new Response(JSON.stringify({
+      success: true,
+      result: {
+        subdomain: 'tenant-subdomain',
+        status: 'active',
+      },
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }),
+    new Response(JSON.stringify({
+      success: true,
+      result: {
+        enabled: true,
+      },
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }),
+  ];
+  const calls = [];
+  const fetchImpl = async (...args) => {
+    calls.push(args);
+    const next = responses.shift();
+    if (!next) throw new Error('unexpected fetch');
+    return next;
+  };
+
+  const result = await ensureWorkersDevSubdomain({
+    apiToken: 'cf-token',
+    accountId: 'account-123',
+    workerName: 'ce-worker',
+    env: {
+      [CLOUDFLARE_API_BASE_URL_ENV]: 'https://api.cloudflare.example.test/client/v4/',
+    },
+    fetchImpl,
+  });
+
+  assert.equal(result.workerUrl, 'https://ce-worker.tenant-subdomain.workers.dev/');
+  assert.equal(
+    calls[0][0],
+    'https://api.cloudflare.example.test/client/v4/accounts/account-123/workers/subdomain'
+  );
+  assert.equal(
+    calls[1][0],
+    'https://api.cloudflare.example.test/client/v4/accounts/account-123/workers/scripts/ce-worker/subdomain'
+  );
 });
