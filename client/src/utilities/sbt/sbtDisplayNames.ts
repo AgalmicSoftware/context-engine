@@ -34,9 +34,74 @@ import {
   resolveSbtDisplayNameFromCacheValue as resolveNameFromSbtCacheValue,
   resolveSbtDisplayRetryAllowed,
   resolveSbtMetadataLookupDecision,
+  isSbtDisplayMetadataRecord,
   shouldPersistSbtDisplayMetadata,
   shouldWriteSbtDisplayLabelMemoEntry,
 } from './sbtDisplayNameContracts.js';
+
+type UnknownRecord = Record<string, unknown>;
+type SessionConfigRecord = UnknownRecord & {
+  __registry?: UnknownRecord;
+  __unresolved?: unknown;
+  networkChainId?: unknown;
+  slug?: unknown;
+};
+type SbtCacheBucket = UnknownRecord & {
+  sbtList: Record<string, unknown>;
+};
+type SbtDisplayMemoValue = UnknownRecord & {
+  name?: unknown;
+};
+type SbtDisplayMemoEntry = {
+  value?: unknown;
+  ts?: number;
+};
+type SbtRetryStateEntry = {
+  attempts?: number;
+  nextRetryAt?: number;
+  lastFailureAt?: number;
+};
+type ChainContextArgs = {
+  chainId?: unknown;
+  preferredSlug?: unknown;
+};
+type SbtMetadataLookupConfig = SessionConfigRecord & {
+  networkChainId?: unknown;
+};
+type MetadataLookupArgs = ChainContextArgs & {
+  metadataLookupConfig?: unknown;
+};
+type PersistSbtMetadataArgs = ChainContextArgs & {
+  address?: unknown;
+  metadata?: unknown;
+};
+type ResolveSbtDisplayLabelArgs = ChainContextArgs & {
+  address?: unknown;
+  sbtInfo?: unknown;
+  fallback?: unknown;
+};
+type HydrateSbtDisplayNameArgs = ChainContextArgs & {
+  address?: unknown;
+  metadataLookupConfig?: unknown;
+  writeBack?: boolean;
+};
+type WarmSbtDisplayNamesArgs = ChainContextArgs & {
+  addresses?: unknown;
+  metadataLookupConfig?: unknown;
+  writeBack?: boolean;
+};
+
+const isRecord = (value: unknown): value is UnknownRecord => !!value && typeof value === 'object';
+
+const readRecord = (value: unknown, key: string): unknown => (isRecord(value) ? value[key] : undefined);
+
+const asSessionConfigRecord = (value: unknown): SessionConfigRecord | null =>
+  isRecord(value) ? (value as SessionConfigRecord) : null;
+
+const asMutableSbtCache = (value: unknown): Record<string, SbtCacheBucket> =>
+  isRecord(value) ? (value as Record<string, SbtCacheBucket>) : {};
+
+const writeCacheValue = writeCache as (namespace: string, slug?: string, value?: unknown) => Promise<unknown>;
 
 const NAME_LOOKUP_BASE_DELAY_MS = 30 * 1000;
 const NAME_LOOKUP_MAX_DELAY_MS = 60 * 60 * 1000;
@@ -47,14 +112,14 @@ const RETRY_STATE_TTL_MS = 24 * 60 * 60 * 1000;
 const RETRY_STATE_MAX = 4000;
 const ALLOW_DEMO_SESSION_FALLBACK = !USE_ONCHAIN_SESSION_REGISTRY;
 
-const inflightByKey = new Map();
-const retryStateByKey = new Map();
-const displayLabelMemoByKey = new Map();
+const inflightByKey = new Map<string, Promise<SbtDisplayMemoValue | null>>();
+const retryStateByKey = new Map<string, SbtRetryStateEntry>();
+const displayLabelMemoByKey = new Map<string, SbtDisplayMemoEntry>();
 let didSubscribeToSbtCacheUpdates = false;
 
-const sanitizeSlug = (value) => toStr(value).trim().toLowerCase();
+const sanitizeSlug = (value: unknown) => toStr(value).trim().toLowerCase();
 
-const normalizeAddress = (value) => {
+const normalizeAddress = (value: unknown) => {
   const raw = toStr(value).trim();
   if (!raw) return '';
   try {
@@ -64,22 +129,22 @@ const normalizeAddress = (value) => {
   }
 };
 
-const isUnresolvedSessionConfig = (config) => !!config && typeof config === 'object' && config.__unresolved === true;
+const isUnresolvedSessionConfig = (config: unknown) => isRecord(config) && config.__unresolved === true;
 
-const getDisplaySessionConfig = (preferredSlug = '') => {
+const getDisplaySessionConfig = (preferredSlug: unknown = ''): SessionConfigRecord | null => {
   const slug = sanitizeSlug(preferredSlug);
-  const strictLookupConfig = getSessionConfigBySlugOrDefault(slug);
+  const strictLookupConfig = asSessionConfigRecord(getSessionConfigBySlugOrDefault(slug));
   if (strictLookupConfig && !isUnresolvedSessionConfig(strictLookupConfig)) {
     return strictLookupConfig;
   }
   if (!ALLOW_DEMO_SESSION_FALLBACK) {
     return strictLookupConfig || null;
   }
-  const demoLookupConfig = getDemoSessionConfigBySlug(slug, { allowDemoFallback: true });
+  const demoLookupConfig = asSessionConfigRecord(getDemoSessionConfigBySlug(slug, { allowDemoFallback: true }));
   return demoLookupConfig || strictLookupConfig || null;
 };
 
-const resolveExpectedChainId = ({ chainId = null, preferredSlug = '' } = {}) => {
+const resolveExpectedChainId = ({ chainId = null, preferredSlug = '' }: ChainContextArgs = {}) => {
   const directChainId = normalizeChainId(chainId);
   if (directChainId > 0) return directChainId;
 
@@ -90,7 +155,7 @@ const resolveExpectedChainId = ({ chainId = null, preferredSlug = '' } = {}) => 
   return normalizeChainId(cfg?.networkChainId || cfg?.__registry?.chainId || 0);
 };
 
-const readBoolish = (raw, defaultValue = false) => {
+const readBoolish = (raw: unknown, defaultValue = false) => {
   if (typeof raw === 'boolean') return raw;
   const value = toStr(raw).trim().toLowerCase();
   if (value === '1' || value === 'true' || value === 'yes' || value === 'on') return true;
@@ -98,7 +163,7 @@ const readBoolish = (raw, defaultValue = false) => {
   return defaultValue;
 };
 
-const getNameLookupDelayMs = (attempts) => {
+const getNameLookupDelayMs = (attempts: unknown) => {
   const safeAttempts = Number(attempts || 0);
   const exponent = Math.min(Math.max(safeAttempts - 1, 0), NAME_LOOKUP_MAX_EXPONENT);
   return Math.min(NAME_LOOKUP_BASE_DELAY_MS * 2 ** exponent, NAME_LOOKUP_MAX_DELAY_MS);
@@ -106,7 +171,7 @@ const getNameLookupDelayMs = (attempts) => {
 
 const getDisplayLabelMemoKey = buildSbtDisplayLabelMemoKey;
 
-const readDisplayLabelMemoEntry = (memoKey) => {
+const readDisplayLabelMemoEntry = (memoKey: unknown) => {
   const key = toStr(memoKey).trim();
   if (!key) return null;
   const entry = displayLabelMemoByKey.get(key);
@@ -118,10 +183,10 @@ const readDisplayLabelMemoEntry = (memoKey) => {
   }
   displayLabelMemoByKey.delete(key);
   displayLabelMemoByKey.set(key, entry);
-  return entry.value || null;
+  return isRecord(entry.value) ? (entry.value as SbtDisplayMemoValue) : null;
 };
 
-const writeDisplayLabelMemoEntry = (memoKey, value) => {
+const writeDisplayLabelMemoEntry = (memoKey: unknown, value: unknown) => {
   const key = toStr(memoKey).trim();
   if (!shouldWriteSbtDisplayLabelMemoEntry({ memoKey: key, value })) return;
   displayLabelMemoByKey.delete(key);
@@ -136,8 +201,8 @@ const writeDisplayLabelMemoEntry = (memoKey, value) => {
 const ensureSbtDisplayNameCacheSubscription = () => {
   if (didSubscribeToSbtCacheUpdates) return;
   didSubscribeToSbtCacheUpdates = true;
-  subscribeCacheUpdates((event) => {
-    if (String(event?.namespace || '') !== 'sbtCache') return;
+  subscribeCacheUpdates((event: unknown) => {
+    if (String(readRecord(event, 'namespace') || '') !== 'sbtCache') return;
     displayLabelMemoByKey.clear();
   });
 };
@@ -150,22 +215,27 @@ export const getSbtDescriptionText = getSbtMetadataDescriptionText;
 
 const getSbtDisplayNameValue = getSbtMetadataDisplayNameValue;
 
-const ensureNetBucket = (cacheObj, netKey) => {
+const ensureNetBucket = (cacheObj: Record<string, SbtCacheBucket>, netKey: unknown): SbtCacheBucket | null => {
   const key = toStr(netKey).trim();
   if (!key) return null;
 
-  if (!cacheObj[key] || typeof cacheObj[key] !== 'object') {
+  if (!isRecord(cacheObj[key])) {
     cacheObj[key] = { sbtList: {} };
   }
-  if (!cacheObj[key].sbtList || typeof cacheObj[key].sbtList !== 'object') {
-    cacheObj[key].sbtList = {};
+  const bucket = cacheObj[key];
+  if (!isRecord(bucket.sbtList)) {
+    bucket.sbtList = {};
   }
-  return cacheObj[key];
+  return bucket;
 };
 
-const getMetadataLookupConfig = ({ preferredSlug = '', metadataLookupConfig = null, chainId = null } = {}) => {
-  if (metadataLookupConfig && typeof metadataLookupConfig === 'object') {
-    const out = { ...metadataLookupConfig };
+const getMetadataLookupConfig = ({
+  preferredSlug = '',
+  metadataLookupConfig = null,
+  chainId = null,
+}: MetadataLookupArgs = {}): SbtMetadataLookupConfig => {
+  if (isRecord(metadataLookupConfig)) {
+    const out: SbtMetadataLookupConfig = { ...metadataLookupConfig };
     if (!out.slug) out.slug = sanitizeSlug(preferredSlug || out.slug || '');
     if (!out.networkChainId && Number(chainId || 0) > 0) {
       out.networkChainId = Number(chainId);
@@ -174,9 +244,9 @@ const getMetadataLookupConfig = ({ preferredSlug = '', metadataLookupConfig = nu
   }
 
   const slug = sanitizeSlug(preferredSlug);
-  const cfg = getDisplaySessionConfig(slug) || {};
-  const out = {
-    ...(cfg && typeof cfg === 'object' ? cfg : {}),
+  const cfg = getDisplaySessionConfig(slug);
+  const out: SbtMetadataLookupConfig = {
+    ...(cfg || {}),
     slug,
   };
 
@@ -184,7 +254,7 @@ const getMetadataLookupConfig = ({ preferredSlug = '', metadataLookupConfig = nu
 
   if (resolvedChainId > 0) {
     out.networkChainId = resolvedChainId;
-    if (!out.__registry || typeof out.__registry !== 'object') {
+    if (!isRecord(out.__registry)) {
       out.__registry = { chainId: resolvedChainId };
     } else if (!Number(out.__registry.chainId || 0)) {
       out.__registry = { ...out.__registry, chainId: resolvedChainId };
@@ -214,12 +284,12 @@ const pruneRetryStateCache = (now = Date.now()) => {
   }
 };
 
-const canRetryNameLookup = (retryKey, now = Date.now()) => {
+const canRetryNameLookup = (retryKey: string, now = Date.now()) => {
   pruneRetryStateCache(now);
   return resolveSbtDisplayRetryAllowed(retryStateByKey.get(retryKey), now);
 };
 
-const markNameLookupFailure = (retryKey, now = Date.now()) => {
+const markNameLookupFailure = (retryKey: string, now = Date.now()) => {
   pruneRetryStateCache(now);
   const prevAttempts = Number(retryStateByKey.get(retryKey)?.attempts || 0) || 0;
   const attempts = prevAttempts + 1;
@@ -232,7 +302,7 @@ const markNameLookupFailure = (retryKey, now = Date.now()) => {
   pruneRetryStateCache(now);
 };
 
-const clearNameLookupFailure = (retryKey) => {
+const clearNameLookupFailure = (retryKey: string) => {
   retryStateByKey.delete(retryKey);
 };
 
@@ -241,13 +311,13 @@ const persistSbtMetadataToCache = async ({
   preferredSlug = '',
   metadata = null,
   chainId = null,
-} = {}) => {
+}: PersistSbtMetadataArgs = {}) => {
   const checksum = normalizeAddress(address);
-  if (!checksum || !shouldPersistSbtDisplayMetadata(metadata)) return false;
+  if (!checksum || !isSbtDisplayMetadataRecord(metadata) || !shouldPersistSbtDisplayMetadata(metadata)) return false;
 
   const slug = sanitizeSlug(preferredSlug || metadata?.slug || '');
   const addressLower = checksum.toLowerCase();
-  const cacheObj = (await readCache('sbtCache', slug)) || {};
+  const cacheObj = asMutableSbtCache(await readCache('sbtCache', slug));
   const netKey = resolveSbtDisplayCacheWriteNetKey({
     cacheObj,
     addressLower,
@@ -268,24 +338,25 @@ const persistSbtMetadataToCache = async ({
     slug,
   });
 
-  return !!(await writeCache('sbtCache', slug, cacheObj));
+  return !!(await writeCacheValue('sbtCache', slug, cacheObj));
 };
 
-export const shortenSbtAddressText = (address) => {
+export const shortenSbtAddressText = (address: unknown) => {
   const raw = toStr(address).trim();
   if (!raw) return '';
   if (raw.length <= 12) return raw;
   return `${raw.slice(0, 6)}...${raw.slice(-4)}`;
 };
 
-export const getSbtDisplayName = (info) => getSbtDisplayNameValue(info);
+export const getSbtDisplayName = (info: unknown) => getSbtDisplayNameValue(info);
 
-export const hasSbtDisplayName = (info) => !!getSbtDisplayNameValue(info);
+export const hasSbtDisplayName = (info: unknown) => !!getSbtDisplayNameValue(info);
 
 export const isTargetedSbtMetadataLookupEnabled = () => {
   try {
-    if (typeof globalThis !== 'undefined' && typeof globalThis.ENABLE_TARGETED_SBT_METADATA_LOOKUP !== 'undefined') {
-      return readBoolish(globalThis.ENABLE_TARGETED_SBT_METADATA_LOOKUP, !!ENABLE_TARGETED_SBT_METADATA_LOOKUP);
+    const runtimeFlags = globalThis as typeof globalThis & { ENABLE_TARGETED_SBT_METADATA_LOOKUP?: unknown };
+    if (typeof runtimeFlags.ENABLE_TARGETED_SBT_METADATA_LOOKUP !== 'undefined') {
+      return readBoolish(runtimeFlags.ENABLE_TARGETED_SBT_METADATA_LOOKUP, !!ENABLE_TARGETED_SBT_METADATA_LOOKUP);
     }
   } catch (e) {
     void e; /* fallback: runtime flag lookup. */
@@ -293,7 +364,11 @@ export const isTargetedSbtMetadataLookupEnabled = () => {
   return !!ENABLE_TARGETED_SBT_METADATA_LOOKUP;
 };
 
-export const resolveSbtDisplayNameFromCaches = ({ address = '', preferredSlug = '', chainId = null } = {}) => {
+export const resolveSbtDisplayNameFromCaches = ({
+  address = '',
+  preferredSlug = '',
+  chainId = null,
+}: ChainContextArgs & { address?: unknown } = {}) => {
   ensureSbtDisplayNameCacheSubscription();
   const checksum = normalizeAddress(address);
   if (!checksum) return null;
@@ -326,12 +401,13 @@ export const resolveSbtDisplayNameFromCaches = ({ address = '', preferredSlug = 
 
   if (expectedChainId <= 0) return null;
 
-  const entries = listNamespaceEntriesSync('sbtCache', { cloneValues: false });
+  const rawEntries = listNamespaceEntriesSync('sbtCache', { cloneValues: false });
+  const entries = Array.isArray(rawEntries) ? rawEntries : [];
   for (const entry of entries) {
-    const entrySlug = sanitizeSlug(entry?.slug || '');
+    const entrySlug = sanitizeSlug(readRecord(entry, 'slug') || '');
     if (slug && entrySlug === slug) continue;
 
-    const hit = resolveNameFromSbtCacheValue(entry?.value, addressLower, { expectedChainId });
+    const hit = resolveNameFromSbtCacheValue(readRecord(entry, 'value'), addressLower, { expectedChainId });
     if (!hit?.name) continue;
 
     const resolved = {
@@ -353,13 +429,13 @@ export const resolveSbtDisplayLabel = ({
   preferredSlug = '',
   chainId = null,
   fallback = 'short',
-} = {}) => {
+}: ResolveSbtDisplayLabelArgs = {}) => {
   const checksum = normalizeAddress(address);
   if (!checksum) return '';
 
   const infoName = getSbtDisplayNameValue(sbtInfo);
   if (infoName) return infoName;
-  const infoChainId = normalizeChainId(sbtInfo?.chainID || sbtInfo?.chainId || 0);
+  const infoChainId = normalizeChainId(readRecord(sbtInfo, 'chainID') || readRecord(sbtInfo, 'chainId') || 0);
   const expectedChainId = normalizeChainId(chainId) || infoChainId;
 
   const cacheHit = resolveSbtDisplayNameFromCaches({
@@ -379,14 +455,14 @@ export const hydrateSbtDisplayNameTargeted = async ({
   metadataLookupConfig = null,
   chainId = null,
   writeBack = true,
-} = {}) => {
+}: HydrateSbtDisplayNameArgs = {}) => {
   ensureSbtDisplayNameCacheSubscription();
   const checksum = normalizeAddress(address);
   if (!checksum) return null;
 
-  const slug = sanitizeSlug(preferredSlug || metadataLookupConfig?.slug || '');
+  const slug = sanitizeSlug(preferredSlug || readRecord(metadataLookupConfig, 'slug') || '');
   const resolvedChainId = resolveExpectedChainId({
-    chainId: chainId || metadataLookupConfig?.networkChainId || 0,
+    chainId: chainId || readRecord(metadataLookupConfig, 'networkChainId') || 0,
     preferredSlug: slug,
   });
 
@@ -437,7 +513,8 @@ export const hydrateSbtDisplayNameTargeted = async ({
           address: checksum,
           preferredSlug: slug,
           metadata,
-          chainId: resolvedChainId || Number(metadata?.chainID || metadata?.chainId || 0) || 0,
+          chainId:
+            resolvedChainId || Number(readRecord(metadata, 'chainID') || readRecord(metadata, 'chainId') || 0) || 0,
         });
       }
 
@@ -457,7 +534,7 @@ export const hydrateSbtDisplayNameTargeted = async ({
         name,
         info: metadata,
       };
-      const metadataChainId = Number(metadata?.chainID || metadata?.chainId || 0) || 0;
+      const metadataChainId = Number(readRecord(metadata, 'chainID') || readRecord(metadata, 'chainId') || 0) || 0;
       const memoChainId = normalizeChainId(resolvedChainId || metadataChainId);
       const targetedMemoKey = getDisplayLabelMemoKey({
         addressLower,
@@ -487,7 +564,7 @@ export const warmSbtDisplayNamesTargeted = async ({
   metadataLookupConfig = null,
   chainId = null,
   writeBack = true,
-} = {}) => {
+}: WarmSbtDisplayNamesArgs = {}) => {
   const unique = Array.from(
     new Set((Array.isArray(addresses) ? addresses : []).map((value) => normalizeAddress(value)).filter(Boolean)),
   );
