@@ -14,13 +14,13 @@ reviewing future test additions.
 
 | Command | Result | Wall time |
 |---|---:|---:|
-| `npm run test:client` | 997 suites, 7,400 passed, 1 skipped | 225.464s |
+| `npm run test:client` | 1,006 suites, 7,415 passed, 1 skipped | 307.803s |
 | `cd client && npm test -- --watchAll=false --runInBand --json --outputFile=/tmp/prd655-jest-results.json` | 997 suites, 7,399 passed, 1 skipped | 150.899s |
 | `npm run test:node` | 222 passed | 28.657s |
 
-Against a 25-minute ceiling, the full client coverage run leaves about 21m15s
+Against a 25-minute ceiling, the full client coverage run leaves about 19m52s
 of headroom inside the client job. The local full client coverage run plus
-`test:node` totals about 254.121s, leaving about 20m46s against a single
+`test:node` totals about 336.460s, leaving about 19m24s against a single
 25-minute budget.
 
 ## Slowest Client Suites
@@ -48,10 +48,10 @@ budget trend or a targeted developer-loop need.
 
 The measured global coverage from `npm run test:client` was:
 
-- Statements: 75.72% (74,479 / 98,352)
-- Branches: 61.01% (64,319 / 105,422)
-- Functions: 77.09% (13,840 / 17,951)
-- Lines: 79.12% (69,229 / 87,488)
+- Statements: 75.74% (74,620 / 98,517)
+- Branches: 61.00% (64,374 / 105,514)
+- Functions: 77.08% (13,860 / 17,981)
+- Lines: 79.14% (69,366 / 87,642)
 
 Selected top-level `client/src` buckets from `client/coverage/lcov.info`:
 
@@ -63,6 +63,9 @@ Selected top-level `client/src` buckets from `client/coverage/lcov.info`:
 | `src/variables` | 12 | 93.25% | 64.66% | 95.28% |
 | `src/wallet` | 13 | 65.17% | 43.59% | 54.04% |
 
-Coverage floors are banked in `client/jest.config.cjs` by rounding the measured
-global floor down conservatively. They should only move upward after large
-verified lanes.
+Coverage floors are banked in both `client/jest.config.cjs` and
+`scripts/coverage-baseline.json` by rounding the measured global floor down
+conservatively. `npm run test:client` emits
+`client/coverage/coverage-summary.json`, and `npm run coverage-floor:check`
+fails if any measured global percentage falls below the checked-in floor. Floors
+should only move upward after large verified lanes.

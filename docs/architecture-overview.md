@@ -21,6 +21,24 @@ worker, or storage utilities directly. Domain ports may import low-level modules
 and must preserve call-time object lookup where tests spy on object-style modules
 such as `contractScripts`.
 
+```mermaid
+flowchart TD
+  Browser["React app routes and pages<br/>client/src/components/**"] --> Domains["Domain ports and planners<br/>client/src/domains/**"]
+  Domains --> Utilities["Low-level utilities<br/>client/src/utilities/**"]
+  Browser --> Wizard["/new and /session/new<br/>SessionWizard"]
+  Wizard --> DeployHelper["deploy-helper worker<br/>workers/deploy-helper"]
+  Browser --> SessionWorker["sessionCorsWorker<br/>workers/sessionCorsWorker"]
+  SessionWorker --> Storage["Arweave and worker storage routes"]
+  SessionWorker --> Contracts["EVM contracts<br/>SessionRegistry, Surveys, SBTFactory, CustomSBT"]
+  Utilities --> Contracts
+  Utilities --> Arweave["Arweave clients and storage refs"]
+  Cecc["contextEngine-cc extension"] --> SessionWorker
+  Cecc --> UtilitiesShared["shared envelope/question modules"]
+  PublicRelease["public release tree"] --> Browser
+  PublicRelease --> SessionWorker
+  PublicRelease -. strips .-> PrivateOnly["private E2E, TODO, agentBridgeWorker, contextEngine-cc"]
+```
+
 Primary navigation maps:
 
 - `docs/MainSite.MAP.md`
@@ -81,6 +99,34 @@ most uploaded images. The session worker also exposes canonical storage routes:
 
 `docs/session-cors-worker.md` describes how those routes map to Arweave,
 Cloudflare storage, worker envelopes, and gated access checks.
+
+## Contracts And Chains
+
+The canonical Solidity contracts live in `contracts/`, with deploy scripts in
+`foundry/script/` and tests in `foundry/test/`:
+
+- `SessionRegistry.sol` stores session identity, metadata pointers, admins,
+  worker URLs, sponsored flags, and resource gates.
+- `Surveys.sol` anchors question and response hashes.
+- `CustomSBT.sol` implements the non-transferable SBT token.
+- `SBTFactory.sol` deploys session/group SBT contracts.
+
+The client reads ABIs from `client/src/contractsABI/`. Checked-in defaults live
+in `client/src/variables/chains.js` and `client/src/variables/contracts.json`;
+OP Sepolia (`11155420`) is the default chain fallback, while Base Sepolia
+(`84532`) remains a compatibility chain.
+
+## CC Extension
+
+`contextEngine-cc/` is the Claude Code integration. It contains the local hook,
+browser auth page, session/question helpers, and agent bridge contracts. Shared
+Envelope v1 primitives are mirrored between
+`client/src/utilities/shared/encryption/envelopeV1Core.mjs` and
+`contextEngine-cc/lib/shared/encryption/envelopeV1Core.mjs`, with
+`contextEngine-cc/lib/envelopeV1.mjs` acting as the Node adapter.
+
+The extension is part of the full private/dev repo. It is stripped from the
+public release artifact, so public release verification must never depend on it.
 
 ## Release And Public Surface
 

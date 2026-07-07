@@ -17,6 +17,22 @@ Then confirm the required local env values are present in `.env.e2e.local`,
 `RPC_URL`, `ARWEAVE_JWK_PATH`, `CLOUDFLARE_API_TOKEN` for fresh worker-deploy
 runs, and a reusable `SESSION_SLUG` plus `SESSION_WORKER_URL` for reuse runs.
 
+## Latest Live Evidence
+
+The Cloudflare worker envelope/group suite was run live on 2026-07-06 with an
+operator-local env file and fresh test workers:
+
+| Suite | Result | Recording |
+|---|---:|---|
+| `npm run ai:test-cf-envelope:worker` | PASS | `artifacts/session-workflows/cloudflare-worker-envelope-20260706-213623.json` |
+| `npm run ai:test-cf-envelope:groups` | PASS | `artifacts/session-workflows/cloudflare-worker-groups-20260706-213656.json` |
+| `npm run ai:test-cf-envelope:group-gates` | PASS | `artifacts/session-workflows/cloudflare-group-envelope-20260706-213928.json` |
+| `npm run ai:test-cf-envelope:key-lifecycle` | PASS | `artifacts/session-workflows/cloudflare-key-lifecycle-20260706-214010.json` |
+
+Other live suites in the cadence still require operator credentials, funded test
+wallets, and stable RPC/Arweave/Cloudflare access at run time. Mark those rows
+`E2E-BLOCKED/<reason>` when the required resource is unavailable.
+
 ## Nightly
 
 Run these when operator credentials and funded test wallets are available:
