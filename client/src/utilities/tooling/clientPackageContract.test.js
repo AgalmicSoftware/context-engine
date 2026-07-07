@@ -176,6 +176,7 @@ describe('client package modernization contract', () => {
     const viteIndex = readClientFile('index.html');
     const viteEntry = readClientFile('src/viteEntry.js');
     const appEntry = readClientFile('src/index.js');
+    const appShellEntry = readClientFile('src/components/App.tsx');
     const legacyOutputCleaner = readClientFile('scripts/clean-legacy-vite-output.mjs');
     const contractSourceLoader = readClientFile('src/components/ContractPage/contractSourceLoader.ts');
 
@@ -188,6 +189,8 @@ describe('client package modernization contract', () => {
     expect(viteEntry).toContain("import 'assets/css/contextEngine.scss';");
     expect(viteEntry).toContain("import('./index.js')");
     expect(appEntry).not.toContain("import 'assets/css/contextEngine.scss';");
+    expect(appShellEntry).toContain("React.lazy(() => import('./MainSite/AppShell'))");
+    expect(appShellEntry).not.toContain("import AppShell from './MainSite/AppShell'");
     expect(legacyOutputCleaner).toContain("const legacyOutputDirs = ['build-vite', 'vite-build']");
     expect(legacyOutputCleaner).toContain('fs.rmSync(targetDir, { recursive: true, force: true })');
     expect(contractSourceLoader).toContain('.sol?raw');
@@ -216,9 +219,26 @@ describe('client package modernization contract', () => {
       'vendor-polyfills',
       'vendor-misc',
     ];
+    const expectedAppChunks = [
+      'vite-preload-helper',
+      'app-boot-support',
+      'app-wallet-runtime',
+      'app-account-wallet',
+      'app-shell-arweave',
+      'app-shell-chain',
+      'app-shell-crypto-worker',
+      'app-shell-session-cache',
+      'app-shell-main-runtime',
+    ];
 
     expect(viteConfig).toContain('export const resolveManualChunk');
     expect(viteConfig).toContain('manualChunks: resolveManualChunk');
+    expect(viteConfig).toContain('chunkSizeWarningLimit: 500');
+    expect(viteConfig).toContain('modulePreload');
+    expect(viteConfig).toContain('resolveDependencies: () => []');
+    expectedAppChunks.forEach((chunkName) => {
+      expect(viteConfig).toContain(chunkName);
+    });
     expectedVendorChunks.forEach((chunkName) => {
       expect(viteConfig).toContain(chunkName);
     });
