@@ -67,6 +67,7 @@
     "ai:test-nav:smoke:mobile": "PLAYWRIGHT_VIEWPORT=mobile npm run -s ai:test-nav:smoke",
     "ai:test-nav:smoke:firefox": "PLAYWRIGHT_BROWSER=firefox npm run -s ai:test-nav:smoke",
     "lint": "cd client && npm run lint",
+    "lint:workers": "node scripts/run-workers-lint.js",
     "test:cache-guard": "bash ./scripts/check-managed-cache-localstorage.sh"
   },
   "devDependencies": {

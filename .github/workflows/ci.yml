@@ -69,6 +69,9 @@ jobs:
       - name: Lint client
         run: npm run lint
 
+      - name: Lint workers
+        run: npm run lint:workers
+
       - name: Typecheck client
         run: npm run typecheck:client
 
