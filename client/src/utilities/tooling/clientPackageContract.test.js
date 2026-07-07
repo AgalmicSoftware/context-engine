@@ -6,6 +6,11 @@ const readClientPackageJson = () => {
   return JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
 };
 
+const readRootJson = (relativePath) => {
+  const filePath = path.resolve(__dirname, '../../../..', relativePath);
+  return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+};
+
 const readClientFile = (relativePath) => {
   const filePath = path.resolve(__dirname, '../../..', relativePath);
   return fs.readFileSync(filePath, 'utf8');
@@ -71,6 +76,15 @@ describe('client package modernization contract', () => {
     expect(pkg.devDependencies['react-scripts']).toBeUndefined();
     expect(pkg.devDependencies.webpack).toBeUndefined();
     expect(pkg.overrides.webpack).toBeUndefined();
+  });
+
+  it('keeps the client coverage floor pinned to the measured ratchet baseline', () => {
+    const jestConfig = readClientJestConfig();
+    const coverageBaseline = readRootJson('scripts/coverage-baseline.json');
+
+    expect(jestConfig.coverageThreshold).toEqual({
+      global: coverageBaseline.global,
+    });
   });
 
   it('keeps stale dependency overrides out of the client package contract', () => {
