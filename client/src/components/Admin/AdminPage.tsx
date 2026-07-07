@@ -7,12 +7,9 @@ import {
   faCaretUp,
   faClipboard,
   faExternalLinkAlt,
-  faLock,
-  faLockOpen,
   faPen,
   faQuestionCircle,
   faSync,
-  faTimes,
 } from '@fortawesome/free-solid-svg-icons';
 import { ethers } from 'ethers';
 import styles from './AdminPage.module.scss';
@@ -44,10 +41,11 @@ import {
 } from '../../utilities/session/sessionWorkerAvailability.js';
 import { buildSponsoredFlagFields as buildSponsoredSessionFlagFields } from '../../utilities/session/sponsoredFlags.js';
 import { toStr } from '../../utilities/shared/primitives.js';
-import AudioInput from '../Shared/AudioInput/AudioInput';
 import SBTSelector from '../SBTs/SBTSelector';
 import { JsonPanel } from '../Shared/Json/JsonControls';
 import CETooltip from '../Shared/CETooltip';
+import AdminPageTestsPanel from './AdminPageTestsPanel';
+import AdminPageWorkerSecretsPanel from './AdminPageWorkerSecretsPanel';
 import { createLogger } from '../../utilities/logging';
 import { notify } from '../../utilities/ui/notify.js';
 import {
@@ -83,17 +81,7 @@ import {
   getAdminSessionDisplayUrl,
   shortAddress,
 } from './adminPageSessionDisplayHelpers';
-import {
-  ADMIN_SECRET_CARDS,
-  buildAdminSecretRemoveTestId,
-  getAdminSecretCardStatus,
-  getAdminSecretFieldInputType,
-  getAdminSecretFieldLabel,
-  getAdminSecretFieldRows,
-  getAdminSecretFieldStatusLabel,
-  normalizeAdminSecretPresence,
-  normalizeAdminSecretPresencePatch,
-} from './adminPageSecretCardHelpers';
+import { normalizeAdminSecretPresence, normalizeAdminSecretPresencePatch } from './adminPageSecretCardHelpers';
 import type { AdminTestResults } from './adminPageTestResultHelpers';
 import { renderAdminTestResult } from './adminPageTestResultHelpers';
 import {
@@ -134,7 +122,6 @@ import {
   buildEditableSessionMetadataPayload,
   parseChainIdInput,
   resolveAutoFeatureBySessionSlug,
-  shouldShowInlineResourceSummary,
 } from './adminPageMetadataDraftHelpers';
 
 const log = createLogger('general');
@@ -2277,27 +2264,14 @@ const AdminPage = ({
       </>
     );
   };
-  const renderInlineResourceSummary = ({ key, label, resource, onRefresh, refreshLabel }: any) => {
-    if (!shouldShowInlineResourceSummary(resource)) return null;
-    return (
-      <div key={key} className={styles.inlineResourceCard}>
-        <div className={styles.inlineResourceHeader}>
-          <div className={styles.resourceLabel}>{label}</div>
-          <button
-            type="button"
-            className={styles.resourceRefreshButton}
-            onClick={onRefresh}
-            aria-label={refreshLabel}
-            title={refreshLabel}
-          >
-            <FontAwesomeIcon icon={faSync} spin={resource.loading} />
-          </button>
-        </div>
-        <div className={styles.inlineResourceBalance}>{resource.display}</div>
-        <div className={styles.inlineResourceStatus}>{resource.meta}</div>
-      </div>
-    );
-  };
+  const handleTranscribeTestTextChange = useCallback((next: string) => {
+    setTranscribeText(next);
+    const trimmed = toStr(next).trim();
+    setTestResults((prev) => ({
+      ...prev,
+      transcribe: trimmed ? `OK (${trimmed.slice(0, 80)})` : '',
+    }));
+  }, []);
   const handleCopyRawMetadata = useCallback(() => {
     if (!groupMetadata || typeof navigator === 'undefined' || !navigator.clipboard?.writeText) return;
     navigator.clipboard
@@ -3201,468 +3175,74 @@ const AdminPage = ({
           )}
         </section>
 
-        <section className={`${styles.panel} ${styles.secretsPanel}`}>
-          <div className={styles.panelHeader}>
-            <div className={styles.panelTitleGroup}>
-              <div className={styles.panelTitleRow}>
-                <div className={styles.panelTitle}>Worker secrets</div>
-                {renderInfoTooltip(
-                  'admin-worker-secrets-tip',
-                  'Edit operator credentials without revealing what is already stored in the worker.',
-                )}
-              </div>
-            </div>
-            <Button
-              size="sm"
-              color="secondary"
-              outline
-              className={styles.collapseToggle}
-              onClick={() => toggleSection('workerSecrets')}
-              aria-label="Toggle Worker secrets section"
-            >
-              <FontAwesomeIcon icon={workerSecretsOpen ? faCaretUp : faCaretDown} />
-            </Button>
-          </div>
-          {workerSecretsOpen && (
-            <>
-              <div className={styles.secretStatusBar}>
-                <div className={styles.statusNote}>
-                  {secretPresenceMessage ||
-                    'Stored secret status not checked. Refresh to verify worker-managed secrets without revealing values.'}
-                </div>
-                <Button
-                  size="sm"
-                  color="secondary"
-                  outline
-                  className={styles.subtleActionButton}
-                  onClick={refreshSecretPresence}
-                  disabled={
-                    secretPresenceStatus === 'loading' ||
-                    !selectedConfig ||
-                    !normalizeWorkerUrl(workerUrl || selectedConfigWorkerUrl)
-                  }
-                >
-                  <FontAwesomeIcon icon={faSync} style={{ marginRight: 6 }} />
-                  {secretPresenceStatus === 'loading' ? 'Checking...' : 'Refresh secret status'}
-                </Button>
-              </div>
-              <div className={styles.secretOptionsGrid}>
-                {ADMIN_SECRET_CARDS.map((card: any) => {
-                  const isOpen = openSecretCards[card.key];
-                  const cardStatus = getAdminSecretCardStatus({
-                    fields: card.fields,
-                    secrets,
-                    clearedSecretKeys,
-                    storedSecretPresence,
-                    secretPresenceStatus,
-                    workerSecretsDirty,
-                  });
-                  return (
-                    <div
-                      key={card.key}
-                      className={`${styles.secretOptionCard}${isOpen ? ` ${styles.activeOption}` : ''}`}
-                    >
-                      <button
-                        type="button"
-                        className={styles.secretOptionHeader}
-                        aria-label={card.label}
-                        onClick={() => setOpenSecretCards((p) => ({ ...p, [card.key]: !p[card.key] }))}
-                        aria-expanded={isOpen}
-                      >
-                        <FontAwesomeIcon
-                          icon={cardStatus.iconLocked ? faLock : faLockOpen}
-                          style={{ opacity: cardStatus.iconLocked ? 0.9 : 0.4, marginRight: 8 }}
-                        />
-                        <span className={styles.secretOptionText}>
-                          <span>{card.label}</span>
-                          <span className={styles.secretOptionMeta}>{cardStatus.label}</span>
-                        </span>
-                        <FontAwesomeIcon icon={isOpen ? faCaretUp : faCaretDown} style={{ marginLeft: 'auto' }} />
-                      </button>
-                      {isOpen && (
-                        <div className={styles.secretOptionBody}>
-                          {card.fields.map((fieldKey: any) => {
-                            const secretFieldKey = String(fieldKey);
-                            const inputType = getAdminSecretFieldInputType(secretFieldKey);
-                            const isTextarea = inputType === 'textarea';
-                            const label = getAdminSecretFieldLabel(secretFieldKey);
-                            return (
-                              <FormGroup key={secretFieldKey}>
-                                <Label>{label}</Label>
-                                <div
-                                  className={`${styles.secretInputRow}${isTextarea ? ` ${styles.secretInputRowMultiline}` : ''}`}
-                                >
-                                  <Input
-                                    type={inputType}
-                                    rows={getAdminSecretFieldRows(secretFieldKey)}
-                                    value={secrets[secretFieldKey]}
-                                    onChange={(e: any) => handleSecretChange(secretFieldKey, e.target.value)}
-                                    className={styles.secretInput}
-                                  />
-                                  <button
-                                    type="button"
-                                    className={`${styles.secretRemoveButton}${clearedSecretKeys.has(secretFieldKey) ? ` ${styles.secretRemoveButtonActive}` : ''}`}
-                                    onClick={() => handleClearSecret(secretFieldKey)}
-                                    title={`Clear ${label} on next save`}
-                                    aria-label={`Clear ${label}`}
-                                    data-testid={buildAdminSecretRemoveTestId(secretFieldKey)}
-                                  >
-                                    <FontAwesomeIcon icon={faTimes} />
-                                  </button>
-                                </div>
-                                <div className={styles.secretFieldStatus}>
-                                  {getAdminSecretFieldStatusLabel({
-                                    fieldKey: secretFieldKey,
-                                    secrets,
-                                    clearedSecretKeys,
-                                    storedSecretPresence,
-                                    secretPresenceStatus,
-                                    workerSecretsDirty,
-                                  })}
-                                </div>
-                                {secretFieldKey === 'litAccountApiKey' ? (
-                                  <div className={styles.warningNote}>
-                                    Anyone with this key can create new Lit groups, PKPs, usage keys, and actions inside
-                                    that bundle-owned Lit account. Use disposable per-bundle accounts instead of a
-                                    shared deployment account.
-                                  </div>
-                                ) : null}
-                              </FormGroup>
-                            );
-                          })}
-                          {card.key === 'arweave' &&
-                            renderInlineResourceSummary({
-                              key: 'arweave-resource',
-                              label: 'Arweave balance',
-                              resource: arweaveResource,
-                              onRefresh: refreshArweaveResource,
-                              refreshLabel: 'Refresh Arweave balance',
-                            })}
-                          {card.key === 'faucet' &&
-                            renderInlineResourceSummary({
-                              key: 'faucet-resource',
-                              label: 'Faucet balance',
-                              resource: faucetResource,
-                              onRefresh: refreshFaucetResource,
-                              refreshLabel: 'Refresh faucet balance',
-                            })}
-                          {card.key === 'lit' &&
-                            renderInlineResourceSummary({
-                              key: 'lit-resource',
-                              label: litResourceLabel,
-                              resource: litResource,
-                              onRefresh: () => refreshLitResource({ includeSignedStatus: true }),
-                              refreshLabel: 'Refresh Lit status',
-                            })}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              {canAdmin && workerSecretsDirty && (
-                <Button
-                  color="primary"
-                  className={styles.actionButton}
-                  onClick={handleSaveWorkerSecrets}
-                  disabled={!canAdmin}
-                >
-                  Save worker secrets
-                </Button>
-              )}
-              {saveStatus && <div className={styles.statusNote}>{saveStatus}</div>}
-              {chainStatus && <div className={styles.statusNote}>{chainStatus}</div>}
-            </>
-          )}
-        </section>
+        <AdminPageWorkerSecretsPanel
+          workerSecretsOpen={workerSecretsOpen}
+          onToggle={() => toggleSection('workerSecrets')}
+          canAdmin={canAdmin}
+          selectedConfig={selectedConfig}
+          workerUrl={workerUrl}
+          selectedConfigWorkerUrl={selectedConfigWorkerUrl}
+          secretPresenceMessage={secretPresenceMessage}
+          secretPresenceStatus={secretPresenceStatus}
+          refreshSecretPresence={refreshSecretPresence}
+          openSecretCards={openSecretCards}
+          setOpenSecretCards={setOpenSecretCards}
+          secrets={secrets}
+          clearedSecretKeys={clearedSecretKeys}
+          storedSecretPresence={storedSecretPresence}
+          workerSecretsDirty={workerSecretsDirty}
+          handleSecretChange={handleSecretChange}
+          handleClearSecret={handleClearSecret}
+          arweaveResource={arweaveResource}
+          faucetResource={faucetResource}
+          litResource={litResource}
+          litResourceLabel={litResourceLabel}
+          refreshArweaveResource={refreshArweaveResource}
+          refreshFaucetResource={refreshFaucetResource}
+          refreshLitResource={refreshLitResource}
+          handleSaveWorkerSecrets={handleSaveWorkerSecrets}
+          saveStatus={saveStatus}
+          chainStatus={chainStatus}
+        />
 
         {showTestsPanel && (
-          <section className={`${styles.panel} ${styles.testsPanel}`}>
-            <div className={styles.panelHeader}>
-              <div className={styles.panelTitleGroup}>
-                <div className={styles.panelTitleRow}>
-                  <div className={styles.panelTitle}>Tests</div>
-                  {renderInfoTooltip(
-                    'admin-tests-tip',
-                    <div className={styles.tooltipTextStack}>
-                      <div>Run quick checks against the selected worker and the session&apos;s gate rules.</div>
-                      <div>
-                        Run these as a user who holds the sponsored SBT. Tests use the configured worker URL and auth
-                        flow.
-                      </div>
-                    </div>,
-                  )}
-                </div>
-              </div>
-              <Button
-                size="sm"
-                color="secondary"
-                outline
-                className={styles.collapseToggle}
-                onClick={() => {
-                  setShowTestsPanel(false);
-                  setOpenSection((prev: any) => (prev === 'tests' ? '' : prev));
-                }}
-                aria-label="Toggle Tests section"
-              >
-                <FontAwesomeIcon icon={testsOpen ? faCaretUp : faCaretDown} />
-              </Button>
-            </div>
-            {testsOpen && (
-              <>
-                <div className={styles.panelTitleRow}>
-                  <div className={styles.panelSubtitle}>Lit quick test (no worker)</div>
-                  {renderInfoTooltip(
-                    'admin-lit-test-tip',
-                    'Uses the selected session’s default gate + Lit hooks. Does not call the worker.',
-                  )}
-                </div>
-                <FormGroup>
-                  <Label>Lit test value</Label>
-                  <Input
-                    type="textarea"
-                    rows="2"
-                    value={litTestValue}
-                    onChange={(e: any) => setLitTestValue(e.target.value)}
-                    placeholder="Type a short test string"
-                  />
-                </FormGroup>
-                <div className={`${styles.formRow} ${styles.litActionRow}`}>
-                  <Button
-                    color="primary"
-                    outline
-                    className={styles.actionButton}
-                    onClick={runLitEncryptTest}
-                    disabled={litTestBusy}
-                  >
-                    Encrypt
-                  </Button>
-                  <Button
-                    color="primary"
-                    outline
-                    className={styles.actionButton}
-                    onClick={runLitDecryptTest}
-                    disabled={litTestBusy || !litTestEnvelope}
-                  >
-                    Decrypt
-                  </Button>
-                </div>
-                {litTestStatus && <div className={styles.statusNote}>{litTestStatus}</div>}
-                {litTestEnvelope && (
-                  <div className={styles.resultBox}>
-                    <div>Envelope</div>
-                    <pre>{litTestEnvelope}</pre>
-                  </div>
-                )}
-                {litTestDecrypted && <div className={styles.statusNote}>Decrypted: {litTestDecrypted}</div>}
-                <div className={styles.inlineRow}>
-                  <Label>
-                    Transcription test (AudioInput)
-                    {!canRunTests &&
-                      renderInfoTooltip(
-                        'admin-transcription-tip',
-                        'Connect a wallet and set a worker URL to test transcription.',
-                      )}
-                  </Label>
-                  {canRunTests ? (
-                    <AudioInput
-                      placeholder="Record a short clip to test /transcribe…"
-                      updateFunction={(next: any) => {
-                        setTranscribeText(next);
-                        const trimmed = toStr(next).trim();
-                        setTestResults((prev) => ({
-                          ...prev,
-                          transcribe: trimmed ? `OK (${trimmed.slice(0, 80)})` : '',
-                        }));
-                      }}
-                      toggleEncryption={() => {}}
-                      value={transcribeText}
-                      encrypted={false}
-                      hideEncryption
-                      disableEncryption
-                      enableAiRewrite={false}
-                      sessionSlug={normalizeSlug(selectedSlug)}
-                      sessionConfig={testSessionConfig}
-                      context={testContext}
-                      workerUrl={baseWorkerUrl}
-                    />
-                  ) : null}
-                </div>
-                {testStatus && <div className={styles.statusNote}>{testStatus}</div>}
-                <div className={styles.grid}>
-                  <div
-                    className={`${styles.statusItem} ${canRunHealthTest ? styles.statusItemClickable : ''}`}
-                    onClick={() => {
-                      if (!testBusy && canRunHealthTest) runWorkerHealthTest();
-                    }}
-                    role={canRunHealthTest ? 'button' : undefined}
-                    tabIndex={canRunHealthTest ? 0 : -1}
-                    onKeyDown={(e: any) => {
-                      if (e.key === 'Enter' && !testBusy && canRunHealthTest) runWorkerHealthTest();
-                    }}
-                    title={(() => {
-                      if (!baseWorkerUrl) return 'Set a worker URL to test /health';
-                      if (!defaultGateIsEmpty && !walletReady) return 'Connect a wallet to run the gated access test.';
-                      return 'Click to test /health';
-                    })()}
-                    id={!defaultGateIsEmpty && !walletReady ? 'admin-health-test-chip' : undefined}
-                  >
-                    <span>Health</span>
-                    <span>{testBusy ? 'Testing\u2026' : renderAdminTestResult(testResults.health)}</span>
-                  </div>
-                  {!defaultGateIsEmpty && !walletReady && (
-                    <CETooltip
-                      placement="top"
-                      trigger="hover focus click"
-                      target="admin-health-test-chip"
-                      className={styles.tooltipBubble}
-                    >
-                      Connect a wallet to run the gated access test.
-                    </CETooltip>
-                  )}
-                  <div
-                    className={`${styles.statusItem} ${account ? styles.statusItemClickable : ''}`}
-                    onClick={() => {
-                      if (!testBusy && account) runWorkerAiTest();
-                    }}
-                    role={account ? 'button' : undefined}
-                    tabIndex={account ? 0 : -1}
-                    onKeyDown={(e: any) => {
-                      if (e.key === 'Enter' && !testBusy && account) runWorkerAiTest();
-                    }}
-                    title="Click to test AI"
-                  >
-                    <span>AI</span>
-                    <span>{testBusy ? 'Testing\u2026' : renderAdminTestResult(testResults.ai)}</span>
-                  </div>
-                  <div
-                    className={`${styles.statusItem} ${account ? styles.statusItemClickable : ''}`}
-                    onClick={() => {
-                      if (!testBusy && account) runWorkerArweaveTest();
-                    }}
-                    role={account ? 'button' : undefined}
-                    tabIndex={account ? 0 : -1}
-                    onKeyDown={(e: any) => {
-                      if (e.key === 'Enter' && !testBusy && account) runWorkerArweaveTest();
-                    }}
-                    title="Click to test Arweave upload"
-                  >
-                    <span>Arweave</span>
-                    <span>{testBusy ? 'Testing\u2026' : renderAdminTestResult(testResults.arweave)}</span>
-                  </div>
-                  <div
-                    className={`${styles.statusItem} ${account ? styles.statusItemClickable : ''}`}
-                    onClick={() => {
-                      if (!testBusy && account) runWorkerFaucetTest();
-                    }}
-                    role={account ? 'button' : undefined}
-                    tabIndex={account ? 0 : -1}
-                    onKeyDown={(e: any) => {
-                      if (e.key === 'Enter' && !testBusy && account) runWorkerFaucetTest();
-                    }}
-                    title="Click to test faucet (0.0000001)"
-                  >
-                    <span>Faucet</span>
-                    <span>{testBusy ? 'Testing\u2026' : renderAdminTestResult(testResults.faucet)}</span>
-                  </div>
-                  <div className={styles.statusItem}>
-                    <span>Transcribe</span>
-                    <span>{renderAdminTestResult(testResults.transcribe)}</span>
-                  </div>
-                </div>
-                <div className={styles.panelTitleRow} style={{ marginTop: 16 }}>
-                  <div className={styles.panelTitle}>Negative tests (denied access)</div>
-                  {renderInfoTooltip(
-                    'admin-negative-tests-tip',
-                    'Connect a wallet that does NOT hold the sponsored SBT. Each test expects a 403 during login.',
-                  )}
-                </div>
-                {deniedStatus && <div className={styles.statusNote}>{deniedStatus}</div>}
-                <div className={styles.grid}>
-                  <div
-                    className={`${styles.statusItem} ${!deniedBusy ? styles.statusItemClickable : ''}`}
-                    onClick={() => {
-                      if (!deniedBusy) runDeniedAccessTest('login');
-                    }}
-                    role={!deniedBusy ? 'button' : undefined}
-                    tabIndex={!deniedBusy ? 0 : -1}
-                    onKeyDown={(e: any) => {
-                      if (e.key === 'Enter' && !deniedBusy) runDeniedAccessTest('login');
-                    }}
-                    title="Click to test login denied"
-                    data-testid="ce-admin-denied-chip-login"
-                  >
-                    <span>Login</span>
-                    <span>{renderAdminTestResult(deniedResults.login)}</span>
-                  </div>
-                  <div
-                    className={`${styles.statusItem} ${!deniedBusy ? styles.statusItemClickable : ''}`}
-                    onClick={() => {
-                      if (!deniedBusy) runDeniedAccessTest('ai');
-                    }}
-                    role={!deniedBusy ? 'button' : undefined}
-                    tabIndex={!deniedBusy ? 0 : -1}
-                    onKeyDown={(e: any) => {
-                      if (e.key === 'Enter' && !deniedBusy) runDeniedAccessTest('ai');
-                    }}
-                    title="Click to test AI denied"
-                    data-testid="ce-admin-denied-chip-ai"
-                  >
-                    <span>AI</span>
-                    <span>{renderAdminTestResult(deniedResults.ai)}</span>
-                  </div>
-                  <div
-                    className={`${styles.statusItem} ${!deniedBusy ? styles.statusItemClickable : ''}`}
-                    onClick={() => {
-                      if (!deniedBusy) runDeniedAccessTest('arweave');
-                    }}
-                    role={!deniedBusy ? 'button' : undefined}
-                    tabIndex={!deniedBusy ? 0 : -1}
-                    onKeyDown={(e: any) => {
-                      if (e.key === 'Enter' && !deniedBusy) runDeniedAccessTest('arweave');
-                    }}
-                    title="Click to test Arweave denied"
-                    data-testid="ce-admin-denied-chip-arweave"
-                  >
-                    <span>Arweave</span>
-                    <span>{renderAdminTestResult(deniedResults.arweave)}</span>
-                  </div>
-                  <div
-                    className={`${styles.statusItem} ${!deniedBusy ? styles.statusItemClickable : ''}`}
-                    onClick={() => {
-                      if (!deniedBusy) runDeniedAccessTest('transcribe');
-                    }}
-                    role={!deniedBusy ? 'button' : undefined}
-                    tabIndex={!deniedBusy ? 0 : -1}
-                    onKeyDown={(e: any) => {
-                      if (e.key === 'Enter' && !deniedBusy) runDeniedAccessTest('transcribe');
-                    }}
-                    title="Click to test transcription denied"
-                    data-testid="ce-admin-denied-chip-transcribe"
-                  >
-                    <span>Transcribe</span>
-                    <span>{renderAdminTestResult(deniedResults.transcribe)}</span>
-                  </div>
-                  <div
-                    className={`${styles.statusItem} ${!deniedBusy ? styles.statusItemClickable : ''}`}
-                    onClick={() => {
-                      if (!deniedBusy) runDeniedAccessTest('faucet');
-                    }}
-                    role={!deniedBusy ? 'button' : undefined}
-                    tabIndex={!deniedBusy ? 0 : -1}
-                    onKeyDown={(e: any) => {
-                      if (e.key === 'Enter' && !deniedBusy) runDeniedAccessTest('faucet');
-                    }}
-                    title="Click to test faucet denied"
-                    data-testid="ce-admin-denied-chip-faucet"
-                  >
-                    <span>Faucet</span>
-                    <span>{renderAdminTestResult(deniedResults.faucet)}</span>
-                  </div>
-                </div>
-              </>
-            )}
-          </section>
+          <AdminPageTestsPanel
+            testsOpen={testsOpen}
+            onCollapse={() => {
+              setShowTestsPanel(false);
+              setOpenSection((prev) => (prev === 'tests' ? '' : prev));
+            }}
+            litTestValue={litTestValue}
+            setLitTestValue={setLitTestValue}
+            litTestBusy={litTestBusy}
+            litTestEnvelope={litTestEnvelope}
+            litTestStatus={litTestStatus}
+            litTestDecrypted={litTestDecrypted}
+            runLitEncryptTest={runLitEncryptTest}
+            runLitDecryptTest={runLitDecryptTest}
+            canRunTests={canRunTests}
+            canRunHealthTest={canRunHealthTest}
+            defaultGateIsEmpty={defaultGateIsEmpty}
+            walletReady={walletReady}
+            account={account}
+            testBusy={testBusy}
+            testResults={testResults}
+            testStatus={testStatus}
+            runWorkerHealthTest={runWorkerHealthTest}
+            runWorkerAiTest={runWorkerAiTest}
+            runWorkerArweaveTest={runWorkerArweaveTest}
+            runWorkerFaucetTest={runWorkerFaucetTest}
+            transcribeText={transcribeText}
+            handleTranscribeTestTextChange={handleTranscribeTestTextChange}
+            selectedSlug={selectedSlug}
+            testSessionConfig={testSessionConfig}
+            testContext={testContext}
+            baseWorkerUrl={baseWorkerUrl}
+            deniedBusy={deniedBusy}
+            deniedStatus={deniedStatus}
+            deniedResults={deniedResults}
+            runDeniedAccessTest={runDeniedAccessTest}
+          />
         )}
       </div>
     </div>
