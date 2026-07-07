@@ -249,124 +249,8 @@ const manualChunkGroups = [
   },
 ];
 
-const appManualChunkGroups = [
-  {
-    name: 'app-boot-support',
-    patterns: [
-      '/src/actions/',
-      '/src/bootRecovery.ts',
-      '/src/components/ErrorBoundary/AppErrorBoundary.tsx',
-      '/src/components/HooksHOC/withRouterBridge',
-      '/src/components/Onboarding/onboardingConfig.ts',
-      '/src/components/Shared/CEToaster.tsx',
-      '/src/reducers/',
-      '/src/store',
-      '/src/utilities/ceAgent',
-      '/src/utilities/demoModeHelpers.ts',
-      '/src/utilities/e2eTestIds.ts',
-      '/src/utilities/logging.ts',
-      '/src/utilities/shared/primitives',
-      '/src/utilities/ui/publicPageHead.ts',
-      '/src/utilities/ui/publicUrl.ts',
-      '/src/utilities/ui/toastBus',
-      '/src/utilities/ui/toastTheme.ts',
-      '/src/variables/publicRepoMetadata.ts',
-    ],
-  },
-  {
-    name: 'app-wallet-runtime',
-    patterns: [
-      '/src/app/runtime/appWagmiRuntime.ts',
-      '/src/utilities/web3/rpcDebugStats.ts',
-      '/src/utilities/web3/rpcReadCache.ts',
-      '/src/utilities/web3/rpcSelection.js',
-      '/src/utilities/web3/wagmiDisconnectState.ts',
-      '/src/variables/appConfig.ts',
-      '/src/variables/chains.ts',
-      '/src/variables/contracts.json',
-      '/src/variables/local-contracts.json',
-      '/src/variables/publicDeploymentConfig.ts',
-      '/src/variables/publicEnv.js',
-      '/src/variables/publicEnv.ts',
-      '/src/variables/rpcDefaults',
-      '/src/variables/rpcEndpoints.ts',
-    ],
-  },
-  {
-    name: 'app-account-wallet',
-    patterns: [
-      '/src/components/Account/',
-      '/src/components/HooksHOC/withWagmiBridge.tsx',
-    ],
-  },
-  {
-    name: 'app-shell-arweave',
-    patterns: [
-      '/src/utilities/arweave/',
-    ],
-  },
-  {
-    name: 'app-shell-chain',
-    patterns: [
-      '/src/domains/sbts/',
-      '/src/domains/sessions/publish/',
-      '/src/utilities/web3/chainEvent',
-      '/src/utilities/web3/chainGateway.ts',
-      '/src/utilities/web3/chainMetadataResolution.ts',
-      '/src/utilities/web3/contractArweaveUploadRuntime.ts',
-      '/src/utilities/web3/contractHelpers.ts',
-      '/src/utilities/web3/contractScripts.',
-      '/src/utilities/web3/contractWrites.ts',
-      '/src/utilities/web3/errorClassifiers.ts',
-      '/src/utilities/web3/profileChainReads.ts',
-      '/src/utilities/web3/providerAdapter.ts',
-      '/src/utilities/web3/rpcProviders.ts',
-      '/src/utilities/web3/rpcSmartLogFetch.ts',
-      '/src/utilities/web3/sessionConfigResolvers.ts',
-      '/src/utilities/web3/sessionRegistry.ts',
-      '/src/utilities/web3/sponsoredAccessState.ts',
-    ],
-  },
-  {
-    name: 'app-shell-crypto-worker',
-    patterns: [
-      '/src/utilities/crypto/',
-      '/src/utilities/worker/',
-      '/src/wallet/',
-    ],
-  },
-  {
-    name: 'app-shell-session-cache',
-    patterns: [
-      '/src/utilities/cache/',
-      '/src/utilities/sbt/session',
-      '/src/utilities/session/',
-      '/src/utilities/survey/filterStateUtils.ts',
-      '/src/utilities/survey/questionRouting.ts',
-      '/src/utilities/survey/session',
-    ],
-  },
-  {
-    name: 'app-shell-main-runtime',
-    patterns: [
-      '/src/components/MainContent/MainAreaTabs.tsx',
-      '/src/components/MainSite/mainSite',
-      '/src/components/MainSite/route',
-      '/src/components/MainSite/session',
-      '/src/components/Navbar/',
-    ],
-  },
-];
-
 export const resolveManualChunk = (id) => {
   const normalizedId = String(id || '').split(path.sep).join('/');
-  if (normalizedId.includes('vite/preload-helper')) return 'vite-preload-helper';
-
-  const appGroup = appManualChunkGroups.find(({ patterns }) => (
-    patterns.some((pattern) => normalizedId.includes(pattern))
-  ));
-  if (appGroup) return appGroup.name;
-
   if (!normalizedId.includes('/node_modules/')) return undefined;
 
   const group = manualChunkGroups.find(({ patterns }) => (
@@ -563,11 +447,6 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: path.resolve(__dirname, 'build'),
       emptyOutDir: true,
-      chunkSizeWarningLimit: 500,
-      modulePreload: {
-        polyfill: false,
-        resolveDependencies: () => [],
-      },
       rollupOptions: {
         input: path.resolve(__dirname, 'index.html'),
         output: {

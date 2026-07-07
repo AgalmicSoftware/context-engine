@@ -69,16 +69,6 @@ const MockRoute = (props: any) => {
   return null;
 };
 
-const getLatestAppShellElement = () => {
-  const routeElement = routeProps[routeProps.length - 1]?.element;
-  return routeElement?.props?.children || routeElement;
-};
-
-const getFirstAppShellElement = () => {
-  const routeElement = routeProps[0]?.element;
-  return routeElement?.props?.children || routeElement;
-};
-
 const mockAppDependencies = () => {
   jest.doMock('react-redux', () => ({
     Provider: ({ children }: { children: React.ReactNode }) => children,
@@ -349,7 +339,7 @@ describe('App wagmi auto-connect persistence', () => {
 
     render(<App params={{}} location={{ search: '', pathname: '/' }} navigate={jest.fn()} />);
 
-    const mainSiteElement = getFirstAppShellElement();
+    const mainSiteElement = routeProps[0].element;
     expect(mainSiteElement.props.firstVisit).toBe(true);
   });
 
@@ -416,13 +406,13 @@ describe('App wagmi auto-connect persistence', () => {
 
     render(<App params={{}} location={{ search: '', pathname: '/' }} navigate={jest.fn()} />);
 
-    expect(getLatestAppShellElement().props.path).toBe('/');
+    expect(routeProps[routeProps.length - 1].element.props.path).toBe('/');
 
     act(() => {
       window.history.replaceState({}, '', '/session/demo?view=results');
     });
 
-    expect(getLatestAppShellElement().props.path).toBe('/session/demo');
+    expect(routeProps[routeProps.length - 1].element.props.path).toBe('/session/demo');
   });
 
   it('reuses the cold-load onboarding snapshot on mount', () => {
@@ -467,7 +457,7 @@ describe('App wagmi auto-connect persistence', () => {
 
     expect(mockReadColdLoadOnboardingState).toHaveBeenNthCalledWith(1, window.localStorage, '/');
     expect(mockReadColdLoadOnboardingState).toHaveBeenNthCalledWith(2, window.sessionStorage, '/');
-    expect(getFirstAppShellElement().props.firstVisit).toBe(true);
+    expect(routeProps[0].element.props.firstVisit).toBe(true);
   });
 
   it('suppresses first-visit redirects when both storage onboarding reads fail', () => {
@@ -480,7 +470,7 @@ describe('App wagmi auto-connect persistence', () => {
     render(<App params={{}} location={{ search: '', pathname: '/' }} navigate={jest.fn()} />);
 
     expect(mockReadColdLoadOnboardingState).toHaveBeenCalledTimes(2);
-    expect(getFirstAppShellElement().props.firstVisit).toBe(false);
+    expect(routeProps[0].element.props.firstVisit).toBe(false);
     expect(mockStoreDispatch).not.toHaveBeenCalled();
   });
 
@@ -495,7 +485,7 @@ describe('App wagmi auto-connect persistence', () => {
         render(<App params={{}} location={{ search: '', pathname: '/' }} navigate={jest.fn()} />),
       ).not.toThrow();
       expect(mockCreateClient).toHaveBeenCalledTimes(1);
-      const mainSiteElement = getFirstAppShellElement();
+      const mainSiteElement = routeProps[0].element;
       expect(mainSiteElement.props.firstVisit).toBe(true);
     } finally {
       localStorageGetterSpy.mockRestore();
