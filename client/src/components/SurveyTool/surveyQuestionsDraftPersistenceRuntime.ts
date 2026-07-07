@@ -50,7 +50,7 @@ export const createSurveyQuestionsDraftPersistenceRuntime = (
         account: propsRef.current?.account,
         surveyScope,
       });
-    } catch (_: any) {
+    } catch (e: unknown) {
       return null;
     }
   };
@@ -92,13 +92,13 @@ export const createSurveyQuestionsDraftPersistenceRuntime = (
           if (parsedResult.status !== 'valid') {
             try {
               sessionStorage.removeItem(key);
-            } catch (e: any) {
+            } catch (e: unknown) {
               surveyLog.warn('SurveyTool: fallback', e);
             }
             return null;
           }
           return { raw: parsedResult.raw, obj: parsedResult.payload };
-        } catch (_: any) {
+        } catch (e: unknown) {
           return null;
         }
       };
@@ -151,7 +151,7 @@ export const createSurveyQuestionsDraftPersistenceRuntime = (
         try {
           sessionStorage.setItem(targetKey, mergedRaw);
           wroteTarget = true;
-        } catch (e: any) {
+        } catch (e: unknown) {
           surveyLog.warn('SurveyTool: fallback', e);
         }
       }
@@ -161,7 +161,7 @@ export const createSurveyQuestionsDraftPersistenceRuntime = (
           if (!hit.readKey || hit.readKey === targetKey) return;
           try {
             sessionStorage.removeItem(hit.readKey);
-          } catch (e: any) {
+          } catch (e: unknown) {
             surveyLog.warn('SurveyTool: fallback', e);
           }
         });
@@ -172,7 +172,7 @@ export const createSurveyQuestionsDraftPersistenceRuntime = (
       }
 
       return mergedDraft;
-    } catch (_: any) {
+    } catch (e: unknown) {
       return null;
     }
   };
@@ -181,7 +181,7 @@ export const createSurveyQuestionsDraftPersistenceRuntime = (
     try {
       if (!propsRef.current?.account) return null;
       return loadDraft();
-    } catch (e: any) {
+    } catch (e: unknown) {
       surveyLog.warn('SurveyTool: fallback', e);
       return null;
     }
@@ -323,7 +323,7 @@ export const createSurveyQuestionsDraftPersistenceRuntime = (
         if (nextJson === inst._lastDraftJSON) return;
         try {
           sessionStorage.setItem(key, nextJson);
-        } catch (e: any) {
+        } catch (e: unknown) {
           surveyLog.warn('SurveyTool: draft persistence failed', e);
           return;
         }
@@ -332,7 +332,7 @@ export const createSurveyQuestionsDraftPersistenceRuntime = (
         if (persistWritePlan.compatWriteKey) {
           try {
             sessionStorage.setItem(persistWritePlan.compatWriteKey, nextJson);
-          } catch (e: any) {
+          } catch (e: unknown) {
             surveyLog.warn('SurveyTool: fallback', e);
           }
         }
@@ -349,11 +349,11 @@ export const createSurveyQuestionsDraftPersistenceRuntime = (
         persistWritePlan.staleAnonKeys.forEach((draftKey: SurveyQuestionsLegacyValue) => {
           try {
             sessionStorage.removeItem(draftKey);
-          } catch (e: any) {
+          } catch (e: unknown) {
             surveyLog.warn('SurveyTool: fallback', e);
           }
         });
-      } catch (e: any) {
+      } catch (e: unknown) {
         surveyLog.warn('SurveyTool: fallback', e);
       }
     });
@@ -376,17 +376,17 @@ export const createSurveyQuestionsDraftPersistenceRuntime = (
         surveyScope,
       });
 
-      purgeKeys.forEach((k: any) => {
+      purgeKeys.forEach((k: SurveyQuestionsLegacyValue) => {
         try {
           sessionStorage.removeItem(k);
-        } catch (e: any) {
+        } catch (e: unknown) {
           surveyLog.warn('SurveyTool: fallback', e);
         }
       });
 
       const clearedTracking: SurveyQuestionsLegacyValue = buildPersistedDraftTrackingClearedState();
       inst._applyDraftTrackingState(clearedTracking);
-    } catch (e: any) {
+    } catch (e: unknown) {
       surveyLog.warn('SurveyTool: fallback', e);
     }
   };
@@ -424,7 +424,7 @@ export const createSurveyQuestionsDraftPersistenceRuntime = (
           if (removalPlan.action === 'delete-storage') {
             try {
               sessionStorage.removeItem(key);
-            } catch (e: any) {
+            } catch (e: unknown) {
               surveyLog.warn('SurveyTool: fallback', e);
             }
             const deleteTracking: SurveyQuestionsLegacyValue = buildPersistedDraftTrackingAfterScopedDelete({
@@ -447,11 +447,11 @@ export const createSurveyQuestionsDraftPersistenceRuntime = (
             });
             inst._applyDraftTrackingState(writeTracking);
           }
-        } catch (e: any) {
+        } catch (e: unknown) {
           surveyLog.warn('SurveyTool: fallback', e);
         }
       });
-    } catch (e: any) {
+    } catch (e: unknown) {
       surveyLog.warn('SurveyTool: fallback', e);
     }
   };
