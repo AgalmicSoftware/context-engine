@@ -9,6 +9,37 @@ import { createLogger } from '../logging.js';
 
 const storageLog = createLogger('cache');
 
+type UnknownRecord = Record<string, unknown>;
+type ParsedDgKey = {
+  key: string;
+  name: string;
+  slug: string;
+};
+type CacheRecord = {
+  createdAt?: number;
+  key: string;
+  name?: string;
+  slug?: string;
+  updatedAt?: number;
+  value?: unknown;
+};
+type CacheMeta = Record<string, number>;
+type CacheMessage = UnknownRecord & {
+  _dg?: boolean;
+  action?: string;
+  fallback?: string;
+  key?: string;
+  sourceId?: string;
+  ts?: number;
+};
+type StorageManagerApi = {
+  key: (name: unknown, slug: unknown) => string;
+  subscribe: (handler: (message: CacheMessage) => void) => () => void;
+  read: (name: unknown, slug: unknown) => Promise<unknown>;
+  write: (name: unknown, slug: unknown, obj: unknown) => Promise<void>;
+  remove: (name: unknown, slug: unknown) => Promise<void>;
+};
+
 const DG_PREFIX = 'dg:';
 
 const DB_NAME = 'ce_dg_cache_db';
@@ -31,7 +62,10 @@ const clientId = (() => {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 })();
 
-let broadcastChannel = null;
+const isRecord = (value: unknown): value is UnknownRecord =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
+
+let broadcastChannel: BroadcastChannel | null = null;
 
 const getBroadcastChannel = () => {
   if (broadcastChannel) return broadcastChannel;
@@ -45,7 +79,7 @@ const getBroadcastChannel = () => {
   }
 };
 
-const broadcast = (message) => {
+const broadcast = (message: CacheMessage) => {
   const chan = getBroadcastChannel();
   if (!chan) return;
   try {
@@ -60,14 +94,15 @@ const broadcast = (message) => {
   }
 };
 
-const isQuotaExceeded = (err) => {
+const isQuotaExceeded = (err: unknown): boolean => {
   if (!err) return false;
-  if (err?.name === 'QuotaExceededError') return true;
-  const msg = String(err?.message || err);
+  const errRecord = isRecord(err) ? err : {};
+  if (errRecord.name === 'QuotaExceededError') return true;
+  const msg = String(errRecord.message || err);
   return /quota/i.test(msg) && /exceed/i.test(msg);
 };
 
-const parseDgKey = (key) => {
+const parseDgKey = (key: unknown): ParsedDgKey | null => {
   const k = String(key || '');
   if (!k.startsWith(DG_PREFIX)) return null;
   const rest = k.slice(DG_PREFIX.length);
@@ -80,9 +115,13 @@ const parseDgKey = (key) => {
   };
 };
 
-const makeKey = (name, slug) => `${DG_PREFIX}${String(name || '')}:${String(slug || '')}`;
+const makeKey = (name: unknown, slug: unknown): string => `${DG_PREFIX}${String(name || '')}:${String(slug || '')}`;
 
-const trimLargeArraysInPlace = (value, maxEntries = MAX_ARRAY_ENTRIES, seen = new Set()) => {
+const trimLargeArraysInPlace = (
+  value: unknown,
+  maxEntries = MAX_ARRAY_ENTRIES,
+  seen: Set<object> = new Set(),
+): void => {
   if (!value || typeof value !== 'object') return;
   if (seen.has(value)) return;
   seen.add(value);
@@ -95,17 +134,18 @@ const trimLargeArraysInPlace = (value, maxEntries = MAX_ARRAY_ENTRIES, seen = ne
     return;
   }
 
-  Object.keys(value).forEach((k) => {
-    trimLargeArraysInPlace(value[k], maxEntries, seen);
+  const record = value as UnknownRecord;
+  Object.keys(record).forEach((k) => {
+    trimLargeArraysInPlace(record[k], maxEntries, seen);
   });
 };
 
 // -------- IndexedDB helpers --------
-let dbPromise = null;
+let dbPromise: Promise<IDBDatabase> | null = null;
 let idbUnavailable = false;
-let migrationPromise = null;
+let migrationPromise: Promise<void> | null = null;
 
-const openDb = () => {
+const openDb = (): Promise<IDBDatabase> => {
   if (idbUnavailable) return Promise.reject(new Error('IndexedDB unavailable'));
   if (dbPromise) return dbPromise;
 
@@ -151,14 +191,18 @@ const openDb = () => {
   return dbPromise;
 };
 
-const idbTx = (db, mode, fn) => {
+const idbTx = <T>(
+  db: IDBDatabase,
+  mode: IDBTransactionMode,
+  fn: (store: IDBObjectStore) => IDBRequest<T> | undefined,
+): Promise<T | undefined> => {
   return new Promise((resolve, reject) => {
     try {
       const tx = db.transaction(DB_STORE, mode);
       const store = tx.objectStore(DB_STORE);
       const req = fn(store);
 
-      const finish = (handler) => {
+      const finish = (handler: () => void) => {
         try {
           handler();
         } catch (e) {
@@ -180,29 +224,30 @@ const idbTx = (db, mode, fn) => {
   });
 };
 
-const idbGetRecord = async (db, key) => {
-  return idbTx(db, 'readonly', (store) => store.get(key));
+const idbGetRecord = async (db: IDBDatabase, key: IDBValidKey): Promise<CacheRecord | undefined> => {
+  const record = await idbTx<CacheRecord>(db, 'readonly', (store) => store.get(key));
+  return isRecord(record) ? (record as CacheRecord) : undefined;
 };
 
-const idbPutRecord = async (db, record) => {
+const idbPutRecord = async (db: IDBDatabase, record: CacheRecord): Promise<void> => {
   await idbTx(db, 'readwrite', (store) => store.put(record));
 };
 
-const idbDeleteRecord = async (db, key) => {
+const idbDeleteRecord = async (db: IDBDatabase, key: IDBValidKey): Promise<void> => {
   await idbTx(db, 'readwrite', (store) => store.delete(key));
 };
 
-const idbGetAllRecords = async (db) => {
+const idbGetAllRecords = async (db: IDBDatabase): Promise<CacheRecord[]> => {
   try {
     // `getAll` is widely supported in modern browsers.
     const records = await idbTx(db, 'readonly', (store) => store.getAll());
-    return Array.isArray(records) ? records : [];
+    return Array.isArray(records) ? records.filter(isRecord).map((record) => record as CacheRecord) : [];
   } catch (_) {
     return [];
   }
 };
 
-const migrateLocalStorageToIdb = async (db) => {
+const migrateLocalStorageToIdb = async (db: IDBDatabase): Promise<void> => {
   if (typeof localStorage === 'undefined') return;
 
   let keys = [];
@@ -263,13 +308,16 @@ const migrateLocalStorageToIdb = async (db) => {
   }
 };
 
-const ensureMigration = async (db) => {
+const ensureMigration = async (db: IDBDatabase): Promise<void> => {
   if (migrationPromise) return migrationPromise;
   migrationPromise = migrateLocalStorageToIdb(db);
   return migrationPromise;
 };
 
-const evictOldIdbEntries = async (db, { maxAgeMs = CACHE_MAX_AGE_MS } = {}) => {
+const evictOldIdbEntries = async (
+  db: IDBDatabase,
+  { maxAgeMs = CACHE_MAX_AGE_MS }: { maxAgeMs?: number } = {},
+): Promise<number> => {
   const threshold = Date.now() - maxAgeMs;
   const records = await idbGetAllRecords(db);
   const toDelete = records
@@ -286,7 +334,10 @@ const evictOldIdbEntries = async (db, { maxAgeMs = CACHE_MAX_AGE_MS } = {}) => {
   return toDelete.length;
 };
 
-const trimIdbArrays = async (db, { maxEntries = MAX_ARRAY_ENTRIES } = {}) => {
+const trimIdbArrays = async (
+  db: IDBDatabase,
+  { maxEntries = MAX_ARRAY_ENTRIES }: { maxEntries?: number } = {},
+): Promise<void> => {
   const records = await idbGetAllRecords(db);
   for (const rec of records) {
     if (!rec || typeof rec !== 'object') continue;
@@ -303,19 +354,19 @@ const trimIdbArrays = async (db, { maxEntries = MAX_ARRAY_ENTRIES } = {}) => {
 // -------- localStorage fallback helpers --------
 const LS_META_KEY = 'dg_meta_v1';
 
-const readLocalStorageMeta = () => {
+const readLocalStorageMeta = (): CacheMeta => {
   if (typeof localStorage === 'undefined') return {};
   try {
     const raw = localStorage.getItem(LS_META_KEY);
     if (!raw) return {};
     const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' ? parsed : {};
+    return isRecord(parsed) ? (parsed as CacheMeta) : {};
   } catch (_) {
     return {};
   }
 };
 
-const writeLocalStorageMeta = (meta) => {
+const writeLocalStorageMeta = (meta: CacheMeta) => {
   if (typeof localStorage === 'undefined') return;
   try {
     localStorage.setItem(LS_META_KEY, JSON.stringify(meta || {}));
@@ -324,7 +375,7 @@ const writeLocalStorageMeta = (meta) => {
   }
 };
 
-const evictOldLocalStorageEntries = ({ maxAgeMs = CACHE_MAX_AGE_MS } = {}) => {
+const evictOldLocalStorageEntries = ({ maxAgeMs = CACHE_MAX_AGE_MS }: { maxAgeMs?: number } = {}): number => {
   if (typeof localStorage === 'undefined') return 0;
   const threshold = Date.now() - maxAgeMs;
   const meta = readLocalStorageMeta();
@@ -347,7 +398,7 @@ const evictOldLocalStorageEntries = ({ maxAgeMs = CACHE_MAX_AGE_MS } = {}) => {
   return deleted;
 };
 
-const trimLocalStorageArrays = ({ maxEntries = MAX_ARRAY_ENTRIES } = {}) => {
+const trimLocalStorageArrays = ({ maxEntries = MAX_ARRAY_ENTRIES }: { maxEntries?: number } = {}): void => {
   if (typeof localStorage === 'undefined') return;
   const meta = readLocalStorageMeta();
 
@@ -381,14 +432,14 @@ const trimLocalStorageArrays = ({ maxEntries = MAX_ARRAY_ENTRIES } = {}) => {
 };
 
 // -------- Public API --------
-const storageManager = {
+const storageManager: StorageManagerApi = {
   key: makeKey,
 
   subscribe: (handler) => {
     const chan = getBroadcastChannel();
     if (!chan) return () => {};
 
-    const listener = (event) => {
+    const listener = (event: MessageEvent<CacheMessage>) => {
       const msg = event?.data;
       if (!msg || msg._dg !== true) return;
       if (msg.sourceId && msg.sourceId === clientId) return;
