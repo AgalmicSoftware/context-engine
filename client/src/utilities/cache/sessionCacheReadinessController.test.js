@@ -13,13 +13,10 @@ jest.mock(
   { virtual: true },
 );
 
-jest.mock(
-  '../../utilities/web3/chainGateway',
-  () => ({
-    __esModule: true,
-    normalizeSessionSlug: jest.fn(),
-  }),
-);
+jest.mock('../../utilities/web3/chainGateway', () => ({
+  __esModule: true,
+  normalizeSessionSlug: jest.fn(),
+}));
 
 const { createSessionCacheReadinessController } = require('./sessionCacheReadinessController.js');
 const {

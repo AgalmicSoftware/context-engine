@@ -82,11 +82,7 @@ type RegistryContractLike = {
 };
 type SessionRegistryUtilsLike = {
   toRegistrySlug: (slug: string) => string;
-  getRegistryContract: (
-    chainId: number,
-    provider?: null,
-    options?: { bootstrapRpc?: boolean },
-  ) => unknown;
+  getRegistryContract: (chainId: number, provider?: null, options?: { bootstrapRpc?: boolean }) => unknown;
   upsertSessionRegistryCache: (input: UnknownRecord) => void;
 };
 type ContractScriptsCacheDeps = {

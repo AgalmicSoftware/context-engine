@@ -1,8 +1,4 @@
-import {
-  bindAdminArweavePorts,
-  type AdminArweaveClientModule,
-  type AdminArweaveUrlsModule,
-} from './adminArweavePorts';
+import { bindAdminArweavePorts, type AdminArweaveClientModule, type AdminArweaveUrlsModule } from './adminArweavePorts';
 
 describe('admin Arweave ports', () => {
   it('routes balance and upload calls through call-time Arweave script lookup', async () => {

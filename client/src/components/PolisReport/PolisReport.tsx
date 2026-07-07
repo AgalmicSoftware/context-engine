@@ -261,9 +261,8 @@ const getD3StringArray = (key: string): readonly string[] => {
 };
 
 const d3Report: D3ReportApi = {
-  scaleOrdinal: (range) => Reflect.apply(getD3Function('scaleOrdinal'), d3, [range]) as (
-    value: string | number,
-  ) => string,
+  scaleOrdinal: (range) =>
+    Reflect.apply(getD3Function('scaleOrdinal'), d3, [range]) as (value: string | number) => string,
   schemeCategory10: getD3StringArray('schemeCategory10'),
   polygonHull: (points) => Reflect.apply(getD3Function('polygonHull'), d3, [points]) as [number, number][] | null,
   min: (values) => Reflect.apply(getD3Function('min'), d3, [values]) as number | undefined,

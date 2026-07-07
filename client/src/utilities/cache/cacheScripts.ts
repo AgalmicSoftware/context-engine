@@ -884,7 +884,11 @@ export const writeCache = async (
 
 // Optimistic write for read-after-write flows that intentionally do not await persistence.
 // Mirror is updated synchronously, then rolled back if persistence fails.
-export const writeCacheOptimistic = (namespace: unknown, slug: unknown = '', value: CacheValue = null): Promise<boolean> => {
+export const writeCacheOptimistic = (
+  namespace: unknown,
+  slug: unknown = '',
+  value: CacheValue = null,
+): Promise<boolean> => {
   const ns = String(namespace || '');
   const sl = String(slug || '');
   if (!isManagedNamespace(ns)) return Promise.resolve(false);

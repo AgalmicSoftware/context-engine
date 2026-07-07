@@ -9,10 +9,7 @@ import {
   resolveSbtDisplayNameFromCaches,
   resolveSbtDisplayLabel,
 } from './sbtDisplayNames.js';
-import contractScripts, {
-  getDemoSessionConfigBySlug,
-  getSessionConfigBySlugOrDefault,
-} from '../web3/chainGateway.js';
+import contractScripts, { getDemoSessionConfigBySlug, getSessionConfigBySlugOrDefault } from '../web3/chainGateway.js';
 import {
   initCacheManager,
   listNamespaceEntriesSync,

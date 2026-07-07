@@ -195,8 +195,7 @@ const loadIsolatedSettingsModal = () => {
     loaded = {
       LoginAndSettingsModal: require('./LoginAndSettingsModal').LoginAndSettingsModal,
       getAllSessionSlugs: require('../../utilities/web3/chainGateway.js').getAllSessionSlugs,
-      getSessionConfigBySlugOrDefault: require('../../utilities/web3/chainGateway.js')
-        .getSessionConfigBySlugOrDefault,
+      getSessionConfigBySlugOrDefault: require('../../utilities/web3/chainGateway.js').getSessionConfigBySlugOrDefault,
       checkSponsoredAccess: require('../../utilities/web3/sponsoredAccess.js').checkSponsoredAccess,
     };
   });

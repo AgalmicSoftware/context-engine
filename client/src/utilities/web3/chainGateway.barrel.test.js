@@ -1,7 +1,4 @@
-import chainGateway, {
-  getReadProviderForGroup,
-  getSessionConfigBySlug,
-} from './chainGateway.js';
+import chainGateway, { getReadProviderForGroup, getSessionConfigBySlug } from './chainGateway.js';
 import * as chainGatewayModule from './chainGateway.js';
 import chainGatewayImpl, {
   getReadProviderForGroup as getReadProviderForGroupImpl,

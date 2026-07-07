@@ -17,13 +17,10 @@ jest.mock('./sessionCacheConstants', () => ({
   DG_PRIMARY_ROUTE_CACHE_NAMES: ['surveysCache', 'questionsCache', 'sbtCache'],
 }));
 
-jest.mock(
-  '../../utilities/web3/chainGateway',
-  () => ({
-    __esModule: true,
-    normalizeSessionSlug: jest.fn(),
-  }),
-);
+jest.mock('../../utilities/web3/chainGateway', () => ({
+  __esModule: true,
+  normalizeSessionSlug: jest.fn(),
+}));
 
 const { createSessionCachePersistenceController } = require('./sessionCachePersistenceController.js');
 const { readCache } = require('../../utilities/cache/cacheScripts');

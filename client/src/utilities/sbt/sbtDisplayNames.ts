@@ -6,10 +6,7 @@
  * Key exports: getSbtDisplayName, resolveSbtDisplayLabel, warmSbtDisplayNamesTargeted, hasSbtDisplayName, shortenSbtAddressText
  */
 import { ethers } from 'ethers';
-import contractScripts, {
-  getDemoSessionConfigBySlug,
-  getSessionConfigBySlugOrDefault,
-} from '../web3/chainGateway.js';
+import contractScripts, { getDemoSessionConfigBySlug, getSessionConfigBySlugOrDefault } from '../web3/chainGateway.js';
 import {
   listNamespaceEntriesSync,
   peekCacheSync,

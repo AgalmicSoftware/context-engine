@@ -800,11 +800,13 @@ export const createContractScriptsSurveyEventReadMethods = (
         surveyId: sId,
       });
       const rawLogs = await fetchLogsSmartWithProvider(provider, responseSubmittedEventTopic, fromBlockNum, toBlockNum);
-      const parsedEvents: Array<Pick<ParsedEventWithPosition, 'event' | 'blockNumber' | 'logIndex'>> = rawLogs.map((log: ContractLogLike) => ({
-        event: SURVEYS_INTERFACE.parseLog(log),
-        blockNumber: Number(log?.blockNumber || 0),
-        logIndex: Number(log?.logIndex || 0),
-      }));
+      const parsedEvents: Array<Pick<ParsedEventWithPosition, 'event' | 'blockNumber' | 'logIndex'>> = rawLogs.map(
+        (log: ContractLogLike) => ({
+          event: SURVEYS_INTERFACE.parseLog(log),
+          blockNumber: Number(log?.blockNumber || 0),
+          logIndex: Number(log?.logIndex || 0),
+        }),
+      );
 
       // Deduplicate by responder; keep only the newest event to avoid repeated response fetches.
       const latestByResponder = new Map<string, LatestResponder>();

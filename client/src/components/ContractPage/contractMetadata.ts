@@ -58,7 +58,10 @@ type ContractsPageHrefOptions = {
   sessionSlug?: unknown;
 };
 
-export const buildContractsPageHref = ({ contractKey = '', sessionSlug = '' }: ContractsPageHrefOptions = {}): string => {
+export const buildContractsPageHref = ({
+  contractKey = '',
+  sessionSlug = '',
+}: ContractsPageHrefOptions = {}): string => {
   const normalizedContractKey = normalizeContractKeyParam(toStr(contractKey));
   const normalizedSessionSlug = toStr(sessionSlug).trim();
   const searchParams = new URLSearchParams();

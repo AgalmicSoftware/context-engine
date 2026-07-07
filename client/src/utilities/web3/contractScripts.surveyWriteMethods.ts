@@ -665,7 +665,12 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
       }
 
       const SurveyContract = new ethers.Contract(addr, SURVEYS, signer as any);
-      const txArgs: unknown[] = [hashedQuestionIds, questionResponseHashesBytes, hashedSurveyId, surveyResponseHashBytes];
+      const txArgs: unknown[] = [
+        hashedQuestionIds,
+        questionResponseHashesBytes,
+        hashedSurveyId,
+        surveyResponseHashBytes,
+      ];
       const txOverrides = await resolveTxGasOverrides({
         contract: SurveyContract,
         method: 'submitResponses',

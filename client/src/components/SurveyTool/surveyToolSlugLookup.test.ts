@@ -1,9 +1,5 @@
 import { resolveSlugForIds } from './surveyToolSlugLookup.js';
-import {
-  getAllSessionSlugs,
-  getSessionConfigBySlug,
-  getSessionSlugByName,
-} from '../../utilities/web3/chainGateway.js';
+import { getAllSessionSlugs, getSessionConfigBySlug, getSessionSlugByName } from '../../utilities/web3/chainGateway.js';
 import { peekCacheSync } from '../../utilities/cache/cacheScripts.js';
 
 jest.mock('../../utilities/web3/chainGateway.js', () => ({

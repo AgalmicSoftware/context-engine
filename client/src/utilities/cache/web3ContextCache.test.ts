@@ -39,7 +39,7 @@ describe('web3ContextCache', () => {
     input.self = input;
 
     expect(__test__web3ContextCache.serialize(input)).toBe(
-      '{"fn":"__fn:namedFactory__","missing":"__undefined__","self":"__circular__","symbol":"Symbol(scope)"}'
+      '{"fn":"__fn:namedFactory__","missing":"__undefined__","self":"__circular__","symbol":"Symbol(scope)"}',
     );
   });
 });
