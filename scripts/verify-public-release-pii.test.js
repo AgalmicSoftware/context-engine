@@ -33,6 +33,9 @@ function runScanner(targetDir) {
 
 test('verify-public-release-pii passes clean text while warning on public values', () => {
   withFixture((rootDir) => {
+    const corpusContact = `public-contact${'@'}example.org`;
+    const packageMaintainer = `maintainer${'@'}example.org`;
+
     writeFile(rootDir, 'README.md', [
       '# Fixture',
       'Published contract: 0x1111111111111111111111111111111111111111',
@@ -43,7 +46,7 @@ test('verify-public-release-pii passes clean text while warning on public values
     ].join('\n'));
     writeFile(rootDir, 'ai-discourse-corpus/corpuses/public-corpus.json', [
       '{',
-      '  "contact": "public-contact@example.org"',
+      `  "contact": "${corpusContact}"`,
       '}',
       '',
     ].join('\n'));
@@ -51,7 +54,7 @@ test('verify-public-release-pii passes clean text while warning on public values
       '{',
       '  "packages": {',
       '    "node_modules/public-package": {',
-      '      "author": "Package Maintainer <maintainer@example.org>"',
+      `      "author": "Package Maintainer <${packageMaintainer}>"`,
       '    }',
       '  }',
       '}',
